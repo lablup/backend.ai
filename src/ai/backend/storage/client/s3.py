@@ -307,26 +307,7 @@ class S3Client:
                 metadata=response.get("Metadata", {}),
             )
 
-    async def delete_object(self, s3_key: str) -> None:
-        """
-        Delete an object from S3 bucket.
-
-        Args:
-            s3_key: The S3 object key to delete
-        """
-        async with self.session.client(
-            "s3",
-            endpoint_url=self.endpoint_url,
-            region_name=self.region_name,
-            aws_access_key_id=self.aws_access_key_id,
-            aws_secret_access_key=self.aws_secret_access_key,
-        ) as s3_client:
-            await s3_client.delete_object(
-                Bucket=self.bucket_name,
-                Key=s3_key,
-            )
-
-    async def delete_folder(
+    async def delete_object(
         self,
         prefix: str,
         *,

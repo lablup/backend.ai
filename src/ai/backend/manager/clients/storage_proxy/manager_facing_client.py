@@ -754,7 +754,7 @@ class StorageProxyManagerFacingClient:
         """
         Delete a file from S3 storage.
         """
-        await self._client.request_with_response(
+        await self._client.request(
             "DELETE",
             f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object",
             body=req.model_dump(by_alias=True),

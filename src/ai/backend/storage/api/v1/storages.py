@@ -268,7 +268,7 @@ class StorageAPIHandler:
         body: BodyParam[DeleteObjectReq],
     ) -> APIResponse:
         """
-        Delete a folder and its contents from the specified S3 bucket.
+        Delete an object and its contents from the specified S3 bucket.
         Permanently removes the object from storage.
         """
         req = body.parsed
@@ -276,10 +276,10 @@ class StorageAPIHandler:
         storage_name = path.parsed.storage_name
         bucket_name = path.parsed.bucket_name
 
-        await log_client_api_entry(log, "delete_folder", req)
+        await log_client_api_entry(log, "delete_object", req)
         storage_service = StorageService(self._storage_configs)
 
-        await storage_service.delete_folder(storage_name, bucket_name, prefix)
+        await storage_service.delete_object(storage_name, bucket_name, prefix)
 
         return APIResponse.no_content(
             status_code=HTTPStatus.OK,
