@@ -1056,7 +1056,7 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     task_specs = root_ctx.sokovan_orchestrator.create_task_specs()
     task_specs.append(
         EventTaskSpec(
-            name="artifact_registry_process_scan",
+            name="reservoir_registry_scan",
             event_factory=lambda: DoScanReservoirRegistryEvent(),
             interval=3600,  # 1 hour
             initial_delay=0,

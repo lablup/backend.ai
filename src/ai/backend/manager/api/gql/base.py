@@ -129,11 +129,11 @@ class JSONString:
     pass
 
 
-def to_global_id(type_: Type[Any], id_: uuid.UUID | str) -> str:
+def to_global_id(type_: Type[Any], local_id: uuid.UUID | str) -> str:
     if not has_object_definition(type_):
         raise TypeError("type_ must be a Strawberry object type (Node or Edge).")
     typename = get_object_definition(type_, strict=True).name
-    return base64(f"{typename}:{id_}")
+    return base64(f"{typename}:{local_id}")
 
 
 def resolve_global_id(global_id: str) -> tuple[str, str]:
