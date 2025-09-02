@@ -203,9 +203,9 @@ show_guide() {
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     show_info "How to run the editable checkout of webui:"
     echo "(Terminal 1)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
+    echo "  > ${WHITE}cd src/ai/backend/webui; pnpm run build:d${NC}"
     echo "(Terminal 2)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
+    echo "  > ${WHITE}cd src/ai/backend/webui; pnpm run server:d${NC}"
     echo "If you just run ${WHITE}./py -m ai.backend.web.server${NC}, it will use the local version compiled from the checked out source."
   fi
   show_info "Manual configuration for the client accessible hostname in various proxies"
