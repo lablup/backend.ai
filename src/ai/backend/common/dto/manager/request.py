@@ -113,7 +113,6 @@ class DeleteHuggingFaceRegistryReq(BaseRequestModel):
     id: uuid.UUID = Field(description="The unique identifier of the Hugging Face model registry")
 
 
-# Object Storage Presigned URL Request Models
 class GetPresignedDownloadURLReq(BaseRequestModel):
     artifact_revision_id: uuid.UUID = Field(
         description="The unique identifier of the artifact revision"
@@ -130,17 +129,6 @@ class GetPresignedUploadURLReq(BaseRequestModel):
     expiration: Optional[int] = Field(default=None, description="URL expiration time in seconds")
     min_size: Optional[int] = Field(default=None, description="Minimum file size")
     max_size: Optional[int] = Field(default=None, description="Maximum file size")
-
-
-# Object Storage Bucket Request Models
-class RegisterObjectStorageBucketReq(BaseRequestModel):
-    storage_id: uuid.UUID = Field(description="The unique identifier of the object storage")
-    bucket_name: str = Field(description="Name of the bucket to register")
-
-
-class UnregisterObjectStorageBucketReq(BaseRequestModel):
-    storage_id: uuid.UUID = Field(description="The unique identifier of the object storage")
-    bucket_name: str = Field(description="Name of the bucket to unregister")
 
 
 class ObjectStorageBucketPathParam(BaseRequestModel):

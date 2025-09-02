@@ -45,7 +45,6 @@ GraphQLResponse.model_rebuild(
 )
 
 
-# Artifact API Response Models
 class ImportArtifactResponse(BaseResponseModel):
     artifact_id: str = Field(description="ID of the imported artifact")
     name: str = Field(description="Name of the artifact")
@@ -64,7 +63,6 @@ class DeleteArtifactResponse(BaseResponseModel):
     message: str = Field(description="Deletion confirmation message")
 
 
-# ObjectStorage API Response Models
 class ObjectStorageResponse(BaseResponseModel):
     id: str = Field(description="ID of the object storage")
     name: str = Field(description="Name of the object storage")
@@ -83,7 +81,6 @@ class DeleteObjectStorageResponse(BaseResponseModel):
     pass
 
 
-# Object Storage Presigned URL Response Models
 class GetPresignedDownloadURLResponse(BaseResponseModel):
     presigned_url: str = Field(description="The presigned download URL")
 
@@ -93,7 +90,6 @@ class GetPresignedUploadURLResponse(BaseResponseModel):
     fields: str = Field(description="JSON string containing the form fields")
 
 
-# Object Storage Bucket Response Models
 class ObjectStorageBucketsResponse(BaseResponseModel):
     buckets: list[str] = Field(description="List of bucket names for a specific storage")
 
@@ -104,6 +100,5 @@ class ObjectStorageAllBucketsResponse(BaseResponseModel):
     )
 
 
-# Artifact Installed Storages Response Models
 class ObjectStorageBucketListResponse(BaseResponseModel):
     buckets: list[str] = Field(default_factory=list, description="List of bucket names")
