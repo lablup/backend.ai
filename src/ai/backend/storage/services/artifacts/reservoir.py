@@ -33,13 +33,6 @@ from ai.backend.storage.types import BucketCopyOptions
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-def _norm_prefix(p: Optional[str]) -> str:
-    # "" or None -> "", ensure trailing slash for non-empty
-    if not p:
-        return ""
-    return p if p.endswith("/") else p + "/"
-
-
 @dataclass
 class ReservoirServiceArgs:
     background_task_manager: BackgroundTaskManager
@@ -181,7 +174,6 @@ class ReservoirService:
 
         copied = 0
         sem = asyncio.Semaphore(options.concurrency)
-        src_root = _norm_prefix(key_prefix)
 
         src_s3_client = S3Client(
             bucket_name=bucket_name,
@@ -221,15 +213,10 @@ class ReservoirService:
                     or "application/octet-stream"
                 )
 
-                if src_root and key.startswith(src_root):
-                    dst_key = key[len(src_root) :]
-                else:
-                    dst_key = key
-
                 part_size = self._storage_configs[storage_name].upload_chunk_size
                 await dst_client.upload_stream(
                     _data_stream(),
-                    dst_key,
+                    key,
                     content_type=ctype,
                     part_size=part_size,
                 )
@@ -258,6 +245,8 @@ class ReservoirService:
 
         reservoir_config = self._reservoir_registry_configs[0]
         prefix_key = f"{model.model_id}/{model.revision}"
+
+        print("prefix_key!", prefix_key)
 
         await self.stream_bucket_to_bucket(
             src=reservoir_config,
