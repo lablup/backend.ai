@@ -623,6 +623,8 @@ class ObjectStorageConfig(BaseModel):
         Should be greater than or equal to 5 MiB due to S3 requirements.
         """,
         examples=[5 * 1024 * 1024],
+        validation_alias=AliasChoices("upload-chunk-size", "upload_chunk_size"),
+        serialization_alias="upload-chunk-size",
     )
     download_chunk_size: int = Field(
         default=8192,
@@ -630,6 +632,8 @@ class ObjectStorageConfig(BaseModel):
         Chunk size (in bytes) for downloading files from the object storage.
         """,
         examples=[8192],
+        validation_alias=AliasChoices("download-chunk-size", "download_chunk_size"),
+        serialization_alias="download-chunk-size",
     )
     reservoir_download_chunk_size: int = Field(
         default=8192,
@@ -637,6 +641,10 @@ class ObjectStorageConfig(BaseModel):
         Chunk size (in bytes) for downloading files from the remote reservoir storage.
         """,
         examples=[8192],
+        validation_alias=AliasChoices(
+            "reservoir-download-chunk-size", "reservoir_download_chunk_size"
+        ),
+        serialization_alias="reservoir-download-chunk-size",
     )
 
 
@@ -670,6 +678,8 @@ class HuggingfaceConfig(BaseModel):
         Chunk size (in bytes) for downloading files from the HuggingFace API.
         """,
         examples=[8192],
+        validation_alias=AliasChoices("download-chunk-size", "download_chunk_size"),
+        serialization_alias="download-chunk-size",
     )
 
 
@@ -691,7 +701,7 @@ class ReservoirConfig(BaseModel):
     object_storage_access_key: Optional[str] = Field(
         default=None,
         description="""
-        Access key for authenticating with the reservoir registry API.
+        Access key for authenticating with the reservoir registry's object storage API.
         """,
         validation_alias=AliasChoices("object-storage-access-key", "object_storage_access_key"),
         serialization_alias="object-storage-access-key",
@@ -699,7 +709,7 @@ class ReservoirConfig(BaseModel):
     object_storage_secret_key: Optional[str] = Field(
         default=None,
         description="""
-        Secret key for authenticating with the reservoir registry API.
+        Secret key for authenticating with the reservoir registry's object storage API.
         """,
         validation_alias=AliasChoices("object-storage-secret-key", "object_storage_secret_key"),
         serialization_alias="object-storage-secret-key",
@@ -707,7 +717,7 @@ class ReservoirConfig(BaseModel):
     object_storage_region: Optional[str] = Field(
         default=None,
         description="""
-        Region for the object storage service.
+        Region for the reservoir registry's object storage.
         """,
         validation_alias=AliasChoices("object-storage-region", "object_storage_region"),
         serialization_alias="object-storage-region",
