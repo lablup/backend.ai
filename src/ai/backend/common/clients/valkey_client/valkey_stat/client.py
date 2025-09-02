@@ -585,6 +585,29 @@ class ValkeyStatClient:
         return metadata
 
     @valkey_decorator()
+    async def get_openid_session_value(self, session_key: str, value_type: str) -> Optional[str]:
+        """
+        Get OpenID session value that was set using setex.
+
+        :param session_key: The session key identifier.
+        :param value_type: The type of value to retrieve (e.g., 'code_verifier', 'state', etc.).
+        :return: The stored value as string, or None if not found or expired.
+        """
+        key = f"openid:session:{session_key}:{value_type}"
+        result = await self._client.client.get(key)
+        if result is None:
+            return None
+        try:
+            return result.decode("utf-8")
+        except UnicodeDecodeError:
+            log.warning(
+                "Failed to decode OpenID session value for key {}: {}",
+                key,
+                result,
+            )
+            return None
+
+    @valkey_decorator()
     async def _get_raw(self, key: str) -> Optional[bytes]:
         """
         Get raw value by key (internal use only for testing).
