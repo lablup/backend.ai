@@ -9260,7 +9260,7 @@
       }
     },
     "/object-storages/presigned/download": {
-      "get": {
+      "post": {
         "operationId": "object-storages.get_presigned_download_url",
         "tags": [
           "object-storages"
