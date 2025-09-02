@@ -6,11 +6,12 @@ import random
 import time
 from contextlib import asynccontextmanager
 from functools import partial
-from typing import AsyncIterator, override
+from typing import AsyncIterator, Final, override
 
 import aiohttp
 import aiotools
 from aiohttp import ClientConnectorError, web
+from multidict import CIMultiDict
 from yarl import URL
 
 from ai.backend.appproxy.common.exceptions import ContainerConnectionRefused, WorkerNotAvailable
@@ -26,16 +27,15 @@ from .base import BaseBackend, HttpRequest
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-HOP_ONLY_HEADERS: frozenset[str] = frozenset([
-    "connection",
-    "keep-alive",
-    "proxy-authenticate",
-    "proxy-authorization",
-    "te",
-    "trailers",
-    "transfer-encoding",
-    "upgrade",
-    "proxy-connection",
+HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
+    ("Connection", 1),
+    ("Keep-Alive", 1),
+    ("Proxy-Authenticate", 1),
+    ("Proxy-Authorization", 1),
+    ("TE", 1),
+    ("Trailers", 1),
+    ("Transfer-Encoding", 1),
+    ("Upgrade", 1),
 ])
 
 
@@ -137,7 +137,7 @@ class HTTPBackend(BaseBackend):
         backend_rqst_hdrs = {}
         # copy frontend request headers without hop-by-hop headers
         for key, value in frontend_request.headers.items():
-            if key.lower() not in HOP_ONLY_HEADERS:
+            if key not in HOP_ONLY_HEADERS:
                 backend_rqst_hdrs[key] = value
         # overwrite proxy-related headers
         backend_rqst_hdrs["x-forwarded-proto"] = protocol
@@ -181,7 +181,7 @@ class HTTPBackend(BaseBackend):
             async with self.request_http(route, backend_request) as backend_response:
                 frontend_resp_hdrs = {}
                 for key, value in backend_response.headers.items():
-                    if key.lower() not in HOP_ONLY_HEADERS:
+                    if key not in HOP_ONLY_HEADERS:
                         frontend_resp_hdrs[key] = value
                 frontend_resp_hdrs["Access-Control-Allow-Origin"] = "*"
                 frontend_response = web.StreamResponse(
