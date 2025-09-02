@@ -39,11 +39,6 @@ class VFolderMetadataResponse(BaseResponseModel):
     )
 
 
-# S3 Storage API Response Models
-class UploadObjectResponse(BaseResponseModel):
-    pass
-
-
 class PresignedUploadObjectResponse(BaseResponseModel):
     url: str
     fields: dict[str, str]
@@ -51,10 +46,6 @@ class PresignedUploadObjectResponse(BaseResponseModel):
 
 class PresignedDownloadObjectResponse(BaseResponseModel):
     url: str
-
-
-class DownloadObjectResponse(BaseResponseModel):
-    pass
 
 
 class PullBucketResponse(BaseResponseModel):
@@ -95,7 +86,3 @@ class HuggingFaceImportModelsResponse(BaseResponseModel):
         """,
         examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
-
-
-class DeleteObjectResponse(BaseResponseModel):
-    pass

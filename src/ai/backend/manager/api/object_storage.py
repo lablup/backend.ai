@@ -156,7 +156,7 @@ def create_app(
         app.router.add_route("POST", "/presigned/upload", api_handler.get_presigned_upload_url)
     )
     cors.add(
-        app.router.add_route("GET", "/presigned/download", api_handler.get_presigned_download_url)
+        app.router.add_route("POST", "/presigned/download", api_handler.get_presigned_download_url)
     )
     cors.add(app.router.add_route("GET", "/buckets", api_handler.get_all_buckets))
     cors.add(app.router.add_route("GET", "/{storage_id}/buckets", api_handler.get_buckets))

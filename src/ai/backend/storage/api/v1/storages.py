@@ -24,7 +24,6 @@ from ai.backend.common.dto.storage.request import (
     ObjectStorageAPIPathParams,
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
-    PullBucketReq,
     UploadObjectReq,
 )
 from ai.backend.common.dto.storage.response import PullBucketResponse
@@ -64,7 +63,7 @@ class StorageAPIHandler:
         self._background_task_manager = background_task_manager
 
     @api_handler
-    async def upload_file(
+    async def upload_object(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
         body: BodyParam[UploadObjectReq],
@@ -100,13 +99,12 @@ class StorageAPIHandler:
                     break
                 yield chunk
 
-        response = await storage_service.stream_upload(
+        await storage_service.stream_upload(
             storage_name, bucket_name, filepath, content_type, data_stream()
         )
 
-        return APIResponse.build(
+        return APIResponse.no_content(
             status_code=HTTPStatus.OK,
-            response_model=response,
         )
 
     @stream_api_handler
@@ -140,13 +138,11 @@ class StorageAPIHandler:
     async def pull_bucket(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
-        body: BodyParam[PullBucketReq],
     ) -> APIResponse:
         """
         Pull object storage bucket from reservoir and store it in the specified S3 bucket.
         """
-        req = body.parsed
-        await log_client_api_entry(log, "pull_bucket", req)
+        await log_client_api_entry(log, "pull_bucket", None)
 
         storage_name = path.parsed.storage_name
         bucket_name = path.parsed.bucket_name
@@ -241,7 +237,7 @@ class StorageAPIHandler:
         )
 
     @api_handler
-    async def get_file_meta(
+    async def get_object_meta(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
         body: BodyParam[GetObjectMetaReq],
@@ -266,7 +262,7 @@ class StorageAPIHandler:
         )
 
     @api_handler
-    async def delete_folder(
+    async def delete_object(
         self,
         path: PathParam[ObjectStorageAPIPathParams],
         body: BodyParam[DeleteObjectReq],
@@ -283,11 +279,10 @@ class StorageAPIHandler:
         await log_client_api_entry(log, "delete_folder", req)
         storage_service = StorageService(self._storage_configs)
 
-        response = await storage_service.delete_folder(storage_name, bucket_name, prefix)
+        await storage_service.delete_folder(storage_name, bucket_name, prefix)
 
-        return APIResponse.build(
+        return APIResponse.no_content(
             status_code=HTTPStatus.OK,
-            response_model=response,
         )
 
 
@@ -302,28 +297,30 @@ def create_app(ctx: RootContext) -> web.Application:
         background_task_manager=ctx.background_task_manager,
     )
     app.router.add_route(
-        "GET", "/s3/{storage_name}/buckets/{bucket_name}/file/meta", api_handler.get_file_meta
+        "GET", "/s3/{storage_name}/buckets/{bucket_name}/object/meta", api_handler.get_object_meta
     )
     app.router.add_route(
-        "DELETE", "/s3/{storage_name}/buckets/{bucket_name}/file", api_handler.delete_folder
+        "DELETE", "/s3/{storage_name}/buckets/{bucket_name}/object", api_handler.delete_object
     )
     app.router.add_route(
-        "POST", "/s3/{storage_name}/buckets/{bucket_name}/file/upload", api_handler.upload_file
-    )
-    app.router.add_route(
-        "GET", "/s3/{storage_name}/buckets/{bucket_name}/file/download", api_handler.download_file
-    )
-    app.router.add_route(
-        "POST", "/s3/{storage_name}/buckets/{bucket_name}/file/pull", api_handler.pull_bucket
+        "POST", "/s3/{storage_name}/buckets/{bucket_name}/object/upload", api_handler.upload_object
     )
     app.router.add_route(
         "POST",
-        "/s3/{storage_name}/buckets/{bucket_name}/file/presigned/upload",
+        "/s3/{storage_name}/buckets/{bucket_name}/object/download",
+        api_handler.download_file,
+    )
+    app.router.add_route(
+        "POST", "/s3/{storage_name}/buckets/{bucket_name}/object/pull", api_handler.pull_bucket
+    )
+    app.router.add_route(
+        "POST",
+        "/s3/{storage_name}/buckets/{bucket_name}/object/presigned/upload",
         api_handler.presigned_upload_url,
     )
     app.router.add_route(
-        "GET",
-        "/s3/{storage_name}/buckets/{bucket_name}/file/presigned/download",
+        "POST",
+        "/s3/{storage_name}/buckets/{bucket_name}/object/presigned/download",
         api_handler.presigned_download_url,
     )
 

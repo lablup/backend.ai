@@ -4,7 +4,6 @@ from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     HuggingFaceImportModelsReq,
-    PullBucketReq,
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -185,7 +184,6 @@ class ArtifactRevisionService:
                 result = await storage_proxy_client.pull_s3_bucket(
                     storage_data.name,
                     storage_namespace.bucket,
-                    PullBucketReq(),
                 )
             case _:
                 raise InvalidArtifactRegistryTypeError(

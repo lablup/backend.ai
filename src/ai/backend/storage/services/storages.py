@@ -8,11 +8,9 @@ import aioboto3
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.dto.storage.request import PresignedUploadObjectReq
 from ai.backend.common.dto.storage.response import (
-    DeleteObjectResponse,
     ObjectMetaResponse,
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
-    UploadObjectResponse,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.config.unified import ObjectStorageConfig, ReservoirConfig
@@ -65,7 +63,7 @@ class StorageService:
         filepath: str,
         content_type: Optional[str],
         data_stream: AsyncIterable[bytes],
-    ) -> UploadObjectResponse:
+    ) -> None:
         """
         Upload a file to S3 using streaming.
 
@@ -75,9 +73,6 @@ class StorageService:
             filepath: Path to the file to upload
             content_type: Content type of the file
             data_stream: Async iterator of file data chunks
-
-        Returns:
-            UploadObjectResponse
         """
         try:
             part_size = self._storage_configs[storage_name].upload_chunk_size
@@ -88,10 +83,7 @@ class StorageService:
                 content_type=content_type,
                 part_size=part_size,
             )
-
-            return UploadObjectResponse()
         except Exception as e:
-            log.error(f"Stream upload failed: {e}")
             raise FileStreamUploadError("Upload failed") from e
 
     async def stream_download(
@@ -115,7 +107,6 @@ class StorageService:
                 yield chunk
 
         except Exception as e:
-            log.error(f"Stream download failed: {e}")
             raise FileStreamDownloadError("Download failed") from e
 
     async def _list_all_keys_and_sizes(
@@ -361,9 +352,7 @@ class StorageService:
         except Exception as e:
             raise ObjectInfoFetchError(f"Get object info failed: {str(e)}") from e
 
-    async def delete_file(
-        self, storage_name: str, bucket_name: str, filepath: str
-    ) -> DeleteObjectResponse:
+    async def delete_file(self, storage_name: str, bucket_name: str, filepath: str) -> None:
         """
         Delete file (object).
 
@@ -378,15 +367,10 @@ class StorageService:
         try:
             s3_client = self._get_s3_client(storage_name, bucket_name)
             await s3_client.delete_object(filepath)
-            return DeleteObjectResponse()
-
         except Exception as e:
-            log.error(f"Delete object failed: {e}")
             raise StorageBucketNotFoundError(f"Delete object failed: {str(e)}") from e
 
-    async def delete_folder(
-        self, storage_name: str, bucket_name: str, prefix: str
-    ) -> DeleteObjectResponse:
+    async def delete_folder(self, storage_name: str, bucket_name: str, prefix: str) -> None:
         """
         Delete folder and all its contents.
 
@@ -394,17 +378,11 @@ class StorageService:
             storage_name: Name of the storage configuration
             bucket_name: Name of the S3 bucket
             filepath: Path of the file to delete
-
-        Returns:
-            DeleteResponse with success status
         """
         try:
             s3_client = self._get_s3_client(storage_name, bucket_name)
             await s3_client.delete_folder(prefix)
-            return DeleteObjectResponse()
-
         except Exception as e:
-            log.error(f"Delete folder failed: {e}")
             raise StorageBucketNotFoundError(f"Delete folder failed: {str(e)}") from e
 
     def _get_s3_client(self, storage_name: str, bucket_name: str) -> S3Client:

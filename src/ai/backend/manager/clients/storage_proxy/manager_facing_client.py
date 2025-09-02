@@ -13,11 +13,8 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceScanModelsReq,
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
-    PullBucketReq,
 )
 from ai.backend.common.dto.storage.response import (
-    DeleteObjectResponse,
-    DownloadObjectResponse,
     HuggingFaceImportModelsResponse,
     HuggingFaceScanModelsResponse,
     PresignedDownloadObjectResponse,
@@ -687,31 +684,29 @@ class StorageProxyManagerFacingClient:
         storage_name: str,
         bucket_name: str,
         req: DownloadObjectReq,
-    ) -> DownloadObjectResponse:
+    ) -> None:
         """
         Download a file from S3 storage.
         """
-        resp = await self._client.request_with_response(
-            "GET",
-            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/file/download",
+        await self._client.request_with_response(
+            "POST",
+            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/download",
             body=req.model_dump(by_alias=True),
         )
-        return DownloadObjectResponse.model_validate(resp)
 
     @client_decorator()
     async def pull_s3_bucket(
         self,
         storage_name: str,
         bucket_name: str,
-        req: PullBucketReq,
     ) -> PullBucketResponse:
         """
         Pull bucket from reservoir storage to S3 storage.
         """
         resp = await self._client.request_with_response(
             "POST",
-            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/file/pull",
-            body=req.model_dump(by_alias=True),
+            # TODO: Replace this API with /reservoir/import
+            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/pull",
         )
         return PullBucketResponse.model_validate(resp)
 
@@ -726,8 +721,8 @@ class StorageProxyManagerFacingClient:
         Get a presigned URL for downloading an object from storage.
         """
         resp = await self._client.request_with_response(
-            "GET",
-            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/file/presigned/download",
+            "POST",
+            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/presigned/download",
             body=req.model_dump(by_alias=True),
         )
         return PresignedDownloadObjectResponse.model_validate(resp)
@@ -744,7 +739,7 @@ class StorageProxyManagerFacingClient:
         """
         resp = await self._client.request_with_response(
             "POST",
-            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/file/presigned/upload",
+            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/presigned/upload",
             body=req.model_dump(by_alias=True),
         )
         return PresignedUploadObjectResponse.model_validate(resp)
@@ -755,13 +750,12 @@ class StorageProxyManagerFacingClient:
         storage_name: str,
         bucket_name: str,
         req: DeleteObjectReq,
-    ) -> DeleteObjectResponse:
+    ) -> None:
         """
         Delete a file from S3 storage.
         """
-        resp = await self._client.request_with_response(
+        await self._client.request_with_response(
             "DELETE",
-            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/file",
+            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object",
             body=req.model_dump(by_alias=True),
         )
-        return DeleteObjectResponse.model_validate(resp)
