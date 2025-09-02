@@ -6,6 +6,10 @@ from ai.backend.manager.repositories.huggingface_registry.repository import Hugg
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
+from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
+    GetArtifactRegistryMetaAction,
+    GetArtifactRegistryMetaActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
     CreateHuggingFaceRegistryActionResult,
@@ -174,3 +178,12 @@ class ArtifactRegistryService:
         log.info("Listing reservoirs")
         reservoir_data_list = await self._reservoir_repository.list_reservoir_registries()
         return ListReservoirRegistriesActionResult(data=reservoir_data_list)
+
+    async def get_registry_meta(
+        self, action: GetArtifactRegistryMetaAction
+    ) -> GetArtifactRegistryMetaActionResult:
+        log.info("Getting artifact registry meta with id: {}", action.registry_id)
+        registry_meta = await self._artifact_registry_repository.get_artifact_registry_data(
+            action.registry_id
+        )
+        return GetArtifactRegistryMetaActionResult(result=registry_meta)

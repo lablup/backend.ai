@@ -18,7 +18,6 @@ from ai.backend.manager.api.gql.base import (
     build_pagination_options,
     to_global_id,
 )
-from ai.backend.manager.api.gql.huggingface_registry import HuggingFaceRegistry
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
@@ -58,6 +57,8 @@ from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
 from ai.backend.manager.types import PaginationOptions, TriState
+
+from .artifact_registry_meta import ArtifactRegistryMeta
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -405,13 +406,13 @@ async def resolve_artifacts(
         )
     )
 
-    registry_loader = DataLoader(
-        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
     )
 
     # Build GraphQL connection response
     return await _build_artifact_connection(
-        registry_loader,
+        registry_meta_loader,
         artifacts=action_result.data,
         total_count=action_result.total_count,
         pagination_options=pagination_options,
@@ -449,7 +450,7 @@ def _convert_gql_artifact_revision_ordering_to_repo_ordering(
 
 
 async def _build_artifact_connection(
-    registry_loader: DataLoader,
+    registry_meta_loader: DataLoader,
     artifacts: list[ArtifactData],
     total_count: int,
     pagination_options: PaginationOptions,
@@ -457,11 +458,11 @@ async def _build_artifact_connection(
     """Build GraphQL connection from artifacts data"""
     edges = []
 
-    for i, artifact_data in enumerate(artifacts):
-        registry_data = await registry_loader.load(artifact_data.registry_id)
-        source_registry_data = await registry_loader.load(artifact_data.source_registry_id)
+    for artifact_data in artifacts:
+        registry_meta = await registry_meta_loader.load(artifact_data.registry_id)
+        source_registry_meta = await registry_meta_loader.load(artifact_data.source_registry_id)
         artifact = Artifact.from_dataclass(
-            artifact_data, registry_url=registry_data.url, source_url=source_registry_data.url
+            artifact_data, registry_url=registry_meta.url, source_url=source_registry_meta.url
         )
         cursor = to_global_id(Artifact, artifact_data.id)
         edges.append(ArtifactEdge(node=artifact, cursor=cursor))
@@ -658,12 +659,12 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifac
         )
     )
 
-    registry_loader = DataLoader(
-        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
     )
 
-    registry_data = await registry_loader.load(action_result.result.registry_id)
-    source_registry_data = await registry_loader.load(action_result.result.source_registry_id)
+    registry_data = await registry_meta_loader.load(action_result.result.registry_id)
+    source_registry_data = await registry_meta_loader.load(action_result.result.source_registry_id)
 
     return Artifact.from_dataclass(
         action_result.result, registry_data.url, source_registry_data.url
@@ -720,13 +721,15 @@ async def scan_artifacts(
         )
     )
 
-    registry_loader = DataLoader(
-        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    # 여기도 고쳐야...
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
     )
+
     artifacts = []
     for item in action_result.result:
-        registry_data = await registry_loader.load(item.artifact.registry_id)
-        source_registry_data = await registry_loader.load(item.artifact.source_registry_id)
+        registry_data = await registry_meta_loader.load(item.artifact.registry_id)
+        source_registry_data = await registry_meta_loader.load(item.artifact.source_registry_id)
         artifacts.append(
             Artifact.from_dataclass(item.artifact, registry_data.url, source_registry_data.url)
         )
@@ -752,6 +755,7 @@ async def import_artifacts(
         task_ids.append(action_result.task_id)
 
     edges = [
+        # 9. cursor
         ArtifactRevisionEdge(node=artifact, cursor=str(i))
         for i, artifact in enumerate(imported_artifacts)
     ]
@@ -782,12 +786,12 @@ async def update_artifact(
     )
 
     artifact = action_result.result
-    registry_loader = DataLoader(
-        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
     )
 
-    registry_data = await registry_loader.load(artifact.registry_id)
-    source_registry_data = await registry_loader.load(artifact.source_registry_id)
+    registry_data = await registry_meta_loader.load(artifact.registry_id)
+    source_registry_data = await registry_meta_loader.load(artifact.source_registry_id)
 
     return UpdateArtifactPayload(
         artifact=Artifact.from_dataclass(
@@ -801,6 +805,7 @@ async def cleanup_artifact_revisions(
     input: CleanupArtifactRevisionsInput, info: Info[StrawberryGQLContext]
 ) -> CleanupArtifactRevisionsPayload:
     cleaned_artifact_revisions: list[ArtifactRevision] = []
+    # 5. asyncio.gather()
     for artifact_revision_id in input.artifact_revision_ids:
         action_result = await info.context.processors.artifact_revision.cleanup.wait_for_complete(
             CleanupArtifactRevisionAction(
