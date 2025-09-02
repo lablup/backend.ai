@@ -18,7 +18,6 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
@@ -31,11 +30,9 @@ from ai.backend.manager.errors.artifact import (
     ArtifactUpdateError,
     InvalidArtifactModifierTypeError,
 )
-from ai.backend.manager.errors.object_storage import ObjectStorageNotFoundError
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
-from ai.backend.manager.models.object_storage import ObjectStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
@@ -259,30 +256,6 @@ class ArtifactRepository:
             if row is None:
                 raise ArtifactNotFoundError()
             return row.to_dataclass()
-
-    @repository_decorator()
-    async def get_artifact_installed_storage(
-        self, artifact_revision_id: uuid.UUID
-    ) -> ObjectStorageData:
-        async with self._db.begin_session() as db_sess:
-            result = await db_sess.execute(
-                sa.select(AssociationArtifactsStorageRow).where(
-                    sa.and_(
-                        AssociationArtifactsStorageRow.artifact_revision_id == artifact_revision_id,
-                    )
-                )
-            )
-            row: AssociationArtifactsStorageRow = result.scalar_one_or_none()
-            if row is None:
-                raise ArtifactAssociationNotFoundError()
-
-            result = await db_sess.execute(
-                sa.select(ObjectStorageRow).where(ObjectStorageRow.id == row.storage_namespace_id)
-            )
-            storage_row: ObjectStorageRow = result.scalar_one_or_none()
-            if storage_row is None:
-                raise ObjectStorageNotFoundError()
-            return storage_row.to_dataclass()
 
     @repository_decorator()
     async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:

@@ -191,9 +191,6 @@ class ObjectStorageService:
         if artifact_data.readonly:
             raise ArtifactReadonly("Cannot upload to a readonly artifact.")
 
-        storage_data = await self._artifact_repository.get_artifact_installed_storage(
-            action.artifact_revision_id
-        )
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
 
         # Build S3 key
