@@ -16,7 +16,6 @@ from ai.backend.manager.dto.request import (
     SearchArtifactsReq,
 )
 from ai.backend.manager.dto.response import (
-    ScanArtifactsResponse,
     SearchArtifactsResponse,
 )
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
@@ -48,8 +47,7 @@ class APIHandler:
             )
         )
 
-        resp = ScanArtifactsResponse()
-        return APIResponse.build(status_code=200, response_model=resp)
+        return APIResponse.no_content(status_code=HTTPStatus.OK)
 
     @auth_required_for_method
     @api_handler

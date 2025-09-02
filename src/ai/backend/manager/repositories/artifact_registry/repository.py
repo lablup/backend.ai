@@ -8,6 +8,7 @@ from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryDa
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
+from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -28,6 +29,8 @@ class ArtifactRegistryRepository:
                 sa.select(ArtifactRegistryRow).where(ArtifactRegistryRow.registry_id == registry_id)
             )
             row: ArtifactRegistryRow = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactRegistryNotFoundError()
             return row.to_dataclass()
 
     @repository_decorator()
@@ -38,7 +41,9 @@ class ArtifactRegistryRepository:
                     ArtifactRegistryRow.registry_id == registry_id
                 )
             )
-            typ = result.scalar()
+            typ = result.scalar_one_or_none()
+            if typ is None:
+                raise ArtifactRegistryNotFoundError()
             return ArtifactRegistryType(typ)
 
     @repository_decorator()
