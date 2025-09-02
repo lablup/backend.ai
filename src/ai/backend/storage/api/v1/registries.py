@@ -195,11 +195,6 @@ def create_app(ctx: RootContext) -> web.Application:
         for r in ctx.local_config.registries
         if r.config.registry_type == ArtifactRegistryType.HUGGINGFACE.value
     )
-
-    reservoir_registry_configs: list[ReservoirConfig] = [
-        r.config for r in ctx.local_config.registries if isinstance(r.config, ReservoirConfig)
-    ]
-
     huggingface_service = HuggingFaceService(
         HuggingFaceServiceArgs(
             background_task_manager=ctx.background_task_manager,
@@ -208,6 +203,17 @@ def create_app(ctx: RootContext) -> web.Application:
             event_producer=ctx.event_producer,
         )
     )
+    huggingface_api_handler = HuggingFaceRegistryAPIHandler(
+        huggingface_service=huggingface_service, event_producer=ctx.event_producer
+    )
+
+    app.router.add_route("POST", "/huggingface/scan", huggingface_api_handler.scan_models)
+    app.router.add_route("POST", "/huggingface/import", huggingface_api_handler.import_models)
+
+    reservoir_registry_configs: list[ReservoirConfig] = [
+        r.config for r in ctx.local_config.registries if isinstance(r.config, ReservoirConfig)
+    ]
+
     reservoir_service = ReservoirService(
         ReservoirServiceArgs(
             background_task_manager=ctx.background_task_manager,
@@ -215,9 +221,6 @@ def create_app(ctx: RootContext) -> web.Application:
             event_producer=ctx.event_producer,
             storage_configs=ctx.local_config.storages,
         )
-    )
-    huggingface_api_handler = HuggingFaceRegistryAPIHandler(
-        huggingface_service=huggingface_service, event_producer=ctx.event_producer
     )
     reservoir_api_handler = ReservoirRegistryAPIHandler(
         storage_configs=ctx.local_config.storages,
@@ -227,8 +230,6 @@ def create_app(ctx: RootContext) -> web.Application:
         background_task_manager=ctx.background_task_manager,
     )
 
-    app.router.add_route("POST", "/huggingface/scan", huggingface_api_handler.scan_models)
-    app.router.add_route("POST", "/huggingface/import", huggingface_api_handler.import_models)
     app.router.add_route("POST", "/reservoir/import", reservoir_api_handler.import_models)
 
     return app

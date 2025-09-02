@@ -27,7 +27,6 @@ from ai.backend.common.dto.storage.request import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import (
-    ArtifactRegistryConfig,
     ObjectStorageConfig,
 )
 
@@ -44,17 +43,14 @@ _DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 
 class StorageAPIHandler:
     _storage_configs: list[ObjectStorageConfig]
-    _registry_configs: list[ArtifactRegistryConfig]
     _background_task_manager: BackgroundTaskManager
 
     def __init__(
         self,
         storage_configs: list[ObjectStorageConfig],
-        registry_configs: list[ArtifactRegistryConfig],
         background_task_manager: BackgroundTaskManager,
     ) -> None:
         self._storage_configs = storage_configs
-        self._registry_configs = registry_configs
         self._background_task_manager = background_task_manager
 
     @api_handler
@@ -237,7 +233,6 @@ def create_app(ctx: RootContext) -> web.Application:
 
     api_handler = StorageAPIHandler(
         storage_configs=ctx.local_config.storages,
-        registry_configs=ctx.local_config.registries,
         background_task_manager=ctx.background_task_manager,
     )
     app.router.add_route(
