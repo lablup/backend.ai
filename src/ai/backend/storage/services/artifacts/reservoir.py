@@ -136,7 +136,7 @@ class ReservoirService:
         Returns the total number of bytes copied.
         """
         dst_client = self._get_s3_client(storage_name, bucket_name)
-        download_chunk_size = self._storage_configs[storage_name].remote_storage_download_chunk_size
+        download_chunk_size = self._storage_configs[storage_name].reservoir_download_chunk_size
 
         # List all objects under prefix
         target_keys, size_map, total_bytes = await self._list_all_keys_and_sizes(
