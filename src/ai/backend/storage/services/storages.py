@@ -157,8 +157,6 @@ class StorageService:
         Returns the number of copied objects.
         """
         dst_client = self._get_s3_client(storage_name, bucket_name)
-        # TODO: # Instead of using its own download_chunksize,
-        # it should retrieve and use the configuration from the remote storage.
         download_chunk_size = self._storage_configs[storage_name].remote_storage_download_chunk_size
 
         # List all objects up front

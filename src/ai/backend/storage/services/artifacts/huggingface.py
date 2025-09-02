@@ -240,7 +240,7 @@ class HuggingFaceService:
         model: ModelTarget,
         storage_name: str,
         bucket_name: str,
-    ) -> uuid.UUID:
+    ) -> None:
         """Import a HuggingFace model to storage.
 
         Args:
@@ -259,80 +259,66 @@ class HuggingFaceService:
             raise RegistryNotFoundError(f"Unknown registry: {registry_name}")
         chunk_size = registry_config.download_chunk_size
 
-        async def _import_model(reporter: ProgressReporter) -> None:
-            artifact_total_size = 0
-            model_id = model.model_id
-            revision = model.revision
-            try:
-                log.info(f"Rescanning model for latest metadata: {model}")
-                scanner = self._make_scanner(registry_name)
-                file_infos = await scanner.list_model_files_info(model)
+        artifact_total_size = 0
+        model_id = model.model_id
+        revision = model.revision
+        try:
+            log.info(f"Rescanning model for latest metadata: {model}")
+            scanner = self._make_scanner(registry_name)
+            file_infos = await scanner.list_model_files_info(model)
 
-                file_count = len(file_infos)
-                reporter.total_progress = file_count
-                file_total_size = sum(file.size for file in file_infos)
-                log.info(
-                    f"Found files to import: model={model}, file_count={file_count}, "
-                    f"total_size={file_total_size / (1024 * 1024)} MB"
-                )
-                artifact_total_size += file_total_size
+            file_count = len(file_infos)
+            file_total_size = sum(file.size for file in file_infos)
+            log.info(
+                f"Found files to import: model={model}, file_count={file_count}, "
+                f"total_size={file_total_size / (1024 * 1024)} MB"
+            )
+            artifact_total_size += file_total_size
 
-                successful_uploads = 0
-                failed_uploads = 0
+            successful_uploads = 0
+            failed_uploads = 0
 
-                for file_info in file_infos:
-                    try:
-                        await self._pipe_single_file_to_storage(
-                            file_info=file_info,
-                            model=model,
-                            storage_name=storage_name,
-                            bucket_name=bucket_name,
-                            download_chunk_size=chunk_size,
-                        )
-
-                        successful_uploads += 1
-                    except Exception as e:
-                        log.error(
-                            f"Failed to upload file: {str(e)}, {model}, file_path={file_info.path}"
-                        )
-                        failed_uploads += 1
-                    finally:
-                        await reporter.update(
-                            1,
-                            message=f"Uploaded file: {file_info.path} to {storage_name} (bucket: {bucket_name})",
-                        )
-
-                log.info(
-                    f"Model import completed: {model}, successful_uploads={successful_uploads}, "
-                    f"failed_uploads={failed_uploads}, total_files={len(file_infos)}"
-                )
-
-                if failed_uploads > 0:
-                    log.warning(
-                        f"Some files failed to import: {model}, failed_count={failed_uploads}"
+            for file_info in file_infos:
+                try:
+                    await self._pipe_single_file_to_storage(
+                        file_info=file_info,
+                        model=model,
+                        storage_name=storage_name,
+                        bucket_name=bucket_name,
+                        download_chunk_size=chunk_size,
                     )
 
-                await self._event_producer.anycast_event(
-                    ModelImportDoneEvent(
-                        model_id=model_id,
-                        revision=revision,
-                        registry_name=registry_name,
-                        registry_type=ArtifactRegistryType.HUGGINGFACE,
-                        total_size=artifact_total_size,
+                    successful_uploads += 1
+                except Exception as e:
+                    log.error(
+                        f"Failed to upload file: {str(e)}, {model}, file_path={file_info.path}"
                     )
+                    failed_uploads += 1
+
+            log.info(
+                f"Model import completed: {model}, successful_uploads={successful_uploads}, "
+                f"failed_uploads={failed_uploads}, total_files={len(file_infos)}"
+            )
+
+            if failed_uploads > 0:
+                log.warning(f"Some files failed to import: {model}, failed_count={failed_uploads}")
+
+            await self._event_producer.anycast_event(
+                ModelImportDoneEvent(
+                    model_id=model_id,
+                    revision=revision,
+                    registry_name=registry_name,
+                    registry_type=ArtifactRegistryType.HUGGINGFACE,
+                    total_size=artifact_total_size,
                 )
+            )
 
-            except HuggingFaceModelNotFoundError:
-                log.error(f"Model not found: {model}")
-                raise
-            except Exception as e:
-                log.error(f"Model import failed: error={str(e)}, {model}")
-                raise HuggingFaceAPIError(
-                    f"Import failed for {model_id}, revision={revision}: {str(e)}"
-                ) from e
-
-        bgtask_id = await self._background_task_manager.start(_import_model)
-        return bgtask_id
+        except HuggingFaceModelNotFoundError:
+            raise
+        except Exception as e:
+            raise HuggingFaceAPIError(
+                f"Import failed for {model_id}, revision={revision}: {str(e)}"
+            ) from e
 
     async def _download_readme_content(self, download_url: str) -> Optional[str]:
         """Download README content from the given URL.
