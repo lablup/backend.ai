@@ -111,4 +111,4 @@ class DirEntry:
 @dataclass
 class BucketCopyOptions:
     concurrency: int
-    progress_log_interval_bytes: int = 0
+    progress_log_interval_bytes: int

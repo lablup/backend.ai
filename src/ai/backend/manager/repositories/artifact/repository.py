@@ -461,7 +461,7 @@ class ArtifactRepository:
 
                     db_sess.add(new_revision)
                     await db_sess.flush()
-                    await db_sess.refresh(new_revision, attribute_names=["id"])
+                    await db_sess.refresh(new_revision)
                     artifacts_map[artifact_row.id][1].append(new_revision)
 
             # Convert to ArtifactDataWithRevisions format

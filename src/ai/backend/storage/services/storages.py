@@ -222,7 +222,7 @@ class StorageService:
 
                     async def _data_stream() -> AsyncIterator[bytes]:
                         sent = 0
-                        next_mark = options.progress_log_interval_bytes or 0
+                        next_mark = options.progress_log_interval_bytes
                         while True:
                             chunk = await body.read(download_chunk_size)
                             if not chunk:

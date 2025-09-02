@@ -179,6 +179,7 @@ class ArtifactService:
 
                 if all_artifacts:
                     for artifact_data in all_artifacts:
+                        # Override registry information
                         artifact_data.artifact.registry_id = registry_id
                         artifact_data.artifact.registry_type = ArtifactRegistryType.RESERVOIR
 

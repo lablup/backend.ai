@@ -176,7 +176,10 @@ class StorageAPIHandler:
                 src=reservoir_config,
                 storage_name=storage_name,
                 bucket_name=bucket_name,
-                options=BucketCopyOptions(concurrency=16),
+                options=BucketCopyOptions(
+                    concurrency=16,
+                    progress_log_interval_bytes=0,  # disabled
+                ),
                 progress_reporter=reporter,
             )
 
