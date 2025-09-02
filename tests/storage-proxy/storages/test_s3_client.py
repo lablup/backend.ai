@@ -174,6 +174,49 @@ async def test_delete_object_nonexistent(s3_client: S3Client):
 
 
 @pytest.mark.asyncio
+async def test_delete_folder_success(s3_client: S3Client):
+    """Test successful folder (prefix) deletion"""
+    # Upload multiple files under a common prefix
+    folder_prefix = "test/folder"
+    files = [
+        f"{folder_prefix}/file1.txt",
+        f"{folder_prefix}/file2.txt",
+        f"{folder_prefix}/subfolder/file3.txt",
+        f"{folder_prefix}/subfolder/file4.txt",
+    ]
+
+    # Upload all files
+    for file_key in files:
+        test_data = f"Content of {file_key}".encode()
+
+        async def data_stream():
+            yield test_data
+
+        await s3_client.upload_stream(data_stream(), file_key, _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE)
+
+    # Verify all files exist
+    for file_key in files:
+        info = await s3_client.get_object_meta(file_key)
+        assert info is not None
+
+    # Delete the entire folder
+    await s3_client.delete_object(f"{folder_prefix}/", delete_all_versions=False)
+
+    # Verify all files under the prefix are gone
+    for file_key in files:
+        with pytest.raises(ClientError):
+            await s3_client.get_object_meta(file_key)
+
+
+@pytest.mark.asyncio
+async def test_delete_folder_empty(s3_client: S3Client) -> None:
+    """Test deletion of empty folder (prefix with no objects)"""
+    # Try to delete a non-existent folder prefix
+    # Should not raise an exception even if nothing was deleted
+    await s3_client.delete_object("empty/folder/")
+
+
+@pytest.mark.asyncio
 async def test_create_bucket_success(s3_client: S3Client):
     """Test successful bucket creation"""
     test_bucket_name = "test-create-bucket-new"

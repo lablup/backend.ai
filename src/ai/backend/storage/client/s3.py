@@ -309,28 +309,22 @@ class S3Client:
 
     async def delete_object(
         self,
-        prefix: str,
+        key_or_prefix: str,
         *,
         delete_all_versions: bool = True,
         batch_size: int = 100,
-    ) -> int:
+    ) -> None:
         """
-        Delete all objects under a given prefix ("folder").
-        If delete_all_versions=True, also deletes all versions & delete markers (versioned buckets).
+        Delete a single object or all objects under a given prefix ("folder").
 
-        Returns:
-            Total number of object entries deleted (for versioned buckets, counts each version/marker).
+        - If key_or_prefix ends with "/", treat as prefix deletion (folder)
+        - Otherwise, treat as single object deletion
+
+        Args:
+            key_or_prefix: Either a specific object key or a prefix for multiple objects (ending with "/")
+            delete_all_versions: Whether to delete all versions in versioned buckets
+            batch_size: Number of objects to delete per batch
         """
-        # Normalize prefix to behave like a folder path
-        norm_prefix = prefix if prefix.endswith("/") else f"{prefix}/"
-        total_deleted = 0
-
-        def _chunks(seq: list[Any], size: int) -> Iterable[list[Any]]:
-            for i in range(0, len(seq), size):
-                return_chunk = seq[i : i + size]
-                if return_chunk:
-                    yield return_chunk
-
         async with self.session.client(
             "s3",
             endpoint_url=self.endpoint_url,
@@ -338,6 +332,20 @@ class S3Client:
             aws_access_key_id=self.aws_access_key_id,
             aws_secret_access_key=self.aws_secret_access_key,
         ) as s3:
+            # If key ends with "/", treat as prefix deletion (folder)
+            if key_or_prefix.endswith("/"):
+                norm_prefix = key_or_prefix
+            else:
+                # Single object deletion
+                await s3.delete_object(Bucket=self.bucket_name, Key=key_or_prefix)
+                return
+
+            def _chunks(seq: list[Any], size: int) -> Iterable[list[Any]]:
+                for i in range(0, len(seq), size):
+                    return_chunk = seq[i : i + size]
+                    if return_chunk:
+                        yield return_chunk
+
             if delete_all_versions:
                 # Remove all versions and delete markers under the prefix
                 paginator = s3.get_paginator("list_object_versions")
@@ -349,14 +357,11 @@ class S3Client:
                         to_delete.append({"Key": m["Key"], "VersionId": m["VersionId"]})
 
                     for chunk in _chunks(to_delete, batch_size):
-                        resp = await s3.delete_objects(
+                        await s3.delete_objects(
                             Bucket=self.bucket_name,
-                            Delete={"Objects": chunk, "Quiet": True},
+                            Delete={"Objects": chunk, "Quiet": False},
                         )
-                        total_deleted += len(resp.get("Deleted", []))
-                # Also try to delete an explicit "directory marker" object version if it exists
-                # (covered by the paginator above since it matches the same prefix).
-                return total_deleted
+                return
 
             # Non-versioned (or just current versions): list & batch-delete
             paginator = s3.get_paginator("list_objects_v2")
@@ -366,19 +371,16 @@ class S3Client:
                     continue
                 keys = [{"Key": obj["Key"]} for obj in contents]
                 for chunk in _chunks(keys, batch_size):
-                    resp = await s3.delete_objects(
+                    await s3.delete_objects(
                         Bucket=self.bucket_name,
-                        Delete={"Objects": chunk, "Quiet": True},
+                        Delete={"Objects": chunk, "Quiet": False},
                     )
-                    total_deleted += len(resp.get("Deleted", []))
 
             # In case there's a standalone "directory marker" object like "prefix/"
             # (It may already have been removed above; this call is idempotent.)
             try:
                 await s3.delete_object(Bucket=self.bucket_name, Key=norm_prefix)
-                total_deleted += 1
             except Exception:
+                # TODO: Improve exception handling
                 # Ignore if it doesn't exist or bucket is not versioned / marker absent
                 pass
-
-        return total_deleted
