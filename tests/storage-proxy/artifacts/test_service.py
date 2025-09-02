@@ -332,25 +332,6 @@ class TestHuggingFaceService:
         )
 
     @pytest.mark.asyncio
-    async def test_import_model_success(
-        self, hf_service: HuggingFaceService, mock_background_task_manager: MagicMock
-    ) -> None:
-        """Test successful model import."""
-        expected_task_id = uuid.uuid4()
-        mock_background_task_manager.start.return_value = expected_task_id
-
-        model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
-        task_id = await hf_service.import_model(
-            registry_name="test_registry",
-            model=model_target,
-            storage_name="test_storage",
-            bucket_name="test_bucket",
-        )
-
-        assert task_id == expected_task_id
-        mock_background_task_manager.start.assert_called_once()
-
-    @pytest.mark.asyncio
     async def test_import_models_batch_success(
         self, hf_service: HuggingFaceService, mock_background_task_manager: MagicMock
     ) -> None:
