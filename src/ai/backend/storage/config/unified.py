@@ -631,6 +631,13 @@ class ObjectStorageConfig(BaseModel):
         """,
         examples=[8192],
     )
+    remote_storage_download_chunk_size: int = Field(
+        default=8192,
+        description="""
+        Chunk size (in bytes) for downloading files from the remote object storage.
+        """,
+        examples=[8192],
+    )
 
 
 class HuggingfaceConfig(BaseModel):
