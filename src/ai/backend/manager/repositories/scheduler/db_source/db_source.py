@@ -1371,7 +1371,7 @@ class ScheduleDBSource:
         allowed_sgroups = await query_allowed_sgroups(
             db_sess,
             domain_name,
-            group_id,
+            UUID(group_id),
             access_key,
         )
 
