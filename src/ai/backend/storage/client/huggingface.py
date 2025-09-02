@@ -78,7 +78,6 @@ class HuggingFaceClient:
             )
             return list(models)
         except Exception as e:
-            log.error(f"Failed to list models: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to list models: {str(e)}") from e
 
     async def list_model_revisions(self, model_id: str) -> list[str]:
@@ -101,7 +100,7 @@ class HuggingFaceClient:
                 revisions.add(tag.name)
             return list(revisions)
         except Exception as e:
-            # TODO: Is this logging level proper?
+            # TODO: Improve exception handling
             log.warning(
                 f"Failed to list revisions for {model_id}: {str(e)}, skipping and fallback to main..."
             )
@@ -125,7 +124,6 @@ class HuggingFaceClient:
             )
             return result
         except Exception as e:
-            log.error(f"Failed to get model info for {model}: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to get model info for {model}: {str(e)}") from e
 
     async def list_model_filepaths(self, model: ModelTarget) -> list[str]:
@@ -145,7 +143,6 @@ class HuggingFaceClient:
             )
             return filepaths
         except Exception as e:
-            log.error(f"Failed to list files for {model}: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to list files for {model}: {str(e)}") from e
 
     async def list_model_files_info(
@@ -172,7 +169,6 @@ class HuggingFaceClient:
             )
             return info
         except Exception as e:
-            log.error(f"Failed to get paths info for {model} ({paths}): {str(e)}")
             raise HuggingFaceAPIError(f'Failed to get paths info for "{model}": {str(e)}') from e
 
     def get_download_url(self, model: ModelTarget, filename: str) -> str:
@@ -268,7 +264,6 @@ class HuggingFaceScanner:
             return result
 
         except Exception as e:
-            log.error(f"Failed to scan HuggingFace models: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to scan models: {str(e)}") from e
 
     async def scan_model(self, model: ModelTarget) -> ModelData:
@@ -306,7 +301,6 @@ class HuggingFaceScanner:
             return result
 
         except Exception as e:
-            log.error(f"Failed to scan HuggingFace model {model}: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to scan model {model}: {str(e)}") from e
 
     def get_download_url(self, model: ModelTarget, filename: str) -> str:
