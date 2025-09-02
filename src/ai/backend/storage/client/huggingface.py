@@ -367,7 +367,6 @@ class HuggingFaceScanner:
             return file_infos
 
         except Exception as e:
-            log.error(f"Failed to list files for model {model}: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to list files for model {model}: {str(e)}") from e
 
     async def _download_readme(self, model: ModelTarget) -> Optional[str]:
