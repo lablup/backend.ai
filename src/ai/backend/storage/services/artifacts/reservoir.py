@@ -33,6 +33,13 @@ from ai.backend.storage.types import BucketCopyOptions
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+def _norm_prefix(p: Optional[str]) -> str:
+    # "" or None -> "", ensure trailing slash for non-empty
+    if not p:
+        return ""
+    return p if p.endswith("/") else p + "/"
+
+
 @dataclass
 class ReservoirServiceArgs:
     background_task_manager: BackgroundTaskManager
@@ -135,10 +142,10 @@ class ReservoirService:
         bucket_name: str,
         options: BucketCopyOptions,
         progress_reporter: ProgressReporter,
-        src_prefix: Optional[str] = None,
+        key_prefix: Optional[str] = None,
     ) -> int:
         """
-        Stream-copy objects from the source bucket (optionally under src_prefix)
+        Stream-copy objects from the source bucket (optionally under key_prefix)
         to the destination bucket.
         Returns the number of copied objects.
         """
@@ -152,7 +159,7 @@ class ReservoirService:
             secret_key=src.object_storage_secret_key,
             region=src.object_storage_region,
             bucket=bucket_name,
-            prefix=src_prefix,  # ✅ prefix 전달
+            prefix=key_prefix,
         )
 
         if not target_keys:
@@ -164,7 +171,7 @@ class ReservoirService:
             "dst_storage={} dst_bucket={} objects={} total_bytes={} concurrency={}",
             src.endpoint,
             bucket_name,
-            src_prefix,
+            key_prefix,
             storage_name,
             bucket_name,
             len(target_keys),
@@ -174,6 +181,7 @@ class ReservoirService:
 
         copied = 0
         sem = asyncio.Semaphore(options.concurrency)
+        src_root = _norm_prefix(key_prefix)
 
         src_s3_client = S3Client(
             bucket_name=bucket_name,
@@ -205,7 +213,7 @@ class ReservoirService:
                             next_mark += options.progress_log_interval_bytes
                         yield chunk
 
-                # Get object metadata to determine content type
+                # Content-Type
                 object_meta = await src_s3_client.get_object_meta(key)
                 ctype = (
                     (object_meta.content_type if object_meta else None)
@@ -213,15 +221,15 @@ class ReservoirService:
                     or "application/octet-stream"
                 )
 
-                # ✅ 대상 key 만들 때 src_prefix 제거해서 상대 경로 유지
-                rel_key = (
-                    key[len(src_prefix) :] if src_prefix and key.startswith(src_prefix) else key
-                )
+                if src_root and key.startswith(src_root):
+                    dst_key = key[len(src_root) :]
+                else:
+                    dst_key = key
 
                 part_size = self._storage_configs[storage_name].upload_chunk_size
                 await dst_client.upload_stream(
                     _data_stream(),
-                    rel_key,  # relative key at destination
+                    dst_key,
                     content_type=ctype,
                     part_size=part_size,
                 )
@@ -250,7 +258,6 @@ class ReservoirService:
 
         reservoir_config = self._reservoir_registry_configs[0]
         prefix_key = f"{model.model_id}/{model.revision}"
-        print("prefix_key!", prefix_key)
 
         await self.stream_bucket_to_bucket(
             src=reservoir_config,
@@ -261,7 +268,7 @@ class ReservoirService:
                 progress_log_interval_bytes=0,  # disabled
             ),
             progress_reporter=reporter,
-            src_prefix=prefix_key,
+            key_prefix=prefix_key,
         )
 
         await self._event_producer.anycast_event(
