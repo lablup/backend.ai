@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.13.4 (2025-09-03)
+
+### Fixes
+* Add missing scheduler options to AllowedScalingGroup and update related components ([#5730](https://github.com/lablup/backend.ai/issues/5730))
+
+
 ## 25.13.3 (2025-09-03)
 
 ### Fixes
