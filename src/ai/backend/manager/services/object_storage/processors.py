@@ -55,7 +55,7 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
     update: ActionProcessor[UpdateObjectStorageAction, UpdateObjectStorageActionResult]
     delete: ActionProcessor[DeleteObjectStorageAction, DeleteObjectStorageActionResult]
     get: ActionProcessor[GetObjectStorageAction, GetObjectStorageActionResult]
-    list_: ActionProcessor[ListObjectStorageAction, ListObjectStorageActionResult]
+    list_storages: ActionProcessor[ListObjectStorageAction, ListObjectStorageActionResult]
     get_presigned_download_url: ActionProcessor[
         GetDownloadPresignedURLAction, GetDownloadPresignedURLActionResult
     ]
@@ -72,7 +72,7 @@ class ObjectStorageProcessors(AbstractProcessorPackage):
         self.update = ActionProcessor(service.update, action_monitors)
         self.delete = ActionProcessor(service.delete, action_monitors)
         self.get = ActionProcessor(service.get, action_monitors)
-        self.list_ = ActionProcessor(service.list, action_monitors)
+        self.list_storages = ActionProcessor(service.list, action_monitors)
         self.get_presigned_download_url = ActionProcessor(
             service.get_presigned_download_url, action_monitors
         )

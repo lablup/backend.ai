@@ -132,7 +132,7 @@ class APIHandler:
     ) -> APIResponse:
         processors = processors_ctx.processors
 
-        action_result = await processors.object_storage.list_.wait_for_complete(
+        action_result = await processors.object_storage.list_storages.wait_for_complete(
             ListObjectStorageAction()
         )
 

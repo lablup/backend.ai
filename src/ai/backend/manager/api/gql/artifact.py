@@ -71,7 +71,6 @@ class ArtifactFilter:
     AND: Optional[list["ArtifactFilter"]] = None
     OR: Optional[list["ArtifactFilter"]] = None
     NOT: Optional[list["ArtifactFilter"]] = None
-    DISTINCT: Optional[bool] = None
 
     def to_repo_filter(self) -> ArtifactFilterOptions:
         repo_filter = ArtifactFilterOptions()
@@ -116,7 +115,6 @@ class ArtifactRevisionFilter:
     AND: Optional[list["ArtifactRevisionFilter"]] = None
     OR: Optional[list["ArtifactRevisionFilter"]] = None
     NOT: Optional[list["ArtifactRevisionFilter"]] = None
-    DISTINCT: Optional[bool] = None
 
     def to_repo_filter(self) -> ArtifactRevisionFilterOptions:
         repo_filter = ArtifactRevisionFilterOptions()
@@ -290,6 +288,33 @@ class ArtifactRevision(Node):
             size=ByteSize(data.size) if data.size is not None else None,
             created_at=data.created_at,
             updated_at=data.updated_at,
+        )
+
+    @strawberry.field
+    async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact:
+        revision_action_result = (
+            await info.context.processors.artifact_revision.get.wait_for_complete(
+                GetArtifactRevisionAction(artifact_revision_id=uuid.UUID(self.id))
+            )
+        )
+
+        artifact_id = revision_action_result.revision.artifact_id
+
+        artifact_action_result = await info.context.processors.artifact.get.wait_for_complete(
+            GetArtifactAction(artifact_id=artifact_id)
+        )
+
+        registry_meta_loader = DataLoader(
+            apartial(ArtifactRegistryMeta.load_by_id, info.context),
+        )
+
+        registry_data = await registry_meta_loader.load(artifact_action_result.result.registry_id)
+        source_registry_data = await registry_meta_loader.load(
+            artifact_action_result.result.source_registry_id
+        )
+
+        return Artifact.from_dataclass(
+            artifact_action_result.result, registry_data.url, source_registry_data.url
         )
 
     @classmethod

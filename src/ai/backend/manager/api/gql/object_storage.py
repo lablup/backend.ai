@@ -146,11 +146,10 @@ async def object_storages(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ObjectStorageConnection:
-    # TODO: Support pagination with before, after, first, last
     # TODO: Does we need to support filtering, ordering here?
     processors = info.context.processors
 
-    action_result = await processors.object_storage.list_.wait_for_complete(
+    action_result = await processors.object_storage.list_storages.wait_for_complete(
         ListObjectStorageAction()
     )
 
