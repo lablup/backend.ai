@@ -324,7 +324,9 @@ class ArtifactRepository:
                         existing_artifact.updated_at = datetime.now()
 
                     await db_sess.flush()
-                    await db_sess.refresh(existing_artifact)
+                    await db_sess.refresh(
+                        existing_artifact, attribute_names=["scanned_at", "updated_at"]
+                    )
                     result_artifacts.append(existing_artifact.to_dataclass())
 
             return result_artifacts
@@ -491,6 +493,11 @@ class ArtifactRepository:
                     .where(ArtifactRow.id.in_(artifact_ids_to_update))
                     .values(updated_at=sa.func.now())
                 )
+
+                # Refresh updated_at for affected artifacts
+                for artifact_id, (artifact_row, _revs) in artifacts_map.items():
+                    if artifact_id in artifact_ids_to_update:
+                        await db_sess.refresh(artifact_row, attribute_names=["updated_at"])
 
             # Convert to ArtifactDataWithRevisions format
             result: list[ArtifactDataWithRevisions] = []
