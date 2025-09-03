@@ -35,12 +35,6 @@ class StorageService:
     _storage_configs: dict[str, ObjectStorageConfig]
 
     def __init__(self, storage_configs: list[ObjectStorageConfig]) -> None:
-        """
-        Initialize the StoragesService.
-
-        Args:
-            storage_configs: List of storage configurations
-        """
         self._storage_configs = {config.name: config for config in storage_configs}
 
     async def stream_upload(
@@ -132,7 +126,6 @@ class StorageService:
             )
 
         except Exception as e:
-            log.error(f"Presigned upload URL generation failed: {e}")
             raise PresignedUploadURLGenerationError() from e
 
     async def generate_presigned_download_url(
@@ -168,7 +161,6 @@ class StorageService:
             return PresignedDownloadObjectResponse(url=presigned_url)
 
         except Exception as e:
-            log.error(f"Presigned download URL generation failed: {e}")
             raise PresignedDownloadURLGenerationError() from e
 
     async def get_object_info(

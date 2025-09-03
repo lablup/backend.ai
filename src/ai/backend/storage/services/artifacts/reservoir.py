@@ -133,7 +133,9 @@ class ReservoirService:
         """
         Stream-copy objects from the source bucket (optionally under key_prefix)
         to the destination bucket.
-        Returns the total number of bytes copied.
+
+        Returns:
+            the total number of bytes copied.
         """
         dst_client = self._get_s3_client(storage_name, bucket_name)
         download_chunk_size = self._storage_configs[storage_name].reservoir_download_chunk_size
@@ -173,7 +175,8 @@ class ReservoirService:
 
         async def _copy_single_object(key: str) -> int:
             """
-            Return the number of bytes copied.
+            Returns:
+                The number of bytes copied.
             """
             async with sem:
                 size = size_map.get(key, -1)
@@ -240,6 +243,7 @@ class ReservoirService:
             model: Reservoir model to import
             storage_name: Target storage name
             bucket_name: Target bucket name
+            reporter: ProgressReporter for tracking progress
         """
         if len(self._reservoir_registry_configs) == 0:
             raise ReservoirStorageConfigInvalidError("No reservoir registry configuration found.")

@@ -190,11 +190,6 @@ class HuggingFaceClient:
         )
 
 
-@dataclass
-class HuggingFaceScannerArgs:
-    client: HuggingFaceClient
-
-
 class HuggingFaceScanner:
     """Scanner for HuggingFace models and metadata."""
 
@@ -322,7 +317,7 @@ class HuggingFaceScanner:
             model: HuggingFace model
 
         Returns:
-            List of FileInfo objects
+            List of FileObjectData
         """
         try:
             filepaths = await self._client.list_model_filepaths(model)

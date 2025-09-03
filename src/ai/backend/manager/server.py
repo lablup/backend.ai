@@ -1054,6 +1054,8 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     # Get task specifications from sokovan and register them
     task_specs = root_ctx.sokovan_orchestrator.create_task_specs()
+
+    # Rescan reservoir registry periodically
     task_specs.append(
         EventTaskSpec(
             name="reservoir_registry_scan",
