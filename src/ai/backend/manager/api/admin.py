@@ -11,8 +11,8 @@ import graphene
 import strawberry
 import trafaret as t
 from aiohttp import web
-from graphene.validation import DisableIntrospection, depth_limit_validator
-from graphql import parse, validate
+from graphene.validation import depth_limit_validator
+from graphql import ValidationRule, parse, validate
 from graphql.error import GraphQLError  # pants: no-infer-dep
 from graphql.execution import ExecutionResult  # pants: no-infer-dep
 from pydantic import ConfigDict, Field
@@ -42,6 +42,8 @@ from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
 
 if TYPE_CHECKING:
+    from graphql import FieldNode
+
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -61,6 +63,18 @@ class GQLLoggingMiddleware:
         return next(root, info, **args)
 
 
+class CustomIntrospectionRule(ValidationRule):
+    def enter_field(self, node: FieldNode, *_args):
+        field_name = node.name.value
+        if field_name.startswith("__"):
+            # Allow __typename field for GraphQL Federation, @connection directive
+            if field_name == "__typename":
+                return
+            self.report_error(
+                GraphQLError(f"Cannot query '{field_name}': introspection is disabled.", node)
+            )
+
+
 async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResult:
     root_ctx: RootContext = request.app["_root.context"]
     app_ctx: PrivateContext = request.app["admin.context"]
@@ -68,7 +82,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     known_slot_types = await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
     rules = []
     if not root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
-        rules.append(DisableIntrospection)
+        rules.append(CustomIntrospectionRule)
     max_depth = cast(int | None, root_ctx.config_provider.config.api.max_gql_query_depth)
     if max_depth is not None:
         rules.append(depth_limit_validator(max_depth=max_depth))
@@ -177,7 +191,7 @@ class GQLAPIHandler:
         rules = []
 
         if not config_ctx.allow_graphql_schema_introspection:
-            rules.append(DisableIntrospection)
+            rules.append(CustomIntrospectionRule)
         max_depth = cast(int | None, config_ctx.max_gql_query_depth)
         if max_depth is not None:
             rules.append(depth_limit_validator(max_depth=max_depth))

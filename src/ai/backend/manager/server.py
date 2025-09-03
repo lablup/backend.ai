@@ -68,10 +68,14 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.events.event_types.artifact_registry.anycast import (
+    DoScanReservoirRegistryEvent,
+)
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.json import dump_json_str
+from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -235,6 +239,7 @@ public_interface_objs: MutableMapping[str, Any] = {}
 global_subapp_pkgs: Final[list[str]] = [
     ".acl",
     ".container_registry",
+    ".artifact_registry",
     ".etcd",
     ".events",
     ".auth",
@@ -256,6 +261,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".group",
     ".groupconfig",
     ".logs",
+    ".object_storage",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -787,6 +793,8 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.idle_checker_host,
             root_ctx.event_dispatcher_plugin_ctx,
             root_ctx.repositories,
+            lambda: root_ctx.processors,
+            root_ctx.storage_manager,
             use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )
@@ -1046,6 +1054,16 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     # Get task specifications from sokovan and register them
     task_specs = root_ctx.sokovan_orchestrator.create_task_specs()
+
+    # Rescan reservoir registry periodically
+    task_specs.append(
+        EventTaskSpec(
+            name="reservoir_registry_scan",
+            event_factory=lambda: DoScanReservoirRegistryEvent(),
+            interval=3600,  # 1 hour
+            initial_delay=0,
+        )
+    )
 
     # Create event producer tasks from specs
     leader_tasks: list[PeriodicTask] = [

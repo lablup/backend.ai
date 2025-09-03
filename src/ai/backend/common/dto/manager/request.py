@@ -74,7 +74,6 @@ class DeleteArtifactPathParam(BaseRequestModel):
     )
 
 
-# ObjectStorage API Request Models
 class CreateObjectStorageReq(BaseRequestModel):
     name: str = Field(description="Name of the object storage")
     host: str = Field(description="Host address of the object storage")
@@ -111,3 +110,21 @@ class CreateHuggingFaceRegistryReq(BaseRequestModel):
 
 class DeleteHuggingFaceRegistryReq(BaseRequestModel):
     id: uuid.UUID = Field(description="The unique identifier of the Hugging Face model registry")
+
+
+class GetPresignedDownloadURLReq(BaseRequestModel):
+    artifact_revision_id: uuid.UUID = Field(
+        description="The unique identifier of the artifact revision"
+    )
+    key: str = Field(description="Object key")
+
+
+class GetPresignedUploadURLReq(BaseRequestModel):
+    artifact_revision_id: uuid.UUID = Field(
+        description="The unique identifier of the artifact revision"
+    )
+    key: str = Field(description="Object key")
+    content_type: Optional[str] = Field(default=None, description="Content type of the object")
+    expiration: Optional[int] = Field(default=None, description="URL expiration time in seconds")
+    min_size: Optional[int] = Field(default=None, description="Minimum file size")
+    max_size: Optional[int] = Field(default=None, description="Maximum file size")

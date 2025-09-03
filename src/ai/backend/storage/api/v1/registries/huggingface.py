@@ -11,39 +11,37 @@ from ai.backend.common.api_handlers import (
     BodyParam,
     api_handler,
 )
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
+    HuggingFaceRetrieveModelsReq,
     HuggingFaceScanModelsReq,
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
+    HuggingFaceRetrieveModelsResponse,
     HuggingFaceScanModelsResponse,
 )
-from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
 )
-from ai.backend.storage.services.storages import StorageService
+from ai.backend.storage.services.storages.object_storage import ObjectStorageService
 
-from ...utils import log_client_api_entry
+from ....utils import log_client_api_entry
 
 if TYPE_CHECKING:
-    from ...context import RootContext
+    from ....context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class HuggingFaceRegistryAPIHandler:
     _huggingface_service: HuggingFaceService
-    _event_producer: EventProducer
 
-    def __init__(
-        self, huggingface_service: HuggingFaceService, event_producer: EventProducer
-    ) -> None:
+    def __init__(self, huggingface_service: HuggingFaceService) -> None:
         self._huggingface_service = huggingface_service
-        self._event_producer = event_producer
 
     @api_handler
     async def scan_models(
@@ -64,6 +62,30 @@ class HuggingFaceRegistryAPIHandler:
 
         response = HuggingFaceScanModelsResponse(
             models=models,
+        )
+
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=response,
+        )
+
+    @api_handler
+    async def retrieve_models(
+        self,
+        body: BodyParam[HuggingFaceRetrieveModelsReq],
+    ) -> APIResponse:
+        """
+        Retrieve HuggingFace registry model data.
+        """
+        await log_client_api_entry(log, "retrieve", body.parsed)
+
+        model_datas = await self._huggingface_service.retrieve_models(
+            registry_name=body.parsed.registry_name,
+            models=body.parsed.models,
+        )
+
+        response = HuggingFaceRetrieveModelsResponse(
+            models=model_datas,
         )
 
         return APIResponse.build(
@@ -101,16 +123,15 @@ class HuggingFaceRegistryAPIHandler:
 def create_app(ctx: RootContext) -> web.Application:
     app = web.Application()
     app["ctx"] = ctx
-    app["prefix"] = "v1/registries"
+    app["prefix"] = "v1/registries/huggingface"
 
-    storage_service = StorageService(storage_configs=ctx.local_config.storages)
+    storage_service = ObjectStorageService(storage_configs=ctx.local_config.storages)
 
     huggingface_registry_configs = dict(
         (r.name, r.config)
         for r in ctx.local_config.registries
-        if r.config.registry_type == "huggingface"
+        if r.config.registry_type == ArtifactRegistryType.HUGGINGFACE.value
     )
-
     huggingface_service = HuggingFaceService(
         HuggingFaceServiceArgs(
             background_task_manager=ctx.background_task_manager,
@@ -119,12 +140,10 @@ def create_app(ctx: RootContext) -> web.Application:
             event_producer=ctx.event_producer,
         )
     )
-    huggingface_api_handler = HuggingFaceRegistryAPIHandler(
-        huggingface_service=huggingface_service, event_producer=ctx.event_producer
-    )
+    huggingface_api_handler = HuggingFaceRegistryAPIHandler(huggingface_service=huggingface_service)
 
-    # HuggingFace registry endpoints
-    app.router.add_route("POST", "/huggingface/scan", huggingface_api_handler.scan_models)
-    app.router.add_route("POST", "/huggingface/import", huggingface_api_handler.import_models)
+    app.router.add_route("POST", "/scan", huggingface_api_handler.scan_models)
+    app.router.add_route("POST", "/import", huggingface_api_handler.import_models)
 
+    app.router.add_route("POST", "/models/batch", huggingface_api_handler.retrieve_models)
     return app

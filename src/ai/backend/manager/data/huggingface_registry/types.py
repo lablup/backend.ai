@@ -6,6 +6,6 @@ from typing import Optional
 @dataclass
 class HuggingFaceRegistryData:
     id: uuid.UUID
-    url: str
     name: str
+    url: str
     token: Optional[str]
