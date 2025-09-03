@@ -1923,7 +1923,7 @@ class AbstractAgent(
         for slot_name, slot_capacity in scanned_slots.items():
             if slot_name == SlotName("mem"):
                 mem_reserved = int(reserved_slots.get(slot_name, 0))
-                mem_align = 16 * (2**20)  # 16 MiB
+                mem_align = int(self.local_config.resource.memory_align_size)
                 mem_usable, mem_resesrved = align_memory(
                     int(slot_capacity), mem_reserved, align=mem_align
                 )
