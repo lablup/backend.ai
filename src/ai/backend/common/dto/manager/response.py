@@ -83,6 +83,7 @@ class GetPresignedDownloadURLResponse(BaseResponseModel):
 
 class GetPresignedUploadURLResponse(BaseResponseModel):
     presigned_url: str = Field(description="The presigned upload URL")
+    # TODO: Remove fields if not needed
     fields: str = Field(description="JSON string containing the form fields")
 
 
@@ -94,7 +95,3 @@ class ObjectStorageAllBucketsResponse(BaseResponseModel):
     buckets_by_storage: dict[uuid.UUID, list[str]] = Field(
         description="Mapping of storage IDs to bucket lists"
     )
-
-
-class ObjectStorageBucketListResponse(BaseResponseModel):
-    buckets: list[str] = Field(default_factory=list, description="List of bucket names")

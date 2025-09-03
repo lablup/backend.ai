@@ -680,6 +680,21 @@ class StorageProxyManagerFacingClient:
         return HuggingFaceImportModelsResponse.model_validate(resp)
 
     @client_decorator()
+    async def import_reservoir_models(
+        self,
+        req: ReservoirImportModelsReq,
+    ) -> ReservoirImportModelsResponse:
+        """
+        Import multiple Reservoir models into the specified registry.
+        """
+        resp = await self._client.request(
+            "POST",
+            "v1/registries/reservoir/import",
+            body=req.model_dump(by_alias=True),
+        )
+        return ReservoirImportModelsResponse.model_validate(resp)
+
+    @client_decorator()
     async def download_s3_file(
         self,
         storage_name: str,
@@ -694,21 +709,6 @@ class StorageProxyManagerFacingClient:
             f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/download",
             body=req.model_dump(by_alias=True),
         )
-
-    @client_decorator()
-    async def import_reservoir_models(
-        self,
-        req: ReservoirImportModelsReq,
-    ) -> ReservoirImportModelsResponse:
-        """
-        Pull bucket from reservoir storage to S3 storage.
-        """
-        resp = await self._client.request(
-            "POST",
-            "v1/registries/reservoir/import",
-            body=req.model_dump(by_alias=True),
-        )
-        return ReservoirImportModelsResponse.model_validate(resp)
 
     @client_decorator()
     async def get_s3_presigned_download_url(

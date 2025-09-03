@@ -57,7 +57,7 @@ class DownloadObjectReq(BaseRequestModel):
 class PresignedUploadObjectReq(BaseRequestModel):
     """
     Data model for generating presigned upload URLs for object storage operations.
-    This is used to specify the target bucket, key, and optional parameters for the presigned
+    This is used to specify the target bucket, key, and optional parameters for the presigned URL.
     """
 
     key: str = Field(description="The object key (path) within the bucket to upload the file to.")
