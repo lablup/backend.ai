@@ -14,6 +14,9 @@ from huggingface_hub import (
     list_repo_refs,
     model_info,
 )
+from huggingface_hub.errors import (
+    GatedRepoError,
+)
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
 from huggingface_hub.hf_api import RepoFile, RepoFolder
 
@@ -99,6 +102,9 @@ class HuggingFaceClient:
             for tag in refs.tags:
                 revisions.add(tag.name)
             return list(revisions)
+        except GatedRepoError:
+            # Just return the main branch for gated repos
+            return ["main"]
         except Exception as e:
             # TODO: Improve exception handling
             log.warning(
