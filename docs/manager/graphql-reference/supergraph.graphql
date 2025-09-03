@@ -245,7 +245,6 @@ input ArtifactFilter
   AND: [ArtifactFilter!] = null
   OR: [ArtifactFilter!] = null
   NOT: [ArtifactFilter!] = null
-  DISTINCT: Boolean = null
 }
 
 """Added in 25.13.0"""
@@ -286,6 +285,7 @@ type ArtifactRevision implements Node
   size: ByteSize
   createdAt: DateTime
   updatedAt: DateTime
+  artifact: Artifact!
 }
 
 """Added in 25.13.0"""
@@ -321,7 +321,6 @@ input ArtifactRevisionFilter
   AND: [ArtifactRevisionFilter!] = null
   OR: [ArtifactRevisionFilter!] = null
   NOT: [ArtifactRevisionFilter!] = null
-  DISTINCT: Boolean = null
 }
 
 """Added in 25.13.0"""
