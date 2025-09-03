@@ -93,6 +93,7 @@ if TYPE_CHECKING:
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry
     from ..repositories.scheduler.repository import SchedulerRepository
+    from ..repositories.user.repository import UserRepository
     from .storage import StorageSessionManager
 
 from ..data.image.types import ImageStatus
@@ -236,6 +237,7 @@ from .gql_models.vfolder import (
     VirtualFolderConnection,
     VirtualFolderNode,
 )
+from .gql_models.viewer import Viewer
 from .group import (
     ProjectType,
 )
@@ -327,6 +329,7 @@ class GraphQueryContext:
     metric_observer: GraphQLMetricObserver
     processors: Processors
     scheduler_repository: SchedulerRepository
+    user_repository: UserRepository
 
 
 class Mutation(graphene.ObjectType):
@@ -736,6 +739,8 @@ class Query(graphene.ObjectType):
             description="Added in 25.4.0.",
         ),
     )
+
+    viewer = graphene.Field(Viewer, description="Added in 25.13.0.")
 
     user = graphene.Field(
         User,
@@ -1796,6 +1801,13 @@ class Query(graphene.ObjectType):
         if is_installed is not None:
             items = [item for item in items if item.installed == is_installed]
         return items
+
+    @staticmethod
+    async def resolve_viewer(
+        root: Any,
+        info: graphene.ResolveInfo,
+    ) -> Viewer:
+        return await Viewer.get_viewer(info)
 
     @staticmethod
     @scoped_query(autofill_user=True, user_key="email")
