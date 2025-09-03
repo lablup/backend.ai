@@ -23,6 +23,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.models import NetworkRow
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.types import UserScope
 
 SESSION_PRIORITY_DEFAULT = 10
@@ -313,6 +314,7 @@ class AllowedScalingGroup:
 
     name: str
     is_private: bool
+    scheduler_opts: ScalingGroupOpts
 
 
 @dataclass

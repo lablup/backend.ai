@@ -21,6 +21,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
     ContainerUserInfo,
@@ -125,7 +126,11 @@ class TestSingleKernelSession:
         # Setup mock context
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
-            allowed_scaling_groups=[AllowedScalingGroup(name="default", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "python:3.9": ImageInfo(
                     canonical="python:3.9",
@@ -217,7 +222,9 @@ class TestMultiContainerSession:
         # Setup mock context
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
-            allowed_scaling_groups=[AllowedScalingGroup(name="gpu", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(name="gpu", is_private=False, scheduler_opts=ScalingGroupOpts())
+            ],
             image_infos={
                 "tensorflow:2.0": ImageInfo(
                     canonical="tensorflow:2.0",
@@ -310,7 +317,11 @@ class TestMultiContainerSession:
         # Setup mock context with multiple images
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=True),
-            allowed_scaling_groups=[AllowedScalingGroup(name="default", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "nginx:latest": ImageInfo(
                     canonical="nginx:latest",
@@ -402,7 +413,11 @@ class TestEdgeCases:
 
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
-            allowed_scaling_groups=[AllowedScalingGroup(name="default", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "python:3.9": ImageInfo(
                     canonical="python:3.9",
@@ -460,7 +475,11 @@ class TestEdgeCases:
             scaling_group_network=ScalingGroupNetworkInfo(
                 use_host_network=False  # Not using host network
             ),
-            allowed_scaling_groups=[AllowedScalingGroup(name="default", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "python:3.9": ImageInfo(
                     canonical="python:3.9",
@@ -487,7 +506,11 @@ class TestEdgeCases:
             scaling_group_network=ScalingGroupNetworkInfo(
                 use_host_network=True  # Using host network
             ),
-            allowed_scaling_groups=[AllowedScalingGroup(name="default", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "python:3.9": ImageInfo(
                     canonical="python:3.9",
@@ -558,7 +581,11 @@ class TestEdgeCases:
 
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
-            allowed_scaling_groups=[AllowedScalingGroup(name="default", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "python:3.9": ImageInfo(
                     canonical="python:3.9",
@@ -622,7 +649,11 @@ class TestMultiClusterScenarios:
         # Setup mock context
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
-            allowed_scaling_groups=[AllowedScalingGroup(name="gpu-cluster", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="gpu-cluster", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "pytorch:2.0": ImageInfo(
                     canonical="pytorch:2.0",
@@ -733,7 +764,11 @@ class TestMultiClusterScenarios:
         # Setup mock context with multiple images
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
-            allowed_scaling_groups=[AllowedScalingGroup(name="gpu-cluster", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="gpu-cluster", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "spark:master": ImageInfo(
                     canonical="spark:master",
@@ -839,7 +874,9 @@ class TestMultiClusterScenarios:
                 use_host_network=True
             ),  # Using host network
             allowed_scaling_groups=[
-                AllowedScalingGroup(name="inference-cluster", is_private=False)
+                AllowedScalingGroup(
+                    name="inference-cluster", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
             ],
             image_infos={
                 "llm:server": ImageInfo(

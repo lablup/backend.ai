@@ -21,6 +21,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    AllowedScalingGroup,
     KernelEnqueueData,
     SessionCreationContext,
     SessionCreationSpec,
@@ -51,7 +52,7 @@ class SessionPreparer:
     async def prepare(
         self,
         spec: SessionCreationSpec,
-        validated_scaling_group: str,
+        validated_scaling_group: AllowedScalingGroup,
         context: SessionCreationContext,
         calculated_resources: CalculatedResources,
     ) -> SessionEnqueueData:
@@ -60,7 +61,7 @@ class SessionPreparer:
 
         Args:
             spec: Session creation specification
-            validated_scaling_group: The validated/resolved scaling group name
+            validated_scaling_group: Validated scaling group
             context: Pre-fetched context with all required data
             calculated_resources: Pre-calculated resource information
 
@@ -124,7 +125,7 @@ class SessionPreparer:
             user_uuid=spec.user_scope.user_uuid,
             group_id=spec.user_scope.group_id,
             domain_name=spec.user_scope.domain_name,
-            scaling_group_name=validated_scaling_group,
+            scaling_group_name=validated_scaling_group.name,
             session_type=spec.session_type,
             cluster_mode=spec.cluster_mode,
             cluster_size=spec.cluster_size,
@@ -174,7 +175,7 @@ class SessionPreparer:
         self,
         spec: SessionCreationSpec,
         session_id: SessionId,
-        validated_scaling_group: str,
+        validated_scaling_group: AllowedScalingGroup,
         kernel_configs: list[KernelEnqueueingConfig],
         internal_data: dict[str, Any],
         vfolder_mounts: list[VFolderMount],
@@ -237,7 +238,7 @@ class SessionPreparer:
                 local_rank=kernel_config.get("local_rank", idx),
                 cluster_hostname=kernel_config.get("cluster_hostname")
                 or f"{kernel_config.get('cluster_role', DEFAULT_ROLE)}{kernel_config.get('cluster_idx', idx + 1)}",
-                scaling_group=validated_scaling_group,
+                scaling_group=validated_scaling_group.name,
                 domain_name=spec.user_scope.domain_name,
                 group_id=spec.user_scope.group_id,
                 user_uuid=spec.user_scope.user_uuid,
