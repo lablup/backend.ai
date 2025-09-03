@@ -318,6 +318,7 @@ input ArtifactRevisionFilter
   status: ArtifactRevisionStatusFilter = null
   version: StringFilter = null
   artifactId: ID = null
+  size: IntFilter = null
   AND: [ArtifactRevisionFilter!] = null
   OR: [ArtifactRevisionFilter!] = null
   NOT: [ArtifactRevisionFilter!] = null
@@ -2359,6 +2360,17 @@ type InferenceSessionErrorInfo
   src: String!
   name: String!
   repr: String!
+}
+
+input IntFilter
+  @join__type(graph: STRAWBERRY)
+{
+  equals: Int = null
+  notEquals: Int = null
+  greaterThan: Int = null
+  greaterThanOrEqual: Int = null
+  lessThan: Int = null
+  lessThanOrEqual: Int = null
 }
 
 interface Item

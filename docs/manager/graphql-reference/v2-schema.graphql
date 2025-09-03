@@ -114,6 +114,7 @@ input ArtifactRevisionFilter {
   status: ArtifactRevisionStatusFilter = null
   version: StringFilter = null
   artifactId: ID = null
+  size: IntFilter = null
   AND: [ArtifactRevisionFilter!] = null
   OR: [ArtifactRevisionFilter!] = null
   NOT: [ArtifactRevisionFilter!] = null
@@ -440,6 +441,15 @@ input ImportArtifactsInput {
 type ImportArtifactsPayload {
   artifactRevisions: ArtifactRevisionConnection!
   tasks: [ArtifactRevisionImportTask!]!
+}
+
+input IntFilter {
+  equals: Int = null
+  notEquals: Int = null
+  greaterThan: Int = null
+  greaterThanOrEqual: Int = null
+  lessThan: Int = null
+  lessThanOrEqual: Int = null
 }
 
 """A custom scalar for JSON strings using orjson"""

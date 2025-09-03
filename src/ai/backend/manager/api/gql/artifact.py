@@ -13,6 +13,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.api.gql.base import (
     ByteSize,
+    IntFilter,
     OrderDirection,
     StringFilter,
     build_pagination_options,
@@ -77,7 +78,6 @@ class ArtifactFilter:
 
         # Handle basic filters
         repo_filter.artifact_type = self.type
-
         repo_filter.name_filter = self.name
         repo_filter.registry_filter = self.registry
         repo_filter.source_filter = self.source
@@ -110,6 +110,7 @@ class ArtifactRevisionFilter:
     status: Optional[ArtifactRevisionStatusFilter] = None
     version: Optional[StringFilter] = None
     artifact_id: Optional[ID] = None
+    size: Optional[IntFilter] = None
 
     AND: Optional[list["ArtifactRevisionFilter"]] = None
     OR: Optional[list["ArtifactRevisionFilter"]] = None
@@ -135,6 +136,9 @@ class ArtifactRevisionFilter:
 
         # Pass StringFilter directly for processing in repository
         repo_filter.version_filter = self.version
+
+        # Handle size filter
+        repo_filter.size_filter = self.size
 
         # Handle logical operations
         if self.AND:

@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Optional
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.manager.api.gql.base import StringFilter
+from ai.backend.manager.api.gql.base import IntFilter, StringFilter
 from ai.backend.manager.data.artifact.types import (
     ArtifactOrderField,
     ArtifactRevisionOrderField,
@@ -70,6 +70,7 @@ class ArtifactRevisionFilterOptions:
     artifact_id: Optional[uuid.UUID] = None
     status_filter: Optional[ArtifactStatusFilter] = None
     version_filter: Optional[StringFilter] = None
+    size_filter: Optional[IntFilter] = None
 
     # Logical operations
     AND: Optional[list["ArtifactRevisionFilterOptions"]] = None

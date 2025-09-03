@@ -84,6 +84,41 @@ class StringFilter:
         return None
 
 
+@strawberry.input
+class IntFilter:
+    equals: Optional[int] = None
+    not_equals: Optional[int] = None
+    greater_than: Optional[int] = None
+    greater_than_or_equal: Optional[int] = None
+    less_than: Optional[int] = None
+    less_than_or_equal: Optional[int] = None
+
+    def apply_to_column(self, column):
+        """Apply this int filter to a SQLAlchemy column and return the condition.
+
+        Args:
+            column: SQLAlchemy column to apply the filter to
+
+        Returns:
+            SQLAlchemy condition expression or None if no filter is set
+        """
+
+        if self.equals is not None:
+            return column == self.equals
+        elif self.not_equals is not None:
+            return column != self.not_equals
+        elif self.greater_than is not None:
+            return column > self.greater_than
+        elif self.greater_than_or_equal is not None:
+            return column >= self.greater_than_or_equal
+        elif self.less_than is not None:
+            return column < self.less_than
+        elif self.less_than_or_equal is not None:
+            return column <= self.less_than_or_equal
+
+        return None
+
+
 @strawberry.enum
 class OrderDirection(StrEnum):
     ASC = "ASC"

@@ -159,6 +159,12 @@ class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOpti
             if version_condition is not None:
                 conditions.append(version_condition)
 
+        # Handle IntFilter-based size filter
+        if filters.size_filter is not None:
+            size_condition = filters.size_filter.apply_to_column(ArtifactRevisionRow.size)
+            if size_condition is not None:
+                conditions.append(size_condition)
+
         return conditions, stmt
 
 
@@ -822,6 +828,10 @@ class ArtifactRepository:
                 )
                 if version_condition is not None:
                     count_stmt = count_stmt.where(version_condition)
+            if filters.size_filter is not None:
+                size_condition = filters.size_filter.apply_to_column(ArtifactRevisionRow.size)
+                if size_condition is not None:
+                    count_stmt = count_stmt.where(size_condition)
 
             count_result = await db_sess.execute(count_stmt)
             total_count = count_result.scalar()
