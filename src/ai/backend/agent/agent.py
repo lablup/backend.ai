@@ -1924,7 +1924,7 @@ class AbstractAgent(
             if slot_name == SlotName("mem"):
                 mem_reserved = int(reserved_slots.get(slot_name, 0))
                 mem_align = int(self.local_config.resource.memory_align_size)
-                mem_usable, mem_resesrved = align_memory(
+                mem_usable, mem_reserved = align_memory(
                     int(slot_capacity), mem_reserved, align=mem_align
                 )
                 usable_capacity = Decimal(mem_usable)
