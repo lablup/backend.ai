@@ -40,7 +40,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 
 
-class StorageAPIHandler:
+class ObjectStorageAPIHandler:
     _storage_configs: list[ObjectStorageConfig]
 
     def __init__(
@@ -227,7 +227,7 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/storages"
 
-    api_handler = StorageAPIHandler(
+    api_handler = ObjectStorageAPIHandler(
         storage_configs=ctx.local_config.storages,
     )
     app.router.add_route(
