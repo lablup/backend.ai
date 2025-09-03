@@ -72,6 +72,7 @@ class RoleManager:
         row = RoleRow.from_input(input)
         db_session.add(row)
         await db_session.flush()
+        await db_session.refresh(row)
         return row.to_data()
 
     async def _create_permission_group(
@@ -84,6 +85,7 @@ class RoleManager:
         row = PermissionGroupRow.from_input(input)
         db_session.add(row)
         await db_session.flush()
+        await db_session.refresh(row)
         return row.to_data()
 
     async def _create_permissions(
@@ -154,5 +156,6 @@ class RoleManager:
         rows = [ObjectPermissionRow.from_input(creator) for creator in creators]
         db_session.add_all(rows)
         await db_session.flush()
+        await db_session.refresh(rows)
 
         return [row.to_data() for row in rows]

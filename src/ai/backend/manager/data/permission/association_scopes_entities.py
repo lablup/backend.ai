@@ -17,8 +17,8 @@ class AssociationScopesEntitiesCreateInput(Creator):
         return {
             "scope_type": self.scope_id.scope_type,
             "scope_id": self.scope_id.scope_id,
-            "entity_type": str(self.object_id.entity_type),
-            "entity_id": str(self.object_id.entity_id),
+            "entity_type": self.object_id.entity_type,
+            "entity_id": self.object_id.entity_id,
         }
 
 
