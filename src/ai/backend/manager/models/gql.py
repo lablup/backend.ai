@@ -99,7 +99,7 @@ if TYPE_CHECKING:
 from ..data.image.types import ImageStatus
 from ..errors.api import InvalidAPIParameters
 from ..errors.auth import InsufficientPrivilege
-from ..errors.common import ObjectNotFound
+from ..errors.common import InternalServerError, ObjectNotFound
 from ..errors.image import ImageNotFound
 from ..errors.kernel import TooManyKernelsFound
 from .acl import PredefinedAtomicPermission
@@ -740,7 +740,9 @@ class Query(graphene.ObjectType):
         ),
     )
 
-    viewer = graphene.Field(Viewer, description="Added in 25.13.0.")
+    viewer = graphene.Field(
+        Viewer, description="Added in 25.14.0. Returns information about the current user."
+    )
 
     user = graphene.Field(
         User,
@@ -1807,7 +1809,10 @@ class Query(graphene.ObjectType):
         root: Any,
         info: graphene.ResolveInfo,
     ) -> Viewer:
-        return await Viewer.get_viewer(info)
+        viewer = await Viewer.get_viewer(info)
+        if viewer is None:
+            raise InternalServerError("Failed to get viewer")
+        return viewer
 
     @staticmethod
     @scoped_query(autofill_user=True, user_key="email")
