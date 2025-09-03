@@ -34,6 +34,17 @@ class ArtifactRegistryRepository:
             return row.to_dataclass()
 
     @repository_decorator()
+    async def get_artifact_registry_data_by_name(self, registry_name: str) -> ArtifactRegistryData:
+        async with self._db.begin_readonly_session() as session:
+            result = await session.execute(
+                sa.select(ArtifactRegistryRow).where(ArtifactRegistryRow.name == registry_name)
+            )
+            row: ArtifactRegistryRow = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactRegistryNotFoundError()
+            return row.to_dataclass()
+
+    @repository_decorator()
     async def get_artifact_registry_datas(
         self, registry_ids: list[uuid.UUID]
     ) -> list[ArtifactRegistryData]:

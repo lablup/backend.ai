@@ -40,7 +40,7 @@ from ai.backend.manager.repositories.artifact.types import (
 )
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
-from ai.backend.manager.services.artifact.actions.retrieve_models import RetrieveModelsAction
+from ai.backend.manager.services.artifact.actions.retrieve_model_multi import RetrieveModelsAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
 from ai.backend.manager.services.artifact_revision.actions.approve import (
@@ -160,8 +160,9 @@ class ArtifactRevisionOrderBy:
 
 @strawberry.input(description="Added in 25.14.0")
 class ScanArtifactsInput:
-    registry_id: ID
+    registry_id: Optional[ID] = None
     limit: int
+    artifact_type: Optional[ArtifactType] = None
     search: Optional[str] = None
 
 
@@ -761,7 +762,8 @@ async def scan_artifacts(
 ) -> ScanArtifactsPayload:
     action_result = await info.context.processors.artifact.scan.wait_for_complete(
         ScanArtifactsAction(
-            registry_id=uuid.UUID(input.registry_id),
+            artifact_type=input.artifact_type,
+            registry_id=uuid.UUID(input.registry_id) if input.registry_id else None,
             limit=input.limit,
             # TODO: Move this huggingface_registries config if needed
             order=ModelSortKey.DOWNLOADS,

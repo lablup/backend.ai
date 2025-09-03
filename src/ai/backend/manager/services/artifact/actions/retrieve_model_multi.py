@@ -10,7 +10,7 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 @dataclass
 class RetrieveModelsAction(ArtifactAction):
-    registry_id: uuid.UUID
+    registry_id: Optional[uuid.UUID]
     models: list[ModelTarget]
 
     @override

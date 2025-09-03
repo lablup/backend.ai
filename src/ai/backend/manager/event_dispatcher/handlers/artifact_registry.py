@@ -2,7 +2,6 @@ import logging
 from typing import Callable
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
     DoScanReservoirRegistryEvent,
 )
@@ -63,9 +62,10 @@ class ArtifactRegistryEventHandler:
                     ScanArtifactsAction(
                         registry_id=registry.registry_id,
                         # Ignored in reservoir types
-                        order=ModelSortKey.DOWNLOADS,
-                        limit=-1,
+                        artifact_type=None,
+                        order=None,
                         search=None,
+                        limit=None,
                     )
                 )
                 log.info("Completed scanning reservoir registry: {}.", registry.registry_id)

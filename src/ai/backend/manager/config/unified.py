@@ -1743,6 +1743,19 @@ class ReservoirStorageConfig(BaseModel):
     )
 
 
+class ModelRegistryConfig(BaseModel):
+    model_registry: str = Field(
+        default="MODEL_REGISTRY_NAME",
+        description="""
+        Name of the Model registry configuration.
+        Used to identify this registry in the system.
+        """,
+        examples=["model-registry"],
+        validation_alias=AliasChoices("model-registry", "model_registry"),
+        serialization_alias="model-registry",
+    )
+
+
 class ManagerUnifiedConfig(BaseModel):
     # From legacy local config
     db: DatabaseConfig = Field(
@@ -1916,6 +1929,14 @@ class ManagerUnifiedConfig(BaseModel):
         Service discovery configuration.
         Controls how services are discovered and connected within the Backend.AI system.
         """,
+    )
+    artifact_registry: ModelRegistryConfig = Field(
+        default_factory=ModelRegistryConfig,
+        description="""
+        Default artifact registry config.
+        """,
+        validation_alias=AliasChoices("artifact_registry", "artifact-registry"),
+        serialization_alias="artifact-registry",
     )
     reservoir: ReservoirStorageConfig = Field(
         default_factory=ReservoirStorageConfig,

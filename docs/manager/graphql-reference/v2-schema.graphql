@@ -24,8 +24,9 @@ type Artifact implements Node {
   registry: SourceInfo!
   source: SourceInfo!
   readonly: Boolean!
+  scannedAt: DateTime!
+  updatedAt: DateTime!
   revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
-  updatedAt: DateTime
 }
 
 """Added in 25.14.0"""
@@ -960,8 +961,9 @@ type ScanArtifactModelsPayload {
 
 """Added in 25.14.0"""
 input ScanArtifactsInput {
-  registryId: ID!
+  registryId: ID = null
   limit: Int!
+  artifactType: ArtifactType!
   search: String = null
 }
 

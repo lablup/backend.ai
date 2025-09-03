@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import uuid
+from typing import Optional
 
 from aiohttp.client_exceptions import ClientConnectorError
 from pydantic import TypeAdapter
@@ -15,7 +17,9 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
     ArtifactRegistryType,
+    ArtifactType,
 )
+from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.dto.request import SearchArtifactsReq
 from ai.backend.manager.dto.response import SearchArtifactsResponse
 from ai.backend.manager.errors.artifact_registry import (
@@ -45,7 +49,7 @@ from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
     ListArtifactsWithRevisionsActionResult,
 )
-from ai.backend.manager.services.artifact.actions.retrieve_models import (
+from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (
     RetrieveModelsAction,
     RetrieveModelsActionResult,
 )
@@ -99,16 +103,19 @@ class ArtifactService:
 
         # TODO: Abstract remote registry client layer (scan, import)
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
-        registry_id = action.registry_id
-        registry_type = await self._artifact_registry_repository.get_artifact_registry_type(
-            registry_id
+
+        registry_meta = await self._resolve_artifact_registry_meta(
+            action.artifact_type, action.registry_id
         )
+        registry_type = registry_meta.type
+        registry_id = registry_meta.registry_id
+
         scanned_models = []
 
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
                 registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
-                    action.registry_id
+                    registry_id
                 )
                 storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
 
@@ -132,7 +139,7 @@ class ArtifactService:
             case ArtifactRegistryType.RESERVOIR:
                 registry_data = (
                     await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
-                        action.registry_id
+                        registry_id
                     )
                 )
                 remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
@@ -264,20 +271,23 @@ class ArtifactService:
         return UpsertArtifactsActionResult(result=result_data)
 
     async def retrieve_models(self, action: RetrieveModelsAction) -> RetrieveModelsActionResult:
+        registry_meta = await self._resolve_artifact_registry_meta(
+            ArtifactType.MODEL, action.registry_id
+        )
+        registry_type = registry_meta.type
+        registry_id = registry_meta.registry_id
+
+        if registry_type != ArtifactRegistryType.HUGGINGFACE:
+            raise NotImplementedError("Only HuggingFace registry is supported for model retrieval")
+
         reservoir_config = self._config_provider.config.reservoir
         storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
 
         # TODO: Abstract remote registry client layer (scan, import)
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
-        registry_type = await self._artifact_registry_repository.get_artifact_registry_type(
-            action.registry_id
-        )
-
-        if registry_type != ArtifactRegistryType.HUGGINGFACE:
-            raise NotImplementedError("Only HuggingFace registry is supported for model retrieval")
 
         registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
-            action.registry_id
+            registry_id
         )
 
         req = HuggingFaceRetrieveModelsReq(
@@ -291,3 +301,22 @@ class ArtifactService:
         )
 
         return RetrieveModelsActionResult(result=scanned_models)
+
+    async def _resolve_artifact_registry_meta(
+        self, artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
+    ) -> ArtifactRegistryData:
+        if registry_id_or_none is None:
+            # TODO: Handle `artifact_type` for other types
+            registry_name = self._config_provider.config.artifact_registry.model_registry
+            registry_meta = (
+                await self._artifact_registry_repository.get_artifact_registry_data_by_name(
+                    registry_name
+                )
+            )
+        else:
+            registry_id = registry_id_or_none
+            registry_meta = await self._artifact_registry_repository.get_artifact_registry_data(
+                registry_id
+            )
+
+        return registry_meta

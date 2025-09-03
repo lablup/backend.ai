@@ -19,7 +19,7 @@ from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
     ListArtifactsWithRevisionsActionResult,
 )
-from ai.backend.manager.services.artifact.actions.retrieve_models import (
+from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (
     RetrieveModelsAction,
     RetrieveModelsActionResult,
 )
