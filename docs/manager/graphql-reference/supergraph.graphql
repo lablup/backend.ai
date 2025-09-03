@@ -4877,7 +4877,7 @@ input ScanArtifactsInput
 {
   registryId: ID = null
   limit: Int!
-  artifactType: ArtifactType!
+  artifactType: ArtifactType = null
   search: String = null
 }
 
