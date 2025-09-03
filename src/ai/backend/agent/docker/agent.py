@@ -359,12 +359,16 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     int_uid = int(valid_uid)
                     int_gid = int(valid_gid)
                 except (TypeError, ValueError):
-                    log.exception("invalid uid/gid to chown: {}/{}", valid_uid, valid_gid)
+                    log.exception(
+                        "invalid uid/gid to chown: {}/{}, skip chown", valid_uid, valid_gid
+                    )
                     continue
                 try:
                     os.chown(p, int_uid, int_gid)
-                except OSError:
-                    log.exception("failed to chown {} to {}/{}", p, int_uid, int_gid)
+                except OSError as e:
+                    log.exception(
+                        "failed to chown {} to {}/{} (error: {})", p, int_uid, int_gid, repr(e)
+                    )
 
     async def prepare_scratch(self) -> None:
         loop = current_loop()
