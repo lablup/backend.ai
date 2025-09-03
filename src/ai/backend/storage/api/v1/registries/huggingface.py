@@ -14,10 +14,12 @@ from ai.backend.common.api_handlers import (
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
+    HuggingFaceRetrieveModelsReq,
     HuggingFaceScanModelsReq,
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
+    HuggingFaceRetrieveModelsResponse,
     HuggingFaceScanModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -60,6 +62,30 @@ class HuggingFaceRegistryAPIHandler:
 
         response = HuggingFaceScanModelsResponse(
             models=models,
+        )
+
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=response,
+        )
+
+    @api_handler
+    async def retrieve_models(
+        self,
+        body: BodyParam[HuggingFaceRetrieveModelsReq],
+    ) -> APIResponse:
+        """
+        Retrieve HuggingFace registry model data.
+        """
+        await log_client_api_entry(log, "retrieve", body.parsed)
+
+        model_datas = await self._huggingface_service.retrieve_models(
+            registry_name=body.parsed.registry_name,
+            models=body.parsed.models,
+        )
+
+        response = HuggingFaceRetrieveModelsResponse(
+            models=model_datas,
         )
 
         return APIResponse.build(
@@ -119,4 +145,5 @@ def create_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/scan", huggingface_api_handler.scan_models)
     app.router.add_route("POST", "/import", huggingface_api_handler.import_models)
 
+    app.router.add_route("POST", "/models/batch", huggingface_api_handler.retrieve_models)
     return app

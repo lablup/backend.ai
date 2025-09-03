@@ -10,6 +10,7 @@ from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     DownloadObjectReq,
     HuggingFaceImportModelsReq,
+    HuggingFaceRetrieveModelsReq,
     HuggingFaceScanModelsReq,
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
@@ -17,6 +18,7 @@ from ai.backend.common.dto.storage.request import (
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
+    HuggingFaceRetrieveModelsResponse,
     HuggingFaceScanModelsResponse,
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
@@ -663,6 +665,21 @@ class StorageProxyManagerFacingClient:
             body=req.model_dump(by_alias=True),
         )
         return HuggingFaceScanModelsResponse.model_validate(resp)
+
+    @client_decorator()
+    async def retrieve_huggingface_models(
+        self,
+        req: HuggingFaceRetrieveModelsReq,
+    ) -> HuggingFaceRetrieveModelsResponse:
+        """
+        Retreive HuggingFace models in the specified registry.
+        """
+        resp = await self._client.request_with_response(
+            "POST",
+            "v1/registries/huggingface/models/batch",
+            body=req.model_dump(by_alias=True),
+        )
+        return HuggingFaceRetrieveModelsResponse.model_validate(resp)
 
     @client_decorator()
     async def import_huggingface_models(

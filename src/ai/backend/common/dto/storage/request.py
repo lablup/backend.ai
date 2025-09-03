@@ -131,6 +131,27 @@ class HuggingFaceScanModelsReq(BaseRequestModel):
     )
 
 
+class HuggingFaceRetrieveModelsReq(BaseRequestModel):
+    """Request for retrieve HuggingFace models."""
+
+    registry_name: str = Field(
+        description="""
+        Name of the HuggingFace registry to scan.
+        This should match the configured registry name in the system.
+        """,
+        examples=["huggingface", "my-huggingface-registry"],
+    )
+    models: list[ModelTarget] = Field(
+        description="""
+        List of model targets to retrieve from the HuggingFace registry.
+        Each target must specify the model ID and optional revision.
+        """,
+        examples=[
+            {"model_id": "microsoft/DialoGPT-medium", "revision": "main"},
+        ],
+    )
+
+
 class HuggingFaceImportModelsReq(BaseRequestModel):
     """Request for batch importing multiple HuggingFace models to storage."""
 

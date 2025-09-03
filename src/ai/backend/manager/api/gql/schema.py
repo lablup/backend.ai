@@ -14,6 +14,7 @@ from .artifact import (
     cleanup_artifact_revisions,
     import_artifacts,
     reject_artifact_revision,
+    scan_artifact_models,
     scan_artifacts,
     update_artifact,
 )
@@ -104,6 +105,7 @@ class Mutation:
     get_presigned_upload_url = get_presigned_upload_url
     approve_artifact_revision = approve_artifact_revision
     reject_artifact_revision = reject_artifact_revision
+    scan_artifact_models = scan_artifact_models
 
 
 @strawberry.type

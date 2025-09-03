@@ -11,6 +11,7 @@ from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
+from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -40,6 +41,7 @@ from ai.backend.manager.repositories.artifact.types import (
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.get_revisions import GetArtifactRevisionsAction
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
+from ai.backend.manager.services.artifact.actions.retrieve_models import RetrieveModelsAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
 from ai.backend.manager.services.artifact_revision.actions.approve import (
@@ -198,6 +200,21 @@ class RejectArtifactInput:
 @strawberry.input(description="Added in 25.13.0")
 class ArtifactStatusChangedInput:
     artifact_revision_ids: list[ID]
+
+
+@strawberry.input(description="Added in 25.13.0")
+class ModelTarget:
+    model_id: str
+    revision: str
+
+    def to_dataclass(self) -> ModelTargetData:
+        return ModelTargetData(model_id=self.model_id, revision=self.revision)
+
+
+@strawberry.input(description="Added in 25.13.0")
+class ScanArtifactModelsInput:
+    models: list[ModelTarget]
+    registry_id: uuid.UUID
 
 
 # Object Types
@@ -396,6 +413,11 @@ class CancelImportArtifactPayload:
 @strawberry.type(description="Added in 25.13.0")
 class ArtifactStatusChangedPayload:
     artifact_revision: ArtifactRevision
+
+
+@strawberry.type(description="Added in 25.13.0")
+class ScanArtifactModelsPayload:
+    artifact_revision: ArtifactRevisionConnection
 
 
 async def resolve_artifacts(
@@ -903,6 +925,40 @@ async def reject_artifact_revision(
     return RejectArtifactPayload(
         artifact_revision=ArtifactRevision.from_dataclass(action_result.result)
     )
+
+
+@strawberry.mutation(description="Added in 25.13.0")
+async def scan_artifact_models(
+    input: ScanArtifactModelsInput, info: Info[StrawberryGQLContext]
+) -> ScanArtifactModelsPayload:
+    action_result = await info.context.processors.artifact.retrieve_models.wait_for_complete(
+        RetrieveModelsAction(
+            models=[m.to_dataclass() for m in input.models], registry_id=input.registry_id
+        )
+    )
+
+    edges = []
+    for data in action_result.result:
+        edges.extend([
+            ArtifactRevisionEdge(
+                node=ArtifactRevision.from_dataclass(revision),
+                cursor=to_global_id(ArtifactRevision, revision.id),
+            )
+            for revision in data.revisions
+        ])
+
+    artifacts_connection = ArtifactRevisionConnection(
+        count=len(edges),
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+    )
+
+    return ScanArtifactModelsPayload(artifact_revision=artifacts_connection)
 
 
 # Subscriptions

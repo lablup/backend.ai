@@ -2906,6 +2906,14 @@ input ModelRuntimeConfigInput
   environ: JSONString = null
 }
 
+"""Added in 25.13.0"""
+input ModelTarget
+  @join__type(graph: STRAWBERRY)
+{
+  modelId: String!
+  revision: String!
+}
+
 type ModifyAgent
   @join__type(graph: GRAPHENE)
 {
@@ -3771,6 +3779,9 @@ type Mutation
 
   """Added in 25.13.0"""
   rejectArtifactRevision(input: RejectArtifactInput!): RejectArtifactPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  scanArtifactModels(input: ScanArtifactModelsInput!): ScanArtifactModelsPayload! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""
@@ -4842,6 +4853,21 @@ type ScalingRule
   @join__type(graph: STRAWBERRY)
 {
   autoScalingRules: [EndpointAutoScalingRuleNode!]!
+}
+
+"""Added in 25.13.0"""
+input ScanArtifactModelsInput
+  @join__type(graph: STRAWBERRY)
+{
+  models: [ModelTarget!]!
+  registryId: UUID!
+}
+
+"""Added in 25.13.0"""
+type ScanArtifactModelsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  artifactRevision: ArtifactRevisionConnection!
 }
 
 """Added in 25.13.0"""

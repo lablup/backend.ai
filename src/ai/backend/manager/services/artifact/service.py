@@ -5,6 +5,7 @@ from aiohttp.client_exceptions import ClientConnectorError
 from pydantic import TypeAdapter
 
 from ai.backend.common.dto.storage.request import (
+    HuggingFaceRetrieveModelsReq,
     HuggingFaceScanModelsReq,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -43,6 +44,10 @@ from ai.backend.manager.services.artifact.actions.list import (
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
     ListArtifactsWithRevisionsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.retrieve_models import (
+    RetrieveModelsAction,
+    RetrieveModelsActionResult,
 )
 from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
@@ -257,3 +262,32 @@ class ArtifactService:
             )
 
         return UpsertArtifactsActionResult(result=result_data)
+
+    async def retrieve_models(self, action: RetrieveModelsAction) -> RetrieveModelsActionResult:
+        reservoir_config = self._config_provider.config.reservoir
+        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
+
+        # TODO: Abstract remote registry client layer (scan, import)
+        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+        registry_type = await self._artifact_registry_repository.get_artifact_registry_type(
+            action.registry_id
+        )
+
+        if registry_type != ArtifactRegistryType.HUGGINGFACE:
+            raise NotImplementedError("Only HuggingFace registry is supported for model retrieval")
+
+        registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
+            action.registry_id
+        )
+
+        req = HuggingFaceRetrieveModelsReq(
+            registry_name=registry_data.name,
+            models=action.models,
+        )
+        resp = await storage_proxy_client.retrieve_huggingface_models(req)
+        scanned_models = await self._artifact_repository.upsert_huggingface_model_artifacts(
+            resp.models,
+            registry_id=registry_data.id,
+        )
+
+        return RetrieveModelsActionResult(result=scanned_models)

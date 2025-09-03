@@ -72,6 +72,18 @@ class HuggingFaceScanModelsResponse(BaseResponseModel):
     )
 
 
+class HuggingFaceRetrieveModelsResponse(BaseResponseModel):
+    """Response for HuggingFace retrieve operation."""
+
+    models: list[ModelData] = Field(
+        default_factory=list,
+        description="""
+        List of HuggingFace models scanned and retrieved.
+        Each model includes comprehensive metadata and file information.
+        """,
+    )
+
+
 class HuggingFaceImportModelsResponse(BaseResponseModel):
     """Response for HuggingFace batch model import operation."""
 

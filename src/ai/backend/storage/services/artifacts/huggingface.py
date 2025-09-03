@@ -182,6 +182,41 @@ class HuggingFaceService:
 
         return models
 
+    async def retrieve_models(
+        self,
+        registry_name: str,
+        models: list[ModelTarget],
+    ) -> list[ModelData]:
+        """Retrieve specific models by their model_id and revision.
+
+        Args:
+            registry_name: Name of the HuggingFace registry
+            models: List of ModelTarget objects with model_id and revision
+
+        Returns:
+            List of ModelData objects with complete metadata
+
+        Raises:
+            HuggingFaceModelNotFoundError: If any model is not found
+            HuggingFaceAPIError: If API call fails
+        """
+        log.info(f"Retrieving {len(models)} HuggingFace models")
+
+        scanner = self._make_scanner(registry_name)
+        retrieved_models = []
+
+        for model in models:
+            try:
+                model_data = await scanner.scan_model(model)
+                retrieved_models.append(model_data)
+                log.debug(f"Successfully retrieved model: {model}")
+            except Exception as e:
+                log.error(f"Failed to retrieve model {model}: {str(e)}")
+                raise
+
+        log.info(f"Successfully retrieved {len(retrieved_models)} models")
+        return retrieved_models
+
     async def scan_model(self, registry_name: str, model: ModelTarget) -> ModelData:
         """Get detailed information about a specific model.
 
