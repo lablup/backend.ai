@@ -82,6 +82,7 @@ class Query:
 @strawberry.type
 class Mutation:
     scan_artifacts = scan_artifacts
+    scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
     update_artifact = update_artifact
     cleanup_artifact_revisions = cleanup_artifact_revisions
@@ -105,7 +106,6 @@ class Mutation:
     get_presigned_upload_url = get_presigned_upload_url
     approve_artifact_revision = approve_artifact_revision
     reject_artifact_revision = reject_artifact_revision
-    scan_artifact_models = scan_artifact_models
 
 
 @strawberry.type

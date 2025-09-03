@@ -24,7 +24,7 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class ArtifactRegistryMeta(Node):
     id: NodeID[str]
     name: str
