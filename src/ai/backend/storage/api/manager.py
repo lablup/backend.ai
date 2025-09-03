@@ -79,7 +79,7 @@ from ..utils import check_params, log_manager_api_entry
 from ..watcher import ChownTask, MountTask, UmountTask
 from .v1.registries.huggingface import create_app as create_huggingface_registries_app
 from .v1.registries.reservoir import create_app as create_reservoir_registries_app
-from .v1.storages import create_app as create_storages_app
+from .v1.storages.object_storage import create_app as create_object_storages_app
 from .vfolder.handler import VFolderHandler
 
 if TYPE_CHECKING:
@@ -1265,7 +1265,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
 
-    app.add_subapp("/v1/storages", create_storages_app(ctx))
+    app.add_subapp("/v1/storages/s3", create_object_storages_app(ctx))
     app.add_subapp("/v1/registries/huggingface", create_huggingface_registries_app(ctx))
     app.add_subapp("/v1/registries/reservoir", create_reservoir_registries_app(ctx))
 

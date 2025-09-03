@@ -29,11 +29,11 @@ from ai.backend.storage.config.unified import (
     ObjectStorageConfig,
 )
 
-from ...services.storages.object_storage import ObjectStorageService
-from ...utils import log_client_api_entry
+from ....services.storages.object_storage import ObjectStorageService
+from ....utils import log_client_api_entry
 
 if TYPE_CHECKING:
-    from ...context import RootContext
+    from ....context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -225,33 +225,33 @@ class ObjectStorageAPIHandler:
 def create_app(ctx: RootContext) -> web.Application:
     app = web.Application()
     app["ctx"] = ctx
-    app["prefix"] = "v1/storages"
+    app["prefix"] = "v1/storages/s3"
 
     api_handler = ObjectStorageAPIHandler(
         storage_configs=ctx.local_config.storages,
     )
     app.router.add_route(
-        "GET", "/s3/{storage_name}/buckets/{bucket_name}/object/meta", api_handler.get_object_meta
+        "GET", "/{storage_name}/buckets/{bucket_name}/object/meta", api_handler.get_object_meta
     )
     app.router.add_route(
-        "DELETE", "/s3/{storage_name}/buckets/{bucket_name}/object", api_handler.delete_object
+        "DELETE", "/{storage_name}/buckets/{bucket_name}/object", api_handler.delete_object
     )
     app.router.add_route(
-        "POST", "/s3/{storage_name}/buckets/{bucket_name}/object/upload", api_handler.upload_object
+        "POST", "/{storage_name}/buckets/{bucket_name}/object/upload", api_handler.upload_object
     )
     app.router.add_route(
         "POST",
-        "/s3/{storage_name}/buckets/{bucket_name}/object/download",
+        "/{storage_name}/buckets/{bucket_name}/object/download",
         api_handler.download_file,
     )
     app.router.add_route(
         "POST",
-        "/s3/{storage_name}/buckets/{bucket_name}/object/presigned/upload",
+        "/{storage_name}/buckets/{bucket_name}/object/presigned/upload",
         api_handler.presigned_upload_url,
     )
     app.router.add_route(
         "POST",
-        "/s3/{storage_name}/buckets/{bucket_name}/object/presigned/download",
+        "/{storage_name}/buckets/{bucket_name}/object/presigned/download",
         api_handler.presigned_download_url,
     )
 

@@ -44,7 +44,7 @@ class ReservoirRegistryAPIHandler:
         body: BodyParam[ReservoirImportModelsReq],
     ) -> APIResponse:
         """
-        Import multiple HuggingFace models to storage in batch.
+        Import multiple models to storage in batch.
         """
         await log_client_api_entry(log, "import_models", None)
 
