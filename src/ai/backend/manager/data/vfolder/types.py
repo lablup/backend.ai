@@ -13,6 +13,8 @@ from ai.backend.common.dto.manager.field import (
 )
 from ai.backend.common.types import CIStrEnum, QuotaScopeID, VFolderID, VFolderUsageMode
 
+from ..permission.types import OperationType
+
 
 class VFolderOwnershipType(CIStrEnum):
     """
@@ -56,6 +58,16 @@ class VFolderMountPermission(enum.StrEnum):
             case "WD" | "OWNER_PERM":
                 return cls.OWNER_PERM
         return None
+
+    def to_rbac_operation(self) -> set[OperationType]:
+        match self:
+            case VFolderMountPermission.READ_ONLY:
+                return {OperationType.READ}
+            case VFolderMountPermission.READ_WRITE:
+                return {OperationType.READ, OperationType.UPDATE, OperationType.SOFT_DELETE}
+            case VFolderMountPermission.RW_DELETE | VFolderMountPermission.OWNER_PERM:
+                return {OperationType.READ, OperationType.UPDATE, OperationType.SOFT_DELETE}
+        return set()
 
 
 class VFolderInvitationState(enum.StrEnum):

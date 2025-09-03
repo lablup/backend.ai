@@ -24,6 +24,8 @@ from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
 
+from ..permission_controller.role_manager import RoleManager
+
 # Layer-specific decorator for group repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.GROUP)
 
@@ -34,6 +36,7 @@ class GroupRepository:
     _db: ExtendedAsyncSAEngine
     _config_provider: ManagerConfigProvider
     _valkey_stat_client: ValkeyStatClient
+    _role_manager: RoleManager
 
     def __init__(
         self,
@@ -44,6 +47,7 @@ class GroupRepository:
         self._db = db
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
+        self._role_manager = RoleManager()
 
     async def _get_group_by_id(self, session: SASession, group_id: uuid.UUID) -> Optional[GroupRow]:
         """Private method to get a group by ID using an existing session."""
@@ -61,6 +65,7 @@ class GroupRepository:
 
             data = row.to_data()
             # Create RBAC role and permissions for the group
+            await self._role_manager.create_system_role(db_session, data)
 
             return data
 

@@ -28,15 +28,19 @@ from ai.backend.manager.models.rbac.permission_defs import DomainPermission, Sca
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
+from ..permission_controller.role_manager import RoleManager
+
 # Layer-specific decorator for domain repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.DOMAIN)
 
 
 class DomainRepository:
     _db: ExtendedAsyncSAEngine
+    _role_manager: RoleManager
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._role_manager = RoleManager()
 
     @repository_decorator()
     async def create_domain_validated(self, creator: DomainCreator) -> DomainData:
@@ -51,6 +55,7 @@ class DomainRepository:
             await db_session.refresh(domain)
 
             result = domain.to_data()
+            await self._role_manager.create_system_role(db_session, result)
 
             # Create model-store group for the domain
             await self._create_model_store_group(db_session, creator.name)

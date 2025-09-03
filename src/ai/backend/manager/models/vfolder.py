@@ -53,6 +53,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.vfolder.types import (
+    VFolderData,
     VFolderInvitationState,
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -471,6 +472,30 @@ class VFolderRow(Base):
     @property
     def vfid(self) -> VFolderID:
         return VFolderID(self.quota_scope_id, self.id)
+
+    def to_data(self) -> VFolderData:
+        return VFolderData(
+            id=self.id,
+            name=self.name,
+            domain_name=self.domain_name,
+            quota_scope_id=self.quota_scope_id,
+            usage_mode=self.usage_mode,
+            permission=self.permission,
+            host=self.host,
+            max_files=self.max_files,
+            max_size=self.max_size,
+            num_files=self.num_files,
+            cur_size=self.cur_size,
+            created_at=self.created_at,
+            last_used=self.last_used,
+            creator=self.creator,
+            unmanaged_path=self.unmanaged_path,
+            ownership_type=self.ownership_type,
+            user=self.user,
+            group=self.group,
+            cloneable=self.cloneable,
+            status=self.status,
+        )
 
 
 def is_unmanaged(unmanaged_path: Optional[str]) -> bool:

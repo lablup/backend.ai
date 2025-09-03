@@ -13,6 +13,8 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserCreator, UserData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
@@ -36,15 +38,19 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.user.actions.modify_user import UserModifier
 
+from ..permission_controller.role_manager import RoleManager
+
 # Layer-specific decorator for user repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.USER)
 
 
 class UserRepository:
     _db: ExtendedAsyncSAEngine
+    _role_manager: RoleManager
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._role_manager = RoleManager()
 
     @repository_decorator()
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
@@ -130,9 +136,16 @@ class UserRepository:
             created_user.main_access_key = kp_data["access_key"]
 
             # Add user to groups including model store project
-            conn = await db_session.connection()
             await self._add_user_to_groups(
-                conn, created_user.uuid, created_user.domain_name, group_ids or []
+                db_session, created_user.uuid, created_user.domain_name, group_ids or []
+            )
+
+            role = await self._role_manager.create_system_role(db_session, created_user)
+            await self._role_manager.map_user_to_role(db_session, created_user.uuid, role.id)
+            await self._role_manager.map_entity_to_scope(
+                db_session,
+                ObjectId(EntityType.USER, str(created_user.uuid)),
+                ScopeId(ScopeType.DOMAIN, str(created_user.domain_name)),
             )
 
         return created_user
@@ -251,12 +264,12 @@ class UserRepository:
         return True
 
     async def _add_user_to_groups(
-        self, conn, user_uuid: UUID, domain_name: str, group_ids: list[str]
+        self, db_session: SASession, user_uuid: UUID, domain_name: str, group_ids: list[str]
     ) -> None:
         """Private method to add user to groups including model store project."""
         # Check for model store project
-        model_store_query = sa.select([groups.c.id]).where(groups.c.type == ProjectType.MODEL_STORE)
-        model_store_project = (await conn.execute(model_store_query)).first()
+        model_store_query = sa.select(groups.c.id).where(groups.c.type == ProjectType.MODEL_STORE)
+        model_store_project = (await db_session.execute(model_store_query)).first()
 
         gids_to_join = list(group_ids)
         if model_store_project:
@@ -264,16 +277,16 @@ class UserRepository:
 
         if gids_to_join:
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == domain_name)
                 .where(groups.c.id.in_(gids_to_join))
             )
-            grps = (await conn.execute(query)).all()
+            grps = (await db_session.execute(query)).all()
             if grps:
                 group_data = [{"user_id": user_uuid, "group_id": grp.id} for grp in grps]
                 group_insert_query = sa.insert(association_groups_users).values(group_data)
-                await conn.execute(group_insert_query)
+                await db_session.execute(group_insert_query)
 
     async def _validate_and_update_main_access_key(
         self, conn, email: str, main_access_key: str
