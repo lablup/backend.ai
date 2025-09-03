@@ -1,5 +1,21 @@
 import enum
 
+from ai.backend.manager.data.permission.status import (
+    RoleStatus as OriginalRoleStatus,
+)
+from ai.backend.manager.data.permission.types import (
+    EntityType as OriginalEntityType,
+)
+from ai.backend.manager.data.permission.types import (
+    OperationType as OriginalOperationType,
+)
+from ai.backend.manager.data.permission.types import (
+    RoleSource as OriginalRoleSource,
+)
+from ai.backend.manager.data.permission.types import (
+    ScopeType as OriginalScopeType,
+)
+
 
 class RoleSource(enum.StrEnum):
     """
@@ -8,6 +24,18 @@ class RoleSource(enum.StrEnum):
 
     SYSTEM = "system"  # System-defined role, e.g., default roles
     CUSTOM = "custom"  # Custom role defined
+
+    def to_original(self) -> OriginalRoleSource:
+        return OriginalRoleSource(self.value)
+
+
+class RoleStatus(enum.StrEnum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+    DELETED = "deleted"
+
+    def to_original(self) -> OriginalRoleStatus:
+        return OriginalRoleStatus(self.value)
 
 
 class OperationType(enum.StrEnum):
@@ -21,6 +49,9 @@ class OperationType(enum.StrEnum):
     GRANT_UPDATE = "grant:update"
     GRANT_SOFT_DELETE = "grant:soft-delete"
     GRANT_HARD_DELETE = "grant:hard-delete"
+
+    def to_original(self) -> OriginalOperationType:
+        return OriginalOperationType(self.value)
 
     @classmethod
     def owner_operations(cls) -> set["OperationType"]:
@@ -49,6 +80,15 @@ class OperationType(enum.StrEnum):
         }
 
 
+class ScopeType(enum.StrEnum):
+    DOMAIN = "domain"
+    PROJECT = "project"
+    USER = "user"
+
+    def to_original(self) -> OriginalScopeType:
+        return OriginalScopeType(self.value)
+
+
 class EntityType(enum.StrEnum):
     USER = "user"
     PROJECT = "project"
@@ -57,6 +97,9 @@ class EntityType(enum.StrEnum):
     VFOLDER = "vfolder"
     IMAGE = "image"
     SESSION = "session"
+
+    def to_original(self) -> OriginalEntityType:
+        return OriginalEntityType(self.value)
 
     @classmethod
     def _scope_types(cls) -> set["EntityType"]:
@@ -96,9 +139,3 @@ class EntityType(enum.StrEnum):
         Returns a set of entity types that are accessible by member roles.
         """
         return {*cls._resource_types(), cls.USER}
-
-
-class ScopeType(enum.StrEnum):
-    DOMAIN = "domain"
-    PROJECT = "project"
-    USER = "user"
