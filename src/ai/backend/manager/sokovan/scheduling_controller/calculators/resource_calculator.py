@@ -309,7 +309,7 @@ class ResourceCalculator:
 
         # Apply fractional resource fragmentation setting
         # TODO: Add this to scaling_group_info if needed
-        allow_fractional = resource_opts.get("allow_fractional_resource_fragmentation", False)
+        allow_fractional = resource_opts.get("allow_fractional_resource_fragmentation", True)
         resource_opts["allow_fractional_resource_fragmentation"] = allow_fractional
 
         # Adjust image minimum slots for shared memory

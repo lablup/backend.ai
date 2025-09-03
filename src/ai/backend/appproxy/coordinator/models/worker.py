@@ -256,7 +256,7 @@ class Worker(Base, BaseMixin):
                         subdomain=c.subdomain,
                         circuit_id=c.id,
                     )
-                    for c in self.circuits
+                    for c in circuits
                 ]
             case _:
                 raise ValueError(f"Invalid frontend mode: {self.frontend_mode}")

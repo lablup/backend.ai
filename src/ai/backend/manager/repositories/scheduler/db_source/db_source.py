@@ -262,6 +262,7 @@ class ScheduleDBSource:
                 SessionRow.priority,
                 SessionRow.session_type,
                 SessionRow.cluster_mode,
+                SessionRow.designated_agent_ids,
                 SessionRow.starts_at,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.image.label("kernel_image"),
@@ -298,6 +299,7 @@ class ScheduleDBSource:
                     cluster_mode=row.cluster_mode,
                     starts_at=row.starts_at,
                     is_private=row.session_type in SessionTypes.private_types(),
+                    designated_agent_ids=row.designated_agent_ids,
                     kernels=[],
                 )
 
@@ -959,6 +961,7 @@ class ScheduleDBSource:
                 images=session_data.images,
                 network_type=session_data.network_type,
                 network_id=session_data.network_id,
+                designated_agent_ids=session_data.designated_agent_list,
                 bootstrap_script=session_data.bootstrap_script,
                 use_host_network=session_data.use_host_network,
                 timeout=session_data.timeout,
@@ -979,7 +982,6 @@ class ScheduleDBSource:
                     cluster_idx=kernel.cluster_idx,
                     local_rank=kernel.local_rank,
                     cluster_hostname=kernel.cluster_hostname,
-                    agent=kernel.agent,
                     scaling_group=kernel.scaling_group,
                     domain_name=kernel.domain_name,
                     group_id=kernel.group_id,
@@ -1371,7 +1373,7 @@ class ScheduleDBSource:
         allowed_sgroups = await query_allowed_sgroups(
             db_sess,
             domain_name,
-            group_id,
+            UUID(group_id),
             access_key,
         )
 
@@ -2337,6 +2339,8 @@ class ScheduleDBSource:
                     session_id=session.id,
                     creation_id=session.creation_id,
                     session_name=session.name,
+                    network_type=session.network_type,
+                    network_id=session.network_id,
                     session_type=session.session_type,
                     access_key=session.access_key,
                     cluster_mode=session.cluster_mode,
@@ -3135,7 +3139,12 @@ class ScheduleDBSource:
             # Update session to PENDING with reset retry count
             update_stmt = (
                 sa.update(SessionRow)
-                .where(SessionRow.id == session_id)
+                .where(
+                    sa.and_(
+                        SessionRow.id == session_id,
+                        SessionRow.status.in_(SessionStatus.retriable_statuses()),
+                    )
+                )
                 .values(
                     status=SessionStatus.PENDING,
                     status_data=sql_json_merge(
@@ -3150,8 +3159,15 @@ class ScheduleDBSource:
             # Also update kernel status to PENDING
             kernel_stmt = (
                 sa.update(KernelRow)
-                .where(KernelRow.session_id == session_id)
+                .where(
+                    sa.and_(
+                        KernelRow.session_id == session_id,
+                        KernelRow.status.in_(KernelStatus.retriable_statuses()),
+                    )
+                )
                 .values(
+                    agent=None,
+                    agent_addr=None,
                     status=KernelStatus.PENDING,
                     status_data=sql_json_merge(
                         KernelRow.status_data,
@@ -3298,3 +3314,24 @@ class ScheduleDBSource:
             sftp_count = sftp_result.scalar() or 0
 
             return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
+
+    async def update_session_network_id(
+        self,
+        session_id: SessionId,
+        network_id: Optional[str],
+    ) -> None:
+        """
+        Update session's network information in the database.
+
+        :param session_id: The session ID to update
+        :param network_id: The network ID to set (or None to clear)
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            update_stmt = (
+                sa.update(SessionRow)
+                .where(SessionRow.id == session_id)
+                .values(
+                    network_id=network_id,
+                )
+            )
+            await db_sess.execute(update_stmt)

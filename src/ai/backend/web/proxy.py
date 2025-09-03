@@ -5,16 +5,17 @@ import base64
 import json
 import logging
 import random
-from typing import Iterable, Optional, Tuple, Union, cast
+from typing import Final, Iterable, Optional, Tuple, Union, cast
 
 import aiohttp
 from aiohttp import web
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import unpad
+from multidict import CIMultiDict
 from trafaret import DataError
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
-from ai.backend.client.request import Request
+from ai.backend.client.request import Request, RequestContent
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging import BraceStyleAdapter
@@ -29,6 +30,19 @@ HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",
     "Authorization",
 ]
+
+CHUNK_SIZE: Final[int] = 64 * 1024
+
+HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
+    ("Connection", 1),
+    ("Keep-Alive", 1),
+    ("Proxy-Authenticate", 1),
+    ("Proxy-Authorization", 1),
+    ("TE", 1),
+    ("Trailers", 1),
+    ("Transfer-Encoding", 1),
+    ("Upgrade", 1),
+])
 
 
 class WebSocketProxy:
@@ -133,16 +147,16 @@ def _decrypt_payload(endpoint: str, payload: bytes) -> bytes:
 
 @web.middleware
 async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
+    config: WebServerUnifiedConfig = request.app["config"]
     try:
         request_headers = extra_config_headers.check(request.headers)
     except DataError as e:
         raise InvalidAPIParameters(f"Invalid request headers: {e}") from e
     secure_context = request_headers.get("X-BackendAI-Encoded", None)
     if secure_context:
-        if not request.can_read_body:  # designated as encrypted but has an empty payload
-            request["payload"] = ""
+        if not request.body_exists:  # designated as encrypted but has an empty payload
+            request["payload"] = None
             return await handler(request)
-        config = cast(WebServerUnifiedConfig, request.app["config"])
         scheme = (
             str(config.service.force_endpoint_protocol)
             if config.service.force_endpoint_protocol
@@ -156,102 +170,89 @@ async def decrypt_payload(request: web.Request, handler) -> web.StreamResponse:
     else:
         # For all other requests without explicit encryption,
         # let the handler decide how to read the body.
-        request["payload"] = ""
+        request["payload"] = None
     return await handler(request)
 
 
 async def web_handler(
-    request: web.Request,
+    frontend_rqst: web.Request,
     *,
     is_anonymous: bool = False,
     api_endpoint: Optional[str] = None,
     http_headers_to_forward_extra: Iterable[str] | None = None,
 ) -> web.StreamResponse:
-    stats: WebStats = request.app["stats"]
+    stats: WebStats = frontend_rqst.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
-    path = request.match_info.get("path", "")
+    path = frontend_rqst.match_info.get("path", "")
     if is_anonymous:
-        api_session = await asyncio.shield(get_anonymous_session(request, api_endpoint))
+        api_session = await asyncio.shield(get_anonymous_session(frontend_rqst, api_endpoint))
     else:
-        api_session = await asyncio.shield(get_api_session(request, api_endpoint))
+        api_session = await asyncio.shield(get_api_session(frontend_rqst, api_endpoint))
     http_headers_to_forward_extra = http_headers_to_forward_extra or []
     try:
         async with api_session:
             # We perform request signing by ourselves using the HTTP session data,
             # but need to keep the client's version header so that
             # the final clients may perform its own API versioning support.
-            request_headers = extra_config_headers.check(request.headers)
-            request_api_version = request_headers.get("X-BackendAI-Version", None)
-            secure_context = request_headers.get("X-BackendAI-Encoded", None)
+            backend_rqst_hdrs = extra_config_headers.check(frontend_rqst.headers)
+            request_api_version = backend_rqst_hdrs.get("X-BackendAI-Version", None)
+            secure_context = backend_rqst_hdrs.get("X-BackendAI-Encoded", None)
             decrypted_payload_length = 0
-            if secure_context:
-                payload = request["payload"]
-                decrypted_payload_length = len(payload)
-            else:
-                payload = request.content
-            fill_forwarding_hdrs_to_api_session(request, api_session)
+            content: RequestContent = None
+            if frontend_rqst.body_exists:
+                if secure_context:
+                    # Use the decrypted payload as request content
+                    content = cast(bytes, frontend_rqst["payload"])
+                    decrypted_payload_length = len(content)
+                else:
+                    # Passthrough the streamed content
+                    content = frontend_rqst.content
+            fill_forwarding_hdrs_to_api_session(frontend_rqst, api_session)
             # Deliver cookie for token-based authentication.
-            api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            # We treat all requests and responses as streaming universally
-            # to be a transparent proxy.
-            api_request = Request(
-                request.method,
+            api_session.aiohttp_session.cookie_jar.update_cookies(frontend_rqst.cookies)
+            backend_rqst = Request(
+                frontend_rqst.method,
                 path,
-                payload,
-                params=request.query,
+                content,
+                params=frontend_rqst.query,
                 override_api_version=request_api_version,
             )
-            if "Content-Type" in request.headers:
-                api_request.content_type = request.content_type  # set for signing
-                api_request.headers["Content-Type"] = request.headers[
+            if "Content-Type" in frontend_rqst.headers:
+                backend_rqst.content_type = frontend_rqst.content_type  # set for signing
+                backend_rqst.headers["Content-Type"] = frontend_rqst.headers[
                     "Content-Type"
                 ]  # preserve raw value
-            if "Content-Length" in request.headers and not secure_context:
-                api_request.headers["Content-Length"] = request.headers["Content-Length"]
-            if "Content-Length" in request.headers and secure_context:
-                api_request.headers["Content-Length"] = str(decrypted_payload_length)
-            for hdr in {*HTTP_HEADERS_TO_FORWARD, *http_headers_to_forward_extra}:
+            if "Content-Length" in frontend_rqst.headers and not secure_context:
+                backend_rqst.headers["Content-Length"] = frontend_rqst.headers["Content-Length"]
+            if "Content-Length" in frontend_rqst.headers and secure_context:
+                backend_rqst.headers["Content-Length"] = str(decrypted_payload_length)
+            for key in {*HTTP_HEADERS_TO_FORWARD, *http_headers_to_forward_extra}:
                 # Prevent malicious or accidental modification of critical headers.
-                if hdr in api_request.headers:
+                if key in backend_rqst.headers:
                     continue
-                if request.headers.get(hdr) is not None:
-                    api_request.headers[hdr] = request.headers[hdr]
-            # Uploading request body happens at the entering of the block,
-            # and downloading response body happens in the read loop inside.
-            config = cast(WebServerUnifiedConfig, request.app["config"])
-            async with api_request.fetch() as up_resp:
-                down_resp = web.StreamResponse()
-                down_resp.set_status(up_resp.status, up_resp.reason)
-
-                final_headers = dict(up_resp.headers)
-
-                # figure out if the response body is gzipped by checking the first chunk
-                first_chunk = await up_resp.read(8192)
-                if config.apollo_router.enabled:
-                    if first_chunk:
-                        body_is_actually_gzipped = first_chunk.startswith(b"\x1f\x8b")
-                        header_says_gzipped = (
-                            "gzip" in final_headers.get("Content-Encoding", "").lower()
-                        )
-                        # If reponse header says gzipped but the body is not actually gzipped,
-                        # remove the header to prevent confusion.
-                        if header_says_gzipped and not body_is_actually_gzipped:
-                            del final_headers["Content-Encoding"]
-
-                # We already have configured CORS handlers and the API server
-                # also provides those headers.  Just let them as-is.
-                down_resp.headers.update(final_headers)
-                await down_resp.prepare(request)
-
-                if first_chunk:
-                    await down_resp.write(first_chunk)
-
-                while True:
-                    chunk = await up_resp.read(8192)
-                    if not chunk:
-                        break
-                    await down_resp.write(chunk)
-                return down_resp
+                if (value := frontend_rqst.headers.get(key)) is not None:
+                    backend_rqst.headers[key] = value
+            async with backend_rqst.fetch() as backend_resp:
+                frontend_resp_hdrs = {
+                    key: value
+                    for key, value in backend_resp.headers.items()
+                    if key not in HOP_ONLY_HEADERS
+                }
+                frontend_resp = web.StreamResponse(
+                    status=backend_resp.status,
+                    reason=backend_resp.reason,
+                    headers=frontend_resp_hdrs,
+                )
+                await frontend_resp.prepare(frontend_rqst)
+                try:
+                    while True:
+                        chunk = await backend_resp.read(CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        await frontend_resp.write(chunk)
+                finally:
+                    await frontend_resp.write_eof()
+                return frontend_resp
     except asyncio.CancelledError:
         raise
     except BackendAPIError as e:
@@ -283,55 +284,69 @@ async def web_handler(
         await api_session.close()
 
 
-async def web_plugin_handler(request, *, is_anonymous=False) -> web.StreamResponse:
+async def web_plugin_handler(
+    frontend_rqst: web.Request,
+    *,
+    is_anonymous: bool = False,
+) -> web.StreamResponse:
     """
     This handler is almost same to web_handler, but does not manipulate the
     content-type and content-length headers before sending up-requests.
     It also configures the domain in the json body for "auth/signup" requests.
     """
-    stats: WebStats = request.app["stats"]
+    stats: WebStats = frontend_rqst.app["stats"]
     stats.active_proxy_plugin_handlers.add(asyncio.current_task())  # type: ignore
-    path = request.match_info["path"]
+    path = frontend_rqst.match_info["path"]
     if is_anonymous:
-        api_session = await asyncio.shield(get_anonymous_session(request))
+        api_session = await asyncio.shield(get_anonymous_session(frontend_rqst))
     else:
-        api_session = await asyncio.shield(get_api_session(request))
+        api_session = await asyncio.shield(get_api_session(frontend_rqst))
+    config: WebServerUnifiedConfig = frontend_rqst.app["config"]
     try:
+        content: RequestContent = None
         async with api_session:
-            content = request.content
-            if path == "auth/signup":
-                body = await request.json()
-                config = cast(WebServerUnifiedConfig, request.app["config"])
-                body["domain"] = config.api.domain
-                content = json.dumps(body).encode("utf8")
-            request_api_version = request.headers.get("X-BackendAI-Version", None)
-            fill_forwarding_hdrs_to_api_session(request, api_session)
+            if frontend_rqst.body_exists:
+                content = frontend_rqst.content
+                if path == "auth/signup":
+                    body = await frontend_rqst.json()
+                    body["domain"] = config.api.domain
+                    content = json.dumps(body).encode("utf8")
+            request_api_version = frontend_rqst.headers.get("X-BackendAI-Version", None)
+            fill_forwarding_hdrs_to_api_session(frontend_rqst, api_session)
             # Deliver cookie for token-based authentication.
-            api_session.aiohttp_session.cookie_jar.update_cookies(request.cookies)
-            api_request = Request(
-                request.method,
+            api_session.aiohttp_session.cookie_jar.update_cookies(frontend_rqst.cookies)
+            backend_rqst = Request(
+                frontend_rqst.method,
                 path,
                 content,
-                params=request.query,
-                content_type=request.content_type,
+                params=frontend_rqst.query,
+                content_type=frontend_rqst.content_type,
                 override_api_version=request_api_version,
             )
-            for hdr in HTTP_HEADERS_TO_FORWARD:
-                if request.headers.get(hdr) is not None:
-                    api_request.headers[hdr] = request.headers[hdr]
-            async with api_request.fetch() as up_resp:
-                down_resp = web.StreamResponse()
-                down_resp.set_status(up_resp.status, up_resp.reason)
-                down_resp.headers.update(up_resp.headers)
-                # We already have configured CORS handlers and the API server
-                # also provides those headers.  Just let them as-is.
-                await down_resp.prepare(request)
-                while True:
-                    chunk = await up_resp.read(8192)
-                    if not chunk:
-                        break
-                    await down_resp.write(chunk)
-                return down_resp
+            for key in HTTP_HEADERS_TO_FORWARD:
+                if (value := frontend_rqst.headers.get(key)) is not None:
+                    backend_rqst.headers[key] = value
+            async with backend_rqst.fetch() as backend_resp:
+                frontend_resp_hdrs = {
+                    key: value
+                    for key, value in backend_resp.headers.items()
+                    if key not in HOP_ONLY_HEADERS
+                }
+                frontend_resp = web.StreamResponse(
+                    status=backend_resp.status,
+                    reason=backend_resp.reason,
+                    headers=frontend_resp_hdrs,
+                )
+                await frontend_resp.prepare(frontend_rqst)
+                try:
+                    while True:
+                        chunk = await backend_resp.read(CHUNK_SIZE)
+                        if not chunk:
+                            break
+                        await frontend_resp.write(chunk)
+                finally:
+                    await frontend_resp.write_eof()
+                return frontend_resp
     except asyncio.CancelledError:
         raise
     except BackendAPIError as e:

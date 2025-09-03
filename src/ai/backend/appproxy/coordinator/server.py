@@ -398,7 +398,7 @@ async def on_route_update_event(
     )
     route_connection_info = InferenceAppConfigDict.validate_json(route_connection_info_json)
 
-    health_check_enabled = health_check_enabled_str == "true"
+    health_check_enabled = health_check_enabled_str.decode() == "true"
     health_check_config: HealthCheckConfig | None
     if health_check_enabled:
         assert health_check_config_json, (
@@ -419,21 +419,22 @@ async def on_route_update_event(
     async def _update(db_sess: SASession) -> None:
         endpoint = await Endpoint.get(db_sess, event.endpoint_id)
         circuit = await Circuit.get_by_endpoint(db_sess, endpoint.id)
-        traffic_ratios = await redis_helper.execute(
-            context.core_redis_live,
-            lambda r: r.mget(*[
-                f"endpoint.{event.endpoint_id}.session.{route.session_id}.traffic_ratio"
-                for route in new_routes.values()
-            ]),
-        )
-        for idx, route in enumerate(new_routes.values()):
-            route.traffic_ratio = float(traffic_ratios[idx] or 1.0)
         old_routes = circuit.route_info or []
-        for route in old_routes:
-            if _duplicate_route := new_routes.get(route.session_id):
-                _duplicate_route.health_status = route.health_status
-                _duplicate_route.last_health_check = route.last_health_check
-                _duplicate_route.consecutive_failures = route.consecutive_failures
+        if new_routes:
+            traffic_ratios = await redis_helper.execute(
+                context.core_redis_live,
+                lambda r: r.mget(*[
+                    f"endpoint.{event.endpoint_id}.session.{route.session_id}.traffic_ratio"
+                    for route in new_routes.values()
+                ]),
+            )
+            for idx, route in enumerate(new_routes.values()):
+                route.traffic_ratio = float(traffic_ratios[idx] or 1.0)
+            for route in old_routes:
+                if _duplicate_route := new_routes.get(route.session_id):
+                    _duplicate_route.health_status = route.health_status
+                    _duplicate_route.last_health_check = route.last_health_check
+                    _duplicate_route.consecutive_failures = route.consecutive_failures
         circuit.route_info = list(new_routes.values())
 
         endpoint.health_check_enabled = health_check_enabled
@@ -448,8 +449,8 @@ async def on_route_update_event(
                 (r.session_id, None, ModelServiceStatus.HEALTHY) for r in circuit.route_info
             ])
 
-            # Propagate updated route information to AppProxy workers
-            await context.health_engine.propagate_route_updates_to_workers(circuit, old_routes)
+        # Propagate updated route information to AppProxy workers
+        await context.health_engine.propagate_route_updates_to_workers(circuit, old_routes)
 
     async with context.db.connect() as db_conn:
         await execute_with_txn_retry(_update, context.db.begin_session, db_conn)

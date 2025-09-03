@@ -40,7 +40,7 @@ def create_session_workload(
     session_id: Optional[SessionId] = None,
     cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
     kernels: Optional[list[KernelWorkload]] = None,
-    designated_agent: Optional[AgentId] = None,
+    designated_agent_ids: Optional[list[AgentId]] = None,
     **kwargs,
 ) -> SessionWorkload:
     """Create a SessionWorkload for testing."""
@@ -75,7 +75,7 @@ def create_session_workload(
         starts_at=starts_at,
         is_private=is_private,
         kernels=kernels,
-        designated_agent=designated_agent,
+        designated_agent_ids=designated_agent_ids,
         kernel_counts_at_endpoint=kernel_counts_at_endpoint,
     )
 
@@ -451,7 +451,7 @@ class TestSchedulerAllocation:
         workload = create_session_workload(
             cluster_mode=ClusterMode.SINGLE_NODE,
             kernels=kernels,
-            designated_agent=designated_agent,
+            designated_agent_ids=[designated_agent],
         )
 
         agents = [
@@ -468,15 +468,17 @@ class TestSchedulerAllocation:
             agents: list[AgentInfo],
             criteria: AgentSelectionCriteria,
             config: AgentSelectionConfig,
-            designated_agent: Optional[AgentId],
+            designated_agent_ids: Optional[list[AgentId]],
         ) -> list[AgentSelection]:
             from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentSelection
 
             resource_requirements = criteria.get_resource_requirements()
             selections = []
+            if not designated_agent_ids:
+                raise AgentSelectionError("No designated agent provided")
             for resource_req in resource_requirements:
                 for agent in agents:
-                    if agent.agent_id == designated_agent:
+                    if agent.agent_id in designated_agent_ids:
                         selections.append(
                             AgentSelection(
                                 resource_requirements=resource_req,
@@ -504,9 +506,9 @@ class TestSchedulerAllocation:
         mock_selector = cast(Mock, scheduler._default_agent_selector)
         selector_calls = mock_selector.select_agents_for_batch_requirements.call_args_list
         assert len(selector_calls) == 1
-        assert (
-            selector_calls[0][0][3] == designated_agent
-        )  # 4th argument (agents, criteria, config, designated_agent)
+        assert selector_calls[0][0][3] == [
+            designated_agent
+        ]  # 4th argument (agents, criteria, config, designated_agent)
 
     async def test_no_resource_requirements(self, scheduler: Scheduler):
         """Test handling of session with no kernels."""
