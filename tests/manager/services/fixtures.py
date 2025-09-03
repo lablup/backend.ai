@@ -1,5 +1,6 @@
 import dataclasses
 import uuid
+from datetime import datetime
 
 from dateutil.parser import isoparse
 
@@ -123,6 +124,8 @@ ARTIFACT_ROW_FIXTURE = ArtifactRow(
     readonly=True,
 )
 ARTIFACT_ROW_FIXTURE.id = uuid.uuid4()
+ARTIFACT_ROW_FIXTURE.scanned_at = datetime.now()
+ARTIFACT_ROW_FIXTURE.updated_at = datetime.now()
 
 ARTIFACT_FIXTURE_DATA = ARTIFACT_ROW_FIXTURE.to_dataclass()
 ARTIFACT_FIXTURE_DICT = dataclasses.asdict(
