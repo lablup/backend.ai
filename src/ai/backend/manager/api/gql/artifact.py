@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import AsyncGenerator, Optional, Self, Sequence
+from typing import AsyncGenerator, Optional, Self
 
 import strawberry
 from aiotools import apartial
@@ -319,18 +319,6 @@ class ArtifactRevision(Node):
         return Artifact.from_dataclass(
             artifact_action_result.result, registry_data.url, source_registry_data.url
         )
-
-    @classmethod
-    async def batch_load_by_artifact_id(
-        cls, ctx: StrawberryGQLContext, artifact_ids: Sequence[uuid.UUID]
-    ) -> list[ArtifactRevision]:
-        revisions = []
-        for artifact_id in artifact_ids:
-            action_result = await ctx.processors.artifact.get_revisions.wait_for_complete(
-                GetArtifactRevisionsAction(artifact_id=artifact_id)
-            )
-            revisions.extend(action_result.revisions)
-        return [ArtifactRevision.from_dataclass(r) for r in revisions]
 
 
 ArtifactEdge = Edge[Artifact]

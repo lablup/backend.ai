@@ -9,7 +9,7 @@ from ai.backend.manager.services.artifact_registry.actions.base import ArtifactR
 
 @dataclass
 class GetReservoirRegistriesAction(ArtifactRegistryAction):
-    reservoir_ids: list[uuid.UUID]
+    registry_ids: list[uuid.UUID]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -18,7 +18,7 @@ class GetReservoirRegistriesAction(ArtifactRegistryAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "get_reservoir_registries"
+        return "get_reservoir_registry_multi"
 
 
 @dataclass

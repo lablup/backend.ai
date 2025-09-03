@@ -18,7 +18,7 @@ class GetHuggingFaceRegistriesAction(ArtifactRegistryAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "get_huggingface_registries"
+        return "get_huggingface_registry_multi"
 
 
 @dataclass

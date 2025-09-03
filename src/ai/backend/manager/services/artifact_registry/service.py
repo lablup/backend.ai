@@ -195,9 +195,9 @@ class ArtifactRegistryService:
         """
         Get multiple reservoir registries by IDs in a single batch query.
         """
-        log.info("Getting {} reservoir registries", len(action.reservoir_ids))
+        log.info("Getting {} reservoir registries", len(action.registry_ids))
         reservoir_data_list = await self._reservoir_repository.get_registries_by_ids(
-            action.reservoir_ids
+            action.registry_ids
         )
         return GetReservoirRegistriesActionResult(result=reservoir_data_list)
 

@@ -63,7 +63,7 @@ class ReservoirRegistry(Node):
     ) -> list["ReservoirRegistry"]:
         action_result = (
             await ctx.processors.artifact_registry.get_reservoir_registries.wait_for_complete(
-                GetReservoirRegistriesAction(reservoir_ids=list(reservoir_ids))
+                GetReservoirRegistriesAction(registry_ids=list(reservoir_ids))
             )
         )
 
