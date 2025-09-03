@@ -30,7 +30,7 @@ class ArtifactRegistryRepository:
             )
             row: ArtifactRegistryRow = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactRegistryNotFoundError()
+                raise ArtifactRegistryNotFoundError(f"Registry with ID {registry_id} not found")
             return row.to_dataclass()
 
     @repository_decorator()
@@ -41,7 +41,7 @@ class ArtifactRegistryRepository:
             )
             row: ArtifactRegistryRow = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactRegistryNotFoundError()
+                raise ArtifactRegistryNotFoundError(f"Registry with name {registry_name} not found")
             return row.to_dataclass()
 
     @repository_decorator()
@@ -70,7 +70,7 @@ class ArtifactRegistryRepository:
             )
             typ = result.scalar_one_or_none()
             if typ is None:
-                raise ArtifactRegistryNotFoundError()
+                raise ArtifactRegistryNotFoundError(f"Registry with ID {registry_id} not found")
             return ArtifactRegistryType(typ)
 
     @repository_decorator()

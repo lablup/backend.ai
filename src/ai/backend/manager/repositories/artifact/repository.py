@@ -200,7 +200,7 @@ class ArtifactRepository:
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactNotFoundError()
+                raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             return row.to_dataclass()
 
     @repository_decorator()
@@ -211,7 +211,9 @@ class ArtifactRepository:
             )
             row: ArtifactRevisionRow = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactRevisionNotFoundError()
+                raise ArtifactRevisionNotFoundError(
+                    f"Artifact revision with ID {revision_id} not found"
+                )
             return row.to_dataclass()
 
     @repository_decorator()
@@ -224,7 +226,7 @@ class ArtifactRepository:
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactNotFoundError()
+                raise ArtifactNotFoundError(f"Artifact with model ID {model_id} not found")
             return row.to_dataclass()
 
     @repository_decorator()
@@ -242,7 +244,7 @@ class ArtifactRepository:
             )
             row: ArtifactRevisionRow = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactRevisionNotFoundError()
+                raise ArtifactRevisionNotFoundError(f"Revision {revision} not found")
             return row.to_dataclass()
 
     @repository_decorator()
@@ -264,7 +266,7 @@ class ArtifactRepository:
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactNotFoundError()
+                raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             return row.to_dataclass()
 
     @repository_decorator()
