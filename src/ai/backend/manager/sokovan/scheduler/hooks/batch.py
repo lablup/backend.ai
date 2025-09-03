@@ -9,12 +9,12 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentPool
 
 from ..types import SessionTransitionData
-from .base import SessionHook
+from .base import AbstractSessionHook
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
-class BatchSessionHook(SessionHook):
+class BatchSessionHook(AbstractSessionHook):
     _agent_pool: AgentPool
 
     def __init__(self, agent_pool: AgentPool) -> None:

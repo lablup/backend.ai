@@ -2339,6 +2339,8 @@ class ScheduleDBSource:
                     session_id=session.id,
                     creation_id=session.creation_id,
                     session_name=session.name,
+                    network_type=session.network_type,
+                    network_id=session.network_id,
                     session_type=session.session_type,
                     access_key=session.access_key,
                     cluster_mode=session.cluster_mode,
@@ -3312,3 +3314,24 @@ class ScheduleDBSource:
             sftp_count = sftp_result.scalar() or 0
 
             return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
+
+    async def update_session_network_id(
+        self,
+        session_id: SessionId,
+        network_id: Optional[str],
+    ) -> None:
+        """
+        Update session's network information in the database.
+
+        :param session_id: The session ID to update
+        :param network_id: The network ID to set (or None to clear)
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            update_stmt = (
+                sa.update(SessionRow)
+                .where(SessionRow.id == session_id)
+                .values(
+                    network_id=network_id,
+                )
+            )
+            await db_sess.execute(update_stmt)
