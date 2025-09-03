@@ -1,14 +1,18 @@
 import logging
 
-from ai.backend.common.exception import InvalidArtifactRegistryTypeError
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
-from ai.backend.manager.repositories.reservoir.repository import ReservoirRegistryRepository
-from ai.backend.manager.services.artifact_registry.actions.common.get import (
-    GetArtifactRegistryAction,
-    GetArtifactRegistryActionResult,
+from ai.backend.manager.repositories.reservoir_registry.repository import (
+    ReservoirRegistryRepository,
+)
+from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
+    GetArtifactRegistryMetaAction,
+    GetArtifactRegistryMetaActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.common.get_multi import (
+    GetArtifactRegistryMetasAction,
+    GetArtifactRegistryMetasActionResult,
 )
 from ai.backend.manager.services.artifact_registry.actions.huggingface.create import (
     CreateHuggingFaceRegistryAction,
@@ -21,6 +25,10 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.delete im
 from ai.backend.manager.services.artifact_registry.actions.huggingface.get import (
     GetHuggingFaceRegistryAction,
     GetHuggingFaceRegistryActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi import (
+    GetHuggingFaceRegistriesAction,
+    GetHuggingFaceRegistriesActionResult,
 )
 from ai.backend.manager.services.artifact_registry.actions.huggingface.list import (
     ListHuggingFaceRegistryAction,
@@ -41,6 +49,10 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.delete impo
 from ai.backend.manager.services.artifact_registry.actions.reservoir.get import (
     GetReservoirRegistryAction,
     GetReservoirRegistryActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.get_multi import (
+    GetReservoirRegistriesAction,
+    GetReservoirRegistriesActionResult,
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.list import (
     ListReservoirRegistriesAction,
@@ -115,6 +127,18 @@ class ArtifactRegistryService:
         )
         return GetHuggingFaceRegistryActionResult(result=registry_data)
 
+    async def get_huggingface_registries(
+        self, action: GetHuggingFaceRegistriesAction
+    ) -> GetHuggingFaceRegistriesActionResult:
+        """
+        Get multiple huggingface registries by IDs in a single batch query.
+        """
+        log.info("Getting {} huggingface registries", len(action.registry_ids))
+        registry_data_list = await self._huggingface_registry_repository.get_registries_by_ids(
+            action.registry_ids
+        )
+        return GetHuggingFaceRegistriesActionResult(result=registry_data_list)
+
     async def list_huggingface_registry(
         self, action: ListHuggingFaceRegistryAction
     ) -> ListHuggingFaceRegistryActionResult:
@@ -169,6 +193,18 @@ class ArtifactRegistryService:
         )
         return GetReservoirRegistryActionResult(result=reservoir_data)
 
+    async def get_reservoir_registries(
+        self, action: GetReservoirRegistriesAction
+    ) -> GetReservoirRegistriesActionResult:
+        """
+        Get multiple reservoir registries by IDs in a single batch query.
+        """
+        log.info("Getting {} reservoir registries", len(action.registry_ids))
+        reservoir_data_list = await self._reservoir_repository.get_registries_by_ids(
+            action.registry_ids
+        )
+        return GetReservoirRegistriesActionResult(result=reservoir_data_list)
+
     async def list_reservoir_registries(
         self, action: ListReservoirRegistriesAction
     ) -> ListReservoirRegistriesActionResult:
@@ -179,26 +215,20 @@ class ArtifactRegistryService:
         reservoir_data_list = await self._reservoir_repository.list_reservoir_registries()
         return ListReservoirRegistriesActionResult(data=reservoir_data_list)
 
-    async def get_artifact_registry(
-        self, action: GetArtifactRegistryAction
-    ) -> GetArtifactRegistryActionResult:
-        """
-        Get an existing artifact registry by ID.
-        """
-        log.info("Getting artifact registry with id: {}", action.registry_id)
-        registry_data = await self._artifact_registry_repository.get_artifact_registry_data(
+    async def get_registry_meta(
+        self, action: GetArtifactRegistryMetaAction
+    ) -> GetArtifactRegistryMetaActionResult:
+        log.info("Getting artifact registry meta with id: {}", action.registry_id)
+        registry_meta = await self._artifact_registry_repository.get_artifact_registry_data(
             action.registry_id
         )
-        match registry_data.type:
-            case ArtifactRegistryType.HUGGINGFACE:
-                result = await self._huggingface_registry_repository.get_registry_data_by_id(
-                    action.registry_id
-                )
-            case ArtifactRegistryType.RESERVOIR:
-                result = await self._reservoir_repository.get_reservoir_registry_data_by_id(
-                    action.registry_id
-                )
-            case _:
-                raise InvalidArtifactRegistryTypeError()
+        return GetArtifactRegistryMetaActionResult(result=registry_meta)
 
-        return GetArtifactRegistryActionResult(result=result, common=registry_data)
+    async def get_registry_metas(
+        self, action: GetArtifactRegistryMetasAction
+    ) -> GetArtifactRegistryMetasActionResult:
+        log.info("Getting {} artifact registry metas", len(action.registry_ids))
+        registry_metas = await self._artifact_registry_repository.get_artifact_registry_datas(
+            action.registry_ids
+        )
+        return GetArtifactRegistryMetasActionResult(result=registry_metas)

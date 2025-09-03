@@ -1695,6 +1695,46 @@
         "description": "\n**Preconditions:**\n* Manager status required: RUNNING\n"
       }
     },
+    "/artifact-registries/scan": {
+      "post": {
+        "operationId": "artifact-registries.scan_artifacts",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifact-registries/search": {
+      "post": {
+        "operationId": "artifact-registries.search_artifacts",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/config/resource-slots": {
       "get": {
         "operationId": "config.get_resource_slots",
@@ -9197,6 +9237,115 @@
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
+      }
+    },
+    "/object-storages/presigned/upload": {
+      "post": {
+        "operationId": "object-storages.get_presigned_upload_url",
+        "tags": [
+          "object-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/object-storages/presigned/download": {
+      "post": {
+        "operationId": "object-storages.get_presigned_download_url",
+        "tags": [
+          "object-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/object-storages/buckets": {
+      "get": {
+        "operationId": "object-storages.get_all_buckets",
+        "tags": [
+          "object-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/object-storages/{storage_id}/buckets": {
+      "get": {
+        "operationId": "object-storages.get_buckets",
+        "tags": [
+          "object-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "storage_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/object-storages/": {
+      "get": {
+        "operationId": "object-storages.list_object_storages",
+        "tags": [
+          "object-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }

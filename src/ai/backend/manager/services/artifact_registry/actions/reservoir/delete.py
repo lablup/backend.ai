@@ -17,7 +17,7 @@ class DeleteReservoirRegistryAction(ArtifactRegistryAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "delete"
+        return "delete_reservoir_registry"
 
 
 @dataclass

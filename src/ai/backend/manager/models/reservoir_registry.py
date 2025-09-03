@@ -7,7 +7,7 @@ from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.common.exception import RelationNotLoadedError
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
+from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 
 from .base import (
     Base,
@@ -17,6 +17,12 @@ from .base import (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 __all__ = ("ReservoirRegistryRow",)
+
+
+def _get_registry_artifact_join_condition():
+    from ai.backend.manager.models.artifact import ArtifactRow
+
+    return ReservoirRegistryRow.id == foreign(ArtifactRow.registry_id)
 
 
 def _get_registry_meta_join_condition():
@@ -34,6 +40,12 @@ class ReservoirRegistryRow(Base):
     secret_key = sa.Column("secret_key", sa.String, nullable=False)
     api_version = sa.Column("api_version", sa.String, nullable=False)
 
+    artifacts = relationship(
+        "ArtifactRow",
+        back_populates="reservoir_registry",
+        primaryjoin=_get_registry_artifact_join_condition,
+        viewonly=True,
+    )
     meta = relationship(
         "ArtifactRegistryRow",
         back_populates="reservoir_registries",
@@ -43,7 +55,7 @@ class ReservoirRegistryRow(Base):
     )
 
     def __str__(self) -> str:
-        return f"ReservoirRegistryRow(id={self.id}, name={self.name}, endpoint={self.endpoint}, api_version={self.api_version})"
+        return f"ReservoirRegistryRow(id={self.id}, endpoint={self.endpoint}, api_version={self.api_version})"
 
     def __repr__(self) -> str:
         return self.__str__()

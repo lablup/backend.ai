@@ -2,7 +2,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, override
 
-from ai.backend.manager.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.types import Creator
 
 

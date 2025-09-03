@@ -4,8 +4,8 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryModifierMeta
-from ai.backend.manager.data.reservoir.modifier import ReservoirRegistryModifier
-from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
+from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
+from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.services.artifact_registry.actions.base import ArtifactRegistryAction
 
 
@@ -22,7 +22,7 @@ class UpdateReservoirRegistryAction(ArtifactRegistryAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "update"
+        return "update_reservoir_registry"
 
 
 @dataclass

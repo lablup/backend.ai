@@ -19,7 +19,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = ("HuggingFaceRegistryRow",)
 
 
-def _get_huggingface_registry_artifact_join_condition():
+def _get_registry_artifact_join_condition():
     from ai.backend.manager.models.artifact import ArtifactRow
 
     return HuggingFaceRegistryRow.id == foreign(ArtifactRow.registry_id)
@@ -41,7 +41,8 @@ class HuggingFaceRegistryRow(Base):
     artifacts = relationship(
         "ArtifactRow",
         back_populates="huggingface_registry",
-        primaryjoin=_get_huggingface_registry_artifact_join_condition,
+        primaryjoin=_get_registry_artifact_join_condition,
+        viewonly=True,
     )
     meta = relationship(
         "ArtifactRegistryRow",

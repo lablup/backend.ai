@@ -3,19 +3,21 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.exception import ArtifactRegistryNotFoundError
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.manager.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
 )
-from ai.backend.manager.data.reservoir.creator import ReservoirRegistryCreator
-from ai.backend.manager.data.reservoir.modifier import ReservoirRegistryModifier
-from ai.backend.manager.data.reservoir.types import ReservoirRegistryData
+from ai.backend.manager.data.reservoir_registry.creator import ReservoirRegistryCreator
+from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
+from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
+from ai.backend.manager.errors.artifact import ArtifactNotFoundError
+from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
+from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -44,6 +46,58 @@ class ReservoirRegistryRepository:
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Reservoir with ID {reservoir_id} not found")
             return row.to_dataclass()
+
+    @repository_decorator()
+    async def get_registries_by_ids(
+        self, reservoir_ids: list[uuid.UUID]
+    ) -> list[ReservoirRegistryData]:
+        """
+        Get multiple Reservoir registry entries by their IDs in a single query.
+        """
+        async with self._db.begin_session() as db_session:
+            result = await db_session.execute(
+                sa.select(ReservoirRegistryRow)
+                .where(ReservoirRegistryRow.id.in_(reservoir_ids))
+                .options(selectinload(ReservoirRegistryRow.meta))
+            )
+            rows: list[ReservoirRegistryRow] = result.scalars().all()
+            return [row.to_dataclass() for row in rows]
+
+    @repository_decorator()
+    async def get_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRegistryRow)
+                .where(ArtifactRegistryRow.name == name)
+                .options(
+                    selectinload(ArtifactRegistryRow.reservoir_registries).selectinload(
+                        ReservoirRegistryRow.meta
+                    )
+                )
+            )
+            row: ArtifactRegistryRow = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactRegistryNotFoundError(f"Registry with name {name} not found")
+            return row.reservoir_registries.to_dataclass()
+
+    @repository_decorator()
+    async def get_registry_data_by_artifact_id(
+        self, artifact_id: uuid.UUID
+    ) -> ReservoirRegistryData:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRow)
+                .where(ArtifactRow.id == artifact_id)
+                .options(
+                    selectinload(ArtifactRow.reservoir_registry).selectinload(
+                        ReservoirRegistryRow.meta
+                    ),
+                )
+            )
+            row: ArtifactRow = result.scalar_one_or_none()
+            if row is None:
+                raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
+            return row.reservoir_registry.to_dataclass()
 
     @repository_decorator()
     async def create(

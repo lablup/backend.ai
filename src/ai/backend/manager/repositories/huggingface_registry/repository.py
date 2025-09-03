@@ -3,9 +3,8 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
-from ai.backend.common.exception import ArtifactRegistryNotFoundError
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.manager.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
@@ -16,6 +15,8 @@ from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegist
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
+from ai.backend.manager.errors.artifact import ArtifactNotFoundError
+from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact import ArtifactRow
 from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
@@ -48,14 +49,18 @@ class HuggingFaceRepository:
     async def get_registry_data_by_name(self, name: str) -> HuggingFaceRegistryData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
-                sa.select(HuggingFaceRegistryRow)
-                .where(HuggingFaceRegistryRow.name == name)
-                .options(selectinload(HuggingFaceRegistryRow.meta))
+                sa.select(ArtifactRegistryRow)
+                .where(ArtifactRegistryRow.name == name)
+                .options(
+                    selectinload(ArtifactRegistryRow.huggingface_registries).selectinload(
+                        HuggingFaceRegistryRow.meta
+                    )
+                )
             )
-            row: HuggingFaceRegistryRow = result.scalar_one_or_none()
+            row: ArtifactRegistryRow = result.scalar_one_or_none()
             if row is None:
                 raise ArtifactRegistryNotFoundError(f"Registry with name {name} not found")
-            return row.to_dataclass()
+            return row.huggingface_registries.to_dataclass()
 
     @repository_decorator()
     async def get_registry_data_by_artifact_id(
@@ -73,7 +78,7 @@ class HuggingFaceRepository:
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
-                raise ValueError(f"Artifact with ID {artifact_id} not found")
+                raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             return row.huggingface_registry.to_dataclass()
 
     @repository_decorator()

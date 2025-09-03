@@ -26,7 +26,9 @@ from ai.backend.manager.repositories.object_storage.repositories import ObjectSt
 from ai.backend.manager.repositories.project_resource_policy.repositories import (
     ProjectResourcePolicyRepositories,
 )
-from ai.backend.manager.repositories.reservoir.repositories import ReservoirRegistryRepositories
+from ai.backend.manager.repositories.reservoir_registry.repositories import (
+    ReservoirRegistryRepositories,
+)
 from ai.backend.manager.repositories.resource_preset.repositories import ResourcePresetRepositories
 from ai.backend.manager.repositories.schedule.repositories import ScheduleRepositories
 from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepositories
