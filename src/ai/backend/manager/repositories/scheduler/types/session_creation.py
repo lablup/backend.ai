@@ -101,7 +101,7 @@ class SessionCreationSpec:
     route_id: Optional[UUID] = None
     sudo_session_enabled: bool = False
     network: Optional[NetworkRow] = None
-    agent_list: Optional[list[str]] = None
+    designated_agent_list: Optional[list[str]] = None
     internal_data: Optional[dict] = None
     public_sgroup_only: bool = True
 
@@ -201,7 +201,6 @@ class KernelEnqueueData:
     cluster_idx: int
     local_rank: int
     cluster_hostname: str
-    agent: Optional[str]  # AgentId if pre-assigned
     scaling_group: str
     domain_name: str
     group_id: UUID
@@ -271,6 +270,7 @@ class SessionEnqueueData:
     batch_timeout: Optional[int]  # seconds
     callback_url: Optional[yarl.URL]
     images: list[str]
+    designated_agent_list: Optional[list[str]]
     network_type: Optional[NetworkType] = None
     network_id: Optional[str] = None
     bootstrap_script: Optional[str] = None

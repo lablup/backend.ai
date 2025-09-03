@@ -28,6 +28,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ScalingGroupNetworkInfo,
     SessionCreationContext,
     SessionCreationSpec,
+    SessionEnqueueData,
 )
 from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
@@ -396,7 +397,7 @@ class TestEdgeCases:
                 ],
             ),
             creation_spec={},
-            agent_list=["agent-001", "agent-002", "agent-003"],
+            designated_agent_list=["agent-001", "agent-002", "agent-003"],
         )
 
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
@@ -423,10 +424,12 @@ class TestEdgeCases:
         await scheduling_controller.enqueue_session(spec)
 
         # Verify agents are correctly assigned
-        session_data = mock_repository.enqueue_session.call_args[0][0]
-        assert session_data.kernels[0].agent == "agent-001"
-        assert session_data.kernels[1].agent == "agent-002"
-        assert session_data.kernels[2].agent == "agent-003"
+        session_data: SessionEnqueueData = mock_repository.enqueue_session.call_args[0][0]
+        assert session_data.designated_agent_list == [
+            "agent-001",
+            "agent-002",
+            "agent-003",
+        ]
 
     async def test_network_types(self, scheduling_controller, mock_repository) -> None:
         """Test different network type configurations."""
@@ -828,7 +831,7 @@ class TestMultiClusterScenarios:
             creation_spec={
                 "scaling_group": "inference-cluster",
             },
-            agent_list=["gpu-agent-01", "gpu-agent-02", "gpu-agent-03"],
+            designated_agent_list=["gpu-agent-01", "gpu-agent-02", "gpu-agent-03"],
         )
 
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
@@ -862,15 +865,15 @@ class TestMultiClusterScenarios:
         await scheduling_controller.enqueue_session(spec)
 
         # Verify
-        session_data = mock_repository.enqueue_session.call_args[0][0]
+        session_data: SessionEnqueueData = mock_repository.enqueue_session.call_args[0][0]
         assert session_data.cluster_size == 3
         assert len(session_data.kernels) == 3
         assert session_data.network_type == NetworkType.HOST  # Should use host network
-
-        # Check agent assignments
-        assert session_data.kernels[0].agent == "gpu-agent-01"
-        assert session_data.kernels[1].agent == "gpu-agent-02"
-        assert session_data.kernels[2].agent == "gpu-agent-03"
+        assert session_data.designated_agent_list == [
+            "gpu-agent-01",
+            "gpu-agent-02",
+            "gpu-agent-03",
+        ]
 
         # All should have same image
         for kernel in session_data.kernels:

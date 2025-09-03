@@ -1021,7 +1021,7 @@ class AgentRegistry:
             route_id=route_id,
             sudo_session_enabled=sudo_session_enabled,
             network=network,
-            agent_list=list(agent_list) if agent_list else None,
+            designated_agent_list=list(agent_list) if agent_list else None,
             internal_data=internal_data,
             public_sgroup_only=public_sgroup_only,
         )

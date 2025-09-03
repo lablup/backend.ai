@@ -262,6 +262,7 @@ class ScheduleDBSource:
                 SessionRow.priority,
                 SessionRow.session_type,
                 SessionRow.cluster_mode,
+                SessionRow.designated_agent_ids,
                 SessionRow.starts_at,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.image.label("kernel_image"),
@@ -298,6 +299,7 @@ class ScheduleDBSource:
                     cluster_mode=row.cluster_mode,
                     starts_at=row.starts_at,
                     is_private=row.session_type in SessionTypes.private_types(),
+                    designated_agent_ids=row.designated_agent_ids,
                     kernels=[],
                 )
 
@@ -959,6 +961,7 @@ class ScheduleDBSource:
                 images=session_data.images,
                 network_type=session_data.network_type,
                 network_id=session_data.network_id,
+                designated_agent_ids=session_data.designated_agent_list,
                 bootstrap_script=session_data.bootstrap_script,
                 use_host_network=session_data.use_host_network,
                 timeout=session_data.timeout,
@@ -979,7 +982,6 @@ class ScheduleDBSource:
                     cluster_idx=kernel.cluster_idx,
                     local_rank=kernel.local_rank,
                     cluster_hostname=kernel.cluster_hostname,
-                    agent=kernel.agent,
                     scaling_group=kernel.scaling_group,
                     domain_name=kernel.domain_name,
                     group_id=kernel.group_id,

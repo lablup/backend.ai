@@ -529,7 +529,7 @@ class Scheduler:
             agents_info,
             criteria,
             selection_config,
-            session_workload.designated_agent,
+            session_workload.designated_agent_ids,
         )
 
         # Build session allocation from selections
