@@ -24,12 +24,10 @@ class ByteSize(str):
 
     @staticmethod
     def parse_value(value: str) -> str:
-        # TODO: Implement this
         return value
 
     @staticmethod
     def parse_literal(ast) -> str:
-        # TODO: Implement this
         if not isinstance(ast, StringValueNode):
             raise ValueError("ByteSize must be provided as a string literal")
         value = ast.value
