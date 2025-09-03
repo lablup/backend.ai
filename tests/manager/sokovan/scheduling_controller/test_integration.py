@@ -45,9 +45,11 @@ async def mock_repository():
     repo.enqueue_session = AsyncMock(return_value=SessionId(uuid.uuid4()))
     repo.query_allowed_scaling_groups = AsyncMock(
         return_value=[
-            AllowedScalingGroup(name="default", is_private=False),
-            AllowedScalingGroup(name="gpu", is_private=False),
-            AllowedScalingGroup(name="private", is_private=True),
+            AllowedScalingGroup(
+                name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+            ),
+            AllowedScalingGroup(name="gpu", is_private=False, scheduler_opts=ScalingGroupOpts()),
+            AllowedScalingGroup(name="private", is_private=True, scheduler_opts=ScalingGroupOpts()),
         ]
     )
     repo.fetch_session_creation_data = AsyncMock()
