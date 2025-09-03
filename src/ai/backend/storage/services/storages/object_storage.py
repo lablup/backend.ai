@@ -10,8 +10,8 @@ from ai.backend.common.dto.storage.response import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.config.unified import ObjectStorageConfig
 
-from ..client.s3 import S3Client
-from ..exception import (
+from ...client.s3 import S3Client
+from ...exception import (
     FileStreamDownloadError,
     FileStreamUploadError,
     ObjectInfoFetchError,
@@ -27,7 +27,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _DEFAULT_EXPIRATION = 1800  # Default token expiration time in seconds
 
 
-class StorageService:
+class ObjectStorageService:
     """
     Service class for S3 storage operations.
     """

@@ -29,7 +29,7 @@ from ai.backend.storage.config.unified import (
     ObjectStorageConfig,
 )
 
-from ...services.storages import StorageService
+from ...services.storages.object_storage import ObjectStorageService
 from ...utils import log_client_api_entry
 
 if TYPE_CHECKING:
@@ -69,7 +69,7 @@ class StorageAPIHandler:
 
         await log_client_api_entry(log, "upload_object", req)
 
-        storage_service = StorageService(self._storage_configs)
+        storage_service = ObjectStorageService(self._storage_configs)
 
         file_part = await file_reader.next()
         while file_part and not getattr(file_part, "filename", None):
@@ -110,7 +110,7 @@ class StorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "download_file", req)
-        storage_service = StorageService(self._storage_configs)
+        storage_service = ObjectStorageService(self._storage_configs)
         download_stream = storage_service.stream_download(storage_name, bucket_name, filepath)
 
         return APIStreamResponse(
@@ -136,7 +136,7 @@ class StorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "presigned_upload_url", req)
-        storage_service = StorageService(self._storage_configs)
+        storage_service = ObjectStorageService(self._storage_configs)
         response = await storage_service.generate_presigned_upload_url(
             storage_name, bucket_name, req
         )
@@ -162,7 +162,7 @@ class StorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "presigned_download_url", req)
-        storage_service = StorageService(self._storage_configs)
+        storage_service = ObjectStorageService(self._storage_configs)
         response = await storage_service.generate_presigned_download_url(
             storage_name, bucket_name, filepath
         )
@@ -189,7 +189,7 @@ class StorageAPIHandler:
 
         await log_client_api_entry(log, "get_object_meta", req)
 
-        storage_service = StorageService(self._storage_configs)
+        storage_service = ObjectStorageService(self._storage_configs)
         response = await storage_service.get_object_info(storage_name, bucket_name, filepath)
 
         return APIResponse.build(
@@ -213,7 +213,7 @@ class StorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "delete_object", req)
-        storage_service = StorageService(self._storage_configs)
+        storage_service = ObjectStorageService(self._storage_configs)
 
         await storage_service.delete_object(storage_name, bucket_name, prefix)
 

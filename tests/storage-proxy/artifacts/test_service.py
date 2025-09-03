@@ -38,7 +38,7 @@ from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirService,
     ReservoirServiceArgs,
 )
-from ai.backend.storage.services.storages import StorageService
+from ai.backend.storage.services.storages.object_storage import ObjectStorageService
 from ai.backend.storage.types import BucketCopyOptions
 
 _DEFAULT_CHUNK_SIZE = 8192
@@ -97,7 +97,7 @@ def mock_background_task_manager() -> MagicMock:
 @pytest.fixture
 def mock_storage_service() -> MagicMock:
     """Mock StorageService."""
-    mock_service = MagicMock(spec=StorageService)
+    mock_service = MagicMock(spec=ObjectStorageService)
     mock_service.stream_upload = AsyncMock()
     return mock_service
 

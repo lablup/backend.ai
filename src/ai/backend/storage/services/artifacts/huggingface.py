@@ -32,7 +32,7 @@ from ai.backend.storage.exception import (
     ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
 )
-from ai.backend.storage.services.storages import StorageService
+from ai.backend.storage.services.storages.object_storage import ObjectStorageService
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -121,14 +121,14 @@ def _make_download_progress_logger(
 class HuggingFaceServiceArgs:
     registry_configs: dict[str, HuggingfaceConfig]
     background_task_manager: BackgroundTaskManager
-    storage_service: StorageService
+    storage_service: ObjectStorageService
     event_producer: EventProducer
 
 
 class HuggingFaceService:
     """Service for HuggingFace model operations"""
 
-    _storages_service: StorageService
+    _storages_service: ObjectStorageService
     _background_task_manager: BackgroundTaskManager
     _registry_configs: dict[str, HuggingfaceConfig]
     _event_producer: EventProducer
