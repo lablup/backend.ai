@@ -63,8 +63,11 @@ class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
         conditions = []
 
         # Handle basic filters
-        if filters.artifact_type is not None:
-            conditions.append(ArtifactRow.type == filters.artifact_type)
+        if filters.artifact_type and len(filters.artifact_type) > 0:
+            if len(filters.artifact_type) == 1:
+                conditions.append(ArtifactRow.type == filters.artifact_type[0])
+            else:
+                conditions.append(ArtifactRow.type.in_(filters.artifact_type))
 
         # Handle StringFilter-based filters
         if filters.name_filter is not None:

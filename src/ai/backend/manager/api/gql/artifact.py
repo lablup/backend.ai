@@ -76,8 +76,7 @@ class ArtifactFilter:
         repo_filter = ArtifactFilterOptions()
 
         # Handle basic filters
-        if self.type:
-            repo_filter.artifact_type = self.type[0] if self.type else None
+        repo_filter.artifact_type = self.type
 
         repo_filter.name_filter = self.name
         repo_filter.registry_filter = self.registry

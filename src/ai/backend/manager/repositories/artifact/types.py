@@ -35,7 +35,7 @@ class ArtifactRevisionOrderingOptions:
 class ArtifactFilterOptions:
     """Filtering options for artifacts."""
 
-    artifact_type: Optional[ArtifactType] = None
+    artifact_type: Optional[list[ArtifactType]] = None
     name_filter: Optional[StringFilter] = None
     registry_filter: Optional[StringFilter] = None
     source_filter: Optional[StringFilter] = None
