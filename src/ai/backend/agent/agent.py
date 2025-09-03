@@ -232,6 +232,7 @@ from .resources import (
     ComputerContext,
     KernelResourceSpec,
     Mount,
+    align_memory,
     allocate,
     known_slot_types,
 )
@@ -940,10 +941,10 @@ class AbstractAgent(
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
             metadatas.append(computer.get_metadata())
 
-        self.slots = await self.scan_available_resources()
+        self.slots = await self.update_slots()
         log.info("Resource slots: {!r}", self.slots)
         log.info("Slot types: {!r}", known_slot_types)
-        self.timer_tasks.append(aiotools.create_timer(self.update_slots, 30.0))
+        self.timer_tasks.append(aiotools.create_timer(self.update_slots_periodically, 30.0))
 
         # Use ValkeyStatClient batch operations for better performance
         field_value_map = {}
@@ -1907,9 +1908,47 @@ class AbstractAgent(
 
     async def update_slots(
         self,
+    ) -> Mapping[SlotName, Decimal]:
+        """
+        Finalize the resource slots from the resource slots scanned by each device plugin,
+        excluding reserved capacities for the system and agent itself.
+        """
+        scanned_slots = await self.scan_available_resources()
+        usable_slots: dict[SlotName, Decimal] = {}
+        reserved_slots = {
+            SlotName("cpu"): Decimal(self.local_config.resource.reserved_cpu),
+            SlotName("mem"): Decimal(self.local_config.resource.reserved_mem),
+            SlotName("disk"): Decimal(self.local_config.resource.reserved_disk),
+        }
+        for slot_name, slot_capacity in scanned_slots.items():
+            if slot_name == SlotName("mem"):
+                mem_reserved = int(reserved_slots.get(slot_name, 0))
+                mem_align = int(self.local_config.resource.memory_align_size)
+                mem_usable, mem_reserved = align_memory(
+                    int(slot_capacity), mem_reserved, align=mem_align
+                )
+                usable_capacity = Decimal(mem_usable)
+                log.debug(
+                    "usable-mem: {:m}, reserved-mem: {:m} after {:m} alignment",
+                    BinarySize(mem_usable),
+                    BinarySize(mem_reserved),
+                    BinarySize(mem_align),
+                )
+            else:
+                usable_capacity = max(
+                    Decimal(0), slot_capacity - reserved_slots.get(slot_name, Decimal(0))
+                )
+            usable_slots[slot_name] = usable_capacity
+        return usable_slots
+
+    async def update_slots_periodically(
+        self,
         interval: float,
     ) -> None:
-        self.slots = await self.scan_available_resources()
+        """
+        A timer function to periodically scan and update the resource slots.
+        """
+        self.slots = await self.update_slots()
         log.debug("slots: {!r}", self.slots)
 
     async def gather_hwinfo(self) -> Mapping[str, HardwareMetadata]:
