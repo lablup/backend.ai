@@ -1381,6 +1381,7 @@ class ScheduleDBSource:
             AllowedScalingGroup(
                 name=sg.name,
                 is_private=not sg.is_public,  # Convert is_public to is_private
+                scheduler_opts=sg.scheduler_opts,
             )
             for sg in allowed_sgroups
         ]

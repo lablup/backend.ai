@@ -2,11 +2,10 @@
 
 import logging
 from decimal import Decimal
-from typing import Mapping, Optional
+from typing import Any, Mapping, Optional
 
 from ai.backend.common.types import (
     BinarySize,
-    KernelEnqueueingConfig,
     ResourceSlot,
     SlotName,
     SlotTypes,
@@ -16,6 +15,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.defs import DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    AllowedScalingGroup,
     ImageInfo,
     ScalingGroupNetworkInfo,
     SessionCreationContext,
@@ -35,6 +35,7 @@ class ResourceCalculator:
 
     async def calculate(
         self,
+        validated_scaling_group: AllowedScalingGroup,
         spec: SessionCreationSpec,
         context: SessionCreationContext,
     ) -> CalculatedResources:
@@ -42,6 +43,7 @@ class ResourceCalculator:
         Calculate all resources for the session.
 
         Args:
+            validated_scaling_group: Validated scaling group
             spec: Session creation specification
             context: Session creation context with fetched data
 
@@ -82,7 +84,7 @@ class ResourceCalculator:
 
             # Calculate kernel resources
             requested_slots, resource_opts = await self.calculate_kernel_resources(
-                kernel_spec,
+                validated_scaling_group,
                 spec.creation_spec,
                 image_info,
                 context.scaling_group_network,
@@ -111,7 +113,7 @@ class ResourceCalculator:
 
     async def calculate_kernel_resources(
         self,
-        kernel_spec: KernelEnqueueingConfig,
+        validated_scaling_group: AllowedScalingGroup,
         creation_config: dict,
         image_info: ImageInfo,
         scaling_group_network: ScalingGroupNetworkInfo,
@@ -175,10 +177,10 @@ class ResourceCalculator:
 
         # Calculate shared memory
         resource_opts = await self._apply_shared_memory_adjustments(
+            validated_scaling_group,
             resource_opts,
             image_info.labels,
             image_min_slots,
-            scaling_group_network,
         )
 
         # Calculate requested slots
@@ -281,10 +283,10 @@ class ResourceCalculator:
 
     async def _apply_shared_memory_adjustments(
         self,
-        resource_opts: dict,
+        validated_scaling_group: AllowedScalingGroup,
+        resource_opts: dict[str, Any],
         image_labels: dict,
         image_min_slots: ResourceSlot,
-        scaling_group_network: ScalingGroupNetworkInfo,
     ) -> dict:
         """Apply shared memory adjustments to resource options."""
         resource_opts = resource_opts.copy()
@@ -307,9 +309,12 @@ class ResourceCalculator:
 
         resource_opts["shmem"] = shmem
 
-        # Apply fractional resource fragmentation setting
-        # TODO: Add this to scaling_group_info if needed
-        allow_fractional = resource_opts.get("allow_fractional_resource_fragmentation", True)
+        allow_fractional = resource_opts.get("allow_fractional_resource_fragmentation")
+        if allow_fractional is None:
+            allow_fractional = (
+                validated_scaling_group.scheduler_opts.allow_fractional_resource_fragmentation
+            )
+
         resource_opts["allow_fractional_resource_fragmentation"] = allow_fractional
 
         # Adjust image minimum slots for shared memory
