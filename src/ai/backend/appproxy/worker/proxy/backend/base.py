@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import logging
 import time
 from dataclasses import dataclass
 from typing import Any, final
 
-import aiohttp
+from aiohttp.streams import AsyncStreamIterator
 from yarl import URL
 
 from ai.backend.appproxy.common.types import RouteInfo
@@ -19,7 +21,7 @@ class HttpRequest:
     method: str
     path: str | URL
     headers: dict[str, Any]
-    body: aiohttp.StreamReader
+    body: AsyncStreamIterator[bytes] | None
 
 
 class BaseBackend:

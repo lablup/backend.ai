@@ -179,12 +179,23 @@
   [logging.pkg_ns]
 
 [resource]
-  # Reserved CPU cores
+  # The number of CPU cores reserved for the operating system and the agent
+  # service.
   reserved-cpu = 1
-  # Reserved memory
+  # The memory space reserved for the operating system and the agent service. It
+  # is subtracted from the reported main memory size and not available for user
+  # workload allocation. Depending on the memory-align-size option and system
+  # configuration, this may not be the exact value but have slightly less or more
+  # values within the memory-align-size.
   reserved-mem = "1G"
-  # Reserved disk space
+  # The disk space reserved for the operating system and the agent service.
+  # Currently this value is unused. In future releases, it may be used to preserve
+  # the minimum disk space from the scratch disk allocation via loopback files.
   reserved-disk = "8G"
+  # The alignment of the reported main memory size to absorb tiny deviations from
+  # per-node firwmare/hardware settings. Recommended to be multiple of the
+  # page/hugepage size (e.g., 2 MiB).
+  memory-align-size = "16M"
   # Resource allocation order
   allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
   # Affinity policy

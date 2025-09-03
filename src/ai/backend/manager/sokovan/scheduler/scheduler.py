@@ -52,7 +52,7 @@ from ai.backend.manager.repositories.scheduler import (
 from ai.backend.manager.types import DistributedLockFactory
 
 from .allocators.allocator import SchedulingAllocator
-from .hooks.registry import HookRegistry
+from .hooks.registry import HookRegistry, HookRegistryArgs
 from .results import ScheduledSessionData, ScheduleResult
 from .selectors.concentrated import ConcentratedAgentSelector
 from .selectors.dispersed import DispersedAgentSelector
@@ -144,7 +144,14 @@ class Scheduler:
             args.config_provider.config.manager.agent_selection_resource_priority
         )
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
-        self._hook_registry = HookRegistry(args.deployment_repository, args.agent_pool)
+        self._hook_registry = HookRegistry(
+            HookRegistryArgs(
+                repository=args.deployment_repository,
+                agent_pool=args.agent_pool,
+                network_plugin_ctx=args.network_plugin_ctx,
+                config_provider=args.config_provider,
+            )
+        )
         self._valkey_schedule = args.valkey_schedule
 
     @classmethod
@@ -529,7 +536,7 @@ class Scheduler:
             agents_info,
             criteria,
             selection_config,
-            session_workload.designated_agent,
+            session_workload.designated_agent_ids,
         )
 
         # Build session allocation from selections
@@ -1318,6 +1325,10 @@ class Scheduler:
                     port_mapping[cluster_hostname] = (agent_host, port)
                 cluster_ssh_port_mapping = ClusterSSHPortMapping(port_mapping)
 
+        await self._repository.update_session_network_id(
+            session.session_id,
+            network_name,
+        )
         return NetworkSetup(
             network_name=network_name,
             network_config=network_config,

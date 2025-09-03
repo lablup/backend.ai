@@ -23,6 +23,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.models import NetworkRow
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.types import UserScope
 
 SESSION_PRIORITY_DEFAULT = 10
@@ -101,7 +102,7 @@ class SessionCreationSpec:
     route_id: Optional[UUID] = None
     sudo_session_enabled: bool = False
     network: Optional[NetworkRow] = None
-    agent_list: Optional[list[str]] = None
+    designated_agent_list: Optional[list[str]] = None
     internal_data: Optional[dict] = None
     public_sgroup_only: bool = True
 
@@ -201,7 +202,6 @@ class KernelEnqueueData:
     cluster_idx: int
     local_rank: int
     cluster_hostname: str
-    agent: Optional[str]  # AgentId if pre-assigned
     scaling_group: str
     domain_name: str
     group_id: UUID
@@ -271,6 +271,7 @@ class SessionEnqueueData:
     batch_timeout: Optional[int]  # seconds
     callback_url: Optional[yarl.URL]
     images: list[str]
+    designated_agent_list: Optional[list[str]]
     network_type: Optional[NetworkType] = None
     network_id: Optional[str] = None
     bootstrap_script: Optional[str] = None
@@ -313,6 +314,7 @@ class AllowedScalingGroup:
 
     name: str
     is_private: bool
+    scheduler_opts: ScalingGroupOpts
 
 
 @dataclass

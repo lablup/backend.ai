@@ -473,12 +473,12 @@ jobs:
     steps:
       - name: Trigger Isla Sorna repo image build
         run: |
-          gh api repos/lablup/isla-sorna/dispatches \
-            -f event_type='build-images' \
-            -f client_payload.version="${{ github.ref_name }}"
+          gh api /repos/lablup/isla-sorna/dispatches \
+              --method POST \
+              -f 'event_type=build-images' \
+              -F "client_payload[version]=${{ github.ref_name }}"
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
-  
 
   make-final-release:
     needs: [build-scies, build-wheels, build-sbom, optimize-ci]

@@ -1643,7 +1643,9 @@ class RedisProfileTarget:
                 target = override_targets[key]
                 target.addr = RedisProfileTarget._parse_addr(target.addr)
 
-        addr = RedisProfileTarget._parse_addr(data.get("addr"))
+        addr = None
+        if data.get("addr"):
+            addr = RedisProfileTarget._parse_addr(data.get("addr"))
 
         sentinel = data.get("sentinel")
         if sentinel:

@@ -8,12 +8,12 @@ import logging
 from ai.backend.logging import BraceStyleAdapter
 
 from ..types import SessionTransitionData
-from .base import SessionHook
+from .base import AbstractSessionHook
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
-class InteractiveSessionHook(SessionHook):
+class InteractiveSessionHook(AbstractSessionHook):
     async def on_transition_to_running(self, session: SessionTransitionData) -> None:
         log.debug(
             "Interactive session {} transitioning to RUNNING",
