@@ -55,6 +55,7 @@ class PendingSessionData:
     cluster_mode: ClusterMode
     starts_at: Optional[datetime]
     is_private: bool
+    designated_agent_ids: Optional[list[AgentId]]
     kernels: list[KernelData]
 
     def to_session_workload(self) -> SessionWorkload:
@@ -74,7 +75,7 @@ class PendingSessionData:
             starts_at=self.starts_at,
             is_private=self.is_private,
             kernels=kernel_workloads,
-            designated_agent=self.kernels[0].agent if self.kernels else None,
+            designated_agent_ids=self.designated_agent_ids,
         )
 
 

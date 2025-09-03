@@ -9,12 +9,12 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 
 from ..types import SessionTransitionData
-from .base import SessionHook
+from .base import AbstractSessionHook
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
-class InferenceSessionHook(SessionHook):
+class InferenceSessionHook(AbstractSessionHook):
     _repository: DeploymentRepository
 
     def __init__(self, repository: DeploymentRepository) -> None:

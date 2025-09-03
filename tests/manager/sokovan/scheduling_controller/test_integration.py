@@ -21,6 +21,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
     ContainerUserInfo,
@@ -28,6 +29,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import (
     ScalingGroupNetworkInfo,
     SessionCreationContext,
     SessionCreationSpec,
+    SessionEnqueueData,
 )
 from ai.backend.manager.sokovan.scheduling_controller import (
     SchedulingController,
@@ -43,9 +45,11 @@ async def mock_repository():
     repo.enqueue_session = AsyncMock(return_value=SessionId(uuid.uuid4()))
     repo.query_allowed_scaling_groups = AsyncMock(
         return_value=[
-            AllowedScalingGroup(name="default", is_private=False),
-            AllowedScalingGroup(name="gpu", is_private=False),
-            AllowedScalingGroup(name="private", is_private=True),
+            AllowedScalingGroup(
+                name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+            ),
+            AllowedScalingGroup(name="gpu", is_private=False, scheduler_opts=ScalingGroupOpts()),
+            AllowedScalingGroup(name="private", is_private=True, scheduler_opts=ScalingGroupOpts()),
         ]
     )
     repo.fetch_session_creation_data = AsyncMock()
@@ -124,7 +128,11 @@ class TestSingleKernelSession:
         # Setup mock context
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
-            allowed_scaling_groups=[AllowedScalingGroup(name="default", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "python:3.9": ImageInfo(
                     canonical="python:3.9",
@@ -216,7 +224,9 @@ class TestMultiContainerSession:
         # Setup mock context
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
-            allowed_scaling_groups=[AllowedScalingGroup(name="gpu", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(name="gpu", is_private=False, scheduler_opts=ScalingGroupOpts())
+            ],
             image_infos={
                 "tensorflow:2.0": ImageInfo(
                     canonical="tensorflow:2.0",
@@ -309,7 +319,11 @@ class TestMultiContainerSession:
         # Setup mock context with multiple images
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=True),
-            allowed_scaling_groups=[AllowedScalingGroup(name="default", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "nginx:latest": ImageInfo(
                     canonical="nginx:latest",
@@ -396,12 +410,16 @@ class TestEdgeCases:
                 ],
             ),
             creation_spec={},
-            agent_list=["agent-001", "agent-002", "agent-003"],
+            designated_agent_list=["agent-001", "agent-002", "agent-003"],
         )
 
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
-            allowed_scaling_groups=[AllowedScalingGroup(name="default", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "python:3.9": ImageInfo(
                     canonical="python:3.9",
@@ -423,10 +441,12 @@ class TestEdgeCases:
         await scheduling_controller.enqueue_session(spec)
 
         # Verify agents are correctly assigned
-        session_data = mock_repository.enqueue_session.call_args[0][0]
-        assert session_data.kernels[0].agent == "agent-001"
-        assert session_data.kernels[1].agent == "agent-002"
-        assert session_data.kernels[2].agent == "agent-003"
+        session_data: SessionEnqueueData = mock_repository.enqueue_session.call_args[0][0]
+        assert session_data.designated_agent_list == [
+            "agent-001",
+            "agent-002",
+            "agent-003",
+        ]
 
     async def test_network_types(self, scheduling_controller, mock_repository) -> None:
         """Test different network type configurations."""
@@ -457,7 +477,11 @@ class TestEdgeCases:
             scaling_group_network=ScalingGroupNetworkInfo(
                 use_host_network=False  # Not using host network
             ),
-            allowed_scaling_groups=[AllowedScalingGroup(name="default", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "python:3.9": ImageInfo(
                     canonical="python:3.9",
@@ -484,7 +508,11 @@ class TestEdgeCases:
             scaling_group_network=ScalingGroupNetworkInfo(
                 use_host_network=True  # Using host network
             ),
-            allowed_scaling_groups=[AllowedScalingGroup(name="default", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "python:3.9": ImageInfo(
                     canonical="python:3.9",
@@ -555,7 +583,11 @@ class TestEdgeCases:
 
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
-            allowed_scaling_groups=[AllowedScalingGroup(name="default", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="default", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "python:3.9": ImageInfo(
                     canonical="python:3.9",
@@ -619,7 +651,11 @@ class TestMultiClusterScenarios:
         # Setup mock context
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
-            allowed_scaling_groups=[AllowedScalingGroup(name="gpu-cluster", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="gpu-cluster", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "pytorch:2.0": ImageInfo(
                     canonical="pytorch:2.0",
@@ -730,7 +766,11 @@ class TestMultiClusterScenarios:
         # Setup mock context with multiple images
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
             scaling_group_network=ScalingGroupNetworkInfo(use_host_network=False),
-            allowed_scaling_groups=[AllowedScalingGroup(name="gpu-cluster", is_private=False)],
+            allowed_scaling_groups=[
+                AllowedScalingGroup(
+                    name="gpu-cluster", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
+            ],
             image_infos={
                 "spark:master": ImageInfo(
                     canonical="spark:master",
@@ -828,7 +868,7 @@ class TestMultiClusterScenarios:
             creation_spec={
                 "scaling_group": "inference-cluster",
             },
-            agent_list=["gpu-agent-01", "gpu-agent-02", "gpu-agent-03"],
+            designated_agent_list=["gpu-agent-01", "gpu-agent-02", "gpu-agent-03"],
         )
 
         mock_repository.fetch_session_creation_data.return_value = SessionCreationContext(
@@ -836,7 +876,9 @@ class TestMultiClusterScenarios:
                 use_host_network=True
             ),  # Using host network
             allowed_scaling_groups=[
-                AllowedScalingGroup(name="inference-cluster", is_private=False)
+                AllowedScalingGroup(
+                    name="inference-cluster", is_private=False, scheduler_opts=ScalingGroupOpts()
+                )
             ],
             image_infos={
                 "llm:server": ImageInfo(
@@ -862,15 +904,15 @@ class TestMultiClusterScenarios:
         await scheduling_controller.enqueue_session(spec)
 
         # Verify
-        session_data = mock_repository.enqueue_session.call_args[0][0]
+        session_data: SessionEnqueueData = mock_repository.enqueue_session.call_args[0][0]
         assert session_data.cluster_size == 3
         assert len(session_data.kernels) == 3
         assert session_data.network_type == NetworkType.HOST  # Should use host network
-
-        # Check agent assignments
-        assert session_data.kernels[0].agent == "gpu-agent-01"
-        assert session_data.kernels[1].agent == "gpu-agent-02"
-        assert session_data.kernels[2].agent == "gpu-agent-03"
+        assert session_data.designated_agent_list == [
+            "gpu-agent-01",
+            "gpu-agent-02",
+            "gpu-agent-03",
+        ]
 
         # All should have same image
         for kernel in session_data.kernels:
