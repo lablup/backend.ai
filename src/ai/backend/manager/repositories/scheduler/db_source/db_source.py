@@ -3135,7 +3135,12 @@ class ScheduleDBSource:
             # Update session to PENDING with reset retry count
             update_stmt = (
                 sa.update(SessionRow)
-                .where(SessionRow.id == session_id)
+                .where(
+                    sa.and_(
+                        SessionRow.id == session_id,
+                        SessionRow.status.in_(SessionStatus.retriable_statuses()),
+                    )
+                )
                 .values(
                     status=SessionStatus.PENDING,
                     status_data=sql_json_merge(
@@ -3150,8 +3155,15 @@ class ScheduleDBSource:
             # Also update kernel status to PENDING
             kernel_stmt = (
                 sa.update(KernelRow)
-                .where(KernelRow.session_id == session_id)
+                .where(
+                    sa.and_(
+                        KernelRow.session_id == session_id,
+                        KernelRow.status.in_(KernelStatus.retriable_statuses()),
+                    )
+                )
                 .values(
+                    agent=None,
+                    agent_addr=None,
                     status=KernelStatus.PENDING,
                     status_data=sql_json_merge(
                         KernelRow.status_data,
