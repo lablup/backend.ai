@@ -22,6 +22,10 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.get impor
     GetHuggingFaceRegistryAction,
     GetHuggingFaceRegistryActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi import (
+    GetHuggingFaceRegistriesAction,
+    GetHuggingFaceRegistriesActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.list import (
     ListHuggingFaceRegistryAction,
     ListHuggingFaceRegistryActionResult,
@@ -41,6 +45,10 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.delete impo
 from ai.backend.manager.services.artifact_registry.actions.reservoir.get import (
     GetReservoirRegistryAction,
     GetReservoirRegistryActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.get_multi import (
+    GetReservoirRegistriesAction,
+    GetReservoirRegistriesActionResult,
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.list import (
     ListReservoirRegistriesAction,
@@ -115,6 +123,18 @@ class ArtifactRegistryService:
         )
         return GetHuggingFaceRegistryActionResult(result=registry_data)
 
+    async def get_huggingface_registries(
+        self, action: GetHuggingFaceRegistriesAction
+    ) -> GetHuggingFaceRegistriesActionResult:
+        """
+        Get multiple huggingface registries by IDs in a single batch query.
+        """
+        log.info("Getting {} huggingface registries", len(action.registry_ids))
+        registry_data_list = await self._huggingface_registry_repository.get_registries_by_ids(
+            action.registry_ids
+        )
+        return GetHuggingFaceRegistriesActionResult(result=registry_data_list)
+
     async def list_huggingface_registry(
         self, action: ListHuggingFaceRegistryAction
     ) -> ListHuggingFaceRegistryActionResult:
@@ -168,6 +188,18 @@ class ArtifactRegistryService:
             action.reservoir_id
         )
         return GetReservoirRegistryActionResult(result=reservoir_data)
+
+    async def get_reservoir_registries(
+        self, action: GetReservoirRegistriesAction
+    ) -> GetReservoirRegistriesActionResult:
+        """
+        Get multiple reservoir registries by IDs in a single batch query.
+        """
+        log.info("Getting {} reservoir registries", len(action.reservoir_ids))
+        reservoir_data_list = await self._reservoir_repository.get_registries_by_ids(
+            action.reservoir_ids
+        )
+        return GetReservoirRegistriesActionResult(result=reservoir_data_list)
 
     async def list_reservoir_registries(
         self, action: ListReservoirRegistriesAction

@@ -23,6 +23,9 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.delete impo
 from ai.backend.manager.services.artifact_registry.actions.reservoir.get import (
     GetReservoirRegistryAction,
 )
+from ai.backend.manager.services.artifact_registry.actions.reservoir.get_multi import (
+    GetReservoirRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.list import (
     ListReservoirRegistriesAction,
 )
@@ -58,14 +61,16 @@ class ReservoirRegistry(Node):
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, reservoir_ids: Sequence[uuid.UUID]
     ) -> list["ReservoirRegistry"]:
-        reservoirs = []
-        for reservoir_id in reservoir_ids:
-            action_result = (
-                await ctx.processors.artifact_registry.get_reservoir_registry.wait_for_complete(
-                    GetReservoirRegistryAction(reservoir_id=reservoir_id)
-                )
+        action_result = (
+            await ctx.processors.artifact_registry.get_reservoir_registries.wait_for_complete(
+                GetReservoirRegistriesAction(reservoir_ids=list(reservoir_ids))
             )
-            reservoirs.append(ReservoirRegistry.from_dataclass(action_result.result))
+        )
+
+        reservoirs = []
+        for reservoir in action_result.result:
+            reservoirs.append(ReservoirRegistry.from_dataclass(reservoir))
+
         return reservoirs
 
 

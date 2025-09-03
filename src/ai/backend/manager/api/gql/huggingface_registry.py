@@ -25,6 +25,9 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.delete im
 from ai.backend.manager.services.artifact_registry.actions.huggingface.get import (
     GetHuggingFaceRegistryAction,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi import (
+    GetHuggingFaceRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.list import (
     ListHuggingFaceRegistryAction,
 )
@@ -56,14 +59,16 @@ class HuggingFaceRegistry(Node):
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
     ) -> list["HuggingFaceRegistry"]:
-        registries = []
-        for registry_id in registry_ids:
-            action_result = (
-                await ctx.processors.artifact_registry.get_huggingface_registry.wait_for_complete(
-                    GetHuggingFaceRegistryAction(registry_id=registry_id)
-                )
+        action_result = (
+            await ctx.processors.artifact_registry.get_huggingface_registries.wait_for_complete(
+                GetHuggingFaceRegistriesAction(registry_ids=list(registry_ids))
             )
-            registries.append(HuggingFaceRegistry.from_dataclass(action_result.result))
+        )
+
+        registries = []
+        for registry in action_result.result:
+            registries.append(HuggingFaceRegistry.from_dataclass(registry))
+
         return registries
 
 

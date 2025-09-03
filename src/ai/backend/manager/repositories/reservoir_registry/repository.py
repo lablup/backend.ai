@@ -48,6 +48,22 @@ class ReservoirRegistryRepository:
             return row.to_dataclass()
 
     @repository_decorator()
+    async def get_registries_by_ids(
+        self, reservoir_ids: list[uuid.UUID]
+    ) -> list[ReservoirRegistryData]:
+        """
+        Get multiple Reservoir registry entries by their IDs in a single query.
+        """
+        async with self._db.begin_session() as db_session:
+            result = await db_session.execute(
+                sa.select(ReservoirRegistryRow)
+                .where(ReservoirRegistryRow.id.in_(reservoir_ids))
+                .options(selectinload(ReservoirRegistryRow.meta))
+            )
+            rows: list[ReservoirRegistryRow] = result.scalars().all()
+            return [row.to_dataclass() for row in rows]
+
+    @repository_decorator()
     async def get_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(

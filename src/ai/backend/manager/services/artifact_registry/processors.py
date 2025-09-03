@@ -19,6 +19,10 @@ from ai.backend.manager.services.artifact_registry.actions.huggingface.get impor
     GetHuggingFaceRegistryAction,
     GetHuggingFaceRegistryActionResult,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.get_multi import (
+    GetHuggingFaceRegistriesAction,
+    GetHuggingFaceRegistriesActionResult,
+)
 from ai.backend.manager.services.artifact_registry.actions.huggingface.list import (
     ListHuggingFaceRegistryAction,
     ListHuggingFaceRegistryActionResult,
@@ -38,6 +42,10 @@ from ai.backend.manager.services.artifact_registry.actions.reservoir.delete impo
 from ai.backend.manager.services.artifact_registry.actions.reservoir.get import (
     GetReservoirRegistryAction,
     GetReservoirRegistryActionResult,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.get_multi import (
+    GetReservoirRegistriesAction,
+    GetReservoirRegistriesActionResult,
 )
 from ai.backend.manager.services.artifact_registry.actions.reservoir.list import (
     ListReservoirRegistriesAction,
@@ -64,6 +72,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     get_huggingface_registry: ActionProcessor[
         GetHuggingFaceRegistryAction, GetHuggingFaceRegistryActionResult
     ]
+    get_huggingface_registries: ActionProcessor[
+        GetHuggingFaceRegistriesAction, GetHuggingFaceRegistriesActionResult
+    ]
     list_huggingface_registries: ActionProcessor[
         ListHuggingFaceRegistryAction, ListHuggingFaceRegistryActionResult
     ]
@@ -78,6 +89,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
     ]
     get_reservoir_registry: ActionProcessor[
         GetReservoirRegistryAction, GetReservoirRegistryActionResult
+    ]
+    get_reservoir_registries: ActionProcessor[
+        GetReservoirRegistriesAction, GetReservoirRegistriesActionResult
     ]
     list_reservoir_registries: ActionProcessor[
         ListReservoirRegistriesAction, ListReservoirRegistriesActionResult
@@ -101,6 +115,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.get_huggingface_registry = ActionProcessor(
             service.get_huggingface_registry, action_monitors
         )
+        self.get_huggingface_registries = ActionProcessor(
+            service.get_huggingface_registries, action_monitors
+        )
         self.list_huggingface_registries = ActionProcessor(
             service.list_huggingface_registry, action_monitors
         )
@@ -116,6 +133,9 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
         self.get_reservoir_registry = ActionProcessor(
             service.get_reservoir_registry, action_monitors
         )
+        self.get_reservoir_registries = ActionProcessor(
+            service.get_reservoir_registries, action_monitors
+        )
         self.list_reservoir_registries = ActionProcessor(
             service.list_reservoir_registries, action_monitors
         )
@@ -128,11 +148,13 @@ class ArtifactRegistryProcessors(AbstractProcessorPackage):
             UpdateHuggingFaceRegistryAction.spec(),
             DeleteHuggingFaceRegistryAction.spec(),
             GetHuggingFaceRegistryAction.spec(),
+            GetHuggingFaceRegistriesAction.spec(),
             ListHuggingFaceRegistryAction.spec(),
             CreateReservoirRegistryAction.spec(),
             UpdateReservoirRegistryAction.spec(),
             DeleteReservoirRegistryAction.spec(),
             GetReservoirRegistryAction.spec(),
+            GetReservoirRegistriesAction.spec(),
             ListReservoirRegistriesAction.spec(),
             GetArtifactRegistryMetaAction.spec(),
         ]
