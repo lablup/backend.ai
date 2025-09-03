@@ -15,7 +15,7 @@ from ai.backend.agent import resources
 from ai.backend.agent.affinity_map import AffinityMap, AffinityPolicy
 from ai.backend.agent.dummy.intrinsic import CPUPlugin, MemoryPlugin
 from ai.backend.agent.exception import FractionalResourceFragmented, InsufficientResource
-from ai.backend.agent.resources import ComputerContext, scan_resource_usage_per_slot
+from ai.backend.agent.resources import ComputerContext, align_memory, scan_resource_usage_per_slot
 from ai.backend.agent.vendor import linux
 from ai.backend.common.types import DeviceId, DeviceName, KernelId, ResourceSlot, SlotName
 
@@ -498,3 +498,15 @@ async def test_allocate_rollback(monkeypatch):
     assert computers[DeviceName("mem")].alloc_map.allocations[SlotName("mem")][
         DeviceId("root")
     ] == Decimal(512)  # this is rolled back because it failed to allocate the mem slot.
+
+
+def test_align_memory():
+    align = 10
+    reserved = 1000
+    print(f"{align=} {reserved=}")
+    for orig in range(19950, 20050):
+        usable, actual_reserved = align_memory(orig, reserved, align=align)
+        print(f"{orig=} -> {usable=} {actual_reserved=}")
+        assert usable % align == 0
+        assert usable + actual_reserved == orig
+        assert 990 <= actual_reserved <= 1010

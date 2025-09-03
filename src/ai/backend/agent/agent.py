@@ -232,6 +232,7 @@ from .resources import (
     ComputerContext,
     KernelResourceSpec,
     Mount,
+    align_memory,
     allocate,
     known_slot_types,
 )
@@ -943,7 +944,7 @@ class AbstractAgent(
         self.slots = await self.update_slots()
         log.info("Resource slots: {!r}", self.slots)
         log.info("Slot types: {!r}", known_slot_types)
-        self.timer_tasks.append(aiotools.create_timer(self.periodic_update_slots, 30.0))
+        self.timer_tasks.append(aiotools.create_timer(self.update_slots_periodically, 30.0))
 
         # Use ValkeyStatClient batch operations for better performance
         field_value_map = {}
@@ -1920,13 +1921,21 @@ class AbstractAgent(
             SlotName("disk"): Decimal(self.local_config.resource.reserved_disk),
         }
         for slot_name, slot_capacity in scanned_slots.items():
-            usable_capacity = max(
-                Decimal(0), slot_capacity - reserved_slots.get(slot_name, Decimal(0))
-            )
+            if slot_name == SlotName("mem"):
+                mem_reserved = int(reserved_slots.get(slot_name, 0))
+                mem_align = 16 * (2**20)  # 16 MiB
+                mem_usable, mem_resesrved = align_memory(
+                    int(slot_capacity), mem_reserved, align=mem_align
+                )
+                usable_capacity = Decimal(mem_usable)
+            else:
+                usable_capacity = max(
+                    Decimal(0), slot_capacity - reserved_slots.get(slot_name, Decimal(0))
+                )
             usable_slots[slot_name] = usable_capacity
         return usable_slots
 
-    async def periodic_update_slots(
+    async def update_slots_periodically(
         self,
         interval: float,
     ) -> None:
