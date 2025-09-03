@@ -49,6 +49,8 @@ class ArtifactRow(Base):
     source_registry_type = sa.Column("source_registry_type", sa.String, nullable=False, index=True)
     description = sa.Column("description", sa.String, nullable=True)
     readonly = sa.Column("readonly", sa.Boolean, default=False, nullable=False)
+    scanned_at = sa.Column("scanned_at", sa.DateTime, nullable=False, server_default=sa.func.now())
+    updated_at = sa.Column("updated_at", sa.DateTime, nullable=False, server_default=sa.func.now())
 
     huggingface_registry = relationship(
         "HuggingFaceRegistryRow",
@@ -81,6 +83,8 @@ class ArtifactRow(Base):
             f"source_registry_id={self.source_registry_id}, "
             f"source_registry_type={self.source_registry_type}, "
             f"description={self.description}, "
+            f"scanned_at={self.scanned_at}, "
+            f"updated_at={self.updated_at}, "
             f"readonly={self.readonly})"
         )
 
@@ -97,5 +101,7 @@ class ArtifactRow(Base):
             source_registry_id=self.source_registry_id,
             source_registry_type=ArtifactRegistryType(self.source_registry_type),
             description=self.description,
+            scanned_at=self.scanned_at,
+            updated_at=self.updated_at,
             readonly=self.readonly,
         )

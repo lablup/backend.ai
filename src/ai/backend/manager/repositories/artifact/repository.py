@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Any, Optional, override
 
 import sqlalchemy as sa
@@ -307,16 +308,21 @@ class ArtifactRepository:
                         source_registry_id=artifact_data.source_registry_id,
                         registry_type=artifact_data.registry_type,
                         source_registry_type=artifact_data.source_registry_type,
-                        readonly=artifact_data.readonly,
+                        readonly=True,  # always overwrite readonly to True
                     )
                     db_sess.add(new_artifact)
                     await db_sess.flush()
-                    await db_sess.refresh(new_artifact)
+                    await db_sess.refresh(
+                        new_artifact, attribute_names=["scanned_at", "updated_at"]
+                    )
                     result_artifacts.append(new_artifact.to_dataclass())
                 else:
                     # Update existing artifact
-                    existing_artifact.description = artifact_data.description
-                    existing_artifact.readonly = artifact_data.readonly
+                    has_changes = existing_artifact.description != artifact_data.description
+                    if has_changes:
+                        existing_artifact.description = artifact_data.description
+                        existing_artifact.updated_at = datetime.now()
+
                     await db_sess.flush()
                     await db_sess.refresh(existing_artifact)
                     result_artifacts.append(existing_artifact.to_dataclass())
@@ -330,8 +336,13 @@ class ArtifactRepository:
     ) -> list[ArtifactRevisionData]:
         async with self._db.begin_session() as db_sess:
             result_revisions: list[ArtifactRevisionData] = []
+            artifact_ids_to_update: set[uuid.UUID] = set()
 
             for revision_data in revisions:
+                # Skip failed or rejected revision copy
+                if revision_data.status in [ArtifactStatus.FAILED, ArtifactStatus.REJECTED]:
+                    continue
+
                 # Check if revision exists
                 revision_query_result = await db_sess.execute(
                     sa.select(ArtifactRevisionRow).where(
@@ -359,15 +370,34 @@ class ArtifactRepository:
                     await db_sess.flush()
                     await db_sess.refresh(new_revision)
                     result_revisions.append(new_revision.to_dataclass())
+                    artifact_ids_to_update.add(revision_data.artifact_id)
                 else:
-                    # Update existing revision
-                    existing_revision.readme = revision_data.readme
-                    existing_revision.size = revision_data.size
-                    existing_revision.created_at = revision_data.created_at
-                    existing_revision.updated_at = revision_data.updated_at
+                    # Update existing revision only if there are changes
+                    has_changes = (
+                        existing_revision.readme != revision_data.readme
+                        or existing_revision.size != revision_data.size
+                        or existing_revision.created_at != revision_data.created_at
+                        or existing_revision.updated_at != revision_data.updated_at
+                    )
+
+                    if has_changes:
+                        existing_revision.readme = revision_data.readme
+                        existing_revision.size = revision_data.size
+                        existing_revision.created_at = revision_data.created_at
+                        existing_revision.updated_at = revision_data.updated_at
+                        artifact_ids_to_update.add(revision_data.artifact_id)
+
                     await db_sess.flush()
                     await db_sess.refresh(existing_revision)
                     result_revisions.append(existing_revision.to_dataclass())
+
+            # Update artifact updated_at timestamp for affected artifacts
+            if artifact_ids_to_update:
+                await db_sess.execute(
+                    sa.update(ArtifactRow)
+                    .where(ArtifactRow.id.in_(artifact_ids_to_update))
+                    .values(updated_at=sa.func.now())
+                )
 
             return result_revisions
 
@@ -380,6 +410,7 @@ class ArtifactRepository:
         async with self._db.begin_session() as db_sess:
             # key: artifact_id
             artifacts_map: dict[uuid.UUID, tuple[ArtifactRow, list[ArtifactRevisionRow]]] = {}
+            artifact_ids_to_update: set[uuid.UUID] = set()
 
             for model in model_list:
                 # Check if artifact exists within the current session
@@ -405,7 +436,9 @@ class ArtifactRepository:
                     )
                     db_sess.add(artifact_row)
                     await db_sess.flush()
-                    await db_sess.refresh(artifact_row)
+                    await db_sess.refresh(
+                        artifact_row, attribute_names=["scanned_at", "updated_at"]
+                    )
 
                 # Initialize artifact in map if not exists
                 if artifact_row.id not in artifacts_map:
@@ -423,10 +456,17 @@ class ArtifactRepository:
 
                 existing_revision: ArtifactRevisionRow = revision_query_result.scalar_one_or_none()
                 if existing_revision is not None:
-                    # Update existing revision
-                    # TODO: Reset to SCANNED?
-                    existing_revision.readme = model.readme
-                    existing_revision.updated_at = model.modified_at
+                    # Update existing revision only if there are changes
+                    has_changes = (
+                        existing_revision.readme != model.readme
+                        or existing_revision.updated_at != model.modified_at
+                        or existing_revision.created_at != model.created_at
+                    )
+
+                    if has_changes:
+                        existing_revision.readme = model.readme
+                        existing_revision.updated_at = model.modified_at
+                        artifact_ids_to_update.add(artifact_row.id)
 
                     await db_sess.flush()
                     await db_sess.refresh(existing_revision)
@@ -442,6 +482,15 @@ class ArtifactRepository:
                     await db_sess.flush()
                     await db_sess.refresh(new_revision)
                     artifacts_map[artifact_row.id][1].append(new_revision)
+                    artifact_ids_to_update.add(artifact_row.id)
+
+            # Update artifact updated_at timestamp for affected artifacts
+            if artifact_ids_to_update:
+                await db_sess.execute(
+                    sa.update(ArtifactRow)
+                    .where(ArtifactRow.id.in_(artifact_ids_to_update))
+                    .values(updated_at=sa.func.now())
+                )
 
             # Convert to ArtifactDataWithRevisions format
             result: list[ArtifactDataWithRevisions] = []

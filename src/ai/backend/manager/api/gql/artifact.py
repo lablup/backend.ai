@@ -39,7 +39,6 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactStatusFilterType,
 )
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
-from ai.backend.manager.services.artifact.actions.get_revisions import GetArtifactRevisionsAction
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
 from ai.backend.manager.services.artifact.actions.retrieve_models import RetrieveModelsAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
@@ -233,6 +232,8 @@ class Artifact(Node):
     registry: SourceInfo
     source: SourceInfo
     readonly: bool
+    scanned_at: datetime
+    updated_at: datetime
 
     @classmethod
     def from_dataclass(cls, data: ArtifactData, registry_url: str, source_url: str) -> Self:
@@ -244,6 +245,8 @@ class Artifact(Node):
             registry=SourceInfo(name=data.registry_type.value, url=registry_url),
             source=SourceInfo(name=data.source_registry_type.value, url=source_url),
             readonly=data.readonly,
+            scanned_at=data.scanned_at,
+            updated_at=data.updated_at,
         )
 
     @strawberry.field
@@ -276,16 +279,17 @@ class Artifact(Node):
             offset=offset,
         )
 
-    @strawberry.field
-    async def updated_at(self, info: Info[StrawberryGQLContext]) -> Optional[datetime]:
-        action_result = await info.context.processors.artifact.get_revisions.wait_for_complete(
-            GetArtifactRevisionsAction(uuid.UUID(self.id))
-        )
+    # TODO: Is this necessary?
+    # @strawberry.field
+    # async def updated_at(self, info: Info[StrawberryGQLContext]) -> Optional[datetime]:
+    #     action_result = await info.context.processors.artifact.get_revisions.wait_for_complete(
+    #         GetArtifactRevisionsAction(uuid.UUID(self.id))
+    #     )
 
-        updated_at_list = [
-            r.updated_at for r in action_result.revisions if r.updated_at is not None
-        ]
-        return max(updated_at_list) if updated_at_list else None
+    #     updated_at_list = [
+    #         r.updated_at for r in action_result.revisions if r.updated_at is not None
+    #     ]
+    #     return max(updated_at_list) if updated_at_list else None
 
 
 @strawberry.type(description="Added in 25.14.0")
