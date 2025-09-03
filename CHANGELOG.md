@@ -16,6 +16,23 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.13.4 (2025-09-03)
+
+### Fixes
+* Add missing scheduler options to AllowedScalingGroup and update related components ([#5730](https://github.com/lablup/backend.ai/issues/5730))
+
+
+## 25.13.3 (2025-09-03)
+
+### Fixes
+* Improve HTTP request proxying in the webserver to be transparent with content-encoding ([#5709](https://github.com/lablup/backend.ai/issues/5709))
+* Add null-user check in resource usage query ([#5712](https://github.com/lablup/backend.ai/issues/5712))
+* Ensure id parameter of chown function is an int ([#5713](https://github.com/lablup/backend.ai/issues/5713))
+* Refresh agent fields in kernel when rescheduling ([#5717](https://github.com/lablup/backend.ai/issues/5717))
+* Fix issue where App-Proxy failed to query worker circuits due to incorrect variable reference ([#5718](https://github.com/lablup/backend.ai/issues/5718))
+* Add missing network cleanup when creating overlay network ([#5721](https://github.com/lablup/backend.ai/issues/5721))
+
+
 ## 25.13.2 (2025-09-02)
 
 ### Features

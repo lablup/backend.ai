@@ -79,18 +79,12 @@ async def scan_available_resources(
     """
     Detect available computing resource of the system.
     """
-    reserved_slots = {
-        "cpu": local_config["resource"]["reserved-cpu"],
-        "mem": local_config["resource"]["reserved-mem"],
-        "disk": local_config["resource"]["reserved-disk"],
-    }
     slots: MutableMapping[SlotName, Decimal] = {}
-
     for key, computer in compute_device_types.items():
         known_slot_types.update(computer.slot_types)  # type: ignore  # (only updated here!)
         resource_slots = await computer.available_slots()
         for sname, sval in resource_slots.items():
-            slots[sname] = Decimal(max(0, sval - reserved_slots.get(sname, 0)))
+            slots[sname] = Decimal(sval)
             if slots[sname] <= 0 and sname in (SlotName("cpu"), SlotName("mem")):
                 raise InitializationError(
                     f"The resource slot '{sname}' is not sufficient (zero or below zero). "
