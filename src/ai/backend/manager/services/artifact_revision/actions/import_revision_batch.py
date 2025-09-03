@@ -4,12 +4,12 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.services.artifact.actions.base import ArtifactAction
+from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
 
 
 # TODO: Make this a batch action.
 @dataclass
-class ImportArtifactBatchAction(ArtifactAction):
+class ImportArtifactBatchAction(ArtifactRevisionAction):
     artifact_revision_ids: list[uuid.UUID]
 
     @override

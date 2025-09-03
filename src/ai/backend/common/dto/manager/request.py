@@ -74,7 +74,6 @@ class DeleteArtifactPathParam(BaseRequestModel):
     )
 
 
-# ObjectStorage API Request Models
 class CreateObjectStorageReq(BaseRequestModel):
     name: str = Field(description="Name of the object storage")
     host: str = Field(description="Host address of the object storage")
@@ -129,8 +128,3 @@ class GetPresignedUploadURLReq(BaseRequestModel):
     expiration: Optional[int] = Field(default=None, description="URL expiration time in seconds")
     min_size: Optional[int] = Field(default=None, description="Minimum file size")
     max_size: Optional[int] = Field(default=None, description="Maximum file size")
-
-
-class ObjectStorageBucketPathParam(BaseRequestModel):
-    storage_id: uuid.UUID = Field(description="The unique identifier of the object storage")
-    bucket_name: str = Field(description="Name of the bucket")

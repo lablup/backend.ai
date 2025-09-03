@@ -77,10 +77,6 @@ class ObjectStorageListResponse(BaseResponseModel):
     storages: list[ObjectStorageResponse] = Field(description="List of object storages")
 
 
-class DeleteObjectStorageResponse(BaseResponseModel):
-    pass
-
-
 class GetPresignedDownloadURLResponse(BaseResponseModel):
     presigned_url: str = Field(description="The presigned download URL")
 
