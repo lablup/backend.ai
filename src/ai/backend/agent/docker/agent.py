@@ -355,7 +355,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     stat = os.stat(p)
                     valid_uid = uid if uid is not None else stat.st_uid
                     valid_gid = gid if gid is not None else stat.st_gid
-                os.chown(p, valid_uid, valid_gid)
+                os.chown(p, int(valid_uid), int(valid_gid))
 
     async def prepare_scratch(self) -> None:
         loop = current_loop()
