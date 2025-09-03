@@ -1928,6 +1928,12 @@ class AbstractAgent(
                     int(slot_capacity), mem_reserved, align=mem_align
                 )
                 usable_capacity = Decimal(mem_usable)
+                log.info(
+                    "usable-mem: {:m}, reserved-mem: {:m} after {:m} alignment",
+                    BinarySize(mem_usable),
+                    BinarySize(mem_reserved),
+                    BinarySize(mem_align),
+                )
             else:
                 usable_capacity = max(
                     Decimal(0), slot_capacity - reserved_slots.get(slot_name, Decimal(0))
