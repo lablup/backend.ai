@@ -145,6 +145,9 @@ class SessionPreparer:
             network_type=network_type,
             network_id=network_id,
             bootstrap_script=bootstrap_script,
+            designated_agent_list=self._get_designated_agent_ids(
+                spec=spec, kernel_config=kernel_configs
+            ),
             use_host_network=scaling_group_network.use_host_network,
             timeout=timeout,
             kernels=kernel_data_list,
@@ -234,7 +237,6 @@ class SessionPreparer:
                 local_rank=kernel_config.get("local_rank", idx),
                 cluster_hostname=kernel_config.get("cluster_hostname")
                 or f"{kernel_config.get('cluster_role', DEFAULT_ROLE)}{kernel_config.get('cluster_idx', idx + 1)}",
-                agent=self._get_preassigned_agent(spec, kernel_config, idx),
                 scaling_group=validated_scaling_group,
                 domain_name=spec.user_scope.domain_name,
                 group_id=spec.user_scope.group_id,
@@ -274,22 +276,20 @@ class SessionPreparer:
 
         return kernel_data_list
 
-    def _get_preassigned_agent(
+    def _get_designated_agent_ids(
         self,
         spec: SessionCreationSpec,
-        kernel_config: KernelEnqueueingConfig,
-        kernel_idx: int,
-    ) -> Optional[str]:
+        kernel_config: list[KernelEnqueueingConfig],
+    ) -> Optional[list[str]]:
         """Get pre-assigned agent for a kernel."""
         # Check if agent is specified in kernel config
-        if agent_id := kernel_config.get("agent"):
-            return str(agent_id)
-
-        # Check if agent list is provided and use by index
-        if spec.agent_list and kernel_idx < len(spec.agent_list):
-            return spec.agent_list[kernel_idx]
-
-        return None
+        designated_agents = set()
+        for kernel_cfg in kernel_config:
+            if agent_id := kernel_cfg.get("agent"):
+                designated_agents.add(str(agent_id))
+        if designated_agents:
+            return list(designated_agents)
+        return spec.designated_agent_list
 
     def _collect_session_images(
         self,
