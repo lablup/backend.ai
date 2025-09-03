@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import Mapping
 from datetime import datetime
 from typing import Any
@@ -20,36 +21,46 @@ class ReservoirRegistryClient:
     Used when connecting to a remote reservoir service.
     """
 
-    _registry_data: ReservoirRegistryData
+    _id: uuid.UUID
+    _name: str
+    _endpoint: str
+    _access_key: str
+    _secret_key: str
+    _api_version: str
 
     def __init__(self, registry_data: ReservoirRegistryData):
-        self._registry_data = registry_data
+        self._id = registry_data.id
+        self._name = registry_data.name
+        self._endpoint = registry_data.endpoint
+        self._access_key = registry_data.access_key
+        self._secret_key = registry_data.secret_key
+        self._api_version = registry_data.api_version
 
     def _build_header(self, method: str, rel_url: str) -> Mapping[str, str]:
         date = datetime.now(tzutc())
         hdrs, _ = generate_signature(
             method=method,
-            version=self._registry_data.api_version,
-            endpoint=yarl.URL(self._registry_data.endpoint),
+            version=self._api_version,
+            endpoint=yarl.URL(self._endpoint),
             date=date,
             rel_url=rel_url,
             content_type="application/json",
-            access_key=self._registry_data.access_key,
-            secret_key=self._registry_data.secret_key,
+            access_key=self._access_key,
+            secret_key=self._secret_key,
             hash_type=_HASH_TYPE,
         )
 
         return {
             "User-Agent": "Backend.AI Manager facing manager client",
             "Content-Type": "application/json",
-            "X-BackendAI-Version": self._registry_data.api_version,
+            "X-BackendAI-Version": self._api_version,
             "Date": date.isoformat(),
             **hdrs,
         }
 
     async def _request(self, method: str, rel_url: str, **kwargs) -> Any:
         header = self._build_header(method=method, rel_url=rel_url)
-        url = yarl.URL(self._registry_data.endpoint) / rel_url.lstrip("/")
+        url = yarl.URL(self._endpoint) / rel_url.lstrip("/")
         async with aiohttp.ClientSession() as session:
             async with session.request(method, str(url), headers=header, **kwargs) as response:
                 response.raise_for_status()
