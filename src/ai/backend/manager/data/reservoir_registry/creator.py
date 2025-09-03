@@ -6,7 +6,6 @@ from ai.backend.manager.types import Creator
 
 @dataclass
 class ReservoirRegistryCreator(Creator):
-    name: str
     endpoint: str
     access_key: str
     secret_key: str
@@ -15,7 +14,6 @@ class ReservoirRegistryCreator(Creator):
     @override
     def fields_to_store(self) -> dict[str, Any]:
         return {
-            "name": self.name,
             "endpoint": self.endpoint,
             "access_key": self.access_key,
             "secret_key": self.secret_key,

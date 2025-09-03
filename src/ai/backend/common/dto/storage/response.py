@@ -39,11 +39,6 @@ class VFolderMetadataResponse(BaseResponseModel):
     )
 
 
-# S3 Storage API Response Models
-class UploadObjectResponse(BaseResponseModel):
-    pass
-
-
 class PresignedUploadObjectResponse(BaseResponseModel):
     url: str
     fields: dict[str, str]
@@ -51,10 +46,6 @@ class PresignedUploadObjectResponse(BaseResponseModel):
 
 class PresignedDownloadObjectResponse(BaseResponseModel):
     url: str
-
-
-class DownloadObjectResponse(BaseResponseModel):
-    pass
 
 
 class ObjectMetaResponse(BaseResponseModel):
@@ -69,11 +60,20 @@ class VFolderCloneResponse(BaseResponseModel):
     bgtask_id: TaskID
 
 
-# HuggingFace API Response Models
-
-
 class HuggingFaceScanModelsResponse(BaseResponseModel):
     """Response for HuggingFace scan operation."""
+
+    models: list[ModelData] = Field(
+        default_factory=list,
+        description="""
+        List of HuggingFace models scanned and retrieved.
+        Each model includes comprehensive metadata and file information.
+        """,
+    )
+
+
+class HuggingFaceRetrieveModelsResponse(BaseResponseModel):
+    """Response for HuggingFace retrieve operation."""
 
     models: list[ModelData] = Field(
         default_factory=list,
@@ -96,5 +96,13 @@ class HuggingFaceImportModelsResponse(BaseResponseModel):
     )
 
 
-class DeleteObjectResponse(BaseResponseModel):
-    pass
+class ReservoirImportModelsResponse(BaseResponseModel):
+    """Response for Reservoir batch model import operation."""
+
+    task_id: uuid.UUID = Field(
+        description="""
+        Unique identifier for the batch import task.
+        Used to track the progress of the batch model import operation.
+        """,
+        examples=["550e8400-e29b-41d4-a716-446655440000"],
+    )

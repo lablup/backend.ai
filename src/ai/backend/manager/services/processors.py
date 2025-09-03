@@ -240,22 +240,29 @@ class Services:
             artifact_repository=repositories.artifact.repository,
             object_storage_repository=repositories.object_storage.repository,
             storage_manager=args.storage_manager,
-        )
-        artifact_registry = ArtifactRegistryService(
-            repositories.huggingface_registry.repository,
-            repositories.reservoir_registry.repository,
+            config_provider=args.config_provider,
         )
         artifact_service = ArtifactService(
             artifact_repository=repositories.artifact.repository,
+            artifact_registry_repository=repositories.artifact_registry.repository,
             storage_manager=args.storage_manager,
             object_storage_repository=repositories.object_storage.repository,
             huggingface_registry_repository=repositories.huggingface_registry.repository,
+            config_provider=args.config_provider,
+            reservoir_registry_repository=repositories.reservoir_registry.repository,
         )
         artifact_revision_service = ArtifactRevisionService(
             artifact_repository=repositories.artifact.repository,
             storage_manager=args.storage_manager,
             object_storage_repository=repositories.object_storage.repository,
             huggingface_registry_repository=repositories.huggingface_registry.repository,
+            reservoir_registry_repository=repositories.reservoir_registry.repository,
+            config_provider=args.config_provider,
+        )
+        artifact_registry_service = ArtifactRegistryService(
+            repositories.huggingface_registry.repository,
+            repositories.reservoir_registry.repository,
+            repositories.artifact_registry.repository,
         )
 
         # Initialize deployment service if controller is available
@@ -285,7 +292,7 @@ class Services:
             object_storage=object_storage_service,
             artifact=artifact_service,
             artifact_revision=artifact_revision_service,
-            artifact_registry=artifact_registry,
+            artifact_registry=artifact_registry_service,
             deployment=deployment_service,
         )
 

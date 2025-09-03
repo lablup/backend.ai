@@ -3,17 +3,15 @@ from typing import AsyncIterable, AsyncIterator, Optional
 
 from ai.backend.common.dto.storage.request import PresignedUploadObjectReq
 from ai.backend.common.dto.storage.response import (
-    DeleteObjectResponse,
     ObjectMetaResponse,
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
-    UploadObjectResponse,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.config.unified import ObjectStorageConfig
 
-from ..client.s3 import S3Client
-from ..exception import (
+from ...client.s3 import S3Client
+from ...exception import (
     FileStreamDownloadError,
     FileStreamUploadError,
     ObjectInfoFetchError,
@@ -29,7 +27,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _DEFAULT_EXPIRATION = 1800  # Default token expiration time in seconds
 
 
-class StorageService:
+class ObjectStorageService:
     """
     Service class for S3 storage operations.
     """
@@ -37,12 +35,6 @@ class StorageService:
     _storage_configs: dict[str, ObjectStorageConfig]
 
     def __init__(self, storage_configs: list[ObjectStorageConfig]) -> None:
-        """
-        Initialize the StoragesService.
-
-        Args:
-            storage_configs: List of storage configurations
-        """
         self._storage_configs = {config.name: config for config in storage_configs}
 
     async def stream_upload(
@@ -52,7 +44,7 @@ class StorageService:
         filepath: str,
         content_type: Optional[str],
         data_stream: AsyncIterable[bytes],
-    ) -> UploadObjectResponse:
+    ) -> None:
         """
         Upload a file to S3 using streaming.
 
@@ -62,9 +54,6 @@ class StorageService:
             filepath: Path to the file to upload
             content_type: Content type of the file
             data_stream: Async iterator of file data chunks
-
-        Returns:
-            UploadObjectResponse
         """
         try:
             part_size = self._storage_configs[storage_name].upload_chunk_size
@@ -75,10 +64,7 @@ class StorageService:
                 content_type=content_type,
                 part_size=part_size,
             )
-
-            return UploadObjectResponse()
         except Exception as e:
-            log.error(f"Stream upload failed: {e}")
             raise FileStreamUploadError("Upload failed") from e
 
     async def stream_download(
@@ -102,7 +88,6 @@ class StorageService:
                 yield chunk
 
         except Exception as e:
-            log.error(f"Stream download failed: {e}")
             raise FileStreamDownloadError("Download failed") from e
 
     # TODO: Replace `request` with proper options
@@ -141,7 +126,6 @@ class StorageService:
             )
 
         except Exception as e:
-            log.error(f"Presigned upload URL generation failed: {e}")
             raise PresignedUploadURLGenerationError() from e
 
     async def generate_presigned_download_url(
@@ -177,7 +161,6 @@ class StorageService:
             return PresignedDownloadObjectResponse(url=presigned_url)
 
         except Exception as e:
-            log.error(f"Presigned download URL generation failed: {e}")
             raise PresignedDownloadURLGenerationError() from e
 
     async def get_object_info(
@@ -213,27 +196,19 @@ class StorageService:
         except Exception as e:
             raise ObjectInfoFetchError(f"Get object info failed: {str(e)}") from e
 
-    async def delete_file(
-        self, storage_name: str, bucket_name: str, filepath: str
-    ) -> DeleteObjectResponse:
+    async def delete_object(self, storage_name: str, bucket_name: str, prefix: str) -> None:
         """
-        Delete file (object).
+        Delete an object and all its contents.
 
         Args:
             storage_name: Name of the storage configuration
             bucket_name: Name of the S3 bucket
-            filepath: Path of the file to delete
-
-        Returns:
-            DeleteResponse with success status
+            prefix: Prefix of the object to delete
         """
         try:
             s3_client = self._get_s3_client(storage_name, bucket_name)
-            await s3_client.delete_object(filepath)
-            return DeleteObjectResponse()
-
+            await s3_client.delete_object(prefix)
         except Exception as e:
-            log.error(f"Delete object failed: {e}")
             raise StorageBucketNotFoundError(f"Delete object failed: {str(e)}") from e
 
     def _get_s3_client(self, storage_name: str, bucket_name: str) -> S3Client:

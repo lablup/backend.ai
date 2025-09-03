@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import AsyncGenerator, Optional, Self, Sequence
+from typing import AsyncGenerator, Optional, Self
 
 import strawberry
 from aiotools import apartial
@@ -11,13 +11,15 @@ from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
+from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
 from ai.backend.manager.api.gql.base import (
     ByteSize,
+    IntFilter,
     OrderDirection,
     StringFilter,
     build_pagination_options,
+    to_global_id,
 )
-from ai.backend.manager.api.gql.huggingface_registry import HuggingFaceRegistry
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
@@ -36,18 +38,17 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactStatusFilter,
     ArtifactStatusFilterType,
 )
-from ai.backend.manager.repositories.types import PaginationOptions
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
-from ai.backend.manager.services.artifact.actions.get_revisions import GetArtifactRevisionsAction
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
+from ai.backend.manager.services.artifact.actions.retrieve_model_multi import RetrieveModelsAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.cancel_import import CancelImportAction
-from ai.backend.manager.services.artifact_revision.actions.delete import (
-    DeleteArtifactRevisionAction,
+from ai.backend.manager.services.artifact_revision.actions.cleanup import (
+    CleanupArtifactRevisionAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
@@ -57,10 +58,12 @@ from ai.backend.manager.services.artifact_revision.actions.list import ListArtif
 from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
 )
-from ai.backend.manager.types import TriState
+from ai.backend.manager.types import PaginationOptions, TriState
+
+from .artifact_registry_meta import ArtifactRegistryMeta
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.14.0")
 class ArtifactFilter:
     type: Optional[list[ArtifactType]] = None
     name: Optional[StringFilter] = None
@@ -70,15 +73,12 @@ class ArtifactFilter:
     AND: Optional[list["ArtifactFilter"]] = None
     OR: Optional[list["ArtifactFilter"]] = None
     NOT: Optional[list["ArtifactFilter"]] = None
-    DISTINCT: Optional[bool] = None
 
     def to_repo_filter(self) -> ArtifactFilterOptions:
         repo_filter = ArtifactFilterOptions()
 
         # Handle basic filters
-        if self.type:
-            repo_filter.artifact_type = self.type[0] if self.type else None
-
+        repo_filter.artifact_type = self.type
         repo_filter.name_filter = self.name
         repo_filter.registry_filter = self.registry
         repo_filter.source_filter = self.source
@@ -94,28 +94,28 @@ class ArtifactFilter:
         return repo_filter
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.14.0")
 class ArtifactOrderBy:
     field: ArtifactOrderField
     direction: OrderDirection = OrderDirection.ASC
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.14.0")
 class ArtifactRevisionStatusFilter:
     in_: Optional[list[ArtifactStatus]] = strawberry.field(name="in", default=None)
     equals: Optional[ArtifactStatus] = None
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.14.0")
 class ArtifactRevisionFilter:
     status: Optional[ArtifactRevisionStatusFilter] = None
     version: Optional[StringFilter] = None
     artifact_id: Optional[ID] = None
+    size: Optional[IntFilter] = None
 
     AND: Optional[list["ArtifactRevisionFilter"]] = None
     OR: Optional[list["ArtifactRevisionFilter"]] = None
     NOT: Optional[list["ArtifactRevisionFilter"]] = None
-    DISTINCT: Optional[bool] = None
 
     def to_repo_filter(self) -> ArtifactRevisionFilterOptions:
         repo_filter = ArtifactRevisionFilterOptions()
@@ -138,6 +138,9 @@ class ArtifactRevisionFilter:
         # Pass StringFilter directly for processing in repository
         repo_filter.version_filter = self.version
 
+        # Handle size filter
+        repo_filter.size_filter = self.size
+
         # Handle logical operations
         if self.AND:
             repo_filter.AND = [f.to_repo_filter() for f in self.AND]
@@ -149,71 +152,79 @@ class ArtifactRevisionFilter:
         return repo_filter
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.14.0")
 class ArtifactRevisionOrderBy:
     field: ArtifactRevisionOrderField
     direction: OrderDirection = OrderDirection.ASC
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.14.0")
 class ScanArtifactsInput:
-    registry_id: ID
-    storage_namespace_id: ID
+    registry_id: Optional[ID] = None
     limit: int
+    artifact_type: Optional[ArtifactType] = None
     search: Optional[str] = None
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.14.0")
 class ImportArtifactsInput:
     artifact_revision_ids: list[ID]
-    storage_namespace_id: ID
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.14.0")
 class UpdateArtifactInput:
     artifact_id: ID
     readonly: Optional[bool] = UNSET
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.14.0")
 class CancelArtifactInput:
     artifact_revision_id: ID
 
 
-@strawberry.input(description="Added in 25.13.0")
-class DeleteArtifactRevisionTarget:
-    artifact_revision_id: ID
-    storage_namespace_id: ID
+@strawberry.input(description="Added in 25.14.0")
+class CleanupArtifactRevisionsInput:
+    artifact_revision_ids: list[ID]
 
 
-@strawberry.input(description="Added in 25.13.0")
-class DeleteArtifactRevisionsInput:
-    targets: list[DeleteArtifactRevisionTarget]
-
-
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.14.0")
 class ApproveArtifactInput:
     artifact_revision_id: ID
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.14.0")
 class RejectArtifactInput:
     artifact_revision_id: ID
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.14.0")
 class ArtifactStatusChangedInput:
     artifact_revision_ids: list[ID]
 
 
+@strawberry.input(description="Added in 25.14.0")
+class ModelTarget:
+    model_id: str
+    revision: str
+
+    def to_dataclass(self) -> ModelTargetData:
+        return ModelTargetData(model_id=self.model_id, revision=self.revision)
+
+
+@strawberry.input(description="Added in 25.14.0")
+class ScanArtifactModelsInput:
+    models: list[ModelTarget]
+    registry_id: uuid.UUID
+
+
 # Object Types
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class SourceInfo:
     name: Optional[str]
     url: Optional[str]
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class Artifact(Node):
     id: NodeID[str]
     name: str
@@ -222,6 +233,8 @@ class Artifact(Node):
     registry: SourceInfo
     source: SourceInfo
     readonly: bool
+    scanned_at: datetime
+    updated_at: datetime
 
     @classmethod
     def from_dataclass(cls, data: ArtifactData, registry_url: str, source_url: str) -> Self:
@@ -233,6 +246,8 @@ class Artifact(Node):
             registry=SourceInfo(name=data.registry_type.value, url=registry_url),
             source=SourceInfo(name=data.source_registry_type.value, url=source_url),
             readonly=data.readonly,
+            scanned_at=data.scanned_at,
+            updated_at=data.updated_at,
         )
 
     @strawberry.field
@@ -265,19 +280,20 @@ class Artifact(Node):
             offset=offset,
         )
 
-    @strawberry.field
-    async def updated_at(self, info: Info[StrawberryGQLContext]) -> Optional[datetime]:
-        action_result = await info.context.processors.artifact.get_revisions.wait_for_complete(
-            GetArtifactRevisionsAction(uuid.UUID(self.id))
-        )
+    # TODO: Is this necessary?
+    # @strawberry.field
+    # async def updated_at(self, info: Info[StrawberryGQLContext]) -> Optional[datetime]:
+    #     action_result = await info.context.processors.artifact.get_revisions.wait_for_complete(
+    #         GetArtifactRevisionsAction(uuid.UUID(self.id))
+    #     )
 
-        updated_at_list = [
-            r.updated_at for r in action_result.revisions if r.updated_at is not None
-        ]
-        return max(updated_at_list) if updated_at_list else None
+    #     updated_at_list = [
+    #         r.updated_at for r in action_result.revisions if r.updated_at is not None
+    #     ]
+    #     return max(updated_at_list) if updated_at_list else None
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class ArtifactRevision(Node):
     id: NodeID[str]
     status: ArtifactStatus
@@ -299,24 +315,39 @@ class ArtifactRevision(Node):
             updated_at=data.updated_at,
         )
 
-    @classmethod
-    async def batch_load_by_artifact_id(
-        cls, ctx: StrawberryGQLContext, artifact_ids: Sequence[uuid.UUID]
-    ) -> list[ArtifactRevision]:
-        revisions = []
-        for artifact_id in artifact_ids:
-            action_result = await ctx.processors.artifact.get_revisions.wait_for_complete(
-                GetArtifactRevisionsAction(artifact_id=artifact_id)
+    @strawberry.field
+    async def artifact(self, info: Info[StrawberryGQLContext]) -> Artifact:
+        revision_action_result = (
+            await info.context.processors.artifact_revision.get.wait_for_complete(
+                GetArtifactRevisionAction(artifact_revision_id=uuid.UUID(self.id))
             )
-            revisions.extend(action_result.revisions)
-        return [ArtifactRevision.from_dataclass(r) for r in revisions]
+        )
+
+        artifact_id = revision_action_result.revision.artifact_id
+
+        artifact_action_result = await info.context.processors.artifact.get.wait_for_complete(
+            GetArtifactAction(artifact_id=artifact_id)
+        )
+
+        registry_meta_loader = DataLoader(
+            apartial(ArtifactRegistryMeta.load_by_id, info.context),
+        )
+
+        registry_data = await registry_meta_loader.load(artifact_action_result.result.registry_id)
+        source_registry_data = await registry_meta_loader.load(
+            artifact_action_result.result.source_registry_id
+        )
+
+        return Artifact.from_dataclass(
+            artifact_action_result.result, registry_data.url, source_registry_data.url
+        )
 
 
 ArtifactEdge = Edge[Artifact]
 ArtifactRevisionEdge = Edge[ArtifactRevision]
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class ArtifactConnection(Connection[Artifact]):
     count: int
 
@@ -325,7 +356,7 @@ class ArtifactConnection(Connection[Artifact]):
         self.count = count
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class ArtifactRevisionConnection(Connection[ArtifactRevision]):
     count: int
 
@@ -334,53 +365,64 @@ class ArtifactRevisionConnection(Connection[ArtifactRevision]):
         self.count = count
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class ArtifactImportProgressUpdatedPayload:
     artifact_id: ID
     progress: float
     status: ArtifactStatus
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class ScanArtifactsPayload:
     artifacts: list[Artifact]
 
 
+@strawberry.type(description="Added in 25.14.0")
+class ArtifactRevisionImportTask:
+    task_id: ID
+    artifact_revision: ArtifactRevision
+
+
 # Mutation Payloads
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class ImportArtifactsPayload:
     artifact_revisions: ArtifactRevisionConnection
-    task_ids: list[uuid.UUID]
+    tasks: list[ArtifactRevisionImportTask]
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class UpdateArtifactPayload:
     artifact: Artifact
 
 
-@strawberry.type(description="Added in 25.13.0")
-class DeleteArtifactRevisionsPayload:
-    artifact_revision_ids: list[ID]
+@strawberry.type(description="Added in 25.14.0")
+class CleanupArtifactRevisionsPayload:
+    artifact_revisions: ArtifactRevisionConnection
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class ApproveArtifactPayload:
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class RejectArtifactPayload:
     artifact_revision: ArtifactRevision
 
 
 @strawberry.type
 class CancelImportArtifactPayload:
-    artifact_revision_id: ID
+    artifact_revision: ArtifactRevision
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.14.0")
 class ArtifactStatusChangedPayload:
     artifact_revision: ArtifactRevision
+
+
+@strawberry.type(description="Added in 25.14.0")
+class ScanArtifactModelsPayload:
+    artifact_revision: ArtifactRevisionConnection
 
 
 async def resolve_artifacts(
@@ -413,13 +455,13 @@ async def resolve_artifacts(
         )
     )
 
-    registry_loader = DataLoader(
-        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
     )
 
     # Build GraphQL connection response
     return await _build_artifact_connection(
-        registry_loader,
+        registry_meta_loader,
         artifacts=action_result.data,
         total_count=action_result.total_count,
         pagination_options=pagination_options,
@@ -457,7 +499,7 @@ def _convert_gql_artifact_revision_ordering_to_repo_ordering(
 
 
 async def _build_artifact_connection(
-    registry_loader: DataLoader,
+    registry_meta_loader: DataLoader,
     artifacts: list[ArtifactData],
     total_count: int,
     pagination_options: PaginationOptions,
@@ -465,13 +507,13 @@ async def _build_artifact_connection(
     """Build GraphQL connection from artifacts data"""
     edges = []
 
-    for i, artifact_data in enumerate(artifacts):
-        registry_data = await registry_loader.load(artifact_data.registry_id)
-        source_registry_data = await registry_loader.load(artifact_data.source_registry_id)
+    for artifact_data in artifacts:
+        registry_meta = await registry_meta_loader.load(artifact_data.registry_id)
+        source_registry_meta = await registry_meta_loader.load(artifact_data.source_registry_id)
         artifact = Artifact.from_dataclass(
-            artifact_data, registry_url=registry_data.url, source_url=source_registry_data.url
+            artifact_data, registry_url=registry_meta.url, source_url=source_registry_meta.url
         )
-        cursor = str(artifact_data.id)  # Use artifact ID as cursor
+        cursor = to_global_id(Artifact, artifact_data.id)
         edges.append(ArtifactEdge(node=artifact, cursor=cursor))
 
     # Calculate pagination info
@@ -533,9 +575,9 @@ def _build_artifact_revision_connection(
 ) -> ArtifactRevisionConnection:
     """Build GraphQL connection from artifact revision data"""
     edges = []
-    for i, revision_data in enumerate(artifact_revisions):
+    for revision_data in artifact_revisions:
         revision = ArtifactRevision.from_dataclass(revision_data)
-        cursor = str(revision_data.id)  # Use revision ID as cursor
+        cursor = to_global_id(ArtifactRevision, revision_data.id)
         edges.append(ArtifactRevisionEdge(node=revision, cursor=cursor))
 
     # Calculate pagination info
@@ -614,7 +656,7 @@ async def resolve_artifact_revisions(
     )
 
     # Get artifact revisions using list action
-    action_result = await info.context.processors.artifact_revision.list_.wait_for_complete(
+    action_result = await info.context.processors.artifact_revision.list_revision.wait_for_complete(
         ListArtifactRevisionsAction(
             pagination=pagination_options,
             ordering=repo_ordering,
@@ -631,7 +673,7 @@ async def resolve_artifact_revisions(
 
 
 # Query Fields
-@strawberry.field(description="Added in 25.13.0")
+@strawberry.field(description="Added in 25.14.0")
 async def artifacts(
     info: Info[StrawberryGQLContext],
     filter: Optional[ArtifactFilter] = None,
@@ -658,7 +700,7 @@ async def artifacts(
     return artifacts
 
 
-@strawberry.field(description="Added in 25.13.0")
+@strawberry.field(description="Added in 25.14.0")
 async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifact]:
     action_result = await info.context.processors.artifact.get.wait_for_complete(
         GetArtifactAction(
@@ -666,19 +708,19 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifac
         )
     )
 
-    registry_loader = DataLoader(
-        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
     )
 
-    registry_data = await registry_loader.load(action_result.result.registry_id)
-    source_registry_data = await registry_loader.load(action_result.result.source_registry_id)
+    registry_data = await registry_meta_loader.load(action_result.result.registry_id)
+    source_registry_data = await registry_meta_loader.load(action_result.result.source_registry_id)
 
     return Artifact.from_dataclass(
         action_result.result, registry_data.url, source_registry_data.url
     )
 
 
-@strawberry.field(description="Added in 25.13.0")
+@strawberry.field(description="Added in 25.14.0")
 async def artifact_revisions(
     info: Info[StrawberryGQLContext],
     filter: Optional[ArtifactRevisionFilter] = None,
@@ -703,7 +745,7 @@ async def artifact_revisions(
     )
 
 
-@strawberry.field(description="Added in 25.13.0")
+@strawberry.field(description="Added in 25.14.0")
 async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ArtifactRevision]:
     action_result = await info.context.processors.artifact_revision.get.wait_for_complete(
         GetArtifactRevisionAction(
@@ -714,14 +756,14 @@ async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Optiona
     return ArtifactRevision.from_dataclass(action_result.revision)
 
 
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.14.0")
 async def scan_artifacts(
     input: ScanArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ScanArtifactsPayload:
     action_result = await info.context.processors.artifact.scan.wait_for_complete(
         ScanArtifactsAction(
-            registry_id=uuid.UUID(input.registry_id),
-            storage_namespace_id=uuid.UUID(input.storage_namespace_id),
+            artifact_type=input.artifact_type,
+            registry_id=uuid.UUID(input.registry_id) if input.registry_id else None,
             limit=input.limit,
             # TODO: Move this huggingface_registries config if needed
             order=ModelSortKey.DOWNLOADS,
@@ -729,13 +771,14 @@ async def scan_artifacts(
         )
     )
 
-    registry_loader = DataLoader(
-        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
     )
+
     artifacts = []
     for item in action_result.result:
-        registry_data = await registry_loader.load(item.artifact.registry_id)
-        source_registry_data = await registry_loader.load(item.artifact.source_registry_id)
+        registry_data = await registry_meta_loader.load(item.artifact.registry_id)
+        source_registry_data = await registry_meta_loader.load(item.artifact.source_registry_id)
         artifacts.append(
             Artifact.from_dataclass(item.artifact, registry_data.url, source_registry_data.url)
         )
@@ -743,25 +786,32 @@ async def scan_artifacts(
 
 
 # Mutations
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.14.0")
 async def import_artifacts(
     input: ImportArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ImportArtifactsPayload:
     imported_artifacts = []
-    task_ids = []
+    tasks = []
     for revision_id in input.artifact_revision_ids:
-        action_result = await info.context.processors.artifact_revision.import_.wait_for_complete(
-            ImportArtifactRevisionAction(
-                artifact_revision_id=uuid.UUID(revision_id),
-                storage_namespace_id=uuid.UUID(input.storage_namespace_id),
+        action_result = (
+            await info.context.processors.artifact_revision.import_revision.wait_for_complete(
+                ImportArtifactRevisionAction(
+                    artifact_revision_id=uuid.UUID(revision_id),
+                )
             )
         )
-        imported_artifacts.append(ArtifactRevision.from_dataclass(action_result.result))
-        task_ids.append(action_result.task_id)
+        artifact_revision = ArtifactRevision.from_dataclass(action_result.result)
+        imported_artifacts.append(artifact_revision)
+        tasks.append(
+            ArtifactRevisionImportTask(
+                task_id=ID(str(action_result.task_id)),
+                artifact_revision=artifact_revision,
+            )
+        )
 
     edges = [
-        ArtifactRevisionEdge(node=artifact, cursor=str(i))
-        for i, artifact in enumerate(imported_artifacts)
+        ArtifactRevisionEdge(node=artifact, cursor=to_global_id(ArtifactRevisionEdge, artifact.id))
+        for artifact in imported_artifacts
     ]
 
     artifacts_connection = ArtifactRevisionConnection(
@@ -775,10 +825,10 @@ async def import_artifacts(
         ),
     )
 
-    return ImportArtifactsPayload(artifact_revisions=artifacts_connection, task_ids=task_ids)
+    return ImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
 
 
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.14.0")
 async def update_artifact(
     input: UpdateArtifactInput, info: Info[StrawberryGQLContext]
 ) -> UpdateArtifactPayload:
@@ -790,12 +840,12 @@ async def update_artifact(
     )
 
     artifact = action_result.result
-    registry_loader = DataLoader(
-        apartial(HuggingFaceRegistry.load_by_id, info.context),
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
     )
 
-    registry_data = await registry_loader.load(artifact.registry_id)
-    source_registry_data = await registry_loader.load(artifact.source_registry_id)
+    registry_data = await registry_meta_loader.load(artifact.registry_id)
+    source_registry_data = await registry_meta_loader.load(artifact.source_registry_id)
 
     return UpdateArtifactPayload(
         artifact=Artifact.from_dataclass(
@@ -804,24 +854,40 @@ async def update_artifact(
     )
 
 
-@strawberry.mutation(description="Added in 25.13.0")
-async def delete_artifact_revisions(
-    input: DeleteArtifactRevisionsInput, info: Info[StrawberryGQLContext]
-) -> DeleteArtifactRevisionsPayload:
-    artifact_revision_ids = []
-    for target in input.targets:
-        action_result = await info.context.processors.artifact_revision.delete.wait_for_complete(
-            DeleteArtifactRevisionAction(
-                artifact_revision_id=uuid.UUID(target.artifact_revision_id),
-                storage_namespace_id=uuid.UUID(target.storage_namespace_id),
+@strawberry.mutation(description="Added in 25.14.0")
+async def cleanup_artifact_revisions(
+    input: CleanupArtifactRevisionsInput, info: Info[StrawberryGQLContext]
+) -> CleanupArtifactRevisionsPayload:
+    cleaned_artifact_revisions: list[ArtifactRevision] = []
+    # TODO: Refactor with asyncio.gather()
+    for artifact_revision_id in input.artifact_revision_ids:
+        action_result = await info.context.processors.artifact_revision.cleanup.wait_for_complete(
+            CleanupArtifactRevisionAction(
+                artifact_revision_id=uuid.UUID(artifact_revision_id),
             )
         )
-        artifact_revision_ids.append(ID(str(action_result.artifact_revision_id)))
+        cleaned_artifact_revisions.append(ArtifactRevision.from_dataclass(action_result.result))
 
-    return DeleteArtifactRevisionsPayload(artifact_revision_ids=artifact_revision_ids)
+    edges = [
+        ArtifactRevisionEdge(node=revision, cursor=to_global_id(ArtifactRevisionEdge, revision.id))
+        for revision in cleaned_artifact_revisions
+    ]
+
+    artifacts_connection = ArtifactRevisionConnection(
+        count=len(cleaned_artifact_revisions),
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+    )
+
+    return CleanupArtifactRevisionsPayload(artifact_revisions=artifacts_connection)
 
 
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.14.0")
 async def cancel_import_artifact(
     input: CancelArtifactInput, info: Info[StrawberryGQLContext]
 ) -> CancelImportArtifactPayload:
@@ -832,12 +898,12 @@ async def cancel_import_artifact(
         )
     )
     return CancelImportArtifactPayload(
-        artifact_revision_id=ID(str(action_result.artifact_revision_id))
+        artifact_revision=ArtifactRevision.from_dataclass(action_result.result)
     )
 
 
 # TODO: Make this available when only having super-admin privileges
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.14.0")
 async def approve_artifact_revision(
     input: ApproveArtifactInput, info: Info[StrawberryGQLContext]
 ) -> ApproveArtifactPayload:
@@ -852,7 +918,7 @@ async def approve_artifact_revision(
     )
 
 
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.14.0")
 async def reject_artifact_revision(
     input: RejectArtifactInput, info: Info[StrawberryGQLContext]
 ) -> RejectArtifactPayload:
@@ -867,8 +933,42 @@ async def reject_artifact_revision(
     )
 
 
+@strawberry.mutation(description="Added in 25.14.0")
+async def scan_artifact_models(
+    input: ScanArtifactModelsInput, info: Info[StrawberryGQLContext]
+) -> ScanArtifactModelsPayload:
+    action_result = await info.context.processors.artifact.retrieve_models.wait_for_complete(
+        RetrieveModelsAction(
+            models=[m.to_dataclass() for m in input.models], registry_id=input.registry_id
+        )
+    )
+
+    edges = []
+    for data in action_result.result:
+        edges.extend([
+            ArtifactRevisionEdge(
+                node=ArtifactRevision.from_dataclass(revision),
+                cursor=to_global_id(ArtifactRevision, revision.id),
+            )
+            for revision in data.revisions
+        ])
+
+    artifacts_connection = ArtifactRevisionConnection(
+        count=len(edges),
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+    )
+
+    return ScanArtifactModelsPayload(artifact_revision=artifacts_connection)
+
+
 # Subscriptions
-@strawberry.subscription(description="Added in 25.13.0")
+@strawberry.subscription(description="Added in 25.14.0")
 async def artifact_status_changed(
     input: ArtifactStatusChangedInput,
 ) -> AsyncGenerator[ArtifactStatusChangedPayload, None]:
@@ -878,7 +978,7 @@ async def artifact_status_changed(
         yield ArtifactStatusChangedPayload(artifact=Artifact())
 
 
-@strawberry.subscription(description="Added in 25.13.0")
+@strawberry.subscription(description="Added in 25.14.0")
 async def artifact_import_progress_updated(
     artifact_revision_id: ID,
 ) -> AsyncGenerator[ArtifactImportProgressUpdatedPayload, None]:

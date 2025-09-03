@@ -3,6 +3,9 @@ from typing import Self
 
 from ai.backend.manager.repositories.agent.repositories import AgentRepositories
 from ai.backend.manager.repositories.artifact.repositories import ArtifactRepositories
+from ai.backend.manager.repositories.artifact_registry.repositories import (
+    ArtifactRegistryRepositories,
+)
 from ai.backend.manager.repositories.auth.repositories import AuthRepositories
 from ai.backend.manager.repositories.container_registry.repositories import (
     ContainerRegistryRepositories,
@@ -23,7 +26,9 @@ from ai.backend.manager.repositories.object_storage.repositories import ObjectSt
 from ai.backend.manager.repositories.project_resource_policy.repositories import (
     ProjectResourcePolicyRepositories,
 )
-from ai.backend.manager.repositories.reservoir.repositories import ReservoirRegistryRepositories
+from ai.backend.manager.repositories.reservoir_registry.repositories import (
+    ReservoirRegistryRepositories,
+)
 from ai.backend.manager.repositories.resource_preset.repositories import ResourcePresetRepositories
 from ai.backend.manager.repositories.schedule.repositories import ScheduleRepositories
 from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepositories
@@ -60,6 +65,7 @@ class Repositories:
     object_storage: ObjectStorageRepositories
     huggingface_registry: HuggingFaceRegistryRepositories
     artifact: ArtifactRepositories
+    artifact_registry: ArtifactRegistryRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -85,6 +91,7 @@ class Repositories:
         object_storage_repositories = ObjectStorageRepositories.create(args)
         artifact_repositories = ArtifactRepositories.create(args)
         huggingface_registry_repositories = HuggingFaceRegistryRepositories.create(args)
+        artifact_registries = ArtifactRegistryRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -109,4 +116,5 @@ class Repositories:
             object_storage=object_storage_repositories,
             huggingface_registry=huggingface_registry_repositories,
             artifact=artifact_repositories,
+            artifact_registry=artifact_registries,
         )
