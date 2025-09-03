@@ -611,6 +611,12 @@ input ModelRuntimeConfigInput {
   environ: JSONString = null
 }
 
+"""Added in 25.13.0"""
+input ModelTarget {
+  modelId: String!
+  revision: String!
+}
+
 type Mutation {
   """Added in 25.13.0"""
   scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload!
@@ -675,6 +681,9 @@ type Mutation {
 
   """Added in 25.13.0"""
   rejectArtifactRevision(input: RejectArtifactInput!): RejectArtifactPayload!
+
+  """Added in 25.13.0"""
+  scanArtifactModels(input: ScanArtifactModelsInput!): ScanArtifactModelsPayload!
 }
 
 """An object with a Globally Unique ID"""
@@ -936,6 +945,16 @@ extend type ScalingGroupNode @key(fields: "id") {
 
 type ScalingRule {
   autoScalingRules: [EndpointAutoScalingRuleNode!]!
+}
+
+"""Added in 25.13.0"""
+input ScanArtifactModelsInput {
+  models: [ModelTarget!]!
+}
+
+"""Added in 25.13.0"""
+type ScanArtifactModelsPayload {
+  artifactRevision: ArtifactRevisionConnection!
 }
 
 """Added in 25.13.0"""
