@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional, Self, override
@@ -9,6 +10,12 @@ from uuid import UUID
 from sqlalchemy.engine import Row
 
 from ai.backend.common.types import AccessKey, CIStrEnum
+from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    ScopeType,
+)
 from ai.backend.manager.types import Creator
 
 
@@ -135,8 +142,28 @@ class UserData:
     container_main_gid: Optional[int] = field(compare=False)
     container_gids: Optional[list[int]] = field(compare=False)
 
+    def scope_id(self) -> ScopeId:
+        return ScopeId(
+            scope_type=ScopeType.USER,
+            scope_id=str(self.id),
+        )
+
+    def role_name(self) -> str:
+        return f"user-{str(self.id)[:8]}"
+
+    def entity_operations(self) -> Mapping[EntityType, Iterable[OperationType]]:
+        resource_entity_permissions = {
+            entity: OperationType.owner_operations()
+            for entity in EntityType.owner_accessible_entity_types_in_user()
+        }
+        user_permissions = OperationType.owner_operations() - {OperationType.CREATE}
+        return {EntityType.USER: user_permissions, **resource_entity_permissions}
+
     @classmethod
     def from_row(cls, row: Row) -> Self:
+        """
+        Deprecated: Use `UserRow.to_data()` method instead.
+        """
         return cls(
             id=row.uuid,
             uuid=row.uuid,

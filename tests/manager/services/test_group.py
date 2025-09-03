@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.types import RedisConnectionInfo, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -33,7 +34,6 @@ from ai.backend.manager.services.group.actions.purge_group import (
 )
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
-from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
 from ai.backend.manager.types import OptionalState, TriState
 
 from .utils import ScenarioBase

@@ -2,7 +2,7 @@ import copy
 import logging
 import uuid
 from datetime import datetime
-from typing import Optional, Sequence
+from typing import Optional, Sequence, cast
 from uuid import UUID
 
 import msgpack
@@ -13,6 +13,7 @@ from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
@@ -22,7 +23,6 @@ from ai.backend.manager.models.kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
 from ai.backend.manager.models.user import UserRole, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
-from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
 
 # Layer-specific decorator for group repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.GROUP)
@@ -53,15 +53,16 @@ class GroupRepository:
     @repository_decorator()
     async def create(self, creator: GroupCreator) -> GroupData:
         """Create a new group."""
-        data = creator.fields_to_store()
-        async with self._db.begin_session() as session:
-            query = sa.insert(groups).values(data).returning(groups)
-            result = await session.execute(query)
-            row = result.first()
-            group_data = GroupData.from_row(row)
-            if group_data is None:
-                raise GroupNotFound()
-            return group_data
+        async with self._db.begin_session() as db_session:
+            row = GroupRow.from_creator(creator)
+            db_session.add(row)
+            await db_session.flush()
+            await db_session.refresh(row)
+
+            data = row.to_data()
+            # Create RBAC role and permissions for the group
+
+            return data
 
     @repository_decorator()
     async def modify_validated(
@@ -99,12 +100,21 @@ class GroupRepository:
 
             # Update group data if provided
             if data:
-                result = await session.execute(
-                    sa.update(groups).values(data).where(groups.c.id == group_id).returning(groups),
+                update_stmt = (
+                    sa.update(GroupRow)
+                    .values(data)
+                    .where(GroupRow.id == group_id)
+                    .returning(GroupRow)
                 )
-                row = result.first()
-                if row:
-                    return GroupData.from_row(row)
+                query_stmt = (
+                    sa.select(GroupRow)
+                    .from_statement(update_stmt)
+                    .execution_options(populate_existing=True)
+                )
+                row = await session.scalar(query_stmt)
+                row = cast(Optional[GroupRow], row)
+                if row is not None:
+                    return row.to_data()
                 raise GroupNotFound()
 
             # If only user updates were performed, return None

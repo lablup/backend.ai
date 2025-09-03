@@ -17,6 +17,7 @@ from typing import (
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
+from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, relationship
@@ -24,6 +25,7 @@ from sqlalchemy.orm import load_only, relationship
 from ai.backend.common import msgpack
 from ai.backend.common.types import VFolderHostPermissionMap
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.domain.types import DomainCreator, DomainData
 
 from ..defs import RESERVED_DOTFILES
 from .base import (
@@ -92,6 +94,21 @@ domains = sa.Table(
 )
 
 
+def row_to_data(row: DomainRow | Row) -> DomainData:
+    return DomainData(
+        name=row.name,
+        description=row.description,
+        is_active=row.is_active,
+        created_at=row.created_at,
+        modified_at=row.modified_at,
+        total_resource_slots=row.total_resource_slots,
+        allowed_vfolder_hosts=row.allowed_vfolder_hosts,
+        allowed_docker_registries=row.allowed_docker_registries,
+        integration_id=row.integration_id,
+        dotfiles=row.dotfiles,
+    )
+
+
 class DomainRow(Base):
     __table__ = domains
     sessions = relationship("SessionRow", back_populates="domain")
@@ -106,6 +123,26 @@ class DomainRow(Base):
         back_populates="domain_row",
         primaryjoin="DomainRow.name==foreign(NetworkRow.domain_name)",
     )
+
+    @classmethod
+    def from_input(cls, input: DomainCreator) -> Self:
+        return cls(
+            name=input.name,
+            description=input.description,
+            is_active=input.is_active if input.is_active is not None else True,
+            total_resource_slots=input.total_resource_slots if input.total_resource_slots else {},
+            allowed_vfolder_hosts=input.allowed_vfolder_hosts
+            if input.allowed_vfolder_hosts
+            else {},
+            allowed_docker_registries=input.allowed_docker_registries
+            if input.allowed_docker_registries
+            else [],
+            integration_id=input.integration_id,
+            dotfiles=input.dotfiles if input.dotfiles else b"\x90",
+        )
+
+    def to_data(self) -> DomainData:
+        return row_to_data(self)
 
 
 @dataclass

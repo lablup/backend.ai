@@ -13,17 +13,17 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.user import UserRole, UserStatus, users
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.domain.repository import DomainRepository
-from ai.backend.manager.services.domain.types import (
+from ai.backend.manager.data.domain.types import (
     DomainCreator,
     DomainData,
     DomainModifier,
     UserInfo,
 )
+from ai.backend.manager.models.domain import domains, row_to_data
+from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.user import UserRole, UserStatus, users
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.types import TriState
 
 
@@ -104,8 +104,8 @@ class TestDomainRepository:
             await conn.execute(sa.insert(groups).values(group_data))
             await conn.commit()
 
-            domain_data_obj = DomainData.from_row(domain_row)
-            assert domain_data_obj is not None
+            assert domain_row is not None
+            domain_data_obj = row_to_data(domain_row)
 
             try:
                 yield domain_data_obj

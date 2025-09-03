@@ -1,10 +1,16 @@
-from typing import Iterable, Optional
+from typing import Iterable, Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.manager.data.domain.types import (
+    DomainCreator,
+    DomainData,
+    DomainModifier,
+    UserInfo,
+)
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
@@ -21,12 +27,6 @@ from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
-from ai.backend.manager.services.domain.types import (
-    DomainCreator,
-    DomainData,
-    DomainModifier,
-    UserInfo,
-)
 
 # Layer-specific decorator for domain repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.DOMAIN)
@@ -44,23 +44,17 @@ class DomainRepository:
         Creates a new domain with model-store group.
         Validates domain creation permissions.
         """
-        async with self._db.begin() as conn:
-            data = creator.fields_to_store()
-            insert_query = sa.insert(domains).values(data).returning(domains)
-            result = await conn.execute(insert_query)
-            row = result.first()
+        async with self._db.begin_session() as db_session:
+            domain = DomainRow.from_input(creator)
+            db_session.add(domain)
+            await db_session.flush()
+            await db_session.refresh(domain)
+
+            result = domain.to_data()
 
             # Create model-store group for the domain
-            await self._create_model_store_group(conn, creator.name)
+            await self._create_model_store_group(db_session, creator.name)
 
-            if result.rowcount != 1 or row is None:
-                raise RuntimeError(f"No domain created. rowcount: {result.rowcount}, data: {data}")
-
-        if row is None:
-            raise DomainDataProcessingError("Failed to retrieve created domain row")
-        result = DomainData.from_row(row)
-        if result is None:
-            raise DomainDataProcessingError("Failed to convert domain row to DomainData")
         return result
 
     @repository_decorator()
@@ -71,21 +65,23 @@ class DomainRepository:
         Modifies an existing domain.
         Validates domain modification permissions.
         """
-        async with self._db.begin() as conn:
+        async with self._db.begin_session() as db_session:
             data = modifier.fields_to_update()
-            update_query = (
-                sa.update(domains)
+            update_stmt = (
+                sa.update(DomainRow)
                 .values(data)
-                .where(domains.c.name == domain_name)
-                .returning(domains)
+                .where(DomainRow.name == domain_name)
+                .returning(DomainRow)
             )
-            result = await conn.execute(update_query)
-            row = result.first()
+            query_stmt = (
+                sa.select(DomainRow)
+                .from_statement(update_stmt)
+                .execution_options(populate_existing=True)
+            )
 
-            if result.rowcount == 0:
-                return None
+            row = cast(Optional[DomainRow], await db_session.scalar(query_stmt))
 
-        return DomainData.from_row(row)
+            return row.to_data() if row is not None else None
 
     @repository_decorator()
     async def soft_delete_domain_validated(self, domain_name: str) -> bool:
@@ -140,7 +136,7 @@ class DomainRepository:
             insert_and_returning = sa.select(DomainRow).from_statement(
                 sa.insert(DomainRow).values(data).returning(DomainRow)
             )
-            domain_row = await session.scalar(insert_and_returning)
+            domain_row: Optional[DomainRow] = await session.scalar(insert_and_returning)
 
             if scaling_groups is not None:
                 await session.execute(
@@ -156,7 +152,7 @@ class DomainRepository:
                 raise DomainDataProcessingError(
                     f"Failed to retrieve created domain node: {creator.name}"
                 )
-            result = DomainData.from_row(domain_row)
+            result = domain_row.to_data()
             if result is None:
                 raise DomainDataProcessingError(
                     f"Failed to convert domain node row to DomainData: {creator.name}"
@@ -201,14 +197,14 @@ class DomainRepository:
             )
             await session.execute(update_stmt)
 
-            domain_row = await session.scalar(
+            domain_row: Optional[DomainRow] = await session.scalar(
                 sa.select(DomainRow).where(DomainRow.name == domain_name)
             )
 
             await session.commit()
-            return DomainData.from_row(domain_row) if domain_row else None
+            return domain_row.to_data() if domain_row is not None else None
 
-    async def _create_model_store_group(self, conn: SAConnection, domain_name: str) -> None:
+    async def _create_model_store_group(self, db_session: SASession, domain_name: str) -> None:
         """
         Private method to create model-store group for a domain.
         """
@@ -223,7 +219,7 @@ class DomainRepository:
             "resource_policy": "default",
             "type": ProjectType.MODEL_STORE,
         })
-        await conn.execute(model_store_insert_query)
+        await db_session.execute(model_store_insert_query)
 
     async def _delete_kernels(self, conn: SAConnection, domain_name: str) -> int:
         """

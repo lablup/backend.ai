@@ -8,6 +8,13 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.data.domain.types import (
+    DomainCreator,
+    DomainData,
+    DomainModifier,
+    DomainNodeModifier,
+    UserInfo,
+)
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -42,13 +49,6 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
-from ai.backend.manager.services.domain.types import (
-    DomainCreator,
-    DomainData,
-    DomainModifier,
-    DomainNodeModifier,
-    UserInfo,
-)
 from ai.backend.manager.types import OptionalState, TriState
 
 from .utils import ScenarioBase

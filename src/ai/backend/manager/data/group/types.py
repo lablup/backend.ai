@@ -1,16 +1,35 @@
-"""
-Data types for group service.
-Deprecated: use `ai.backend.manager.data.group.types` instead.
-"""
+from __future__ import annotations
 
+import enum
 import uuid
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self, override
+from typing import Any, Optional, override
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.models.group import GroupRow, ProjectType
+from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    ScopeType,
+)
 from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
+
+
+class ProjectType(enum.StrEnum):
+    GENERAL = "general"
+    MODEL_STORE = "model-store"
+
+    @classmethod
+    def _missing_(cls, value: Any) -> Optional[ProjectType]:
+        assert isinstance(value, str)
+        match value.upper():
+            case "GENERAL":
+                return cls.GENERAL
+            case "MODEL_STORE" | "MODEL-STORE":
+                return cls.MODEL_STORE
+        return None
 
 
 @dataclass
@@ -60,26 +79,20 @@ class GroupData:
     type: ProjectType
     container_registry: Optional[dict[str, str]]
 
-    @classmethod
-    def from_row(cls, row: Optional[GroupRow]) -> Optional[Self]:
-        if row is None:
-            return None
-        return cls(
-            id=row.id,
-            name=row.name,
-            description=row.description,
-            is_active=row.is_active,
-            created_at=row.created_at,
-            modified_at=row.modified_at,
-            integration_id=row.integration_id,
-            domain_name=row.domain_name,
-            total_resource_slots=row.total_resource_slots,
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts,
-            dotfiles=row.dotfiles,
-            resource_policy=row.resource_policy,
-            type=row.type,
-            container_registry=row.container_registry,
+    def scope_id(self) -> ScopeId:
+        return ScopeId(
+            scope_type=ScopeType.PROJECT,
+            scope_id=str(self.id),
         )
+
+    def role_name(self) -> str:
+        return f"project-{str(self.id)[:8]}-admin"
+
+    def entity_operations(self) -> Mapping[EntityType, Iterable[OperationType]]:
+        return {
+            entity: OperationType.admin_operations()
+            for entity in EntityType.admin_accessible_entity_types_in_project()
+        }
 
 
 @dataclass

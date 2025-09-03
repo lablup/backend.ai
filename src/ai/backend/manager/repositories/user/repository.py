@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, cast
 from uuid import UUID
 
 import msgpack
@@ -28,7 +28,7 @@ from ai.backend.manager.errors.user import (
     UserNotFound,
 )
 from ai.backend.manager.models import kernels
-from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs, prepare_new_keypair
@@ -80,72 +80,62 @@ class UserRepository:
         email = user_creator.email
         user_name = user_creator.username
 
-        user_data = user_creator.fields_to_store()
-        async with self._db.begin() as conn:
+        async with self._db.begin_session() as db_session:
             # Check if domain exists before creating user
-            domain_check_query = sa.select(domains.c.name).where(domains.c.name == domain_name)
-            domain_exists = await conn.scalar(domain_check_query)
+            domain_exists = await self._check_domain_exists(db_session, domain_name)
             if not domain_exists:
                 raise UserCreationBadRequest(f"Domain '{domain_name}' does not exist.")
 
             # Check if user with the same email or username already exists
-            existing_user_query = sa.select(users.c.email).where(
-                sa.or_(users.c.email == email, users.c.username == user_name)
+            duplicate_exists = await self._check_user_exists_with_email_or_username(
+                db_session, email=email, username=user_name
             )
-            existing_user = await conn.scalar(existing_user_query)
-            if existing_user:
+            if duplicate_exists:
                 raise UserConflict(
                     f"User with email {email} or username {user_name} already exists."
                 )
-
-            # Insert user
-            user_insert_query = sa.insert(users).values(user_data)
-            query = user_insert_query.returning(user_insert_query.table)
-            created_user = None
-
             try:
-                result = await conn.execute(query)
-                created_user = result.first()
+                # Insert user
+                row = UserRow.from_creator(user_creator)
+                db_session.add(row)
+                await db_session.flush()
+                await db_session.refresh(row)
             except sa.exc.IntegrityError as e:
                 error_msg = str(e)
                 raise UserCreationBadRequest(
                     f"Failed to create user due to database constraint violation: {error_msg}"
                 ) from e
 
-            if not created_user:
+            if not row:
                 raise UserCreationFailure("Failed to create user")
+            created_user = row.to_data()
 
             # Create default keypair
-            email = user_data["email"]
+            email = created_user.email
             keypair_creator = KeyPairCreator(
-                is_active=(user_data["status"] == UserStatus.ACTIVE),
-                is_admin=user_data["role"] in ["superadmin", "admin"],
+                is_active=(created_user.status == UserStatus.ACTIVE),
+                is_admin=created_user.role in ["superadmin", "admin"],
                 resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
                 rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
             )
             kp_data = prepare_new_keypair(email, keypair_creator)
-            kp_insert_query = sa.insert(keypairs).values(
+            kp_insert_query = sa.insert(KeyPairRow).values(
                 **kp_data,
                 user=created_user.uuid,
             )
-            await conn.execute(kp_insert_query)
+            await db_session.execute(kp_insert_query)
 
             # Update user main_access_key
-            main_ak = kp_data["access_key"]
-            update_query = (
-                sa.update(users)
-                .where(users.c.uuid == created_user.uuid)
-                .values(main_access_key=main_ak)
-            )
-            await conn.execute(update_query)
+            row.main_access_key = kp_data["access_key"]
+            created_user.main_access_key = kp_data["access_key"]
 
             # Add user to groups including model store project
+            conn = await db_session.connection()
             await self._add_user_to_groups(
-                conn, created_user.uuid, user_data["domain_name"], group_ids or []
+                conn, created_user.uuid, created_user.domain_name, group_ids or []
             )
 
-            res = UserData.from_row(created_user)
-        return res
+        return created_user
 
     @repository_decorator()
     async def update_user_validated(
@@ -216,6 +206,22 @@ class UserRepository:
                 .values(status=UserStatus.DELETED, status_info="admin-requested")
                 .where(users.c.email == email)
             )
+
+    async def _check_domain_exists(self, session: SASession, domain_name: str) -> bool:
+        query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
+        result = await session.scalar(query)
+        result = cast(Optional[str], result)
+        return result is not None
+
+    async def _check_user_exists_with_email_or_username(
+        self, session: SASession, *, email: str, username: str
+    ) -> bool:
+        query = sa.select(UserRow.uuid).where(
+            sa.or_(UserRow.email == email, UserRow.username == username)
+        )
+        result = await session.scalar(query)
+        result = cast(Optional[UUID], result)
+        return result is not None
 
     async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:
         """Private method to get user by email."""
