@@ -170,11 +170,11 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
 
 
 class ReservoirImportModelsReq(BaseRequestModel):
-    """Request for batch importing multiple HuggingFace models to storage."""
+    """Request for batch importing multiple models to storage."""
 
     models: list[ModelTarget] = Field(
         description="""
-        List of models to import from HuggingFace.
+        List of models to import.
         Each model must specify the model ID and optional revision.
         """,
         examples=[
@@ -186,10 +186,10 @@ class ReservoirImportModelsReq(BaseRequestModel):
     )
     registry_name: str = Field(
         description="""
-        Name of the HuggingFace registry to import from.
+        Name of the Reservoir registry to import from.
         This should match the configured registry name in the system.
         """,
-        examples=["huggingface", "my-huggingface"],
+        examples=["reservoir", "my-reservoir"],
     )
     storage_name: str = Field(
         description="""
