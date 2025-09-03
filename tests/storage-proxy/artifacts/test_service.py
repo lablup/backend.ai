@@ -23,6 +23,7 @@ from ai.backend.storage.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.storage.exception import (
+    ArtifactStorageEmptyError,
     HuggingFaceAPIError,
     ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
@@ -734,16 +735,15 @@ class TestReservoirService:
         with patch.object(reservoir_service, "_list_all_keys_and_sizes") as mock_list_keys:
             mock_list_keys.return_value = ([], {}, 0)
 
-            bytes_copied = await reservoir_service._stream_bucket_to_bucket(
-                source_cfg=mock_reservoir_config,
-                storage_name="test_storage",
-                bucket_name="test-bucket",
-                options=BucketCopyOptions(concurrency=1, progress_log_interval_bytes=0),
-                progress_reporter=mock_progress_reporter,
-                key_prefix="models/",
-            )
-
-            assert bytes_copied == 0
+            with pytest.raises(ArtifactStorageEmptyError):
+                await reservoir_service._stream_bucket_to_bucket(
+                    source_cfg=mock_reservoir_config,
+                    storage_name="test_storage",
+                    bucket_name="test-bucket",
+                    options=BucketCopyOptions(concurrency=1, progress_log_interval_bytes=0),
+                    progress_reporter=mock_progress_reporter,
+                    key_prefix="models/",
+                )
 
     @pytest.mark.asyncio
     async def test_import_model_success(
