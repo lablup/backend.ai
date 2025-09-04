@@ -13,6 +13,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import graphql
 import more_itertools
 import sqlalchemy as sa
@@ -190,6 +191,7 @@ class SessionPermissionValueField(graphene.Scalar):
         return ComputeSessionPermission(value)
 
 
+@graphene_federation.key("id")
 class ComputeSessionNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -446,6 +448,14 @@ class ComputeSessionNode(graphene.ObjectType):
         )
         result.permissions = [] if permissions is None else permissions
         return result
+
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs
+    ) -> Optional["ComputeSessionNode"]:
+        # TODO: Confirm if scope and permsission are correct
+        return await ComputeSessionNode.get_accessible_node(
+            info, self.id, SystemScope(), ComputeSessionPermission.READ_ATTRIBUTE
+        )
 
     async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> dict[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context
