@@ -27,8 +27,7 @@ import memray
 import pyroscope
 from aiohttp import web
 from aiohttp.web_app import CleanupError
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
+from glide import ExpirySet, ExpiryType
 from setproctitle import setproctitle
 from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_exponential
 
@@ -68,6 +67,7 @@ from ai.backend.appproxy.common.utils import (
     ping_redis_connection,
 )
 from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.defs import (
     REDIS_LIVE_DB,
     REDIS_STATISTICS_DB,
@@ -80,7 +80,6 @@ from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.redis_client import RedisConnection
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
     RedisServiceDiscoveryArgs,
@@ -213,68 +212,50 @@ async def exception_middleware(
         return resp
 
 
-async def request_counter_marker_experimental(root_ctx: RootContext) -> None:
+async def request_counter_marker(root_ctx: RootContext) -> None:
+    """Request counter marker function using the valkey client."""
     redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
+    valkey_live = await ValkeyLiveClient.create(
+        valkey_target=redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+        db_id=REDIS_LIVE_DB,
+        human_readable_name="appproxy-worker-request-counter",
+    )
 
-    while True:
-        async with RedisConnection(
-            redis_profile_target.profile_target(RedisRole.LIVE),
-            db=REDIS_LIVE_DB,
-        ) as client:
+    try:
+        while True:
             try:
                 redis_key = await root_ctx.request_counter_redis_queue.get()
-                await client.execute([
-                    "INCR",
-                    redis_key,
-                ])
+                batch = valkey_live._create_batch()
+                batch.incr(redis_key)
+                await valkey_live._execute_batch(batch)
             except Exception:
                 log.exception("request_counter_marker(): error while handling request:")
+    finally:
+        await valkey_live.close()
 
 
-async def request_counter_marker_redispy(root_ctx: RootContext) -> None:
-    while True:
-        try:
-            redis_key = await root_ctx.request_counter_redis_queue.get()
-            await redis_helper.execute(root_ctx.redis_live, lambda r: r.incr(redis_key))
-        except Exception:
-            log.exception("request_counter_marker(): error while handling request:")
-
-
-async def last_used_time_marker_experimental(root_ctx: RootContext) -> None:
+async def last_used_time_marker(root_ctx: RootContext) -> None:
+    """Last used time marker function using the valkey client."""
     redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
+    valkey_live = await ValkeyLiveClient.create(
+        valkey_target=redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+        db_id=REDIS_LIVE_DB,
+        human_readable_name="appproxy-worker-last-used-time",
+    )
 
-    while True:
-        async with RedisConnection(
-            redis_profile_target.profile_target(RedisRole.LIVE),
-            db=REDIS_LIVE_DB,
-        ) as client:
+    try:
+        while True:
             try:
                 redis_keys, target_time = await root_ctx.last_used_time_marker_redis_queue.get()
-                for key in redis_keys:
-                    await client.execute([
-                        "SET",
-                        key,
-                        target_time,
-                    ])
-            except Exception:
-                log.exception("last_used_time_marker(): error while handling request:")
-
-
-async def last_used_time_marker_redispy(root_ctx: RootContext) -> None:
-    while True:
-        try:
-            redis_keys, target_time = await root_ctx.last_used_time_marker_redis_queue.get()
-
-            async def _pipe(r: Redis) -> Pipeline:
-                pipe = r.pipeline(transaction=False)
+                batch = valkey_live._create_batch()
                 ttl = get_default_redis_key_ttl()
                 for key in redis_keys:
-                    pipe.set(key, target_time, ex=ttl)
-                return pipe
-
-            await redis_helper.execute(root_ctx.redis_live, _pipe)
-        except Exception:
-            log.exception("last_used_time_marker(): error while handling request:")
+                    batch.set(key, str(target_time), expiry=ExpirySet(ExpiryType.SEC, ttl))
+                await valkey_live._execute_batch(batch)
+            except Exception:
+                log.exception("last_used_time_marker(): error while handling request:")
+    finally:
+        await valkey_live.close()
 
 
 @actxmgr
@@ -297,16 +278,8 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.last_used_time_marker_redis_queue = asyncio.Queue()
     root_ctx.request_counter_redis_queue = asyncio.Queue()
 
-    if root_ctx.local_config.proxy_worker.use_experimental_redis_event_dispatcher:
-        last_used_time_marker_task = asyncio.create_task(
-            last_used_time_marker_experimental(root_ctx)
-        )
-        request_counter_marker_task = asyncio.create_task(
-            request_counter_marker_experimental(root_ctx)
-        )
-    else:
-        last_used_time_marker_task = asyncio.create_task(last_used_time_marker_redispy(root_ctx))
-        request_counter_marker_task = asyncio.create_task(request_counter_marker_redispy(root_ctx))
+    last_used_time_marker_task = asyncio.create_task(last_used_time_marker(root_ctx))
+    request_counter_marker_task = asyncio.create_task(request_counter_marker(root_ctx))
 
     yield
 
