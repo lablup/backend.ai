@@ -1,7 +1,7 @@
 """Make artifact scanned_at, updated_at columns timezone aware
 
 Revision ID: 982a7c19a06c
-Revises: 2cc8337d78a3
+Revises: 5b171528a6f5
 Create Date: 2025-09-04 03:23:38.648535
 
 """
@@ -12,7 +12,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "982a7c19a06c"
-down_revision = "2cc8337d78a3"
+down_revision = "5b171528a6f5"
 branch_labels = None
 depends_on = None
 
