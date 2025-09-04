@@ -6,40 +6,39 @@ from typing import Awaitable, Callable, Generic, Optional
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.actions.validators.validator import ActionValidator
+from ai.backend.manager.actions.validator.scope import ScopeActionValidator
 
-from .action import (
+from ..action import (
     BaseActionResultMeta,
     BaseActionTriggerMeta,
     ProcessResult,
-    TAction,
-    TActionResult,
 )
-from .monitors.monitor import ActionMonitor
+from ..action.scope import TScopeAction, TScopeActionResult
+from ..monitors.monitor import ActionMonitor
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ActionProcessor(Generic[TAction, TActionResult]):
+class ScopeActionProcessor(Generic[TScopeAction, TScopeActionResult]):
     _monitors: list[ActionMonitor]
-    _validators: list[ActionValidator]
-    _func: Callable[[TAction], Awaitable[TActionResult]]
+    _validators: list[ScopeActionValidator]
+    _func: Callable[[TScopeAction], Awaitable[TScopeActionResult]]
 
     def __init__(
         self,
-        func: Callable[[TAction], Awaitable[TActionResult]],
+        func: Callable[[TScopeAction], Awaitable[TScopeActionResult]],
         monitors: Optional[list[ActionMonitor]] = None,
-        validators: Optional[list[ActionValidator]] = None,
+        validators: Optional[list[ScopeActionValidator]] = None,
     ) -> None:
         self._func = func
         self._monitors = monitors or []
         self._validators = validators or []
 
-    async def _run(self, action: TAction) -> TActionResult:
+    async def _run(self, action: TScopeAction) -> TScopeActionResult:
         started_at = datetime.now()
         status = OperationStatus.UNKNOWN
         description: str = "unknown"
-        result: Optional[TActionResult] = None
+        result: Optional[TScopeActionResult] = None
         error_code: Optional[ErrorCode] = None
 
         action_id = uuid.uuid4()
@@ -53,9 +52,6 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             for validator in self._validators:
                 await validator.validate(action, action_trigger_meta)
             result = await self._func(action)
-            status = OperationStatus.SUCCESS
-            description = "Success"
-            return result
         except BackendAIError as e:
             log.exception("Action processing error: {}", e)
             status = OperationStatus.ERROR
@@ -68,6 +64,10 @@ class ActionProcessor(Generic[TAction, TActionResult]):
             description = str(e)
             error_code = ErrorCode.default()
             raise
+        else:
+            status = OperationStatus.SUCCESS
+            description = "Success"
+            return result
         finally:
             ended_at = datetime.now()
             duration = ended_at - started_at
@@ -91,5 +91,5 @@ class ActionProcessor(Generic[TAction, TActionResult]):
                 except Exception as e:
                     log.warning("Error in monitor done method: {}", e)
 
-    async def wait_for_complete(self, action: TAction) -> TActionResult:
+    async def wait_for_complete(self, action: TScopeAction) -> TScopeActionResult:
         return await self._run(action)
