@@ -10,6 +10,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
     GetArtifactRegistryMetaAction,
 )
@@ -34,7 +35,7 @@ async def default_artifact_registry(
         case ArtifactType.MODEL:
             registry_name = artifact_registry_cfg.model_registry
         case _:
-            raise NotImplementedError(
+            raise NotImplementedAPI(
                 f"Default registry for artifact type {artifact_type} is not implemented."
             )
 
