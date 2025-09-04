@@ -7,6 +7,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import AsyncGenerator
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -35,7 +36,15 @@ class TestDomainRepository:
         self, database_fixture, database_engine: ExtendedAsyncSAEngine
     ) -> DomainRepository:
         """Create DomainRepository instance with real database"""
-        return DomainRepository(db=database_engine)
+
+        repo = DomainRepository(db=database_engine)
+
+        # Create mock for _role_manager
+        mock_role_manager = MagicMock()
+        mock_role_manager.create_system_role = AsyncMock(return_value=None)
+        repo._role_manager = mock_role_manager
+
+        return repo
 
     @pytest.fixture
     def sample_domain_creator(self) -> DomainCreator:

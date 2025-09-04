@@ -2,7 +2,7 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, AsyncGenerator, Optional
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -62,6 +62,11 @@ def processors(
         config_provider=service_mock_args["config_provider"],
         valkey_stat_client=service_mock_args["valkey_stat_client"],
     )
+
+    # Mock the _role_manager with all required methods
+    mock_role_manager = MagicMock()
+    mock_role_manager.create_system_role = AsyncMock(return_value=None)
+    group_repository._role_manager = mock_role_manager
     admin_group_repository = AdminGroupRepository(
         db=database_engine, storage_manager=service_mock_args["storage_manager"]
     )
