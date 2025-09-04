@@ -23,6 +23,85 @@ directive @join__unionMember(graph: join__Graph!, member: String!) repeatable on
 
 directive @link(url: String, as: String, for: link__Purpose, import: [link__Import]) repeatable on SCHEMA
 
+type AccessToken implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Added in 25.13.0: The access token."""
+  token: String!
+
+  """Added in 25.13.0: The creation timestamp of the access token."""
+  createdAt: DateTime!
+
+  """Added in 25.13.0: The expiration timestamp of the access token."""
+  validUntil: DateTime!
+}
+
+"""Added in 25.13.0"""
+type AccessTokenConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [AccessTokenEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type AccessTokenEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: AccessToken!
+}
+
+"""
+Added in 25.13.0. This enum represents the activeness status of a replica, indicating whether the deployment is currently active and able to serve requests.
+"""
+enum ActivenessStatus
+  @join__type(graph: STRAWBERRY)
+{
+  ACTIVE @join__enumValue(graph: STRAWBERRY)
+  INACTIVE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 25.13.0"""
+input ActivenessStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  in: [ActivenessStatus!] = null
+  equals: ActivenessStatus = null
+}
+
+"""Added in 25.13.0"""
+input AddModelRevisionInput
+  @join__type(graph: STRAWBERRY)
+{
+  name: String = null
+  deploymentId: ID!
+  clusterConfig: ClusterConfigInput!
+  resourceConfig: ResourceConfigInput!
+  image: ImageInput!
+  modelRuntimeConfig: ModelRuntimeConfigInput!
+  modelMountConfig: ModelMountConfigInput!
+  extraMounts: [ExtraVFolderMountInput!]
+}
+
+"""Added in 25.13.0"""
+type AddModelRevisionPayload
+  @join__type(graph: STRAWBERRY)
+{
+  revision: ModelRevision!
+}
+
 type Agent implements Item
   @join__implements(graph: GRAPHENE, interface: "Item")
   @join__type(graph: GRAPHENE)
@@ -543,9 +622,42 @@ enum AutoScalingMetricComparator
 """The source type to fetch metrics. Added in 25.1.0."""
 enum AutoScalingMetricSource
   @join__type(graph: GRAPHENE)
+  @join__type(graph: STRAWBERRY)
 {
-  KERNEL @join__enumValue(graph: GRAPHENE)
-  INFERENCE_FRAMEWORK @join__enumValue(graph: GRAPHENE)
+  KERNEL @join__enumValue(graph: GRAPHENE) @join__enumValue(graph: STRAWBERRY)
+  INFERENCE_FRAMEWORK @join__enumValue(graph: GRAPHENE) @join__enumValue(graph: STRAWBERRY)
+}
+
+type AutoScalingRule implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """Added in 25.13.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"""
+  metricSource: AutoScalingMetricSource!
+  metricName: String!
+
+  """Added in 25.13.0: The minimum threshold for scaling (e.g. 0.5)"""
+  minThreshold: Decimal
+
+  """Added in 25.13.0: The maximum threshold for scaling (e.g. 21.0)"""
+  maxThreshold: Decimal
+
+  """Added in 25.13.0: The step size for scaling (e.g. 1)."""
+  stepSize: Int!
+
+  """Added in 25.13.0: The time window (seconds) for scaling (e.g. 60)."""
+  timeWindow: Int!
+
+  """Added in 25.13.0: The minimum number of replicas (e.g. 1)."""
+  minReplicas: Int
+
+  """Added in 25.13.0: The maximum number of replicas (e.g. 10)."""
+  maxReplicas: Int
+  createdAt: DateTime!
+  lastTriggeredAt: DateTime!
 }
 
 """Added in 25.8.0."""
@@ -666,6 +778,7 @@ type ClearImages
   msg: String
 }
 
+"""Added in 25.13.0"""
 type ClusterConfig
   @join__type(graph: STRAWBERRY)
 {
@@ -673,6 +786,7 @@ type ClusterConfig
   size: Int!
 }
 
+"""Added in 25.13.0"""
 input ClusterConfigInput
   @join__type(graph: STRAWBERRY)
 {
@@ -680,6 +794,7 @@ input ClusterConfigInput
   size: Int!
 }
 
+"""Added in 25.13.0"""
 enum ClusterMode
   @join__type(graph: STRAWBERRY)
 {
@@ -1036,6 +1151,44 @@ type ContainerUtilizationMetricMetadata
   metric_names: [String]
 }
 
+input CreateAccessTokenInput
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Added in 25.13.0: The ID of the model deployment for which the access token is created.
+  """
+  modelDeploymentId: ID!
+
+  """Added in 25.13.0: The expiration timestamp of the access token."""
+  validUntil: DateTime!
+}
+
+type CreateAccessTokenPayload
+  @join__type(graph: STRAWBERRY)
+{
+  accessToken: AccessToken!
+}
+
+input CreateAutoScalingRuleInput
+  @join__type(graph: STRAWBERRY)
+{
+  modelDeploymentId: ID!
+  metricSource: AutoScalingMetricSource!
+  metricName: String!
+  minThreshold: Decimal
+  maxThreshold: Decimal
+  stepSize: Int!
+  timeWindow: Int!
+  minReplicas: Int
+  maxReplicas: Int
+}
+
+type CreateAutoScalingRulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  autoScalingRule: AutoScalingRule!
+}
+
 """Deprecated since 24.09.0. use `CreateContainerRegistryNode` instead"""
 type CreateContainerRegistry
   @join__type(graph: GRAPHENE)
@@ -1218,33 +1371,38 @@ input CreateKeyPairResourcePolicyInput
   max_pending_session_resource_slots: JSONString
 }
 
+"""Added in 25.13.0"""
 input CreateModelDeploymentInput
   @join__type(graph: STRAWBERRY)
 {
   metadata: ModelDeploymentMetadataInput!
   networkAccess: ModelDeploymentNetworkAccessInput!
-  clusterConfig: ClusterConfigInput!
-  resourceConfig: ResourceConfigInput!
-  deploymentStrategy: DeploymentStrategyInput!
+  defaultDeploymentStrategy: DeploymentStrategyInput!
+  desiredReplicaCount: Int!
   initialRevision: CreateModelRevisionInput!
 }
 
+"""Added in 25.13.0"""
 type CreateModelDeploymentPayload
   @join__type(graph: STRAWBERRY)
 {
   deployment: ModelDeployment!
 }
 
+"""Added in 25.13.0"""
 input CreateModelRevisionInput
   @join__type(graph: STRAWBERRY)
 {
-  deploymentId: ID!
-  name: String!
+  name: String = null
+  clusterConfig: ClusterConfigInput!
+  resourceConfig: ResourceConfigInput!
   image: ImageInput!
   modelRuntimeConfig: ModelRuntimeConfigInput!
   modelMountConfig: ModelMountConfigInput!
+  extraMounts: [ExtraVFolderMountInput!]
 }
 
+"""Added in 25.13.0"""
 type CreateModelRevisionPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -1425,6 +1583,47 @@ type DealiasImage
   msg: String
 }
 
+<<<<<<< Updated upstream
+=======
+"""Decimal (fixed-point)"""
+scalar Decimal
+  @join__type(graph: STRAWBERRY)
+
+"""Added in 25.13.0"""
+input DeleteArtifactRevisionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  targets: [DeleteArtifactRevisionTarget!]!
+}
+
+"""Added in 25.13.0"""
+type DeleteArtifactRevisionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  artifactRevisionIds: [ID!]!
+}
+
+"""Added in 25.13.0"""
+input DeleteArtifactRevisionTarget
+  @join__type(graph: STRAWBERRY)
+{
+  artifactRevisionId: ID!
+  storageNamespaceId: ID!
+}
+
+input DeleteAutoScalingRuleInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+}
+
+type DeleteAutoScalingRulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+}
+
+>>>>>>> Stashed changes
 """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
 type DeleteContainerRegistry
   @join__type(graph: GRAPHENE)
@@ -1506,16 +1705,18 @@ type DeleteKeyPairResourcePolicy
   msg: String
 }
 
+"""Added in 25.13.0"""
 input DeleteModelDeploymentInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
 }
 
+"""Added in 25.13.0"""
 type DeleteModelDeploymentPayload
   @join__type(graph: STRAWBERRY)
 {
-  deployment: ModelDeployment
+  id: ID!
 }
 
 """Added in 24.12.0."""
@@ -1594,18 +1795,22 @@ type DeleteUserResourcePolicy
   msg: String
 }
 
+"""Added in 25.13.0"""
 input DeploymentFilter
   @join__type(graph: STRAWBERRY)
 {
-  status: DeploymentStatus = null
+  name: StringFilter = null
+  status: DeploymentStatusFilter = null
   openToPublic: Boolean = null
-  tags: [StringFilter!] = null
-  AND: DeploymentFilter = null
-  OR: DeploymentFilter = null
-  NOT: DeploymentFilter = null
+  tags: StringFilter = null
+  endpointUrl: StringFilter = null
+  AND: [DeploymentFilter!] = null
+  OR: [DeploymentFilter!] = null
+  NOT: [DeploymentFilter!] = null
   DISTINCT: Boolean = null
 }
 
+"""Added in 25.13.0"""
 input DeploymentOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -1613,6 +1818,7 @@ input DeploymentOrderBy
   direction: OrderDirection! = DESC
 }
 
+"""Added in 25.13.0"""
 enum DeploymentOrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -1621,37 +1827,57 @@ enum DeploymentOrderField
   NAME @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in 25.13.0. This enum represents the deployment status of a model deployment, indicating its current state.
+"""
 enum DeploymentStatus
   @join__type(graph: STRAWBERRY)
 {
-  ACTIVE @join__enumValue(graph: STRAWBERRY)
-  INACTIVE @join__enumValue(graph: STRAWBERRY)
+  PENDING @join__enumValue(graph: STRAWBERRY)
+  SCALING @join__enumValue(graph: STRAWBERRY)
+  DEPLOYING @join__enumValue(graph: STRAWBERRY)
+  READY @join__enumValue(graph: STRAWBERRY)
+  STOPPING @join__enumValue(graph: STRAWBERRY)
+  STOPPED @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Added in 25.13.0"""
 type DeploymentStatusChangedPayload
   @join__type(graph: STRAWBERRY)
 {
   deployment: ModelDeployment!
 }
 
+"""Added in 25.13.0"""
+input DeploymentStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  in: [DeploymentStatus!] = null
+  equals: DeploymentStatus = null
+}
+
+"""Added in 25.13.0"""
 type DeploymentStrategy
   @join__type(graph: STRAWBERRY)
 {
   type: DeploymentStrategyType!
 }
 
+"""Added in 25.13.0"""
 input DeploymentStrategyInput
   @join__type(graph: STRAWBERRY)
 {
   type: DeploymentStrategyType!
 }
 
+"""
+Added in 25.13.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.
+"""
 enum DeploymentStrategyType
   @join__type(graph: STRAWBERRY)
 {
   ROLLING @join__enumValue(graph: STRAWBERRY)
   BLUE_GREEN @join__enumValue(graph: STRAWBERRY)
-  CANARY @join__enumValue(graph: STRAWBERRY)
 }
 
 type DisassociateAllScalingGroupsWithDomain
@@ -1767,21 +1993,22 @@ input DomainInput
 """Added in 24.12.0."""
 type DomainNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
-  @join__type(graph: GRAPHENE)
+  @join__type(graph: GRAPHENE, key: "id")
+  @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
   """The ID of the object"""
   id: ID!
-  name: String
-  description: String
-  is_active: Boolean
-  created_at: DateTime
-  modified_at: DateTime
-  total_resource_slots: JSONString
-  allowed_vfolder_hosts: JSONString
-  allowed_docker_registries: [String]
-  dotfiles: Bytes
-  integration_id: String
-  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalinGroupConnection
+  name: String @join__field(graph: GRAPHENE)
+  description: String @join__field(graph: GRAPHENE)
+  is_active: Boolean @join__field(graph: GRAPHENE)
+  created_at: DateTime @join__field(graph: GRAPHENE)
+  modified_at: DateTime @join__field(graph: GRAPHENE)
+  total_resource_slots: JSONString @join__field(graph: GRAPHENE)
+  allowed_vfolder_hosts: JSONString @join__field(graph: GRAPHENE)
+  allowed_docker_registries: [String] @join__field(graph: GRAPHENE)
+  dotfiles: Bytes @join__field(graph: GRAPHENE)
+  integration_id: String @join__field(graph: GRAPHENE)
+  scaling_groups(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ScalinGroupConnection @join__field(graph: GRAPHENE)
 }
 
 """
@@ -1904,22 +2131,21 @@ input EndpointAutoScalingRuleInput
 type EndpointAutoScalingRuleNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
   @join__type(graph: GRAPHENE, key: "id")
-  @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
   """The ID of the object"""
   id: ID!
-  row_id: UUID! @join__field(graph: GRAPHENE)
-  metric_source: AutoScalingMetricSource! @join__field(graph: GRAPHENE)
-  metric_name: String! @join__field(graph: GRAPHENE)
-  threshold: String! @join__field(graph: GRAPHENE)
-  comparator: AutoScalingMetricComparator! @join__field(graph: GRAPHENE)
-  step_size: Int! @join__field(graph: GRAPHENE)
-  cooldown_seconds: Int! @join__field(graph: GRAPHENE)
-  min_replicas: Int @join__field(graph: GRAPHENE)
-  max_replicas: Int @join__field(graph: GRAPHENE)
-  created_at: DateTime! @join__field(graph: GRAPHENE)
-  last_triggered_at: DateTime @join__field(graph: GRAPHENE)
-  endpoint: UUID! @join__field(graph: GRAPHENE)
+  row_id: UUID!
+  metric_source: AutoScalingMetricSource!
+  metric_name: String!
+  threshold: String!
+  comparator: AutoScalingMetricComparator!
+  step_size: Int!
+  cooldown_seconds: Int!
+  min_replicas: Int
+  max_replicas: Int
+  created_at: DateTime!
+  last_triggered_at: DateTime
+  endpoint: UUID!
 }
 
 type EndpointList implements PaginatedList
@@ -1933,16 +2159,15 @@ type EndpointList implements PaginatedList
 type EndpointToken implements Item
   @join__implements(graph: GRAPHENE, interface: "Item")
   @join__type(graph: GRAPHENE, key: "token")
-  @join__type(graph: STRAWBERRY, key: "token", extension: true)
 {
-  id: ID @join__field(graph: GRAPHENE)
+  id: ID
   token: String!
-  endpoint_id: UUID! @join__field(graph: GRAPHENE)
-  domain: String! @join__field(graph: GRAPHENE)
-  project: String! @join__field(graph: GRAPHENE)
-  session_owner: UUID! @join__field(graph: GRAPHENE)
-  created_at: DateTime! @join__field(graph: GRAPHENE)
-  valid_until: DateTime @join__field(graph: GRAPHENE)
+  endpoint_id: UUID!
+  domain: String!
+  project: String!
+  session_owner: UUID!
+  created_at: DateTime!
+  valid_until: DateTime
 }
 
 type EndpointTokenList implements PaginatedList
@@ -1969,6 +2194,47 @@ input ExtraMountInput
   Added in 24.03.4. Set permission of this mount. Should be one of (ro,rw,wd). Default is null
   """
   permission: String
+}
+
+type ExtraVFolderMount implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  mountDestination: String!
+  vfolder: VirtualFolderNode!
+}
+
+"""Added in 25.13.0"""
+type ExtraVFolderMountConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ExtraVFolderMountEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ExtraVFolderMountEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ExtraVFolderMount!
+}
+
+"""Added in 25.13.0"""
+input ExtraVFolderMountInput
+  @join__type(graph: STRAWBERRY)
+{
+  vfolderId: ID!
+  mountDestination: String
 }
 
 """
@@ -2107,34 +2373,35 @@ input GroupInput
 
 type GroupNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
-  @join__type(graph: GRAPHENE)
+  @join__type(graph: GRAPHENE, key: "id")
+  @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
   """The ID of the object"""
   id: ID!
 
   """Added in 24.03.7. The undecoded id value stored in DB."""
-  row_id: UUID
-  name: String
-  description: String
-  is_active: Boolean
-  created_at: DateTime
-  modified_at: DateTime
-  domain_name: String
-  total_resource_slots: JSONString
-  allowed_vfolder_hosts: JSONString
-  integration_id: String
-  resource_policy: String
+  row_id: UUID @join__field(graph: GRAPHENE)
+  name: String @join__field(graph: GRAPHENE)
+  description: String @join__field(graph: GRAPHENE)
+  is_active: Boolean @join__field(graph: GRAPHENE)
+  created_at: DateTime @join__field(graph: GRAPHENE)
+  modified_at: DateTime @join__field(graph: GRAPHENE)
+  domain_name: String @join__field(graph: GRAPHENE)
+  total_resource_slots: JSONString @join__field(graph: GRAPHENE)
+  allowed_vfolder_hosts: JSONString @join__field(graph: GRAPHENE)
+  integration_id: String @join__field(graph: GRAPHENE)
+  resource_policy: String @join__field(graph: GRAPHENE)
 
   """Added in 24.03.7. One of ['GENERAL', 'MODEL_STORE']."""
-  type: String
+  type: String @join__field(graph: GRAPHENE)
 
   """Added in 24.03.7."""
-  container_registry: JSONString
-  scaling_groups: [String]
+  container_registry: JSONString @join__field(graph: GRAPHENE)
+  scaling_groups: [String] @join__field(graph: GRAPHENE)
 
   """Added in 25.3.0."""
-  registry_quota: BigInt
-  user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection
+  registry_quota: BigInt @join__field(graph: GRAPHENE)
+  user_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): UserConnection @join__field(graph: GRAPHENE)
 }
 
 """
@@ -2242,6 +2509,7 @@ type ImageEdge
   cursor: String!
 }
 
+"""Added in 25.13.0"""
 input ImageInput
   @join__type(graph: STRAWBERRY)
 {
@@ -2390,6 +2658,13 @@ enum join__Graph {
   GRAPHENE @join__graph(name: "graphene", url: "http://host.docker.internal:8091/admin/gql")
   STRAWBERRY @join__graph(name: "strawberry", url: "http://host.docker.internal:8091/admin/gql/strawberry")
 }
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
+"""
+scalar JSON
+  @join__type(graph: STRAWBERRY)
+  @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
 """
 Allows use of a JSON String for input / output from the GraphQL schema.
@@ -2633,6 +2908,26 @@ enum link__Purpose {
   EXECUTION
 }
 
+"""
+Added in 25.13.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
+"""
+enum LivenessStatus
+  @join__type(graph: STRAWBERRY)
+{
+  NOT_CHECKED @join__enumValue(graph: STRAWBERRY)
+  HEALTHY @join__enumValue(graph: STRAWBERRY)
+  UNHEALTHY @join__enumValue(graph: STRAWBERRY)
+  DEGRADED @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 25.13.0"""
+input LivenessStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  in: [LivenessStatus!] = null
+  equals: LivenessStatus = null
+}
+
 """Added in 25.6.0. A pair of timestamp and value."""
 type MetricResultValue
   @join__type(graph: GRAPHENE)
@@ -2710,6 +3005,7 @@ type ModelCardEdge
   cursor: String!
 }
 
+"""Added in 25.13.0"""
 type ModelDeployment implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -2722,12 +3018,11 @@ type ModelDeployment implements Node
   revisionHistory: ModelRevisionConnection!
   scalingRule: ScalingRule!
   replicaState: ReplicaState!
-  deploymentStrategy: DeploymentStrategy!
-  clusterConfig: ClusterConfig!
-  resourceConfig: ResourceConfig!
+  defaultDeploymentStrategy: DeploymentStrategy!
   createdUser: UserNode!
 }
 
+"""Added in 25.13.0"""
 type ModelDeploymentConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -2750,32 +3045,40 @@ type ModelDeploymentEdge
   node: ModelDeployment!
 }
 
+"""Added in 25.13.0"""
 type ModelDeploymentMetadata
   @join__type(graph: STRAWBERRY)
 {
   name: String!
   status: DeploymentStatus!
   tags: [String!]!
+  project: GroupNode!
+  domain: DomainNode!
   createdAt: DateTime!
   updatedAt: DateTime!
 }
 
+"""Added in 25.13.0"""
 input ModelDeploymentMetadataInput
   @join__type(graph: STRAWBERRY)
 {
-  name: String!
+  projectId: ID!
+  domainName: String!
+  name: String = null
   tags: [String!] = null
 }
 
+"""Added in 25.13.0"""
 type ModelDeploymentNetworkAccess
   @join__type(graph: STRAWBERRY)
 {
   endpointUrl: String
   preferredDomainName: String
   openToPublic: Boolean!
-  accessTokens: [EndpointToken!]!
+  accessTokens: AccessTokenConnection!
 }
 
+"""Added in 25.13.0"""
 input ModelDeploymentNetworkAccessInput
   @join__type(graph: STRAWBERRY)
 {
@@ -2783,6 +3086,7 @@ input ModelDeploymentNetworkAccessInput
   openToPublic: Boolean! = false
 }
 
+"""Added in 25.13.0"""
 type ModelMountConfig
   @join__type(graph: STRAWBERRY)
 {
@@ -2791,6 +3095,7 @@ type ModelMountConfig
   definitionPath: String!
 }
 
+"""Added in 25.13.0"""
 input ModelMountConfigInput
   @join__type(graph: STRAWBERRY)
 {
@@ -2799,18 +3104,49 @@ input ModelMountConfigInput
   definitionPath: String!
 }
 
+"""Added in 25.13.0"""
 type ModelReplica implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
 {
   """The Globally Unique ID of this object"""
   id: ID!
-  name: String!
-  status: ReplicaStatus!
   revision: ModelRevision!
-  routings: [RoutingNode!]!
+
+  """
+  The session ID associated with the replica. This can be null right after replica creation.
+  """
+  sessionId: ID
+
+  """
+  This represents whether the replica has been checked and its health state.
+  """
+  readinessStatus: ReadinessStatus!
+
+  """
+  This represents whether the replica is currently running and able to serve requests.
+  """
+  livenessStatus: LivenessStatus!
+
+  """
+  This represents whether the replica is currently active and able to serve requests.
+  """
+  activenessStatus: ActivenessStatus!
+  weight: Int!
+
+  """
+  Detailed information about the routing node. It can include both error messages and success messages.
+  """
+  detail: JSONString!
+  createdAt: DateTime!
+
+  """
+  live statistics of the routing node. e.g. "live_stat": "{\"cpu_util\": {\"current\": \"7.472\", \"capacity\": \"1000\", \"pct\": \"0.75\", \"unit_hint\": \"percent\"}}"
+  """
+  liveStat: JSONString!
 }
 
+"""Added in 25.13.0"""
 type ModelReplicaConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -2833,6 +3169,7 @@ type ModelReplicaEdge
   node: ModelReplica!
 }
 
+"""Added in 25.13.0"""
 type ModelRevision implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -2840,12 +3177,16 @@ type ModelRevision implements Node
   """The Globally Unique ID of this object"""
   id: ID!
   name: String!
+  clusterConfig: ClusterConfig!
+  resourceConfig: ResourceConfig!
   modelRuntimeConfig: ModelRuntimeConfig!
   modelMountConfig: ModelMountConfig!
+  extraMounts: ExtraVFolderMountConnection!
   image: ImageNode!
   createdAt: DateTime!
 }
 
+"""Added in 25.13.0"""
 type ModelRevisionConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -2868,24 +3209,27 @@ type ModelRevisionEdge
   node: ModelRevision!
 }
 
+"""Added in 25.13.0"""
 input ModelRevisionFilter
   @join__type(graph: STRAWBERRY)
 {
   name: StringFilter = null
   deploymentId: ID = null
-  AND: ModelRevisionFilter = null
-  OR: ModelRevisionFilter = null
-  NOT: ModelRevisionFilter = null
+  AND: [ModelRevisionFilter!] = null
+  OR: [ModelRevisionFilter!] = null
+  NOT: [ModelRevisionFilter!] = null
   DISTINCT: Boolean = null
 }
 
-input ModelRevisionOrder
+"""Added in 25.13.0"""
+input ModelRevisionOrderBy
   @join__type(graph: STRAWBERRY)
 {
   field: ModelRevisionOrderField!
   direction: OrderDirection! = DESC
 }
 
+"""Added in 25.13.0"""
 enum ModelRevisionOrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -2893,19 +3237,29 @@ enum ModelRevisionOrderField
   NAME @join__enumValue(graph: STRAWBERRY)
 }
 
+"""Added in 25.13.0"""
 type ModelRuntimeConfig
   @join__type(graph: STRAWBERRY)
 {
   runtimeVariant: String!
-  serviceConfig: ServiceConfig
+  inferenceRuntimeConfig: JSON
+
+  """
+  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}
+  """
   environ: JSONString
 }
 
+"""Added in 25.13.0"""
 input ModelRuntimeConfigInput
   @join__type(graph: STRAWBERRY)
 {
   runtimeVariant: String!
-  serviceConfig: JSONString = null
+  inferenceRuntimeConfig: JSON = null
+
+  """
+  Environment variables for the service, e.g. {"CUDA_VISIBLE_DEVICES": "0"}
+  """
   environ: JSONString = null
 }
 
@@ -3736,9 +4090,25 @@ type Mutation
 
   """Added in 25.14.0"""
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
   createModelDeployment(input: CreateModelDeploymentInput!): CreateModelDeploymentPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
   updateModelDeployment(input: UpdateModelDeploymentInput!): UpdateModelDeploymentPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
   deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 25.13.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers
+  """
+  syncReplicas(input: SyncReplicaInput!): SyncReplicaPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  addModelRevision(input: AddModelRevisionInput!): AddModelRevisionPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
   createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
@@ -3747,7 +4117,20 @@ type Mutation
   """Added in 25.14.0"""
   updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload! @join__field(graph: STRAWBERRY)
 
+<<<<<<< Updated upstream
   """Added in 25.14.0"""
+=======
+  """Added in 25.13.0"""
+  createAutoScalingRule(input: CreateAutoScalingRuleInput!): CreateAutoScalingRulePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  updateAutoScalingRule(input: UpdateAutoScalingRuleInput!): UpdateAutoScalingRulePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+>>>>>>> Stashed changes
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
@@ -3785,6 +4168,9 @@ type Mutation
 
   """Added in 25.14.0"""
   rejectArtifactRevision(input: RejectArtifactInput!): RejectArtifactPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload! @join__field(graph: STRAWBERRY)
 }
 
 """Added in 24.12.0."""
@@ -4469,40 +4855,23 @@ type Query
 
   """Added in 25.14.0"""
   artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection! @join__field(graph: STRAWBERRY)
-  deployments(
-    filter: DeploymentFilter = null
-    orderBy: DeploymentOrderBy = null
 
-    """Returns the first n items from the list."""
-    first: Int = null
+  """Added in 25.13.0"""
+  deployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection! @join__field(graph: STRAWBERRY)
 
-    """Returns the items in the list that come after the specified cursor."""
-    after: String = null
-
-    """Returns the items in the list that come before the specified cursor."""
-    before: String = null
-
-    """Returns the items in the list that come after the specified cursor."""
-    last: Int = null
-  ): ModelDeploymentConnection! @join__field(graph: STRAWBERRY)
+  """Added in 25.13.0"""
   deployment(id: ID!): ModelDeployment @join__field(graph: STRAWBERRY)
-  revisions(
-    filter: ModelRevisionFilter = null
-    order: ModelRevisionOrder = null
 
-    """Returns the first n items from the list."""
-    first: Int = null
+  """Added in 25.13.0"""
+  revisions(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection! @join__field(graph: STRAWBERRY)
 
-    """Returns the items in the list that come after the specified cursor."""
-    after: String = null
-
-    """Returns the items in the list that come before the specified cursor."""
-    before: String = null
-
-    """Returns the items in the list that come after the specified cursor."""
-    last: Int = null
-  ): ModelRevisionConnection! @join__field(graph: STRAWBERRY)
+  """Added in 25.13.0"""
   revision(id: ID!): ModelRevision @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
+  replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0"""
   replica(id: ID!): ModelReplica @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
@@ -4517,11 +4886,21 @@ type Query
   """Added in 25.14.0"""
   huggingfaceRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): HuggingFaceRegistryConnection! @join__field(graph: STRAWBERRY)
 
+<<<<<<< Updated upstream
   """Added in 25.14.0"""
   reservoirRegistry(id: ID!): ReservoirRegistry @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
+=======
+  """
+  Added in 25.13.0 Get configuration JSON Schemas for all inference runtimes
+  """
+  inferenceRuntimeConfigs: JSON! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.13.0. Get JSON Schema for inference runtime configuration"""
+  inferenceRuntimeConfig(name: String!): JSON! @join__field(graph: STRAWBERRY)
+>>>>>>> Stashed changes
 }
 
 type QuotaDetails
@@ -4548,11 +4927,23 @@ input QuotaScopeInput
   hard_limit_bytes: BigInt
 }
 
-type RawServiceConfig
+"""
+Added in 25.13.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.
+"""
+enum ReadinessStatus
   @join__type(graph: STRAWBERRY)
 {
-  config: JSONString!
-  extraCliParameters: String
+  NOT_CHECKED @join__enumValue(graph: STRAWBERRY)
+  HEALTHY @join__enumValue(graph: STRAWBERRY)
+  UNHEALTHY @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 25.13.0"""
+input ReadinessStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  in: [ReadinessStatus!] = null
+  equals: ReadinessStatus = null
 }
 
 """Added in 25.14.0"""
@@ -4584,20 +4975,43 @@ type RejectArtifactPayload
   artifactRevision: ArtifactRevision!
 }
 
+"""Added in 25.13.0"""
+input ReplicaFilter
+  @join__type(graph: STRAWBERRY)
+{
+  readinessStatus: ReadinessStatusFilter = null
+  livenessStatus: LivenessStatusFilter = null
+  activenessStatus: ActivenessStatusFilter = null
+  AND: [ReplicaFilter!] = null
+  OR: [ReplicaFilter!] = null
+  NOT: [ReplicaFilter!] = null
+  DISTINCT: Boolean = null
+}
+
+"""Added in 25.13.0"""
+input ReplicaOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: ReplicaOrderField!
+  direction: OrderDirection! = DESC
+}
+
+"""Added in 25.13.0"""
+enum ReplicaOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 25.13.0"""
 type ReplicaState
   @join__type(graph: STRAWBERRY)
 {
   desiredReplicaCount: Int!
-  replicas: ModelReplicaConnection!
+  replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection!
 }
 
-enum ReplicaStatus
-  @join__type(graph: STRAWBERRY)
-{
-  HEALTHY @join__enumValue(graph: STRAWBERRY)
-  UNHEALTHY @join__enumValue(graph: STRAWBERRY)
-}
-
+"""Added in 25.13.0"""
 type ReplicaStatusChangedPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -4619,6 +5033,7 @@ type RescanImages
   task_id: UUID
 }
 
+<<<<<<< Updated upstream
 """Added in 25.14.0"""
 type ReservoirRegistry implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -4656,22 +5071,43 @@ type ReservoirRegistryEdge
   node: ReservoirRegistry!
 }
 
+=======
+"""Added in 25.13.0"""
+>>>>>>> Stashed changes
 type ResourceConfig
   @join__type(graph: STRAWBERRY)
 {
   resourceGroup: ScalingGroupNode!
+
+  """
+  Resource Slots are a JSON string that describes the resources allocated for the deployment. Example: "resourceSlots": "{\"cpu\": \"1\", \"mem\": \"1073741824\", \"cuda.device\": \"0\"}"
+  """
   resourceSlots: JSONString!
+
+  """
+  Resource Options are a JSON string that describes additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\"shmem\": \"64m\"}"
+  """
   resourceOpts: JSONString
 }
 
+"""Added in 25.13.0"""
 input ResourceConfigInput
   @join__type(graph: STRAWBERRY)
 {
   resourceGroup: ResourceGroupInput!
+
+  """
+  Resources allocated for the deployment. Example: "resourceSlots": "{\"cpu\": \"1\", \"mem\": \"1073741824\", \"cuda.device\": \"0\"}"
+  """
   resourceSlots: JSONString!
+
+  """
+  Additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\"shmem\": \"64m\"}"
+  """
   resourceOpts: JSONString = null
 }
 
+"""Added in 25.13.0"""
 input ResourceGroupInput
   @join__type(graph: STRAWBERRY)
 {
@@ -4732,21 +5168,6 @@ type RoutingList implements PaginatedList
 {
   items: [Routing]!
   total_count: Int!
-}
-
-type RoutingNode implements Node
-  @join__implements(graph: STRAWBERRY, interface: "Node")
-  @join__type(graph: STRAWBERRY)
-{
-  """The Globally Unique ID of this object"""
-  id: ID!
-  routingId: UUID!
-  endpoint: String!
-  session: UUID!
-  status: String!
-  trafficRatio: Float!
-  createdAt: DateTime!
-  liveStat: JSONString!
 }
 
 """Added in 24.03.5."""
@@ -4852,10 +5273,11 @@ type ScalinGroupEdge
   cursor: String!
 }
 
+"""Added in 25.13.0"""
 type ScalingRule
   @join__type(graph: STRAWBERRY)
 {
-  autoScalingRules: [EndpointAutoScalingRuleNode!]!
+  autoScalingRules: [AutoScalingRule!]!
 }
 
 """Added in 25.14.0"""
@@ -4895,12 +5317,6 @@ Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. <SCOPE
 """
 scalar ScopeField
   @join__type(graph: GRAPHENE)
-
-"""Different service configurations for model runtime"""
-union ServiceConfig
-  @join__type(graph: STRAWBERRY)
-  @join__unionMember(graph: STRAWBERRY, member: "RawServiceConfig")
- = RawServiceConfig
 
 """Added in 25.8.0."""
 type ServiceConfigConnection
@@ -5047,8 +5463,26 @@ type Subscription
 
   """Added in 25.14.0"""
   artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
+
+  """Added in 25.13.0"""
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
+
+  """Added in 25.13.0"""
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
+}
+
+"""Added in 25.13.0"""
+input SyncReplicaInput
+  @join__type(graph: STRAWBERRY)
+{
+  modelDeploymentId: ID!
+}
+
+"""Added in 25.13.0"""
+type SyncReplicaPayload
+  @join__type(graph: STRAWBERRY)
+{
+  success: Boolean!
 }
 
 """Added in 25.5.0."""
@@ -5118,6 +5552,26 @@ type UpdateArtifactPayload
   artifact: Artifact!
 }
 
+input UpdateAutoScalingRuleInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+  metricSource: AutoScalingMetricSource
+  metricName: String
+  minThreshold: Decimal
+  maxThreshold: Decimal
+  stepSize: Int
+  timeWindow: Int
+  minReplicas: Int
+  maxReplicas: Int
+}
+
+type UpdateAutoScalingRulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  autoScalingRule: AutoScalingRule!
+}
+
 """Added in 25.3.0."""
 type UpdateContainerRegistryQuota
   @join__type(graph: GRAPHENE)
@@ -5143,20 +5597,25 @@ type UpdateHuggingFaceRegistryPayload
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
+"""Added in 25.13.0"""
 input UpdateModelDeploymentInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
   openToPublic: Boolean = null
   tags: [String!] = null
-  deploymentStrategy: DeploymentStrategyInput = null
+  defaultDeploymentStrategy: DeploymentStrategyInput = null
   activeRevisionId: ID = null
+  desiredReplicaCount: Int = null
+  name: String = null
+  preferredDomainName: String = null
 }
 
+"""Added in 25.13.0"""
 type UpdateModelDeploymentPayload
   @join__type(graph: STRAWBERRY)
 {
-  deployment: ModelDeployment
+  deployment: ModelDeployment!
 }
 
 """Added in 25.14.0"""
