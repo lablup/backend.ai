@@ -552,6 +552,28 @@ class ImageRow(Base):
         return image_row
 
     @classmethod
+    def from_dataclass_with_details(cls, image_data: ImageDataWithDetails) -> Self:
+        image_row = ImageRow(
+            name=image_data.name,
+            project=image_data.project,
+            image=image_data.name,
+            tag=image_data.tag,
+            registry=image_data.registry,
+            registry_id=image_data.registry_id,
+            architecture=image_data.architecture,
+            config_digest=image_data.digest,
+            size_bytes=image_data.size_bytes,
+            is_local=image_data.is_local,
+            type=image_data.type,
+            accelerators=",".join(image_data.supported_accelerators),
+            labels={kv.key: kv.value for kv in image_data.labels},
+            resources={rl.key: {rl.min, rl.max} for rl in image_data.resource_limits},
+            status=image_data.status,
+        )
+        image_row.id = image_data.id
+        return image_row
+
+    @classmethod
     def from_optional_dataclass(cls, image_data: Optional[ImageData]) -> Optional[Self]:
         if image_data is None:
             return None
@@ -865,6 +887,8 @@ class ImageRow(Base):
             tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
             version=version,
             registry=self.registry,
+            registry_id=self.registry_id,
+            type=self.type,
             architecture=self.architecture,
             is_local=self.is_local,
             digest=self.trimmed_digest or None,

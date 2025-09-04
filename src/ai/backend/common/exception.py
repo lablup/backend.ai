@@ -635,6 +635,19 @@ class GenericNotImplementedError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/object-storage-bucket-not-found"
+    error_title = "Object Storage Bucket Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.OBJECT_STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class InvalidConfigError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/invalid-configuration"
     error_title = "Invalid Configuration"
@@ -669,6 +682,71 @@ class AgentNotFound(BackendAIError, web.HTTPNotFound):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/scaling-group-not-found"
+    error_title = "Scaling Group Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class VFolderNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/vfolder-not-found"
+    error_title = "Virtual Folder Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class UserNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/user-not-found"
+    error_title = "User Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class GroupNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/group-not-found"
+    error_title = "Project Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class DomainNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/domain-not-found"
+    error_title = "Domain Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )

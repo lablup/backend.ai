@@ -755,6 +755,20 @@ class ImageNode(graphene.ObjectType):
                 ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
+    # TODO: Introduce access control logic considering scope and permission
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> "Image":
+        ctx: GraphQueryContext = info.context
+        _, image_id = AsyncNode.resolve_global_id(info, self.id)
+        action_result = await ctx.processors.image.get_image_by_id.wait_for_complete(
+            GetImageByIdAction(
+                image_id=UUID(image_id),
+                user_role=ctx.user["role"],
+                image_status=None,
+            )
+        )
+        image_data = action_result.image_with_agent_install_status.image
+        return ImageNode.from_row(ctx, ImageRow.from_dataclass_with_details(image_data))
+
 
 class ImageConnection(Connection):
     class Meta:

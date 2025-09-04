@@ -128,7 +128,7 @@ type Query {
     """Added in 24.03.1"""
     id: String
     reference: String
-    architecture: String = "x86_64"
+    architecture: String = "aarch64"
   ): Image
   images(
     """
@@ -633,7 +633,7 @@ type ImageNode implements Node @key(fields: "id") {
   type: ImageType
 }
 
-type KVPair {
+type KVPair @shareable {
   key: String
   value: String
 }
@@ -644,7 +644,7 @@ to support integers outside the range of a signed 32-bit integer.
 """
 scalar BigInt
 
-type ResourceLimit {
+type ResourceLimit @shareable {
   key: String
   min: String
   max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete.")
@@ -689,7 +689,7 @@ type AgentSummaryList implements PaginatedList {
 }
 
 """Added in 24.12.0."""
-type DomainNode implements Node {
+type DomainNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
   name: String
@@ -920,7 +920,7 @@ type Domain {
   scaling_groups: [String]
 }
 
-type GroupNode implements Node {
+type GroupNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -2253,7 +2253,7 @@ type ServiceConfigEdge {
   cursor: String!
 }
 
-union _Entity = ImageNode | ScalingGroupNode | UserNode | VirtualFolderNode | EndpointToken | EndpointAutoScalingRuleNode
+union _Entity = ImageNode | DomainNode | ScalingGroupNode | GroupNode | UserNode | VirtualFolderNode | EndpointToken | EndpointAutoScalingRuleNode
 
 scalar _Any
 
@@ -2341,7 +2341,7 @@ type Mutation {
   ): RescanImages
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage
-  modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage
+  modify_image(architecture: String = "aarch64", props: ModifyImageInput!, target: String!): ModifyImage
 
   """Added in 25.6.0"""
   clear_image_custom_resource_limit(key: ClearImageCustomResourceLimitKey!): ClearImageCustomResourceLimitPayload
@@ -2350,7 +2350,7 @@ type Mutation {
   forget_image_by_id(image_id: String!): ForgetImageById
 
   """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
-  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
+  forget_image(architecture: String = "aarch64", reference: String!): ForgetImage @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
 
   """Added in 25.4.0"""
   purge_image_by_id(
@@ -2362,7 +2362,7 @@ type Mutation {
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry
-  alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage
+  alias_image(alias: String!, architecture: String = "aarch64", target: String!): AliasImage
   dealias_image(alias: String!): DealiasImage
   clear_images(registry: String): ClearImages
 
@@ -2937,7 +2937,7 @@ type ClearImageCustomResourceLimitPayload {
 """Added in 25.6.0."""
 input ClearImageCustomResourceLimitKey {
   image_canonical: String!
-  architecture: String! = "x86_64"
+  architecture: String! = "aarch64"
 }
 
 """Added in 24.03.0."""
