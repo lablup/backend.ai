@@ -288,3 +288,18 @@ class ArtifactStorageEmptyError(web.HTTPNotFound):
             text=dump_json_str(payload),
             content_type="application/problem+json",
         )
+
+
+class ArtifactRevisionEmptyError(web.HTTPInternalServerError):
+    def __init__(self, msg: Optional[str] = None) -> None:
+        payload = {
+            "type": "https://api.backend.ai/probs/storage/artifact/revision/empty",
+            "title": "Artifact Revision Empty",
+        }
+        if msg is not None:
+            payload["title"] = f"Artifact Revision Empty ({msg})"
+            payload["data"] = msg
+        super().__init__(
+            text=dump_json_str(payload),
+            content_type="application/problem+json",
+        )

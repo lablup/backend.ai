@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional, override
 
 import sqlalchemy as sa
@@ -122,7 +122,7 @@ class ArtifactOrderingApplier(BaseOrderingApplier[ArtifactOrderingOptions]):
     @override
     def get_order_column(self, field) -> sa.Column:
         """Get the SQLAlchemy column for the given artifact field"""
-        return getattr(ArtifactRow, field.value, ArtifactRow.name)
+        return getattr(ArtifactRow, field.value.lower(), ArtifactRow.name)
 
 
 class ArtifactModelConverter:
@@ -323,7 +323,7 @@ class ArtifactRepository:
                     has_changes = existing_artifact.description != artifact_data.description
                     if has_changes:
                         existing_artifact.description = artifact_data.description
-                        existing_artifact.updated_at = datetime.now()
+                        existing_artifact.updated_at = datetime.now(timezone.utc)
 
                     await db_sess.flush()
                     await db_sess.refresh(
@@ -745,7 +745,10 @@ class ArtifactRepository:
             result = await db_sess.execute(querybuild_result.data_query)
             rows = result.scalars().all()
 
+            # Build count query with same filters applied
             count_stmt = sa.select(sa.func.count()).select_from(ArtifactRow)
+            if filters is not None:
+                count_stmt = artifact_paginator.filter_applier.apply_filters(count_stmt, filters)
             count_result = await db_sess.execute(count_stmt)
             total_count = count_result.scalar()
 
@@ -803,7 +806,10 @@ class ArtifactRepository:
             result = await db_sess.execute(querybuild_result.data_query)
             rows = result.scalars().all()
 
+            # Build count query with same filters applied
             count_stmt = sa.select(sa.func.count()).select_from(ArtifactRow)
+            if filters is not None:
+                count_stmt = artifact_paginator.filter_applier.apply_filters(count_stmt, filters)
             count_result = await db_sess.execute(count_stmt)
             total_count = count_result.scalar()
 

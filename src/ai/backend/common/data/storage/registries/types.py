@@ -4,6 +4,9 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.exception import ArtifactDefaultRevisionResolveError
+
 
 class ModelSortKey(enum.StrEnum):
     LAST_MODIFIED = "last_modified"
@@ -13,6 +16,7 @@ class ModelSortKey(enum.StrEnum):
     LIKES = "likes"
 
 
+# TODO: Separate of the ModelTarget type used in the storage proxy and the one used in the manager
 class ModelTarget(BaseModel):
     model_id: str = Field(
         description="""
@@ -21,14 +25,26 @@ class ModelTarget(BaseModel):
         """,
         examples=["microsoft/DialoGPT-medium", "openai/gpt-2", "bert-base-uncased"],
     )
-    revision: str = Field(
-        default="main",
+    revision: Optional[str] = Field(
+        default=None,
         description="""
         Specific revision (branch or tag) of the model to import.
         Defaults to 'main' if not specified.
         """,
         examples=["main", "v1.0", "latest"],
     )
+
+    def resolve_revision(self, registry_type: ArtifactRegistryType) -> str:
+        if self.revision is not None:
+            return self.revision
+
+        match registry_type:
+            case ArtifactRegistryType.HUGGINGFACE:
+                return "main"
+            case _:
+                raise ArtifactDefaultRevisionResolveError(
+                    f"Cannot resolve default revision for registry type: {registry_type}"
+                )
 
 
 class FileObjectData(BaseModel):

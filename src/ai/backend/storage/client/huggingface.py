@@ -20,6 +20,7 @@ from huggingface_hub.errors import (
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
 from huggingface_hub.hf_api import RepoFile, RepoFolder
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
     ModelData,
@@ -123,7 +124,7 @@ class HuggingFaceClient:
             HfModelInfo object with model metadata
         """
         model_id = model.model_id
-        revision = model.revision
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
             result = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: model_info(model_id, revision=revision, token=self._token)
@@ -142,7 +143,7 @@ class HuggingFaceClient:
             List of file paths
         """
         model_id = model.model_id
-        revision = model.revision
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
             filepaths = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: list_repo_files(model_id, revision=revision, token=self._token)
@@ -164,7 +165,7 @@ class HuggingFaceClient:
             List of RepoFile or RepoFolder objects
         """
         model_id = model.model_id
-        revision = model.revision
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
 
         try:
             info = await asyncio.get_event_loop().run_in_executor(
@@ -190,7 +191,7 @@ class HuggingFaceClient:
         return hf_hub_url(
             repo_id=model.model_id,
             filename=filename,
-            revision=model.revision,
+            revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
             endpoint=self._endpoint,
             repo_type="model",
         )
@@ -276,20 +277,17 @@ class HuggingFaceScanner:
         Returns:
             ModelData object with model metadata and files
         """
-        model_id = model.model_id
-        revision = model.revision
-
         try:
             log.info(f"Scanning specific HuggingFace model: {model}")
             model_info = await self._client.scan_model(model)
-
             readme_content = await self._download_readme(model)
 
+            model_id = model.model_id
             result = ModelData(
                 id=model_id,
                 name=model_id.split("/")[-1],
                 author=model_info.author,
-                revision=revision,
+                revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
                 tags=model_info.tags or [],
                 created_at=model_info.created_at,
                 modified_at=model_info.last_modified,

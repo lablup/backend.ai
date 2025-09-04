@@ -18,7 +18,7 @@ class ArtifactOrderingOptions:
     """Ordering options for artifact queries."""
 
     order_by: list[tuple[ArtifactOrderField, bool]] = field(
-        default_factory=lambda: [(ArtifactOrderField.NAME, True)]
+        default_factory=lambda: [(ArtifactOrderField.NAME, False)]
     )  # (field, desc)
 
 
@@ -27,7 +27,7 @@ class ArtifactRevisionOrderingOptions:
     """Ordering options for artifact revision queries."""
 
     order_by: list[tuple[ArtifactRevisionOrderField, bool]] = field(
-        default_factory=lambda: [(ArtifactRevisionOrderField.CREATED_AT, True)]
+        default_factory=lambda: [(ArtifactRevisionOrderField.CREATED_AT, False)]
     )  # (field, desc)
 
 

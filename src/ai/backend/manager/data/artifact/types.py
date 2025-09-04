@@ -65,6 +65,8 @@ class ArtifactOrderField(enum.StrEnum):
     NAME = "NAME"
     TYPE = "TYPE"
     SIZE = "SIZE"
+    SCANNED_AT = "SCANNED_AT"
+    UPDATED_AT = "UPDATED_AT"
 
 
 class ArtifactRevisionOrderField(enum.StrEnum):
