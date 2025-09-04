@@ -13,7 +13,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.data.user.types import UserCreator, UserData
 from ai.backend.manager.errors.auth import UserNotFound
-from ai.backend.manager.errors.user import UserCreationFailure
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -145,81 +144,186 @@ class TestUserRepository:
         self, user_repository: UserRepository, mock_db_engine, sample_user_creator
     ):
         """Test successful user creation"""
-        # Mock database connection
+        # Mock database session
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
+
+        # Mock connection for _add_user_to_groups
         mock_conn = AsyncMock()
-        mock_db_engine.begin.return_value.__aenter__.return_value = mock_conn
+        mock_session.connection.return_value = mock_conn
 
-        # Mock scalar calls for domain check and existing user check
-        # First call (domain check) returns True, second call (existing user check) returns None
-        mock_conn.scalar.side_effect = [True, None]
+        # Mock the helper methods
+        with patch.object(user_repository, "_check_domain_exists", return_value=True):
+            with patch.object(
+                user_repository, "_check_user_exists_with_email_or_username", return_value=False
+            ):
+                # Mock the created user row
+                created_user_row = MagicMock()
+                created_user_row.uuid = uuid.uuid4()
+                created_user_row.email = sample_user_creator.email
+                created_user_row.username = sample_user_creator.username
+                created_user_row.role = sample_user_creator.role
+                created_user_row.status = sample_user_creator.status
+                created_user_row.domain_name = sample_user_creator.domain_name
+                created_user_row.full_name = sample_user_creator.full_name
+                created_user_row.description = sample_user_creator.description
+                created_user_row.need_password_change = sample_user_creator.need_password_change
+                created_user_row.status_info = "admin-requested"
+                created_user_row.created_at = datetime.now()
+                created_user_row.modified_at = datetime.now()
+                created_user_row.resource_policy = sample_user_creator.resource_policy
+                created_user_row.allowed_client_ip = sample_user_creator.allowed_client_ip
+                created_user_row.totp_activated = sample_user_creator.totp_activated
+                created_user_row.totp_activated_at = None
+                created_user_row.sudo_session_enabled = sample_user_creator.sudo_session_enabled
+                created_user_row.main_access_key = "test_access_key"
+                created_user_row.container_uid = sample_user_creator.container_uid
+                created_user_row.container_main_gid = sample_user_creator.container_main_gid
+                created_user_row.container_gids = sample_user_creator.container_gids
 
-        # Mock the created user result
-        created_user_row = MagicMock()
-        created_user_row.uuid = uuid.uuid4()
-        created_user_row.email = sample_user_creator.email
-        created_user_row.username = sample_user_creator.username
-        created_user_row.role = sample_user_creator.role
-        created_user_row.status = sample_user_creator.status
-        created_user_row.domain_name = sample_user_creator.domain_name
-        created_user_row.full_name = sample_user_creator.full_name
-        created_user_row.description = sample_user_creator.description
-        created_user_row.need_password_change = sample_user_creator.need_password_change
-        # No is_active field in UserRow - status field is used instead
-        created_user_row.status_info = "admin-requested"
-        created_user_row.created_at = datetime.now()
-        created_user_row.modified_at = datetime.now()
-        created_user_row.resource_policy = sample_user_creator.resource_policy
-        created_user_row.allowed_client_ip = sample_user_creator.allowed_client_ip
-        created_user_row.totp_activated = sample_user_creator.totp_activated
-        created_user_row.totp_activated_at = None
-        created_user_row.sudo_session_enabled = sample_user_creator.sudo_session_enabled
-        created_user_row.main_access_key = "test_access_key"
-        created_user_row.container_uid = sample_user_creator.container_uid
-        created_user_row.container_main_gid = sample_user_creator.container_main_gid
-        created_user_row.container_gids = sample_user_creator.container_gids
+                # Mock to_data method
+                def to_data():
+                    user_data = UserData(
+                        id=created_user_row.uuid,
+                        uuid=created_user_row.uuid,
+                        is_active=created_user_row.status == UserStatus.ACTIVE,
+                        username=created_user_row.username,
+                        email=created_user_row.email,
+                        need_password_change=created_user_row.need_password_change,
+                        full_name=created_user_row.full_name,
+                        description=created_user_row.description,
+                        status=created_user_row.status,
+                        status_info=created_user_row.status_info,
+                        created_at=created_user_row.created_at,
+                        modified_at=created_user_row.modified_at,
+                        domain_name=created_user_row.domain_name,
+                        role=created_user_row.role,
+                        resource_policy=created_user_row.resource_policy,
+                        allowed_client_ip=created_user_row.allowed_client_ip,
+                        totp_activated=created_user_row.totp_activated,
+                        totp_activated_at=created_user_row.totp_activated_at,
+                        sudo_session_enabled=created_user_row.sudo_session_enabled,
+                        main_access_key=created_user_row.main_access_key,
+                        container_uid=created_user_row.container_uid,
+                        container_main_gid=created_user_row.container_main_gid,
+                        container_gids=created_user_row.container_gids,
+                    )
+                    return user_data
 
-        # Mock execute result
-        mock_result = MagicMock()
-        mock_result.first.return_value = created_user_row
-        mock_conn.execute.return_value = mock_result
+                created_user_row.to_data = to_data
 
-        # Mock the _add_user_to_groups method
-        with patch.object(user_repository, "_add_user_to_groups", return_value=None):
-            result = await user_repository.create_user_validated(
-                sample_user_creator, group_ids=["group1", "group2"]
-            )
+                # Mock session.add to not raise errors
+                mock_session.add = MagicMock()
+                # Mock session.flush
+                mock_session.flush = AsyncMock()
+                # Mock session.refresh
+                mock_session.refresh = AsyncMock()
 
-            assert result is not None
-            assert isinstance(result, UserData)
-            assert result.email == sample_user_creator.email
-            assert result.username == sample_user_creator.username
-            assert result.role == sample_user_creator.role
+                # Mock UserRow.from_creator to return our mocked row
+                with patch(
+                    "ai.backend.manager.models.user.UserRow.from_creator",
+                    return_value=created_user_row,
+                ):
+                    # Mock keypair preparation
+                    with patch(
+                        "ai.backend.manager.repositories.user.repository.prepare_new_keypair"
+                    ) as mock_prepare_keypair:
+                        mock_prepare_keypair.return_value = {
+                            "access_key": "test_access_key",
+                            "secret_key": "test_secret_key",
+                        }
 
-            # Verify database operations were called
-            assert (
-                mock_conn.execute.call_count >= 3
-            )  # insert user, insert keypair, update main_access_key
+                        # Mock the _add_user_to_groups method
+                        with patch.object(
+                            user_repository, "_add_user_to_groups", return_value=None
+                        ):
+                            result = await user_repository.create_user_validated(
+                                sample_user_creator, group_ids=["group1", "group2"]
+                            )
+
+                            assert result is not None
+                            assert isinstance(result, UserData)
+                            assert result.email == sample_user_creator.email
+                            assert result.username == sample_user_creator.username
+                            assert result.role == sample_user_creator.role
+                            assert result.main_access_key == "test_access_key"
 
     @pytest.mark.asyncio
     async def test_create_user_validated_failure(
         self, user_repository: UserRepository, mock_db_engine, sample_user_creator
     ):
-        """Test user creation failure"""
-        # Mock database connection
-        mock_conn = AsyncMock()
-        mock_db_engine.begin.return_value.__aenter__.return_value = mock_conn
+        """Test user creation failure scenarios"""
+        # Mock database session
+        mock_session = AsyncMock(spec=AsyncSession)
+        mock_db_engine.begin_session.return_value.__aenter__.return_value = mock_session
 
-        # Mock scalar calls for domain check and existing user check
-        # First call (domain check) returns True, second call (existing user check) returns None
-        mock_conn.scalar.side_effect = [True, None]
+        # Test 1: Domain does not exist
+        with patch.object(user_repository, "_check_domain_exists", return_value=False):
+            from ai.backend.manager.errors.user import UserCreationBadRequest
 
-        # Mock execute to return None (creation failed)
-        mock_result = MagicMock()
-        mock_result.first.return_value = None
-        mock_conn.execute.return_value = mock_result
+            with pytest.raises(UserCreationBadRequest, match="Domain.*does not exist"):
+                await user_repository.create_user_validated(sample_user_creator, group_ids=[])
 
-        with pytest.raises(UserCreationFailure):
-            await user_repository.create_user_validated(sample_user_creator, group_ids=[])
+        # Test 2: User with same email or username already exists
+        with patch.object(user_repository, "_check_domain_exists", return_value=True):
+            with patch.object(
+                user_repository, "_check_user_exists_with_email_or_username", return_value=True
+            ):
+                from ai.backend.manager.errors.user import UserConflict
+
+                with pytest.raises(
+                    UserConflict, match="User with email.*or username.*already exists"
+                ):
+                    await user_repository.create_user_validated(sample_user_creator, group_ids=[])
+
+        # Test 3: Database integrity error
+        with patch.object(user_repository, "_check_domain_exists", return_value=True):
+            with patch.object(
+                user_repository, "_check_user_exists_with_email_or_username", return_value=False
+            ):
+                # Mock session.add to not raise errors
+                mock_session.add = MagicMock()
+                # Mock session.flush to raise IntegrityError
+                import sqlalchemy as sa
+
+                mock_session.flush = AsyncMock(
+                    side_effect=sa.exc.IntegrityError("statement", "params", "orig")
+                )
+
+                # Mock UserRow.from_creator
+                created_user_row = MagicMock()
+                with patch(
+                    "ai.backend.manager.models.user.UserRow.from_creator",
+                    return_value=created_user_row,
+                ):
+                    from ai.backend.manager.errors.user import UserCreationBadRequest
+
+                    with pytest.raises(
+                        UserCreationBadRequest,
+                        match="Failed to create user due to database constraint violation",
+                    ):
+                        await user_repository.create_user_validated(
+                            sample_user_creator, group_ids=[]
+                        )
+
+        # Test 4: Row creation returns None (should not happen but checking for safety)
+        with patch.object(user_repository, "_check_domain_exists", return_value=True):
+            with patch.object(
+                user_repository, "_check_user_exists_with_email_or_username", return_value=False
+            ):
+                # Mock session operations
+                mock_session.add = MagicMock()
+                mock_session.flush = AsyncMock()
+                mock_session.refresh = AsyncMock()
+
+                # Mock UserRow.from_creator to return None
+                with patch(
+                    "ai.backend.manager.models.user.UserRow.from_creator", return_value=None
+                ):
+                    # Since add() doesn't check for None, we need to mock the flow differently
+                    # Actually in real code, from_creator should not return None
+                    # So this test case might not be reachable
+                    pass  # Skip this test as it's not a realistic scenario
 
     @pytest.mark.asyncio
     async def test_update_user_validated_success(

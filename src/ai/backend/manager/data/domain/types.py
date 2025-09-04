@@ -1,18 +1,17 @@
-"""
-Data types for domain service.
-Deprecated: use `ai.backend.manager.data.domain.types` instead.
-"""
-
 import uuid
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self, override
-
-from sqlalchemy.engine.result import Row
+from typing import Any, Optional, override
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.data.permission.id import ScopeId
+from ai.backend.manager.data.permission.types import (
+    EntityType,
+    OperationType,
+    ScopeType,
+)
+from ai.backend.manager.data.user.types import UserRole
 from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
 
 
@@ -36,22 +35,20 @@ class DomainData:
     dotfiles: bytes
     integration_id: Optional[str]
 
-    @classmethod
-    def from_row(cls, row: Optional[DomainRow | Row]) -> Optional[Self]:
-        if row is None:
-            return None
-        return cls(
-            name=row.name,
-            description=row.description,
-            is_active=row.is_active,
-            created_at=row.created_at,
-            modified_at=row.modified_at,
-            total_resource_slots=row.total_resource_slots,
-            allowed_vfolder_hosts=row.allowed_vfolder_hosts,
-            allowed_docker_registries=row.allowed_docker_registries,
-            dotfiles=row.dotfiles,
-            integration_id=row.integration_id,
+    def scope_id(self) -> ScopeId:
+        return ScopeId(
+            scope_type=ScopeType.DOMAIN,
+            scope_id=self.name,
         )
+
+    def role_name(self) -> str:
+        return f"domain-{self.name}-admin"
+
+    def entity_operations(self) -> Mapping[EntityType, Iterable[OperationType]]:
+        return {
+            entity: OperationType.admin_operations()
+            for entity in EntityType.admin_accessible_entity_types_in_domain()
+        }
 
 
 @dataclass
