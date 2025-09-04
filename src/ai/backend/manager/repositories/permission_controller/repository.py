@@ -59,8 +59,6 @@ class PermissionControllerRepository:
                     role_id=role_id,
                     entity_type=scope_permission.entity_type,
                     operation=scope_permission.operation,
-                    scope_type=scope_permission.scope_id.scope_type,
-                    scope_id=scope_permission.scope_id.scope_id,
                 )
                 db_session.add(scope_permission_row)  # type: ignore[arg-type]
             for object_permission in data.object_permissions:

@@ -11,9 +11,10 @@ from .artifact import (
     artifact_status_changed,
     artifacts,
     cancel_import_artifact,
-    delete_artifact_revisions,
+    cleanup_artifact_revisions,
     import_artifacts,
     reject_artifact_revision,
+    scan_artifact_models,
     scan_artifacts,
     update_artifact,
 )
@@ -50,6 +51,13 @@ from .object_storage import (
     unregister_object_storage_bucket,
     update_object_storage,
 )
+from .reservoir_registry import (
+    create_reservoir_registry,
+    delete_reservoir_registry,
+    reservoir_registries,
+    reservoir_registry,
+    update_reservoir_registry,
+)
 
 
 @strawberry.type
@@ -67,14 +75,17 @@ class Query:
     object_storages = object_storages
     huggingface_registry = huggingface_registry
     huggingface_registries = huggingface_registries
+    reservoir_registry = reservoir_registry
+    reservoir_registries = reservoir_registries
 
 
 @strawberry.type
 class Mutation:
     scan_artifacts = scan_artifacts
+    scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
     update_artifact = update_artifact
-    delete_artifact_revisions = delete_artifact_revisions
+    cleanup_artifact_revisions = cleanup_artifact_revisions
     cancel_import_artifact = cancel_import_artifact
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
@@ -88,6 +99,9 @@ class Mutation:
     create_huggingface_registry = create_huggingface_registry
     update_huggingface_registry = update_huggingface_registry
     delete_huggingface_registry = delete_huggingface_registry
+    create_reservoir_registry = create_reservoir_registry
+    update_reservoir_registry = update_reservoir_registry
+    delete_reservoir_registry = delete_reservoir_registry
     get_presigned_download_url = get_presigned_download_url
     get_presigned_upload_url = get_presigned_upload_url
     approve_artifact_revision = approve_artifact_revision

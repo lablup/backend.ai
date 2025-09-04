@@ -1,7 +1,7 @@
 import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -65,6 +65,16 @@ def processors(
 ) -> UserProcessors:
     agent_registry_mock = MagicMock()
     user_repository = UserRepository(db=database_engine)
+
+    # Mock the _role_manager with all required methods
+    mock_role_manager = MagicMock()
+    mock_role = MagicMock()
+    mock_role.id = uuid.uuid4()
+    mock_role_manager.create_system_role = AsyncMock(return_value=mock_role)
+    mock_role_manager.map_user_to_role = AsyncMock(return_value=None)
+    mock_role_manager.map_entity_to_scope = AsyncMock(return_value=None)
+    user_repository._role_manager = mock_role_manager
+
     admin_user_repository = AdminUserRepository(db=database_engine)
     user_service = UserService(
         storage_manager=mock_storage_manager,

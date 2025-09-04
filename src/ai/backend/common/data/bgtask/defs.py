@@ -1,2 +1,2 @@
-TASK_METADATA_TTL = 7200  # 2 hours
-TASK_TTL_THRESHOLD = 6900  # 1 hour 55 minutes
+TASK_METADATA_TTL = 60 * 60 * 24  # 24 hours
+TASK_TTL_THRESHOLD = TASK_METADATA_TTL - 60 * 5  # 5 minutes margin

@@ -4,15 +4,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
+
 
 class ArtifactType(enum.StrEnum):
     MODEL = "MODEL"
     PACKAGE = "PACKAGE"
     IMAGE = "IMAGE"
-
-
-class ArtifactRegistryType(enum.StrEnum):
-    HUGGINGFACE = "huggingface"
 
 
 class ArtifactStatus(enum.StrEnum):
@@ -35,11 +33,13 @@ class ArtifactData:
     id: uuid.UUID
     name: str
     type: ArtifactType
-    description: str
+    description: Optional[str]
     registry_id: uuid.UUID
     source_registry_id: uuid.UUID
     registry_type: ArtifactRegistryType
     source_registry_type: ArtifactRegistryType
+    scanned_at: datetime
+    updated_at: datetime
     readonly: bool
 
 
@@ -55,7 +55,6 @@ class ArtifactRevisionData:
     updated_at: Optional[datetime]
 
 
-# TODO: Should we keep this for REST API?
 @dataclass
 class ArtifactDataWithRevisions:
     artifact: ArtifactData
@@ -66,6 +65,8 @@ class ArtifactOrderField(enum.StrEnum):
     NAME = "NAME"
     TYPE = "TYPE"
     SIZE = "SIZE"
+    SCANNED_AT = "SCANNED_AT"
+    UPDATED_AT = "UPDATED_AT"
 
 
 class ArtifactRevisionOrderField(enum.StrEnum):

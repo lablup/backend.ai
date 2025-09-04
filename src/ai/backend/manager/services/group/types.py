@@ -1,3 +1,8 @@
+"""
+Data types for group service.
+Deprecated: use `ai.backend.manager.data.group.types` instead.
+"""
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -20,6 +25,7 @@ class GroupCreator(Creator):
     integration_id: Optional[str] = None
     resource_policy: Optional[str] = None
     container_registry: Optional[dict[str, str]] = None
+    dotfiles: Optional[bytes] = None
 
     def fields_to_store(self) -> dict[str, Any]:
         return {
@@ -33,6 +39,7 @@ class GroupCreator(Creator):
             "integration_id": self.integration_id,
             "resource_policy": self.resource_policy,
             "container_registry": self.container_registry,
+            "dotfiles": self.dotfiles,
         }
 
 

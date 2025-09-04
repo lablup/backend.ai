@@ -460,7 +460,11 @@ class BackgroundTaskManager:
                 for task_id, bg_task in self._ongoing_tasks.items():
                     if not bg_task.done():
                         alive_task_ids.append(task_id)
-                await self._valkey_client.heartbeat(alive_task_ids)
+                await self._valkey_client.heartbeat(
+                    alive_task_ids,
+                    server_id=self._server_id,
+                    tags=self._tags,
+                )
             except Exception as e:
                 log.exception("Exception in heartbeat loop: {}", e)
             await asyncio.sleep(_HEARTBEAT_INTERVAL)
