@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
-import os
 import sys
 from pathlib import Path
 from pprint import pformat
@@ -24,7 +22,7 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
-from ai.backend.common.types import RedisConnectionInfo, RedisProfileTarget
+from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
@@ -40,15 +38,15 @@ class CLIContext:
         self.log_level = log_level
         self._bootstrap_config = None
 
-    def get_bootstrap_config(self) -> BootstrapConfig:
+    async def get_bootstrap_config(self) -> BootstrapConfig:
         # Lazy-load the configuration only when requested.
         try:
             if self._bootstrap_config is None:
                 if self.config_path is None:
                     self.config_path = find_config_file("manager")
 
-                self._bootstrap_config = asyncio.run(
-                    BootstrapConfig.load_from_file(self.config_path, self.log_level)
+                self._bootstrap_config = await BootstrapConfig.load_from_file(
+                    self.config_path, self.log_level
                 )
         except ConfigurationError as e:
             print(
@@ -65,22 +63,7 @@ class CLIContext:
         # If we duplicate the local logging with it, the process termination may hang.
         click_ctx = click.get_current_context()
         if click_ctx.invoked_subcommand != "start-server":
-            logging_config = {
-                "level": self.log_level,
-                "pkg-ns": {
-                    "": LogLevel.WARNING,
-                    "ai.backend": self.log_level,
-                },
-            }
-            try:
-                # Try getting the logging config but silently fallback to the default if not
-                # present (e.g., when `mgr gql show` command used in CI without installation as
-                # addressed in #1686).
-                with open(os.devnull, "w") as sink, contextlib.redirect_stderr(sink):
-                    logging_config = self.get_bootstrap_config().logging
-            except click.Abort:
-                pass
-            self._logger = LocalLogger(logging_config)
+            self._logger = LocalLogger(log_level=self.log_level)
             self._logger.__enter__()
         return self
 
@@ -92,25 +75,26 @@ class CLIContext:
 
 @contextlib.asynccontextmanager
 async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
-    etcd_config = cli_ctx.get_bootstrap_config().etcd
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
+    etcd_config_data = bootstrap_config.etcd.to_dataclass()
     creds = None
-    if etcd_config.user:
-        if not etcd_config.password:
+    if etcd_config_data.user:
+        if not etcd_config_data.password:
             raise ConfigurationError({
                 "etcd": "password is required when user is set",
             })
 
         creds = {
-            "user": etcd_config.user,
-            "password": etcd_config.password,
+            "user": etcd_config_data.user,
+            "password": etcd_config_data.password,
         }
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
         # TODO: provide a way to specify other scope prefixes
     }
     etcd = AsyncEtcd(
-        etcd_config.addr.to_legacy(),
-        etcd_config.namespace,
+        [addr.to_legacy() for addr in etcd_config_data.addrs],
+        etcd_config_data.namespace,
         scope_prefix_map,
         credentials=creds,
     )
@@ -124,7 +108,9 @@ async def etcd_ctx(cli_ctx: CLIContext) -> AsyncIterator[AsyncEtcd]:
 async def config_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerUnifiedConfig]:
     # scope_prefix_map is created inside ConfigServer
 
-    etcd = AsyncEtcd.initialize(cli_ctx.get_bootstrap_config().etcd.to_dataclass())
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
+    etcd_config_data = bootstrap_config.etcd.to_dataclass()
+    etcd = AsyncEtcd.initialize(etcd_config_data)
     etcd_loader = LegacyEtcdLoader(etcd)
     redis_config = await etcd_loader.load()
     unified_config = ManagerUnifiedConfig(**redis_config)
@@ -145,29 +131,31 @@ class RedisConnectionSet:
 
 @contextlib.asynccontextmanager
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
-    etcd = AsyncEtcd.initialize(cli_ctx.get_bootstrap_config().etcd.to_dataclass())
+    bootstrap_config = await cli_ctx.get_bootstrap_config()
+    etcd_config_data = bootstrap_config.etcd.to_dataclass()
+    etcd = AsyncEtcd.initialize(etcd_config_data)
     loader = LegacyEtcdLoader(etcd, config_prefix="config/redis")
     raw_redis_config = await loader.load()
     redis_config = RedisConfig(**raw_redis_config)
-    etcd_redis_config = RedisProfileTarget.from_dict(redis_config.model_dump())
+    redis_profile_target = redis_config.to_redis_profile_target()
 
     redis_live = redis_helper.get_redis_object(
-        etcd_redis_config.profile_target(RedisRole.LIVE),
+        redis_profile_target.profile_target(RedisRole.LIVE),
         name="mgr_cli.live",
         db=REDIS_LIVE_DB,
     )
     valkey_stat_client = await ValkeyStatClient.create(
-        etcd_redis_config.profile_target(RedisRole.STATISTICS),
+        redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target(),
         db_id=REDIS_STATISTICS_DB,
         human_readable_name="mgr_cli.stat",
     )
     redis_image = await ValkeyImageClient.create(
-        etcd_redis_config.profile_target(RedisRole.IMAGE),
+        redis_profile_target.profile_target(RedisRole.IMAGE).to_valkey_target(),
         db_id=REDIS_IMAGE_DB,
         human_readable_name="mgr_cli.image",
     )
     redis_stream = redis_helper.get_redis_object(
-        etcd_redis_config.profile_target(RedisRole.STREAM),
+        redis_profile_target.profile_target(RedisRole.STREAM),
         name="mgr_cli.stream",
         db=REDIS_STREAM_DB,
     )

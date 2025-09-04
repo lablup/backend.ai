@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.23.2"
+pants_version = "2.27.0"
 pythonpath = ["%(buildroot)s/tools/pants-plugins"]
 backend_packages = [
     "pants.backend.python",
@@ -12,7 +12,6 @@ backend_packages = [
     "pants.backend.plugin_development",
     "setupgen",
     "platform_resources",
-    "towncrier_tool",
 ]
 pants_ignore = [
     ".*/",
@@ -26,7 +25,6 @@ pants_ignore = [
     "/tools/pants-plugins",
     "/wheelhouse/*/",
     "/wheelhouse/*.whl",
-    "src/ai/backend/web/static"
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 
@@ -54,9 +52,9 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.13.3"]
+interpreter_constraints = ["CPython==3.13.7"]
 tailor_pex_binary_targets = false
-pip_version = "25.0.1"
+pip_version = "25.2"
 
 [python-bootstrap]
 search_path = ["<PYENV>"]
@@ -73,25 +71,29 @@ python-default = "python.lock"
 python-kernel = "python-kernel.lock"
 pants-plugins = "tools/pants-plugins.lock"
 black = "tools/black.lock"
-ruff = "tools/ruff.lock"
 pytest = "tools/pytest.lock"
 coverage-py = "tools/coverage-py.lock"
 mypy = "tools/mypy.lock"
 towncrier = "tools/towncrier.lock"
 setuptools = "tools/setuptools.lock"
 
+[export]
+bin = [
+    "ruff",
+]
+
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"
 
 [pex-cli]
-# Pants 2.23 uses PEX 2.16.2 by default.
+# Pants 2.27 uses PEX 2.33.2 by default.
 # Pin the PEX version to get benefits from a-scie/lift#116.
-version = "v2.33.1"
+version = "v2.50.4"
 known_versions = [
-    "v2.33.1|macos_arm64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
-    "v2.33.1|macos_x86_64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
-    "v2.33.1|linux_arm64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
-    "v2.33.1|linux_x86_64|5ebed0e2ba875983a72b4715ee3b2ca6ae5fedbf28d738634e02e30e3bb5ed28|4559974",
+    "v2.50.4|macos_arm64|7b7be5cee59a6515d15751e6467317d272f671e9a8adcf2125c073e00ff27a84|4774138",
+    "v2.50.4|macos_x86_64|7b7be5cee59a6515d15751e6467317d272f671e9a8adcf2125c073e00ff27a84|4774138",
+    "v2.50.4|linux_arm64|7b7be5cee59a6515d15751e6467317d272f671e9a8adcf2125c073e00ff27a84|4774138",
+    "v2.50.4|linux_x86_64|7b7be5cee59a6515d15751e6467317d272f671e9a8adcf2125c073e00ff27a84|4774138",
 ]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.28.1/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
@@ -101,7 +103,13 @@ known_versions = [
 install_from_resolve = "black"
 
 [ruff]
-install_from_resolve = "ruff"
+version = "0.12.9"
+known_versions = [
+    "0.12.9|macos_arm64|68cb47f9a98e17c59e861c3b635b32c5212defd21a4ec0b5c1d56950d06076e5|11720090",
+    "0.12.9|macos_x86_64|cc8195f89146268086e99225316b4214100eb78010aa84b9e650f8322d5790f0|12507867",
+    "0.12.9|linux_arm64|dca567860383bb6a7b021dab76c616b02ed9a268516a0a1a1dce56ee482740d7|11764382",
+    "0.12.9|linux_x86_64|c177d59d4c6347abbf08c8943eff919432d5c70229a0dd6390e5697d393a9c05|13029104",
+]
 
 [pytest]
 install_from_resolve = "pytest"

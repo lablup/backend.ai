@@ -10,6 +10,7 @@ import aiohttp_cors
 import aiotools
 import attrs
 import sqlalchemy as sa
+import yarl
 from aiohttp import web
 from pydantic import (
     AliasChoices,
@@ -35,6 +36,26 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.types import (
+    DeploymentInfo,
+    DeploymentMetadata,
+    DeploymentNetworkSpec,
+    ExecutionSpec,
+    ModelRevisionSpec,
+    MountMetadata,
+    ReplicaSpec,
+    ResourceSpec,
+)
+from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.services.deployment.actions.create_deployment import (
+    CreateDeploymentAction,
+    CreateDeploymentActionResult,
+)
+from ai.backend.manager.services.deployment.actions.destroy_deployment import (
+    DestroyDeploymentAction,
+    DestroyDeploymentActionResult,
+)
 from ai.backend.manager.services.model_serving.actions.clear_error import ClearErrorAction
 from ai.backend.manager.services.model_serving.actions.create_model_service import (
     CreateModelServiceAction,
@@ -250,6 +271,36 @@ class ServeInfoModel(LegacyBaseResponseModel):
             service_endpoint=dto.service_endpoint,
             is_public=dto.is_public,
             runtime_variant=dto.runtime_variant,
+        )
+
+    @classmethod
+    def from_deployment_info(cls, deployment_info: DeploymentInfo) -> Self:
+        """Convert DeploymentInfo to ServeInfoModel."""
+        # Get the first model revision (should only have one for now)
+        model_revision = (
+            deployment_info.model_revisions[0] if deployment_info.model_revisions else None
+        )
+
+        return cls(
+            endpoint_id=deployment_info.id,
+            model_id=model_revision.mounts.model_vfolder_id if model_revision else uuid.UUID(int=0),
+            extra_mounts=[m.vfid.folder_id for m in model_revision.mounts.extra_mounts]
+            if model_revision
+            else [],
+            name=deployment_info.metadata.name,
+            model_definition_path=model_revision.mounts.model_definition_path
+            if model_revision
+            else None,
+            replicas=deployment_info.replica_spec.replica_count,
+            desired_session_count=deployment_info.replica_spec.replica_count,
+            active_routes=[],  # Will be populated once sessions are created
+            service_endpoint=HttpUrl(deployment_info.network.url)
+            if deployment_info.network.url
+            else None,
+            is_public=deployment_info.network.open_to_public,
+            runtime_variant=model_revision.execution.runtime_variant
+            if model_revision
+            else RuntimeVariant.CUSTOM,
         )
 
 
@@ -506,6 +557,38 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
             ),
         )
 
+    def to_image_identifier(self) -> ImageIdentifier:
+        """Convert to ImageIdentifier for deployment."""
+        return ImageIdentifier(
+            canonical=self.image,
+            architecture=self.architecture,
+        )
+
+    def to_model_revision(self, validation_result: ValidationResult) -> ModelRevisionSpec:
+        """Convert to ModelRevisionSpec for deployment."""
+        return ModelRevisionSpec(
+            image_identifier=self.to_image_identifier(),
+            resource_spec=ResourceSpec(
+                cluster_mode=ClusterMode(self.cluster_mode),
+                cluster_size=self.cluster_size,
+                resource_slots=self.config.resources,
+                resource_opts=self.config.resource_opts,
+            ),
+            mounts=MountMetadata(
+                model_vfolder_id=validation_result.model_id,
+                model_definition_path=validation_result.model_definition_path,
+                model_mount_destination=self.config.model_mount_destination,
+                extra_mounts=list(validation_result.extra_mounts),
+            ),
+            execution=ExecutionSpec(
+                startup_command=self.startup_command,
+                bootstrap_script=self.bootstrap_script,
+                environ=self.config.environ,
+                runtime_variant=self.runtime_variant,
+                callback_url=yarl.URL(str(self.callback_url)) if self.callback_url else None,
+            ),
+        )
+
 
 async def _validate(request: web.Request, params: NewServiceRequestModel) -> ValidationResult:
     root_ctx: RootContext = request.app["_root.context"]
@@ -646,17 +729,50 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     root_ctx: RootContext = request.app["_root.context"]
 
     validation_result = await _validate(request, params)
-    action = params.to_create_action(
-        validation_result=validation_result,
-        request_user_id=request["user"]["uuid"],
-        sudo_session_enabled=request["user"]["sudo_session_enabled"],
-    )
-
-    result: CreateModelServiceActionResult = (
-        await root_ctx.processors.model_serving.create_model_service.wait_for_complete(action)
-    )
-
-    return ServeInfoModel.from_dto(result.data)
+    # Use deployment service if sokovan is enabled, otherwise fall back to model_serving
+    if (
+        root_ctx.config_provider.config.manager.use_sokovan
+        and root_ctx.processors.deployment is not None
+    ):
+        # Create deployment using the new deployment controller
+        deployment_action = CreateDeploymentAction(
+            creator=DeploymentCreator(
+                metadata=DeploymentMetadata(
+                    name=params.service_name,
+                    domain=params.domain_name,
+                    project=validation_result.group_id,
+                    resource_group=validation_result.scaling_group,
+                    created_user=request["user"]["uuid"],
+                    session_owner=validation_result.owner_uuid,
+                    created_at=None,  # Will be set by controller
+                    tag=params.tag,
+                ),
+                replica_spec=ReplicaSpec(
+                    replica_count=params.replicas,
+                ),
+                model_revision=params.to_model_revision(validation_result),
+                network=DeploymentNetworkSpec(
+                    open_to_public=params.open_to_public,
+                ),
+            )
+        )
+        deployment_result: CreateDeploymentActionResult = (
+            await root_ctx.processors.deployment.create_deployment.wait_for_complete(
+                deployment_action
+            )
+        )
+        return ServeInfoModel.from_deployment_info(deployment_result.data)
+    else:
+        # Fall back to model_serving
+        action = params.to_create_action(
+            validation_result=validation_result,
+            request_user_id=request["user"]["uuid"],
+            sudo_session_enabled=request["user"]["sudo_session_enabled"],
+        )
+        result: CreateModelServiceActionResult = (
+            await root_ctx.processors.model_serving.create_model_service.wait_for_complete(action)
+        )
+        return ServeInfoModel.from_dto(result.data)
 
 
 class TryStartResponseModel(LegacyBaseResponseModel):
@@ -697,19 +813,36 @@ async def delete(request: web.Request) -> SuccessResponseModel:
         "SERVE.DELETE (email:{}, ak:{}, s:{})", request["user"]["email"], access_key, service_id
     )
 
-    action = DeleteModelServiceAction(
-        service_id=service_id,
-        requester_ctx=RequesterCtx(
-            is_authorized=request["is_authorized"],
-            user_id=request["user"]["uuid"],
-            user_role=request["user"]["role"],
-            domain_name=request["user"]["domain_name"],
-        ),
-    )
-
-    result = await root_ctx.processors.model_serving.delete_model_service.wait_for_complete(action)
-
-    return SuccessResponseModel(success=result.success)
+    # Use deployment service if sokovan is enabled, otherwise fall back to model_serving
+    if (
+        root_ctx.config_provider.config.manager.use_sokovan
+        and root_ctx.processors.deployment is not None
+    ):
+        # Use deployment destroy action
+        deployment_action = DestroyDeploymentAction(
+            endpoint_id=service_id,
+        )
+        deployment_result: DestroyDeploymentActionResult = (
+            await root_ctx.processors.deployment.destroy_deployment.wait_for_complete(
+                deployment_action
+            )
+        )
+        return SuccessResponseModel(success=deployment_result.success)
+    else:
+        # Fall back to model_serving
+        action = DeleteModelServiceAction(
+            service_id=service_id,
+            requester_ctx=RequesterCtx(
+                is_authorized=request["is_authorized"],
+                user_id=request["user"]["uuid"],
+                user_role=request["user"]["role"],
+                domain_name=request["user"]["domain_name"],
+            ),
+        )
+        result = await root_ctx.processors.model_serving.delete_model_service.wait_for_complete(
+            action
+        )
+        return SuccessResponseModel(success=result.success)
 
 
 @auth_required

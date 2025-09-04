@@ -9,12 +9,15 @@ from typing import TYPE_CHECKING, Any, Optional, cast
 
 import attrs
 import graphene
+import sqlalchemy as sa
 from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
+from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import (
     BackendAIError,
@@ -59,11 +62,13 @@ set_input_object_type_default_value(Undefined)
 from ai.backend.common.types import QuotaScopeID, SessionId
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
 from ai.backend.manager.models.gql_relay import (
+    AsyncListConnectionField,
     AsyncNode,
     ConnectionResolverResult,
     GlobalIDField,
     ResolvedGlobalID,
 )
+from ai.backend.manager.models.session import SessionRow
 
 from .container_registry import (
     ContainerRegistry,
@@ -87,6 +92,7 @@ if TYPE_CHECKING:
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry
+    from ..repositories.scheduler.repository import SchedulerRepository
     from .storage import StorageSessionManager
 
 from ..data.image.types import ImageStatus
@@ -176,6 +182,7 @@ from .gql_models.kernel import (
 from .gql_models.keypair import CreateKeyPair, DeleteKeyPair, KeyPair, KeyPairList, ModifyKeyPair
 from .gql_models.metric.base import ContainerUtilizationMetricMetadata
 from .gql_models.metric.user import UserUtilizationMetric, UserUtilizationMetricQueryInput
+from .gql_models.pending_queue import SessionPendingQueueConnection
 from .gql_models.resource_preset import (
     CreateResourcePreset,
     DeleteResourcePreset,
@@ -310,6 +317,7 @@ class GraphQueryContext:
     valkey_stat: ValkeyStatClient
     valkey_live: ValkeyLiveClient
     valkey_image: ValkeyImageClient
+    valkey_schedule: ValkeyScheduleClient  # TODO: Remove this client from here
     manager_status: ManagerStatus
     known_slot_types: Mapping[SlotName, SlotTypes]
     background_task_manager: BackgroundTaskManager
@@ -318,11 +326,13 @@ class GraphQueryContext:
     idle_checker_host: IdleCheckerHost
     metric_observer: GraphQLMetricObserver
     processors: Processors
+    scheduler_repository: SchedulerRepository
 
 
-class Mutations(graphene.ObjectType):
+class Mutation(graphene.ObjectType):
     """
     All available GraphQL mutations.
+    Type name changed from 'Mutations' to 'Mutation' in 25.13.0
     """
 
     # super-admin only
@@ -495,9 +505,10 @@ class Mutations(graphene.ObjectType):
     delete_network = DeleteNetwork.Field()
 
 
-class Queries(graphene.ObjectType):
+class Query(graphene.ObjectType):
     """
     All available GraphQL queries.
+    Type name changed from 'Queries' to 'Query' in 25.13.0
     """
 
     node = AsyncNode.Field()
@@ -996,6 +1007,27 @@ class Queries(graphene.ObjectType):
         permission=SessionPermissionValueField(
             default_value=ComputeSessionPermission.READ_ATTRIBUTE,
             description=f"Added in 24.09.0. Default is {ComputeSessionPermission.READ_ATTRIBUTE.value}.",
+        ),
+    )
+
+    session_pending_queue = AsyncListConnectionField(
+        SessionPendingQueueConnection,
+        description="Added in 25.13.0.",
+        resource_group_id=graphene.String(required=True),
+        offset=graphene.Int(
+            description="Specifies how many items to skip before beginning to return result."
+        ),
+        before=graphene.String(
+            description="If this value is provided, the query will be limited to that value."
+        ),
+        after=graphene.String(
+            description="Queries the `last` number of results from the query result from last."
+        ),
+        first=graphene.Int(
+            description="Queries the `first` number of results from the query result from first."
+        ),
+        last=graphene.Int(
+            description="If the given value is provided, the query will start from that value."
         ),
     )
 
@@ -2526,6 +2558,71 @@ class Queries(graphene.ObjectType):
         )
 
     @staticmethod
+    async def resolve_session_pending_queue(
+        root: Any,
+        info: graphene.ResolveInfo,
+        *,
+        resource_group_id: str,
+        offset: Optional[int] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        before: Optional[str] = None,
+        last: Optional[int] = None,
+    ) -> ConnectionResolverResult[ComputeSessionNode]:
+        # TODO: Clean up this function
+        graph_ctx: GraphQueryContext = info.context
+        pending_sessions = await graph_ctx.valkey_schedule.get_pending_queue(resource_group_id)
+        session_order = {sid: idx for idx, sid in enumerate(pending_sessions)}
+        result: list[ComputeSessionNode] = []
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            stmt = (
+                sa.select(SessionRow)
+                .where(SessionRow.id.in_(pending_sessions))
+                .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
+            )
+            query_result = await db_session.scalars(stmt)
+            for row in query_result:
+                node = ComputeSessionNode.from_row(graph_ctx, row)
+                result.append(node)
+        result.sort(key=lambda node: session_order[SessionId(node.row_id)])
+        total_count = len(result)
+        page_size: Optional[int] = None
+        cursor: Optional[str] = None
+        if offset is not None:
+            result = result[offset:]
+        if after is not None:
+            _, raw_session_id = AsyncNode.resolve_global_id(info, after)
+            target_id = uuid.UUID(raw_session_id)
+            idx = 0
+            for idx, session_node in enumerate(result):
+                if session_node.id == target_id:
+                    cursor = after
+                    break
+            result = result[idx + 1 :]
+        if first is not None:
+            result = result[:first]
+            page_size = first
+        if before is not None:
+            _, raw_session_id = AsyncNode.resolve_global_id(info, before)
+            target_id = uuid.UUID(raw_session_id)
+            idx = len(result)
+            for idx, session_node in enumerate(result):
+                if session_node.id == target_id:
+                    cursor = before
+                    break
+            result = result[:idx]
+        if last is not None:
+            result = result[-last:]
+            page_size = last
+        return ConnectionResolverResult(
+            result,
+            cursor,
+            None,
+            page_size,
+            total_count,
+        )
+
+    @staticmethod
     @scoped_query(autofill_user=False, user_key="access_key")
     async def resolve_compute_container_list(
         root: Any,
@@ -3186,7 +3283,7 @@ class GQLMutationPrivilegeCheckMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         graph_ctx: GraphQueryContext = info.context
         if info.operation.operation == OperationType.MUTATION:
-            mutation_field: GraphQLField | None = getattr(Mutations, info.field_name, None)  # noqa
+            mutation_field: GraphQLField | None = getattr(Mutation, info.field_name, None)  # noqa
             if mutation_field is None:
                 return next(root, info, **args)
             mutation_cls = mutation_field.type

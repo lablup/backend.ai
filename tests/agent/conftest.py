@@ -15,6 +15,8 @@ from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.types import HostPortPair
 from ai.backend.logging import LocalLogger
+from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
+from ai.backend.logging.types import LogFormat, LogLevel
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     etcd_container,
     redis_container,
@@ -30,20 +32,23 @@ def test_id():
 
 @pytest.fixture(scope="session")
 def logging_config():
-    config = {
-        "drivers": ["console"],
-        "console": {"colored": None, "format": "verbose"},
-        "level": "DEBUG",
-        "pkg-ns": {
-            "": "INFO",
-            "ai.backend": "DEBUG",
-            "tests": "DEBUG",
-            "alembic": "INFO",
-            "aiotools": "INFO",
-            "aiohttp": "INFO",
-            "sqlalchemy": "WARNING",
+    config = LoggingConfig(
+        drivers=[LogDriver.CONSOLE],
+        console=ConsoleConfig(
+            colored=None,
+            format=LogFormat.VERBOSE,
+        ),
+        level=LogLevel.DEBUG,
+        pkg_ns={
+            "": LogLevel.INFO,
+            "ai.backend": LogLevel.DEBUG,
+            "tests": LogLevel.DEBUG,
+            "alembic": LogLevel.INFO,
+            "aiotools": LogLevel.INFO,
+            "aiohttp": LogLevel.INFO,
+            "sqlalchemy": LogLevel.WARNING,
         },
-    }
+    )
     logger = LocalLogger(config)
     with logger:
         yield config
@@ -65,7 +70,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
     except FileNotFoundError:
         pass
 
-    cfg = {
+    raw_server_config = {
         "agent": {
             "region": f"rg-{test_id}",
             "id": f"i-{test_id}",
@@ -116,7 +121,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
         },
         "plugins": {},
     }
-    cfg = AgentUnifiedConfig.model_validate(cfg)
+    server_config = AgentUnifiedConfig.model_validate(raw_server_config)
 
     def _override_if_exists(src: dict, dst: dict, key: str) -> None:
         sentinel = object()
@@ -126,12 +131,12 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
     try:
         # Override external database config with the current environment's config.
         fs_local_config, cfg_src_path = config.read_from_file(None, "agent")
-        cfg.etcd.addr = fs_local_config["etcd"]["addr"]
-        _override_if_exists(fs_local_config["etcd"], cfg.etcd.model_dump(), "user")
-        _override_if_exists(fs_local_config["etcd"], cfg.etcd.model_dump(), "password")
+        server_config.etcd.addr = fs_local_config["etcd"]["addr"]
+        _override_if_exists(fs_local_config["etcd"], server_config.etcd.model_dump(), "user")
+        _override_if_exists(fs_local_config["etcd"], server_config.etcd.model_dump(), "password")
     except config.ConfigurationError:
         pass
-    yield cfg
+    yield server_config
     shutil.rmtree(ipc_base_path)
     try:
         os.unlink(registry_state_path)

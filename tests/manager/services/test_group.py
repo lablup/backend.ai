@@ -2,13 +2,14 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, AsyncGenerator, Optional
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import RedisConnectionInfo, ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -33,10 +34,9 @@ from ai.backend.manager.services.group.actions.purge_group import (
 )
 from ai.backend.manager.services.group.processors import GroupProcessors
 from ai.backend.manager.services.group.service import GroupService
-from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
 from ai.backend.manager.types import OptionalState, TriState
 
-from .test_utils import TestScenario
+from .utils import ScenarioBase
 
 
 @pytest.fixture
@@ -62,6 +62,11 @@ def processors(
         config_provider=service_mock_args["config_provider"],
         valkey_stat_client=service_mock_args["valkey_stat_client"],
     )
+
+    # Mock the _role_manager with all required methods
+    mock_role_manager = MagicMock()
+    mock_role_manager.create_system_role = AsyncMock(return_value=None)
+    group_repository._role_manager = mock_role_manager
     admin_group_repository = AdminGroupRepository(
         db=database_engine, storage_manager=service_mock_args["storage_manager"]
     )
@@ -117,7 +122,7 @@ async def create_group(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "When trigger create group action with valid data, group creation should be successful",
             CreateGroupAction(
                 input=GroupCreator(
@@ -151,8 +156,8 @@ async def create_group(
             ),
         ),
         # TODO: If business logic is implemented to raise exception instead of returning None
-        # we need to update TestScenario.failure
-        TestScenario.success(
+        # we need to update ScenarioBase.failure
+        ScenarioBase.success(
             "With duplicated name, group creation should be failed",
             CreateGroupAction(
                 input=GroupCreator(
@@ -169,7 +174,7 @@ async def create_group(
                 success=False,
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "When trigger create group action with invalid resource policy, group creation should be failed",
             CreateGroupAction(
                 input=GroupCreator(
@@ -190,7 +195,7 @@ async def create_group(
 )
 async def test_create_group(
     processors: GroupProcessors,
-    test_scenario: TestScenario[CreateGroupAction, CreateGroupActionResult],
+    test_scenario: ScenarioBase[CreateGroupAction, CreateGroupActionResult],
 ) -> None:
     await test_scenario.test(processors.create_group.wait_for_complete)
 

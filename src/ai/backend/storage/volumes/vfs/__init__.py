@@ -10,7 +10,7 @@ import shutil
 import time
 from collections import deque
 from pathlib import Path, PurePosixPath
-from typing import Any, AsyncIterator, FrozenSet, Optional, Sequence, Union, final
+from typing import Any, AsyncIterator, FrozenSet, Optional, Sequence, Union, final, override
 
 import aiofiles.os
 import janus
@@ -40,6 +40,7 @@ from ...types import (
     Stat,
     TreeUsage,
     VFolderID,
+    VolumeInfo,
 )
 from ...utils import fstime2datetime
 from ...watcher import DeletePathTask, WatcherClient
@@ -371,6 +372,15 @@ class BaseFSOpModel(AbstractFSOpModel):
 
 class BaseVolume(AbstractVolume):
     name = "vfs"
+
+    @override
+    def info(self) -> VolumeInfo:
+        return VolumeInfo(
+            backend=self.name,
+            path=self.mount_path,
+            fsprefix=None,
+            options=self.config,
+        )
 
     async def create_quota_model(self) -> AbstractQuotaModel:
         return BaseQuotaModel(self.mount_path)

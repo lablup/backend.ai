@@ -7,23 +7,24 @@ import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import AsyncGenerator
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.user import UserRole, UserStatus, users
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.domain.repository import DomainRepository
-from ai.backend.manager.services.domain.types import (
+from ai.backend.manager.data.domain.types import (
     DomainCreator,
     DomainData,
     DomainModifier,
     UserInfo,
 )
+from ai.backend.manager.models.domain import domains, row_to_data
+from ai.backend.manager.models.group import groups
+from ai.backend.manager.models.user import UserRole, UserStatus, users
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.types import TriState
 
 
@@ -35,7 +36,15 @@ class TestDomainRepository:
         self, database_fixture, database_engine: ExtendedAsyncSAEngine
     ) -> DomainRepository:
         """Create DomainRepository instance with real database"""
-        return DomainRepository(db=database_engine)
+
+        repo = DomainRepository(db=database_engine)
+
+        # Create mock for _role_manager
+        mock_role_manager = MagicMock()
+        mock_role_manager.create_system_role = AsyncMock(return_value=None)
+        repo._role_manager = mock_role_manager
+
+        return repo
 
     @pytest.fixture
     def sample_domain_creator(self) -> DomainCreator:
@@ -104,8 +113,8 @@ class TestDomainRepository:
             await conn.execute(sa.insert(groups).values(group_data))
             await conn.commit()
 
-            domain_data_obj = DomainData.from_row(domain_row)
-            assert domain_data_obj is not None
+            assert domain_row is not None
+            domain_data_obj = row_to_data(domain_row)
 
             try:
                 yield domain_data_obj

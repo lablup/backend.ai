@@ -15,7 +15,7 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.types import RequesterCtx
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -74,7 +74,7 @@ class TestUpdateRoute:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.success(
+            ScenarioBase.success(
                 "weighted routing",
                 UpdateRouteAction(
                     requester_ctx=RequesterCtx(
@@ -89,7 +89,7 @@ class TestUpdateRoute:
                 ),
                 UpdateRouteActionResult(success=True),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "canary deployment",
                 UpdateRouteAction(
                     requester_ctx=RequesterCtx(
@@ -104,7 +104,7 @@ class TestUpdateRoute:
                 ),
                 UpdateRouteActionResult(success=True),
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "SUPERADMIN blue-green deployment",
                 UpdateRouteAction(
                     requester_ctx=RequesterCtx(
@@ -124,7 +124,7 @@ class TestUpdateRoute:
     @pytest.mark.asyncio
     async def test_update_route(
         self,
-        scenario: TestScenario[UpdateRouteAction, UpdateRouteActionResult],
+        scenario: ScenarioBase[UpdateRouteAction, UpdateRouteActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_update_route,
         mock_update_route_traffic_force,
@@ -169,7 +169,7 @@ class TestUpdateRoute:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.failure(
+            ScenarioBase.failure(
                 "non-existent route",
                 UpdateRouteAction(
                     requester_ctx=RequesterCtx(
@@ -189,7 +189,7 @@ class TestUpdateRoute:
     @pytest.mark.asyncio
     async def test_update_route_failure(
         self,
-        scenario: TestScenario[UpdateRouteAction, Exception],
+        scenario: ScenarioBase[UpdateRouteAction, Exception],
         model_serving_processors: ModelServingProcessors,
         mock_check_requester_access_update_route,
         mock_update_route_traffic_validated,

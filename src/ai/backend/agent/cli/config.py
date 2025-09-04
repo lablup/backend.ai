@@ -4,14 +4,18 @@ Configuration management CLI commands for Backend.AI Agent.
 This module provides CLI commands for generating and managing configuration files.
 """
 
+import logging
 import pathlib
 
 import click
 
-from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.common.configs.sample_generator import generate_sample_config_file
+from ai.backend.logging.utils import BraceStyleAdapter
 
+from ..config.unified import AgentUnifiedConfig
 from .context import CLIContext
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @click.group()
@@ -72,9 +76,8 @@ Generated automatically from the AgentUnifiedConfig schema.
         generate_sample_config_file(
             AgentUnifiedConfig, str(output), header_comment=header_comment.strip()
         )
-        click.echo(f"Sample configuration file generated successfully: {output}")
+        log.info("Sample configuration file generated successfully: {}", output)
     except Exception as e:
-        click.echo(f"Error generating sample configuration: {e}", err=True)
         raise click.ClickException(f"Failed to generate sample configuration: {e}")
 
 

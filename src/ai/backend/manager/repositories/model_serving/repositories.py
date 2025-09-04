@@ -1,11 +1,11 @@
 from dataclasses import dataclass
 from typing import Self
 
-from ai.backend.manager.repositories.image.repositories import RepositoryArgs
 from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
 )
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
+from ai.backend.manager.repositories.types import RepositoryArgs
 
 
 @dataclass

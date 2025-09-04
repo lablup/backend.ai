@@ -16,6 +16,9 @@ from ai.backend.common.types import (
     RuntimeVariant,
     VFolderMount,
 )
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.types import ModelRevisionSpec
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.models.routing import RouteStatus, RoutingRow
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.types import Creator, OptionalState, PartialModifier, TriState
@@ -292,3 +295,36 @@ class ModelServiceDefinition(BaseModel):
             {"MY_ENV_VAR": "value", "ANOTHER_VAR": "another_value"},
         ],
     )
+
+    def ovrride_model_revision(self, model_revision: ModelRevisionSpec) -> ModelRevisionSpec:
+        """Override model revision configuration with model service definition values."""
+        if self.resource_slots:
+            model_revision.resource_spec.resource_slots = self.resource_slots
+        if self.environment:
+            model_revision.image_identifier = ImageIdentifier(
+                canonical=self.environment.image, architecture=self.environment.architecture
+            )
+        if self.environ:
+            if model_revision.execution.environ:
+                model_revision.execution.environ.update(self.environ)
+            else:
+                model_revision.execution.environ = self.environ
+
+        return model_revision
+
+    def override_creator(self, creator: DeploymentCreator) -> DeploymentCreator:
+        """Override deployment creator configuration with model service definition values."""
+        # Override resource slots if specified
+        if self.resource_slots:
+            creator.model_revision.resource_spec.resource_slots = self.resource_slots
+        if self.environment:
+            creator.model_revision.image_identifier = ImageIdentifier(
+                canonical=self.environment.image, architecture=self.environment.architecture
+            )
+        if self.environ:
+            if creator.model_revision.execution.environ:
+                creator.model_revision.execution.environ.update(self.environ)
+            else:
+                creator.model_revision.execution.environ = self.environ
+
+        return creator

@@ -6,9 +6,6 @@
 #
 # Generated automatically from the WebServerUnifiedConfig schema.
 
-# Logging configuration.
-# logging = ""
-
 [service]
   # IP address to bind the webserver service.
   # Use '0.0.0.0' to bind to all interfaces.
@@ -18,44 +15,46 @@
   port = 8080
   # Whether to enable SSL/TLS for the webserver.
   # When enabled, requires ssl_cert and ssl_privkey to be set.
-  ssl_enabled = true
+  ssl_enabled = false
   # Path to SSL certificate file.
   # Required when ssl_enabled is True.
-  ssl_cert = "/path/to/cert.pem"
+  ## ssl_cert = "/path/to/cert.pem"
   # Path to SSL private key file.
   # Required when ssl_enabled is True.
-  ssl_privkey = "/path/to/privkey.pem"
+  ## ssl_privkey = "/path/to/privkey.pem"
   # Path to static files directory.
   # Contains web UI assets and other static resources.
   static_path = "/path/to/static"
   # Force a specific protocol for API endpoints.
   # Useful when running behind a reverse proxy.
+  ## force_endpoint_protocol = "{ ForceEndpointProtocol }"
   # Service mode.
   # 'webui' serves the full web UI, 'static' serves only static files.
   mode = "webui"
   # Whether to enable user signup functionality.
-  enable_signup = true
+  enable_signup = false
   # Whether to allow anonymous users to change passwords.
-  allow_anonymous_change_password = true
+  allow_anonymous_change_password = false
   # Whether to allow project resource monitoring.
-  allow_project_resource_monitor = true
+  allow_project_resource_monitor = false
   # Whether to allow users to change signin mode.
-  allow_change_signin_mode = true
+  allow_change_signin_mode = false
   # Whether to allow manual image name specification for sessions.
-  allow_manual_image_name_for_session = true
+  allow_manual_image_name_for_session = false
   # Whether to allow signup without email confirmation.
-  allow_signup_without_confirmation = true
+  allow_signup_without_confirmation = false
   # Whether to always enqueue compute sessions.
-  always_enqueue_compute_session = true
+  always_enqueue_compute_session = false
   # Whether to enable debug mode for the web UI.
-  webui_debug = true
+  webui_debug = false
   # Whether to mask user information in the UI.
-  mask_user_info = true
+  mask_user_info = false
   # List of single sign-on vendors to enable.
+  ## single_sign_on_vendors = "..."
   # SSO realm name for single sign-on.
   sso_realm_name = ""
   # Whether to enable container commit functionality.
-  enable_container_commit = true
+  enable_container_commit = false
   # Whether to hide agent information in the UI.
   hide_agents = true
   # URL for app download.
@@ -63,19 +62,19 @@
   # Whether to allow app download panel in the UI.
   allow_app_download_panel = true
   # Whether to enable two-factor authentication.
-  enable_2FA = true
+  enable_2FA = false
   # Whether to force two-factor authentication for all users.
-  force_2FA = true
+  force_2FA = false
   # System SSH image name.
   system_SSH_image = ""
   # Whether to use directory-based usage tracking.
-  directory_based_usage = true
+  directory_based_usage = false
   # Whether to allow custom resource allocation.
   allow_custom_resource_allocation = true
   # Education app name prefix.
   edu_appname_prefix = ""
   # Whether to enable extended login sessions.
-  enable_extend_login_session = true
+  enable_extend_login_session = false
   # Whether directory size is visible in the UI.
   is_directory_size_visible = true
   # Whether to enable interactive login account switching.
@@ -83,7 +82,7 @@
   # Default file browser image name.
   default_file_browser_image = ""
 
-[service.wsproxy]
+  [service.wsproxy]
     # WebSocket proxy URL.
     # Used to proxy WebSocket connections through a separate service.
     # Leave empty to disable WebSocket proxy.
@@ -95,14 +94,15 @@
   # List of response security policies.
   response_policies = []
   # Content Security Policy configuration.
+  ## csp = "{ CSPConfig }"
 
 [resources]
   # Whether to open ports to public.
-  open_port_to_public = true
+  open_port_to_public = false
   # Whether to allow non-authenticated TCP connections.
-  allow_non_auth_tcp = true
+  allow_non_auth_tcp = false
   # Whether to allow preferred port selection.
-  allow_preferred_port = true
+  allow_preferred_port = false
   # Maximum CPU cores per container.
   max_cpu_cores_per_container = 64
   # Maximum memory per container in GB.
@@ -132,28 +132,35 @@
 
 [environments]
   # List of allowed environments.
+  ## allowlist = "..."
   # Whether to show non-installed images.
-  show_non_installed_images = true
+  show_non_installed_images = false
 
 [plugin]
   # List of page plugins.
+  ## page = "..."
 
 [pipeline]
   # Pipeline service endpoint URL.
   endpoint = "http://127.0.0.1:9500"
   # Frontend endpoint URL for pipeline service.
+  ## frontend_endpoint = "..."
 
 [ui]
   # Default environment for new sessions.
+  ## default_environment = "..."
   # Default environment for import operations.
+  ## default_import_environment = "..."
   # List of blocked menu items.
+  ## menu_blocklist = "..."
   # List of inactive menu items.
+  ## menu_inactivelist = "..."
   # Whether to enable model folders functionality.
   enable_model_folders = true
 
 [api]
   # API domain name.
-  domain = "api.example.com"
+  domain = "default"
   # API endpoint URL.
   endpoint = "http://127.0.0.1:8080,http://api.example.com:8080"
   # API text description.
@@ -170,31 +177,62 @@
   # Session maximum age in seconds.
   max_age = 604800
   # Login session extension in seconds.
+  ## login_session_extension_sec =   
   # Whether to flush sessions on startup.
-  flush_on_startup = true
+  flush_on_startup = false
   # Login block time in seconds.
   login_block_time = 1200
   # Allowed login failure count.
   login_allowed_fail_count = 10
   # Whether to enable auto logout.
-  auto_logout = true
+  auto_logout = false
   # Maximum count for preopen ports.
   max_count_for_preopen_ports = 10
 
-[session.redis]
-    # Redis server address.
-    # Redis database number.
-    db = 0
-    # Redis sentinel addresses.
-    # Redis service name for sentinel.
-    # Redis password.
+  [session.redis]
+    # Network address and port of the Redis server.
+    # Redis is used for distributed caching and messaging between managers.
+    # Set to None when using Sentinel for high availability.
+    ## addr = "{ HostPortPair }"
+    # List of Redis Sentinel addresses for high availability.
+    # If provided, the manager will use Redis Sentinel for automatic failover.
+    # When using Sentinel, the addr field is ignored and service_name is required.
+    ## sentinel = [ "{ HostPortPair }" ]
+    # Service name for Redis Sentinel.
+    # Required when using Redis Sentinel for high availability.
+    # Identifies which service to monitor for failover.
+    ## service_name = "..."
+    # Password for authenticating with Redis.
+    # Set to None if Redis doesn't require authentication.
+    # Should be kept secret in production environments.
+    ## password = "..."
+    # Timeout in milliseconds for Redis requests.
+    # Controls how long operations wait before timing out.
+    # If None, uses the default timeout configured in the Redis client.
+    ## request_timeout =   
+    # Whether to use TLS for Redis connections.
+    use_tls = false
+    # Whether to skip TLS certificate verification.
+    # Set to True for self-signed certificates or development environments.
+    tls_skip_verify = false
+    # Optional override configurations for specific Redis contexts.
+    # Allows different Redis settings for different services within Backend.AI.
+    # Each key represents a context name, and the value is a complete Redis
+    # configuration.
+    ## override_configs = {  }
 
-[session.redis.redis_helper_config]
-      # Socket timeout in seconds.
+    [session.redis.redis_helper_config]
+      # Timeout in seconds for Redis socket operations.
+      # Controls how long operations wait before timing out.
+      # Increase for slow or congested networks.
       socket_timeout = 5.0
-      # Socket connection timeout in seconds.
+      # Timeout in seconds for establishing Redis connections.
+      # Controls how long connection attempts wait before failing.
+      # Shorter values fail faster but may be too aggressive for some networks.
       socket_connect_timeout = 2.0
-      # Reconnect poll timeout in seconds.
+      # Time in seconds to wait between reconnection attempts.
+      # Controls the polling frequency when trying to reconnect to Redis.
+      # Lower values reconnect faster but may increase network load.
       reconnect_poll_timeout = 0.3
 
 [license]
@@ -207,20 +245,54 @@
 
 [webserver]
   # Event loop type.
-  event_loop = "asyncio"
+  event_loop = "uvloop"
   # IPC base path.
   ipc_base_path = "/tmp/backend.ai/ipc"
   # Process ID file path.
-  pid_file = "/var/run/webserver.pid"
+  pid_file = "/dev/null"
 
 [otel]
   # Whether to enable OpenTelemetry.
-  enabled = true
+  enabled = false
   # OpenTelemetry log level.
   log_level = "INFO"
   # OpenTelemetry endpoint.
   endpoint = "http://127.0.0.1:4317"
 
+[apollo_router]
+  # Whether to enable Apollo Router.
+  enabled = false
+  # Apollo Router endpoint.
+  endpoint = "http://127.0.0.1:4000"
+
+[logging]
+  # The version used by logging.dictConfig().
+  version = 1
+  # The main log level to filter messages from all loggers.
+  level = "INFO"
+  # Disable the existing loggers when applying the config.
+  disable-existing-loggers = false
+  # The list of log drivers to activate.
+  drivers = [ "console",]
+  ## file = "{ FileConfig }"
+  ## logstash = "{ LogstashConfig }"
+  ## graylog = "{ GraylogConfig }"
+
+  # The mapping of log handler configurations.
+  [logging.handlers]
+
+  # The mapping of per-namespace logger configurations.
+  [logging.loggers]
+
+  [logging.console]
+    # Opt to print colorized log.
+    ## colored = true
+    # Determine verbosity of log.
+    format = "verbose"
+
+  # Override default log level for specific scope of package
+  [logging.pkg_ns]
+
 [debug]
   # Whether to enable debug mode.
-  enabled = true
+  enabled = false

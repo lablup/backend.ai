@@ -7,6 +7,7 @@ from typing import AsyncIterator, Optional
 
 from aiohttp import web
 
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
@@ -39,13 +40,16 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class VolumeService:
     _volume_pool: VolumePool
+    _event_producer: EventProducer
     _deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task]
 
     def __init__(
         self,
         volume_pool: VolumePool,
+        event_producer: EventProducer,
     ) -> None:
         self._volume_pool = volume_pool
+        self._event_producer = event_producer
         self._deletion_tasks = weakref.WeakValueDictionary[VFolderID, asyncio.Task]()
 
     async def _get_capabilities(self, volume_id: VolumeID) -> list[str]:
@@ -84,7 +88,7 @@ class VolumeService:
             msg = str(e) if e.strerror is None else e.strerror
             msg = f"{msg} (errno:{e.errno})"
             log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{msg})")
-            await self._volume_pool._event_producer.anycast_event(
+            await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,
                     message=msg,
@@ -92,7 +96,7 @@ class VolumeService:
             )
         except Exception as e:
             log.exception(f"VFolder deletion task failed. (vfolder_id:{vfolder_id}, e:{str(e)})")
-            await self._volume_pool._event_producer.anycast_event(
+            await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,
                     message=str(e),
@@ -102,9 +106,7 @@ class VolumeService:
             log.warning(f"Vfolder deletion task cancelled. (vfolder_id:{vfolder_id})")
         else:
             log.info(f"VFolder deletion task successed. (vfolder_id:{vfolder_id})")
-            await self._volume_pool._event_producer.anycast_event(
-                VFolderDeletionSuccessEvent(vfolder_id)
-            )
+            await self._event_producer.anycast_event(VFolderDeletionSuccessEvent(vfolder_id))
 
     async def get_volume(self, volume_id: VolumeID) -> VolumeMeta:
         await log_manager_api_entry_new(log, "get_volume", volume_id)

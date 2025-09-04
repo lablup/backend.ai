@@ -30,7 +30,6 @@ jobs:
       pull-requests: write
     outputs:
       skip: ${{ steps.check_skip.outputs.SKIP_CI }}
-      graphite-labels: ${{ steps.graphite_labels.outputs.GRAPHITE_LABELS }}
       release: ${{ steps.release.outputs.IS_RELEASE }}
       alembic: ${{ steps.alembic.outputs.ALEMBIC }}
     steps:
@@ -65,30 +64,12 @@ jobs:
         id: labeler
         if: github.event_name == 'pull_request'
         uses: lablup/auto-labeler@main   # actions/labeler, lablup/size-label-action, lablup/auto-label-in-issue
-      - name: Optimize CI
-        id: check_stacked_pr
-        run: |
-          echo "NON_TOP_BOTTOM=false" >> $GITHUB_OUTPUT
-          BASE_BRANCH=${{ github.event.pull_request.base.ref }}
-          if [[ "$BASE_BRANCH" != "main" && ! "$BASE_BRANCH" =~ ^[0-9]{2}\.[0-9]{1,2}$ ]]; then
-            response=$(curl -s -o /dev/null -w "%{http_code}" -X GET "${{ secrets.KVSTORE_URL }}/?key=base_${{ github.event.pull_request.head }}" \
-            -H "Authorization: Bearer ${{ secrets.KVSTORE_TOKEN }}")
-            if [ "$response" == "200" ]; then
-              echo "NON_TOP_BOTTOM=true" >> $GITHUB_OUTPUT
-            fi
-          fi
       - name: Skip CI
         id: check_skip
         if: |
           contains(toJSON(github.event.head_commit.message), 'skip:ci')
           || contains(github.event.pull_request.labels.*.name, 'skip:ci')
-          || steps.check_stacked_pr.outputs.NON_TOP_BOTTOM == 'true'
         run: echo "SKIP_CI=true" >> $GITHUB_OUTPUT
-      - name: Graphite labels
-        id: graphite_labels
-        if: contains(fromJSON('["flow:merge-queue", "flow:hotfix"]'), github.event.pull_request.labels.*.name)
-        run: |
-          echo "GRAPHITE_LABELS=true" >> $GITHUB_OUTPUT
       - name: Release
         id: release
         if: github.event_name == 'push' && contains(github.ref, 'refs/tags/')
@@ -106,7 +87,6 @@ jobs:
   lint:
     if: |
       needs.optimize-ci.outputs.skip != 'true'
-      && needs.optimize-ci.outputs.graphite-labels != 'true'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -183,8 +163,6 @@ jobs:
         || needs.optimize-ci.outputs.release == 'true'
       )
       && needs.optimize-ci.outputs.skip != 'true'
-      && needs.optimize-ci.outputs.graphite-labels !=
-      'true'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -238,7 +216,6 @@ jobs:
   typecheck:
     if: |
       needs.optimize-ci.outputs.skip != 'true'
-      && needs.optimize-ci.outputs.graphite-labels != 'true'
     needs: [optimize-ci]
     runs-on: ubuntu-latest
     steps:
@@ -306,7 +283,6 @@ jobs:
   test:
     if: |
       needs.optimize-ci.outputs.skip != 'true'
-      && needs.optimize-ci.outputs.graphite-labels != 'true'
     needs: [optimize-ci]
     runs-on: [ubuntu-latest-8-cores]
     steps:
@@ -489,6 +465,20 @@ jobs:
     if: needs.optimize-ci.outputs.release == 'true'
     uses: ./.github/workflows/sbom.yml
 
+  build-isla-sorna-image:
+    needs: [build-scies, build-wheels, build-sbom, optimize-ci]
+    if: needs.optimize-ci.outputs.release == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Isla Sorna repo image build
+        run: |
+          gh api /repos/lablup/isla-sorna/dispatches \
+              --method POST \
+              -f 'event_type=build-images' \
+              -F "client_payload[version]=${{ github.ref_name }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
 
   make-final-release:
     needs: [build-scies, build-wheels, build-sbom, optimize-ci]
@@ -517,12 +507,12 @@ jobs:
         python ./scripts/extract-release-changelog.py
         python ./scripts/determine-release-type.py
     - name: Download wheels
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: wheels
         path: dist
     - name: Download scies
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         pattern: scies-*
         path: dist
@@ -532,7 +522,7 @@ jobs:
         cat dist/checksum-*.txt > dist/checksum.txt
         sort -u -k2 dist/checksum.txt -o dist/checksum.txt
     - name: Download SBOM report
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: SBOM report
         path: dist
@@ -669,7 +659,7 @@ jobs:
       with:
         activate-conda: false
     - name: Download wheels
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v5
       with:
         name: wheels
         path: dist

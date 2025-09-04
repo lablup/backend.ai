@@ -33,6 +33,7 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.types import (
     BroadcastMessage,
+    BroadcastPayload,
     MessageId,
     MessageMetadata,
     MessagePayload,
@@ -763,6 +764,45 @@ class EventProducer:
             cache_id,
             raw_event,
         )
+
+    async def broadcast_events_batch(
+        self,
+        events: Sequence[AbstractBroadcastEvent],
+    ) -> None:
+        """
+        Broadcast multiple events in a batch with optional caching.
+        Cache ID is obtained from each event's cache_id() method.
+        """
+        if self._closed:
+            return
+        if not events:
+            return
+
+        # Capture current request_id and other metadata
+        request_id = current_request_id()
+        user = current_user()
+        metadata = MessageMetadata(
+            request_id=request_id,
+            user=user,
+        )
+
+        # Convert events to BroadcastPayload objects
+        broadcast_payloads: list[BroadcastPayload] = []
+        for event in events:
+            raw_event = MessagePayload(
+                name=event.event_name(),
+                source=str(self._source),
+                args=event.serialize(),
+                metadata=metadata,
+            ).serialize_broadcast()
+            broadcast_payloads.append(
+                BroadcastPayload(
+                    payload=raw_event,
+                    cache_id=event.cache_id(),  # Get cache_id from event
+                )
+            )
+
+        await self._msg_queue.broadcast_batch(broadcast_payloads)
 
     async def anycast_and_broadcast_event(
         self,

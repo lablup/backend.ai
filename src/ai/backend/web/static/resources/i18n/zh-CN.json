@@ -340,10 +340,12 @@
       "CannotDeleteFolder": "无法删除安装在一个或多个会话中的文件夹。请先终止会话。",
       "CannotDeletePipelineFolder": "您无法删除管道文件夹。",
       "CannotRestorePipelineFolder": "您无法还原管道文件夹。",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "模型项目文件夹只能在模型商店的独家项目中创建。\n更改当前项目或用户类型。",
       "CloneAFolder": "克隆文件夹",
       "CloneFolder": "克隆文件夹",
       "Cloneable": "可克隆",
       "Control": "控制",
+      "CreateModelFolderOnlyInExclusiveProject": "模型项目文件夹只能在模型商店的独家项目中创建。",
       "CreatedAt": "创建在",
       "Delete": "删除",
       "DeleteAFolder": "删除文件夹",
@@ -398,6 +400,7 @@
       "Path": "存储路径",
       "Permission": "允许",
       "ProjectFolderAlertDesc": "该文件夹与项目的所有成员共享",
+      "ProjectFolderCreationHelp": "将创建一个可以通过“{{projectName}}”项目用户访问的文件夹。",
       "Rename": "改名",
       "Restore": "恢复",
       "RestoreDescription": "您要还原“{{ folderName }}”文件夹？",
@@ -618,6 +621,7 @@
     "SmallerResourceThenImageRequires": "您的资源请求小于图像要求的最小值。尝试更多资源。",
     "TooManyLoginFailures": "短时间内登录失败次数过多。登录被暂时阻止。",
     "UnauthorizedToken": "未经授权的令牌。请检查您的令牌。",
+    "UnexpectedError": "发生意外错误。\n如果问题持续下去，请稍后再试或联系支持。",
     "UnknownError": "出现未知错误。请重试。",
     "UpdateError": "更新错误",
     "UserHasNoGroup": "用户没有组。请联系管理员修复。",
@@ -634,8 +638,10 @@
     "Title": "发生错误。"
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "未找到或拒绝访问的文件夹",
     "InputTooShort": "输入太短",
     "NoExplorerSupportForUnmanagedFolder": "未管理的文件夹不支持文件资源管理器。",
+    "NoPermissions": "无权访问此文件夹",
     "ValueRequired": "需要值"
   },
   "general": {
@@ -770,6 +776,9 @@
   "kernel": {
     "AgentId": "代理ID",
     "ContainerId": "容器ID",
+    "ContainerLogs": "容器日志",
+    "Hostname": "主机名",
+    "Kernel": "核心",
     "KernelId": "内核ID",
     "Kernels": "内核",
     "Role": "角色",
@@ -911,6 +920,7 @@
     "EndpointName": "端点名称",
     "Error": "错误",
     "ExpiredDate": "过期日期",
+    "ExtraMountsWarning": "编辑服务时，可能不会保留其他安装文件夹的名称（别名）。\n保存之前，请仔细检查文件夹名称。",
     "FailedToStartService": "创建服务失败。",
     "FailedToTerminateService": "终止服务的请求失败。",
     "FailedToUpdateService": "更新服务失败。",
@@ -1025,10 +1035,6 @@
   },
   "pagination": {
     "Total": "{{start}}  -  {{end}} {{total}}项目"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "搜索",
-    "ResetFilter": "重置过滤器"
   },
   "registry": {
     "AddRegistry": "添加注册表",
@@ -1197,6 +1203,9 @@
     "SharedMemory": "共享内存",
     "Updated": "资源预设已更新"
   },
+  "scheduler": {
+    "PendingSessions": "等待会议"
+  },
   "session": {
     "Agent": "代理人",
     "AgentId": "代理ID",
@@ -1277,12 +1286,15 @@
     "OpenToPublic": "向公众开放应用",
     "OpenToPublicDesc": "启用此选项允许网络中的所有用户访问应用程序。<br /><br />\n对于访问管理，请在“允许IP”字段中输入特定的IP地址。<br /><br />\n将此字段留为空，将允许从所有IP地址访问。<br /><br />\n考虑安全管理时，请考虑设置IP限制。",
     "Others": "其他",
+    "PanelSettings": "面板设置",
+    "PendingPosition": "队列位置",
     "PredicateChecks": "谓词检查",
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
     "ReadLess": "更多信息",
     "ReadMore": "阅读全文...",
     "RecentlyCreatedSessions": "最近创建了会议",
+    "RecentlyCreatedSessionsTooltip": "显示当前项目中最近创建的{{count}}个正在运行的会话",
     "RequestContainerCommit": "请求容器承诺",
     "Reservation": "预订",
     "ResourceGroup": "资源组",
@@ -1538,6 +1550,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "原子最大支持",
     "ATOMPlusSupport": "ATOM+支持",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "允许代理端注册",
@@ -1545,6 +1558,7 @@
     "Config": "配置",
     "ConfigPerJobSchduler": "调度程序设置",
     "ConfigPerJobSchdulerDescription": "调度程序设置中的值是每个资源组中没有调度程序设置时使用的默认值。如果存在特定于资源组的设置，则该值将被忽略。",
+    "DescATOMMaxSupport": "使用 Rebellions ATOM Max 加速器。",
     "DescATOMPlusSupport": "使用 Rebellions ATOM+ 加速器。",
     "DescATOMSupport": "使用 Rebellions ATOM 加速器",
     "DescAllowAgentSideRegistration": "允许代理商向经理注册。仅当后端群集在安全位置管理时才使用。",
@@ -1588,6 +1602,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "ROCm GPU 支持",
     "RegisterNewImagesFromRepo": "从存储库注册新图像",
+    "RequireATOMMaxPlugin": "需要 Backend.AI ATOM Max 插件。",
     "RequireATOMPlugin": "需要 Backend.AI ATOM 插件。",
     "RequireATOMPlusPlugin": "需要 Backend.AI ATOM+ 插件。",
     "RequireFGPUPlugin": "需要 Backend.AI 虚拟 CUDA API 层插件。",
@@ -1752,6 +1767,7 @@
   },
   "summary": {
     "ATOMEnabled": "已启用 ATOM NPU",
+    "ATOMMaxEnabled": "Atom Max NPU启用",
     "ATOMPlusEnabled": "ATOM+ NPU 启用",
     "Accept": "接受",
     "AcceptSharedVFolder": "您现在可以访问文件夹：",
@@ -1971,6 +1987,7 @@
       "MyResources": "我的资源",
       "MyResourcesDescription": "<p>此面板显示了您的总资源使用情况，并保留在所有项目和资源组中。</p> <p>当有多个限制（例如域，项目或按键）时，最限制的限制将用于显示您的用法和剩余能力。</p> </p>",
       "MyResourcesIn": "我的资源",
+      "MyResourcesInResourceGroup": "我在资源组中的资源",
       "MyResourcesInResourceGroupDescription": "该面板显示了您当前的资源使用情况和所选资源组中的可用容量。",
       "NewPassword": "新密码",
       "NewPasswordAgain": "确认新密码）",
@@ -1990,6 +2007,7 @@
       "Remaining": "其余的",
       "ResourcePolicy": "资源政策",
       "Resources": "资源",
+      "Scheduler": "调度程序",
       "Serving": "服务",
       "Sessions": "会话",
       "Settings": "设置",
@@ -2001,6 +2019,7 @@
       "Tasks": "任务",
       "TermsOfService": "服务条款",
       "TotalResourcesIn": "总资源中",
+      "TotalResourcesInResourceGroup": "资源组的总资源",
       "TotalResourcesInResourceGroupDescription": "该面板显示了使用的总和剩余资源。\n这些值是通过使用所选资源组添加所有代理的使用量和剩余数量来计算的。",
       "TotpActivated": "已启用 2FA",
       "Update": "更新",

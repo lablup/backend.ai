@@ -340,10 +340,12 @@
       "CannotDeleteFolder": "Невозможно удалить папку, установленную в одном или нескольких сеансах. Пожалуйста, сначала завершите сеанс.",
       "CannotDeletePipelineFolder": "Вы не можете удалить папки трубопровода.",
       "CannotRestorePipelineFolder": "Вы не можете восстановить папки трубопровода.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Папки моделей проектов могут быть созданы только в эксклюзивных проектах Model Store. \nИзмените текущий проект или тип пользователя.",
       "CloneAFolder": "Клонировать папку",
       "CloneFolder": "Клонировать папку",
       "Cloneable": "Клонируемый",
       "Control": "Контроль",
+      "CreateModelFolderOnlyInExclusiveProject": "Папки моделей проектов могут быть созданы только в эксклюзивных проектах Model Store.",
       "CreatedAt": "Создан в",
       "Delete": "Удалить",
       "DeleteAFolder": "Удалить папку",
@@ -398,6 +400,7 @@
       "Path": "Путь хранения",
       "Permission": "Разрешение",
       "ProjectFolderAlertDesc": "Эта папка передается всем членам проекта",
+      "ProjectFolderCreationHelp": "Папка, доступная по \"{{projectName}}\" Пользователи проекта будут созданы.",
       "Rename": "Переименовать",
       "Restore": "Восстановить",
       "RestoreDescription": "Вы хотите восстановить \"{{ folderName }}\" папка?",
@@ -618,6 +621,7 @@
     "SmallerResourceThenImageRequires": "Ваш запрос ресурсов меньше, чем минимально требуется для изображения. Попробуйте использовать больше ресурсов.",
     "TooManyLoginFailures": "За короткое время произошло слишком много сбоев при входе в систему. Вход в систему на некоторое время заблокирован.",
     "UnauthorizedToken": "Неавторизованный токен. Пожалуйста, проверьте ваш токен.",
+    "UnexpectedError": "Произошла неожиданная ошибка. \nПожалуйста, попробуйте еще раз позже или свяжитесь с поддержкой, если проблема сохранится.",
     "UnknownError": "Произошла неизвестная ошибка. Пожалуйста, попробуйте еще раз.",
     "UpdateError": "Ошибка обновления",
     "UserHasNoGroup": "У пользователя нет группы. Обратитесь к администратору для устранения проблемы.",
@@ -634,6 +638,7 @@
     "Title": "Произошла ошибка."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Папка не найдена или доступа отказана",
     "InputTooShort": "ВводОченьКороток",
     "NoExplorerSupportForUnmanagedFolder": "Неуправляемые папки не поддерживают исследователь файлов.",
     "ValueRequired": "НужноЗначение"
@@ -770,6 +775,9 @@
   "kernel": {
     "AgentId": "Идентификатор агента",
     "ContainerId": "Идентификатор контейнера",
+    "ContainerLogs": "Журналы контейнеров",
+    "Hostname": "Имя хоста",
+    "Kernel": "Ядро",
     "KernelId": "Ядро идентификатор",
     "Kernels": "Ядра",
     "Role": "Роль",
@@ -911,6 +919,7 @@
     "EndpointName": "Имя конечной точки",
     "Error": "Ошибка",
     "ExpiredDate": "Дата истечения срока действия",
+    "ExtraMountsWarning": "При редактировании службы имя (псевдоним) дополнительных монтированных папок не может быть сохранено. \nПожалуйста, проверьте имена папок перед сохранением.",
     "FailedToStartService": "Не удалось создать службу.",
     "FailedToTerminateService": "Запрос на завершение службы завершился неудачно.",
     "FailedToUpdateService": "Не удалось обновить службу.",
@@ -1025,10 +1034,6 @@
   },
   "pagination": {
     "Total": "{{start}} - {{end}} of {{total}} элементы"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "Поиск",
-    "ResetFilter": "Сбросить фильтры"
   },
   "registry": {
     "AddRegistry": "Добавить реестр",
@@ -1197,6 +1202,9 @@
     "SharedMemory": "Общая память",
     "Updated": "Предустановка ресурса обновлена"
   },
+  "scheduler": {
+    "PendingSessions": "В ожидании сессий"
+  },
   "session": {
     "Agent": "Агент",
     "AgentId": "Идентификатор агента",
@@ -1277,12 +1285,15 @@
     "OpenToPublic": "Открыть приложение для всех",
     "OpenToPublicDesc": "Включение этой опции позволяет получить доступ к приложениям для всех пользователей в сети.<br /><br /> \nДля управления доступом введите конкретные IP -адреса в поле «Разрешено IP».<br /><br /> \nОставляя это поле пустым, разрешит доступ от всех IP -адресов.<br /><br /> \nРассмотрите возможность установления ограничений IP, когда это необходимо для управления безопасности.",
     "Others": "Другие",
+    "PanelSettings": "Панель настройки",
+    "PendingPosition": "Позиция очереди",
     "PredicateChecks": "ПРЕДИСКИЕ ПРОВЕРКИ",
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
     "ReadLess": "Читать далее",
     "ReadMore": "Читать далее...",
     "RecentlyCreatedSessions": "Недавно создал сессии",
+    "RecentlyCreatedSessionsTooltip": "Показывает {{count}} недавно созданных активных сессий в текущем проекте",
     "RequestContainerCommit": "Запрос контейнера Commit",
     "Reservation": "Бронирование",
     "ResourceGroup": "Группа ресурсов",
@@ -1538,6 +1549,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Atom Max поддержка",
     "ATOMPlusSupport": "Поддержка АТОМ+",
     "ATOMSupport": "АТОМ",
     "AllowAgentSideRegistration": "Разрешить регистрацию на стороне агента",
@@ -1545,6 +1557,7 @@
     "Config": "Конфиг",
     "ConfigPerJobSchduler": "Настройки планировщика",
     "ConfigPerJobSchdulerDescription": "Значения в настройке планировщика - это значения по умолчанию, которые используются, когда в каждой группе ресурсов нет настройки планировщика. Если есть параметр, относящийся к группе ресурсов, это значение будет проигнорировано.",
+    "DescATOMMaxSupport": "Используйте Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Используйте ускоритель Rebellions ATOM+.",
     "DescATOMSupport": "Использование ускорителя Rebellions ATOM",
     "DescAllowAgentSideRegistration": "Позвольте агенту зарегистрироваться в менеджере. Используйте только в том случае, если кластер Backend.ai управляется в безопасном месте.",
@@ -1588,6 +1601,7 @@
     "RNGDSupport": "РНГД",
     "ROCMGPUSupport": "Поддержка графического процессора ROCm",
     "RegisterNewImagesFromRepo": "Зарегистрируйте новые образы из репозитория",
+    "RequireATOMMaxPlugin": "Требует плагин Backend.AI ATOM Max.",
     "RequireATOMPlugin": "Требуется наличие плагина Backend.AI ATOM Plugin.",
     "RequireATOMPlusPlugin": "Требуется плагин Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Требуется подключаемый модуль уровня виртуального CUDA API Backend.AI.",
@@ -1752,6 +1766,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Включено",
+    "ATOMMaxEnabled": "Atom Max NPU включен",
     "ATOMPlusEnabled": "NPU ATOM+ включен",
     "Accept": "Принимать",
     "AcceptSharedVFolder": "Теперь вы можете получить доступ к папке:",
@@ -1971,6 +1986,7 @@
       "MyResources": "Мои ресурсы",
       "MyResourcesDescription": "<p> Эта панель показывает ваше общее использование ресурсов и оставшееся во всех проектах и группах ресурсов.",
       "MyResourcesIn": "Мои ресурсы в",
+      "MyResourcesInResourceGroup": "Мои ресурсы в ресурсной группе",
       "MyResourcesInResourceGroupDescription": "Эта панель показывает ваше текущее использование ресурсов и доступную емкость в выбранной группе ресурсов.",
       "NewPassword": "Новый пароль",
       "NewPasswordAgain": "Новый пароль (ещё раз)",
@@ -1990,6 +2006,7 @@
       "Remaining": "Оставшийся",
       "ResourcePolicy": "Ресурсная политика",
       "Resources": "Ресурсы",
+      "Scheduler": "Планировщик",
       "Serving": "Обслуживание",
       "Sessions": "Сессии",
       "Settings": "Настройки",
@@ -2001,6 +2018,7 @@
       "Tasks": "Задачи",
       "TermsOfService": "Условия использования",
       "TotalResourcesIn": "Общие ресурсы в",
+      "TotalResourcesInResourceGroup": "Общие ресурсы в ресурсной группе",
       "TotalResourcesInResourceGroupDescription": "На этой панели показаны общие и оставшиеся ресурсы. \nЗначения рассчитываются путем добавления использования и оставшихся сумм всех агентов, использующих выбранную группу ресурсов.",
       "TotpActivated": "2FA Enabled",
       "Update": "Обновить",

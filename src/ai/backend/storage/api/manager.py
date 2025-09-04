@@ -32,7 +32,9 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.bgtask.types import TaskName
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
+from ai.backend.common.dto.storage.response import VFolderCloneResponse
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
@@ -61,6 +63,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
+from ..bgtask.tasks.clone import VFolderCloneTaskArgs
 from ..exception import (
     ExecutionError,
     ExternalError,
@@ -74,6 +77,9 @@ from ..exception import (
 from ..types import QuotaConfig, VFolderID
 from ..utils import check_params, log_manager_api_entry
 from ..watcher import ChownTask, MountTask, UmountTask
+from .v1.registries.huggingface import create_app as create_huggingface_registries_app
+from .v1.registries.reservoir import create_app as create_reservoir_registries_app
+from .v1.storages.object_storage import create_app as create_object_storages_app
 from .vfolder.handler import VFolderHandler
 
 if TYPE_CHECKING:
@@ -473,7 +479,6 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         src_vfid: VFolderID
         dst_volume: str | None  # deprecated
         dst_vfid: VFolderID
-        options: dict[str, Any] | None  # deprecated
 
     async with cast(
         AsyncContextManager[Params],
@@ -485,9 +490,8 @@ async def clone_vfolder(request: web.Request) -> web.Response:
                     t.Key("src_vfid"): tx.VFolderID(),
                     t.Key("dst_volume"): t.String() | t.Null,
                     t.Key("dst_vfid"): tx.VFolderID(),
-                    t.Key("options", default=None): t.Null | t.Dict().allow_extra("*"),
                 },
-            ),
+            ).allow_extra("*"),
         ),
     ) as params:
         if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
@@ -496,12 +500,17 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         ctx: RootContext = request.app["ctx"]
         if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
             raise StorageProxyError("Cross-volume vfolder cloning is not implemented yet")
-        async with ctx.get_volume(params["src_volume"]) as src_volume:
-            await src_volume.clone_vfolder(
-                params["src_vfid"],
-                params["dst_vfid"],
-            )
-        return web.Response(status=HTTPStatus.NO_CONTENT)
+        clone_args = VFolderCloneTaskArgs(
+            volume=params["src_volume"],
+            src_vfolder=params["src_vfid"],
+            dst_vfolder=params["dst_vfid"],
+        )
+        task_id = await ctx.background_task_manager.start_retriable(
+            TaskName.CLONE_VFOLDER,
+            clone_args,
+        )
+        data = VFolderCloneResponse(bgtask_id=task_id).model_dump(mode="json")
+        return web.json_response(data)
 
 
 async def get_vfolder_mount(request: web.Request) -> web.Response:
@@ -1256,7 +1265,10 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
 
-    app.add_subapp("/v2", init_v2_volume_app(ctx.service_context))
+    app.add_subapp("/v1/storages/s3", create_object_storages_app(ctx))
+    app.add_subapp("/v1/registries/huggingface", create_huggingface_registries_app(ctx))
+    app.add_subapp("/v1/registries/reservoir", create_reservoir_registries_app(ctx))
+
     # passive events
     evd = ctx.event_dispatcher
     evd.subscribe(DoVolumeMountEvent, ctx, handle_volume_mount, name="storage.volume.mount")

@@ -30,7 +30,7 @@ def mock_volume_pool():
 
 @pytest.fixture
 def mock_service(mock_volume_pool):
-    service = VolumeService(volume_pool=mock_volume_pool)
+    service = VolumeService(volume_pool=mock_volume_pool, event_producer=MagicMock())
     service._get_capabilities = AsyncMock(return_value=["capability1", "capability2"])
 
     service.log = service_log

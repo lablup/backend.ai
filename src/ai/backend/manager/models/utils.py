@@ -147,10 +147,18 @@ class ExtendedAsyncSAEngine(SAEngine):
 
     @actxmgr
     async def begin_readonly(
-        self, bind: SAConnection | None = None, deferrable: bool = False
+        self,
+        bind: SAConnection | None = None,
+        *,
+        deferrable: bool = False,
+        isolation_level: str | None = None,  # override only when existing conn is not given
     ) -> AsyncIterator[SAConnection]:
         if bind is None:
             async with self.connect() as _bind:
+                if isolation_level is not None:
+                    _bind = await _bind.execution_options(
+                        isolation_level=isolation_level,
+                    )
                 async with self._begin_readonly(_bind, deferrable) as conn:
                     yield conn
         else:
@@ -185,7 +193,9 @@ class ExtendedAsyncSAEngine(SAEngine):
     async def begin_readonly_session(
         self,
         bind: SAConnection | None = None,
+        *,
         deferrable: bool = False,
+        isolation_level: str | None = None,  # override only when existing conn is not given
     ) -> AsyncIterator[SASession]:
         @actxmgr
         async def _begin_session(connection: SAConnection) -> AsyncIterator[SASession]:
@@ -195,8 +205,12 @@ class ExtendedAsyncSAEngine(SAEngine):
                 yield session
 
         if bind is None:
-            async with self.connect() as _conn:
-                async with _begin_session(_conn) as sess:
+            async with self.connect() as _bind:
+                if isolation_level is not None:
+                    _bind = await _bind.execution_options(
+                        isolation_level=isolation_level,
+                    )
+                async with _begin_session(_bind) as sess:
                     yield sess
         else:
             async with _begin_session(bind) as sess:

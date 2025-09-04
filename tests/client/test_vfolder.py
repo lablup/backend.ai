@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from http import HTTPStatus
 from typing import Mapping, Optional, Union
 from unittest import mock
@@ -5,13 +6,16 @@ from uuid import UUID
 
 import pytest
 from aioresponses import aioresponses
+from yarl import URL
 
 from ai.backend.client.config import API_VERSION, APIConfig
 from ai.backend.client.session import Session
 from ai.backend.testutils.mock import AsyncMock
 
 
-def build_url(config: APIConfig, path: str, params: Optional[Mapping[str, Union[str, int]]] = None):
+def build_url(
+    config: APIConfig, path: str, params: Optional[Mapping[str, Union[str, int]]] = None
+) -> URL:
     base_url = config.endpoint.path.rstrip("/")
     query_path = path.lstrip("/") if len(path) > 0 else ""
     path = "{0}/{1}".format(base_url, query_path)
@@ -22,14 +26,14 @@ def build_url(config: APIConfig, path: str, params: Optional[Mapping[str, Union[
 
 
 @pytest.fixture(scope="module", autouse=True)
-def api_version():
+def api_version() -> Iterator[None]:
     mock_nego_func = AsyncMock()
     mock_nego_func.return_value = API_VERSION
     with mock.patch("ai.backend.client.session._negotiate_api_version", mock_nego_func):
         yield
 
 
-def test_create_vfolder():
+def test_create_vfolder() -> None:
     with Session() as session, aioresponses() as m:
         payload = {
             "id": "fake-vfolder-id",
@@ -41,7 +45,7 @@ def test_create_vfolder():
         assert resp == payload
 
 
-def test_create_vfolder_in_other_host():
+def test_create_vfolder_in_other_host() -> None:
     with Session() as session, aioresponses() as m:
         payload = {
             "id": "fake-vfolder-id",
@@ -53,7 +57,7 @@ def test_create_vfolder_in_other_host():
         assert resp == payload
 
 
-def test_list_vfolders():
+def test_list_vfolders() -> None:
     with Session() as session, aioresponses() as m:
         payload = [
             {
@@ -76,7 +80,7 @@ def test_list_vfolders():
         assert resp == payload
 
 
-def test_delete_vfolder():
+def test_delete_vfolder() -> None:
     with Session() as session, aioresponses() as m:
         vfolder_name = "fake-vfolder-name"
         source_vfolder_uuid: UUID = UUID("c59395cd-ac91-4cd3-a1b0-3d2568aa2d04")
@@ -90,7 +94,7 @@ def test_delete_vfolder():
         assert resp == {}
 
 
-def test_vfolder_get_info():
+def test_vfolder_get_info() -> None:
     with Session() as session, aioresponses() as m:
         vfolder_name = "fake-vfolder-name"
         payload = {
@@ -117,7 +121,7 @@ def test_vfolder_get_info():
         assert resp == payload
 
 
-def test_vfolder_delete_files():
+def test_vfolder_delete_files() -> None:
     with Session() as session, aioresponses() as m:
         vfolder_name = "fake-vfolder-name"
         files = ["fake-file1", "fake-file2"]
@@ -136,7 +140,7 @@ def test_vfolder_delete_files():
         assert resp == "{}"
 
 
-def test_vfolder_list_files():
+def test_vfolder_list_files() -> None:
     with Session() as session, aioresponses() as m:
         vfolder_name = "fake-vfolder-name"
         payload = {
@@ -179,7 +183,7 @@ def test_vfolder_list_files():
         assert resp == payload
 
 
-def test_vfolder_invite():
+def test_vfolder_invite() -> None:
     with Session() as session, aioresponses() as m:
         vfolder_name = "fake-vfolder-name"
         user_ids = ["user1@lablup.com", "user2@lablup.com"]
@@ -199,7 +203,7 @@ def test_vfolder_invite():
         assert resp == payload
 
 
-def test_vfolder_invitations():
+def test_vfolder_invitations() -> None:
     with Session() as session, aioresponses() as m:
         payload = {
             "invitations": [
@@ -220,7 +224,7 @@ def test_vfolder_invitations():
         assert resp == payload
 
 
-def test_vfolder_accept_invitation():
+def test_vfolder_accept_invitation() -> None:
     with Session() as session, aioresponses() as m:
         payload = {
             "msg": "User invitee@lablup.com now can access vfolder fake-vfolder-id",
@@ -234,7 +238,7 @@ def test_vfolder_accept_invitation():
         assert resp == payload
 
 
-def test_vfolder_delete_invitation():
+def test_vfolder_delete_invitation() -> None:
     with Session() as session, aioresponses() as m:
         payload = {"msg": "Vfolder invitation is deleted: fake-inv-id."}
         m.delete(
@@ -246,7 +250,7 @@ def test_vfolder_delete_invitation():
         assert resp == payload
 
 
-def test_vfolder_clone():
+def test_vfolder_clone() -> None:
     with Session() as session, aioresponses() as m:
         source_vfolder_name = "fake-source-vfolder-name"
         target_vfolder_name = "fake-target-vfolder-name"

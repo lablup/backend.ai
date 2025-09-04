@@ -3,22 +3,26 @@ from __future__ import annotations
 import enum
 import os
 from pathlib import Path
-from typing import Any, Optional
+from typing import Optional
 
 from pydantic import (
     AliasChoices,
     BaseModel,
+    ConfigDict,
     Field,
     FilePath,
     HttpUrl,
     field_validator,
 )
 
+from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     CommaSeparatedStrList,
     HostPortPair,
 )
+from ai.backend.logging.config import LoggingConfig
 
 
 class ServiceMode(enum.StrEnum):
@@ -817,6 +821,59 @@ class APIConfig(BaseModel):
     )
 
 
+class EtcdConfig(BaseModel):
+    namespace: str = Field(
+        default="ETCD_NAMESPACE",
+        description="""
+        Namespace prefix for etcd keys used by Backend.AI.
+        Allows multiple Backend.AI clusters to share the same etcd cluster.
+        All Backend.AI related keys will be stored under this namespace.
+        """,
+        examples=["local", "backend"],
+    )
+    addr: HostPortPair | list[HostPortPair] = Field(
+        default=HostPortPair(host="127.0.0.1", port=2379),
+        description="""
+        Network address of the etcd server.
+        Default is the standard etcd port on localhost.
+        In production, should point to one or more etcd instance endpoint(s).
+        """,
+        examples=[
+            {"host": "127.0.0.1", "port": 2379},  # single endpoint
+            [
+                {"host": "127.0.0.4", "port": 2379},
+                {"host": "127.0.0.5", "port": 2379},
+            ],  # multiple endpoints
+        ],
+    )
+    user: Optional[str] = Field(
+        default=None,
+        description="""
+        Username for authenticating with etcd.
+        Optional if etcd doesn't require authentication.
+        Should be set along with password for secure deployments.
+        """,
+        examples=["backend", "manager"],
+    )
+    password: Optional[str] = Field(
+        default=None,
+        description="""
+        Password for authenticating with etcd.
+        Optional if etcd doesn't require authentication.
+        Can be a direct password or environment variable reference.
+        """,
+        examples=["develove", "ETCD_PASSWORD"],
+    )
+
+    def to_dataclass(self) -> EtcdConfigData:
+        return EtcdConfigData(
+            namespace=self.namespace,
+            addrs=self.addr if isinstance(self.addr, list) else [self.addr],
+            user=self.user,
+            password=self.password,
+        )
+
+
 class RedisHelperConfig(BaseModel):
     socket_timeout: float = Field(
         default=5.0,
@@ -847,51 +904,13 @@ class RedisHelperConfig(BaseModel):
     )
 
 
-class RedisConfig(BaseModel):
-    addr: Optional[HostPortPair] = Field(
-        default=None,
-        description="""
-        Redis server address.
-        """,
-        examples=[None, {"host": "127.0.0.1", "port": 6379}],
-    )
+class WebServerRedisConfig(RedisConfig):
     db: int = Field(
         default=0,
         description="""
         Redis database number.
         """,
         examples=[0, 1],
-    )
-    sentinel: Optional[list[HostPortPair]] = Field(
-        default=None,
-        description="""
-        Redis sentinel addresses.
-        """,
-        examples=[None, [{"host": "127.0.0.1", "port": 26379}]],
-    )
-    service_name: Optional[str] = Field(
-        default=None,
-        description="""
-        Redis service name for sentinel.
-        """,
-        examples=[None, "mymaster"],
-        validation_alias=AliasChoices("service_name", "service-name"),
-        serialization_alias="service-name",
-    )
-    password: Optional[str] = Field(
-        default=None,
-        description="""
-        Redis password.
-        """,
-        examples=[None, "password"],
-    )
-    redis_helper_config: RedisHelperConfig = Field(
-        default_factory=RedisHelperConfig,
-        description="""
-        Redis helper configuration.
-        """,
-        validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
-        serialization_alias="redis_helper_config",
     )
 
 
@@ -1064,6 +1083,23 @@ class OTELConfig(BaseModel):
     )
 
 
+class ApolloRouterConfig(BaseModel):
+    enabled: bool = Field(
+        default=False,
+        description="""
+        Whether to enable Apollo Router.
+        """,
+        examples=[True, False],
+    )
+    endpoint: str = Field(
+        default="http://127.0.0.1:4000",
+        description="""
+        Apollo Router endpoint.
+        """,
+        examples=["http://127.0.0.1:4000"],
+    )
+
+
 class DebugConfig(BaseModel):
     enabled: bool = Field(
         default=False,
@@ -1147,8 +1183,16 @@ class WebServerUnifiedConfig(BaseModel):
         OpenTelemetry configuration.
         """,
     )
-    logging: Any = Field(
-        default_factory=lambda: {},
+    apollo_router: ApolloRouterConfig = Field(
+        default_factory=ApolloRouterConfig,
+        description="""
+        Apollo Router configuration.
+        """,
+        validation_alias=AliasChoices("apollo_router", "apollo-router"),
+        serialization_alias="sapollo-router",
+    )
+    logging: LoggingConfig = Field(
+        default_factory=LoggingConfig,
         description="""
         Logging configuration.
         """,
@@ -1161,5 +1205,6 @@ class WebServerUnifiedConfig(BaseModel):
     )
 
     # TODO: Remove me after changing config injection logic
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(
+        extra="allow",
+    )

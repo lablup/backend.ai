@@ -19,14 +19,15 @@ import tqdm
 import yarl
 
 from ai.backend.common.config import redis_config_iv
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.types import AGENTID_STORAGE, RedisProfileTarget
-from ai.backend.logging import BraceStyleAdapter, LocalLogger
+from ai.backend.common.types import AGENTID_STORAGE
+from ai.backend.logging import BraceStyleAdapter, LocalLogger, LogLevel
 
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import StorageProxyUnifiedConfig
@@ -227,10 +228,11 @@ async def check_and_upgrade(
     force_scan_folder_size: bool = False,
 ):
     etcd = make_etcd(local_config)
-    redis_config = redis_config_iv.check(
+    raw_redis_config = redis_config_iv.check(
         await etcd.get_prefix("config/redis"),
     )
-    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(redis_config)
+    redis_config = RedisConfig.model_validate(raw_redis_config)
+    redis_profile_target = redis_config.to_redis_profile_target()
     node_id = local_config.storage_proxy.node_id
     redis_mq = await RedisQueue.create(
         redis_profile_target.profile_target(RedisRole.STREAM),
@@ -263,6 +265,8 @@ async def check_and_upgrade(
         event_producer=event_producer,
         event_dispatcher=event_dispatcher,
         watcher=None,
+        volume_pool=None,  # type: ignore[arg-type]
+        background_task_manager=None,  # type: ignore[arg-type]
     )
 
     async with ctx:
@@ -324,7 +328,13 @@ async def check_and_upgrade(
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="A shortcut to set `--log-level=DEBUG`",
+)
+@click.option(
+    "--log-level",
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
+    help="Set the logging verbosity level",
 )
 def main(
     outfile: str,
@@ -332,13 +342,15 @@ def main(
     dsn: str,
     report_path: Optional[Path],
     force_scan_folder_size: bool,
+    log_level: LogLevel,
     debug: bool,
 ) -> None:
     """
     Print migration script to OUTFILE.
     Pass - as OUTFILE to print results to STDOUT.
     """
-    local_config = load_local_config(config_path, debug=debug)
+    log_level = LogLevel.DEBUG if debug else log_level
+    local_config = load_local_config(config_path, log_level=log_level)
     with LocalLogger(local_config.logging):
         asyncio.run(
             check_and_upgrade(

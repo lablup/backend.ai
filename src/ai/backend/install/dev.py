@@ -67,10 +67,9 @@ async def pants_export(ctx: Context) -> None:
             """
     pants export \
      --resolve=python-default \
+     --resolve=python-kernel \
      --resolve=towncrier \
-     --resolve=ruff \
-     --resolve=mypy \
-     --resolve=black
+     --resolve=mypy
     """
         )
     )

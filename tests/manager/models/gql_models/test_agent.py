@@ -1,6 +1,7 @@
 import asyncio
 import json
 from dataclasses import asdict
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -13,7 +14,7 @@ from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.models.agent import AgentStatus
-from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
+from ai.backend.manager.models.gql import GraphQueryContext, Mutation, Query
 from ai.backend.manager.server import (
     agent_registry_ctx,
     background_task_ctx,
@@ -26,6 +27,7 @@ from ai.backend.manager.server import (
     monitoring_ctx,
     network_plugin_ctx,
     redis_ctx,
+    repositories_ctx,
     services_ctx,
     storage_manager_ctx,
 )
@@ -33,7 +35,7 @@ from ai.backend.manager.server import (
 
 @pytest.fixture(scope="module")
 def client() -> Client:
-    return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
+    return Client(Schema(query=Query, mutation=Mutation, auto_camelcase=False))
 
 
 def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
@@ -48,6 +50,7 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
         valkey_stat=None,  # type: ignore
         valkey_image=None,  # type: ignore
         valkey_live=None,  # type: ignore
+        valkey_schedule=None,  # type: ignore
         manager_status=None,  # type: ignore
         known_slot_types=None,  # type: ignore
         background_task_manager=root_context.background_task_manager,  # type: ignore
@@ -58,6 +61,7 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
         services_ctx=None,  # type: ignore
         metric_observer=GraphQLMetricObserver.instance(),
         processors=None,  # type: ignore
+        scheduler_repository=None,  # type: ignore
     )
 
 
@@ -120,7 +124,7 @@ async def test_scan_gpu_alloc_maps(
     create_app_and_client,
     test_case,
     extra_fixtures,
-):
+) -> None:
     test_app, _ = await create_app_and_client(
         [
             event_hub_ctx,
@@ -131,6 +135,7 @@ async def test_scan_gpu_alloc_maps(
             message_queue_ctx,
             event_producer_ctx,
             storage_manager_ctx,
+            repositories_ctx,
             monitoring_ctx,
             network_plugin_ctx,
             hook_plugin_ctx,
@@ -148,7 +153,7 @@ async def test_scan_gpu_alloc_maps(
 
     root_ctx: RootContext = test_app["_root.context"]
     dispatcher: EventDispatcher = root_ctx.event_dispatcher
-    done_handler_ctx = {}
+    done_handler_ctx: dict[str, Any] = {}
     done_event = asyncio.Event()
 
     async def done_sub(

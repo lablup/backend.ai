@@ -9,7 +9,7 @@ from ai.backend.common.typed_validators import HostPortPair
 @dataclass
 class EtcdConfigData:
     namespace: str
-    addr: HostPortPair
+    addrs: list[HostPortPair]
     user: Optional[str]
     password: Optional[str]
 

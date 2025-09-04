@@ -4,16 +4,13 @@ import asyncio
 import functools
 import importlib
 import logging
-import logging.config
 import os
-import os.path
 import shutil
 import signal
 import ssl
 import sys
 import time
 from collections import OrderedDict, defaultdict
-from datetime import datetime, timezone
 from ipaddress import IPv4Address, IPv6Address, ip_network
 from pathlib import Path
 from pprint import pformat, pprint
@@ -54,6 +51,7 @@ from ai.backend.agent.stats import StatModes
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import (
@@ -65,11 +63,6 @@ from ai.backend.common.dto.agent.response import (
 )
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.events.event_types.image.anycast import (
-    ImagePullFailedEvent,
-    ImagePullFinishedEvent,
-    ImagePullStartedEvent,
-)
 from ai.backend.common.events.event_types.kernel.anycast import (
     KernelTerminatedAnycastEvent,
 )
@@ -77,6 +70,7 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
     KernelTerminatedBroadcastEvent,
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.json import pretty_json
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
@@ -99,7 +93,6 @@ from ai.backend.common.service_discovery.service_discovery import (
     ServiceMetadata,
 )
 from ai.backend.common.types import (
-    AutoPullBehavior,
     ClusterInfo,
     CommitStatus,
     ContainerId,
@@ -111,7 +104,6 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelId,
     QueueSentinel,
-    RedisProfileTarget,
     ServiceDiscoveryType,
     SessionId,
     aobject,
@@ -133,7 +125,13 @@ from .config.unified import (
 )
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
-from .types import AgentBackend, KernelOwnershipData, LifecycleEvent, VolumeInfo
+from .types import (
+    AgentBackend,
+    KernelLifecycleStatus,
+    KernelOwnershipData,
+    LifecycleEvent,
+    VolumeInfo,
+)
 from .utils import get_arch_name, get_subnet_ip
 
 if TYPE_CHECKING:
@@ -499,9 +497,11 @@ class AgentRPCServer(aobject):
         redis_config_dict = self._redis_config.copy()
         if isinstance(self._redis_config.get("addr"), object):
             addr = self._redis_config["addr"]
-            redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
+            if addr is not None:
+                redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
 
-        self.local_config = self.local_config.model_copy(update={"redis": redis_config_dict})
+        redis_config = RedisConfig.model_validate(redis_config_dict)
+        self.local_config.redis = redis_config
 
         # Fill up vfolder configs from etcd and store as separate attributes
         # TODO: Integrate vfolder_config into local_config
@@ -632,6 +632,38 @@ class AgentRPCServer(aobject):
 
     @rpc_function
     @collect_error
+    async def check_pulling(self, image_name: str) -> bool:
+        """Check if an image is being pulled."""
+        log.debug("rpc::check_pulling(image:{})", image_name)
+        return image_name in self.agent._active_pulls
+
+    @rpc_function
+    @collect_error
+    async def check_creating(self, kernel_id: str) -> bool:
+        """Check if a kernel is being created or already exists."""
+        log.debug("rpc::check_creating(k:{})", kernel_id)
+        kid = KernelId(UUID(kernel_id))
+        # Check if kernel is being created OR already exists in registry
+        return kid in self.agent._active_creates or kid in self.agent.kernel_registry
+
+    @rpc_function
+    @collect_error
+    async def check_running(self, kernel_id: str) -> bool:
+        """Check if a kernel is running."""
+        log.debug("rpc::check_running(k:{})", kernel_id)
+        kid = KernelId(UUID(kernel_id))
+
+        # Safely get kernel from registry
+        kernel_obj = self.agent.kernel_registry.get(kid)
+
+        # Check if kernel exists and is running
+        if kernel_obj is None:
+            return False
+
+        return kernel_obj.state == KernelLifecycleStatus.RUNNING
+
+    @rpc_function
+    @collect_error
     async def sync_kernel_registry(
         self,
         raw_kernel_session_ids: Iterable[tuple[str, str]],
@@ -675,92 +707,11 @@ class AgentRPCServer(aobject):
         image_configs: Mapping[str, ImageConfig],
     ) -> dict[str, str]:
         """
-        Check whether the agent has an image.
-        Spawn a bgtask that pulls the specified image and return bgtask ID.
+        Check whether the agent has images and pull if needed.
+        Delegates to agent's check_and_pull method which handles tracking.
         """
-        log.info(
-            "rpc::check_and_pull(images:{0})",
-            [
-                {
-                    "name": conf["canonical"],
-                    "project": conf["project"],
-                    "registry": conf["registry"]["name"],
-                }
-                for conf in image_configs.values()
-            ],
-        )
-
-        bgtask_mgr = self.agent.background_task_manager
-
-        async def _pull(reporter: ProgressReporter, *, img_conf: ImageConfig) -> None:
-            img_ref = ImageRef.from_image_config(img_conf)
-            need_to_pull = await self.agent.check_image(
-                img_ref, img_conf["digest"], AutoPullBehavior(img_conf["auto_pull"])
-            )
-            if need_to_pull:
-                log.info(f"rpc::check_and_pull() start pulling {str(img_ref)}")
-                await self.agent.anycast_event(
-                    ImagePullStartedEvent(
-                        image=str(img_ref),
-                        image_ref=img_ref,
-                        agent_id=self.agent.id,
-                        timestamp=datetime.now(timezone.utc).timestamp(),
-                    )
-                )
-                image_pull_timeout = cast(Optional[float], self.local_config.api.pull_timeout)
-                try:
-                    await self.agent.pull_image(
-                        img_ref, img_conf["registry"], timeout=image_pull_timeout
-                    )
-                except asyncio.TimeoutError:
-                    log.exception(
-                        f"Image pull timeout (img:{str(img_ref)}, sec:{image_pull_timeout})"
-                    )
-                    await self.agent.anycast_event(
-                        ImagePullFailedEvent(
-                            image=str(img_ref),
-                            image_ref=img_ref,
-                            agent_id=self.agent.id,
-                            msg=f"timeout (s:{image_pull_timeout})",
-                        )
-                    )
-                except Exception as e:
-                    log.exception(f"Image pull failed (img:{img_ref}, err:{repr(e)})")
-                    await self.agent.anycast_event(
-                        ImagePullFailedEvent(
-                            image=str(img_ref),
-                            image_ref=img_ref,
-                            agent_id=self.agent.id,
-                            msg=repr(e),
-                        )
-                    )
-                else:
-                    log.info(f"Image pull succeeded {img_ref}")
-                    await self.agent.anycast_event(
-                        ImagePullFinishedEvent(
-                            image=str(img_ref),
-                            image_ref=img_ref,
-                            agent_id=self.agent.id,
-                            timestamp=datetime.now(timezone.utc).timestamp(),
-                        )
-                    )
-            else:
-                log.debug(f"No need to pull image {img_ref}")
-                await self.agent.anycast_event(
-                    ImagePullFinishedEvent(
-                        image=str(img_ref),
-                        image_ref=img_ref,
-                        agent_id=self.agent.id,
-                        timestamp=datetime.now(timezone.utc).timestamp(),
-                        msg="Image already exists",
-                    )
-                )
-
-        ret: dict[str, str] = {}
-        for img, img_conf in image_configs.items():
-            task_id = await bgtask_mgr.start(_pull, img_conf=img_conf)
-            ret[img] = task_id.hex
-        return ret
+        log.debug("rpc::check_and_pull(images:{})", list(image_configs.keys()))
+        return await self.agent.check_and_pull(image_configs)
 
     @rpc_function
     @collect_error
@@ -1221,7 +1172,7 @@ async def server_main(
     pidx: int,
     _args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
-    local_config = cast(AgentUnifiedConfig, _args[0])
+    local_config: AgentUnifiedConfig = _args[0]
 
     # Start aiomonitor.
     # Port is set by config (default=50200).
@@ -1283,8 +1234,9 @@ async def server_main(
         ConfigScopes.SGROUP: f"sgroup/{local_config.agent.scaling_group}",
         ConfigScopes.NODE: f"nodes/agents/{local_config.agent.id}",
     }
+    etcd_config_data = local_config.etcd.to_dataclass()
     etcd = AsyncEtcd(
-        HostPortPair(local_config.etcd.addr.host, local_config.etcd.addr.port),
+        [addr.to_legacy() for addr in etcd_config_data.addrs],
         local_config.etcd.namespace,
         scope_prefix_map,
         credentials=etcd_credentials,
@@ -1354,10 +1306,12 @@ async def server_main(
             service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
         case ServiceDiscoveryType.REDIS:
             await agent.read_agent_config()
-            redis_profile_target = RedisProfileTarget.from_dict(agent._redis_config)
-            live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
+            if not local_config.redis:
+                raise ConfigurationError({"server_main": "Redis runtime configuration is missing."})
+            valkey_profile_target = local_config.redis.to_valkey_profile_target()
+            live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
             service_discovery = await RedisServiceDiscovery.create(
-                args=RedisServiceDiscoveryArgs(redis_target=live_redis_target)
+                args=RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
             )
 
     sd_loop = ServiceDiscoveryLoop(
@@ -1426,7 +1380,7 @@ async def server_main(
 @click.option(
     "--debug",
     is_flag=True,
-    help="Set the logging level to DEBUG",
+    help="A shortcut to set `--log-level=DEBUG`",
 )
 @click.option(
     "--log-level",
@@ -1468,32 +1422,30 @@ def main(
     config.override_with_env(raw_cfg, ("container", "sandbox-type"), "BACKEND_SANDBOX_TYPE")
     config.override_with_env(raw_cfg, ("container", "scratch-root"), "BACKEND_SCRATCH_ROOT")
 
-    if debug:
-        log_level = LogLevel.DEBUG
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
-    if log_level != LogLevel.NOTSET:
-        config.override_key(raw_cfg, ("logging", "level"), log_level)
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
-
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
     try:
-        unified_conf = AgentUnifiedConfig.model_validate(raw_cfg)
-        if unified_conf.agent.backend == AgentBackend.KUBERNETES:
-            if unified_conf.container.scratch_type == "k8s-nfs" and (
-                unified_conf.container.scratch_nfs_address is None
-                or unified_conf.container.scratch_nfs_options is None
+        server_config = AgentUnifiedConfig.model_validate(raw_cfg)
+        if debug:
+            log_level = LogLevel.DEBUG
+        server_config.debug.enabled = log_level == LogLevel.DEBUG
+        if log_level != LogLevel.NOTSET:
+            server_config.logging.level = log_level
+            server_config.logging.pkg_ns["ai.backend"] = log_level
+        if server_config.agent.backend == AgentBackend.KUBERNETES:
+            if server_config.container.scratch_type == "k8s-nfs" and (
+                server_config.container.scratch_nfs_address is None
+                or server_config.container.scratch_nfs_options is None
             ):
                 raise ValueError(
                     "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
                 )
-        elif unified_conf.agent.backend == AgentBackend.DOCKER:
+        elif server_config.agent.backend == AgentBackend.DOCKER:
             DockerExtraConfig.model_validate(raw_cfg.get("container", {}))
 
-        if unified_conf.debug.enabled:
-            cfg = unified_conf.model_dump(by_alias=True)
+        if server_config.debug.enabled:
             print("== Agent configuration ==")
-            pprint(cfg)
+            pprint(server_config.model_dump(by_alias=True))
     except Exception as e:
         print("ConfigurationError: Validation of agent local config has failed:", file=sys.stderr)
         print(str(e), file=sys.stderr)
@@ -1502,13 +1454,13 @@ def main(
     # FIXME: Remove this after ARM64 support lands on Jail
     current_arch = get_arch_name()
     if (
-        unified_conf.container.sandbox_type == ContainerSandboxType.JAIL
+        server_config.container.sandbox_type == ContainerSandboxType.JAIL
         and current_arch != "x86_64"
     ):
         print(f"ConfigurationError: Jail sandbox is not supported on architecture {current_arch}")
         raise click.Abort()
 
-    rpc_host = unified_conf.agent.rpc_listen_addr.host
+    rpc_host = server_config.agent.rpc_listen_addr.host
     if isinstance(rpc_host, (IPv4Address, IPv6Address)) and (
         rpc_host.is_unspecified or rpc_host.is_link_local
     ):
@@ -1519,14 +1471,14 @@ def main(
         )
         raise click.Abort()
 
-    if os.getuid() != 0 and unified_conf.container.stats_type == StatModes.CGROUP:
+    if os.getuid() != 0 and server_config.container.stats_type == StatModes.CGROUP:
         print(
             "Cannot use cgroup statistics collection mode unless the agent runs as root.",
             file=sys.stderr,
         )
         raise click.Abort()
 
-    if os.getuid() != 0 and unified_conf.container.scratch_type == ScratchType.HOSTFILE:
+    if os.getuid() != 0 and server_config.container.scratch_type == ScratchType.HOSTFILE:
         print(
             "Cannot use hostfile scratch type unless the agent runs as root.",
             file=sys.stderr,
@@ -1534,7 +1486,7 @@ def main(
         raise click.Abort()
 
     if cli_ctx.invoked_subcommand is None:
-        if unified_conf.debug.coredump.enabled:
+        if server_config.debug.coredump.enabled:
             if not sys.platform.startswith("linux"):
                 print(
                     "ConfigurationError: Storing container coredumps is only supported in Linux.",
@@ -1550,19 +1502,18 @@ def main(
                     file=sys.stderr,
                 )
                 raise click.Abort()
-            unified_conf.debug.coredump.set_core_path(Path(core_pattern).parent)
+            server_config.debug.coredump.set_core_path(Path(core_pattern).parent)
 
-        unified_conf.agent.pid_file.write_text(str(os.getpid()))
-        image_commit_path = unified_conf.agent.image_commit_path
+        server_config.agent.pid_file.write_text(str(os.getpid()))
+        image_commit_path = server_config.agent.image_commit_path
         image_commit_path.mkdir(parents=True, exist_ok=True)
-        ipc_base_path = unified_conf.agent.ipc_base_path
+        ipc_base_path = server_config.agent.ipc_base_path
         log_sockpath = ipc_base_path / f"agent-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        unified_conf.logging["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                unified_conf.logging,
+                server_config.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
@@ -1571,7 +1522,7 @@ def main(
                 },
             )
             with logger:
-                ns = unified_conf.etcd.namespace
+                ns = server_config.etcd.namespace
                 setproctitle(f"backend.ai: agent {ns}")
                 log.info("Backend.AI Agent {0}", VERSION)
                 log.info("runtime: {0}", utils.env_info())
@@ -1579,7 +1530,7 @@ def main(
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if log_level == "DEBUG":
                     log_config.debug("debug mode enabled.")
-                if unified_conf.agent.event_loop == EventLoopType.UVLOOP:
+                if server_config.agent.event_loop == EventLoopType.UVLOOP:
                     import uvloop
 
                     uvloop.install()
@@ -1587,14 +1538,14 @@ def main(
                 aiotools.start_server(
                     server_main_logwrapper,
                     num_workers=1,
-                    args=(unified_conf, log_endpoint),
+                    args=(server_config, log_endpoint),
                     wait_timeout=5.0,
                 )
                 log.info("exit.")
         finally:
-            if unified_conf.agent.pid_file.is_file():
+            if server_config.agent.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
-                unified_conf.agent.pid_file.unlink()
+                server_config.agent.pid_file.unlink()
     else:
         # Click is going to invoke a subcommand.
         pass

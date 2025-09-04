@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, cast
 from uuid import UUID
 
 import msgpack
@@ -13,13 +13,24 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserCreator, UserData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
-from ai.backend.manager.errors.user import KeyPairForbidden, KeyPairNotFound, UserNotFound
+from ai.backend.manager.errors.user import (
+    KeyPairForbidden,
+    KeyPairNotFound,
+    UserConflict,
+    UserCreationBadRequest,
+    UserCreationFailure,
+    UserModificationFailure,
+    UserNotFound,
+)
 from ai.backend.manager.models import kernels
+from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
 from ai.backend.manager.models.keypair import KeyPairRow, keypairs, prepare_new_keypair
@@ -27,15 +38,19 @@ from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.user.actions.modify_user import UserModifier
 
+from ..permission_controller.role_manager import RoleManager
+
 # Layer-specific decorator for user repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.USER)
 
 
 class UserRepository:
     _db: ExtendedAsyncSAEngine
+    _role_manager: RoleManager
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._role_manager = RoleManager()
 
     @repository_decorator()
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
@@ -67,50 +82,73 @@ class UserRepository:
         """
         Create a new user with default keypair and group associations.
         """
-        user_data = user_creator.fields_to_store()
-        async with self._db.begin() as conn:
-            # Insert user
-            user_insert_query = sa.insert(users).values(user_data)
-            query = user_insert_query.returning(user_insert_query.table)
-            result = await conn.execute(query)
-            created_user = result.first()
+        domain_name = user_creator.domain_name
+        email = user_creator.email
+        user_name = user_creator.username
 
-            if not created_user:
-                raise RuntimeError("Failed to create user")
+        async with self._db.begin_session() as db_session:
+            # Check if domain exists before creating user
+            domain_exists = await self._check_domain_exists(db_session, domain_name)
+            if not domain_exists:
+                raise UserCreationBadRequest(f"Domain '{domain_name}' does not exist.")
+
+            # Check if user with the same email or username already exists
+            duplicate_exists = await self._check_user_exists_with_email_or_username(
+                db_session, email=email, username=user_name
+            )
+            if duplicate_exists:
+                raise UserConflict(
+                    f"User with email {email} or username {user_name} already exists."
+                )
+            try:
+                # Insert user
+                row = UserRow.from_creator(user_creator)
+                db_session.add(row)
+                await db_session.flush()
+                await db_session.refresh(row)
+            except sa.exc.IntegrityError as e:
+                error_msg = str(e)
+                raise UserCreationBadRequest(
+                    f"Failed to create user due to database constraint violation: {error_msg}"
+                ) from e
+
+            if not row:
+                raise UserCreationFailure("Failed to create user")
+            created_user = row.to_data()
 
             # Create default keypair
-            email = user_data["email"]
+            email = created_user.email
             keypair_creator = KeyPairCreator(
-                is_active=(user_data["status"] == UserStatus.ACTIVE),
-                is_admin=user_data["role"] in ["superadmin", "admin"],
+                is_active=(created_user.status == UserStatus.ACTIVE),
+                is_admin=created_user.role in ["superadmin", "admin"],
                 resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
                 rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
             )
             kp_data = prepare_new_keypair(email, keypair_creator)
-            kp_insert_query = sa.insert(keypairs).values(
+            kp_insert_query = sa.insert(KeyPairRow).values(
                 **kp_data,
                 user=created_user.uuid,
             )
-            await conn.execute(kp_insert_query)
+            await db_session.execute(kp_insert_query)
 
             # Update user main_access_key
-            main_ak = kp_data["access_key"]
-            update_query = (
-                sa.update(users)
-                .where(users.c.uuid == created_user.uuid)
-                .values(main_access_key=main_ak)
-            )
-            await conn.execute(update_query)
+            row.main_access_key = kp_data["access_key"]
+            created_user.main_access_key = kp_data["access_key"]
 
             # Add user to groups including model store project
             await self._add_user_to_groups(
-                conn, created_user.uuid, user_data["domain_name"], group_ids or []
+                db_session, created_user.uuid, created_user.domain_name, group_ids or []
             )
 
-            res = UserData.from_row(created_user)
-        if not res:
-            raise RuntimeError("Failed to convert created user row to UserData")
-        return res
+            role = await self._role_manager.create_system_role(db_session, created_user)
+            await self._role_manager.map_user_to_role(db_session, created_user.uuid, role.id)
+            await self._role_manager.map_entity_to_scope(
+                db_session,
+                ObjectId(EntityType.USER, str(created_user.uuid)),
+                ScopeId(ScopeType.DOMAIN, str(created_user.domain_name)),
+            )
+
+        return created_user
 
     @repository_decorator()
     async def update_user_validated(
@@ -145,7 +183,7 @@ class UserRepository:
             result = await conn.execute(update_query)
             updated_user = result.first()
             if not updated_user:
-                raise RuntimeError("Failed to update user")
+                raise UserModificationFailure("Failed to update user")
 
             # Handle role changes
             prev_role = current_user.role
@@ -182,6 +220,22 @@ class UserRepository:
                 .where(users.c.email == email)
             )
 
+    async def _check_domain_exists(self, session: SASession, domain_name: str) -> bool:
+        query = sa.select(DomainRow.name).where(DomainRow.name == domain_name)
+        result = await session.scalar(query)
+        result = cast(Optional[str], result)
+        return result is not None
+
+    async def _check_user_exists_with_email_or_username(
+        self, session: SASession, *, email: str, username: str
+    ) -> bool:
+        query = sa.select(UserRow.uuid).where(
+            sa.or_(UserRow.email == email, UserRow.username == username)
+        )
+        result = await session.scalar(query)
+        result = cast(Optional[UUID], result)
+        return result is not None
+
     async def _get_user_by_email(self, session: SASession, email: str) -> UserRow:
         """Private method to get user by email."""
         res = await session.scalar(sa.select(UserRow).where(UserRow.email == email))
@@ -210,12 +264,12 @@ class UserRepository:
         return True
 
     async def _add_user_to_groups(
-        self, conn, user_uuid: UUID, domain_name: str, group_ids: list[str]
+        self, db_session: SASession, user_uuid: UUID, domain_name: str, group_ids: list[str]
     ) -> None:
         """Private method to add user to groups including model store project."""
         # Check for model store project
-        model_store_query = sa.select([groups.c.id]).where(groups.c.type == ProjectType.MODEL_STORE)
-        model_store_project = (await conn.execute(model_store_query)).first()
+        model_store_query = sa.select(groups.c.id).where(groups.c.type == ProjectType.MODEL_STORE)
+        model_store_project = (await db_session.execute(model_store_query)).first()
 
         gids_to_join = list(group_ids)
         if model_store_project:
@@ -223,16 +277,16 @@ class UserRepository:
 
         if gids_to_join:
             query = (
-                sa.select([groups.c.id])
+                sa.select(groups.c.id)
                 .select_from(groups)
                 .where(groups.c.domain_name == domain_name)
                 .where(groups.c.id.in_(gids_to_join))
             )
-            grps = (await conn.execute(query)).all()
+            grps = (await db_session.execute(query)).all()
             if grps:
                 group_data = [{"user_id": user_uuid, "group_id": grp.id} for grp in grps]
                 group_insert_query = sa.insert(association_groups_users).values(group_data)
-                await conn.execute(group_insert_query)
+                await db_session.execute(group_insert_query)
 
     async def _validate_and_update_main_access_key(
         self, conn, email: str, main_access_key: str

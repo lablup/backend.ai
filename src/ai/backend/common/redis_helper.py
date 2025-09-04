@@ -14,24 +14,30 @@ from typing import (
     Mapping,
     MutableMapping,
     Optional,
-    Sequence,
     Union,
     cast,
 )
 
 import redis.exceptions
 import yarl
-from glide import GlideClient, GlideClientConfiguration, NodeAddress, ServerCredentials
+from glide import (
+    AdvancedGlideClientConfiguration,
+    GlideClient,
+    GlideClientConfiguration,
+    NodeAddress,
+    ServerCredentials,
+    TlsAdvancedConfiguration,
+)
 from redis.asyncio import ConnectionPool, Redis
 from redis.asyncio.client import Pipeline
 from redis.asyncio.sentinel import MasterNotFoundError, Sentinel, SlaveNotFoundError
 from redis.backoff import ExponentialBackoff
 from redis.retry import Retry
 
+from ai.backend.common.utils import addr_to_hostport_pair
 from ai.backend.logging import BraceStyleAdapter
 
-from .types import HostPortPair as _HostPortPair
-from .types import RedisConnectionInfo, RedisHelperConfig, RedisTarget
+from .types import RedisConnectionInfo, RedisHelperConfig, RedisTarget, ValkeyTarget
 from .validators import DelimiterSeperatedList, HostPortPair
 
 __all__ = (
@@ -40,6 +46,10 @@ __all__ = (
 )
 
 _keepalive_options: MutableMapping[int, int] = {}
+
+
+SSL_CERT_NONE = "none"
+SSL_CERT_REQUIRED = "required"
 
 # macOS does not support several TCP_ options
 # so check if socket package includes TCP options before adding it
@@ -179,6 +189,27 @@ async def execute(
             await asyncio.sleep(0)
 
 
+def _get_redis_url_schema(redis_target: RedisTarget) -> str:
+    """
+    Returns the Redis URL schema based on the Redis target configuration.
+    """
+    if redis_target.use_tls:
+        return "rediss"
+    return "redis"
+
+
+def _parse_redis_url(redis_target: RedisTarget, db: int) -> yarl.URL:
+    redis_url = redis_target.addr
+    if redis_url is None:
+        raise ValueError("Redis URL is not provided in the configuration.")
+
+    schema = _get_redis_url_schema(redis_target)
+    url = yarl.URL(f"{schema}://host").with_host(str(redis_url[0])).with_port(
+        redis_url[1]
+    ).with_password(redis_target.get("password")) / str(db)
+    return url
+
+
 def get_redis_object(
     redis_target: RedisTarget,
     *,
@@ -222,6 +253,11 @@ def get_redis_object(
             "config/redis/service_name is required when using Redis Sentinel"
         )
 
+        kwargs = {
+            "password": password,
+            "ssl": redis_target.use_tls,
+            "ssl_cert_reqs": SSL_CERT_NONE if redis_target.tls_skip_verify else SSL_CERT_REQUIRED,
+        }
         sentinel = Sentinel(
             [(str(host), port) for host, port in sentinel_addresses],
             password=password,
@@ -247,10 +283,7 @@ def get_redis_object(
         if redis_url is None:
             raise ValueError("Redis URL is not provided in the configuration.")
 
-        url = yarl.URL("redis://host").with_host(str(redis_url[0])).with_port(
-            redis_url[1]
-        ).with_password(redis_target.get("password")) / str(db)
-
+        url = _parse_redis_url(redis_target, db)
         return RedisConnectionInfo(
             # In redis-py 5.0.1+, we should migrate to `Redis.from_pool()` API
             client=Redis(
@@ -261,6 +294,8 @@ def get_redis_object(
                 ),
                 **conn_opts,
                 auto_close_connection_pool=True,
+                ssl=redis_target.use_tls,
+                ssl_cert_reqs=SSL_CERT_NONE if redis_target.tls_skip_verify else SSL_CERT_REQUIRED,
             ),
             sentinel=None,
             name=name,
@@ -270,31 +305,26 @@ def get_redis_object(
 
 
 async def create_valkey_client(
-    redis_target: RedisTarget,
+    valkey_target: ValkeyTarget,
     *,
     name: str,
     db: int = 0,
     pubsub_channels: Optional[set[str]] = None,
 ) -> GlideClient:
     addresses: list[NodeAddress] = []
-    if redis_target.addr:
-        addresses.append(
-            NodeAddress(host=str(redis_target.addr.host), port=int(redis_target.addr.port))
-        )
-    sentinel_addresses: Sequence[_HostPortPair] = []
-    if isinstance(redis_target.sentinel, str):
-        sentinel_addresses = DelimiterSeperatedList(HostPortPair).check_and_return(
-            redis_target.sentinel
-        )
-    elif isinstance(redis_target.sentinel, list):
-        sentinel_addresses = redis_target.sentinel
-    if sentinel_addresses:
+    if valkey_target.addr:
+        host, port = addr_to_hostport_pair(valkey_target.addr)
+        addresses.append(NodeAddress(host=str(host), port=int(port)))
+
+    if sentinel_addresses := valkey_target.sentinel:
         for address in sentinel_addresses:
-            addresses.append(NodeAddress(host=str(address.host), port=int(address.port)))
+            host, port = addr_to_hostport_pair(address)
+            addresses.append(NodeAddress(host=str(host), port=int(port)))
+
     credentials: Optional[ServerCredentials] = None
-    if redis_target.password:
+    if valkey_target.password:
         credentials = ServerCredentials(
-            password=redis_target.password,
+            password=valkey_target.password,
         )
     pubsub_subscriptions: Optional[GlideClientConfiguration.PubSubSubscriptions] = None
     if pubsub_channels is not None:
@@ -309,10 +339,16 @@ async def create_valkey_client(
         raise ValueError("At least one Redis address is required to create a GlideClient.")
     config = GlideClientConfiguration(
         addresses,
+        use_tls=valkey_target.use_tls,
+        advanced_config=AdvancedGlideClientConfiguration(
+            tls_config=TlsAdvancedConfiguration(
+                use_insecure_tls=valkey_target.tls_skip_verify,
+            ),
+        ),
         credentials=credentials,
         database_id=db,
         client_name=name,
-        request_timeout=1_000,  # 1 second
+        request_timeout=valkey_target.request_timeout or 1_000,  # default to 1 second
         pubsub_subscriptions=pubsub_subscriptions,
     )
     return await GlideClient.create(config)

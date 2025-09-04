@@ -51,7 +51,6 @@ from ai.backend.appproxy.common.exceptions import (
     ObjectNotFound,
     URLNotFound,
 )
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     AppCreator,
     AppMode,
@@ -63,7 +62,6 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.common.utils import (
     BackendAIAccessLogger,
-    config_key_to_kebab_case,
     ensure_json_serializable,
     mime_match,
     ping_redis_connection,
@@ -82,14 +80,26 @@ from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
+from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
+    RedisServiceDiscovery,
+    RedisServiceDiscoveryArgs,
+)
+from ai.backend.common.service_discovery.service_discovery import (
+    ServiceDiscovery,
+    ServiceDiscoveryLoop,
+    ServiceEndpoint,
+    ServiceMetadata,
+)
 from ai.backend.common.types import (
     AgentId,
     HostPortPair,
     ModelServiceStatus,
     RedisProfileTarget,
+    ServiceDiscoveryType,
 )
 from ai.backend.common.utils import env_info
-from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__
 from .config import ServerConfig
@@ -314,7 +324,11 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         log_events=root_ctx.local_config.debug.log_events,
         event_observer=root_ctx.metrics.event,
     )
+    await root_ctx.event_dispatcher.start()
+    await root_ctx.core_event_dispatcher.start()
+
     yield
+
     await root_ctx.event_producer.close()
     await root_ctx.core_event_producer.close()
     await asyncio.sleep(0.2)
@@ -385,7 +399,7 @@ async def on_route_update_event(
     )
     route_connection_info = InferenceAppConfigDict.validate_json(route_connection_info_json)
 
-    health_check_enabled = health_check_enabled_str == "true"
+    health_check_enabled = health_check_enabled_str.decode() == "true"
     health_check_config: HealthCheckConfig | None
     if health_check_enabled:
         assert health_check_config_json, (
@@ -406,21 +420,22 @@ async def on_route_update_event(
     async def _update(db_sess: SASession) -> None:
         endpoint = await Endpoint.get(db_sess, event.endpoint_id)
         circuit = await Circuit.get_by_endpoint(db_sess, endpoint.id)
-        traffic_ratios = await redis_helper.execute(
-            context.core_redis_live,
-            lambda r: r.mget(*[
-                f"endpoint.{event.endpoint_id}.session.{route.session_id}.traffic_ratio"
-                for route in new_routes.values()
-            ]),
-        )
-        for idx, route in enumerate(new_routes.values()):
-            route.traffic_ratio = float(traffic_ratios[idx] or 1.0)
         old_routes = circuit.route_info or []
-        for route in old_routes:
-            if _duplicate_route := new_routes.get(route.session_id):
-                _duplicate_route.health_status = route.health_status
-                _duplicate_route.last_health_check = route.last_health_check
-                _duplicate_route.consecutive_failures = route.consecutive_failures
+        if new_routes:
+            traffic_ratios = await redis_helper.execute(
+                context.core_redis_live,
+                lambda r: r.mget(*[
+                    f"endpoint.{event.endpoint_id}.session.{route.session_id}.traffic_ratio"
+                    for route in new_routes.values()
+                ]),
+            )
+            for idx, route in enumerate(new_routes.values()):
+                route.traffic_ratio = float(traffic_ratios[idx] or 1.0)
+            for route in old_routes:
+                if _duplicate_route := new_routes.get(route.session_id):
+                    _duplicate_route.health_status = route.health_status
+                    _duplicate_route.last_health_check = route.last_health_check
+                    _duplicate_route.consecutive_failures = route.consecutive_failures
         circuit.route_info = list(new_routes.values())
 
         endpoint.health_check_enabled = health_check_enabled
@@ -435,8 +450,8 @@ async def on_route_update_event(
                 (r.session_id, None, ModelServiceStatus.HEALTHY) for r in circuit.route_info
             ])
 
-            # Propagate updated route information to AppProxy workers
-            await context.health_engine.propagate_route_updates_to_workers(circuit, old_routes)
+        # Propagate updated route information to AppProxy workers
+        await context.health_engine.propagate_route_updates_to_workers(circuit, old_routes)
 
     async with context.db.connect() as db_conn:
         await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
@@ -604,12 +619,56 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
 
 
 @actxmgr
-async def event_dispatcher_lifecycle_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    await root_ctx.event_dispatcher.start()
-    await root_ctx.core_event_dispatcher.start()
+async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    sd_type = root_ctx.local_config.service_discovery.type
+    service_discovery: ServiceDiscovery
+    match sd_type:
+        case ServiceDiscoveryType.REDIS:
+            # Use core redis for service discovery if available, otherwise use main redis
+            core_redis_profile_target = RedisProfileTarget.from_dict(
+                (root_ctx.local_config.core_redis or root_ctx.local_config.redis).to_dict()
+            )
+            live_redis_target = core_redis_profile_target.profile_target(RedisRole.LIVE)
+            service_discovery = await RedisServiceDiscovery.create(
+                RedisServiceDiscoveryArgs(valkey_target=live_redis_target.to_valkey_target())
+            )
+        case _:
+            raise RuntimeError(
+                f"Unsupported service discovery type: {sd_type}. "
+                "Please use Redis service discovery for appproxy."
+            )
+
+    # Determine announce addresses
+    announce_addr = root_ctx.local_config.proxy_coordinator.announce_addr
+    sd_loop = ServiceDiscoveryLoop(
+        sd_type,
+        service_discovery,
+        ServiceMetadata(
+            display_name=f"appproxy-coordinator-{root_ctx.local_config.proxy_coordinator.id}",
+            service_group="appproxy-coordinator",
+            version=__version__,
+            endpoint=ServiceEndpoint(
+                address=announce_addr.host,
+                port=announce_addr.port,
+                protocol="http",
+                # It can be separated into an internal-purpose port later.
+                prometheus_address=str(announce_addr),
+            ),
+        ),
+    )
+
+    if root_ctx.local_config.otel.enabled:
+        meta = sd_loop.metadata
+        otel_spec = OpenTelemetrySpec(
+            service_id=meta.id,
+            service_name=meta.service_group,
+            service_version=meta.version,
+            log_level=root_ctx.local_config.otel.log_level,
+            endpoint=root_ctx.local_config.otel.endpoint,
+        )
+        BraceStyleAdapter.apply_otel(otel_spec)
     yield
-    await root_ctx.event_dispatcher.close()
-    await root_ctx.core_event_dispatcher.close()
+    sd_loop.close()
 
 
 @actxmgr
@@ -780,7 +839,7 @@ def build_root_app(
             health_check_ctx,
             unused_port_collection_ctx,
             event_handler_ctx,
-            event_dispatcher_lifecycle_ctx,
+            service_discovery_ctx,
         ]
 
     async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
@@ -906,11 +965,10 @@ async def server_main_logwrapper(
     _args: tuple[ServerConfig, str],
 ) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: proxy-coordinator worker-{pidx}")
-    log_endpoint = _args[1]
-    logging_config = config_key_to_kebab_case(_args[0].logging.model_dump(exclude_none=True))
-    logging_config["endpoint"] = log_endpoint
+    local_config: ServerConfig = _args[0]
+    log_endpoint: str = _args[1]
     logger = Logger(
-        logging_config,
+        local_config.logging,
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -940,40 +998,44 @@ async def server_main_logwrapper(
     ),
 )
 @click.option(
+    "--debug",
+    is_flag=True,
+    help="A shortcut to set `--log-level=DEBUG`",
+)
+@click.option(
     "--log-level",
-    type=click.Choice([*LogLevel.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
+def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel) -> None:
     """
     Start the proxy-coordinator service as a foreground process.
     """
-    cfg = load_config(config_path, log_level)
+    log_level = LogLevel.DEBUG if debug else log_level
+    server_config = load_config(config_path, log_level)
 
     if ctx.invoked_subcommand is None:
         tracker: memray.Tracker | None = None
-        if cfg.profiling.enable_pyroscope:
-            assert cfg.profiling.pyroscope_config
-            pyroscope.configure(**cfg.profiling.pyroscope_config.model_dump())
-        if cfg.profiling.enable_memray:
+        if server_config.profiling.enable_pyroscope:
+            assert server_config.profiling.pyroscope_config
+            pyroscope.configure(**server_config.profiling.pyroscope_config.model_dump())
+        if server_config.profiling.enable_memray:
             tracker = memray.Tracker(
-                cfg.profiling.memray_output_destination,
+                server_config.profiling.memray_output_destination,
                 follow_fork=True,
             )
             tracker.__enter__()
-        cfg.proxy_coordinator.pid_file.touch(exist_ok=True)
-        cfg.proxy_coordinator.pid_file.write_text(str(os.getpid()))
-        ipc_base_path = cfg.proxy_coordinator.ipc_base_path
+        server_config.proxy_coordinator.pid_file.touch(exist_ok=True)
+        server_config.proxy_coordinator.pid_file.write_text(str(os.getpid()))
+        ipc_base_path = server_config.proxy_coordinator.ipc_base_path
         ipc_base_path.mkdir(exist_ok=True, parents=True)
         log_sockpath = ipc_base_path / f"coordinator-logger-{os.getpid()}.sock"
         log_endpoint = f"ipc://{log_sockpath}"
-        logging_config = config_key_to_kebab_case(cfg.logging.model_dump(exclude_none=True))
-        logging_config["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                logging_config,
+                server_config.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
@@ -985,13 +1047,13 @@ def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
                 setproctitle("backend.ai: proxy-coordinator")
                 log.info("Backend.AI AppProxy Coordinator {0}", __version__)
                 log.info("runtime: {0}", env_info())
-                if cfg.profiling.enable_pyroscope:
+                if server_config.profiling.enable_pyroscope:
                     log.info("Pyroscope tracing enabled")
-                if cfg.profiling.enable_memray:
+                if server_config.profiling.enable_memray:
                     log.info("Memray tracing enabled")
                 log_config = logging.getLogger("ai.backend.appproxy.coordinator.config")
                 log_config.debug("debug mode enabled.")
-                if cfg.proxy_coordinator.event_loop == "uvloop":
+                if server_config.proxy_coordinator.event_loop == "uvloop":
                     import uvloop
 
                     uvloop.install()
@@ -1000,15 +1062,15 @@ def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
                     aiotools.start_server(
                         server_main_logwrapper,  # type: ignore
                         num_workers=1,
-                        args=(cfg, log_endpoint),
+                        args=(server_config, log_endpoint),
                         wait_timeout=5.0,
                     )
                 finally:
                     log.info("terminated.")
         finally:
-            if cfg.proxy_coordinator.pid_file.is_file():
+            if server_config.proxy_coordinator.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
-                cfg.proxy_coordinator.pid_file.unlink()
+                server_config.proxy_coordinator.pid_file.unlink()
             if tracker:
                 tracker.__exit__(None, None, None)
     else:

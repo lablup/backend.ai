@@ -15,6 +15,7 @@ import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
@@ -104,18 +105,9 @@ class ServiceContext:
 
     def __init__(
         self,
-        local_config: StorageProxyUnifiedConfig,
-        etcd: AsyncEtcd,
-        event_dispatcher: EventDispatcher,
-        event_producer: EventProducer,
+        service: VolumeService,
     ) -> None:
-        volume_pool = VolumePool(
-            local_config=local_config,
-            etcd=etcd,
-            event_dispatcher=event_dispatcher,
-            event_producer=event_producer,
-        )
-        self.volume_service = VolumeService(volume_pool)
+        self.volume_service = service
 
 
 class RootContext:
@@ -124,11 +116,12 @@ class RootContext:
     etcd: AsyncEtcd
     local_config: StorageProxyUnifiedConfig
     dsn: str | None
+    volume_pool: VolumePool
     event_producer: EventProducer
     event_dispatcher: EventDispatcher
     watcher: WatcherClient | None
-    service_context: ServiceContext
     metric_registry: CommonMetricRegistry
+    background_task_manager: BackgroundTaskManager
 
     def __init__(
         self,
@@ -138,6 +131,8 @@ class RootContext:
         local_config: StorageProxyUnifiedConfig,
         etcd: AsyncEtcd,
         *,
+        volume_pool: VolumePool,
+        background_task_manager: BackgroundTaskManager,
         event_producer: EventProducer,
         event_dispatcher: EventDispatcher,
         watcher: WatcherClient | None,
@@ -161,13 +156,9 @@ class RootContext:
                 allow_credentials=False, expose_headers="*", allow_headers="*"
             ),
         }
-        self.service_context = ServiceContext(
-            local_config=self.local_config,
-            etcd=self.etcd,
-            event_dispatcher=self.event_dispatcher,
-            event_producer=self.event_producer,
-        )
         self.metric_registry = metric_registry
+        self.volume_pool = volume_pool
+        self.background_task_manager = background_task_manager
 
     async def __aenter__(self) -> None:
         # TODO: Setup the apps outside of the context.
@@ -213,7 +204,6 @@ class RootContext:
     async def __aexit__(self, *exc_info) -> Optional[bool]:
         for volume in self.volumes.values():
             await volume.shutdown()
-
         await self.storage_plugin_ctx.cleanup()
         await self.manager_webapp_plugin_ctx.cleanup()
         await self.client_webapp_plugin_ctx.cleanup()

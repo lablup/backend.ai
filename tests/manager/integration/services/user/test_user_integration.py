@@ -160,8 +160,6 @@ class TestCreateUserIntegration:
 
         result = await processors.create_user.wait_for_complete(action)
 
-        assert result.success is True
-        assert result.data is not None
         assert result.data.email == "testnewuser@example.com"
         assert result.data.username == "testnewuser"
         assert result.data.full_name == "New User"
@@ -192,8 +190,6 @@ class TestCreateUserIntegration:
 
         result = await processors.create_user.wait_for_complete(action)
 
-        assert result.success is True
-        assert result.data is not None
         assert result.data.email == "testadmin@example.com"
         assert result.data.role == UserRole.ADMIN
         assert result.data.sudo_session_enabled is True
@@ -222,8 +218,6 @@ class TestCreateUserIntegration:
 
         result = await processors.create_user.wait_for_complete(action)
 
-        assert result.success is True
-        assert result.data is not None
         assert result.data.container_uid == 2000
         assert result.data.container_main_gid == 2000
         assert result.data.container_gids == [2000, 2001]
@@ -250,8 +244,6 @@ class TestCreateUserIntegration:
 
         result = await processors.create_user.wait_for_complete(action)
 
-        assert result.success is True
-        assert result.data is not None
         assert result.data.resource_policy == "default"
         assert result.data.allowed_client_ip is not None
         assert str(result.data.allowed_client_ip[0]) == "192.168.1.0/24"
@@ -284,8 +276,6 @@ class TestModifyUserIntegration:
 
         result = await processors.modify_user.wait_for_complete(action)
 
-        assert result.success is True
-        assert result.data is not None
         assert result.data.full_name == "Updated Name"
         assert result.data.description == "Senior Developer"
 
@@ -312,8 +302,6 @@ class TestModifyUserIntegration:
 
         result = await processors.modify_user.wait_for_complete(action)
 
-        assert result.success is True
-        assert result.data is not None
         assert result.data.role == UserRole.ADMIN
 
     @pytest.mark.asyncio
@@ -381,8 +369,6 @@ class TestModifyUserIntegration:
 
         result = await processors.modify_user.wait_for_complete(action)
 
-        assert result.success is True
-        assert result.data is not None
         assert result.data.domain_name == "test-domain"
 
         # Verify group membership
@@ -416,9 +402,7 @@ class TestDeleteUserIntegration:
             )
 
         action = DeleteUserAction(email=user_email)
-        result = await processors.delete_user.wait_for_complete(action)
-
-        assert result.success is True
+        await processors.delete_user.wait_for_complete(action)
 
         # Verify user is soft deleted
         async with database_engine.begin_session() as session:
@@ -466,9 +450,7 @@ class TestPurgeUserIntegration:
             ),
         )
 
-        result = await processors.purge_user.wait_for_complete(purge_action)
-
-        assert result.success is True
+        await processors.purge_user.wait_for_complete(purge_action)
 
         # Verify user is completely removed
         async with database_engine.begin_session() as session:

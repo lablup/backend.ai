@@ -60,8 +60,9 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
     from ..models.utils import create_async_engine
 
     async def _impl():
+        bootstrap_config = await cli_ctx.get_bootstrap_config()
         manager_public_key, manager_secret_key = load_certificate(
-            cli_ctx.get_bootstrap_config().manager.rpc_auth_manager_keypair
+            bootstrap_config.manager.rpc_auth_manager_keypair
         )
         assert manager_secret_key is not None
         alembic_cfg = Config(alembic_config)

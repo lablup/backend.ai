@@ -22,7 +22,7 @@ from ai.backend.manager.services.model_serving.types import (
     ServiceInfo,
 )
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -108,7 +108,7 @@ class TestCreateModelService:
     @pytest.mark.parametrize(
         "scenario",
         [
-            TestScenario.success(
+            ScenarioBase.success(
                 "Successful model deployment",
                 CreateModelServiceAction(
                     request_user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
@@ -165,7 +165,7 @@ class TestCreateModelService:
                     ),
                 ),
             ),
-            TestScenario.failure(
+            ScenarioBase.failure(
                 "insufficient resources",
                 CreateModelServiceAction(
                     request_user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
@@ -208,7 +208,7 @@ class TestCreateModelService:
                 ),
                 Exception,  # insufficient resources
             ),
-            TestScenario.failure(
+            ScenarioBase.failure(
                 "duplicate model name",
                 CreateModelServiceAction(
                     request_user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
@@ -251,7 +251,7 @@ class TestCreateModelService:
                 ),
                 InvalidAPIParameters,
             ),
-            TestScenario.success(
+            ScenarioBase.success(
                 "public endpoint creation",
                 CreateModelServiceAction(
                     request_user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),
@@ -313,7 +313,7 @@ class TestCreateModelService:
     @pytest.mark.asyncio
     async def test_create_model_service(
         self,
-        scenario: TestScenario[CreateModelServiceAction, CreateModelServiceActionResult],
+        scenario: ScenarioBase[CreateModelServiceAction, CreateModelServiceActionResult],
         model_serving_processors: ModelServingProcessors,
         mock_get_vfolder_by_id,
         mock_fetch_file_from_storage_proxy,

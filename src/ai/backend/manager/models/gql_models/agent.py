@@ -27,6 +27,7 @@ from ai.backend.common.types import (
     HardwareMetadata,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.kernel.types import KernelStatus
 
 from ..agent import (
     ADMIN_PERMISSIONS,
@@ -47,7 +48,7 @@ from ..base import (
     set_if_set,
     simple_db_mutate,
 )
-from ..gql_models.kernel import ComputeContainer, KernelStatus
+from ..gql_models.kernel import ComputeContainer
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..group import AssocGroupUserRow
 from ..keypair import keypairs
@@ -166,8 +167,8 @@ class AgentNode(graphene.ObjectType):
             region=row.region,
             scaling_group=row.scaling_group,
             schedulable=row.schedulable,
-            available_slots=row.available_slots,
-            occupied_slots=row.occupied_slots,
+            available_slots=row.available_slots.to_json(),
+            occupied_slots=row.occupied_slots.to_json(),
             addr=row.addr,
             architecture=row.architecture,
             first_contact=row.first_contact,

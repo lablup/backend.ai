@@ -1,19 +1,19 @@
 import uuid
 from dataclasses import dataclass
-from datetime import datetime
 
 from ai.backend.manager.types import OptionalState
 
 from .id import ObjectId
 from .status import PermissionStatus
+from .types import EntityType, OperationType
 
 
 @dataclass
 class ObjectPermissionCreateInput:
     role_id: uuid.UUID
-    entity_type: str
+    entity_type: EntityType
     entity_id: str
-    operation: str
+    operation: OperationType
     status: PermissionStatus = PermissionStatus.ACTIVE
 
 
@@ -32,8 +32,6 @@ class ObjectPermissionDeleteInput:
 @dataclass
 class ObjectPermissionData:
     id: uuid.UUID
-    status: PermissionStatus
     role_id: uuid.UUID
     object_id: ObjectId
-    operation: str
-    created_at: datetime
+    operation: OperationType

@@ -16,13 +16,13 @@ from ...fixtures import (
     IMAGE_FIXTURE_DICT,
     IMAGE_ROW_FIXTURE,
 )
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Success Case",
             ClearImagesAction(
                 registry=CONTAINER_REGISTRY_ROW_FIXTURE.registry_name,
@@ -47,7 +47,7 @@ from ...test_utils import TestScenario
 )
 async def test_clear_images(
     processors: ContainerRegistryProcessors,
-    test_scenario: TestScenario[ClearImagesAction, ClearImagesActionResult],
+    test_scenario: ScenarioBase[ClearImagesAction, ClearImagesActionResult],
 ):
     await test_scenario.test(processors.clear_images.wait_for_complete)
 

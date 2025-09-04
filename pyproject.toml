@@ -1,5 +1,5 @@
 [project]
-requires-python = "~=3.13.3"
+requires-python = "~=3.13.7"
 name = "backend.ai"
 dynamic = ["version"]
 
@@ -95,7 +95,7 @@ ignore = ["E203","E731","E501"]
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend"]
 known-local-folder = ["src"]
-known-third-party = ["alembic", "redis"]
+known-third-party = ["alembic", "redis", "kubernetes"]
 split-on-trailing-comma = true
 
 [tool.ruff.lint.per-file-ignores]
@@ -111,12 +111,12 @@ line-length = 100
 preview = true
 
 [tool.mypy]
-plugins = ["pydantic.mypy"]
+plugins = ["pydantic.mypy", "strawberry.ext.mypy_plugin"]
 ignore_missing_imports = true
 mypy_path = "stubs:src:tools/pants-plugins"
 namespace_packages = true
 explicit_package_bases = true
-python_executable = "dist/export/python/virtualenvs/python-default/3.13.3/bin/python"
+python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
 disable_error_code = ["typeddict-unknown-key"]
 
 [tool.pyright]
@@ -133,7 +133,7 @@ exclude = [
     "src/ai/backend/web/static",
 ]
 venvPath = "dist/export/python/virtualenvs/python-default"
-venv = "3.13.3"
+venv = "3.13.7"
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

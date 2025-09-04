@@ -30,6 +30,7 @@ from ..types import (
     QuotaUsage,
     TreeUsage,
     VFolderID,
+    VolumeInfo,
 )
 from ..watcher import WatcherClient
 
@@ -222,6 +223,10 @@ class AbstractVolume(metaclass=ABCMeta):
 
     async def shutdown(self) -> None:
         pass
+
+    @abstractmethod
+    def info(self) -> VolumeInfo:
+        raise NotImplementedError
 
     @abstractmethod
     async def create_quota_model(self) -> AbstractQuotaModel:

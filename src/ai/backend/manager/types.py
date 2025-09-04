@@ -18,6 +18,7 @@ import attr
 from graphql import UndefinedType
 from pydantic import AliasChoices, BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from strawberry.types.unset import UnsetType
 
 from ai.backend.common.types import MountPermission, MountTypes
 
@@ -132,7 +133,7 @@ class TriState(Generic[TVal]):
     def from_graphql(cls, value: Optional[TVal] | UndefinedType) -> TriState[TVal]:
         if value is None:
             return cls.nullify()
-        if isinstance(value, UndefinedType):
+        if isinstance(value, UndefinedType) or isinstance(value, UnsetType):
             return cls.nop()
         return cls.update(value)
 
@@ -200,8 +201,8 @@ class OptionalState(Generic[TVal]):
         self._value = value
 
     @classmethod
-    def from_graphql(cls, value: Optional[TVal] | UndefinedType) -> OptionalState[TVal]:
-        if isinstance(value, UndefinedType):
+    def from_graphql(cls, value: Optional[TVal] | UndefinedType | UnsetType) -> OptionalState[TVal]:
+        if isinstance(value, UndefinedType) or isinstance(value, UnsetType):
             return OptionalState.nop()
         if value is None:
             raise ValueError("OptionalState cannot be NULLIFY")
@@ -248,3 +249,34 @@ class OptionalState(Generic[TVal]):
 class SMTPTriggerPolicy(enum.StrEnum):
     ALL = "ALL"
     ON_ERROR = "ON_ERROR"
+
+
+@dataclass
+class OffsetBasedPaginationOptions:
+    """Standard offset/limit pagination options."""
+
+    offset: Optional[int] = None
+    limit: Optional[int] = None
+
+
+@dataclass
+class ForwardPaginationOptions:
+    """Forward pagination: fetch items after a given cursor."""
+
+    after: Optional[str] = None
+    first: Optional[int] = None
+
+
+@dataclass
+class BackwardPaginationOptions:
+    """Backward pagination: fetch items before a given cursor."""
+
+    before: Optional[str] = None
+    last: Optional[int] = None
+
+
+@dataclass
+class PaginationOptions:
+    forward: Optional[ForwardPaginationOptions] = None
+    backward: Optional[BackwardPaginationOptions] = None
+    offset: Optional[OffsetBasedPaginationOptions] = None

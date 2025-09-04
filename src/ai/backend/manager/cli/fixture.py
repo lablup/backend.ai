@@ -36,10 +36,11 @@ def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
         except AttributeError:
             log.error("No such fixture.")
             return
-        db_username = cli_ctx.get_bootstrap_config().db.user
-        db_password = cli_ctx.get_bootstrap_config().db.password
-        db_addr = cli_ctx.get_bootstrap_config().db.addr.to_legacy()
-        db_name = cli_ctx.get_bootstrap_config().db.name
+        bootstrap_config = await cli_ctx.get_bootstrap_config()
+        db_username = bootstrap_config.db.user
+        db_password = bootstrap_config.db.password
+        db_addr = bootstrap_config.db.addr.to_legacy()
+        db_name = bootstrap_config.db.name
         engine = sa.ext.asyncio.create_async_engine(
             f"postgresql+asyncpg://{urlquote(db_username)}:{urlquote(db_password)}@{db_addr}/{db_name}",
         )

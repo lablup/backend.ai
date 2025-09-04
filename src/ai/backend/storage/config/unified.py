@@ -3,15 +3,17 @@ from __future__ import annotations
 import enum
 import os
 from pathlib import Path, PurePath
-from typing import Any, Optional
+from typing import Any, Literal, Optional, Union
 
 from pydantic import (
     AliasChoices,
     BaseModel,
+    ConfigDict,
     Field,
     FilePath,
 )
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
@@ -21,6 +23,7 @@ from ai.backend.common.typed_validators import (
     UserID,
 )
 from ai.backend.common.types import ServiceDiscoveryType
+from ai.backend.logging.config import LoggingConfig
 from ai.backend.storage.types import VolumeInfo
 
 _max_cpu_count = os.cpu_count()
@@ -89,14 +92,20 @@ class EtcdConfig(BaseModel):
         """,
         examples=["local", "backend"],
     )
-    addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="127.0.0.1", port=2379),
+    addr: HostPortPair | list[HostPortPair] = Field(
+        default=HostPortPair(host="127.0.0.1", port=2379),
         description="""
         Network address of the etcd server.
         Default is the standard etcd port on localhost.
-        For production, should point to an etcd cluster endpoint.
+        In production, should point to one or more etcd instance endpoint(s).
         """,
-        examples=[{"host": "127.0.0.1", "port": 2379}],
+        examples=[
+            {"host": "127.0.0.1", "port": 2379},  # single endpoint
+            [
+                {"host": "127.0.0.4", "port": 2379},
+                {"host": "127.0.0.5", "port": 2379},
+            ],  # multiple endpoints
+        ],
     )
     user: Optional[str] = Field(
         default=None,
@@ -120,7 +129,7 @@ class EtcdConfig(BaseModel):
     def to_dataclass(self) -> EtcdConfigData:
         return EtcdConfigData(
             namespace=self.namespace,
-            addr=self.addr,
+            addrs=self.addr if isinstance(self.addr, list) else [self.addr],
             user=self.user,
             password=self.password,
         )
@@ -173,11 +182,11 @@ class PyroscopeConfig(BaseModel):
 
 class ClientAPIConfig(BaseModel):
     service_addr: HostPortPair = Field(
+        default=HostPortPair(host="127.0.0.1", port=6021),
         description="""
         Network address and port where the client API service will listen.
         This is the address accessible by clients for file operations.
         """,
-        examples=[{"host": "127.0.0.1", "port": 6021}],
         validation_alias=AliasChoices("service-addr", "service_addr"),
         serialization_alias="service-addr",
     )
@@ -214,41 +223,38 @@ class ClientAPIConfig(BaseModel):
 
 class ManagerAPIConfig(BaseModel):
     service_addr: HostPortPair = Field(
+        default=HostPortPair(host="127.0.0.1", port=6022),
         description="""
         Network address and port where the manager API service will listen.
         This is the address accessible by managers for control operations.
         """,
-        examples=[{"host": "127.0.0.1", "port": 6022}],
         validation_alias=AliasChoices("service-addr", "service_addr"),
         serialization_alias="service-addr",
     )
     announce_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="127.0.0.1", port=6022),
+        default=HostPortPair(host="127.0.0.1", port=6022),
         description="""
         Address and port to announce to managers for service discovery.
         Should be accessible by other manager components.
         """,
-        examples=[{"host": "127.0.0.1", "port": 6022}],
         validation_alias=AliasChoices("announce-addr", "announce_addr"),
         serialization_alias="announce-addr",
     )
     announce_internal_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="host.docker.internal", port=6023),
+        default=HostPortPair(host="host.docker.internal", port=6023),
         description="""
         Address and port to announce for internal manager API requests.
         Used for service discovery within container environments.
         """,
-        examples=[{"host": "host.docker.internal", "port": 6023}],
         validation_alias=AliasChoices("announce-internal-addr", "announce_internal_addr"),
         serialization_alias="announce-internal-addr",
     )
     internal_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="127.0.0.1", port=16023),
+        default=HostPortPair(host="127.0.0.1", port=16023),
         description="""
         Internal address where manager API listens for internal requests.
         Used for internal communication between services.
         """,
-        examples=[{"host": "127.0.0.1", "port": 16023}],
         validation_alias=AliasChoices("internal-addr", "internal_addr"),
         serialization_alias="internal-addr",
     )
@@ -563,6 +569,180 @@ class StorageProxyConfig(BaseModel):
     )
 
 
+# TODO: Remove this after migrating this to database
+class ObjectStorageConfig(BaseModel):
+    name: str = Field(
+        description="""
+        Name of the storage configuration.
+        """,
+    )
+    endpoint: str = Field(
+        description="""
+        Endpoint URL for the object storage service.
+        Should include the protocol (http or https) and port if non-standard.
+        """,
+        examples=["http://localhost:9000", "https://storage.example.com"],
+    )
+    access_key: str = Field(
+        description="""
+        Access key for authenticating with the object storage service.
+        Required for services that use access keys for authentication.
+        """,
+        examples=["my-access-key"],
+        validation_alias=AliasChoices("access-key", "access_key"),
+        serialization_alias="access-key",
+    )
+    secret_key: str = Field(
+        description="""
+        Secret key for authenticating with the object storage service.
+        Required for services that use secret keys for authentication.
+        """,
+        examples=["my-secret-key"],
+        validation_alias=AliasChoices("secret-key", "secret_key"),
+        serialization_alias="secret-key",
+    )
+    buckets: list[str] = Field(
+        default_factory=list,
+        description="""
+        List of bucket names managed by this storage configuration.
+        """,
+        examples=["my-bucket"],
+    )
+    region: str = Field(
+        description="""
+        Region where the object storage service is located.
+        Required for services that require region specification.
+        """,
+        examples=["us-west-1", "eu-central-1"],
+    )
+    upload_chunk_size: int = Field(
+        default=5 * 1024 * 1024,
+        ge=5 * 1024 * 1024,
+        description="""
+        Chunk size (in bytes) for uploading files to the object storage.
+        Should be greater than or equal to 5 MiB due to S3 requirements.
+        """,
+        examples=[5 * 1024 * 1024],
+        validation_alias=AliasChoices("upload-chunk-size", "upload_chunk_size"),
+        serialization_alias="upload-chunk-size",
+    )
+    download_chunk_size: int = Field(
+        default=8192,
+        description="""
+        Chunk size (in bytes) for downloading files from the object storage.
+        """,
+        examples=[8192],
+        validation_alias=AliasChoices("download-chunk-size", "download_chunk_size"),
+        serialization_alias="download-chunk-size",
+    )
+    reservoir_download_chunk_size: int = Field(
+        default=8192,
+        description="""
+        Chunk size (in bytes) for downloading files from the remote reservoir storage.
+        """,
+        examples=[8192],
+        validation_alias=AliasChoices(
+            "reservoir-download-chunk-size", "reservoir_download_chunk_size"
+        ),
+        serialization_alias="reservoir-download-chunk-size",
+    )
+
+
+class HuggingfaceConfig(BaseModel):
+    registry_type: Literal["huggingface"] = Field(
+        description="""
+        Type of the registry configuration.
+        This is used to identify the specific registry type.
+        """,
+        alias="type",
+    )
+    endpoint: str = Field(
+        default="https://huggingface.co",
+        description="""
+        Custom endpoint for HuggingFace API.
+        If not provided, defaults to the official HuggingFace API endpoint.
+        Useful for connecting to self-hosted HuggingFace instances.
+        """,
+        examples=["https://huggingface.co"],
+    )
+    token: Optional[str] = Field(
+        default=None,
+        description="""
+        HuggingFace API token for authentication.
+        You cannot access the gated repositories without this token.
+        """,
+    )
+    download_chunk_size: int = Field(
+        default=8192,
+        description="""
+        Chunk size (in bytes) for downloading files from the HuggingFace API.
+        """,
+        examples=[8192],
+        validation_alias=AliasChoices("download-chunk-size", "download_chunk_size"),
+        serialization_alias="download-chunk-size",
+    )
+
+
+class ReservoirConfig(BaseModel):
+    registry_type: Literal["reservoir"] = Field(
+        description="""
+        Type of the registry configuration.
+        This is used to identify the specific registry type.
+        """,
+        alias="type",
+    )
+    endpoint: str = Field(
+        default="https://huggingface.co",
+        description="""
+        Custom endpoint for the reservoir registry API.
+        """,
+        examples=["https://huggingface.co"],
+    )
+    object_storage_access_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Access key for authenticating with the reservoir registry's object storage API.
+        """,
+        validation_alias=AliasChoices("object-storage-access-key", "object_storage_access_key"),
+        serialization_alias="object-storage-access-key",
+    )
+    object_storage_secret_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Secret key for authenticating with the reservoir registry's object storage API.
+        """,
+        validation_alias=AliasChoices("object-storage-secret-key", "object_storage_secret_key"),
+        serialization_alias="object-storage-secret-key",
+    )
+    object_storage_region: Optional[str] = Field(
+        default=None,
+        description="""
+        Region for the reservoir registry's object storage.
+        """,
+        validation_alias=AliasChoices("object-storage-region", "object_storage_region"),
+        serialization_alias="object-storage-region",
+    )
+
+
+RegistrySpecificConfig = Union[HuggingfaceConfig, ReservoirConfig]
+
+
+class ArtifactRegistryConfig(BaseModel):
+    name: str = Field(
+        description="""
+        Name of the artifact registry configuration.
+        Used to identify this registry in the system.
+        """,
+        examples=[typ.value for typ in ArtifactRegistryType],
+    )
+    config: RegistrySpecificConfig = Field(
+        discriminator="registry_type",
+        description="""
+        Configuration for the artifact registry.
+        """,
+    )
+
+
 class StorageProxyUnifiedConfig(BaseModel):
     storage_proxy: StorageProxyConfig = Field(
         description="""
@@ -579,8 +759,8 @@ class StorageProxyUnifiedConfig(BaseModel):
         Controls integration with the Pyroscope performance profiling tool.
         """,
     )
-    logging: Any = Field(
-        default_factory=lambda: {},
+    logging: LoggingConfig = Field(
+        default_factory=LoggingConfig,
         description="""
         Logging system configuration.
         Controls how logs are formatted, filtered, and stored.
@@ -628,7 +808,22 @@ class StorageProxyUnifiedConfig(BaseModel):
         Used for distributed coordination.
         """,
     )
+    storages: list[ObjectStorageConfig] = Field(
+        default_factory=list,
+        description="""
+        List of object storage configurations.
+        Each configuration defines how to connect to and use an object storage service.
+        """,
+    )
+    registries: list[ArtifactRegistryConfig] = Field(
+        default_factory=list,
+        description="""
+        List of artifact registry configurations.
+        Each configuration defines how to connect to and use an artifact registry service.
+        """,
+    )
 
     # TODO: Remove me after changing config injection logic
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(
+        extra="allow",
+    )

@@ -9,7 +9,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
 from ai.backend.manager.models.container_registry import ContainerRegistryType
-from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
+from ai.backend.manager.models.gql import GraphQueryContext, Mutation, Query
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 CONTAINER_REGISTRY_FIELDS = """
@@ -27,7 +27,7 @@ CONTAINER_REGISTRY_FIELDS = """
 
 @pytest.fixture(scope="module")
 def client() -> Client:
-    return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
+    return Client(Schema(query=Query, mutation=Mutation, auto_camelcase=False))
 
 
 async def get_graphquery_context(
@@ -53,6 +53,7 @@ async def get_graphquery_context(
         valkey_stat=None,  # type: ignore
         valkey_image=None,  # type: ignore
         valkey_live=None,  # type: ignore
+        valkey_schedule=None,  # type: ignore
         manager_status=None,  # type: ignore
         known_slot_types=None,  # type: ignore
         background_task_manager=None,  # type: ignore
@@ -63,6 +64,7 @@ async def get_graphquery_context(
         services_ctx=None,  # type: ignore
         metric_observer=GraphQLMetricObserver.instance(),
         processors=None,  # type: ignore
+        scheduler_repository=None,  # type: ignore
     )
 
 

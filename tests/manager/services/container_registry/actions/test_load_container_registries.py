@@ -15,7 +15,7 @@ from ...fixtures import (
     CONTAINER_REGISTRY_FIXTURE_DICT,
     CONTAINER_REGISTRY_ROW_FIXTURE,
 )
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 CONTAINER_REGISTRY_FIXTURE_2_DATA = copy.deepcopy(CONTAINER_REGISTRY_FIXTURE_DATA)
 CONTAINER_REGISTRY_FIXTURE_2_DATA.id = uuid.uuid4()
@@ -27,7 +27,7 @@ CONTAINER_REGISTRY_FIXTURE_2_DICT = dataclasses.asdict(CONTAINER_REGISTRY_FIXTUR
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Load container registries with registry name",
             LoadContainerRegistriesAction(
                 registry=CONTAINER_REGISTRY_ROW_FIXTURE.registry_name, project=None
@@ -39,7 +39,7 @@ CONTAINER_REGISTRY_FIXTURE_2_DICT = dataclasses.asdict(CONTAINER_REGISTRY_FIXTUR
                 ]
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Load container registries with registry name and project",
             LoadContainerRegistriesAction(
                 registry=CONTAINER_REGISTRY_ROW_FIXTURE.registry_name,
@@ -66,6 +66,6 @@ CONTAINER_REGISTRY_FIXTURE_2_DICT = dataclasses.asdict(CONTAINER_REGISTRY_FIXTUR
 )
 async def test_load_container_registries(
     processors: ContainerRegistryProcessors,
-    test_scenario: TestScenario[LoadContainerRegistriesAction, LoadContainerRegistriesActionResult],
+    test_scenario: ScenarioBase[LoadContainerRegistriesAction, LoadContainerRegistriesActionResult],
 ):
     await test_scenario.test(processors.load_container_registries.wait_for_complete)

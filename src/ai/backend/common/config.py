@@ -54,7 +54,7 @@ class BaseConfigModel(BaseModel):
 etcd_config_iv = t.Dict({
     t.Key("etcd"): t.Dict({
         t.Key("namespace"): t.String,
-        t.Key("addr", ("127.0.0.1", 2379)): tx.HostPortPair,
+        t.Key("addr", default=("127.0.0.1", 2379)): tx.HostPortPair | t.List(tx.HostPortPair),
         t.Key("user", default=""): t.Null | t.String(allow_blank=True),
         t.Key("password", default=""): t.Null | t.String(allow_blank=True),
     }).allow_extra("*"),
@@ -78,6 +78,8 @@ redis_default_config = {
     "service_name": None,
     "password": None,
     "redis_helper_config": redis_helper_default_config,
+    "use_tls": False,
+    "tls_skip_verify": False,
 }
 
 redis_config_iv = t.Dict({
@@ -87,6 +89,8 @@ redis_config_iv = t.Dict({
     ): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
     t.Key("service_name", default=redis_default_config["service_name"]): t.Null | t.String,
     t.Key("password", default=redis_default_config["password"]): t.Null | t.String,
+    t.Key("use_tls", default=redis_default_config["use_tls"]): t.Bool,
+    t.Key("tls_skip_verify", default=redis_default_config["tls_skip_verify"]): t.Bool,
     t.Key(
         "redis_helper_config",
         default=redis_helper_default_config,
@@ -101,6 +105,8 @@ redis_config_iv = t.Dict({
             ): t.Null | tx.DelimiterSeperatedList(tx.HostPortPair),
             t.Key("service_name", default=redis_default_config["service_name"]): t.Null | t.String,
             t.Key("password", default=redis_default_config["password"]): t.Null | t.String,
+            t.Key("use_tls", default=redis_default_config["use_tls"]): t.Bool,
+            t.Key("tls_skip_verify", default=redis_default_config["tls_skip_verify"]): t.Bool,
             t.Key(
                 "redis_helper_config",
                 default=redis_helper_default_config,
@@ -312,6 +318,13 @@ class ModelDefinition(BaseConfigModel):
         default_factory=list,
         description="List of models in the model definition.",
     )
+
+    def health_check_config(self) -> Optional[ModelHealthCheck]:
+        for model in self.models:
+            if model.service and model.service.health_check:
+                if model.service.health_check is not None:
+                    return model.service.health_check
+        return None
 
 
 def find_config_file(daemon_name: str) -> Path:

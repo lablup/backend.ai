@@ -36,3 +36,9 @@ class KeyPairResourcePolicyData:
     max_containers_per_session: int
     idle_timeout: int
     allowed_vfolder_hosts: dict[str, Any]
+
+
+@dataclass
+class ScalingGroupProxyTarget:
+    addr: str
+    api_token: str

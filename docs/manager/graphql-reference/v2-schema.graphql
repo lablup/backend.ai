@@ -1,0 +1,1103 @@
+schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@external", "@key", "@shareable"]) {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}
+
+"""Added in 25.14.0"""
+input ApproveArtifactInput {
+  artifactRevisionId: ID!
+}
+
+"""Added in 25.14.0"""
+type ApproveArtifactPayload {
+  artifactRevision: ArtifactRevision!
+}
+
+"""Added in 25.14.0"""
+type Artifact implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  type: ArtifactType!
+  description: String
+  registry: SourceInfo!
+  source: SourceInfo!
+  readonly: Boolean!
+  scannedAt: DateTime!
+  updatedAt: DateTime!
+  revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
+}
+
+"""Added in 25.14.0"""
+type ArtifactConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ArtifactEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ArtifactEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: Artifact!
+}
+
+"""Added in 25.14.0"""
+input ArtifactFilter {
+  type: [ArtifactType!] = null
+  name: StringFilter = null
+  registry: StringFilter = null
+  source: StringFilter = null
+  AND: [ArtifactFilter!] = null
+  OR: [ArtifactFilter!] = null
+  NOT: [ArtifactFilter!] = null
+}
+
+"""Added in 25.14.0"""
+type ArtifactImportProgressUpdatedPayload {
+  artifactId: ID!
+  progress: Float!
+  status: ArtifactStatus!
+}
+
+"""Added in 25.14.0"""
+input ArtifactOrderBy {
+  field: ArtifactOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum ArtifactOrderField {
+  NAME
+  TYPE
+  SIZE
+  SCANNED_AT
+  UPDATED_AT
+}
+
+"""Added in 25.14.0"""
+type ArtifactRevision implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  status: ArtifactStatus!
+  version: String!
+  readme: String
+  size: ByteSize
+  createdAt: DateTime
+  updatedAt: DateTime
+  artifact: Artifact!
+}
+
+"""Added in 25.14.0"""
+type ArtifactRevisionConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ArtifactRevisionEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ArtifactRevisionEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ArtifactRevision!
+}
+
+"""Added in 25.14.0"""
+input ArtifactRevisionFilter {
+  status: ArtifactRevisionStatusFilter = null
+  version: StringFilter = null
+  artifactId: ID = null
+  size: IntFilter = null
+  AND: [ArtifactRevisionFilter!] = null
+  OR: [ArtifactRevisionFilter!] = null
+  NOT: [ArtifactRevisionFilter!] = null
+}
+
+"""Added in 25.14.0"""
+type ArtifactRevisionImportTask {
+  taskId: ID!
+  artifactRevision: ArtifactRevision!
+}
+
+"""Added in 25.14.0"""
+input ArtifactRevisionOrderBy {
+  field: ArtifactRevisionOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum ArtifactRevisionOrderField {
+  VERSION
+  SIZE
+  CREATED_AT
+  UPDATED_AT
+  STATUS
+}
+
+"""Added in 25.14.0"""
+input ArtifactRevisionStatusFilter {
+  in: [ArtifactStatus!] = null
+  equals: ArtifactStatus = null
+}
+
+enum ArtifactStatus {
+  SCANNED
+  PULLING
+  PULLED
+  VERIFYING
+  NEEDS_APPROVAL
+  AVAILABLE
+  FAILED
+  REJECTED
+}
+
+"""Added in 25.14.0"""
+input ArtifactStatusChangedInput {
+  artifactRevisionIds: [ID!]!
+}
+
+"""Added in 25.14.0"""
+type ArtifactStatusChangedPayload {
+  artifactRevision: ArtifactRevision!
+}
+
+enum ArtifactType {
+  MODEL
+  PACKAGE
+  IMAGE
+}
+
+scalar ByteSize
+
+"""Added in 25.14.0"""
+input CancelArtifactInput {
+  artifactRevisionId: ID!
+}
+
+type CancelImportArtifactPayload {
+  artifactRevision: ArtifactRevision!
+}
+
+"""Added in 25.14.0"""
+input CleanupArtifactRevisionsInput {
+  artifactRevisionIds: [ID!]!
+}
+
+"""Added in 25.14.0"""
+type CleanupArtifactRevisionsPayload {
+  artifactRevisions: ArtifactRevisionConnection!
+}
+
+type ClusterConfig {
+  mode: ClusterMode!
+  size: Int!
+}
+
+input ClusterConfigInput {
+  mode: ClusterMode!
+  size: Int!
+}
+
+enum ClusterMode {
+  SINGLE_NODE
+  MULTI_NODE
+}
+
+"""Added in 25.14.0"""
+input CreateHuggingFaceRegistryInput {
+  url: String!
+  name: String!
+  token: String = null
+}
+
+"""Added in 25.14.0"""
+type CreateHuggingFaceRegistryPayload {
+  huggingfaceRegistry: HuggingFaceRegistry!
+}
+
+input CreateModelDeploymentInput {
+  metadata: ModelDeploymentMetadataInput!
+  networkAccess: ModelDeploymentNetworkAccessInput!
+  clusterConfig: ClusterConfigInput!
+  resourceConfig: ResourceConfigInput!
+  deploymentStrategy: DeploymentStrategyInput!
+  initialRevision: CreateModelRevisionInput!
+}
+
+type CreateModelDeploymentPayload {
+  deployment: ModelDeployment!
+}
+
+input CreateModelRevisionInput {
+  deploymentId: ID!
+  name: String!
+  image: ImageInput!
+  modelRuntimeConfig: ModelRuntimeConfigInput!
+  modelMountConfig: ModelMountConfigInput!
+}
+
+type CreateModelRevisionPayload {
+  revision: ModelRevision!
+}
+
+"""Added in 25.14.0"""
+input CreateObjectStorageInput {
+  name: String!
+  host: String!
+  accessKey: String!
+  secretKey: String!
+  endpoint: String!
+  region: String!
+}
+
+"""Added in 25.14.0"""
+type CreateObjectStoragePayload {
+  objectStorage: ObjectStorage!
+}
+
+"""Added in 25.14.0"""
+input CreateReservoirRegistryInput {
+  name: String!
+  endpoint: String!
+  accessKey: String!
+  secretKey: String!
+  apiVersion: String!
+}
+
+"""Added in 25.14.0"""
+type CreateReservoirRegistryPayload {
+  reservoir: ReservoirRegistry!
+}
+
+"""Date with time (isoformat)"""
+scalar DateTime
+
+"""Added in 25.14.0"""
+input DeleteHuggingFaceRegistryInput {
+  id: ID!
+}
+
+"""Added in 25.14.0"""
+type DeleteHuggingFaceRegistryPayload {
+  id: ID!
+}
+
+input DeleteModelDeploymentInput {
+  id: ID!
+}
+
+type DeleteModelDeploymentPayload {
+  deployment: ModelDeployment
+}
+
+"""Added in 25.14.0"""
+input DeleteObjectStorageInput {
+  id: ID!
+}
+
+"""Added in 25.14.0"""
+type DeleteObjectStoragePayload {
+  id: ID!
+}
+
+"""Added in 25.14.0"""
+input DeleteReservoirRegistryInput {
+  id: ID!
+}
+
+"""Added in 25.14.0"""
+type DeleteReservoirRegistryPayload {
+  id: ID!
+}
+
+input DeploymentFilter {
+  status: DeploymentStatus = null
+  openToPublic: Boolean = null
+  tags: [StringFilter!] = null
+  AND: DeploymentFilter = null
+  OR: DeploymentFilter = null
+  NOT: DeploymentFilter = null
+  DISTINCT: Boolean = null
+}
+
+input DeploymentOrderBy {
+  field: DeploymentOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum DeploymentOrderField {
+  CREATED_AT
+  UPDATED_AT
+  NAME
+}
+
+enum DeploymentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+type DeploymentStatusChangedPayload {
+  deployment: ModelDeployment!
+}
+
+type DeploymentStrategy {
+  type: DeploymentStrategyType!
+}
+
+input DeploymentStrategyInput {
+  type: DeploymentStrategyType!
+}
+
+enum DeploymentStrategyType {
+  ROLLING
+  BLUE_GREEN
+  CANARY
+}
+
+extend type EndpointAutoScalingRuleNode @key(fields: "id") {
+  id: ID! @external
+}
+
+extend type EndpointToken @key(fields: "token") {
+  token: String! @external
+}
+
+"""Added in 25.14.0"""
+input GetPresignedDownloadURLInput {
+  artifactRevisionId: ID!
+  key: String!
+}
+
+"""Added in 25.14.0"""
+type GetPresignedDownloadURLPayload {
+  presignedUrl: String!
+}
+
+"""Added in 25.14.0"""
+input GetPresignedUploadURLInput {
+  artifactRevisionId: ID!
+  key: String!
+  contentType: String = null
+  expiration: Int = null
+  minSize: Int = null
+  maxSize: Int = null
+}
+
+"""Added in 25.14.0"""
+type GetPresignedUploadURLPayload {
+  presignedUrl: String!
+  fields: String!
+}
+
+"""Added in 25.14.0"""
+type HuggingFaceRegistry implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  url: String!
+  name: String!
+  token: String
+}
+
+"""Added in 25.14.0"""
+type HuggingFaceRegistryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [HuggingFaceRegistryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type HuggingFaceRegistryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: HuggingFaceRegistry!
+}
+
+input ImageInput {
+  name: String!
+  architecture: String!
+}
+
+extend type ImageNode @key(fields: "id") {
+  id: ID! @external
+}
+
+"""Added in 25.14.0"""
+input ImportArtifactsInput {
+  artifactRevisionIds: [ID!]!
+}
+
+"""Added in 25.14.0"""
+type ImportArtifactsPayload {
+  artifactRevisions: ArtifactRevisionConnection!
+  tasks: [ArtifactRevisionImportTask!]!
+}
+
+input IntFilter {
+  equals: Int = null
+  notEquals: Int = null
+  greaterThan: Int = null
+  greaterThanOrEqual: Int = null
+  lessThan: Int = null
+  lessThanOrEqual: Int = null
+}
+
+"""A custom scalar for JSON strings using orjson"""
+scalar JSONString
+
+type ModelDeployment implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  metadata: ModelDeploymentMetadata!
+  networkAccess: ModelDeploymentNetworkAccess!
+  revision: ModelRevision
+  revisionHistory: ModelRevisionConnection!
+  scalingRule: ScalingRule!
+  replicaState: ReplicaState!
+  deploymentStrategy: DeploymentStrategy!
+  clusterConfig: ClusterConfig!
+  resourceConfig: ResourceConfig!
+  createdUser: UserNode!
+}
+
+type ModelDeploymentConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelDeploymentEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelDeploymentEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelDeployment!
+}
+
+type ModelDeploymentMetadata {
+  name: String!
+  status: DeploymentStatus!
+  tags: [String!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+input ModelDeploymentMetadataInput {
+  name: String!
+  tags: [String!] = null
+}
+
+type ModelDeploymentNetworkAccess {
+  endpointUrl: String
+  preferredDomainName: String
+  openToPublic: Boolean!
+  accessTokens: [EndpointToken!]!
+}
+
+input ModelDeploymentNetworkAccessInput {
+  preferredDomainName: String = null
+  openToPublic: Boolean! = false
+}
+
+type ModelMountConfig {
+  vfolder: VirtualFolderNode!
+  mountDestination: String!
+  definitionPath: String!
+}
+
+input ModelMountConfigInput {
+  vfolderId: ID!
+  mountDestination: String!
+  definitionPath: String!
+}
+
+type ModelReplica implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  status: ReplicaStatus!
+  revision: ModelRevision!
+  routings: [RoutingNode!]!
+}
+
+type ModelReplicaConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelReplicaEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelReplicaEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelReplica!
+}
+
+type ModelRevision implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  modelRuntimeConfig: ModelRuntimeConfig!
+  modelMountConfig: ModelMountConfig!
+  image: ImageNode!
+  createdAt: DateTime!
+}
+
+type ModelRevisionConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ModelRevisionEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ModelRevisionEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ModelRevision!
+}
+
+input ModelRevisionFilter {
+  name: StringFilter = null
+  deploymentId: ID = null
+  AND: ModelRevisionFilter = null
+  OR: ModelRevisionFilter = null
+  NOT: ModelRevisionFilter = null
+  DISTINCT: Boolean = null
+}
+
+input ModelRevisionOrder {
+  field: ModelRevisionOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum ModelRevisionOrderField {
+  CREATED_AT
+  NAME
+}
+
+type ModelRuntimeConfig {
+  runtimeVariant: String!
+  serviceConfig: ServiceConfig
+  environ: JSONString
+}
+
+input ModelRuntimeConfigInput {
+  runtimeVariant: String!
+  serviceConfig: JSONString = null
+  environ: JSONString = null
+}
+
+"""Added in 25.14.0"""
+input ModelTarget {
+  modelId: String!
+  revision: String = null
+}
+
+type Mutation {
+  """Added in 25.14.0"""
+  scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload!
+
+  """Added in 25.14.0"""
+  scanArtifactModels(input: ScanArtifactModelsInput!): ScanArtifactModelsPayload!
+
+  """Added in 25.14.0"""
+  importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload!
+
+  """Added in 25.14.0"""
+  updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
+
+  """Added in 25.14.0"""
+  cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload!
+
+  """Added in 25.14.0"""
+  cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload!
+  createModelDeployment(input: CreateModelDeploymentInput!): CreateModelDeploymentPayload!
+  updateModelDeployment(input: UpdateModelDeploymentInput!): UpdateModelDeploymentPayload!
+  deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload!
+  createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload!
+
+  """Added in 25.14.0"""
+  createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
+
+  """Added in 25.14.0"""
+  updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload!
+
+  """Added in 25.14.0"""
+  deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
+
+  """Added in 25.14.0"""
+  registerObjectStorageBucket(input: RegisterObjectStorageBucketInput!): RegisterObjectStorageBucketPayload!
+
+  """Added in 25.14.0"""
+  unregisterObjectStorageBucket(input: UnregisterObjectStorageBucketInput!): UnregisterObjectStorageBucketPayload!
+
+  """Added in 25.14.0"""
+  createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload!
+
+  """Added in 25.14.0"""
+  updateHuggingfaceRegistry(input: UpdateHuggingFaceRegistryInput!): UpdateHuggingFaceRegistryPayload!
+
+  """Added in 25.14.0"""
+  deleteHuggingfaceRegistry(input: DeleteHuggingFaceRegistryInput!): DeleteHuggingFaceRegistryPayload!
+
+  """Added in 25.14.0"""
+  createReservoirRegistry(input: CreateReservoirRegistryInput!): CreateReservoirRegistryPayload!
+
+  """Added in 25.14.0"""
+  updateReservoirRegistry(input: UpdateReservoirRegistryInput!): UpdateReservoirRegistryPayload!
+
+  """Added in 25.14.0"""
+  deleteReservoirRegistry(input: DeleteReservoirRegistryInput!): DeleteReservoirRegistryPayload!
+
+  """Added in 25.14.0"""
+  getPresignedDownloadUrl(input: GetPresignedDownloadURLInput!): GetPresignedDownloadURLPayload!
+
+  """Added in 25.14.0"""
+  getPresignedUploadUrl(input: GetPresignedUploadURLInput!): GetPresignedUploadURLPayload!
+
+  """Added in 25.14.0"""
+  approveArtifactRevision(input: ApproveArtifactInput!): ApproveArtifactPayload!
+
+  """Added in 25.14.0"""
+  rejectArtifactRevision(input: RejectArtifactInput!): RejectArtifactPayload!
+}
+
+"""An object with a Globally Unique ID"""
+interface Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+}
+
+"""Added in 25.14.0"""
+type ObjectStorage implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  host: String!
+  accessKey: String!
+  secretKey: String!
+  endpoint: String!
+  region: String!
+  namespaces(before: String, after: String, first: Int, last: Int, limit: Int, offset: Int): ObjectStorageNamespaceConnection!
+}
+
+"""Added in 25.14.0"""
+type ObjectStorageConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ObjectStorageEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ObjectStorageEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ObjectStorage!
+}
+
+"""Added in 25.14.0"""
+type ObjectStorageNamespace implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  storageId: ID!
+  bucket: String!
+}
+
+"""Added in 25.14.0"""
+type ObjectStorageNamespaceConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ObjectStorageNamespaceEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ObjectStorageNamespaceEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ObjectStorageNamespace!
+}
+
+enum OrderDirection {
+  ASC
+  DESC
+}
+
+"""Information to aid in pagination."""
+type PageInfo @shareable {
+  """When paginating forwards, are there more items?"""
+  hasNextPage: Boolean!
+
+  """When paginating backwards, are there more items?"""
+  hasPreviousPage: Boolean!
+
+  """When paginating backwards, the cursor to continue."""
+  startCursor: String
+
+  """When paginating forwards, the cursor to continue."""
+  endCursor: String
+}
+
+type Query {
+  _entities(representations: [_Any!]!): [_Entity]!
+  _service: _Service!
+
+  """Added in 25.14.0"""
+  artifact(id: ID!): Artifact
+
+  """Added in 25.14.0"""
+  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
+
+  """Added in 25.14.0"""
+  artifactRevision(id: ID!): ArtifactRevision
+
+  """Added in 25.14.0"""
+  artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
+  deployments(
+    filter: DeploymentFilter = null
+    orderBy: DeploymentOrderBy = null
+
+    """Returns the first n items from the list."""
+    first: Int = null
+
+    """Returns the items in the list that come after the specified cursor."""
+    after: String = null
+
+    """Returns the items in the list that come before the specified cursor."""
+    before: String = null
+
+    """Returns the items in the list that come after the specified cursor."""
+    last: Int = null
+  ): ModelDeploymentConnection!
+  deployment(id: ID!): ModelDeployment
+  revisions(
+    filter: ModelRevisionFilter = null
+    order: ModelRevisionOrder = null
+
+    """Returns the first n items from the list."""
+    first: Int = null
+
+    """Returns the items in the list that come after the specified cursor."""
+    after: String = null
+
+    """Returns the items in the list that come before the specified cursor."""
+    before: String = null
+
+    """Returns the items in the list that come after the specified cursor."""
+    last: Int = null
+  ): ModelRevisionConnection!
+  revision(id: ID!): ModelRevision
+  replica(id: ID!): ModelReplica
+
+  """Added in 25.14.0"""
+  objectStorage(id: ID!): ObjectStorage
+
+  """Added in 25.14.0"""
+  objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ObjectStorageConnection!
+
+  """Added in 25.14.0"""
+  huggingfaceRegistry(id: ID!): HuggingFaceRegistry
+
+  """Added in 25.14.0"""
+  huggingfaceRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): HuggingFaceRegistryConnection!
+
+  """Added in 25.14.0"""
+  reservoirRegistry(id: ID!): ReservoirRegistry
+
+  """Added in 25.14.0"""
+  reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
+}
+
+type RawServiceConfig {
+  config: JSONString!
+  extraCliParameters: String
+}
+
+"""Added in 25.14.0"""
+input RegisterObjectStorageBucketInput {
+  storageId: UUID!
+  bucketName: String!
+}
+
+"""Added in 25.14.0"""
+type RegisterObjectStorageBucketPayload {
+  id: UUID!
+}
+
+"""Added in 25.14.0"""
+input RejectArtifactInput {
+  artifactRevisionId: ID!
+}
+
+"""Added in 25.14.0"""
+type RejectArtifactPayload {
+  artifactRevision: ArtifactRevision!
+}
+
+type ReplicaState {
+  desiredReplicaCount: Int!
+  replicas: ModelReplicaConnection!
+}
+
+enum ReplicaStatus {
+  HEALTHY
+  UNHEALTHY
+}
+
+type ReplicaStatusChangedPayload {
+  replica: ModelReplica!
+}
+
+"""Added in 25.14.0"""
+type ReservoirRegistry implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  endpoint: String!
+  accessKey: String!
+  secretKey: String!
+  apiVersion: String!
+}
+
+"""Added in 25.14.0"""
+type ReservoirRegistryConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ReservoirRegistryEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ReservoirRegistryEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ReservoirRegistry!
+}
+
+type ResourceConfig {
+  resourceGroup: ScalingGroupNode!
+  resourceSlots: JSONString!
+  resourceOpts: JSONString
+}
+
+input ResourceConfigInput {
+  resourceGroup: ResourceGroupInput!
+  resourceSlots: JSONString!
+  resourceOpts: JSONString = null
+}
+
+input ResourceGroupInput {
+  name: String!
+}
+
+type RoutingNode implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  routingId: UUID!
+  endpoint: String!
+  session: UUID!
+  status: String!
+  trafficRatio: Float!
+  createdAt: DateTime!
+  liveStat: JSONString!
+}
+
+extend type ScalingGroupNode @key(fields: "id") {
+  id: ID! @external
+}
+
+type ScalingRule {
+  autoScalingRules: [EndpointAutoScalingRuleNode!]!
+}
+
+"""Added in 25.14.0"""
+input ScanArtifactModelsInput {
+  models: [ModelTarget!]!
+  registryId: UUID = null
+}
+
+"""Added in 25.14.0"""
+type ScanArtifactModelsPayload {
+  artifactRevision: ArtifactRevisionConnection!
+}
+
+"""Added in 25.14.0"""
+input ScanArtifactsInput {
+  registryId: ID = null
+  limit: Int!
+  artifactType: ArtifactType = null
+  search: String = null
+}
+
+"""Added in 25.14.0"""
+type ScanArtifactsPayload {
+  artifacts: [Artifact!]!
+}
+
+"""Different service configurations for model runtime"""
+union ServiceConfig = RawServiceConfig
+
+"""Added in 25.14.0"""
+type SourceInfo {
+  name: String
+  url: String
+}
+
+input StringFilter {
+  contains: String = null
+  startsWith: String = null
+  endsWith: String = null
+  equals: String = null
+  notEquals: String = null
+  iContains: String = null
+  iStartsWith: String = null
+  iEndsWith: String = null
+  iEquals: String = null
+  iNotEquals: String = null
+}
+
+type Subscription {
+  """Added in 25.14.0"""
+  artifactStatusChanged(input: ArtifactStatusChangedInput!): ArtifactStatusChangedPayload!
+
+  """Added in 25.14.0"""
+  artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
+  deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
+  replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
+}
+
+scalar UUID
+
+"""Added in 25.14.0"""
+input UnregisterObjectStorageBucketInput {
+  storageId: UUID!
+  bucketName: String!
+}
+
+"""Added in 25.14.0"""
+type UnregisterObjectStorageBucketPayload {
+  id: UUID!
+}
+
+"""Added in 25.14.0"""
+input UpdateArtifactInput {
+  artifactId: ID!
+  readonly: Boolean
+}
+
+"""Added in 25.14.0"""
+type UpdateArtifactPayload {
+  artifact: Artifact!
+}
+
+"""Added in 25.14.0"""
+input UpdateHuggingFaceRegistryInput {
+  id: ID!
+  url: String
+  name: String
+  token: String
+}
+
+"""Added in 25.14.0"""
+type UpdateHuggingFaceRegistryPayload {
+  huggingfaceRegistry: HuggingFaceRegistry!
+}
+
+input UpdateModelDeploymentInput {
+  id: ID!
+  openToPublic: Boolean = null
+  tags: [String!] = null
+  deploymentStrategy: DeploymentStrategyInput = null
+  activeRevisionId: ID = null
+}
+
+type UpdateModelDeploymentPayload {
+  deployment: ModelDeployment
+}
+
+"""Added in 25.14.0"""
+input UpdateObjectStorageInput {
+  id: ID!
+  name: String
+  host: String
+  accessKey: String
+  secretKey: String
+  endpoint: String
+  region: String
+}
+
+"""Added in 25.14.0"""
+type UpdateObjectStoragePayload {
+  objectStorage: ObjectStorage!
+}
+
+"""Added in 25.14.0"""
+input UpdateReservoirRegistryInput {
+  id: ID!
+  name: String
+  endpoint: String
+  accessKey: String
+  secretKey: String
+  apiVersion: String
+}
+
+"""Added in 25.14.0"""
+type UpdateReservoirRegistryPayload {
+  reservoir: ReservoirRegistry!
+}
+
+extend type UserNode @key(fields: "id") {
+  id: ID! @external
+}
+
+extend type VirtualFolderNode @key(fields: "id") {
+  id: ID! @external
+}
+
+scalar _Any
+
+union _Entity = EndpointAutoScalingRuleNode | EndpointToken | ImageNode | ScalingGroupNode | UserNode | VirtualFolderNode
+
+type _Service {
+  sdl: String!
+}

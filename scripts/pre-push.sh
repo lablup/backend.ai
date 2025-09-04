@@ -2,8 +2,7 @@
 # implementation: backend.ai monorepo standard pre-push hook
 BASE_PATH=$(cd "$(dirname "$0")"/.. && pwd)
 if [ -f .pants.rc ]; then
-  source scripts/bootstrap-static-python.sh
-  local_exec_root_dir=$($bpython scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')
+  local_exec_root_dir=$(scripts/pyscript.sh scripts/tomltool.py -f .pants.rc get 'GLOBAL.local_execution_root_dir')
   mkdir -p "$local_exec_root_dir"
 fi
 CURRENT_COMMIT=$(git rev-parse --short HEAD)

@@ -24,10 +24,10 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.types import CHAR, SchemaType, TypeDecorator
 
 from ai.backend.appproxy.common.exceptions import InvalidAPIParameters
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.utils import ensure_json_serializable
 from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.types import ReadableCIDR
+from ai.backend.logging import BraceStyleAdapter
 
 SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991

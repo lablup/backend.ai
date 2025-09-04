@@ -11,8 +11,9 @@ from ai.backend.manager.services.session.actions.destroy_session import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
+    AGENT_FIXTURE_DICT,
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
     KERNEL_FIXTURE_DICT,
@@ -32,7 +33,7 @@ def mock_agent_destroy_session_rpc(mocker, mock_agent_response_result):
     return mock
 
 
-DESTROY_SESSION_MOCK = {"destroyed": True}
+DESTROY_SESSION_MOCK = {"status": "cancelled"}
 DESTROY_SESSION_RESPONSE_MOCK = {"stats": DESTROY_SESSION_MOCK}
 
 
@@ -40,7 +41,7 @@ DESTROY_SESSION_RESPONSE_MOCK = {"stats": DESTROY_SESSION_MOCK}
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Destroy session",
                 DestroySessionAction(
                     user_role=UserRole.USER,
@@ -50,7 +51,6 @@ DESTROY_SESSION_RESPONSE_MOCK = {"stats": DESTROY_SESSION_MOCK}
                     owner_access_key=cast(AccessKey, SESSION_FIXTURE_DATA.access_key),
                 ),
                 DestroySessionActionResult(
-                    destroyed_sessions=[SESSION_FIXTURE_DATA],
                     result=DESTROY_SESSION_RESPONSE_MOCK,
                 ),
             ),
@@ -62,6 +62,7 @@ DESTROY_SESSION_RESPONSE_MOCK = {"stats": DESTROY_SESSION_MOCK}
     "extra_fixtures",
     [
         {
+            "agents": [AGENT_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
             "users": [USER_FIXTURE_DATA],
@@ -73,7 +74,7 @@ DESTROY_SESSION_RESPONSE_MOCK = {"stats": DESTROY_SESSION_MOCK}
 async def test_destroy_session(
     mock_agent_destroy_session_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[DestroySessionAction, DestroySessionActionResult],
+    test_scenario: ScenarioBase[DestroySessionAction, DestroySessionActionResult],
     session_repository,
 ):
     await test_scenario.test(processors.destroy_session.wait_for_complete)

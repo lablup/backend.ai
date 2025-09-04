@@ -30,6 +30,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         valkey_stat=None,  # type: ignore
         valkey_image=None,  # type: ignore
         valkey_live=None,  # type: ignore
+        valkey_schedule=None,  # type: ignore
         manager_status=None,  # type: ignore
         known_slot_types=None,  # type: ignore
         background_task_manager=None,  # type: ignore
@@ -40,6 +41,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         services_ctx=None,  # type: ignore
         metric_observer=GraphQLMetricObserver.instance(),
         processors=None,  # type: ignore
+        scheduler_repository=None,  # type: ignore
     )
 
 

@@ -478,3 +478,15 @@ def deep_merge(*args: Mapping[str, Any]) -> Mapping[str, Any]:
             else:
                 merged[k] = vb
     return merged
+
+
+def addr_to_hostport_pair(addr: str) -> tuple[str, int]:
+    """
+    Convert a Redis address string to a host-port pair.
+    """
+    parts = addr.split(":")
+    if len(parts) == 1:
+        raise ValueError(f"Invalid Redis address format: {addr}")
+    host = parts[0]
+    port = int(parts[1])
+    return host, port

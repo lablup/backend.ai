@@ -13,6 +13,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import sqlalchemy as sa
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
@@ -73,6 +74,7 @@ __all__ = (
 )
 
 
+@graphene_federation.key("id")
 class ScalingGroupNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)

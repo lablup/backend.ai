@@ -1,4 +1,10 @@
-resource(name="version", source="VERSION")
+python_sources(
+    name="src",
+    sources=["**/*.py"],
+    dependencies=[
+        ":resources",
+    ],
+)
 
 resources(
     name="resources",
@@ -11,12 +17,7 @@ resources(
     ],
 )
 
-python_sources(
-    name="src",
-    dependencies=[
-        ":resources",
-    ],
-)
+resource(name="version", source="VERSION")
 
 python_distribution(
     name="dist",

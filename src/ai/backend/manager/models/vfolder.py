@@ -39,15 +39,8 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
-from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
-from ai.backend.common.dto.manager.field import (
-    VFolderOperationStatusField,
-    VFolderOwnershipTypeField,
-    VFolderPermissionField,
-)
 from ai.backend.common.types import (
-    CIStrEnum,
     MountPermission,
     QuotaScopeID,
     QuotaScopeType,
@@ -59,6 +52,13 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.vfolder.types import (
+    VFolderData,
+    VFolderInvitationState,
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+)
+from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
 
 from ..defs import (
     RESERVED_VFOLDER_PATTERNS,
@@ -114,7 +114,6 @@ from .user import UserRole, UserRow
 from .utils import ExtendedAsyncSAEngine, execute_with_retry, execute_with_txn_retry, sql_json_merge
 
 if TYPE_CHECKING:
-    from ..api.context import BackgroundTaskManager
     from .gql import GraphQueryContext
     from .storage import StorageSessionManager
 
@@ -137,7 +136,6 @@ __all__: Sequence[str] = (
     "SetQuotaScope",
     "UnsetQuotaScope",
     "query_accessible_vfolders",
-    "initiate_vfolder_clone",
     "initiate_vfolder_deletion",
     "get_allowed_vfolder_hosts_by_group",
     "get_allowed_vfolder_hosts_by_user",
@@ -157,122 +155,11 @@ __all__: Sequence[str] = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class VFolderOwnershipType(CIStrEnum):
-    """
-    Ownership type of virtual folder.
-    """
-
-    USER = "user"
-    GROUP = "group"
-
-    def to_field(self) -> VFolderOwnershipTypeField:
-        return VFolderOwnershipTypeField(self)
-
-
-class VFolderPermission(enum.StrEnum):
-    # TODO: Replace this class with VFolderRBACPermission
-    # Or rename this class to VFolderMountPermission
-    """
-    Permissions for a virtual folder given to a specific access key.
-    RW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.
-    """
-
-    READ_ONLY = "ro"
-    READ_WRITE = "rw"
-    RW_DELETE = "wd"
-    OWNER_PERM = "wd"  # resolved as RW_DELETE
-
-    def to_field(self) -> VFolderPermissionField:
-        return VFolderPermissionField(self)
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Optional[VFolderPermission]:
-        assert isinstance(value, str)
-        match value.upper():
-            case "RO" | "READ_ONLY":
-                return cls.READ_ONLY
-            case "RW" | "READ_WRITE":
-                return cls.READ_WRITE
-            case "RW_DELETE":
-                return cls.RW_DELETE
-            case "WD" | "OWNER_PERM":
-                return cls.OWNER_PERM
-        return None
-
-
 class VFolderPermissionValidator(t.Trafaret):
     def check_and_return(self, value: Any) -> VFolderPermission:
         if value not in ["ro", "rw", "wd"]:
             self._failure('one of "ro", "rw", or "wd" required', value=value)
         return VFolderPermission(value)
-
-
-class VFolderInvitationState(enum.StrEnum):
-    """
-    Virtual Folder invitation state.
-    """
-
-    PENDING = "pending"
-    CANCELED = "canceled"  # canceled by inviter
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"  # rejected by invitee
-
-
-class VFolderOperationStatus(enum.StrEnum):
-    """
-    Introduce virtual folder current status for storage-proxy operations.
-    """
-
-    READY = "ready"
-    PERFORMING = "performing"
-    CLONING = "cloning"
-    MOUNTED = "mounted"
-    ERROR = "error"
-
-    DELETE_PENDING = "delete-pending"  # vfolder is in trash bin
-    DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
-    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
-    DELETE_ERROR = "delete-error"
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Optional[VFolderOperationStatus]:
-        assert isinstance(value, str)
-        match value.upper():
-            case "READY":
-                return cls.READY
-            case "PERFORMING":
-                return cls.PERFORMING
-            case "CLONING":
-                return cls.CLONING
-            case "MOUNTED":
-                return cls.MOUNTED
-            case "ERROR":
-                return cls.ERROR
-            case "DELETE_PENDING" | "DELETE-PENDING":
-                return cls.DELETE_PENDING
-            case "DELETE_ONGOING" | "DELETE-ONGOING":
-                return cls.DELETE_ONGOING
-            case "DELETE_COMPLETE" | "DELETE-COMPLETE":
-                return cls.DELETE_COMPLETE
-            case "DELETE_ERROR" | "DELETE-ERROR":
-                return cls.DELETE_ERROR
-        return None
-
-    def is_deletable(self, force: bool = False) -> bool:
-        if force:
-            return self in {
-                VFolderOperationStatus.READY,
-                VFolderOperationStatus.DELETE_PENDING,
-                VFolderOperationStatus.DELETE_ONGOING,
-                VFolderOperationStatus.DELETE_ERROR,
-            }
-        else:
-            return self == VFolderOperationStatus.DELETE_PENDING
-
-    def to_field(self) -> VFolderOperationStatusField:
-        return VFolderOperationStatusField(self)
 
 
 class VFolderStatusSet(enum.StrEnum):
@@ -585,6 +472,30 @@ class VFolderRow(Base):
     @property
     def vfid(self) -> VFolderID:
         return VFolderID(self.quota_scope_id, self.id)
+
+    def to_data(self) -> VFolderData:
+        return VFolderData(
+            id=self.id,
+            name=self.name,
+            domain_name=self.domain_name,
+            quota_scope_id=self.quota_scope_id,
+            usage_mode=self.usage_mode,
+            permission=self.permission,
+            host=self.host,
+            max_files=self.max_files,
+            max_size=self.max_size,
+            num_files=self.num_files,
+            cur_size=self.cur_size,
+            created_at=self.created_at,
+            last_used=self.last_used,
+            creator=self.creator,
+            unmanaged_path=self.unmanaged_path,
+            ownership_type=self.ownership_type,
+            user=self.user,
+            group=self.group,
+            cloneable=self.cloneable,
+            status=self.status,
+        )
 
 
 def is_unmanaged(unmanaged_path: Optional[str]) -> bool:
@@ -1287,92 +1198,6 @@ async def filter_host_allowed_permission(
         )
         allowed_hosts = allowed_hosts | allowed_hosts_by_group
     return allowed_hosts
-
-
-async def initiate_vfolder_clone(
-    db_engine: ExtendedAsyncSAEngine,
-    vfolder_info: VFolderCloneInfo,
-    storage_manager: StorageSessionManager,
-    background_task_manager: BackgroundTaskManager,
-) -> tuple[uuid.UUID, uuid.UUID]:
-    source_vf_cond = vfolders.c.id == vfolder_info.source_vfolder_id.folder_id
-
-    async def _update_status() -> None:
-        async with db_engine.begin_session() as db_session:
-            query = (
-                sa.update(vfolders)
-                .values(status=VFolderOperationStatus.CLONING)
-                .where(source_vf_cond)
-            )
-            await db_session.execute(query)
-
-    await execute_with_retry(_update_status)
-
-    target_proxy, target_volume = storage_manager.get_proxy_and_volume(vfolder_info.target_host)
-    source_proxy, source_volume = storage_manager.get_proxy_and_volume(
-        vfolder_info.source_host, is_unmanaged(vfolder_info.unmanaged_path)
-    )
-
-    # Generate the ID of the destination vfolder.
-    # TODO: If we refactor to use ORM, the folder ID will be created from the database by inserting
-    #       the actual object (with RETURNING clause).  In that case, we need to temporarily
-    #       mark the object to be "unusable-yet" until the storage proxy creates the destination
-    #       vfolder.  After done, we need to make another transaction to clear the unusable state.
-    target_folder_id = VFolderID(vfolder_info.source_vfolder_id.quota_scope_id, uuid.uuid4())
-
-    async def _clone(reporter: ProgressReporter) -> None:
-        async def _insert_vfolder() -> None:
-            async with db_engine.begin_session() as db_session:
-                insert_values = {
-                    "id": target_folder_id.folder_id,
-                    "name": vfolder_info.target_vfolder_name,
-                    "domain_name": vfolder_info.domain_name,
-                    "usage_mode": vfolder_info.usage_mode,
-                    "permission": vfolder_info.permission,
-                    "last_used": None,
-                    "host": vfolder_info.target_host,
-                    # TODO: add quota_scope_id
-                    "creator": vfolder_info.email,
-                    "ownership_type": VFolderOwnershipType("user"),
-                    "user": vfolder_info.user_id,
-                    "group": None,
-                    "unmanaged_path": None,
-                    "cloneable": vfolder_info.cloneable,
-                    "quota_scope_id": vfolder_info.source_vfolder_id.quota_scope_id,
-                }
-                insert_query = sa.insert(vfolders, insert_values)
-                try:
-                    await db_session.execute(insert_query)
-                except sa.exc.DataError:
-                    # TODO: pass exception info
-                    raise InvalidAPIParameters
-
-        await execute_with_retry(_insert_vfolder)
-
-        try:
-            manager_client = storage_manager.get_manager_facing_client(source_proxy)
-            await manager_client.clone_folder(
-                source_volume,
-                str(vfolder_info.source_vfolder_id),
-                target_volume,
-                str(target_folder_id),
-            )
-        except aiohttp.ClientResponseError:
-            raise VFolderOperationFailed(extra_msg=str(vfolder_info.source_vfolder_id))
-
-        async def _update_source_vfolder() -> None:
-            async with db_engine.begin_session() as db_session:
-                query = (
-                    sa.update(vfolders)
-                    .values(status=VFolderOperationStatus.READY)
-                    .where(source_vf_cond)
-                )
-                await db_session.execute(query)
-
-        await execute_with_retry(_update_source_vfolder)
-
-    task_id = await background_task_manager.start(_clone)
-    return task_id, target_folder_id.folder_id
 
 
 async def _delete_vfolder_permission_rows(

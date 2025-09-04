@@ -6,14 +6,19 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
+import aioboto3
 import pytest
+from botocore.exceptions import ClientError
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import HostPortPair, QuotaScopeID, QuotaScopeType
+from ai.backend.logging import LogLevel
+from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.loaders import load_local_config
 from ai.backend.storage.types import VFolderID
 from ai.backend.storage.volumes.abc import AbstractVolume
+from ai.backend.testutils.bootstrap import minio_container  # noqa: F401
 
 
 @pytest.fixture(scope="session")
@@ -37,7 +42,7 @@ def local_volume(vfroot) -> Iterator[Path]:
 @pytest.fixture
 def mock_etcd() -> Iterator[AsyncEtcd]:
     yield AsyncEtcd(
-        addr=HostPortPair("", 0),
+        addrs=[HostPortPair("", 0)],
         namespace="",
         scope_prefix_map={
             ConfigScopes.GLOBAL: "",
@@ -47,7 +52,7 @@ def mock_etcd() -> Iterator[AsyncEtcd]:
 
 def has_backend(backend_name: str) -> dict[str, Any] | None:
     try:
-        local_config = load_local_config(None, debug=True)
+        local_config = load_local_config(None, log_level=LogLevel.DEBUG)
     except ConfigurationError:
         return None
     for _, info in local_config.volume.items():
@@ -142,3 +147,35 @@ async def empty_vfolder(volume: AbstractVolume) -> AsyncIterator[VFolderID]:
     yield vfid
     await volume.delete_vfolder(vfid)
     await volume.quota_model.delete_quota_scope(qsid)
+
+
+@pytest.fixture
+async def s3_client(minio_container):  # noqa: F811
+    """Create S3Client instance for testing with MinIO container"""
+    container_id, host_port = minio_container
+
+    client = S3Client(
+        bucket_name="test-bucket",
+        endpoint_url=f"http://{host_port.host}:{host_port.port}",
+        region_name="us-east-1",
+        aws_access_key_id="minioadmin",
+        aws_secret_access_key="minioadmin",
+    )
+
+    # Create test bucket
+    session = aioboto3.Session()
+    async with session.client(
+        "s3",
+        endpoint_url=f"http://{host_port.host}:{host_port.port}",
+        region_name="us-east-1",
+        aws_access_key_id="minioadmin",
+        aws_secret_access_key="minioadmin",
+    ) as s3_admin:
+        try:
+            await s3_admin.create_bucket(Bucket="test-bucket")
+        except ClientError as e:
+            # Bucket might already exist
+            if e.response["Error"]["Code"] != "BucketAlreadyOwnedByYou":
+                raise
+
+    return client

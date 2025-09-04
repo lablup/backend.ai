@@ -14,7 +14,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..types import RedisTarget
 from .queue import AbstractMessageQueue
-from .types import BroadcastMessage, MessageId, MQMessage
+from .types import BroadcastMessage, BroadcastPayload, MessageId, MQMessage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -121,6 +121,42 @@ class HiRedisQueue(AbstractMessageQueue):
             if reply is None:
                 return None
             return load_json(reply)
+
+    async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
+        """
+        Broadcast multiple messages in a batch with optional caching.
+        This method broadcasts multiple messages to all subscribers.
+        """
+        if self._closed:
+            raise RuntimeError("Queue is closed")
+        if not events:
+            return
+
+        async with RedisConnection(self._target, db=self._db) as client:
+            pipeline_commands: list[list[str | bytes | int]] = []
+            for event in events:
+                payload_bytes: bytes = dump_json(event.payload)
+                # Only add cache commands if cache_id is provided
+                if event.cache_id:
+                    pipeline_commands.extend([
+                        [
+                            "SET",
+                            event.cache_id,
+                            payload_bytes,
+                        ],
+                        [
+                            "EXPIRE",
+                            event.cache_id,
+                            60,  # Set a default expiration time of 60 seconds
+                        ],
+                    ])
+                # Always publish the message
+                pipeline_commands.append([
+                    "PUBLISH",
+                    self._broadcast_channel,
+                    payload_bytes,
+                ])
+            await client.pipeline(pipeline_commands)
 
     async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore
         """

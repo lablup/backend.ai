@@ -145,6 +145,7 @@ It also monitors and scales the cluster of multiple agents (a few tens to hundre
   * Legacy per-pkg repo: https://github.com/lablup/backend.ai-manager
   * Available plugin interfaces
     - `backendai_scheduler_v10`
+    - `backendai_agentselector_v10`
     - `backendai_hook_v20`
     - `backendai_webapp_v20`
     - `backendai_monitor_stats_v10`
@@ -301,7 +302,7 @@ To build:
 
 ```bash
 # Build wheels or SCIE packages
-./scripts/build-wheel.sh
+./scripts/build-wheels.sh
 ./scripts/build-scies.sh
 ```
 

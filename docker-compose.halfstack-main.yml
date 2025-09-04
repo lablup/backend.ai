@@ -9,8 +9,8 @@ services:
     ports:
       - "8100:5432"
     environment:
-      - POSTGRES_PASSWORD=develove
       - POSTGRES_DB=backend
+      - POSTGRES_PASSWORD=develove
     volumes:
       - "./volumes/${DATADIR_PREFIX:-.}/postgres-data:/var/lib/postgresql/data:rw"
     healthcheck:
@@ -133,6 +133,7 @@ services:
 
   backendai-half-otel-collector:
     image: otel/opentelemetry-collector-contrib:0.126.0
+    restart: unless-stopped
     networks:
       - half
     command: ["--config=/etc/otel-collector-config.yaml"]
@@ -144,6 +145,7 @@ services:
 
   backendai-half-loki:
     image: grafana/loki:3.5.0
+    restart: unless-stopped
     networks:
       - half
     command: -config.file=/etc/loki/local-config.yaml
@@ -154,6 +156,7 @@ services:
 
   backendai-half-tempo:
     image: grafana/tempo:2.7.2
+    restart: unless-stopped
     networks:
       - half
     command: [ "-config.file=/etc/tempo.yaml" ]
@@ -164,6 +167,44 @@ services:
       - "3200" # tempo
       - "4317" # otlp grpc
 
+  backendai-half-apollo-router:
+    image: ghcr.io/apollographql/router:v1.61.9
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./configs/graphql:/etc/graphql
+      - ./docs/manager/graphql-reference:/etc/schemas
+    command:
+      - "--config"
+      - "/etc/graphql/router.yaml"
+      - "--supergraph"
+      - "/etc/schemas/supergraph.graphql"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  backendai-half-minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "9000:9000"    # API port
+      - "9001:9001"    # Console port
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    volumes:
+      - half-minio:/data:rw
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
 networks:
   half:
 
@@ -171,3 +212,4 @@ volumes:
   half-grafana:
   half-pyroscope:
   half-tempo:
+  half-minio:

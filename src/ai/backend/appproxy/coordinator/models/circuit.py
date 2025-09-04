@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Sequence
+from typing import TYPE_CHECKING, Any, Optional, Sequence
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -243,7 +243,7 @@ class Circuit(Base, BaseMixin):
 
         return c
 
-    async def get_endpoint_url(self) -> URL:
+    async def get_endpoint_url(self, session: Optional[AsyncSession] = None) -> URL:
         from .worker import Worker
 
         worker: Worker = self.worker_row
@@ -253,6 +253,9 @@ class Circuit(Base, BaseMixin):
             return await self.static_address.get_endpoint_url(worker, self.protocol)
 
         # Legacy behavior - use direct port/subdomain
+        if session is not None:
+            worker = await Worker.get(session, self.worker)
+
         match (worker.use_tls, self.protocol):
             case (True, ProxyProtocol.TCP):
                 scheme = "tls"

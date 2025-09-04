@@ -23,6 +23,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common import validators as tx
+from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
     ClusterMode,
     KernelId,
@@ -31,9 +32,10 @@ from ai.backend.common.types import (
     SessionResult,
     VFolderMount,
 )
-from ai.backend.manager.data.session.types import SessionData
+from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import ReportInfo
+from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import agg_to_array
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
@@ -66,16 +68,16 @@ from ..gql_relay import (
 from ..minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ..minilang.ordering import ColumnMapType, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecType, QueryFilterParser
-from ..rbac import ScopeType
+from ..rbac import ScopeType, SystemScope
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import ComputeSessionPermission
+from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from ..session import (
     DEFAULT_SESSION_ORDERING,
     SESSION_PRIORITY_MAX,
     SESSION_PRIORITY_MIN,
     SessionDependencyRow,
     SessionRow,
-    SessionStatus,
     SessionTypes,
     by_domain_name,
     by_raw_filter,
@@ -90,6 +92,8 @@ from ..types import (
     load_related_field,
 )
 from ..user import UserRole, UserRow
+from ..vfolder import VFolderRow
+from ..vfolder import get_permission_ctx as get_vfolder_permission_ctx
 from .group import GroupRow
 from .kernel import ComputeContainer, KernelConnection, KernelNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode
@@ -209,6 +213,7 @@ class ComputeSessionNode(graphene.ObjectType):
     domain_name = graphene.String()
     project_id = graphene.UUID()
     user_id = graphene.UUID()
+    owner = graphene.Field(UserNode, description="Added in 25.13.0.")
     access_key = graphene.String()
     permissions = graphene.List(
         SessionPermissionValueField,
@@ -225,6 +230,8 @@ class ComputeSessionNode(graphene.ObjectType):
     terminated_at = GQLDateTime()
     starts_at = GQLDateTime()
     scheduled_at = GQLDateTime()
+
+    queue_position = graphene.Int(description="Added in 25.13.0.")
 
     startup_command = graphene.String()
     result = graphene.String()
@@ -289,6 +296,21 @@ class ComputeSessionNode(graphene.ObjectType):
             stmt = option(stmt)
         return stmt
 
+    async def resolve_queue_position(self, info: graphene.ResolveInfo) -> Optional[int]:
+        if self.status != SessionStatus.PENDING:
+            return None
+        graph_ctx: GraphQueryContext = info.context
+        loader = graph_ctx.dataloader_manager.get_loader_by_func(
+            graph_ctx, self._batch_load_queue_position
+        )
+        return await loader.load(self.row_id)
+
+    async def _batch_load_queue_position(
+        self, ctx: GraphQueryContext, session_ids: Sequence[SessionId]
+    ) -> list[Optional[int]]:
+        positions = await ctx.valkey_schedule.get_queue_positions(session_ids)
+        return positions
+
     @classmethod
     def from_row(
         cls,
@@ -315,6 +337,7 @@ class ComputeSessionNode(graphene.ObjectType):
             project_id=row.group_id,
             user_id=row.user_uuid,
             access_key=row.access_key,
+            owner=UserNode.from_row(ctx, row.user),
             # status
             status=row.status.name,
             # status_changed=row.status_changed,  # FIXME: generated attribute
@@ -359,6 +382,9 @@ class ComputeSessionNode(graphene.ObjectType):
         else:
             vfolder_mounts = [vf.vfid.folder_id for vf in session_data.vfolder_mounts]
 
+        if session_data.owner is None:
+            raise SessionWithInvalidStateError()
+
         result = cls(
             # identity
             id=session_data.id,  # auto-converted to Relay global ID
@@ -375,6 +401,7 @@ class ComputeSessionNode(graphene.ObjectType):
             project_id=session_data.group_id,
             user_id=session_data.user_uuid,
             access_key=session_data.access_key,
+            owner=UserNode.from_dataclass(ctx, session_data.owner),
             # status
             status=session_data.status.name,
             # status_changed=row.status_changed,  # FIXME: generated attribute
@@ -420,6 +447,28 @@ class ComputeSessionNode(graphene.ObjectType):
         result = cast(list[list[VirtualFolderNode]], await loader.load_many(_folder_ids))
 
         vf_nodes = cast(list[VirtualFolderNode], list(more_itertools.flatten(result)))
+
+        # Calculate permissions for each node
+        if vf_nodes:
+            async with ctx.db.connect() as db_conn:
+                user = ctx.user
+                client_ctx = ClientContext(ctx.db, user["domain_name"], user["uuid"], user["role"])
+                permission_ctx = await get_vfolder_permission_ctx(
+                    db_conn, client_ctx, SystemScope(), VFolderRBACPermission.READ_ATTRIBUTE
+                )
+
+                # Load VFolderRow for each node to calculate permissions
+                query = sa.select(VFolderRow).where(VFolderRow.id.in_(_folder_ids))
+                async with ctx.db.begin_readonly_session(db_conn) as db_session:
+                    vfolder_rows = {row.id: row for row in await db_session.scalars(query)}
+
+                # Update permissions for each node
+                for node in vf_nodes:
+                    if node.row_id in vfolder_rows:
+                        node.permissions = await permission_ctx.calculate_final_permission(
+                            vfolder_rows[node.row_id]
+                        )
+
         return ConnectionResolverResult(vf_nodes, None, None, None, total_count=len(vf_nodes))
 
     async def resolve_kernel_nodes(
@@ -490,7 +539,13 @@ class ComputeSessionNode(graphene.ObjectType):
             query = sa.select(dependency_cte.c.id)
             session_ids = (await db_sess.execute(query)).scalars().all()
             # Get the session rows in the graph
-            query = sa.select(SessionRow).where(SessionRow.id.in_(session_ids))
+            query = (
+                sa.select(SessionRow)
+                .where(SessionRow.id.in_(session_ids))
+                .options(
+                    selectinload(SessionRow.user),
+                )
+            )
             session_rows = (await db_sess.execute(query)).scalars().all()
 
         # Convert into GraphQL node objects

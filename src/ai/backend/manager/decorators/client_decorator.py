@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from typing import Awaitable, Callable, ParamSpec, TypeVar
+from typing import Any, Callable, Coroutine, ParamSpec, TypeVar
 
 from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.metrics.metric import DomainType, LayerMetricObserver, LayerType
@@ -36,8 +36,8 @@ def create_layer_aware_client_decorator(
         retry_count: int = default_retry_count,
         retry_delay: float = default_retry_delay,
     ) -> Callable[
-        [Callable[P, Awaitable[R]]],
-        Callable[P, Awaitable[R]],
+        [Callable[P, Coroutine[Any, Any, R]]],
+        Callable[P, Coroutine[Any, Any, R]],
     ]:
         """
         Decorator for client operations that adds retry logic and metrics.
@@ -46,7 +46,9 @@ def create_layer_aware_client_decorator(
         to external users. Internal/private methods should not use this decorator.
         """
 
-        def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+        def decorator(
+            func: Callable[P, Coroutine[Any, Any, R]],
+        ) -> Callable[P, Coroutine[Any, Any, R]]:
             observer = LayerMetricObserver.instance()
             operation = func.__name__
 

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.services.session.actions.get_session_info import (
     GetSessionInfoAction,
     GetSessionInfoActionResult,
@@ -13,8 +13,9 @@ from ai.backend.manager.services.session.actions.get_session_info import (
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.types import LegacySessionInfo
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
+    AGENT_FIXTURE_DICT,
     KERNEL_FIXTURE_DICT,
     KERNEL_ROW_FIXTURE,
     SESSION_FIXTURE_DATA,
@@ -69,7 +70,7 @@ def mock_increment_session_usage_rpc(mocker):
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Get session info",
             GetSessionInfoAction(
                 session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -86,6 +87,7 @@ def mock_increment_session_usage_rpc(mocker):
     "extra_fixtures",
     [
         {
+            "agents": [AGENT_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
         }
@@ -94,7 +96,7 @@ def mock_increment_session_usage_rpc(mocker):
 async def test_get_session_info(
     mock_increment_session_usage_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[GetSessionInfoAction, GetSessionInfoActionResult],
+    test_scenario: ScenarioBase[GetSessionInfoAction, GetSessionInfoActionResult],
 ):
     # Execute the actual service
     result = await processors.get_session_info.wait_for_complete(test_scenario.input)

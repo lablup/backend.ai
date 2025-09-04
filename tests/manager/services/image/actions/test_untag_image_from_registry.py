@@ -20,7 +20,7 @@ from ...fixtures import (
     IMAGE_FIXTURE_DICT,
     IMAGE_ROW_FIXTURE,
 )
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ HARBOR2_REGISTRY_FIXTURE_DICT["type"] = "harbor2"
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Success Case",
             UntagImageFromRegistryAction(
                 user_id=uuid.uuid4(),
@@ -51,7 +51,7 @@ HARBOR2_REGISTRY_FIXTURE_DICT["type"] = "harbor2"
                 image=IMAGE_FIXTURE_DATA,
             ),
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "When the user is not SUPERADMIN, and the user is not the image's owner, raise Generic Forbidden Error",
             UntagImageFromRegistryAction(
                 user_id=uuid.uuid4(),
@@ -60,7 +60,7 @@ HARBOR2_REGISTRY_FIXTURE_DICT["type"] = "harbor2"
             ),
             ForgetImageForbiddenError,
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Image not found",
             UntagImageFromRegistryAction(
                 user_id=uuid.uuid4(),
@@ -87,6 +87,6 @@ HARBOR2_REGISTRY_FIXTURE_DICT["type"] = "harbor2"
 async def test_untag_image_from_registry(
     mock_harbor_v2_untag,
     processors: ImageProcessors,
-    test_scenario: TestScenario[UntagImageFromRegistryAction, UntagImageFromRegistryActionResult],
+    test_scenario: ScenarioBase[UntagImageFromRegistryAction, UntagImageFromRegistryActionResult],
 ):
     await test_scenario.test(processors.untag_image_from_registry.wait_for_complete)

@@ -287,26 +287,26 @@ async def server_main(
     internal_app = build_internal_app()
     root_ctx: RootContext = root_app["_root.context"]
 
-    local_cfg = cast(ServerConfig, root_ctx.local_config)
-    am_cfg = cast(AccountManagerConfig, local_cfg.account_manager)
+    local_config = cast(ServerConfig, root_ctx.local_config)
+    am_config = cast(AccountManagerConfig, local_config.account_manager)
     Profiler(
         pyroscope_args=PyroscopeArgs(
-            enabled=local_cfg.pyroscope.enabled,
-            application_name=local_cfg.pyroscope.app_name,
-            server_address=local_cfg.pyroscope.server_addr,
-            sample_rate=local_cfg.pyroscope.sample_rate,
+            enabled=local_config.pyroscope.enabled,
+            application_name=local_config.pyroscope.app_name,
+            server_address=local_config.pyroscope.server_addr,
+            sample_rate=local_config.pyroscope.sample_rate,
         )
     )
 
     # Start aiomonitor.
     # Port is set by config (default=50100 + pidx).
-    loop.set_debug(local_cfg.debug.asyncio)
+    loop.set_debug(local_config.debug.asyncio)
     m = aiomonitor.Monitor(
         loop,
-        termui_port=am_cfg.aiomonitor_termui_port + pidx,
-        webui_port=am_cfg.aiomonitor_webui_port + pidx,
+        termui_port=am_config.aiomonitor_termui_port + pidx,
+        webui_port=am_config.aiomonitor_webui_port + pidx,
         console_enabled=False,
-        hook_task_factory=local_cfg.debug.enhanced_aiomonitor_task_info,
+        hook_task_factory=local_config.debug.enhanced_aiomonitor_task_info,
     )
     m.prompt = f"monitor (manager[{pidx}@{os.getpid()}]) >>> "
     # Add some useful console_locals for ease of debugging
@@ -323,21 +323,21 @@ async def server_main(
     # which freezes on_startup event.
     try:
         ssl_ctx = None
-        if am_cfg.ssl_enabled:
-            assert am_cfg.ssl_cert is not None, (
+        if am_config.ssl_enabled:
+            assert am_config.ssl_cert is not None, (
                 "Should set `account_manager.ssl-cert` in config file."
             )
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             ssl_ctx.load_cert_chain(
-                str(am_cfg.ssl_cert),
-                str(am_cfg.ssl_privkey),
+                str(am_config.ssl_cert),
+                str(am_config.ssl_privkey),
             )
 
         runner = web.AppRunner(root_app, keepalive_timeout=30.0)
         internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
         await runner.setup()
         await internal_runner.setup()
-        service_addr = am_cfg.service_addr
+        service_addr = am_config.service_addr
         site = web.TCPSite(
             runner,
             str(service_addr.host),
@@ -348,8 +348,8 @@ async def server_main(
         )
         internal_site = web.TCPSite(
             internal_runner,
-            str(am_cfg.internal_addr.host),
-            am_cfg.internal_addr.port,
+            str(am_config.internal_addr.host),
+            am_config.internal_addr.port,
             backlog=1024,
             reuse_port=True,
         )
@@ -357,8 +357,8 @@ async def server_main(
         await internal_site.start()
 
         if os.geteuid() == 0:
-            uid = am_cfg.user
-            gid = am_cfg.group
+            uid = am_config.user
+            gid = am_config.group
             os.setgroups([
                 g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem
             ])
@@ -415,35 +415,36 @@ async def server_main_logwrapper(
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="A shortcut to set `--log-level=DEBUG`",
 )
 @click.option(
     "--log-level",
     type=click.Choice([*LogLevel], case_sensitive=False),
-    default=LogLevel.INFO,
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
 def main(
     ctx: click.Context,
-    config_path: Path,
+    config_path: Optional[Path],
+    debug: bool,
     log_level: LogLevel,
-    debug: bool = False,
 ) -> None:
     """
     Start the account-manager service as a foreground process.
     """
-    cfg = load_config(config_path, log_level)
+    log_level = LogLevel.DEBUG if debug else log_level
+    server_config = load_config(config_path, log_level)
 
     if ctx.invoked_subcommand is None:
-        account_manager_cfg = cast(AccountManagerConfig, cfg.account_manager)
+        account_manager_cfg = cast(AccountManagerConfig, server_config.account_manager)
         account_manager_cfg.pid_file.touch(exist_ok=True)
         account_manager_cfg.pid_file.write_text(str(os.getpid()))
         ipc_base_path = account_manager_cfg.ipc_base_path
         ipc_base_path.mkdir(exist_ok=True, parents=True)
         log_sockpath = ipc_base_path / f"account-manager-logger-{os.getpid()}.sock"
         log_endpoint = f"ipc://{log_sockpath}"
-        logging_config = cfg.logging  # type: ignore[attr-defined]
+        logging_config = server_config.logging  # type: ignore[attr-defined]
         try:
             logger = Logger(
                 logging_config,
@@ -469,7 +470,7 @@ def main(
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=account_manager_cfg.num_workers,
-                        args=(cfg, log_endpoint),
+                        args=(server_config, log_endpoint),
                         wait_timeout=5.0,
                     )
                 finally:

@@ -59,7 +59,6 @@ from ai.backend.common.events.event_types.session.broadcast import (
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AccessKey,
-    CIStrEnum,
     ClusterMode,
     KernelId,
     ResourceSlot,
@@ -68,12 +67,27 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.user.types import UserData
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.session.types import SessionData
+from ai.backend.manager.data.session.types import (
+    ImageSpec,
+    MountSpec,
+    ResourceSpec,
+    SessionData,
+    SessionExecution,
+    SessionIdentity,
+    SessionInfo,
+    SessionLifecycle,
+    SessionMetadata,
+    SessionMetrics,
+    SessionNetwork,
+    SessionStatus,
+)
 
 from ..defs import DEFAULT_ROLE
 from ..errors.kernel import (
@@ -101,7 +115,7 @@ from .base import (
 )
 from .group import GroupRow
 from .image import ImageRow
-from .kernel import KernelRow, KernelStatus
+from .kernel import KernelRow
 from .minilang.queryfilter import FieldSpecType, QueryFilterParser
 from .network import NetworkRow, NetworkType
 from .rbac import (
@@ -138,7 +152,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 __all__ = (
     "determine_session_status_by_kernels",
     "handle_session_exception",
-    "SessionStatus",
     "ALLOWED_IMAGE_ROLES_FOR_SESSION_TYPE",
     "PRIVATE_SESSION_TYPES",
     "SESSION_STATUS_TRANSITION_MAP",
@@ -152,37 +165,6 @@ __all__ = (
 )
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.session"))
-
-
-class SessionStatus(CIStrEnum):
-    # values are only meaningful inside the manager
-    PENDING = "PENDING"
-    # ---
-    SCHEDULED = "SCHEDULED"
-    PREPARING = "PREPARING"
-    # manager can set PENDING, SCHEDULED and PREPARING independently
-    # ---
-    PULLING = "PULLING"
-    PREPARED = "PREPARED"
-    CREATING = "CREATING"
-    # ---
-    RUNNING = "RUNNING"
-    RESTARTING = "RESTARTING"
-    RUNNING_DEGRADED = "RUNNING_DEGRADED"
-    # ---
-    TERMINATING = "TERMINATING"
-    TERMINATED = "TERMINATED"
-    ERROR = "ERROR"
-    CANCELLED = "CANCELLED"
-
-    @classmethod
-    def kernel_awaiting_statuses(cls) -> set[SessionStatus]:
-        return {
-            cls.PREPARING,
-            cls.PULLING,
-            cls.CREATING,
-            cls.TERMINATING,
-        }
 
 
 FOLLOWING_SESSION_STATUSES = (
@@ -215,12 +197,13 @@ AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
     )
 )
 
+# statuses that occupy user resources
+# these statuses are used to calculate user resource usage
 USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
     e
     for e in SessionStatus
     if e
     not in (
-        SessionStatus.TERMINATING,
         SessionStatus.TERMINATED,
         SessionStatus.PENDING,
         SessionStatus.CANCELLED,
@@ -344,6 +327,7 @@ SESSION_STATUS_TRANSITION_MAP: Mapping[SessionStatus, set[SessionStatus]] = {
 }
 
 
+# TODO:
 def determine_session_status_by_kernels(kernels: Sequence[KernelRow]) -> SessionStatus:
     if not kernels:
         raise KernelNotFound
@@ -717,6 +701,7 @@ class SessionRow(Base):
     )
     cluster_size = sa.Column("cluster_size", sa.Integer, nullable=False, default=1)
     agent_ids = sa.Column("agent_ids", sa.ARRAY(sa.String), nullable=True)
+    designated_agent_ids = sa.Column("designated_agent_ids", sa.ARRAY(sa.String), nullable=True)
     kernels = relationship("KernelRow", back_populates="session")
 
     # Resource ownership
@@ -771,6 +756,7 @@ class SessionRow(Base):
     use_host_network = sa.Column("use_host_network", sa.Boolean(), default=False, nullable=False)
 
     # Lifecycle
+    # Deprecated: Not used anymore
     timeout = sa.Column("timeout", sa.BigInteger(), nullable=True)
     batch_timeout = sa.Column(
         "batch_timeout", sa.BigInteger(), nullable=True
@@ -867,6 +853,13 @@ class SessionRow(Base):
         ),
         sa.Index("ix_sessions_vfolder_mounts", "vfolder_mounts", postgresql_using="gin"),
         sa.Index("ix_session_status_with_priority", "status", "priority"),
+        # Unique index for session names excluding terminal statuses
+        sa.Index(
+            "ix_sessions_unique_name_nonterminal",
+            "name",
+            unique=True,
+            postgresql_where=sa.text("status NOT IN ('ERROR', 'TERMINATED', 'CANCELLED')"),
+        ),
     )
 
     @classmethod
@@ -930,7 +923,7 @@ class SessionRow(Base):
         instance.id = session_data.id
         return instance
 
-    def to_dataclass(self) -> SessionData:
+    def to_dataclass(self, owner: Optional[UserData] = None) -> SessionData:
         return SessionData(
             id=self.id,
             creation_id=self.creation_id,
@@ -971,6 +964,116 @@ class SessionRow(Base):
             network_type=self.network_type,
             network_id=self.network_id,
             service_ports=self.main_kernel.service_ports,
+            owner=owner if owner is not None else None,
+        )
+
+    @classmethod
+    def from_session_info(cls, info: SessionInfo) -> Self:
+        return cls(
+            id=info.identity.id,
+            creation_id=info.identity.creation_id,
+            name=info.identity.name,
+            session_type=info.identity.session_type,
+            priority=info.identity.priority,
+            cluster_mode=info.resource.cluster_mode,
+            cluster_size=info.resource.cluster_size,
+            agent_ids=info.resource.agent_ids,
+            scaling_group_name=info.resource.scaling_group_name,
+            target_sgroup_names=info.resource.target_sgroup_names,
+            domain_name=info.metadata.domain_name,
+            group_id=info.metadata.group_id,
+            user_uuid=info.metadata.user_uuid,
+            access_key=info.metadata.access_key,
+            images=info.image.images,
+            tag=info.image.tag or info.metadata.tag,
+            occupying_slots=info.resource.occupying_slots,
+            requested_slots=info.resource.requested_slots,
+            vfolder_mounts=info.mounts.vfolder_mounts,
+            environ=info.execution.environ,
+            bootstrap_script=info.execution.bootstrap_script,
+            startup_command=info.execution.startup_command,
+            use_host_network=info.execution.use_host_network,
+            batch_timeout=info.lifecycle.batch_timeout,
+            created_at=info.lifecycle.created_at
+            or info.metadata.created_at
+            or datetime.now(tzutc()),
+            terminated_at=info.lifecycle.terminated_at,
+            starts_at=info.lifecycle.starts_at,
+            status=info.lifecycle.status or SessionStatus.PENDING,
+            status_info=info.lifecycle.status_info,
+            status_data=info.lifecycle.status_data,
+            status_history=info.lifecycle.status_history,
+            callback_url=info.execution.callback_url,
+            result=info.lifecycle.result,
+            num_queries=info.metrics.num_queries,
+            last_stat=info.metrics.last_stat,
+            network_type=info.network.network_type,
+            network_id=info.network.network_id,
+        )
+
+    def to_session_info(self) -> SessionInfo:
+        return SessionInfo(
+            identity=SessionIdentity(
+                id=self.id,
+                creation_id=self.creation_id,
+                name=self.name,
+                session_type=self.session_type,
+                priority=self.priority,
+            ),
+            metadata=SessionMetadata(
+                name=self.name,
+                domain_name=self.domain_name,
+                group_id=self.group_id,
+                user_uuid=self.user_uuid,
+                access_key=self.access_key,
+                session_type=self.session_type,
+                priority=self.priority,
+                created_at=self.created_at,
+                tag=self.tag,
+            ),
+            resource=ResourceSpec(
+                cluster_mode=self.cluster_mode,
+                cluster_size=self.cluster_size,
+                occupying_slots=self.occupying_slots,
+                requested_slots=self.requested_slots,
+                scaling_group_name=self.scaling_group_name,
+                target_sgroup_names=self.target_sgroup_names,
+                agent_ids=self.agent_ids,
+            ),
+            image=ImageSpec(
+                images=self.images,
+                tag=self.tag,
+            ),
+            mounts=MountSpec(
+                vfolder_mounts=self.vfolder_mounts,
+            ),
+            execution=SessionExecution(
+                environ=self.environ,
+                bootstrap_script=self.bootstrap_script,
+                startup_command=self.startup_command,
+                use_host_network=self.use_host_network,
+                callback_url=self.callback_url,
+            ),
+            lifecycle=SessionLifecycle(
+                status=self.status,
+                result=self.result,
+                created_at=self.created_at,
+                terminated_at=self.terminated_at,
+                starts_at=self.starts_at,
+                status_changed=self.status_changed,
+                batch_timeout=self.batch_timeout,
+                status_info=self.status_info,
+                status_data=self.status_data,
+                status_history=self.status_history,
+            ),
+            metrics=SessionMetrics(
+                num_queries=self.num_queries,
+                last_stat=self.last_stat,
+            ),
+            network=SessionNetwork(
+                network_type=self.network_type,
+                network_id=self.network_id,
+            ),
         )
 
     @property

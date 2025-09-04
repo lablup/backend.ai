@@ -29,7 +29,6 @@ from ai.backend.appproxy.common.events import (
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.exceptions import ServerMisconfiguredError, ServiceUnavailable
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo, SerializableCircuit
 from ai.backend.appproxy.coordinator.health_checker import HealthCheckEngine
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -40,6 +39,7 @@ from ai.backend.common.metrics.metric import (
     SystemMetricObserver,
 )
 from ai.backend.common.types import AgentId, RedisConnectionInfo
+from ai.backend.logging import BraceStyleAdapter
 
 from .config import ServerConfig
 from .defs import LockID

@@ -51,6 +51,7 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.manager.data.kernel.types import KernelStatus
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -75,7 +76,6 @@ from ..models import (
     ACTIVE_USER_STATUSES,
     AgentStatus,
     EndpointRow,
-    KernelStatus,
     UserRole,
     UserStatus,
     VFolderInvitationState,
@@ -2479,7 +2479,7 @@ async def mount_host(request: web.Request, params: Any) -> web.Response:
             *[_mount(sema, sess, row.id) for row in rows], return_exceptions=True
         )
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 # exceptions are already logged.
                 continue
             resp["agents"][result[0]] = result[1]
@@ -2606,7 +2606,7 @@ async def umount_host(request: web.Request, params: Any) -> web.Response:
             *[_umount(sema, sess, _agent.id) for _agent in _agents], return_exceptions=True
         )
         for result in results:
-            if isinstance(result, Exception):
+            if isinstance(result, BaseException):
                 # exceptions are already logged.
                 continue
             resp["agents"][result[0]] = result[1]

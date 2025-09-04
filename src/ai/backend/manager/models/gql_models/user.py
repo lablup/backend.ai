@@ -13,6 +13,7 @@ from typing import (
 from uuid import UUID
 
 import graphene
+import graphene_federation
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
@@ -22,11 +23,9 @@ from sqlalchemy.engine.row import Row
 from ai.backend.manager.data.user.types import UserCreator, UserData, UserInfoContext
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
-    CreateUserActionResult,
 )
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
-    DeleteUserActionResult,
 )
 from ai.backend.manager.services.user.actions.modify_user import (
     ModifyUserAction,
@@ -35,7 +34,6 @@ from ai.backend.manager.services.user.actions.modify_user import (
 )
 from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
-    PurgeUserActionResult,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -84,6 +82,7 @@ __all__ = (
 )
 
 
+@graphene_federation.key("id")
 class UserNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -151,6 +150,32 @@ class UserNode(graphene.ObjectType):
             container_uid=row.container_uid,
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
+        )
+
+    @classmethod
+    def from_dataclass(cls, ctx: GraphQueryContext, user_data: UserData) -> Self:
+        return cls(
+            id=user_data.id,
+            username=user_data.username,
+            email=user_data.email,
+            need_password_change=user_data.need_password_change,
+            full_name=user_data.full_name,
+            description=user_data.description,
+            is_active=user_data.is_active,
+            status=user_data.status,
+            status_info=user_data.status_info,
+            created_at=user_data.created_at,
+            modified_at=user_data.modified_at,
+            domain_name=user_data.domain_name,
+            role=user_data.role,
+            resource_policy=user_data.resource_policy,
+            allowed_client_ip=user_data.allowed_client_ip,
+            totp_activated=user_data.totp_activated,
+            totp_activated_at=user_data.totp_activated_at,
+            sudo_session_enabled=user_data.sudo_session_enabled,
+            container_uid=user_data.container_uid,
+            container_main_gid=user_data.container_main_gid,
+            container_gids=user_data.container_gids,
         )
 
     @classmethod
@@ -896,14 +921,12 @@ class CreateUser(graphene.Mutation):
         graph_ctx: GraphQueryContext = info.context
         action: CreateUserAction = props.to_action(email)
 
-        res: CreateUserActionResult = await graph_ctx.processors.user.create_user.wait_for_complete(
-            action
-        )
+        action_result = await graph_ctx.processors.user.create_user.wait_for_complete(action)
 
         return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
-            user=User.from_dto(res.data) if res.data else None,
+            ok=True,
+            msg="success",
+            user=User.from_dto(action_result.data),
         )
 
 
@@ -934,9 +957,9 @@ class ModifyUser(graphene.Mutation):
         )
 
         return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
-            user=User.from_dto(res.data) if res.data else None,
+            ok=True,
+            msg="success",
+            user=User.from_dto(res.data),
         )
 
 
@@ -963,15 +986,11 @@ class DeleteUser(graphene.Mutation):
         email: str,
     ) -> DeleteUser:
         graph_ctx: GraphQueryContext = info.context
-
         action = DeleteUserAction(email)
-        res: DeleteUserActionResult = await graph_ctx.processors.user.delete_user.wait_for_complete(
-            action
-        )
-
+        await graph_ctx.processors.user.delete_user.wait_for_complete(action)
         return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
+            ok=True,
+            msg="success",
         )
 
 
@@ -1016,11 +1035,9 @@ class PurgeUser(graphene.Mutation):
         )
         action = props.to_action(email, user_info_ctx)
 
-        res: PurgeUserActionResult = await graph_ctx.processors.user.purge_user.wait_for_complete(
-            action
-        )
+        await graph_ctx.processors.user.purge_user.wait_for_complete(action)
 
         return cls(
-            ok=res.success,
-            msg="success" if res.success else "failed",
+            ok=True,
+            msg="success",
         )

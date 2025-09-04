@@ -27,6 +27,7 @@ from ai.backend.common.types import (
     KernelId,
     SessionId,
 )
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.base import (
     Item,
     PaginatedList,
@@ -50,7 +51,6 @@ from ..kernel import (
     DEFAULT_KERNEL_ORDERING,
     LIVE_STATUS,
     KernelRow,
-    KernelStatus,
     kernels,
 )
 from ..user import UserRole, users

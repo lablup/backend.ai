@@ -1,9 +1,7 @@
-python_sources(
-    name="conftest",
-    sources=["conftest.py"],
-)
-
+python_test_utils()
 python_tests(
     name="tests",
-    dependencies=[":conftest"],
+    dependencies=[
+        "src/ai/backend/manager:src",
+    ],
 )

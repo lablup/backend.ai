@@ -35,13 +35,14 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.registry import AgentRegistry
 
 from ...models.endpoint import EndpointRow
 from ...models.routing import RouteStatus, RoutingRow
-from ...models.session import KernelLoadingStrategy, SessionRow, SessionStatus
+from ...models.session import KernelLoadingStrategy, SessionRow
 from ...models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,

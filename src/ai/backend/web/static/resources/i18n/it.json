@@ -339,10 +339,12 @@
       "CannotDeleteFolder": "Impossibile eliminare la cartella montata in una o più sessioni. Si prega di terminare prima la sessione.",
       "CannotDeletePipelineFolder": "Non puoi eliminare le cartelle della pipeline.",
       "CannotRestorePipelineFolder": "Non puoi ripristinare le cartelle della pipeline.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Le cartelle del progetto di modello possono essere create solo in progetti esclusivi del negozio di modelli. \nModificare il progetto corrente o il tipo di utente.",
       "CloneAFolder": "Clonare una cartella",
       "CloneFolder": "Clona la cartella",
       "Cloneable": "Clonabile",
       "Control": "Controllo",
+      "CreateModelFolderOnlyInExclusiveProject": "Le cartelle del progetto di modello possono essere create solo in progetti esclusivi del negozio di modelli.",
       "CreatedAt": "Creato a",
       "Delete": "Elimina",
       "DeleteAFolder": "Elimina una cartella",
@@ -397,6 +399,7 @@
       "Path": "Percorso di archiviazione",
       "Permission": "Autorizzazione",
       "ProjectFolderAlertDesc": "Questa cartella è condivisa con tutti i membri del progetto",
+      "ProjectFolderCreationHelp": "Verrà creata una cartella accessibile da \"{{projectName}}\". Gli utenti del progetto.",
       "Rename": "Rinominare",
       "Restore": "Ristabilire",
       "RestoreDescription": "Vuoi ripristinare la cartella \"{{ folderName }}\"?",
@@ -617,6 +620,7 @@
     "SmallerResourceThenImageRequires": "La richiesta di risorse è inferiore al minimo richiesto dall'immagine. Provare con altre risorse.",
     "TooManyLoginFailures": "Si sono verificati troppi errori di accesso in poco tempo. L'accesso è bloccato per un po'.",
     "UnauthorizedToken": "Token non autorizzato. Controllare il token.",
+    "UnexpectedError": "Si è verificato un errore imprevisto. \nRiprova più tardi o contatta il supporto se il problema persiste.",
     "UnknownError": "Si è verificato un errore sconosciuto. Si prega di riprovare.",
     "UpdateError": "Errore di aggiornamento",
     "UserHasNoGroup": "L'utente non ha un gruppo. Contattare l'amministratore per risolvere il problema.",
@@ -633,8 +637,10 @@
     "Title": "Si è verificato un errore."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Cartella non trovata o accesso negata",
     "InputTooShort": "Inputtroppo corto",
     "NoExplorerSupportForUnmanagedFolder": "Le cartelle non gestite non supportano l'esploratore dei file.",
+    "NoPermissions": "Nessuna autorizzazione per accedere a questa cartella",
     "ValueRequired": "ValoreRichiesto"
   },
   "general": {
@@ -769,6 +775,9 @@
   "kernel": {
     "AgentId": "ID agente",
     "ContainerId": "ID contenitore",
+    "ContainerLogs": "Registri del contenitore",
+    "Hostname": "Nome host",
+    "Kernel": "Kernel",
     "KernelId": "Kernel ID",
     "Kernels": "Kernels",
     "Role": "Ruolo",
@@ -909,6 +918,7 @@
     "EndpointName": "Nome del punto finale",
     "Error": "Errore",
     "ExpiredDate": "Data di scadenza",
+    "ExtraMountsWarning": "Durante la modifica del servizio, il nome (alias) di cartelle montate aggiuntive non può essere mantenuto. \nSi prega di ricontrollare i nomi delle cartelle prima di salvare.",
     "FailedToStartService": "Impossibile creare il servizio.",
     "FailedToTerminateService": "La richiesta di terminare il servizio è fallita.",
     "FailedToUpdateService": "Impossibile aggiornare il servizio.",
@@ -1023,10 +1033,6 @@
   },
   "pagination": {
     "Total": "{{start}} - {{end}} di {{total}} elementi"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "Ricerca",
-    "ResetFilter": "Reimposta i filtri"
   },
   "registry": {
     "AddRegistry": "Aggiungi registro",
@@ -1194,6 +1200,9 @@
     "SharedMemory": "Memoria condivisa",
     "Updated": "Preimpostazione delle risorse aggiornata"
   },
+  "scheduler": {
+    "PendingSessions": "Sessioni in sospeso"
+  },
   "session": {
     "Agent": "Agente",
     "AgentId": "ID agente",
@@ -1274,12 +1283,15 @@
     "OpenToPublic": "Apri l'app al pubblico",
     "OpenToPublicDesc": "Abilitazione di questa opzione consente l'accesso all'applicazione per tutti gli utenti all'interno della rete.<br /><br /> \nPer la gestione dell'accesso, immettere indirizzi IP specifici nel campo \"IP consentito\".<br /><br /> \nLasciare questo campo vuoto consentirà l'accesso da tutti gli indirizzi IP.<br /><br /> \nPrendi in considerazione l'impostazione delle restrizioni IP quando necessario per la gestione della sicurezza.",
     "Others": "Altri",
+    "PanelSettings": "Impostazioni del pannello",
+    "PendingPosition": "Posizione in coda",
     "PredicateChecks": "Controlli predicati",
     "Preparing": "Preparazione...",
     "PreparingSession": "Preparazione della sessione...",
     "ReadLess": "Leggi di più",
     "ReadMore": "Per saperne di più...",
     "RecentlyCreatedSessions": "Sessioni create di recente",
+    "RecentlyCreatedSessionsTooltip": "Mostra le {{count}} sessioni in esecuzione create più di recente nel progetto corrente",
     "RequestContainerCommit": "Richiesta di impegno del contenitore",
     "Reservation": "Prenotazione",
     "ResourceGroup": "Gruppo di risorse",
@@ -1535,6 +1547,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Atom Max Support",
     "ATOMPlusSupport": "Supporto ATOM+",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Consenti registrazione lato agente",
@@ -1542,6 +1555,7 @@
     "Config": "config",
     "ConfigPerJobSchduler": "Impostazioni del programma di pianificazione",
     "ConfigPerJobSchdulerDescription": "I valori nell'impostazione dell'utilità di pianificazione sono i valori predefiniti da utilizzare quando non sono presenti impostazioni dell'utilità di pianificazione in ogni gruppo di risorse. Se è presente un'impostazione specifica del gruppo di risorse, questo valore verrà ignorato.",
+    "DescATOMMaxSupport": "Usa Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Usa l'acceleratore ATOM+ di Rebellions.",
     "DescATOMSupport": "Utilizzare l'acceleratore ATOM di Rebellions",
     "DescAllowAgentSideRegistration": "Consentire all'agente di registrarsi a manager. Utilizzare solo se il cluster backend.ai è gestito in posizione sicura.",
@@ -1585,6 +1599,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "Supporto GPU ROCm",
     "RegisterNewImagesFromRepo": "Registra nuove immagini dal repository",
+    "RequireATOMMaxPlugin": "Richiede il Plugin Backend.AI ATOM Max.",
     "RequireATOMPlugin": "Richiede il plugin Backend.AI ATOM.",
     "RequireATOMPlusPlugin": "Richiede il plugin Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Richiede il plug-in di livello API CUDA virtuale Backend.AI.",
@@ -1749,6 +1764,7 @@
   },
   "summary": {
     "ATOMEnabled": "NPU ATOM abilitata",
+    "ATOMMaxEnabled": "Atom Max NPU abilitato",
     "ATOMPlusEnabled": "NPU ATOM+ abilitata",
     "Accept": "Accettare",
     "AcceptSharedVFolder": "Ora puoi accedere alla cartella:",
@@ -1968,6 +1984,7 @@
       "MyResources": "Le mie risorse",
       "MyResourcesDescription": "<p> Questo panel mostra il tuo utilizzo totale delle risorse e rimanendo in tutti i progetti e gruppi di risorse. </p> <p> Quando ci sono più limiti (come dominio, progetto o tastiera), il limite più restrittivo viene applicato per mostrare il tuo utilizzo e la capacità rimanente. </p>",
       "MyResourcesIn": "Le mie risorse in",
+      "MyResourcesInResourceGroup": "Le mie risorse nel gruppo di risorse",
       "MyResourcesInResourceGroupDescription": "Questo pannello mostra il tuo attuale utilizzo delle risorse e rimanendo nel gruppo di risorse selezionato.",
       "NewPassword": "Nuova password",
       "NewPasswordAgain": "Conferma la nuova password)",
@@ -1987,6 +2004,7 @@
       "Remaining": "Rimanente",
       "ResourcePolicy": "Politica delle risorse",
       "Resources": "risorse",
+      "Scheduler": "Scheduler",
       "Serving": "Servire",
       "Sessions": "sessioni",
       "Settings": "impostazioni",
@@ -1998,6 +2016,7 @@
       "Tasks": "Compiti",
       "TermsOfService": "Termini di servizio",
       "TotalResourcesIn": "Risorse totali in",
+      "TotalResourcesInResourceGroup": "Risorse totali nel gruppo di risorse",
       "TotalResourcesInResourceGroupDescription": "Questo pannello mostra le risorse totali utilizzate e rimanenti. \nI valori vengono calcolati aggiungendo l'utilizzo e le quantità rimanenti di tutti gli agenti utilizzando il gruppo di risorse selezionato.",
       "TotpActivated": "2FA abilitato",
       "Update": "Aggiornare",

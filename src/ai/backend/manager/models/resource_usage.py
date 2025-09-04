@@ -11,12 +11,13 @@ import sqlalchemy as sa
 from sqlalchemy.orm import joinedload, load_only
 
 from ai.backend.common.utils import nmget
+from ai.backend.manager.data.kernel.types import KernelStatus
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
 from .group import GroupRow
-from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow, KernelStatus
+from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow
 from .session import SessionRow
 from .user import UserRow
 from .utils import ExtendedAsyncSAEngine
@@ -514,7 +515,7 @@ async def parse_resource_usage_groups(
             used_days=kern.get_used_days(local_tz),
             last_stat=stat_map[kern.id],
             user_id=kern.session.user_uuid,
-            user_email=kern.session.user.email,
+            user_email=kern.session.user.email if kern.session.user is not None else None,
             access_key=kern.session.access_key,
             project_id=kern.session.group.id if kern.session.group is not None else None,
             project_name=kern.session.group.name if kern.session.group is not None else None,
@@ -523,7 +524,7 @@ async def parse_resource_usage_groups(
             session_id=kern.session_id,
             session_name=kern.session.name,
             domain_name=kern.session.domain_name,
-            full_name=kern.session.user.full_name,
+            full_name=kern.session.user.full_name if kern.session.user is not None else None,
             images={kern.image},
             agents={kern.agent},
             status=kern.status.name,

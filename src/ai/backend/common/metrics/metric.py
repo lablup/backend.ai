@@ -402,6 +402,8 @@ class LayerType(enum.StrEnum):
     # Repository layers
     AGENT = "agent"
     AUTH = "auth"
+    ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact_registry"
     CONTAINER_REGISTRY = "container_registry"
     DOMAIN = "domain"
     GROUP = "group"
@@ -417,14 +419,18 @@ class LayerType(enum.StrEnum):
     USER_RESOURCE_POLICY = "user_resource_policy"
     VFOLDER = "vfolder"
     PERMISSION_CONTROL = "permission_control"
+    OBJECT_STORAGE = "object_storage"
 
     # Valkey client layers
+    VALKEY_CONTAINER_LOG = "valkey_container_log"
     VALKEY_IMAGE = "valkey_image"
     VALKEY_LIVE = "valkey_live"
     VALKEY_RATE_LIMIT = "valkey_rate_limit"
+    VALKEY_SCHEDULE = "valkey_schedule"
     VALKEY_SESSION = "valkey_session"
     VALKEY_STAT = "valkey_stat"
     VALKEY_STREAM = "valkey_stream"
+    VALKEY_BGTASK = "valkey_bgtask"
 
     # Client layers
     AGENT_CLIENT = "agent_client"
@@ -598,6 +604,52 @@ class SweeperMetricObserver:
         self._kernel_sweep_count.labels(success=success).inc()
 
 
+class EventPropagatorMetricObserver:
+    _instance: Optional[Self] = None
+
+    _propagator_count: Gauge
+    _propagator_alias_count: Gauge
+    _propagator_registration_count: Counter
+    _propagator_unregistration_count: Counter
+
+    def __init__(self) -> None:
+        self._propagator_count = Gauge(
+            name="backendai_event_propagator_count",
+            documentation="Current number of active event propagators",
+        )
+        self._propagator_alias_count = Gauge(
+            name="backendai_event_propagator_alias_count",
+            documentation="Current number of event propagator aliases",
+            labelnames=["domain", "alias_id"],
+        )
+        self._propagator_registration_count = Counter(
+            name="backendai_event_propagator_registration_count",
+            documentation="Total number of event propagator registrations",
+        )
+        self._propagator_unregistration_count = Counter(
+            name="backendai_event_propagator_unregistration_count",
+            documentation="Total number of event propagator unregistrations",
+        )
+
+    @classmethod
+    def instance(cls) -> Self:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
+    def observe_propagator_registered(self, *, aliases: list[tuple[str, str]]) -> None:
+        self._propagator_count.inc()
+        self._propagator_registration_count.inc()
+        for domain, alias_id in aliases:
+            self._propagator_alias_count.labels(domain=domain, alias_id=alias_id).inc()
+
+    def observe_propagator_unregistered(self, *, aliases: list[tuple[str, str]]) -> None:
+        self._propagator_count.dec()
+        self._propagator_unregistration_count.inc()
+        for domain, alias_id in aliases:
+            self._propagator_alias_count.labels(domain=domain, alias_id=alias_id).dec()
+
+
 class CommonMetricRegistry:
     _instance: Optional[Self] = None
 
@@ -607,6 +659,7 @@ class CommonMetricRegistry:
     bgtask: BgTaskMetricObserver
     system: SystemMetricObserver
     sweeper: SweeperMetricObserver
+    event_propagator_observer: EventPropagatorMetricObserver
 
     def __init__(self) -> None:
         self.api = APIMetricObserver.instance()
@@ -615,6 +668,7 @@ class CommonMetricRegistry:
         self.bgtask = BgTaskMetricObserver.instance()
         self.system = SystemMetricObserver.instance()
         self.sweeper = SweeperMetricObserver.instance()
+        self.event_propagator_observer = EventPropagatorMetricObserver.instance()
 
     @classmethod
     def instance(cls):

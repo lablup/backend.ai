@@ -339,10 +339,12 @@
       "CannotDeleteFolder": "Tidak dapat menghapus folder yang dipasang di satu atau beberapa sesi. Mohon hentikan sesi terlebih dahulu.",
       "CannotDeletePipelineFolder": "Anda tidak dapat menghapus folder pipa.",
       "CannotRestorePipelineFolder": "Anda tidak dapat mengembalikan folder pipa.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Folder Proyek Model hanya dapat dibuat di proyek Model Store -Eksklusif. \nUbah proyek atau jenis pengguna saat ini.",
       "CloneAFolder": "Klon folder",
       "CloneFolder": "Folder klon",
       "Cloneable": "Dapat diklon",
       "Control": "Kontrol",
+      "CreateModelFolderOnlyInExclusiveProject": "Folder Proyek Model hanya dapat dibuat di proyek Model Store -Eksklusif.",
       "CreatedAt": "Dibuat di",
       "Delete": "Hapus",
       "DeleteAFolder": "Hapus folder",
@@ -397,6 +399,7 @@
       "Path": "Jalur penyimpanan",
       "Permission": "Izin",
       "ProjectFolderAlertDesc": "Folder ini dibagikan dengan semua anggota proyek",
+      "ProjectFolderCreationHelp": "Folder yang dapat diakses oleh \"{{projectName}}\" pengguna proyek akan dibuat.",
       "Rename": "Ganti nama",
       "Restore": "Memulihkan",
       "RestoreDescription": "Apakah Anda ingin mengembalikan \"{{ folderName }}\"?",
@@ -617,6 +620,7 @@
     "SmallerResourceThenImageRequires": "Permintaan sumber daya Anda lebih kecil dari jumlah minimum yang dibutuhkan oleh gambar. Coba lebih banyak sumber daya.",
     "TooManyLoginFailures": "Terlalu banyak kegagalan login dalam waktu singkat. Login diblokir untuk sementara waktu.",
     "UnauthorizedToken": "Token tidak sah. Silakan periksa token Anda.",
+    "UnexpectedError": "Terjadi kesalahan yang tidak terduga. \nSilakan coba lagi nanti atau hubungi dukungan jika masalah tetap ada.",
     "UnknownError": "Terjadi kesalahan yang tidak diketahui. Silakan coba lagi.",
     "UpdateError": "Galat pembaruan",
     "UserHasNoGroup": "Pengguna tidak memiliki grup. Silakan hubungi administrator untuk memperbaikinya.",
@@ -633,8 +637,10 @@
     "Title": "Telah terjadi kesalahan."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Folder tidak ditemukan atau akses ditolak",
     "InputTooShort": "MasukanTerlaluPendek",
     "NoExplorerSupportForUnmanagedFolder": "Folder yang tidak dikelola tidak mendukung file explorer.",
+    "NoPermissions": "Tidak ada izin untuk mengakses folder ini",
     "ValueRequired": "NilaiDiperlukan"
   },
   "general": {
@@ -769,6 +775,9 @@
   "kernel": {
     "AgentId": "ID Agen",
     "ContainerId": "ID Kontainer",
+    "ContainerLogs": "Log Kontainer",
+    "Hostname": "Nama host",
+    "Kernel": "Inti",
     "KernelId": "ID kernel",
     "Kernels": "Kernel",
     "Role": "Peran",
@@ -909,6 +918,7 @@
     "EndpointName": "Nama Titik Akhir",
     "Error": "Kesalahan",
     "ExpiredDate": "Tanggal Kadaluarsa",
+    "ExtraMountsWarning": "Saat mengedit layanan, nama (alias) dari folder yang dipasang tambahan mungkin tidak dipertahankan. \nHarap periksa ulang nama folder sebelum disimpan.",
     "FailedToStartService": "Gagal membuat layanan.",
     "FailedToTerminateService": "Permintaan untuk menghentikan layanan gagal.",
     "FailedToUpdateService": "Gagal memperbarui layanan.",
@@ -1023,10 +1033,6 @@
   },
   "pagination": {
     "Total": "{{start}} - {{end}} dari {{total}} item"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "Pencarian",
-    "ResetFilter": "Setel ulang filter"
   },
   "registry": {
     "AddRegistry": "Tambahkan Registri",
@@ -1195,6 +1201,9 @@
     "SharedMemory": "Memori bersama",
     "Updated": "Preset sumber daya diperbarui"
   },
+  "scheduler": {
+    "PendingSessions": "Sesi yang tertunda"
+  },
   "session": {
     "Agent": "Agen",
     "AgentId": "ID Agen",
@@ -1275,12 +1284,15 @@
     "OpenToPublic": "Buka aplikasi untuk publik",
     "OpenToPublicDesc": "Mengaktifkan opsi ini memungkinkan akses aplikasi untuk semua pengguna dalam jaringan.<br /><br /> \nUntuk manajemen akses, masukkan alamat IP tertentu di bidang 'IP yang diizinkan'.<br /><br /> \nMembiarkan bidang ini kosong akan memungkinkan akses dari semua alamat IP.<br /><br /> \nPertimbangkan untuk menetapkan pembatasan IP bila diperlukan untuk manajemen keamanan.",
     "Others": "Lainnya",
+    "PanelSettings": "Pengaturan Panel",
+    "PendingPosition": "Posisi antrian",
     "PredicateChecks": "Pemeriksaan Predikat",
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
     "ReadLess": "Baca lebih sedikit",
     "ReadMore": "Baca Selengkapnya...",
     "RecentlyCreatedSessions": "Sesi yang baru dibuat",
+    "RecentlyCreatedSessionsTooltip": "Menampilkan {{count}} sesi yang sedang berjalan yang baru dibuat di proyek saat ini",
     "RequestContainerCommit": "Permintaan Komitmen Kontainer",
     "Reservation": "Reservasi",
     "ResourceGroup": "Grup Sumber Daya",
@@ -1537,6 +1549,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Dukungan Atom Max",
     "ATOMPlusSupport": "Dukungan ATOM+",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Izinkan pendaftaran sisi agen",
@@ -1544,6 +1557,7 @@
     "Config": "Konfigurasi",
     "ConfigPerJobSchduler": "Pengaturan penjadwal",
     "ConfigPerJobSchdulerDescription": "Nilai dalam pengaturan penjadwal adalah default untuk digunakan ketika tidak ada pengaturan penjadwal di setiap grup sumber daya. Jika ada setelan khusus grup sumber daya, nilai ini akan diabaikan.",
+    "DescATOMMaxSupport": "Gunakan Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Gunakan akselerator ATOM+ Rebellions.",
     "DescATOMSupport": "Gunakan akselerator Rebellions ATOM",
     "DescAllowAgentSideRegistration": "Izinkan agen untuk mendaftarkan diri ke manajer. Gunakan hanya jika backend.ai cluster dikelola di lokasi yang aman.",
@@ -1587,6 +1601,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "Dukungan GPU ROCm",
     "RegisterNewImagesFromRepo": "Daftarkan image baru dari repositori",
+    "RequireATOMMaxPlugin": "Memerlukan Plugin Backend.AI ATOM Max.",
     "RequireATOMPlugin": "Membutuhkan Plugin Backend.AI ATOM.",
     "RequireATOMPlusPlugin": "Membutuhkan Plugin Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Memerlukan Plugin Lapisan API CUDA Virtual Backend.AI.",
@@ -1751,6 +1766,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Diaktifkan",
+    "ATOMMaxEnabled": "Atom max npu diaktifkan",
     "ATOMPlusEnabled": "ATOM+ NPU Diaktifkan",
     "Accept": "Terima",
     "AcceptSharedVFolder": "Anda sekarang dapat mengakses folder: ",
@@ -1970,6 +1986,7 @@
       "MyResources": "Sumber daya saya",
       "MyResourcesDescription": "<p> Panel ini menunjukkan penggunaan total sumber daya Anda dan tetap di semua proyek dan grup sumber daya. </p> <p> Ketika ada beberapa batasan (seperti domain, proyek, atau keypair), batas yang paling membatasi diterapkan untuk menunjukkan penggunaan dan sisa kapasitas Anda. </p>",
       "MyResourcesIn": "Sumber daya saya di",
+      "MyResourcesInResourceGroup": "Sumber Daya Saya dalam Grup Sumber Daya",
       "MyResourcesInResourceGroupDescription": "Panel ini menunjukkan penggunaan sumber daya Anda saat ini dan tersisa di grup sumber daya yang dipilih.",
       "NewPassword": "Kata sandi baru",
       "NewPasswordAgain": "Kata sandi (konfirmasi)",
@@ -1989,6 +2006,7 @@
       "Remaining": "Tersisa",
       "ResourcePolicy": "Kebijakan Sumber Daya",
       "Resources": "Sumber daya",
+      "Scheduler": "Penjadwal",
       "Serving": "Penyajian",
       "Sessions": "Sesi",
       "Settings": "Pengaturan",
@@ -2000,6 +2018,7 @@
       "Tasks": "Tugas",
       "TermsOfService": "Persyaratan Layanan",
       "TotalResourcesIn": "Total sumber daya di",
+      "TotalResourcesInResourceGroup": "Total Sumber Daya dalam Grup Sumber Daya",
       "TotalResourcesInResourceGroupDescription": "Panel ini menunjukkan total sumber daya yang digunakan dan sisa. \nNilai dihitung dengan menambahkan penggunaan dan jumlah yang tersisa dari semua agen menggunakan grup sumber daya yang dipilih.",
       "TotpActivated": "2FA Diaktifkan",
       "Update": "Perbarui",

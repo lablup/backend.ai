@@ -395,27 +395,6 @@ class GraylogConfig(BaseSchema):
     ]
 
 
-class LoggingConfig(BaseSchema):
-    level: Annotated[LogLevel, Field(default=LogLevel.INFO, description="Log level.")]
-    pkg_ns: Annotated[
-        dict[str, LogLevel],
-        Field(
-            description="Override default log level for specific scope of package",
-            default=default_pkg_ns,
-        ),
-    ]
-    drivers: Annotated[
-        list[LogDriver],
-        Field(default=[LogDriver.CONSOLE], description="Array of log drivers to print."),
-    ]
-    console: Annotated[
-        ConsoleLogConfig, Field(default=ConsoleLogConfig(colored=None, format=LogFormat.VERBOSE))
-    ]
-    file: Annotated[FileLogConfig | None, Field(default=None)]
-    logstash: Annotated[LogstashConfig | None, Field(default=None)]
-    graylog: Annotated[GraylogConfig | None, Field(default=None)]
-
-
 class PyroscopeConfig(BaseSchema):
     application_name: str | None = Field(
         description="Pyroscope application name", default=None, examples=["proxy-worker-dev"]
@@ -492,3 +471,11 @@ def generate_example_json(
         return res
     else:
         raise UnsupportedTypeError(str(schema))
+
+
+def get_default_redis_key_ttl() -> int:
+    """
+    Returns the default TTL for Redis keys.
+    This is used to set the expiration time for keys in Redis.
+    """
+    return 2 * 24 * 60 * 60  # 2 days in seconds

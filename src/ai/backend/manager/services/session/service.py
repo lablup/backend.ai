@@ -6,7 +6,7 @@ import secrets
 import uuid
 from dataclasses import asdict, dataclass
 from datetime import datetime
-from typing import Any, Iterable, Mapping, MutableMapping, Optional, Union, cast
+from typing import Any, Mapping, MutableMapping, Optional, Union, cast
 from urllib.parse import urlparse
 
 import aiohttp
@@ -22,6 +22,7 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
     BaseBgtaskEvent,
 )
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
@@ -53,8 +54,9 @@ from ai.backend.manager.api.session import (
     overwritten_param_check,
 )
 from ai.backend.manager.api.utils import undefined
+from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.common import (
-    GenericForbidden,
     InternalServerError,
     ServiceUnavailable,
 )
@@ -72,13 +74,10 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.group import GroupRow
-from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.models.session import (
     DEAD_SESSION_STATUSES,
     PRIVATE_SESSION_TYPES,
     KernelLoadingStrategy,
-    SessionRow,
-    SessionStatus,
 )
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.registry import AgentRegistry
@@ -195,6 +194,7 @@ from ai.backend.manager.services.session.actions.upload_files import (
     UploadFilesActionResult,
 )
 from ai.backend.manager.services.session.types import CommitStatusInfo, LegacySessionInfo
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import UserScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
@@ -210,6 +210,7 @@ class SessionServiceArgs:
     idle_checker_host: IdleCheckerHost
     session_repository: SessionRepository
     admin_session_repository: AdminSessionRepository
+    scheduling_controller: SchedulingController
 
 
 class SessionService:
@@ -221,6 +222,7 @@ class SessionService:
     _idle_checker_host: IdleCheckerHost
     _session_repository: SessionRepository
     _admin_session_repository: AdminSessionRepository
+    _scheduling_controller: SchedulingController
     _database_ptask_group: aiotools.PersistentTaskGroup
     _rpc_ptask_group: aiotools.PersistentTaskGroup
 
@@ -236,6 +238,7 @@ class SessionService:
         self._idle_checker_host = args.idle_checker_host
         self._session_repository = args.session_repository
         self._admin_session_repository = args.admin_session_repository
+        self._scheduling_controller = args.scheduling_controller
         self._database_ptask_group = aiotools.PersistentTaskGroup()
         self._rpc_ptask_group = aiotools.PersistentTaskGroup()
         self._webhook_ptask_group = aiotools.PersistentTaskGroup()
@@ -421,7 +424,7 @@ class SessionService:
                 propagator, [(EventDomain.BGTASK, str(bgtask_id))]
             )
             try:
-                cache_id = EventCacheDomain.BGTASK.cache_id(bgtask_id)
+                cache_id = EventCacheDomain.BGTASK.cache_id(str(bgtask_id))
                 async for event in propagator.receive(cache_id):
                     if not isinstance(event, BaseBgtaskEvent):
                         log.warning("unexpected event: {}", event)
@@ -463,7 +466,7 @@ class SessionService:
                     propagator, [(EventDomain.BGTASK, str(bgtask_id))]
                 )
                 try:
-                    cache_id = EventCacheDomain.BGTASK.cache_id(bgtask_id)
+                    cache_id = EventCacheDomain.BGTASK.cache_id(str(bgtask_id))
                     async for event in propagator.receive(cache_id):
                         if not isinstance(event, BaseBgtaskEvent):
                             log.warning("unexpected event: {}", event)
@@ -865,80 +868,41 @@ class SessionService:
             raise InternalServerError
 
     async def destroy_session(self, action: DestroySessionAction) -> DestroySessionActionResult:
-        user_role = action.user_role
         session_name = action.session_name
         owner_access_key = action.owner_access_key
         forced = action.forced
         recursive = action.recursive
 
-        if recursive:
-            dependent_session_ids = await self._session_repository.find_dependent_sessions(
-                session_name,
-                owner_access_key,
-                allow_stale=True,
-            )
+        # Get session IDs to terminate (based on recursive flag)
+        session_ids = await self._session_repository.get_target_session_ids(
+            session_name,
+            owner_access_key,
+            recursive=recursive,
+        )
 
-            target_session_references: list[str | uuid.UUID] = [
-                *dependent_session_ids,
-                session_name,
-            ]
-
-            async def get_session_safe(name_or_id):
-                try:
-                    return await self._session_repository.get_session_validated(
-                        name_or_id,
-                        owner_access_key,
-                        kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-                        allow_stale=True,
-                    )
-                except Exception as e:
-                    return e
-
-            sessions: Iterable[SessionRow | BaseException] = await asyncio.gather(
-                *[get_session_safe(name_or_id) for name_or_id in target_session_references],
-                return_exceptions=True,
-            )
-
-            last_stats = await asyncio.gather(
-                *[
-                    self._agent_registry.destroy_session(sess, forced=forced, user_role=user_role)
-                    for sess in sessions
-                    if isinstance(sess, SessionRow)
-                ],
-                return_exceptions=True,
-            )
-
-            # Consider not found sessions already terminated.
-            # Consider GenericForbidden error occurs with scheduled/preparing/terminating/error status session, and leave them not to be quitted.
-            last_stats = [
-                *filter(lambda x: not isinstance(x, SessionNotFound | GenericForbidden), last_stats)
-            ]
-
-            # Convert SessionRows to SessionData
-            destroyed_sessions = [
-                sess.to_dataclass() if isinstance(sess, SessionRow) else sess for sess in sessions
-            ]
-            return DestroySessionActionResult(
-                result=last_stats, destroyed_sessions=destroyed_sessions
-            )
+        # Determine termination reason based on forced flag
+        if forced:
+            reason = KernelLifecycleEventReason.FORCE_TERMINATED
         else:
-            session = await self._session_repository.get_session_validated(
-                session_name,
-                owner_access_key,
-                kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS,
-            )
-            last_stat = await self._agent_registry.destroy_session(
-                session,
-                forced=forced,
-                user_role=user_role,
-            )
-            resp = {
-                "stats": last_stat,
-            }
+            reason = KernelLifecycleEventReason.USER_REQUESTED
 
-            return DestroySessionActionResult(
-                result=resp, destroyed_sessions=[session.to_dataclass()]
-            )
+        # Mark sessions for termination
+        mark_result = await self._scheduling_controller.mark_sessions_for_termination(
+            session_ids,
+            reason=reason.value,
+        )
+
+        # Build stats for response - prioritize cancelled over terminating
+        if mark_result.cancelled_sessions:
+            last_stat = {"status": "cancelled"}
+        elif mark_result.terminating_sessions:
+            last_stat = {"status": "terminated"}
+        else:
+            last_stat = {}
+
+        # Return response - same format for both recursive and non-recursive
+        resp = {"stats": last_stat}
+        return DestroySessionActionResult(result=resp)
 
     async def download_file(self, action: DownloadFileAction) -> DownloadFileActionResult:
         session_name = action.session_name
@@ -1577,8 +1541,11 @@ class SessionService:
         )
         if session_row is None:
             raise ValueError(f"Session not found (id:{session_id})")
+        session_owner_data = await self._session_repository.get_session_owner(str(session_id))
 
-        return ModifySessionActionResult(session_data=session_row.to_dataclass())
+        return ModifySessionActionResult(
+            session_data=session_row.to_dataclass(owner=session_owner_data)
+        )
 
     async def check_and_transit_status(
         self, action: CheckAndTransitStatusAction
@@ -1610,10 +1577,11 @@ class SessionService:
         await self._agent_registry.session_lifecycle_mgr.deregister_status_updatable_session([
             row.id for row, is_transited in session_rows if is_transited
         ])
+        session_owner_data = await self._session_repository.get_session_owner(session_id)
 
         result = {row.id: row.status.name for row, _ in session_rows}
         return CheckAndTransitStatusActionResult(
-            result=result, session_data=session_row.to_dataclass()
+            result=result, session_data=session_row.to_dataclass(owner=session_owner_data)
         )
 
     async def check_and_transit_status_multi(

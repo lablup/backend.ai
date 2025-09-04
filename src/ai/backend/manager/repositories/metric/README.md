@@ -32,7 +32,7 @@ While the metric domain currently doesn't store data in the database (metrics ar
 ## Usage
 
 ```python
-from ai.backend.manager.repositories.image.repositories import RepositoryArgs
+from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.metric.repositories import MetricRepositories
 
 # Create repository instances

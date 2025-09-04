@@ -23,6 +23,7 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common import config
+from ai.backend.logging import LogLevel
 
 from .types import EventLoopType
 from .utils import config_key_to_snake_case
@@ -397,23 +398,23 @@ class ServerConfig(BaseSchema):
     # logging
 
 
-def load(config_path: Path | None = None, log_level: str = "INFO") -> ServerConfig:
+def load(config_path: Path | None = None, log_level: LogLevel = LogLevel.NOTSET) -> ServerConfig:
     # Determine where to read configuration.
     raw_cfg, _ = config.read_from_file(config_path, "account-manager")
 
-    config.override_key(raw_cfg, ("debug", "enabled"), log_level == "DEBUG")
-    config.override_key(raw_cfg, ("logging", "level"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level.upper())
-    config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level.upper())
+    config.override_key(raw_cfg, ("debug", "enabled"), log_level == LogLevel.DEBUG)
+    if log_level != LogLevel.NOTSET:
+        config.override_key(raw_cfg, ("logging", "level"), log_level)
+        config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
     try:
         raw_cfg = config_key_to_snake_case(raw_cfg)
-        cfg = ServerConfig(**raw_cfg)
-        if cfg.debug.enabled:
+        server_config = ServerConfig(**raw_cfg)
+        if server_config.debug.enabled:
             print("== Account Manager configuration ==", file=sys.stderr)
-            print(pformat(cfg.model_dump()), file=sys.stderr)
+            print(pformat(server_config.model_dump()), file=sys.stderr)
     except ValidationError as e:
         print(
             "ConfigurationError: Could not read or validate the account manager local config:",
@@ -422,7 +423,7 @@ def load(config_path: Path | None = None, log_level: str = "INFO") -> ServerConf
         print(pformat(e), file=sys.stderr)
         raise click.Abort()
     else:
-        return cfg
+        return server_config
 
 
 class Undefined:

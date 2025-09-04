@@ -1,0 +1,9 @@
+subgraphs:
+  graphene:
+    routing_url: http://host.docker.internal:8091/admin/gql
+    schema:
+      file: ../../docs/manager/graphql-reference/schema.graphql
+  strawberry:
+    routing_url: http://host.docker.internal:8091/admin/gql/strawberry
+    schema:
+      file: ../../docs/manager/graphql-reference/v2-schema.graphql

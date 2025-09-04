@@ -6,13 +6,6 @@
 #
 # Generated automatically from the AgentUnifiedConfig schema.
 
-# Logging configuration
-# logging = ""
-# Plugins configuration.
-# This field is injected at runtime based on etcd configuration.
-# It is not intended to be set in the configuration file.
-# plugins = ""
-
 [agent]
   # Backend type for the agent.
   # This determines how the agent interacts with the underlying infrastructure.
@@ -21,45 +14,52 @@
   # - `kubernetes`: Uses Kubernetes as the backend.
   # - `dummy`: A dummy backend for testing purposes.
   backend = "docker"
+  # RPC listen address and port
+  rpc-listen-addr = { host = "0.0.0.0", port = 6001 }
+  # Service address and port
+  service-addr = { host = "0.0.0.0", port = 6003 }
+  # Announce address and port
+  announce-addr = { host = "host.docker.internal", port = 6003 }
   # Whether to enable SSL
-  ssl-enabled = true
+  ssl-enabled = false
   # Path to SSL certificate file
-  ssl-cert = "/path/to/cert.pem"
+  ## ssl-cert = "/path/to/cert.pem"
   # Path to SSL private key file
-  ssl-key = "/path/to/key.pem"
+  ## ssl-key = "/path/to/key.pem"
   # Advertised RPC address and port
+  ## advertised-rpc-addr = { host = "192.168.1.100", port = 6001 }
   # Path to RPC auth manager public key
-  rpc-auth-manager-public-key = "/path/to/public.key"
+  ## rpc-auth-manager-public-key = "/path/to/public.key"
   # Path to RPC auth agent keypair
-  rpc-auth-agent-keypair = "/path/to/keypair.key"
+  ## rpc-auth-agent-keypair = "/path/to/keypair.key"
   # Agent socket port
   agent-sock-port = 6007
   # Agent ID
-  id = "agent-001"
+  ## id = "agent-001"
   # Base path for IPC
   ipc-base-path = "/tmp/backend.ai/ipc"
   # Base path for variable data
-  var-base-path = "./var/lib/backend.ai"
+  var-base-path = "var/lib/backend.ai"
   # Mount path for containers
-  mount-path = "/mnt/backend.ai"
+  ## mount-path = "/mnt/backend.ai"
   # Whether to enable cohabiting storage proxy
   cohabiting-storage-proxy = true
   # Public host address
-  public-host = "backend.ai"
+  ## public-host = "backend.ai"
   # Region name
-  region = "us-east-1"
+  ## region = "us-east-1"
   # Instance type
-  instance-type = "m5.large"
+  ## instance-type = "m5.large"
   # Scaling group name
   scaling-group = "default"
   # Scaling group type
   scaling-group-type = "compute"
   # Path to PID file
-  pid-file = "/var/run/agent.pid"
+  pid-file = "/dev/null"
   # Event loop type
   event-loop = "asyncio"
   # Whether to skip manager detection
-  skip-manager-detection = true
+  skip-manager-detection = false
   # Port for aiomonitor terminal UI
   aiomonitor-termui-port = 38200
   # Port for aiomonitor web UI
@@ -69,59 +69,29 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  allow-compute-plugins = [ "cuda", "rocm",]
+  ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
   # Blocked compute plugins
-  block-compute-plugins = [ "cpu",]
+  ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
   # Allowed network plugins
-  allow-network-plugins = [ "overlay",]
+  ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
   # Blocked network plugins
-  block-network-plugins = [ "host",]
+  ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
   # Path for image commit
-  image-commit-path = "./tmp/backend.ai/commit"
+  image-commit-path = "tmp/backend.ai/commit"
   # Path for abuse reports
-  abuse-report-path = "/var/log/backend.ai/abuse"
+  ## abuse-report-path = "/var/log/backend.ai/abuse"
   # Whether to force terminate abusing containers
-  force-terminate-abusing-containers = true
+  force-terminate-abusing-containers = false
   # Kernel creation concurrency
   kernel-creation-concurrency = 4
   # Whether to use experimental Redis event dispatcher
-  use-experimental-redis-event-dispatcher = true
+  use-experimental-redis-event-dispatcher = false
   # Docker mode detected based on kernel version (linuxkit/native)
-  docker-mode = "linuxkit"
+  ## docker-mode = "linuxkit"
   # Owner uid:gid of the mount directory
-  mount-path-uid-gid = "root:root"
+  ## mount-path-uid-gid = "root:root"
 
-[agent.rpc-listen-addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
-
-[agent.service-addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
-
-[agent.announce-addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
-
-[agent.sync-container-lifecycles]
+  [agent.sync-container-lifecycles]
     # Whether to enable container lifecycle synchronization
     enabled = true
     # Synchronization interval in seconds
@@ -129,17 +99,17 @@
 
 [container]
   # Kernel user ID
-  kernel-uid = 1000
+  kernel-uid = -1
   # Kernel group ID
-  kernel-gid = 1000
+  kernel-gid = -1
   # Bind host for containers
-  bind-host = "0.0.0.0"
+  bind-host = ""
   # Advertised host for containers
-  advertised-host = "192.168.1.100"
+  ## advertised-host = "192.168.1.100"
   # Port range for containers
   port-range = [ 30000, 31000,]
   # Statistics type
-  stats-type = "cgroup"
+  ## stats-type = "docker"
   # Sandbox type
   sandbox-type = "docker"
   # Jail arguments
@@ -147,93 +117,133 @@
   # Scratch type
   scratch-type = "hostdir"
   # Scratch root directory
-  scratch-root = "./scratches"
+  scratch-root = "scratches"
   # Scratch size
-  scratch-size = "1G"
+  scratch-size = "0"
   # Scratch NFS address
-  scratch-nfs-address = "192.168.1.100:/export"
+  ## scratch-nfs-address = "192.168.1.100:/export"
   # Scratch NFS options
-  scratch-nfs-options = "rw,sync"
+  ## scratch-nfs-options = "rw,sync"
   # Alternative bridge network
-  alternative-bridge = "br-backend"
+  ## alternative-bridge = "br-backend"
   # KRunner volumes configuration, mapping container names to host paths.
   # This is used to specify volumes that should be mounted into containers
   # when using the KRunner backend.
   # This fields is filled by the agent at runtime based on the
   # `krunner_volumes` configuration in the agent's environment.
   # It is not intended to be set in the configuration file.
+  ## krunner-volumes = {  }
   # Whether to enable Docker Swarm mode.
   # This allows the agent to manage containers in a Docker Swarm cluster.
   # When enabled, the agent will use Docker Swarm APIs to manage containers,
   # networks, and services.
   # This field is only used when backend is set to 'docker'.
-  swarm-enabled = true
+  swarm-enabled = false
 
 [pyroscope]
   # Whether to enable Pyroscope profiling
-  enabled = true
+  enabled = false
   # Application name to use in Pyroscope
-  app-name = "backendai-agent"
+  ## app-name = "backendai-agent"
   # Address of the Pyroscope server
-  server-addr = "http://localhost:4040"
+  ## server-addr = "http://localhost:4040"
   # Sampling rate for Pyroscope profiling
-  sample-rate = 10
+  ## sample-rate = 10
+
+[logging]
+  # The version used by logging.dictConfig().
+  version = 1
+  # The main log level to filter messages from all loggers.
+  level = "INFO"
+  # Disable the existing loggers when applying the config.
+  disable-existing-loggers = false
+  # The list of log drivers to activate.
+  drivers = [ "console",]
+  ## file = "{ FileConfig }"
+  ## logstash = "{ LogstashConfig }"
+  ## graylog = "{ GraylogConfig }"
+
+  # The mapping of log handler configurations.
+  [logging.handlers]
+
+  # The mapping of per-namespace logger configurations.
+  [logging.loggers]
+
+  [logging.console]
+    # Opt to print colorized log.
+    ## colored = true
+    # Determine verbosity of log.
+    format = "verbose"
+
+  # Override default log level for specific scope of package
+  [logging.pkg_ns]
 
 [resource]
-  # Reserved CPU cores
+  # The number of CPU cores reserved for the operating system and the agent
+  # service.
   reserved-cpu = 1
-  # Reserved memory
+  # The memory space reserved for the operating system and the agent service. It
+  # is subtracted from the reported main memory size and not available for user
+  # workload allocation. Depending on the memory-align-size option and system
+  # configuration, this may not be the exact value but have slightly less or more
+  # values within the memory-align-size.
   reserved-mem = "1G"
-  # Reserved disk space
+  # The disk space reserved for the operating system and the agent service.
+  # Currently this value is unused. In future releases, it may be used to preserve
+  # the minimum disk space from the scratch disk allocation via loopback files.
   reserved-disk = "8G"
+  # The alignment of the reported main memory size to absorb tiny deviations from
+  # per-node firwmare/hardware settings. Recommended to be multiple of the
+  # page/hugepage size (e.g., 2 MiB).
+  memory-align-size = "16M"
   # Resource allocation order
   allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
   # Affinity policy
-  affinity-policy = "PREFER_SINGLE_NODE"
+  affinity-policy = "INTERLEAVED"
 
 [otel]
   # Whether to enable OpenTelemetry
-  enabled = true
+  enabled = false
   # Log level for OpenTelemetry
-  log-level = "DEBUG"
+  log-level = "INFO"
   # OTLP endpoint for sending traces
   endpoint = "http://127.0.0.1:4317"
 
 [service-discovery]
   # Type of service discovery to use
-  type = "etcd"
+  type = "redis"
 
 [debug]
   # Master switch for debug mode
-  enabled = true
+  enabled = false
   # Whether to enable asyncio debug mode
-  asyncio = true
+  asyncio = false
   # Whether to enable kernel runner debug mode
-  kernel-runner = true
+  kernel-runner = false
   # Enable enhanced task information in aiomonitor
-  enhanced-aiomonitor-task-info = true
+  enhanced-aiomonitor-task-info = false
   # Whether to skip container deletion for debugging
-  skip-container-deletion = true
+  skip-container-deletion = false
   # Whether to log statistics
-  log-stats = true
+  log-stats = false
   # Whether to log kernel configuration
-  log-kernel-config = true
+  log-kernel-config = false
   # Whether to log allocation map
-  log-alloc-map = true
+  log-alloc-map = false
   # Whether to log all internal events
-  log-events = true
+  log-events = false
   # Whether to log heartbeats
-  log-heartbeats = true
+  log-heartbeats = false
   # Heartbeat interval in seconds
   heartbeat-interval = 20.0
   # Whether to log Docker events
-  log-docker-events = true
+  log-docker-events = false
 
-[debug.coredump]
+  [debug.coredump]
     # Whether to enable core dump collection
-    enabled = true
+    enabled = false
     # Directory path for storing core dumps
-    path = "./coredumps"
+    path = "coredumps"
     # Number of core dump backups to retain
     backup-count = 10
     # Maximum size limit for core dumps
@@ -242,20 +252,12 @@
 [etcd]
   # Etcd namespace
   namespace = "local"
+  # Etcd address and port
+  ## addr = { host = "127.0.0.1", port = 2379 }  # | [ { host = "127.0.0.1", port = 2379 } ]
   # Etcd username
-  user = "backend"
+  ## user = "backend"
   # Etcd password
-  password = "PASSWORD"
-
-[etcd.addr]
-    # Host address of the service.
-    # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
-    # all interfaces.
-    host = "127.0.0.1"
-    # Port number of the service.
-    # Must be between 1 and 65535.
-    # Ports below 1024 require root/admin privileges.
-    port = 8080
+  ## password = "PASSWORD"
 
 [container-logs]
   # Maximum length of container logs
@@ -265,9 +267,9 @@
 
 [api]
   # Image pull timeout in seconds
-  pull-timeout = 7200.0
+  ## pull-timeout = 7200.0  # min=0
   # Image push timeout in seconds
-  push-timeout = 7200.0
+  ## push-timeout = 7200.0  # min=0
 
 [kernel-lifecycles]
   # Number of init polling attempts

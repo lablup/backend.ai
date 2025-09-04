@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, Self, Sequence, cast
 from uuid import UUID
 
 import graphene
+import graphene_federation
 import jwt
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
@@ -100,6 +101,7 @@ AutoScalingMetricComparatorGQLEnum = graphene.Enum.from_enum(
 )
 
 
+@graphene_federation.key("id")
 class EndpointAutoScalingRuleNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -1163,6 +1165,7 @@ class ModifyEndpoint(graphene.Mutation):
         )
 
 
+@graphene_federation.key("token")
 class EndpointToken(graphene.ObjectType):
     class Meta:
         interfaces = (Item,)

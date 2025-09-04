@@ -17,7 +17,7 @@ from sqlalchemy.engine.interfaces import Dialect
 from sqlalchemy.orm import registry
 from sqlalchemy.types import CHAR, VARCHAR, TypeDecorator
 
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ..utils import hash_password
 

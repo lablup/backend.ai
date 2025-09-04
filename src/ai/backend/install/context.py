@@ -238,7 +238,7 @@ class Context(metaclass=ABCMeta):
                 "password": halfstack.etcd_password,
             }
         etcd = AsyncEtcd(
-            self.install_info.halfstack_config.etcd_addr[0].face,
+            [addr.face for addr in self.install_info.halfstack_config.etcd_addr],
             "local",
             scope_prefix_map,
             credentials=creds,

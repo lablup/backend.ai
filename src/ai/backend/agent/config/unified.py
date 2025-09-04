@@ -21,6 +21,7 @@ from pydantic import (
     field_validator,
 )
 
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
@@ -35,6 +36,7 @@ from ai.backend.common.types import (
     ServiceDiscoveryType,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.config import LoggingConfig
 
 from ..affinity_map import AffinityPolicy
 from ..stats import StatModes
@@ -178,8 +180,9 @@ class CoreDumpConfig(BaseModel):
             )
         return self._core_path
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+    )
 
 
 class DebugConfig(BaseModel):
@@ -295,14 +298,12 @@ class AgentConfig(BaseModel):
     service_addr: HostPortPair = Field(
         default=HostPortPair(host="0.0.0.0", port=6003),
         description="Service address and port",
-        examples=[{"host": "0.0.0.0", "port": 6003}],
         validation_alias=AliasChoices("service-addr", "internal-addr", "service_addr"),
         serialization_alias="service-addr",
     )
     announce_addr: HostPortPair = Field(
         default=HostPortPair(host="host.docker.internal", port=6003),
         description="Announce address and port",
-        examples=[{"host": "host.docker.internal", "port": 6003}],
         validation_alias=AliasChoices("announce-addr", "announce-internal-addr", "announce_addr"),
         serialization_alias="announce-addr",
     )
@@ -483,28 +484,28 @@ class AgentConfig(BaseModel):
     allow_compute_plugins: Optional[set[str]] = Field(
         default=None,
         description="Allowed compute plugins",
-        examples=[{"cuda", "rocm"}],
+        examples=[{"ai.backend.activator.agent", "ai.backend.accelerator.cuda_open"}],
         validation_alias=AliasChoices("allow-compute-plugins", "allow_compute_plugins"),
         serialization_alias="allow-compute-plugins",
     )
     block_compute_plugins: Optional[set[str]] = Field(
         default=None,
         description="Blocked compute plugins",
-        examples=[{"cpu"}],
+        examples=[{"ai.backend.accelerator.mock"}],
         validation_alias=AliasChoices("block-compute-plugins", "block_compute_plugins"),
         serialization_alias="block-compute-plugins",
     )
     allow_network_plugins: Optional[set[str]] = Field(
         default=None,
         description="Allowed network plugins",
-        examples=[{"overlay"}],
+        examples=[{"ai.backend.manager.network.overlay"}],
         validation_alias=AliasChoices("allow-network-plugins", "allow_network_plugins"),
         serialization_alias="allow-network-plugins",
     )
     block_network_plugins: Optional[set[str]] = Field(
         default=None,
         description="Blocked network plugins",
-        examples=[{"host"}],
+        examples=[{"ai.backend.manager.network.overlay"}],
         validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
         serialization_alias="block-network-plugins",
     )
@@ -707,9 +708,10 @@ class ContainerConfig(BaseModel):
         serialization_alias="swarm-enabled",
     )
 
-    class Config:
-        extra = "allow"
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        extra="allow",
+        arbitrary_types_allowed=True,
+    )
 
     @field_validator("port_range", mode="before")
     @classmethod
@@ -722,26 +724,46 @@ class ContainerConfig(BaseModel):
 class ResourceConfig(BaseModel):
     reserved_cpu: int = Field(
         default=1,
-        description="Reserved CPU cores",
+        description="The number of CPU cores reserved for the operating system and the agent service.",
         examples=[1, 2],
         validation_alias=AliasChoices("reserved-cpu", "reserved_cpu"),
         serialization_alias="reserved-cpu",
     )
     reserved_mem: BinarySizeField = Field(
         default=BinarySize.finite_from_str("1G"),
-        description="Reserved memory",
+        description=(
+            "The memory space reserved for the operating system and the agent service. "
+            "It is subtracted from the reported main memory size and not available for user workload allocation. "
+            "Depending on the memory-align-size option and system configuration, "
+            "this may not be the exact value but have slightly less or more values within the memory-align-size."
+        ),
         examples=["1G", "2G"],
         validation_alias=AliasChoices("reserved-mem", "reserved_mem"),
         serialization_alias="reserved-mem",
     )
     reserved_disk: BinarySizeField = Field(
         default=BinarySize.finite_from_str("8G"),
-        description="Reserved disk space",
+        description=(
+            "The disk space reserved for the operating system and the agent service. "
+            "Currently this value is unused. "
+            "In future releases, it may be used to preserve the minimum disk space "
+            "from the scratch disk allocation via loopback files."
+        ),
         examples=["8G", "16G"],
         validation_alias=AliasChoices("reserved-disk", "reserved_disk"),
         serialization_alias="reserved-disk",
     )
-
+    memory_align_size: BinarySizeField = Field(
+        default=BinarySize.finite_from_str("16M"),
+        description=(
+            "The alignment of the reported main memory size to absorb tiny deviations "
+            "from per-node firwmare/hardware settings. "
+            "Recommended to be multiple of the page/hugepage size (e.g., 2 MiB)."
+        ),
+        examples=["2M", "32M"],
+        validation_alias=AliasChoices("memory-align-size", "memory_align_size"),
+        serialization_alias="memory-align-size",
+    )
     allocation_order: list[str] = Field(
         default=["cuda", "rocm", "tpu", "cpu", "mem"],
         description="Resource allocation order",
@@ -757,9 +779,10 @@ class ResourceConfig(BaseModel):
         serialization_alias="affinity-policy",
     )
 
-    class Config:
-        extra = "allow"
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        extra="allow",
+        arbitrary_types_allowed=True,
+    )
 
     @field_validator("affinity_policy", mode="before")
     @classmethod
@@ -777,9 +800,15 @@ class EtcdConfig(BaseModel):
         description="Etcd namespace",
         examples=["local", "backend"],
     )
-    addr: HostPortPair = Field(
+    addr: HostPortPair | list[HostPortPair] = Field(
         description="Etcd address and port",
-        examples=[{"host": "127.0.0.1", "port": 2379}],
+        examples=[
+            {"host": "127.0.0.1", "port": 2379},  # single endpoint
+            [
+                {"host": "127.0.0.4", "port": 2379},
+                {"host": "127.0.0.5", "port": 2379},
+            ],  # multiple endpoints
+        ],
     )
     user: Optional[str] = Field(
         default=None,
@@ -795,7 +824,7 @@ class EtcdConfig(BaseModel):
     def to_dataclass(self) -> EtcdConfigData:
         return EtcdConfigData(
             namespace=self.namespace,
-            addr=self.addr,
+            addrs=self.addr if isinstance(self.addr, list) else [self.addr],
             user=self.user,
             password=self.password,
         )
@@ -817,8 +846,9 @@ class ContainerLogsConfig(BaseModel):
         serialization_alias="chunk-size",
     )
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+    )
 
 
 class APIConfig(BaseModel):
@@ -890,8 +920,8 @@ class AgentUnifiedConfig(BaseModel):
         default_factory=PyroscopeConfig,
         description="Pyroscope configuration",
     )
-    logging: Any = Field(
-        default_factory=lambda: {},
+    logging: LoggingConfig = Field(
+        default_factory=LoggingConfig,
         description="Logging configuration",
     )
     resource: ResourceConfig = Field(
@@ -940,7 +970,16 @@ class AgentUnifiedConfig(BaseModel):
         It is not intended to be set in the configuration file.
         """),
     )
+    redis: Optional[RedisConfig] = Field(
+        default=None,
+        description=textwrap.dedent("""
+        Redis configuration.
+        This field is injected at runtime based on etcd configuration.
+        It is not intended to be set in the other way.
+        """),
+    )
 
     # TODO: Remove me after changing config injection logic
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(
+        extra="allow",
+    )

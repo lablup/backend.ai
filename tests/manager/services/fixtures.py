@@ -1,9 +1,17 @@
 import dataclasses
 import uuid
+from datetime import datetime, timezone
 
 from dateutil.parser import isoparse
 
 from ai.backend.common.container_registry import ContainerRegistryType
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.manager.data.artifact.types import (
+    ArtifactStatus,
+    ArtifactType,
+)
+from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
 from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
@@ -100,3 +108,50 @@ DOCKERHUB_RESPONSE_MOCK = {
     },
     "get_config": {"architecture": "amd64", "os": "linux"},
 }
+
+
+# Artifact fixtures
+HUGGINGFACE_REGISTRY_ID = uuid.uuid4()
+
+ARTIFACT_ROW_FIXTURE = ArtifactRow(
+    name="microsoft/DialoGPT-medium",
+    type=ArtifactType.MODEL,
+    registry_id=HUGGINGFACE_REGISTRY_ID,
+    registry_type=ArtifactRegistryType.HUGGINGFACE.value,
+    source_registry_id=HUGGINGFACE_REGISTRY_ID,
+    source_registry_type=ArtifactRegistryType.HUGGINGFACE.value,
+    description="A conversational AI model by Microsoft",
+    readonly=True,
+)
+ARTIFACT_ROW_FIXTURE.id = uuid.uuid4()
+ARTIFACT_ROW_FIXTURE.scanned_at = datetime.now(timezone.utc)
+ARTIFACT_ROW_FIXTURE.updated_at = datetime.now(timezone.utc)
+
+ARTIFACT_FIXTURE_DATA = ARTIFACT_ROW_FIXTURE.to_dataclass()
+ARTIFACT_FIXTURE_DICT = dataclasses.asdict(
+    dataclasses.replace(
+        ARTIFACT_FIXTURE_DATA,
+        type=ArtifactType.MODEL.value,  # type: ignore
+        registry_type=ArtifactRegistryType.HUGGINGFACE.value,  # type: ignore
+        source_registry_type=ArtifactRegistryType.HUGGINGFACE.value,  # type: ignore
+    )
+)
+
+ARTIFACT_REVISION_ROW_FIXTURE = ArtifactRevisionRow(
+    artifact_id=ARTIFACT_ROW_FIXTURE.id,
+    version="main",
+    readme="# DialoGPT-medium\n\nA conversational AI model.",
+    size=1024000,
+    status=ArtifactStatus.NEEDS_APPROVAL,
+)
+ARTIFACT_REVISION_ROW_FIXTURE.id = uuid.uuid4()
+ARTIFACT_REVISION_ROW_FIXTURE.created_at = isoparse("2023-10-01T00:00:00+09:00")
+ARTIFACT_REVISION_ROW_FIXTURE.updated_at = isoparse("2023-10-01T00:00:00+09:00")
+
+ARTIFACT_REVISION_FIXTURE_DATA = ARTIFACT_REVISION_ROW_FIXTURE.to_dataclass()
+ARTIFACT_REVISION_FIXTURE_DICT = dataclasses.asdict(
+    dataclasses.replace(
+        ARTIFACT_REVISION_FIXTURE_DATA,
+        status=ArtifactStatus.NEEDS_APPROVAL.value,  # type: ignore
+    )
+)

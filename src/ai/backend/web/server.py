@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import logging.config
 import os
 import re
@@ -19,6 +18,7 @@ from pprint import pprint
 from typing import Any, AsyncGenerator, AsyncIterator, Mapping, Optional, cast
 from uuid import uuid4
 
+import aiohttp
 import aiohttp_cors
 import aiotools
 import click
@@ -31,7 +31,7 @@ from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config
-from ai.backend.common.clients.http_client.client_pool import ClientConfig, ClientPool
+from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dto.manager.auth.field import (
@@ -41,7 +41,6 @@ from ai.backend.common.dto.manager.auth.field import (
 )
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.common.types import RedisProfileTarget
 from ai.backend.common.web.session import (
     extra_config_headers,
     get_session,
@@ -284,7 +283,7 @@ async def login_handler(request: web.Request) -> web.Response:
     stats.active_login_handlers.add(asyncio.current_task())  # type: ignore
     session = await get_session(request)
     if session.get("authenticated", False):
-        return web.HTTPBadRequest(
+        raise web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/generic-bad-request",
                 "title": "You have already logged in.",
@@ -305,7 +304,7 @@ async def login_handler(request: web.Request) -> web.Response:
         log.error("Login: JSON decoding error: {}", e)
         creds = {}
     if "username" not in creds or not creds["username"]:
-        return web.HTTPBadRequest(
+        raise web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/invalid-api-params",
                 "title": "You must provide the username field.",
@@ -313,7 +312,7 @@ async def login_handler(request: web.Request) -> web.Response:
             content_type="application/problem+json",
         )
     if "password" not in creds or not creds["password"]:
-        return web.HTTPBadRequest(
+        raise web.HTTPBadRequest(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/invalid-api-params",
                 "title": "You must provide the password field.",
@@ -371,7 +370,7 @@ async def login_handler(request: web.Request) -> web.Response:
             client_ip,
         )
         await _set_login_history(last_login_attempt, login_fail_count)
-        return web.HTTPTooManyRequests(
+        raise web.HTTPTooManyRequests(
             text=json.dumps({
                 "type": "https://api.backend.ai/probs/too-many-requests",
                 "title": "Too many failed login attempts",
@@ -639,7 +638,7 @@ async def server_main_logwrapper(
     _args: Sequence[Any],
 ) -> AsyncGenerator[Any, signal.Signals]:
     setproctitle(f"backend.ai: webserver worker-{pidx}")
-    config = cast(WebServerUnifiedConfig, _args[0])
+    config: WebServerUnifiedConfig = _args[0]
     log_endpoint = _args[1]
     logger = Logger(
         config.logging,
@@ -675,9 +674,13 @@ async def server_main(
     )
     app["config"] = config
     app["client_pool"] = ClientPool(
-        ClientConfig(
-            ssl=config.api.ssl_verify,
-            limit=config.api.connection_limit,
+        lambda key: aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(
+                ssl=config.api.ssl_verify,
+                limit=config.api.connection_limit,
+            ),
+            base_url=key.endpoint,
+            auto_decompress=False,
         )
     )
     request_policy_config: list[str] = config.security.request_policies
@@ -706,14 +709,12 @@ async def server_main(
     if (_TCP_KEEPCNT := getattr(socket, "TCP_KEEPCNT", None)) is not None:
         keepalive_options[_TCP_KEEPCNT] = 3
 
-    etcd_redis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
-        config.session.redis.model_dump(by_alias=True)
-    )
-    redis_target = etcd_redis_config.profile_target(RedisRole.STATISTICS)
+    valkey_profile_target = config.session.redis.to_valkey_profile_target()
+    valkey_target = valkey_profile_target.profile_target(RedisRole.STATISTICS)
 
     # Create ValkeySessionClient for session management
     valkey_session_client = await ValkeySessionClient.create(
-        redis_target=redis_target,
+        valkey_target=valkey_target,
         db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
         human_readable_name="web.session",
     )
@@ -790,6 +791,12 @@ async def server_main(
     cors.add(app.router.add_route("GET", "/func/{path:stream/session/[^/]+/apps$}", web_handler))
     cors.add(app.router.add_route("GET", "/func/{path:stream/.*$}", websocket_handler))
     cors.add(app.router.add_route("GET", "/func/", anon_web_handler))
+
+    # Feature flag for using Apollo Router(Graphql Federation)
+    if config.apollo_router.enabled:
+        supergraph_handler = partial(web_handler, api_endpoint=str(config.apollo_router.endpoint))
+        cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
+
     cors.add(app.router.add_route("HEAD", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("GET", "/func/{path:.*$}", web_handler))
     cors.add(app.router.add_route("PUT", "/func/{path:.*$}", web_handler))
@@ -874,7 +881,7 @@ async def server_main(
     "--debug",
     is_flag=True,
     default=False,
-    help="Set the logging level to DEBUG",
+    help="A shortcut to set `--log-level=DEBUG`",
 )
 @click.option(
     "--log-level",
@@ -900,20 +907,19 @@ def main(
         config.override_key(raw_cfg, ("logging", "level"), log_level)
         config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
 
-    cfg = WebServerUnifiedConfig.model_validate(raw_cfg)
-    if cfg.pipeline.frontend_endpoint is None:
-        cfg.pipeline.frontend_endpoint = str(cfg.pipeline.endpoint)
+    server_config = WebServerUnifiedConfig.model_validate(raw_cfg)
+    if server_config.pipeline.frontend_endpoint is None:
+        server_config.pipeline.frontend_endpoint = str(server_config.pipeline.endpoint)
 
     if ctx.invoked_subcommand is None:
-        cfg.webserver.pid_file.write_text(str(os.getpid()))
-        ipc_base_path = cfg.webserver.ipc_base_path
+        server_config.webserver.pid_file.write_text(str(os.getpid()))
+        ipc_base_path = server_config.webserver.ipc_base_path
         log_sockpath = ipc_base_path / f"webserver-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"
-        cfg.logging["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                cfg.logging,
+                server_config.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
@@ -922,7 +928,9 @@ def main(
                 },
             )
             with logger:
-                setproctitle(f"backend.ai: webserver {cfg.service.ip}:{cfg.service.port}")
+                setproctitle(
+                    f"backend.ai: webserver {server_config.service.ip}:{server_config.service.port}"
+                )
                 log.info("Backend.AI Web Server {0}", __version__)
                 log.info("runtime: {0}", sys.prefix)
 
@@ -930,9 +938,9 @@ def main(
                 if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
                     print("== Web Server configuration ==")
-                    pprint(cfg.model_dump())
-                log.info("serving at {0}:{1}", cfg.service.ip, cfg.service.port)
-                if cfg.webserver.event_loop == "uvloop":
+                    pprint(server_config.model_dump())
+                log.info("serving at {0}:{1}", server_config.service.ip, server_config.service.port)
+                if server_config.webserver.event_loop == "uvloop":
                     import uvloop
 
                     uvloop.install()
@@ -941,14 +949,14 @@ def main(
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=min(4, os.cpu_count() or 1),
-                        args=(cfg, log_endpoint),
+                        args=(server_config, log_endpoint),
                     )
                 finally:
                     log.info("terminated.")
         finally:
-            if cfg.webserver.pid_file.is_file():
+            if server_config.webserver.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
-                cfg.webserver.pid_file.unlink()
+                server_config.webserver.pid_file.unlink()
     else:
         # Click is going to invoke a subcommand.
         pass

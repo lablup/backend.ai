@@ -29,9 +29,9 @@ from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.logging import BraceStyleAdapter, LogLevel
+from ai.backend.manager.data.session.types import SessionStatus
 
 from .defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
-from .models.session import SessionStatus
 from .pglock import PgAdvisoryLock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -451,7 +451,6 @@ def load(
     if log_level != LogLevel.NOTSET:
         config.override_key(raw_cfg, ("logging", "level"), log_level)
         config.override_key(raw_cfg, ("logging", "pkg-ns", "ai.backend"), log_level)
-        config.override_key(raw_cfg, ("logging", "pkg-ns", "aiohttp"), log_level)
 
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-compatible)

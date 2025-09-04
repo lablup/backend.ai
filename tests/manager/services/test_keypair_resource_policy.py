@@ -33,7 +33,7 @@ from ai.backend.manager.services.keypair_resource_policy.service import KeypairR
 from ai.backend.manager.services.keypair_resource_policy.types import KeyPairResourcePolicyCreator
 from ai.backend.manager.types import OptionalState, TriState
 
-from .test_utils import TestScenario
+from .utils import ScenarioBase
 
 
 @pytest.fixture
@@ -112,7 +112,7 @@ def create_keypair_resource_policy(database_engine: ExtendedAsyncSAEngine):
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Create keypair resource policy with valid data",
             CreateKeyPairResourcePolicyAction(
                 creator=KeyPairResourcePolicyCreator(
@@ -157,7 +157,7 @@ def create_keypair_resource_policy(database_engine: ExtendedAsyncSAEngine):
                 )
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Create keypair resource policy with minimal configuration",
             CreateKeyPairResourcePolicyAction(
                 creator=KeyPairResourcePolicyCreator(
@@ -201,7 +201,7 @@ def create_keypair_resource_policy(database_engine: ExtendedAsyncSAEngine):
     ],
 )
 async def test_create_keypair_resource_policy(
-    test_scenario: TestScenario,
+    test_scenario: ScenarioBase,
     processors: KeypairResourcePolicyProcessors,
 ) -> None:
     await test_scenario.test(processors.create_keypair_resource_policy.wait_for_complete)
@@ -210,7 +210,7 @@ async def test_create_keypair_resource_policy(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Create keypair resource policy with duplicate name should raise error",
             CreateKeyPairResourcePolicyAction(
                 creator=KeyPairResourcePolicyCreator(
@@ -235,7 +235,7 @@ async def test_create_keypair_resource_policy(
     ],
 )
 async def test_create_keypair_resource_policy_failure(
-    test_scenario: TestScenario,
+    test_scenario: ScenarioBase,
     processors: KeypairResourcePolicyProcessors,
 ) -> None:
     await test_scenario.test(processors.create_keypair_resource_policy.wait_for_complete)
@@ -244,7 +244,7 @@ async def test_create_keypair_resource_policy_failure(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Modify keypair resource policy with valid data",
             ModifyKeyPairResourcePolicyAction(
                 name="test-modify-policy",
@@ -275,7 +275,7 @@ async def test_create_keypair_resource_policy_failure(
                 )
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Modify keypair resource policy with tristate nullify",
             ModifyKeyPairResourcePolicyAction(
                 name="test-nullify-policy",
@@ -303,7 +303,7 @@ async def test_create_keypair_resource_policy_failure(
                 )
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Modify keypair resource policy with complete resource slots replacement",
             ModifyKeyPairResourcePolicyAction(
                 name="test-resource-replacement-policy",
@@ -337,7 +337,7 @@ async def test_create_keypair_resource_policy_failure(
     ],
 )
 async def test_modify_keypair_resource_policy(
-    test_scenario: TestScenario,
+    test_scenario: ScenarioBase,
     processors: KeypairResourcePolicyProcessors,
     create_keypair_resource_policy,
 ) -> None:
@@ -351,7 +351,7 @@ async def test_modify_keypair_resource_policy(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Modify non-existent keypair resource policy should raise ObjectNotFound",
             ModifyKeyPairResourcePolicyAction(
                 name="non-existent-policy",
@@ -364,7 +364,7 @@ async def test_modify_keypair_resource_policy(
     ],
 )
 async def test_modify_keypair_resource_policy_failure(
-    test_scenario: TestScenario,
+    test_scenario: ScenarioBase,
     processors: KeypairResourcePolicyProcessors,
 ) -> None:
     await test_scenario.test(processors.modify_keypair_resource_policy.wait_for_complete)
@@ -373,7 +373,7 @@ async def test_modify_keypair_resource_policy_failure(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Delete existing keypair resource policy",
             DeleteKeyPairResourcePolicyAction(name="test-delete-policy"),
             DeleteKeyPairResourcePolicyActionResult(
@@ -398,7 +398,7 @@ async def test_modify_keypair_resource_policy_failure(
     ],
 )
 async def test_delete_keypair_resource_policy(
-    test_scenario: TestScenario,
+    test_scenario: ScenarioBase,
     processors: KeypairResourcePolicyProcessors,
     create_keypair_resource_policy,
     database_engine: ExtendedAsyncSAEngine,
@@ -424,7 +424,7 @@ async def test_delete_keypair_resource_policy(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Delete non-existent keypair resource policy should raise ObjectNotFound",
             DeleteKeyPairResourcePolicyAction(name="non-existent-policy"),
             ObjectNotFound,
@@ -432,7 +432,7 @@ async def test_delete_keypair_resource_policy(
     ],
 )
 async def test_delete_keypair_resource_policy_failure(
-    test_scenario: TestScenario,
+    test_scenario: ScenarioBase,
     processors: KeypairResourcePolicyProcessors,
 ) -> None:
     await test_scenario.test(processors.delete_keypair_resource_policy.wait_for_complete)

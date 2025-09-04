@@ -11,8 +11,9 @@ from ai.backend.manager.services.session.actions.complete import (
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
+    AGENT_FIXTURE_DICT,
     KERNEL_FIXTURE_DICT,
     SESSION_FIXTURE_DATA,
     SESSION_FIXTURE_DICT,
@@ -59,7 +60,7 @@ COMPLETE_ACTION = CompleteAction(
     ("test_scenario", "mock_agent_response_result"),
     [
         (
-            TestScenario.success(
+            ScenarioBase.success(
                 "Complete session",
                 COMPLETE_ACTION,
                 CompleteActionResult(
@@ -75,6 +76,7 @@ COMPLETE_ACTION = CompleteAction(
     "extra_fixtures",
     [
         {
+            "agents": [AGENT_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
         }
@@ -84,7 +86,7 @@ async def test_complete_session(
     mock_increment_session_usage_rpc,
     mock_complete_session_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[CompleteAction, CompleteActionResult],
+    test_scenario: ScenarioBase[CompleteAction, CompleteActionResult],
 ):
     # Execute the actual service
     result = await processors.complete.wait_for_complete(test_scenario.input)

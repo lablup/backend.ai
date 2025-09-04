@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import functools
 import grp
@@ -30,6 +32,7 @@ from redis.asyncio.client import Pipeline
 from setproctitle import setproctitle
 from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_exponential
 
+from ai.backend.appproxy.common.config import get_default_redis_key_ttl
 from ai.backend.appproxy.common.defs import (
     AGENTID_WORKER,
     APPPROXY_ANYCAST_STREAM_KEY,
@@ -50,7 +53,6 @@ from ai.backend.appproxy.common.exceptions import (
     MethodNotAllowed,
     URLNotFound,
 )
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     AppCreator,
     FrontendMode,
@@ -61,7 +63,6 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.common.utils import (
     BackendAIAccessLogger,
-    config_key_to_kebab_case,
     ensure_json_serializable,
     mime_match,
     ping_redis_connection,
@@ -80,9 +81,20 @@ from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.redis_client import RedisConnection
-from ai.backend.common.types import AgentId, RedisProfileTarget
+from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
+    RedisServiceDiscovery,
+    RedisServiceDiscoveryArgs,
+)
+from ai.backend.common.service_discovery.service_discovery import (
+    ServiceDiscovery,
+    ServiceDiscoveryLoop,
+    ServiceEndpoint,
+    ServiceMetadata,
+)
+from ai.backend.common.types import AgentId, RedisProfileTarget, ServiceDiscoveryType
 from ai.backend.common.utils import env_info
-from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__
 from .config import ServerConfig
@@ -254,9 +266,10 @@ async def last_used_time_marker_redispy(root_ctx: RootContext) -> None:
             redis_keys, target_time = await root_ctx.last_used_time_marker_redis_queue.get()
 
             async def _pipe(r: Redis) -> Pipeline:
-                pipe = r.pipeline()
+                pipe = r.pipeline(transaction=False)
+                ttl = get_default_redis_key_ttl()
                 for key in redis_keys:
-                    pipe.set(key, target_time)
+                    pipe.set(key, target_time, ex=ttl)
                 return pipe
 
             await redis_helper.execute(root_ctx.redis_live, _pipe)
@@ -353,7 +366,10 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         log_events=root_ctx.local_config.debug.log_events,
         event_observer=root_ctx.metrics.event,
     )
+    await root_ctx.event_dispatcher.start()
+
     yield
+
     await root_ctx.event_producer.close()
     await asyncio.sleep(0.2)
     await root_ctx.event_dispatcher.close()
@@ -374,13 +390,6 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     yield
     for handler in handlers:
         root_ctx.event_dispatcher.unsubscribe(handler)
-
-
-@actxmgr
-async def event_dispatcher_lifecycle_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    await root_ctx.event_dispatcher.start()
-    yield
-    await root_ctx.event_dispatcher.close()
 
 
 @actxmgr
@@ -481,6 +490,56 @@ async def inference_metric_collection_ctx(root_ctx: RootContext) -> AsyncIterato
     yield
     timer.cancel()
     await timer
+
+
+@actxmgr
+async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    sd_type = root_ctx.local_config.service_discovery.type
+    service_discovery: ServiceDiscovery
+    match sd_type:
+        case ServiceDiscoveryType.REDIS:
+            redis_profile_target = RedisProfileTarget.from_dict(
+                root_ctx.local_config.redis.to_dict()
+            )
+            live_redis_target = redis_profile_target.profile_target(RedisRole.LIVE)
+            service_discovery = await RedisServiceDiscovery.create(
+                RedisServiceDiscoveryArgs(valkey_target=live_redis_target.to_valkey_target())
+            )
+        case _:
+            raise RuntimeError(f"Unsupported service discovery type: {sd_type}")
+
+    # Determine announce addresses
+    announce_addr = root_ctx.local_config.proxy_worker.announce_addr
+    assert announce_addr is not None  # auto-populated if None
+    sd_loop = ServiceDiscoveryLoop(
+        sd_type,
+        service_discovery,
+        ServiceMetadata(
+            display_name=f"appproxy-worker-{root_ctx.local_config.proxy_worker.authority}",
+            service_group="appproxy-worker",
+            version=__version__,
+            endpoint=ServiceEndpoint(
+                address=announce_addr.host,
+                port=announce_addr.port,
+                protocol="http",
+                # It can be separated into an internal-purpose port later.
+                prometheus_address=str(announce_addr),
+            ),
+        ),
+    )
+
+    if root_ctx.local_config.otel.enabled:
+        meta = sd_loop.metadata
+        otel_spec = OpenTelemetrySpec(
+            service_id=meta.id,
+            service_name=meta.service_group,
+            service_version=meta.version,
+            log_level=root_ctx.local_config.otel.log_level,
+            endpoint=root_ctx.local_config.otel.endpoint,
+        )
+        BraceStyleAdapter.apply_otel(otel_spec)
+    yield
+    sd_loop.close()
 
 
 async def metrics(request: web.Request) -> web.Response:
@@ -650,6 +709,7 @@ def build_root_app(
             cleanup_contexts = [
                 proxy_frontend_ctx,
                 redis_ctx,
+                service_discovery_ctx,
                 worker_registration_ctx,
                 inference_metric_collection_ctx,
             ]
@@ -658,8 +718,8 @@ def build_root_app(
                 proxy_frontend_ctx,
                 redis_ctx,
                 event_dispatcher_ctx,
-                event_dispatcher_lifecycle_ctx,
                 event_handler_ctx,
+                service_discovery_ctx,
                 worker_registration_ctx,
                 inference_metric_collection_ctx,
             ]
@@ -780,9 +840,7 @@ async def server_main(
     finally:
         if aiomon_started:
             m.close()
-        log.info("Leftover tasks:")
-        for task in asyncio.all_tasks():
-            log.info("{}", task)
+        log.debug("The number of leftover asyncio tasks: {}", len(asyncio.all_tasks()))
 
 
 @actxmgr
@@ -792,11 +850,10 @@ async def server_main_logwrapper(
     _args: tuple[ServerConfig, str],
 ) -> AsyncIterator[None]:
     setproctitle(f"backend.ai: proxy-worker worker-{pidx}")
-    log_endpoint = _args[1]
-    logging_config = config_key_to_kebab_case(_args[0].logging.model_dump(exclude_none=True))
-    logging_config["endpoint"] = log_endpoint
+    local_config: ServerConfig = _args[0]
+    log_endpoint: str = _args[1]
     logger = Logger(
-        logging_config,
+        local_config.logging,
         is_master=False,
         log_endpoint=log_endpoint,
         msgpack_options={
@@ -824,40 +881,44 @@ async def server_main_logwrapper(
     ),
 )
 @click.option(
+    "--debug",
+    is_flag=True,
+    help="A shortcut to set `--log-level=DEBUG`",
+)
+@click.option(
     "--log-level",
-    type=click.Choice([*LogLevel.__members__.keys()], case_sensitive=False),
-    default="INFO",
+    type=click.Choice([*LogLevel], case_sensitive=False),
+    default=LogLevel.NOTSET,
     help="Set the logging verbosity level",
 )
 @click.pass_context
-def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
+def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel) -> None:
     """
     Start the proxy-worker service as a foreground process.
     """
-    cfg = load_config(config_path, log_level)
+    log_level = LogLevel.DEBUG if debug else log_level
+    server_config = load_config(config_path, log_level)
 
     if ctx.invoked_subcommand is None:
         tracker: memray.Tracker | None = None
-        if cfg.profiling.enable_pyroscope:
-            assert cfg.profiling.pyroscope_config
-            pyroscope.configure(**cfg.profiling.pyroscope_config.model_dump())
-        if cfg.profiling.enable_memray:
+        if server_config.profiling.enable_pyroscope:
+            assert server_config.profiling.pyroscope_config
+            pyroscope.configure(**server_config.profiling.pyroscope_config.model_dump())
+        if server_config.profiling.enable_memray:
             tracker = memray.Tracker(
-                cfg.profiling.memray_output_destination,
+                server_config.profiling.memray_output_destination,
                 follow_fork=True,
             )
             tracker.__enter__()
-        cfg.proxy_worker.pid_file.touch(exist_ok=True)
-        cfg.proxy_worker.pid_file.write_text(str(os.getpid()))
-        ipc_base_path = cfg.proxy_worker.ipc_base_path
+        server_config.proxy_worker.pid_file.touch(exist_ok=True)
+        server_config.proxy_worker.pid_file.write_text(str(os.getpid()))
+        ipc_base_path = server_config.proxy_worker.ipc_base_path
         ipc_base_path.mkdir(exist_ok=True, parents=True)
         log_sockpath = ipc_base_path / f"worker-logger-{os.getpid()}.sock"
         log_endpoint = f"ipc://{log_sockpath}"
-        logging_config = config_key_to_kebab_case(cfg.logging.model_dump(exclude_none=True))
-        logging_config["endpoint"] = log_endpoint
         try:
             logger = Logger(
-                logging_config,
+                server_config.logging,
                 is_master=True,
                 log_endpoint=log_endpoint,
                 msgpack_options={
@@ -869,13 +930,13 @@ def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
                 setproctitle("backend.ai: proxy-worker")
                 log.info("Backend.AI AppProxy Worker {0}", __version__)
                 log.info("runtime: {0}", env_info())
-                if cfg.profiling.enable_pyroscope:
+                if server_config.profiling.enable_pyroscope:
                     log.info("Pyroscope tracing enabled")
-                if cfg.profiling.enable_memray:
+                if server_config.profiling.enable_memray:
                     log.info("Memray tracing enabled")
                 log_config = logging.getLogger("ai.backend.appproxy.worker.config")
                 log_config.debug("debug mode enabled.")
-                if cfg.proxy_worker.event_loop == "uvloop":
+                if server_config.proxy_worker.event_loop == "uvloop":
                     import uvloop
 
                     uvloop.install()
@@ -884,15 +945,15 @@ def main(ctx: click.Context, config_path: Path, log_level: str) -> None:
                     aiotools.start_server(
                         server_main_logwrapper,  # type: ignore
                         num_workers=1,
-                        args=(cfg, log_endpoint),
+                        args=(server_config, log_endpoint),
                         wait_timeout=5.0,
                     )
                 finally:
                     log.info("terminated.")
         finally:
-            if cfg.proxy_worker.pid_file.is_file():
+            if server_config.proxy_worker.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
-                cfg.proxy_worker.pid_file.unlink()
+                server_config.proxy_worker.pid_file.unlink()
             if tracker:
                 tracker.__exit__(None, None, None)
     else:

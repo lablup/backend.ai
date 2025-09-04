@@ -1,10 +1,12 @@
-from typing import Any, Mapping
+from typing import Any
 from uuid import UUID
 
 import aiohttp
 
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.decorators.client_decorator import create_layer_aware_client_decorator
+
+from .types import CreateEndpointRequestBody
 
 client_decorator = create_layer_aware_client_decorator(LayerType.WSPROXY_CLIENT)
 
@@ -23,11 +25,11 @@ class WSProxyClient:
     async def create_endpoint(
         self,
         endpoint_id: UUID,
-        body: Mapping[str, Any],
+        body: CreateEndpointRequestBody,
     ) -> dict[str, Any]:
         async with self._client_session.post(
-            f"{self._address}/v2/endpoints/{endpoint_id}",
-            json=body,
+            f"/v2/endpoints/{endpoint_id}",
+            json=body.model_dump(mode="json"),
             headers={
                 "X-BackendAI-Token": self._token,
             },
@@ -41,7 +43,7 @@ class WSProxyClient:
         endpoint_id: UUID,
     ) -> None:
         async with self._client_session.delete(
-            f"{self._address}/v2/endpoints/{endpoint_id}",
+            f"/v2/endpoints/{endpoint_id}",
             headers={
                 "X-BackendAI-Token": self._token,
             },

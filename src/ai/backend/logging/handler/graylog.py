@@ -3,9 +3,10 @@ from __future__ import annotations
 import logging
 import socket
 import ssl
-from typing import Any, Mapping, Optional
 
 import graypy
+
+from ai.backend.logging.config import LoggingConfig
 
 
 class GELFTLSHandler(graypy.GELFTLSHandler):
@@ -51,21 +52,22 @@ class GELFTLSHandler(graypy.GELFTLSHandler):
         return wrapped_socket
 
 
-def setup_graylog_handler(config: Mapping[str, Any]) -> Optional[logging.Handler]:
-    drv_config = config["graylog"]
+def setup_graylog_handler(config: LoggingConfig) -> logging.Handler:
+    drv_config = config.graylog
+    assert drv_config is not None
     graylog_params = {
-        "host": drv_config["host"],
-        "port": drv_config["port"],
-        "validate": drv_config["ssl-verify"],
-        "ca_certs": drv_config["ca-certs"],
-        "keyfile": drv_config["keyfile"],
-        "certfile": drv_config["certfile"],
+        "host": drv_config.host,
+        "port": drv_config.port,
+        "validate": drv_config.ssl_verify,
+        "ca_certs": drv_config.ca_certs,
+        "keyfile": drv_config.keyfile,
+        "certfile": drv_config.certfile,
     }
-    if drv_config["localname"]:
-        graylog_params["localname"] = drv_config["localname"]
+    if drv_config.localname:
+        graylog_params["localname"] = drv_config.localname
     else:
-        graylog_params["fqdn"] = drv_config["fqdn"]
+        graylog_params["fqdn"] = drv_config.fqdn
 
     graylog_handler = GELFTLSHandler(**graylog_params)
-    graylog_handler.setLevel(config["level"])
+    graylog_handler.setLevel(config.level)
     return graylog_handler

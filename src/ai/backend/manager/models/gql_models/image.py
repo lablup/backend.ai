@@ -17,6 +17,7 @@ from typing import (
 from uuid import UUID
 
 import graphene
+import graphene_federation
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
@@ -425,6 +426,7 @@ class ImagePermissionValueField(graphene.Scalar):
         return ImagePermission(value)
 
 
+@graphene_federation.key("id")
 class ImageNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -591,31 +593,32 @@ class ImageNode(graphene.ObjectType):
 
     @classmethod
     def from_legacy_image(
-        cls, row: Image, *, permissions: Optional[Iterable[ImagePermission]] = None
+        cls, image: Image, *, permissions: Optional[Iterable[ImagePermission]] = None
     ) -> ImageNode:
-        image_type = row.labels.get(LabelName.ROLE, ImageType.COMPUTE.value)
+        labels: dict[str, str] = {kvpair.key: kvpair.value for kvpair in cast(list, image.labels)}
+        image_type = labels.get(LabelName.ROLE, ImageType.COMPUTE.value)
         result = cls(
-            id=row.id,
-            row_id=row.id,
-            name=row.name,
-            namespace=row.namespace,
-            base_image_name=row.base_image_name,
-            humanized_name=row.humanized_name,
-            tag=row.tag,
-            tags=row.tags,
-            version=row.version,
-            project=row.project,
-            registry=row.registry,
-            architecture=row.architecture,
-            is_local=row.is_local,
-            digest=row.digest,
-            labels=row.labels,
-            size_bytes=row.size_bytes,
-            resource_limits=row.resource_limits,
-            supported_accelerators=row.supported_accelerators,
-            aliases=row.aliases,
+            id=image.id,
+            row_id=image.id,
+            name=image.name,
+            namespace=image.namespace,
+            base_image_name=image.base_image_name,
+            humanized_name=image.humanized_name,
+            tag=image.tag,
+            tags=image.tags,
+            version=image.version,
+            project=image.project,
+            registry=image.registry,
+            architecture=image.architecture,
+            is_local=image.is_local,
+            digest=image.digest,
+            labels=image.labels,
+            size_bytes=image.size_bytes,
+            resource_limits=image.resource_limits,
+            supported_accelerators=image.supported_accelerators,
+            aliases=image.aliases,
             permissions=[] if permissions is None else permissions,
-            status=row.status,
+            status=image.status,
             type=image_type,
         )
         return result

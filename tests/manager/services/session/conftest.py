@@ -37,6 +37,7 @@ async def processors(
             idle_checker_host=idle_checker_host,
             session_repository=session_repository,
             admin_session_repository=admin_session_repository,
+            scheduling_controller=AsyncMock(),
         )
     )
 

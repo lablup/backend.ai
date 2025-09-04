@@ -340,10 +340,12 @@
       "CannotDeleteFolder": "Não é possível excluir a pasta montada em uma ou mais sessões. Por favor, termine a sessão primeiro.",
       "CannotDeletePipelineFolder": "Você não pode excluir pastas de pipeline.",
       "CannotRestorePipelineFolder": "Você não pode restaurar pastas de pipeline.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "As pastas de projeto modelo só podem ser criadas em projetos exclusivos da loja de modelos. \nAltere o projeto atual ou o tipo de usuário.",
       "CloneAFolder": "Clonar uma pasta",
       "CloneFolder": "Clonar pasta",
       "Cloneable": "Clonável",
       "Control": "Ao controle",
+      "CreateModelFolderOnlyInExclusiveProject": "As pastas de projeto modelo só podem ser criadas em projetos exclusivos da loja de modelos.",
       "CreatedAt": "Criado em",
       "Delete": "Excluir",
       "DeleteAFolder": "Excluir uma pasta",
@@ -398,6 +400,7 @@
       "Path": "Caminho de armazenamento",
       "Permission": "Permissão",
       "ProjectFolderAlertDesc": "Esta pasta é compartilhada com todos os membros do projeto",
+      "ProjectFolderCreationHelp": "Uma pasta acessível por \"{{projectName}}\" \"os usuários do projeto serão criados.",
       "Rename": "Renomear",
       "Restore": "Restaurar",
       "RestoreDescription": "Deseja restaurar a pasta \"{{ folderName }}\"?",
@@ -618,6 +621,7 @@
     "SmallerResourceThenImageRequires": "O seu pedido de recursos é mais pequeno do que o mínimo exigido pela imagem. Tente mais recursos.",
     "TooManyLoginFailures": "Ocorreram demasiadas falhas de início de sessão num curto espaço de tempo. O início de sessão está bloqueado durante algum tempo.",
     "UnauthorizedToken": "Token não autorizado. Por favor, verifique o seu token.",
+    "UnexpectedError": "Ocorreu um erro inesperado. \nTente novamente mais tarde ou entre em contato com o suporte se o problema persistir.",
     "UnknownError": "Ocorreu um erro desconhecido. Por favor, tente novamente.",
     "UpdateError": "Erro de ATUALIZAÇÃO",
     "UserHasNoGroup": "O utilizador não tem grupo. Contacte o administrador para resolver o problema.",
@@ -634,8 +638,10 @@
     "Title": "Ocorreu um erro."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Pasta não encontrada ou acesso negado",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Pastas não gerenciadas não suportam o File Explorer.",
+    "NoPermissions": "Sem permissões para acessar esta pasta",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -770,6 +776,9 @@
   "kernel": {
     "AgentId": "ID do agente",
     "ContainerId": "ID do contêiner",
+    "ContainerLogs": "Logs de contêineres",
+    "Hostname": "Nome do host",
+    "Kernel": "Kernel",
     "KernelId": "ID do kernel",
     "Kernels": "Kernels",
     "Role": "Papel",
@@ -911,6 +920,7 @@
     "EndpointName": "Nome do ponto final",
     "Error": "Erro",
     "ExpiredDate": "Data de expiração",
+    "ExtraMountsWarning": "Ao editar o serviço, o nome (alias) de pastas montadas adicionais não pode ser retido. \nPor favor, verifique os nomes das pastas duas vezes antes de salvar.",
     "FailedToStartService": "Falha ao criar o serviço.",
     "FailedToTerminateService": "O pedido para terminar o serviço falhou.",
     "FailedToUpdateService": "Falha ao atualizar o serviço.",
@@ -1024,10 +1034,6 @@
   },
   "pagination": {
     "Total": "{{start}} - {{end}} de {{total}} itens"
-  },
-  "propertyFilter": {
-    "PlaceHolder": "Pesquisar",
-    "ResetFilter": "Redefinir filtros"
   },
   "registry": {
     "AddRegistry": "Adicionar registro",
@@ -1196,6 +1202,9 @@
     "SharedMemory": "Memória compartilhada",
     "Updated": "Predefinição de recurso atualizada"
   },
+  "scheduler": {
+    "PendingSessions": "Sessões pendentes"
+  },
   "session": {
     "Agent": "Agente",
     "AgentId": "ID do agente",
@@ -1276,12 +1285,15 @@
     "OpenToPublic": "Abra o aplicativo para o público",
     "OpenToPublicDesc": "A ativação desta opção permite o acesso do aplicativo para todos os usuários da rede.<br /><br /> \nPara gerenciamento de acesso, insira endereços IP específicos no campo 'IP permitido'.<br /><br /> \nDeixar este campo vazio permitirá o acesso de todos os endereços IP.<br /><br /> \nConsidere definir restrições de IP quando necessário para o gerenciamento de segurança.",
     "Others": "Outras",
+    "PanelSettings": "Configurações do painel",
+    "PendingPosition": "Posição na fila",
     "PredicateChecks": "Verificações predicadas",
     "Preparing": "Preparando...",
     "PreparingSession": "Preparando sessão ...",
     "ReadLess": "Ler menos",
     "ReadMore": "Ler mais...",
     "RecentlyCreatedSessions": "Sessões criadas recentemente",
+    "RecentlyCreatedSessionsTooltip": "Mostra as {{count}} sessões em execução criadas mais recentemente no projeto atual",
     "RequestContainerCommit": "Pedido de autorização do contentor",
     "Reservation": "Reserva",
     "ResourceGroup": "Grupo de Recursos",
@@ -1537,6 +1549,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Suporte Atom Max",
     "ATOMPlusSupport": "Suporte ATOM+",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Permitir registro do lado do agente",
@@ -1544,6 +1557,7 @@
     "Config": "Config",
     "ConfigPerJobSchduler": "Configurações do agendador",
     "ConfigPerJobSchdulerDescription": "Os valores na configuração do planejador são os padrões a serem usados quando não há configuração do planejador em cada grupo de recursos. Se houver uma configuração específica do grupo de recursos, este valor será ignorado.",
+    "DescATOMMaxSupport": "Use Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Use o acelerador Rebellions ATOM+.",
     "DescATOMSupport": "Utilizar o acelerador ATOM da Rebellions",
     "DescAllowAgentSideRegistration": "Permitir que o agente se registre no gerente. Use somente se o cluster back -end.ai for gerenciado no local seguro.",
@@ -1587,6 +1601,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "Suporte para GPU ROCm",
     "RegisterNewImagesFromRepo": "Registre novas imagens do repositório",
+    "RequireATOMMaxPlugin": "Requer o Plugin Backend.AI ATOM Max.",
     "RequireATOMPlugin": "Requer o plug-in Backend.AI ATOM.",
     "RequireATOMPlusPlugin": "Requer plug-in Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Requer Backend.AI Virtual CUDA API Layer Plugin.",
@@ -1751,6 +1766,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Ativado",
+    "ATOMMaxEnabled": "Atom Max NPU habilitado",
     "ATOMPlusEnabled": "ATOM+ NPU habilitado",
     "Accept": "Aceitar",
     "AcceptSharedVFolder": "Agora você pode acessar a pasta:",
@@ -1970,6 +1986,7 @@
       "MyResources": "Meus recursos",
       "MyResourcesDescription": "<p> Este painel mostra o uso total de recursos e permanecendo em todos os projetos e grupos de recursos.",
       "MyResourcesIn": "Meus recursos em",
+      "MyResourcesInResourceGroup": "Meus recursos em grupo de recursos",
       "MyResourcesInResourceGroupDescription": "Este painel mostra o uso atual de recursos e a capacidade disponível no grupo de recursos selecionados.",
       "NewPassword": "Nova Senha",
       "NewPasswordAgain": "Nova senha (novamente)",
@@ -1989,6 +2006,7 @@
       "Remaining": "Restante",
       "ResourcePolicy": "Política de Recursos",
       "Resources": "Recursos",
+      "Scheduler": "Agendador",
       "Serving": "Servir",
       "Sessions": "Sessões",
       "Settings": "Definições",
@@ -2000,6 +2018,7 @@
       "Tasks": "Tarefas",
       "TermsOfService": "Termos de serviço",
       "TotalResourcesIn": "Recursos totais em",
+      "TotalResourcesInResourceGroup": "Recursos totais no grupo de recursos",
       "TotalResourcesInResourceGroupDescription": "Este painel mostra o total de recursos usados ​​e restantes. \nOs valores são calculados adicionando o uso e as quantidades restantes de todos os agentes usando o grupo de recursos selecionados.",
       "TotpActivated": "2FA ativado",
       "Update": "Atualizar",

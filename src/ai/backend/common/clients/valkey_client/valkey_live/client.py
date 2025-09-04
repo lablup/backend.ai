@@ -26,7 +26,7 @@ from ai.backend.common.clients.valkey_client.client import (
 )
 from ai.backend.common.data.config.types import HealthCheckConfig
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.common.types import RedisTarget
+from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -56,7 +56,7 @@ class ValkeyLiveClient:
     @classmethod
     async def create(
         cls,
-        redis_target: RedisTarget,
+        valkey_target: ValkeyTarget,
         *,
         db_id: int,
         human_readable_name: str,
@@ -71,7 +71,7 @@ class ValkeyLiveClient:
         :return: An instance of ValkeyLiveClient.
         """
         client = create_valkey_client(
-            target=redis_target,
+            valkey_target=valkey_target,
             db_id=db_id,
             human_readable_name=human_readable_name,
         )
@@ -84,7 +84,7 @@ class ValkeyLiveClient:
         Close the ValkeyLiveClient connection.
         """
         if self._closed:
-            log.warning("ValkeyLiveClient is already closed.")
+            log.debug("ValkeyLiveClient is already closed.")
             return
         self._closed = True
         await self._client.disconnect()

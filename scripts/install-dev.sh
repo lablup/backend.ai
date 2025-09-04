@@ -27,11 +27,11 @@ NC="\033[0m"
 REWRITELN="\033[A\r\033[K"
 
 readlinkf() {
-  $bpython -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
+  scripts/python.sh -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
 }
 
 relpath() {
-  $bpython -c "import os.path; print(os.path.relpath('$1','${2:-$PWD}'))"
+  scripts/python.sh -c "import os.path; print(os.path.relpath('$1','${2:-$PWD}'))"
 }
 
 sed_inplace() {
@@ -80,6 +80,16 @@ usage() {
   echo "  ${LWHITE}--enable-cuda-mock${NC}"
   echo "    Install CUDA accelerator mock plugin and pull a"
   echo "    TensorFlow CUDA kernel for testing/demo."
+  echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--enable-cuda-mig-mock${NC}"
+  echo "    Install CUDA accelerator mock plugin and pull a"
+  echo "    TensorFlow CUDA kernel for testing/demo."
+  echo "    (default: false)"
+  echo ""
+  echo "  ${LWHITE}--enable-rocm-mock${NC}"
+  echo "    Install ROCm accelerator mock plugin and pull a"
+  echo "    TensorFlow ROCm kernel for testing/demo."
   echo "    (default: false)"
   echo ""
   echo "  ${LWHITE}--editable-webui${NC}"
@@ -193,9 +203,9 @@ show_guide() {
   if [ $EDITABLE_WEBUI -eq 1 ]; then
     show_info "How to run the editable checkout of webui:"
     echo "(Terminal 1)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run build:d${NC}"
+    echo "  > ${WHITE}cd src/ai/backend/webui; pnpm run build:d${NC}"
     echo "(Terminal 2)"
-    echo "  > ${WHITE}cd src/ai/backend/webui; npm run server:d${NC}"
+    echo "  > ${WHITE}cd src/ai/backend/webui; pnpm run server:d${NC}"
     echo "If you just run ${WHITE}./py -m ai.backend.web.server${NC}, it will use the local version compiled from the checked out source."
   fi
   show_info "Manual configuration for the client accessible hostname in various proxies"
@@ -229,19 +239,29 @@ show_guide() {
   fi
 }
 
+# Prepare sudo command options
+ORIG_USER=${USER:-$(logname)}
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
+  ORIG_HOME=$(getent passwd "$ORIG_USER" | cut -d: -f6)
   if [ $(id -u) = "0" ]; then
     docker_sudo=''
+    sudo=''
   else
-    docker_sudo='sudo -E'
+    docker_sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
+  fi
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+  ORIG_HOME=$(id -P "$ORIG_USER" | cut -d: -f9)
+  if [ $(id -u) = "0" ]; then
+    docker_sudo=''
+    sudo=''
+  else
+    docker_sudo=''  # not required for docker commands (Docker Desktop, OrbStack, etc.)
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
   fi
 else
-  docker_sudo=''
-fi
-if [ $(id -u) = "0" ]; then
-  sudo=''
-else
-  sudo='sudo -E'
+  echo "Unsupported OSTYPE: $OSTYPE"
+  exit 1
 fi
 
 # Detect distribution
@@ -269,9 +289,21 @@ else
   exit 1
 fi
 
+show_info "Checking the uv installation..."
+if ! command -v uv >/dev/null 2>&1; then
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+  if [ $SHELL = "/bin/fish" ]; then
+    source $HOME/.local/bin/env.fish
+  else
+    source $HOME/.local/bin/env
+  fi
+  show_info "uv is installed."
+else
+  show_info "uv is already installed."
+fi
+
 show_info "Checking the bootstrapper Python version..."
-source scripts/bootstrap-static-python.sh
-$bpython -c 'import sys;print(sys.version_info)'
+scripts/python.sh -c 'import sys; print(sys.version_info)'
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
@@ -282,8 +314,8 @@ if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
 fi
 PLUGIN_PATH=$(relpath "${ROOT_PATH}/plugins")
 HALFSTACK_VOLUME_PATH=$(relpath "${ROOT_PATH}/volumes")
-PANTS_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'GLOBAL.pants_version')
-PYTHON_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'python.interpreter_constraints[0]' | awk -F '==' '{print $2}')
+PANTS_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'GLOBAL.pants_version')
+PYTHON_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'python.interpreter_constraints[0]' | awk -F '==' '{print $2}')
 NODE_VERSION=$(curl -sL https://raw.githubusercontent.com/lablup/backend.ai-webui/main/.nvmrc)
 
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -291,6 +323,8 @@ CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 SHOW_GUIDE=0
 ENABLE_CUDA=0
 ENABLE_CUDA_MOCK=0
+ENABLE_CUDA_MIG_MOCK=0
+ENABLE_ROCM_MOCK=0
 CONFIGURE_HA=0
 EDITABLE_WEBUI=0
 POSTGRES_PORT="8101"
@@ -334,6 +368,8 @@ while [ $# -gt 0 ]; do
     --python-version=*)    PYTHON_VERSION="${1#*=}" ;;
     --enable-cuda)         ENABLE_CUDA=1 ;;
     --enable-cuda-mock)    ENABLE_CUDA_MOCK=1 ;;
+    --enable-cuda-mig-mock) ENABLE_CUDA_MIG_MOCK=1 ;;
+    --enable-rocm-mock)    ENABLE_ROCM_MOCK=1 ;;
     --editable-webui)      EDITABLE_WEBUI=1 ;;
     --postgres-port)       POSTGRES_PORT=$2; shift ;;
     --postgres-port=*)     POSTGRES_PORT="${1#*=}" ;;
@@ -574,9 +610,9 @@ check_python() {
 }
 
 bootstrap_pants() {
-  pants_local_exec_root=$($docker_sudo $bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
+  pants_local_exec_root=$($docker_sudo scripts/pyscript.sh scripts/check-docker.py --get-preferred-pants-local-exec-root)
   mkdir -p "$pants_local_exec_root"
-  $bpython scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
+  scripts/pyscript.sh scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
   set +e
   if command -v pants &> /dev/null ; then
     echo "Pants system command is already installed."
@@ -656,11 +692,8 @@ fi
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
-$bpython -m ensurepip --upgrade
-# FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
-$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' aiohttp
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-  $docker_sudo $bpython scripts/check-docker.py
+  $docker_sudo scripts/pyscript.sh scripts/check-docker.py
   if [ $? -ne 0 ]; then
     exit 1
   fi
@@ -694,9 +727,10 @@ if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
   fi
 fi
 
-if [ $ENABLE_CUDA -eq 1 ] && [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-  show_error "You can't use both CUDA and CUDA mock plugins at once!"
-  show_error "Please remove --enable-cuda or --enable-cuda-mock flag to continue."
+count=$(( ENABLE_CUDA_MIG_MOCK + ENABLE_CUDA_MOCK + ENABLE_CUDA + ENABLE_ROCM_MOCK ))
+if [ $count -gt 1 ]; then
+  show_error "You can't use multiple CUDA/ROCm plugins at once!"
+  show_error "Please remove --enable-cuda, --enable-cuda-mock, --enable-cuda-mig-mock, --enable-rocm-mock flag to continue."
   exit 1
 fi
 
@@ -793,9 +827,7 @@ setup_environment() {
   pants export \
     --resolve=python-default \
     --resolve=python-kernel \
-    --resolve=pants-plugins \
     --resolve=towncrier \
-    --resolve=ruff \
     --resolve=mypy
   # NOTE: Some resolves like pytest are not needed to be exported at this point
   # because pants will generate temporary resolves when actually running the test cases.
@@ -805,7 +837,7 @@ setup_environment() {
   mkdir -p "$HALFSTACK_VOLUME_PATH"
   if [ $CONFIGURE_HA -eq 1 ]; then
     SOURCE_COMPOSE_PATH="docker-compose.halfstack-ha.yml"
-    SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus.yaml"
+    SOURCE_PROMETHEUS_PATH="configs/prometheus/prometheus-ha.yaml"
     SOURCE_GRAFANA_DASHBOARDS_PATH="configs/grafana/dashboards"
     SOURCE_GRAFANA_PROVISIONING_PATH="configs/grafana/provisioning"
 
@@ -817,12 +849,12 @@ setup_environment() {
     sed_inplace "s/8110:6379/${REDIS_PORT}:6379/" "docker-compose.halfstack.current.yml"
     sed_inplace "s/8120:2379/${ETCD_PORT}:2379/" "docker-compose.halfstack.current.yml"
 
-    sed_inplace "s/${REDIS_MASTER_PORT}/9500/g" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/${REDIS_SLAVE1_PORT}/9501/g" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/${REDIS_SLAVE2_PORT}/9502/g" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/${REDIS_SENTINEL1_PORT}/9503/g" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/${REDIS_SENTINEL2_PORT}/9504/g" "docker-compose.halfstack.current.yml"
-    sed_inplace "s/${REDIS_SENTINEL3_PORT}/9505/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_MASTER_PORT}/${REDIS_MASTER_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SLAVE1_PORT}/${REDIS_SLAVE1_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SLAVE2_PORT}/${REDIS_SLAVE2_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL1_PORT}/${REDIS_SENTINEL1_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL2_PORT}/${REDIS_SENTINEL2_PORT}/g" "docker-compose.halfstack.current.yml"
+    sed_inplace "s/\${REDIS_SENTINEL3_PORT}/${REDIS_SENTINEL3_PORT}/g" "docker-compose.halfstack.current.yml"
 
     mkdir -p "./tmp/backend.ai-halfstack-ha/configs"
 
@@ -887,10 +919,22 @@ configure_backendai() {
   wait_for_docker
   show_info "Creating docker compose \"halfstack\"..."
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
-  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see six containers here.
+  $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see containers here.
+
+  # Configure MinIO using separate configuration script
+  source "$(dirname "$0")/configure-minio.sh"
+  configure_minio "docker-compose.halfstack.current.yml"
 
   if [ $ENABLE_CUDA_MOCK -eq 1 ]; then
     cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
+  fi
+
+  if [ $ENABLE_CUDA_MIG_MOCK -eq 1 ]; then
+    cp "configs/accelerator/cuda-mock-mig.toml" mock-accelerator.toml
+  fi
+
+  if [ $ENABLE_ROCM_MOCK -eq 1 ]; then
+    cp "configs/accelerator/rocm-mock.toml" mock-accelerator.toml
   fi
 
   # configure manager
@@ -975,6 +1019,10 @@ configure_backendai() {
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
   elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
+  elif [ $ENABLE_CUDA_MIG_MOCK -eq 1 ]; then
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
+  elif [ $ENABLE_ROCM_MOCK -eq 1 ]; then
+    sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
   else
     sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
   fi
@@ -1001,12 +1049,12 @@ configure_backendai() {
   # add LOCAL_STORAGE_VOLUME vfs volume
   echo "\n[volume.${LOCAL_STORAGE_VOLUME}]\nbackend = \"vfs\"\npath = \"${ROOT_PATH}/${VFOLDER_REL_PATH}\"" >> ./storage-proxy.toml
 
+  # Configure storage-proxy MinIO settings using separate configuration script
+  configure_storage_proxy_minio "./storage-proxy.toml"
+
   # configure webserver
   cp configs/webserver/halfstack.conf ./webserver.conf
   sed_inplace "s/https:\/\/api.backend.ai/http:\/\/127.0.0.1:${MANAGER_PORT}/" ./webserver.conf
-
-  # # configure wsproxy (deprecated)
-  # cp configs/wsproxy/halfstack.toml ./wsproxy.toml
 
   if [ $CONFIGURE_HA -eq 1 ]; then
     sed_inplace "s/redis.addr = \"localhost:6379\"/# redis.addr = \"localhost:6379\"/" ./webserver.conf
@@ -1045,14 +1093,22 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
 
+  # Populate artifact registries with substituted MinIO credentials
+  TMP_ARTIFACT_REGISTRIES_JSON="/tmp/example-artifact-registries.json"
+  cp fixtures/manager/example-artifact-registries.json "$TMP_ARTIFACT_REGISTRIES_JSON"
+  sed_inplace "s/<access_key>/${MINIO_ACCESS_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
+  sed_inplace "s/<secret_key>/${MINIO_SECRET_KEY}/g" "$TMP_ARTIFACT_REGISTRIES_JSON"
+  ./backend.ai mgr fixture populate "$TMP_ARTIFACT_REGISTRIES_JSON"
+  rm -f "$TMP_ARTIFACT_REGISTRIES_JSON"
+
   show_info "Setting up databases... (account-manager)"
   # TODO: add "schema oneshot" command for account-manager
   # ./py -m alembic -c alembic-accountmgr.ini upgrade head
   # TODO: populate fixtures
 
   show_info "Setting up databases... (app-proxy)"
-  _psql_core="$docker_sudo docker exec -it -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d backend -q"
-  _psql_appproxy="$docker_sudo docker exec -it -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d appproxy -q"
+  _psql_core="$docker_sudo docker exec -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d backend -q"
+  _psql_appproxy="$docker_sudo docker exec -e PGPASSWORD=develove $POSTGRES_CONTAINER_ID psql -U postgres -d appproxy -q"
   $_psql_core -c "\
     DO \$\$
     BEGIN

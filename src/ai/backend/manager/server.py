@@ -24,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 from pprint import pformat
 from typing import (
+    TYPE_CHECKING,
     Any,
     AsyncGenerator,
     AsyncIterator,
@@ -44,13 +45,20 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
+from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
+    ValkeyContainerLogClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import (
+    REDIS_BGTASK_DB,
+    REDIS_CONTAINER_LOG,
     REDIS_IMAGE_DB,
     REDIS_LIVE_DB,
     REDIS_STATISTICS_DB,
@@ -60,10 +68,14 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.events.event_types.artifact_registry.anycast import (
+    DoScanReservoirRegistryEvent,
+)
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.json import dump_json_str
+from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -94,15 +106,11 @@ from ai.backend.common.service_discovery.service_discovery import (
 from ai.backend.common.types import (
     AGENTID_MANAGER,
     AgentSelectionStrategy,
-    RedisProfileTarget,
     ServiceDiscoveryType,
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
-from ai.backend.manager.actions.monitors.audit_log import AuditLogMonitor
-from ai.backend.manager.actions.monitors.prometheus import PrometheusMonitor
-from ai.backend.manager.actions.monitors.reporter import ReporterMonitor
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
 from ai.backend.manager.config.loader.etcd_loader import (
@@ -118,41 +126,27 @@ from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
-from ai.backend.manager.event_dispatcher.dispatch import DispatcherArgs, Dispatchers
-from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.reporters.base import AbstractReporter
-from ai.backend.manager.reporters.hub import ReporterHub, ReporterHubArgs
-from ai.backend.manager.reporters.smtp import SMTPReporter, SMTPSenderArgs
-from ai.backend.manager.repositories.image.repositories import RepositoryArgs
-from ai.backend.manager.repositories.repositories import Repositories
-from ai.backend.manager.service.base import ServicesContext
-from ai.backend.manager.service.container_registry.base import PerProjectRegistryQuotaRepository
-from ai.backend.manager.service.container_registry.harbor import (
-    PerProjectContainerRegistryQuotaClientPool,
-    PerProjectContainerRegistryQuotaService,
+from ai.backend.manager.sokovan.deployment.deployment_controller import (
+    DeploymentController,
+    DeploymentControllerArgs,
 )
-from ai.backend.manager.services.processors import ProcessorArgs, Processors, ServiceArgs
+from ai.backend.manager.sokovan.deployment.route.route_controller import (
+    RouteController,
+    RouteControllerArgs,
+)
 
 from . import __version__
-from .agent_cache import AgentRPCCache
-from .api import ManagerStatus
 from .api.context import RootContext
-from .api.types import (
-    AppCreator,
-    CleanupContext,
-    WebRequestHandler,
-)
-from .errors.api import InvalidAPIParameters
-from .errors.common import (
-    GenericBadRequest,
-    InternalServerError,
-    MethodNotAllowed,
-    URLNotFound,
-)
-from .exceptions import InvalidArgument
-from .sweeper.kernel import stale_kernel_sweeper_ctx
-from .sweeper.session import stale_session_sweeper_ctx
 from .types import DistributedLockFactory, SMTPTriggerPolicy
+
+if TYPE_CHECKING:
+    from ai.backend.manager.reporters.base import AbstractReporter
+
+    from .api.types import (
+        AppCreator,
+        CleanupContext,
+        WebRequestHandler,
+    )
 
 VALID_VERSIONS: Final = frozenset([
     # 'v1.20160915',  # deprecated
@@ -245,6 +239,7 @@ public_interface_objs: MutableMapping[str, Any] = {}
 global_subapp_pkgs: Final[list[str]] = [
     ".acl",
     ".container_registry",
+    ".artifact_registry",
     ".etcd",
     ".events",
     ".auth",
@@ -266,6 +261,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".group",
     ".groupconfig",
     ".logs",
+    ".object_storage",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -289,6 +285,8 @@ async def on_prepare(request: web.Request, response: web.StreamResponse) -> None
 
 @web.middleware
 async def api_middleware(request: web.Request, handler: WebRequestHandler) -> web.StreamResponse:
+    from .errors.common import GenericBadRequest, InternalServerError
+
     _handler = handler
     method_override = request.headers.get("X-Method-Override", None)
     if method_override:
@@ -354,6 +352,15 @@ def _debug_error_response(
 async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
+    from .errors.api import InvalidAPIParameters
+    from .errors.common import (
+        GenericBadRequest,
+        InternalServerError,
+        MethodNotAllowed,
+        URLNotFound,
+    )
+    from .exceptions import InvalidArgument
+
     root_ctx: RootContext = request.app["_root.context"]
     error_monitor = root_ctx.error_monitor
     stats_monitor = root_ctx.stats_monitor
@@ -463,7 +470,6 @@ async def config_provider_ctx(
         overrides += [
             (("logging", "level"), log_level),
             (("logging", "pkg-ns", "ai.backend"), log_level),
-            (("logging", "pkg-ns", "aiohttp"), log_level),
         ]
 
     loaders.append(ConfigOverrider(overrides))
@@ -515,6 +521,8 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
 
 @actxmgr
 async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .api import ManagerStatus
+
     if root_ctx.pidx == 0:
         mgr_status = await root_ctx.config_provider.legacy_etcd_config_loader.get_manager_status()
         if mgr_status is None or mgr_status not in (ManagerStatus.RUNNING, ManagerStatus.FROZEN):
@@ -531,40 +539,56 @@ async def manager_status_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.config_provider.config.redis.model_dump()
-    )
-    root_ctx.redis_profile_target = redis_profile_target
+    valkey_profile_target = root_ctx.config_provider.config.redis.to_valkey_profile_target()
+    root_ctx.valkey_profile_target = valkey_profile_target
 
+    root_ctx.valkey_container_log = await ValkeyContainerLogClient.create(
+        valkey_profile_target.profile_target(RedisRole.CONTAINER_LOG),
+        db_id=REDIS_CONTAINER_LOG,
+        human_readable_name="container_log",  # saving container_log queue
+    )
     root_ctx.valkey_live = await ValkeyLiveClient.create(
-        redis_profile_target.profile_target(RedisRole.LIVE),
+        valkey_profile_target.profile_target(RedisRole.LIVE),
         db_id=REDIS_LIVE_DB,
         human_readable_name="live",  # tracking live status of various entities
     )
     root_ctx.valkey_stat = await ValkeyStatClient.create(
-        redis_profile_target.profile_target(RedisRole.STATISTICS),
+        valkey_profile_target.profile_target(RedisRole.STATISTICS),
         db_id=REDIS_STATISTICS_DB,
         human_readable_name="stat",  # temporary storage for stat snapshots
     )
     root_ctx.valkey_image = await ValkeyImageClient.create(
-        redis_profile_target.profile_target(RedisRole.IMAGE),
+        valkey_profile_target.profile_target(RedisRole.IMAGE),
         db_id=REDIS_IMAGE_DB,
         human_readable_name="image",  # per-agent image availability
     )
     root_ctx.valkey_stream = await ValkeyStreamClient.create(
-        redis_profile_target.profile_target(RedisRole.STREAM),
+        valkey_profile_target.profile_target(RedisRole.STREAM),
         human_readable_name="stream",
         db_id=REDIS_STREAM_DB,
+    )
+    root_ctx.valkey_schedule = await ValkeyScheduleClient.create(
+        valkey_profile_target.profile_target(RedisRole.STREAM),
+        db_id=REDIS_LIVE_DB,
+        human_readable_name="schedule",  # scheduling marks and coordination
+    )
+    root_ctx.valkey_bgtask = await ValkeyBgtaskClient.create(
+        valkey_profile_target.profile_target(RedisRole.BGTASK),
+        human_readable_name="bgtask",
+        db_id=REDIS_BGTASK_DB,
     )
     # Ping ValkeyLiveClient directly
     await root_ctx.valkey_live.get_server_time()
     # ValkeyImageClient has its own connection handling
     # No need to ping it separately as it's already connected
     yield
+    await root_ctx.valkey_container_log.close()
     await root_ctx.valkey_image.close()
     await root_ctx.valkey_stat.close()
     await root_ctx.valkey_live.close()
     await root_ctx.valkey_stream.close()
+    await root_ctx.valkey_schedule.close()
+    await root_ctx.valkey_bgtask.close()
 
 
 @actxmgr
@@ -579,6 +603,8 @@ async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 def _make_registered_reporters(
     root_ctx: RootContext,
 ) -> dict[str, AbstractReporter]:
+    from .reporters.smtp import SMTPReporter, SMTPSenderArgs
+
     reporters: dict[str, AbstractReporter] = {}
     smtp_configs = root_ctx.config_provider.config.reporter.smtp
     for smtp_conf in smtp_configs:
@@ -621,6 +647,12 @@ def _make_action_reporters(
 
 @actxmgr
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .actions.monitors.audit_log import AuditLogMonitor
+    from .actions.monitors.prometheus import PrometheusMonitor
+    from .actions.monitors.reporter import ReporterMonitor
+    from .reporters.hub import ReporterHub, ReporterHubArgs
+    from .services.processors import ProcessorArgs, Processors, ServiceArgs
+
     registered_reporters = _make_registered_reporters(root_ctx)
     action_reporters = _make_action_reporters(root_ctx, registered_reporters)
     reporter_hub = ReporterHub(
@@ -649,6 +681,8 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 idle_checker_host=root_ctx.idle_checker_host,
                 event_dispatcher=root_ctx.event_dispatcher,
                 hook_plugin_ctx=root_ctx.hook_plugin_ctx,
+                scheduling_controller=root_ctx.scheduling_controller,
+                deployment_controller=root_ctx.deployment_controller,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -678,9 +712,9 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 ETCDServiceDiscoveryArgs(root_ctx.etcd)
             )
         case ServiceDiscoveryType.REDIS:
-            live_redis_target = root_ctx.redis_profile_target.profile_target(RedisRole.LIVE)
+            live_valkey_target = root_ctx.valkey_profile_target.profile_target(RedisRole.LIVE)
             root_ctx.service_discovery = await RedisServiceDiscovery.create(
-                RedisServiceDiscoveryArgs(redis_target=live_redis_target)
+                RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
             )
 
     root_ctx.sd_loop = ServiceDiscoveryLoop(
@@ -735,6 +769,8 @@ async def event_producer_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .event_dispatcher.dispatch import DispatcherArgs, Dispatchers
+
     root_ctx.event_dispatcher = EventDispatcher(
         root_ctx.message_queue,
         log_events=root_ctx.config_provider.config.debug.log_events,
@@ -742,13 +778,24 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     dispatchers = Dispatchers(
         DispatcherArgs(
+            root_ctx.valkey_container_log,
+            root_ctx.valkey_stat,
             root_ctx.valkey_stream,
             root_ctx.scheduler_dispatcher,
+            root_ctx.sokovan_orchestrator.coordinator,
+            root_ctx.scheduling_controller,
+            root_ctx.sokovan_orchestrator.deployment_coordinator,
+            root_ctx.sokovan_orchestrator.route_coordinator,
+            root_ctx.repositories.scheduler.repository,
             root_ctx.event_hub,
             root_ctx.registry,
             root_ctx.db,
             root_ctx.idle_checker_host,
             root_ctx.event_dispatcher_plugin_ctx,
+            root_ctx.repositories,
+            lambda: root_ctx.processors,
+            root_ctx.storage_manager,
+            use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )
     dispatchers.dispatch(root_ctx.event_dispatcher)
@@ -760,9 +807,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def _make_message_queue(
     root_ctx: RootContext,
 ) -> AbstractMessageQueue:
-    redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.config_provider.config.redis.model_dump()
-    )
+    redis_profile_target = root_ctx.config_provider.config.redis.to_redis_profile_target()
     stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
     node_id = root_ctx.config_provider.config.manager.id
     args = RedisMQArgs(
@@ -815,6 +860,9 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .repositories.repositories import Repositories
+    from .repositories.types import RepositoryArgs
+
     repositories = Repositories.create(
         args=RepositoryArgs(
             db=root_ctx.db,
@@ -829,6 +877,8 @@ async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .plugin.network import NetworkPluginContext
+
     ctx = NetworkPluginContext(
         root_ctx.etcd,
         root_ctx.config_provider.config.model_dump(by_alias=True),
@@ -839,6 +889,7 @@ async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         allowlist=root_ctx.config_provider.config.manager.allowed_plugins,
         blocklist=root_ctx.config_provider.config.manager.disabled_plugins,
     )
+    log.info("NetworkPluginContext initialized with plugins: {}", list(ctx.plugins.keys()))
     yield
     await ctx.cleanup()
 
@@ -886,8 +937,41 @@ async def event_dispatcher_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[No
 async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from zmq.auth.certs import load_certificate
 
+    from ai.backend.manager.sokovan.scheduling_controller import (
+        SchedulingController,
+        SchedulingControllerArgs,
+    )
+
+    from .agent_cache import AgentRPCCache
     from .registry import AgentRegistry
 
+    # Create scheduling controller first
+    root_ctx.scheduling_controller = SchedulingController(
+        SchedulingControllerArgs(
+            repository=root_ctx.repositories.scheduler.repository,
+            config_provider=root_ctx.config_provider,
+            storage_manager=root_ctx.storage_manager,
+            event_producer=root_ctx.event_producer,
+            valkey_schedule=root_ctx.valkey_schedule,
+            network_plugin_ctx=root_ctx.network_plugin_ctx,
+        )
+    )
+    # Create deployment controller if Sokovan is enabled
+    root_ctx.deployment_controller = DeploymentController(
+        DeploymentControllerArgs(
+            scheduling_controller=root_ctx.scheduling_controller,
+            deployment_repository=root_ctx.repositories.deployment.repository,
+            config_provider=root_ctx.config_provider,
+            storage_manager=root_ctx.storage_manager,
+            event_producer=root_ctx.event_producer,
+            valkey_schedule=root_ctx.valkey_schedule,
+        )
+    )
+    root_ctx.route_controller = RouteController(
+        RouteControllerArgs(
+            valkey_schedule=root_ctx.valkey_schedule,
+        )
+    )
     manager_pkey, manager_skey = load_certificate(
         root_ctx.config_provider.config.manager.rpc_auth_manager_keypair
     )
@@ -903,12 +987,15 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.valkey_live,
         root_ctx.valkey_image,
         root_ctx.event_producer,
+        root_ctx.event_hub,
         root_ctx.storage_manager,
         root_ctx.hook_plugin_ctx,
         root_ctx.network_plugin_ctx,
+        root_ctx.scheduling_controller,
         debug=root_ctx.config_provider.config.debug.enabled,
         manager_public_key=manager_public_key,
         manager_secret_key=manager_secret_key,
+        use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
     )
     await root_ctx.registry.init()
     yield
@@ -931,6 +1018,145 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     yield
     await root_ctx.scheduler_dispatcher.close()
+
+
+@actxmgr
+async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """Initialize leader election for distributed coordination."""
+    import socket
+
+    from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
+    from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionConfig
+    from ai.backend.common.leader.tasks import EventProducerTask, LeaderCron, PeriodicTask
+
+    # Create ValkeyLeaderClient for leader election
+    valkey_leader_client = await ValkeyLeaderClient.create(
+        valkey_target=root_ctx.valkey_profile_target.profile_target(RedisRole.STREAM),
+        db_id=REDIS_STREAM_LOCK,  # Use a dedicated DB for leader election
+        human_readable_name="leader",
+    )
+
+    # Create leader election configuration
+    server_id = f"manager-{socket.gethostname()}-{root_ctx.pidx}"
+    leader_config = ValkeyLeaderElectionConfig(
+        server_id=server_id,
+        leader_key="leader:sokovan:scheduler",
+        lease_duration=30,
+        renewal_interval=10.0,
+        failure_threshold=3,
+    )
+
+    # Create leader election instance
+    root_ctx.leader_election = ValkeyLeaderElection(
+        leader_client=valkey_leader_client,
+        config=leader_config,
+    )
+
+    # Get task specifications from sokovan and register them
+    task_specs = root_ctx.sokovan_orchestrator.create_task_specs()
+
+    # Rescan reservoir registry periodically
+    task_specs.append(
+        EventTaskSpec(
+            name="reservoir_registry_scan",
+            event_factory=lambda: DoScanReservoirRegistryEvent(),
+            interval=3600,  # 1 hour
+            initial_delay=0,
+        )
+    )
+
+    # Create event producer tasks from specs
+    leader_tasks: list[PeriodicTask] = [
+        EventProducerTask(spec, root_ctx.event_producer) for spec in task_specs
+    ]
+
+    # Register tasks with the election system
+    leader_cron = LeaderCron(tasks=leader_tasks)
+    root_ctx.leader_election.register_task(leader_cron)
+
+    # Start leader election (will start tasks when becoming leader)
+    await root_ctx.leader_election.start()
+    log.info(f"Leader election started for server {server_id}")
+
+    yield
+
+    # Cleanup leader election
+    await root_ctx.leader_election.stop()
+
+
+@actxmgr
+async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .clients.agent import AgentPool
+    from .sokovan.scheduler.factory import create_default_scheduler
+    from .sokovan.sokovan import SokovanOrchestrator
+
+    # Create agent pool for scheduler
+    agent_pool = AgentPool(root_ctx.agent_cache)
+
+    # Create scheduler with default components
+    scheduler = create_default_scheduler(
+        root_ctx.repositories.scheduler.repository,
+        root_ctx.repositories.deployment.repository,
+        root_ctx.config_provider,
+        root_ctx.distributed_lock_factory,
+        agent_pool,
+        root_ctx.network_plugin_ctx,
+        root_ctx.valkey_schedule,
+    )
+
+    # Create HTTP client pool for deployment operations
+    from ai.backend.common.clients.http_client.client_pool import (
+        ClientPool,
+        tcp_client_session_factory,
+    )
+    from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
+    from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
+
+    client_pool = ClientPool(tcp_client_session_factory)
+
+    # Create deployment coordinator
+    deployment_coordinator = DeploymentCoordinator(
+        valkey_schedule=root_ctx.valkey_schedule,
+        deployment_controller=root_ctx.deployment_controller,
+        deployment_repository=root_ctx.repositories.deployment.repository,
+        event_producer=root_ctx.event_producer,
+        lock_factory=root_ctx.distributed_lock_factory,
+        config_provider=root_ctx.config_provider,
+        scheduling_controller=root_ctx.scheduling_controller,
+        client_pool=client_pool,
+        valkey_stat=root_ctx.valkey_stat,
+        route_controller=root_ctx.route_controller,
+    )
+
+    # Create route coordinator
+    route_coordinator = RouteCoordinator(
+        valkey_schedule=root_ctx.valkey_schedule,
+        deployment_repository=root_ctx.repositories.deployment.repository,
+        event_producer=root_ctx.event_producer,
+        lock_factory=root_ctx.distributed_lock_factory,
+        config_provider=root_ctx.config_provider,
+        scheduling_controller=root_ctx.scheduling_controller,
+        client_pool=client_pool,
+    )
+
+    # Create sokovan orchestrator with lock factory for timers
+    root_ctx.sokovan_orchestrator = SokovanOrchestrator(
+        scheduler=scheduler,
+        event_producer=root_ctx.event_producer,
+        valkey_schedule=root_ctx.valkey_schedule,
+        lock_factory=root_ctx.distributed_lock_factory,
+        scheduling_controller=root_ctx.scheduling_controller,
+        deployment_coordinator=deployment_coordinator,
+        route_coordinator=route_coordinator,
+    )
+
+    log.info("Sokovan orchestrator initialized")
+
+    try:
+        yield
+    finally:
+        # Leader election will handle task cleanup
+        pass
 
 
 @actxmgr
@@ -965,6 +1191,13 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @actxmgr
 async def services_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .service.base import ServicesContext
+    from .service.container_registry.base import PerProjectRegistryQuotaRepository
+    from .service.container_registry.harbor import (
+        PerProjectContainerRegistryQuotaClientPool,
+        PerProjectContainerRegistryQuotaService,
+    )
+
     db = root_ctx.db
 
     per_project_container_registries_quota = PerProjectContainerRegistryQuotaService(
@@ -985,6 +1218,8 @@ class background_task_ctx:
     async def __aenter__(self) -> None:
         self.root_ctx.background_task_manager = BackgroundTaskManager(
             self.root_ctx.event_producer,
+            valkey_client=self.root_ctx.valkey_bgtask,
+            server_id=self.root_ctx.config_provider.config.manager.id,
             bgtask_observer=self.root_ctx.metrics.bgtask,
         )
 
@@ -1065,9 +1300,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
             from ai.backend.common.lock import RedisLock
 
             redlock_config = root_ctx.config_provider.config.manager.redlock_config
-            redis_profile_target: RedisProfileTarget = RedisProfileTarget.from_dict(
-                root_ctx.config_provider.config.redis.model_dump()
-            )
+            redis_profile_target = root_ctx.config_provider.config.redis.to_redis_profile_target()
             redis_lock = redis_helper.get_redis_object(
                 redis_profile_target.profile_target(RedisRole.STREAM_LOCK),
                 name="lock",  # distributed locks
@@ -1099,6 +1332,9 @@ def build_root_app(
     subapp_pkgs: Optional[Sequence[str]] = None,
     scheduler_opts: Optional[Mapping[str, Any]] = None,
 ) -> web.Application:
+    from .sweeper.kernel import stale_kernel_sweeper_ctx
+    from .sweeper.session import stale_session_sweeper_ctx
+
     public_interface_objs.clear()
     if bootstrap_config.pyroscope.enabled:
         if (
@@ -1117,7 +1353,8 @@ def build_root_app(
             )
         )
 
-    root_ctx = RootContext(metrics=CommonMetricRegistry.instance())
+    root_ctx = RootContext()
+    root_ctx.metrics = CommonMetricRegistry.instance()
     app = web.Application(
         middlewares=[
             request_id_middleware,
@@ -1175,6 +1412,8 @@ def build_root_app(
             idle_checker_ctx,
             agent_registry_ctx,
             sched_dispatcher_ctx,
+            sokovan_orchestrator_ctx,
+            leader_election_ctx,
             event_dispatcher_ctx,
             background_task_ctx,
             stale_session_sweeper_ctx,
@@ -1443,7 +1682,7 @@ async def server_main_logwrapper(
 @click.option(
     "--debug",
     is_flag=True,
-    help="This option will soon change to --log-level TEXT option.",
+    help="A shortcut to set `--log-level=DEBUG`",
 )
 @click.option(
     "--log-level",
@@ -1454,9 +1693,9 @@ async def server_main_logwrapper(
 @click.pass_context
 def main(
     ctx: click.Context,
+    config_path: Optional[Path],
+    debug: bool,
     log_level: LogLevel,
-    config_path: Optional[Path] = None,
-    debug: bool = False,
 ) -> None:
     """
     Start the manager service as a foreground process.

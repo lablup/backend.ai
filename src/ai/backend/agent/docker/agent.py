@@ -130,6 +130,7 @@ from ..utils import (
     closing_async,
     container_pid_to_host_pid,
     get_kernel_id_from_container,
+    get_safe_ulimit,
     host_pid_to_container_pid,
     update_nested_dict,
 )
@@ -171,7 +172,7 @@ def container_from_docker_container(src: DockerContainer) -> Container:
             host_port = int(host_ports[0]["HostPort"])
         ports.append(Port(host_ip, private_port, host_port))
     return Container(
-        id=src._id,
+        id=ContainerId(src.id),
         status=src["State"]["Status"],
         image=src["Config"]["Image"],
         labels=src["Config"]["Labels"],
@@ -354,7 +355,20 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     stat = os.stat(p)
                     valid_uid = uid if uid is not None else stat.st_uid
                     valid_gid = gid if gid is not None else stat.st_gid
-                os.chown(p, valid_uid, valid_gid)
+                try:
+                    int_uid = int(valid_uid)
+                    int_gid = int(valid_gid)
+                except (TypeError, ValueError):
+                    log.exception(
+                        "invalid uid/gid to chown: {}/{}, skip chown", valid_uid, valid_gid
+                    )
+                    continue
+                try:
+                    os.chown(p, int_uid, int_gid)
+                except OSError as e:
+                    log.exception(
+                        "failed to chown {} to {}/{} (error: {})", p, int_uid, int_gid, repr(e)
+                    )
 
     async def prepare_scratch(self) -> None:
         loop = current_loop()
@@ -735,7 +749,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         device_alloc: Mapping[SlotName, Mapping[DeviceId, Decimal]],
     ) -> List[MountInfo]:
         src_path = self.config_dir / str(computer.key)
-        src_path.mkdir()
+        src_path.mkdir(exist_ok=True)
         return await computer.generate_mounts(src_path, device_alloc)
 
     async def prepare_container(
@@ -1046,8 +1060,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     "SYS_NICE",  # for NFS based GPUDirect Storage
                 ],
                 "Ulimits": [
-                    {"Name": "nofile", "Soft": 1048576, "Hard": 1048576},
-                    {"Name": "memlock", "Soft": -1, "Hard": -1},
+                    get_safe_ulimit("nofile", 1048576, 1048576),
+                    get_safe_ulimit("memlock", -1, -1),
                 ],
                 "LogConfig": {
                     "Type": "local",  # for efficient docker-specific storage
@@ -1142,7 +1156,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             except asyncio.CancelledError:
                 if container is not None:
                     raise ContainerCreationError(
-                        container_id=container._id, message="Container creation cancelled"
+                        container_id=ContainerId(container.id),
+                        message="Container creation cancelled",
                     )
                 raise
             except Exception as e:
@@ -1150,7 +1165,8 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await _rollback_container_creation()
                 if container is not None:
                     raise ContainerCreationError(
-                        container_id=container._id, message=f"unknown. {repr(e)}"
+                        container_id=ContainerId(container.id),
+                        message=f"unknown. {repr(e)}",
                     )
                 raise
 
@@ -1573,9 +1589,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                         continue
 
                     img_detail = await docker.images.inspect(repo_tag)
-                    labels = img_detail.get("Config", {}).get("Labels")
+                    labels = (img_detail.get("Config") or {}).get("Labels")
                     if labels is None:
                         continue
+
                     kernelspec = int(labels.get(LabelName.KERNEL_SPEC, "1"))
                     if MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC:
                         scanned_images[repo_tag] = img_detail["Id"]
@@ -1978,18 +1995,31 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     async def create_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:
-            await docker.networks.create({
-                "Name": network_name,
-                "Driver": "bridge",
-                "Labels": {
-                    "ai.backend.cluster-network": "1",
-                },
-            })
+            try:
+                await docker.networks.get(network_name)
+            except DockerError as e:
+                if e.status == HTTPStatus.NOT_FOUND:
+                    await docker.networks.create({
+                        "Name": network_name,
+                        "Driver": "bridge",
+                        "Labels": {
+                            "ai.backend.cluster-network": "1",
+                        },
+                    })
+                else:
+                    raise
 
     async def destroy_local_network(self, network_name: str) -> None:
         async with closing_async(Docker()) as docker:
-            network = await docker.networks.get(network_name)
-            await network.delete()
+            try:
+                network = await docker.networks.get(network_name)
+                await network.delete()
+            except DockerError as e:
+                if e.status == HTTPStatus.NOT_FOUND:
+                    # skip silently if already removed/missing
+                    pass
+                else:
+                    raise
 
     @preserve_termination_log
     async def monitor_docker_events(self):

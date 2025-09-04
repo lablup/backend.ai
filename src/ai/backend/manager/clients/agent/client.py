@@ -175,6 +175,25 @@ class AgentClient:
         async with self._with_connection() as rpc:
             await rpc.call.drop_kernel_registry(kernel_id_list)
 
+    # Health monitoring methods
+    @client_decorator()
+    async def check_pulling(self, image_name: str) -> bool:
+        """Check if an image is being pulled."""
+        async with self._with_connection() as rpc:
+            return await rpc.call.check_pulling(image_name)
+
+    @client_decorator()
+    async def check_creating(self, kernel_id: str) -> bool:
+        """Check if a kernel is being created."""
+        async with self._with_connection() as rpc:
+            return await rpc.call.check_creating(str(kernel_id))
+
+    @client_decorator()
+    async def check_running(self, kernel_id: str) -> bool:
+        """Check if a kernel is running."""
+        async with self._with_connection() as rpc:
+            return await rpc.call.check_running(str(kernel_id))
+
     # Container management methods
     @client_decorator()
     async def purge_containers(self, serialized_data: list[tuple[str, str]]) -> None:
@@ -338,7 +357,7 @@ class AgentClient:
     @client_decorator()
     async def push_image(
         self,
-        image_ref: str,
+        image_ref: ImageRef,
         registry: Any,
     ) -> Mapping[str, Any]:
         """Push an image from the agent."""

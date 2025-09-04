@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.manager.repositories.agent.repository import AgentRepository
-from ai.backend.manager.repositories.image.repositories import RepositoryArgs
+from ai.backend.manager.repositories.types import RepositoryArgs
 
 
 @dataclass

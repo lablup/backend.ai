@@ -10,7 +10,6 @@ import aiohttp
 import sqlalchemy as sa
 
 from ai.backend.appproxy.common.exceptions import ObjectNotFound
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import AppMode, HealthCheckConfig, HealthCheckState, RouteInfo
 from ai.backend.appproxy.coordinator.models.utils import (
     ExtendedAsyncSAEngine,
@@ -24,6 +23,7 @@ from ai.backend.common.events.event_types.model_serving.broadcast import (
     ModelServiceStatusBroadcastEvent,
 )
 from ai.backend.common.types import ModelServiceStatus, RedisConnectionInfo, SessionId
+from ai.backend.logging import BraceStyleAdapter
 
 from .models import Circuit, Endpoint
 

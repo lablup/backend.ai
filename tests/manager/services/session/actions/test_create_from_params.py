@@ -17,8 +17,9 @@ from ...fixtures import (
     IMAGE_ALIAS_DICT,
     IMAGE_FIXTURE_DICT,
 )
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 from ..fixtures import (
+    AGENT_FIXTURE_DICT,
     GROUP_FIXTURE_DATA,
     GROUP_USER_ASSOCIATION_DATA,
     KERNEL_FIXTURE_DICT,
@@ -78,7 +79,7 @@ CREATE_FROM_PARAMS_ACTION = CreateFromParamsAction(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Create session from params",
             CREATE_FROM_PARAMS_ACTION,
             CreateFromParamsActionResult(
@@ -86,7 +87,7 @@ CREATE_FROM_PARAMS_ACTION = CreateFromParamsAction(
                 result=CREATE_FROM_PARAMS_MOCK,
             ),
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Create session with unknown image",
             CreateFromParamsAction(
                 params=CreateFromParamsActionParams(
@@ -120,7 +121,7 @@ CREATE_FROM_PARAMS_ACTION = CreateFromParamsAction(
             ),
             ImageNotFound,  # Actual error when image is not found in database
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Create session with environment variables",
             CreateFromParamsAction(
                 params=CreateFromParamsActionParams(
@@ -163,7 +164,7 @@ CREATE_FROM_PARAMS_ACTION = CreateFromParamsAction(
                 result=CREATE_FROM_PARAMS_MOCK,
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Create session with bootstrap script",
             CreateFromParamsAction(
                 params=CreateFromParamsActionParams(
@@ -206,6 +207,7 @@ CREATE_FROM_PARAMS_ACTION = CreateFromParamsAction(
     "extra_fixtures",
     [
         {
+            "agents": [AGENT_FIXTURE_DICT],
             "sessions": [SESSION_FIXTURE_DICT],
             "kernels": [KERNEL_FIXTURE_DICT],
             "users": [USER_FIXTURE_DATA],
@@ -219,7 +221,7 @@ CREATE_FROM_PARAMS_ACTION = CreateFromParamsAction(
 async def test_create_from_params(
     mock_create_from_params_rpc,
     processors: SessionProcessors,
-    test_scenario: TestScenario[CreateFromParamsAction, CreateFromParamsActionResult],
+    test_scenario: ScenarioBase[CreateFromParamsAction, CreateFromParamsActionResult],
     session_repository,
 ):
     # Set up the mock return value for create_session

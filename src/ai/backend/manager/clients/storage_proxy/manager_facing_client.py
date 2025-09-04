@@ -6,6 +6,25 @@ from typing import Any, AsyncIterator, Optional
 
 import aiohttp
 
+from ai.backend.common.dto.storage.request import (
+    DeleteObjectReq,
+    DownloadObjectReq,
+    HuggingFaceImportModelsReq,
+    HuggingFaceRetrieveModelsReq,
+    HuggingFaceScanModelsReq,
+    PresignedDownloadObjectReq,
+    PresignedUploadObjectReq,
+    ReservoirImportModelsReq,
+)
+from ai.backend.common.dto.storage.response import (
+    HuggingFaceImportModelsResponse,
+    HuggingFaceRetrieveModelsResponse,
+    HuggingFaceScanModelsResponse,
+    PresignedDownloadObjectResponse,
+    PresignedUploadObjectResponse,
+    ReservoirImportModelsResponse,
+    VFolderCloneResponse,
+)
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.clients.storage_proxy.base import StorageProxyHTTPClient
 from ai.backend.manager.decorators.client_decorator import create_layer_aware_client_decorator
@@ -92,7 +111,7 @@ class StorageProxyManagerFacingClient:
         src_vfid: str,
         dst_volume: str,
         dst_vfid: str,
-    ) -> None:
+    ) -> VFolderCloneResponse:
         """
         Clone a folder to another location.
 
@@ -107,7 +126,8 @@ class StorageProxyManagerFacingClient:
             "dst_volume": dst_volume,
             "dst_vfid": dst_vfid,
         }
-        await self._client.request("POST", "folder/clone", body=body)
+        data = await self._client.request_with_response("POST", "folder/clone", body=body)
+        return VFolderCloneResponse.model_validate(data)
 
     @client_decorator()
     async def get_mount_path(
@@ -629,4 +649,130 @@ class StorageProxyManagerFacingClient:
                 "volume": volume,
                 "vfid": vfid,
             },
+        )
+
+    @client_decorator()
+    async def scan_huggingface_models(
+        self,
+        req: HuggingFaceScanModelsReq,
+    ) -> HuggingFaceScanModelsResponse:
+        """
+        Scan HuggingFace models in the specified registry.
+        """
+        resp = await self._client.request_with_response(
+            "POST",
+            "v1/registries/huggingface/scan",
+            body=req.model_dump(by_alias=True),
+        )
+        return HuggingFaceScanModelsResponse.model_validate(resp)
+
+    @client_decorator()
+    async def retrieve_huggingface_models(
+        self,
+        req: HuggingFaceRetrieveModelsReq,
+    ) -> HuggingFaceRetrieveModelsResponse:
+        """
+        Retreive HuggingFace models in the specified registry.
+        """
+        resp = await self._client.request_with_response(
+            "POST",
+            "v1/registries/huggingface/models/batch",
+            body=req.model_dump(by_alias=True),
+        )
+        return HuggingFaceRetrieveModelsResponse.model_validate(resp)
+
+    @client_decorator()
+    async def import_huggingface_models(
+        self,
+        req: HuggingFaceImportModelsReq,
+    ) -> HuggingFaceImportModelsResponse:
+        """
+        Import multiple HuggingFace models into the specified registry.
+        """
+        resp = await self._client.request_with_response(
+            "POST",
+            "v1/registries/huggingface/import",
+            body=req.model_dump(by_alias=True),
+        )
+        return HuggingFaceImportModelsResponse.model_validate(resp)
+
+    @client_decorator()
+    async def import_reservoir_models(
+        self,
+        req: ReservoirImportModelsReq,
+    ) -> ReservoirImportModelsResponse:
+        """
+        Import multiple Reservoir models into the specified registry.
+        """
+        resp = await self._client.request(
+            "POST",
+            "v1/registries/reservoir/import",
+            body=req.model_dump(by_alias=True),
+        )
+        return ReservoirImportModelsResponse.model_validate(resp)
+
+    @client_decorator()
+    async def download_s3_file(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        req: DownloadObjectReq,
+    ) -> None:
+        """
+        Download a file from S3 storage.
+        """
+        await self._client.request_with_response(
+            "POST",
+            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/download",
+            body=req.model_dump(by_alias=True),
+        )
+
+    @client_decorator()
+    async def get_s3_presigned_download_url(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        req: PresignedDownloadObjectReq,
+    ) -> PresignedDownloadObjectResponse:
+        """
+        Get a presigned URL for downloading an object from storage.
+        """
+        resp = await self._client.request_with_response(
+            "POST",
+            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/presigned/download",
+            body=req.model_dump(by_alias=True),
+        )
+        return PresignedDownloadObjectResponse.model_validate(resp)
+
+    @client_decorator()
+    async def get_s3_presigned_upload_url(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        req: PresignedUploadObjectReq,
+    ) -> PresignedUploadObjectResponse:
+        """
+        Get a presigned URL for uploading an object to storage.
+        """
+        resp = await self._client.request_with_response(
+            "POST",
+            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object/presigned/upload",
+            body=req.model_dump(by_alias=True),
+        )
+        return PresignedUploadObjectResponse.model_validate(resp)
+
+    @client_decorator()
+    async def delete_s3_object(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        req: DeleteObjectReq,
+    ) -> None:
+        """
+        Delete a file from S3 storage.
+        """
+        await self._client.request(
+            "DELETE",
+            f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object",
+            body=req.model_dump(by_alias=True),
         )

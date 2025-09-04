@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-from typing import Any, FrozenSet, Mapping, Optional
+from typing import Any, FrozenSet, Literal, Mapping, Optional
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -174,10 +174,11 @@ class GPFSVolume(BaseVolume):
             if health_status == "ERROR":
                 break
             node_health_statuses = await self.api_client.get_node_health(node)
-            for status in node_health_statuses:
-                if status.state in invalid_status:
-                    health_status = status
+            for node_health_status in node_health_statuses:
+                if node_health_status.state in invalid_status:
+                    health_status = node_health_status
 
+        status: Literal["healthy", "degraded", "unavailable"]
         match health_status:
             case "HEALTHY":
                 status = "healthy"

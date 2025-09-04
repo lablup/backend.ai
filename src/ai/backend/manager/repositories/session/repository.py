@@ -8,23 +8,25 @@ from sqlalchemy.orm import load_only, noload, selectinload
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
-from ai.backend.manager.api.session import find_dependency_sessions, find_dependent_sessions
-from ai.backend.manager.data.image.types import ImageStatus
+from ai.backend.manager.api.session import find_dependency_sessions
+from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
+from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups
-from ai.backend.manager.models.image import ImageIdentifier, ImageRow, rescan_images
+from ai.backend.manager.models.image import ImageRow, rescan_images
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.scaling_group import scaling_groups
 from ai.backend.manager.models.session import (
     KernelLoadingStrategy,
+    SessionDependencyRow,
     SessionRow,
 )
 from ai.backend.manager.models.session_template import session_templates
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 from ai.backend.manager.utils import query_userinfo
 
@@ -37,6 +39,19 @@ class SessionRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+
+    @repository_decorator()
+    async def get_session_owner(self, session_id: str | SessionId) -> Optional[UserData]:
+        async with self._db.begin_readonly_session() as db_sess:
+            query = (
+                sa.select(UserRow)
+                .join(SessionRow, SessionRow.user_uuid == UserRow.uuid)
+                .where(SessionRow.id == session_id)
+            )
+            user = await db_sess.scalar(query)
+            if user is None:
+                raise SessionNotFound(f"Session with id {session_id} not found")
+            return UserData.from_row(user)
 
     @repository_decorator()
     async def get_session_validated(
@@ -369,6 +384,91 @@ class SessionRepository:
                 query_on_behalf_of=query_on_behalf_of,
             )
 
+    async def _find_dependent_sessions(
+        self,
+        db_sess: AsyncSession,
+        root_session_name_or_id: str | uuid.UUID,
+        access_key: AccessKey,
+        allow_stale: bool = False,
+    ) -> tuple[uuid.UUID, set[uuid.UUID]]:
+        """
+        Find the root session and all sessions that depend on it (recursively).
+
+        :param db_sess: Database session
+        :param root_session_name_or_id: Root session name or ID
+        :param access_key: Access key of the session owner
+        :param allow_stale: Whether to allow stale sessions
+        :return: Tuple of (root_session_id, set of dependent session IDs)
+        """
+
+        async def _find_recursive_dependencies(session_id: uuid.UUID) -> set[uuid.UUID]:
+            result = await db_sess.execute(
+                sa.select(SessionDependencyRow).where(SessionDependencyRow.depends_on == session_id)
+            )
+            dependent_sessions: set[uuid.UUID] = {x.session_id for x in result.scalars()}
+
+            # Recursively find dependencies
+            for dependent_session in list(dependent_sessions):
+                recursive_deps = await _find_recursive_dependencies(dependent_session)
+                dependent_sessions |= recursive_deps
+
+            return dependent_sessions
+
+        # Get the root session first
+        root_session = await SessionRow.get_session(
+            db_sess,
+            root_session_name_or_id,
+            access_key=access_key,
+            allow_stale=allow_stale,
+        )
+        root_session_id = cast(uuid.UUID, root_session.id)
+        dependent_ids = await _find_recursive_dependencies(root_session_id)
+
+        return root_session_id, dependent_ids
+
+    @repository_decorator()
+    async def get_target_session_ids(
+        self,
+        session_name_or_id: str | uuid.UUID,
+        access_key: AccessKey,
+        recursive: bool = False,
+    ) -> list[SessionId]:
+        """
+        Get list of session IDs including dependent sessions if recursive.
+
+        :param session_name_or_id: Name or ID of the primary session
+        :param access_key: Access key of the session owner
+        :param recursive: If True, include dependent sessions
+        :return: List of session IDs
+        """
+        async with self._db.begin_readonly_session() as db_sess:
+            try:
+                if recursive:
+                    # Get root session and dependent sessions
+                    root_id, dependent_ids = await self._find_dependent_sessions(
+                        db_sess,
+                        session_name_or_id,
+                        access_key,
+                        allow_stale=True,
+                    )
+                    # Return dependent sessions first, then root session
+                    session_ids = [cast(SessionId, sid) for sid in dependent_ids]
+                    session_ids.append(cast(SessionId, root_id))
+                else:
+                    # Get only the main session
+                    session = await SessionRow.get_session(
+                        db_sess,
+                        session_name_or_id,
+                        access_key,
+                        kernel_loading_strategy=KernelLoadingStrategy.NONE,
+                        allow_stale=True,
+                    )
+                    session_ids = [cast(SessionId, session.id)]
+
+                return session_ids
+            except SessionNotFound:
+                raise
+
     @repository_decorator()
     async def find_dependent_sessions(
         self,
@@ -376,13 +476,18 @@ class SessionRepository:
         access_key: AccessKey,
         allow_stale: bool = False,
     ):
+        """
+        Public method for finding dependent sessions.
+        Maintained for backward compatibility.
+        """
         async with self._db.begin_readonly_session() as db_sess:
-            return await find_dependent_sessions(
-                root_session_name_or_id,
+            _, dependent_ids = await self._find_dependent_sessions(
                 db_sess,
+                root_session_name_or_id,
                 access_key,
                 allow_stale=allow_stale,
             )
+            return list(dependent_ids)
 
     @repository_decorator()
     async def find_dependency_sessions(

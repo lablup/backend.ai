@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from enum import StrEnum
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -41,6 +42,25 @@ if TYPE_CHECKING:
     from ..registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.scheduler"))
+
+
+class ScheduleType(StrEnum):
+    """Types of scheduling operations that can be triggered."""
+
+    SCHEDULE = "schedule"  # Schedule pending sessions
+    SWEEP = "sweep"  # Sweep stale sessions (maintenance operation)
+    CHECK_PRECONDITION = "check_precondition"  # Check preconditions for scheduled sessions
+    START = "start"  # Start prepared sessions
+    TERMINATE = "terminate"  # Terminate sessions
+    CHECK_PULLING_PROGRESS = "check_pulling_progress"  # Check if PULLING sessions can transition
+    CHECK_CREATING_PROGRESS = (
+        "check_creating_progress"  # Check if CREATING sessions can transition to RUNNING
+    )
+    CHECK_TERMINATING_PROGRESS = (
+        "check_terminating_progress"  # Check if TERMINATING sessions can transition to TERMINATED
+    )
+    RETRY_PREPARING = "retry_preparing"  # Retry stuck PREPARING/PULLING sessions
+    RETRY_CREATING = "retry_creating"  # Retry stuck CREATING sessions
 
 
 def merge_resource(

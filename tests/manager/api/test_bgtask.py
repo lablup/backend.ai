@@ -20,7 +20,7 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskFailedEvent,
     BgtaskUpdatedEvent,
 )
-from ai.backend.common.types import AgentId, RedisProfileTarget
+from ai.backend.common.types import AgentId
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.server import (
     agent_registry_ctx,
@@ -34,6 +34,7 @@ from ai.backend.manager.server import (
     monitoring_ctx,
     network_plugin_ctx,
     redis_ctx,
+    repositories_ctx,
     storage_manager_ctx,
 )
 
@@ -64,6 +65,7 @@ async def bgtask_fixture(
             message_queue_ctx,
             event_producer_ctx,
             storage_manager_ctx,
+            repositories_ctx,
             monitoring_ctx,
             network_plugin_ctx,
             hook_plugin_ctx,
@@ -80,9 +82,7 @@ async def bgtask_fixture(
 
     yield root_ctx.background_task_manager, producer, dispatcher
 
-    etcd_redis_config: RedisProfileTarget = RedisProfileTarget.from_dict(
-        root_ctx.config_provider.config.redis.model_dump()
-    )
+    etcd_redis_config = root_ctx.config_provider.config.redis.to_redis_profile_target()
     stream_redis_config = etcd_redis_config.profile_target(RedisRole.STREAM)
     stream_redis = redis_helper.get_redis_object(
         stream_redis_config,

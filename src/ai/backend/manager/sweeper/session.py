@@ -15,11 +15,11 @@ from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.metrics.metric import SweeperMetricObserver
 from ai.backend.common.validators import TimeDelta
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.session.types import SessionStatus
 
 from ..api.context import RootContext
 from ..config_legacy import session_hang_tolerance_iv
 from ..models import SessionRow
-from ..models.session import SessionStatus
 from ..models.utils import ExtendedAsyncSAEngine
 from ..registry import AgentRegistry
 from .base import DEFAULT_SWEEP_INTERVAL_SEC, AbstractSweeper

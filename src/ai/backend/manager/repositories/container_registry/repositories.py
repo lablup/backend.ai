@@ -7,7 +7,7 @@ from ai.backend.manager.repositories.container_registry.admin_repository import 
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
-from ai.backend.manager.repositories.image.repositories import RepositoryArgs
+from ai.backend.manager.repositories.types import RepositoryArgs
 
 
 @dataclass

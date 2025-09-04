@@ -23,9 +23,10 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
-from ai.backend.manager.models.session import SessionRow, SessionStatus
+from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
 from ai.backend.manager.scheduler.agent_selector import (
@@ -551,7 +552,7 @@ async def test_pending_timeout() -> None:
     )
     from unittest.mock import Mock
 
-    repository = ScheduleRepository(db=Mock(), valkey_stat=Mock())
+    repository = ScheduleRepository(db=Mock(), valkey_stat=Mock(), config_provider=Mock())
     _, candidate_session_rows, cancelled_session_rows = await repository._list_managed_sessions(
         mock_dbsess,
         "default",

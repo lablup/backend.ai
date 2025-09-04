@@ -1,9 +1,8 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         "src/ai/backend/cli:src",  # not auto-inferred
-        "src/ai/backend/account_manager/cli:src",  # not auto-inferred (due to lazy-loading cmdgroup)
-        "src/ai/backend/account_manager/models/alembic:migrations",  # not auto-inferred
         ":resources",
     ],
 )
@@ -83,7 +82,7 @@ resources(
     name="resources",
     dependencies=[
         ":version",
-        ":vendor",
+        # ":vendor",
     ],
     sources=[
         "**/py.typed",

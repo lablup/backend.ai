@@ -131,8 +131,15 @@ class ErrorDomain(enum.StrEnum):
 
     BACKENDAI = "backendai"  # Whenever possible, use specific domain names instead of this one.
     API = "api"
+    ARTIFACT = "artifact"
+    ARTIFACT_REGISTRY = "artifact-registry"
+    ARTIFACT_REVISION = "artifact-revision"
+    ARTIFACT_ASSOCIATION = "artifact-association"
+    OBJECT_STORAGE = "object-storage"
+    STORAGE_NAMESPACE = "storage-namespace"
     PLUGIN = "plugin"
     BGTASK = "bgtask"
+    LEADER_ELECTION = "leader-election"
     KERNEL = "kernel"
     USER = "user"
     KEYPAIR = "keypair"
@@ -181,8 +188,10 @@ class ErrorOperation(enum.StrEnum):
     REQUEST = "request"
     PARSING = "parsing"
     EXECUTE = "execute"
+    SCHEDULE = "schedule"
     SETUP = "setup"
     GRANT = "grant"
+    CHECK_LIMIT = "check-limit"
 
 
 class ErrorDetail(enum.StrEnum):
@@ -415,6 +424,19 @@ class ParameterNotParsedError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class BgtaskNotRegisteredError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/bgtask-not-registered"
+    error_title = "Background Task Not Registered"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BGTASK,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
 class BgtaskNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/bgtask-not-found"
     error_title = "Background Task Not Found"
@@ -477,4 +499,69 @@ class PermissionDeniedError(BackendAIError, web.HTTPForbidden):
             domain=ErrorDomain.API,
             operation=ErrorOperation.AUTH,
             error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class SessionWithInvalidStateError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/session-invalid-state"
+    error_title = "Session with Invalid State"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.MISMATCH,
+        )
+
+
+class StorageNamespaceNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/object-storage-not-found"
+    error_title = "Artifact Storage Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_NAMESPACE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class InvalidCursorTypeError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-cursor-type"
+    error_title = "Invalid Cursor Type"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class RelationNotLoadedError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/relation-not-loaded"
+    error_title = "Relation Not Loaded"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ArtifactDefaultRevisionResolveError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/artifact-revision-resolve-failed"
+    error_title = "Cannot Resolve Artifact Default Revision"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
         )

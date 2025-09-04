@@ -32,14 +32,14 @@ from pydantic import BaseModel, ValidationError
 from ai.backend.appproxy.common.types import PydanticResponse
 from ai.backend.common import redis_helper
 from ai.backend.common.types import RedisConnectionInfo
+from ai.backend.logging import BraceStyleAdapter
 
 from .config import HostPortPair, PermitHashConfig
 from .exceptions import InvalidAPIParameters
-from .logging_utils import BraceStyleAdapter
 
 # FIXME: merge majority of common definitions to ai.backend.common when ready
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _danger_words = ["password", "passwd", "secret"]
 
 

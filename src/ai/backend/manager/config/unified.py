@@ -177,7 +177,7 @@ from datetime import datetime, timezone
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Union
 
 from pydantic import (
     AliasChoices,
@@ -190,6 +190,7 @@ from pydantic import (
     field_validator,
 )
 
+from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
@@ -203,9 +204,9 @@ from ai.backend.common.typed_validators import (
     UserID,
     _TimeDurationPydanticAnnotation,
 )
-from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.config import LoggingConfig
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
 
@@ -246,7 +247,6 @@ class DatabaseConfig(BaseModel):
         Network address and port of the database server.
         Default is the standard PostgreSQL port on localhost.
         """,
-        examples=[{"host": "127.0.0.1", "port": 5432}],
     )
     name: str = Field(
         default="DB_NAME",
@@ -360,14 +360,20 @@ class EtcdConfig(BaseModel):
         """,
         examples=["local", "backend"],
     )
-    addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="127.0.0.1", port=2379),
+    addr: HostPortPair | list[HostPortPair] = Field(
+        default=HostPortPair(host="127.0.0.1", port=2379),
         description="""
         Network address of the etcd server.
         Default is the standard etcd port on localhost.
-        For production, should point to an etcd cluster endpoint.
+        In production, should point to one or more etcd instance endpoint(s).
         """,
-        examples=[{"host": "127.0.0.1", "port": 2379}],
+        examples=[
+            {"host": "127.0.0.1", "port": 2379},  # single endpoint
+            [
+                {"host": "127.0.0.4", "port": 2379},
+                {"host": "127.0.0.5", "port": 2379},
+            ],  # multiple endpoints
+        ],
     )
     user: Optional[str] = Field(
         default=None,
@@ -391,7 +397,7 @@ class EtcdConfig(BaseModel):
     def to_dataclass(self) -> EtcdConfigData:
         return EtcdConfigData(
             namespace=self.namespace,
-            addr=self.addr,
+            addrs=self.addr if isinstance(self.addr, list) else [self.addr],
             user=self.user,
             password=self.password,
         )
@@ -404,7 +410,7 @@ class ManagerConfig(BaseModel):
         Base directory path for inter-process communication files.
         Used for Unix domain sockets and other IPC mechanisms.
         This directory must be writable by the manager process.
-        In production environments, consider using /var/run/backend.ai/ipc instead.
+        In production, consider using /var/run/backend.ai/ipc instead.
         """,
         examples=["/var/run/backend.ai/ipc"],
         validation_alias=AliasChoices("ipc-base-path", "ipc_base_path"),
@@ -452,40 +458,36 @@ class ManagerConfig(BaseModel):
         examples=[_file_perm.st_gid],
     )
     service_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="0.0.0.0", port=8080),
+        default=HostPortPair(host="0.0.0.0", port=8080),
         description="""
         Network address and port where the manager service will listen.
         Default is all interfaces (0.0.0.0) on port 8080.
         For private deployments, consider using 127.0.0.1 instead.
         """,
-        examples=[{"host": "127.0.0.1", "port": 8080}],
         validation_alias=AliasChoices("service-addr", "service_addr"),
         serialization_alias="service-addr",
     )
     announce_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="127.0.0.1", port=5432),
+        default=HostPortPair(host="127.0.0.1", port=5432),
         description="""
         Address and port to announce to other components.
         This is used for service discovery and should be accessible by other components.
         """,
-        examples=[{"host": "127.0.0.1", "port": 5432}],
         alias="announce-addr",
     )
     announce_internal_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="host.docker.internal", port=18080),
+        default=HostPortPair(host="host.docker.internal", port=18080),
         description="""
         Address and port to announce for internal API requests.
         This is used for service discovery and should be accessible by other components.
         """,
-        examples=[{"host": "127.0.0.1", "port": 18080}],
         alias="announce-internal-addr",
     )
     internal_addr: HostPortPair = Field(
-        default_factory=lambda: HostPortPair(host="0.0.0.0", port=18080),
+        default=HostPortPair(host="0.0.0.0", port=18080),
         description="""
         Set the internal hostname/port to accept internal API requests.
         """,
-        examples=[{"host": "127.0.0.1", "port": 18080}],
         validation_alias=AliasChoices("internal-addr", "internal_addr"),
         serialization_alias="internal-addr",
     )
@@ -496,7 +498,6 @@ class ManagerConfig(BaseModel):
         This file contains key pairs used for secure communication between manager components.
         In production, should be stored in a secure location with restricted access.
         """,
-        examples=["fixtures/manager/manager.key_secret"],
         validation_alias=AliasChoices("rpc-auth-manager-keypair", "rpc_auth_manager_keypair"),
         serialization_alias="rpc-auth-manager-keypair",
     )
@@ -508,7 +509,6 @@ class ManagerConfig(BaseModel):
         If an agent doesn't respond within this time, it's considered offline.
         Should be set higher than the agent's heartbeat interval.
         """,
-        examples=[1.0, 40.0],
         validation_alias=AliasChoices("heartbeat-timeout", "heartbeat_timeout"),
         serialization_alias="heartbeat-timeout",
     )
@@ -827,6 +827,17 @@ class ManagerConfig(BaseModel):
         examples=[8080, 9090],
         validation_alias=AliasChoices("public-metrics-port", "public_metrics_port"),
         serialization_alias="public-metrics-port",
+    )
+    use_sokovan: bool = Field(
+        default=True,
+        description="""
+        Whether to use the Sokovan orchestrator for session scheduling.
+        When enabled, uses the new Sokovan orchestrator for improved scheduling performance.
+        When disabled, falls back to the legacy scheduling system.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices("use-sokovan", "use_sokovan"),
+        serialization_alias="use-sokovan",
     )
 
     @property
@@ -1209,145 +1220,6 @@ class APIConfig(BaseModel):
     )
 
 
-class RedisHelperConfig(BaseModel):
-    socket_timeout: float = Field(
-        default=5.0,
-        description="""
-        Timeout in seconds for Redis socket operations.
-        Controls how long operations wait before timing out.
-        Increase for slow or congested networks.
-        """,
-        examples=[5.0, 10.0],
-        validation_alias=AliasChoices("socket_timeout", "socket-timeout"),
-        serialization_alias="socket_timeout",
-    )
-    socket_connect_timeout: float = Field(
-        default=2.0,
-        description="""
-        Timeout in seconds for establishing Redis connections.
-        Controls how long connection attempts wait before failing.
-        Shorter values fail faster but may be too aggressive for some networks.
-        """,
-        examples=[2.0, 5.0],
-        validation_alias=AliasChoices("socket_connect_timeout", "socket-connect-timeout"),
-        serialization_alias="socket_connect_timeout",
-    )
-    reconnect_poll_timeout: float = Field(
-        default=0.3,
-        description="""
-        Time in seconds to wait between reconnection attempts.
-        Controls the polling frequency when trying to reconnect to Redis.
-        Lower values reconnect faster but may increase network load.
-        """,
-        examples=[0.3, 1.0],
-        validation_alias=AliasChoices("reconnect_poll_timeout", "reconnect-poll-timeout"),
-        serialization_alias="reconnect_poll_timeout",
-    )
-
-
-class SingleRedisConfig(BaseModel):
-    addr: Optional[HostPortPairModel] = Field(
-        default=None,
-        description="""
-        Network address and port of the Redis server.
-        Redis is used for distributed caching and messaging between managers.
-        Set to None when using Sentinel for high availability.
-        """,
-        examples=[None, {"host": "127.0.0.1", "port": 6379}],
-    )
-    sentinel: Optional[list[HostPortPairModel]] = Field(
-        default=None,
-        description="""
-        List of Redis Sentinel addresses for high availability.
-        If provided, the manager will use Redis Sentinel for automatic failover.
-        When using Sentinel, the addr field is ignored and service_name is required.
-        """,
-        examples=[
-            None,
-            [{"host": "redis-sentinel", "port": 26379}, {"host": "redis-sentinel", "port": 26380}],
-        ],
-    )
-    service_name: Optional[str] = Field(
-        default=None,
-        description="""
-        Service name for Redis Sentinel.
-        Required when using Redis Sentinel for high availability.
-        Identifies which service to monitor for failover.
-        """,
-        examples=[None, "mymaster", "backend-ai"],
-        validation_alias=AliasChoices("service_name", "service-name"),
-        serialization_alias="service-name",
-    )
-    password: Optional[str] = Field(
-        default=None,
-        description="""
-        Password for authenticating with Redis.
-        Set to None if Redis doesn't require authentication.
-        Should be kept secret in production environments.
-        """,
-        examples=[None, "REDIS_PASSWORD"],
-    )
-    redis_helper_config: RedisHelperConfig = Field(
-        default_factory=RedisHelperConfig,
-        description="""
-        Configuration for the Redis helper library.
-        Controls timeouts and reconnection behavior.
-        Adjust based on network conditions and reliability requirements.
-        """,
-        validation_alias=AliasChoices("redis_helper_config", "redis-helper-config"),
-        serialization_alias="redis-helper-config",
-    )
-
-    @field_validator("sentinel", mode="before")
-    @classmethod
-    def _parse_sentinel(
-        cls, v: Optional[str | list[HostPortPairModel]]
-    ) -> Optional[list[HostPortPairModel]]:
-        if v is None or isinstance(v, list):
-            return v
-        if isinstance(v, str):
-            entries: list[HostPortPairModel] = []
-            for part in v.split(","):
-                host, port = part.strip().split(":")
-                entries.append(HostPortPairModel(host=host, port=int(port)))
-            return entries
-        raise TypeError("sentinel must be list or 'host:port,host:port' string")
-
-    @field_serializer("addr")
-    def _serialize_addr(self, addr: Optional[HostPortPairModel], _info) -> Optional[str]:
-        return None if addr is None else f"{addr.host}:{addr.port}"
-
-    @field_serializer("sentinel")
-    def _serialize_sentinel(
-        self, sentinel: Optional[list[HostPortPairModel]], _info
-    ) -> Optional[str]:
-        if sentinel is None:
-            return None
-        return ",".join(f"{hp.host}:{hp.port}" for hp in sentinel)
-
-
-class RedisConfig(SingleRedisConfig):
-    override_configs: Optional[dict[str, SingleRedisConfig]] = Field(
-        default=None,
-        description="""
-        Optional override configurations for specific Redis contexts.
-        Allows different Redis settings for different services within Backend.AI.
-        Each key represents a context name, and the value is a complete Redis configuration.
-        """,
-        examples=[
-            None,
-            {
-                "live": {
-                    "addr": {"host": "127.0.0.1", "port": 6379},
-                    "password": "different-password",
-                    "redis_helper_config": {"socket_timeout": 10.0},
-                }
-            },
-        ],
-        alias="override-configs",
-    )
-
-
 class DockerImageAutoPullPolicy(enum.StrEnum):
     digest = "digest"
     tag = "tag"
@@ -1584,12 +1456,11 @@ class SessionConfig(BaseModel):
 
 
 class MetricConfig(BaseModel):
-    address: HostPortPairModel = Field(
-        default=HostPortPairModel(host="127.0.0.1", port=9090),
+    address: HostPortPair = Field(
+        default=HostPortPair(host="127.0.0.1", port=9090),
         description="""
         Address for the metric collection service.
         """,
-        examples=[None, {"host": "127.0.0.1", "port": 9090}],
         alias="addr",
     )
     timewindow: str = Field(
@@ -1603,7 +1474,7 @@ class MetricConfig(BaseModel):
     )
 
     @field_serializer("address")
-    def _serialize_addr(self, addr: Optional[HostPortPairModel], _info: Any) -> Optional[str]:
+    def _serialize_addr(self, addr: Optional[HostPortPair], _info: Any) -> Optional[str]:
         return None if addr is None else f"{addr.host}:{addr.port}"
 
 
@@ -1829,6 +1700,62 @@ class ServiceDiscoveryConfig(BaseModel):
     )
 
 
+class ReservoirObjectStorageConfig(BaseModel):
+    storage_type: Literal["object_storage"] = Field(
+        default="object_storage",
+        description="""
+        Type of the storage configuration.
+        This is used to identify the specific storage type.
+        """,
+        alias="type",
+    )
+    bucket_name: str = Field(
+        default="OBJECT_STORAGE_BUCKET_NAME",
+        description="""
+        Name of the bucket to use for the reservoir.
+        """,
+        examples=["minio-bucket"],
+        validation_alias=AliasChoices("bucket-name", "bucket_name"),
+        serialization_alias="bucket-name",
+    )
+
+
+StorageSpecificConfig = Union[ReservoirObjectStorageConfig]
+
+
+class ReservoirStorageConfig(BaseModel):
+    storage_name: str = Field(
+        default="RESERVOIR_STORAGE_NAME",
+        description="""
+        Name of the reservoir storage configuration.
+        Used to identify this storage in the system.
+        """,
+        examples=["minio-storage", "gitlfs-storage", "vfs-storage"],
+        validation_alias=AliasChoices("storage-name", "storage_name"),
+        serialization_alias="storage-name",
+    )
+    config: StorageSpecificConfig = Field(
+        default_factory=ReservoirObjectStorageConfig,
+        discriminator="storage_type",
+        description="""
+        Configuration for the storage.
+        """,
+    )
+
+
+class ModelRegistryConfig(BaseModel):
+    model_registry: str = Field(
+        default="MODEL_REGISTRY_NAME",
+        description="""
+        Name of the Model registry configuration.
+        Used to identify this registry in the system.
+        """,
+        examples=["model-registry"],
+        validation_alias=AliasChoices("model-registry", "model_registry"),
+        serialization_alias="model-registry",
+    )
+
+
 class ManagerUnifiedConfig(BaseModel):
     # From legacy local config
     db: DatabaseConfig = Field(
@@ -1864,8 +1791,8 @@ class ManagerUnifiedConfig(BaseModel):
         validation_alias=AliasChoices("docker_registry", "docker-registry"),
         serialization_alias="docker-registry",
     )
-    logging: Any = Field(
-        default_factory=lambda: {},
+    logging: LoggingConfig = Field(
+        default_factory=LoggingConfig,
         description="""
         Logging system configuration.
         Controls how logs are formatted, filtered, and stored.
@@ -1954,8 +1881,8 @@ class ManagerUnifiedConfig(BaseModel):
         Controls the component that monitors compute sessions.
         """,
     )
-    auth: Optional[AuthConfig] = Field(
-        default=None,
+    auth: AuthConfig = Field(
+        default_factory=AuthConfig,
         description="""
         Authentication settings.
         Controls password policies and other security measures.
@@ -2003,10 +1930,26 @@ class ManagerUnifiedConfig(BaseModel):
         Controls how services are discovered and connected within the Backend.AI system.
         """,
     )
+    artifact_registry: ModelRegistryConfig = Field(
+        default_factory=ModelRegistryConfig,
+        description="""
+        Default artifact registry config.
+        """,
+        validation_alias=AliasChoices("artifact_registry", "artifact-registry"),
+        serialization_alias="artifact-registry",
+    )
+    reservoir: ReservoirStorageConfig = Field(
+        default_factory=ReservoirStorageConfig,
+        description="""
+        Reservoir storage configuration.
+        Controls which storage backend is used for the reservoir.
+        """,
+    )
 
     # TODO: Remove me after changing the method of loading the license server address in the plugins
-    class Config:
-        extra = "allow"
+    model_config = ConfigDict(
+        extra="allow",
+    )
 
     def __repr__(self):
         return pformat(self.model_dump())

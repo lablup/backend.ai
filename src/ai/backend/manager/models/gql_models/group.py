@@ -19,6 +19,7 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
 from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.group.actions.create_group import CreateGroupAction
@@ -29,7 +30,6 @@ from ai.backend.manager.services.group.actions.modify_group import ModifyGroupAc
 from ai.backend.manager.services.group.actions.purge_group import (
     PurgeGroupAction,
 )
-from ai.backend.manager.services.group.types import GroupCreator, GroupData, GroupModifier
 from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (

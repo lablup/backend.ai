@@ -142,10 +142,6 @@ class KernelTerminationEvent(BaseKernelEvent):
         )
 
     @override
-    def domain_id(self) -> Optional[str]:
-        return None
-
-    @override
     def user_event(self) -> Optional[UserEvent]:
         return None
 

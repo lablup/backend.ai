@@ -54,11 +54,15 @@ from yarl import URL
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.auth import PublicKey, SecretKey
-from ai.backend.common.clients.http_client.client_pool import ClientConfig, ClientKey, ClientPool
+from ai.backend.common.clients.http_client.client_pool import (
+    ClientKey,
+    ClientPool,
+    tcp_client_session_factory,
+)
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.config.types import HealthCheckConfig
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -104,11 +108,16 @@ from ai.backend.common.events.event_types.session.anycast import (
     SessionTerminatingAnycastEvent,
 )
 from ai.backend.common.events.event_types.session.broadcast import (
+    SchedulingBroadcastEvent,
     SessionCancelledBroadcastEvent,
     SessionEnqueuedBroadcastEvent,
     SessionStartedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
+from ai.backend.common.events.fetcher import EventFetcher
+from ai.backend.common.events.hub.hub import EventHub
+from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
+from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.exception import AliasResolutionFailed, BackendAIError
 from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.service_ports import parse_service_ports
@@ -144,11 +153,21 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.clients.wsproxy.types import (
+    CreateEndpointRequestBody,
+    EndpointTagsModel,
+    SessionTagsModel,
+    TagsModel,
+)
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.endpoint import ModelServiceHelper
-from ai.backend.manager.models.image import ImageIdentifier
 from ai.backend.manager.plugin.network import NetworkPluginContext
+from ai.backend.manager.repositories.scheduler.types.session_creation import SessionCreationSpec
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.utils import query_userinfo
 
 from .agent_cache import AgentRPCCache
@@ -179,7 +198,6 @@ from .models import (
     ImageRow,
     KernelLoadingStrategy,
     KernelRow,
-    KernelStatus,
     KeyPairResourcePolicyRow,
     KeyPairRow,
     NetworkRow,
@@ -189,7 +207,6 @@ from .models import (
     ScalingGroupRow,
     SessionDependencyRow,
     SessionRow,
-    SessionStatus,
     UserRole,
     UserRow,
     VFolderRow,
@@ -201,8 +218,6 @@ from .models import (
     prepare_vfolder_mounts,
     query_allowed_sgroups,
     query_bootstrap_script,
-    recalc_agent_resource_occupancy,
-    recalc_concurrency_used,
     scaling_groups,
     verify_vfolder_name,
 )
@@ -231,6 +246,7 @@ __all__ = ["AgentRegistry", "InstanceNotFound"]
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
+DEFAULT_WAIT_TIMEOUT_SECONDS = 60
 
 
 class AgentRegistry:
@@ -243,6 +259,9 @@ class AgentRegistry:
     """
 
     _kernel_actual_allocated_resources: dict[KernelId, ResourceSlot]
+    _scheduling_controller: SchedulingController
+    _use_sokovan: bool
+    _event_hub: EventHub
 
     session_creation_tracker: dict[str, asyncio.Event]
     pending_waits: set[asyncio.Task[None]]
@@ -259,13 +278,16 @@ class AgentRegistry:
         valkey_live: ValkeyLiveClient,
         valkey_image: ValkeyImageClient,
         event_producer: EventProducer,
+        event_hub: EventHub,
         storage_manager: StorageSessionManager,
         hook_plugin_ctx: HookPluginContext,
         network_plugin_ctx: NetworkPluginContext,
+        scheduling_controller: SchedulingController,
         *,
         debug: bool = False,
         manager_public_key: PublicKey,
         manager_secret_key: SecretKey,
+        use_sokovan: bool = True,
     ) -> None:
         self.config_provider = config_provider
         self.docker = aiodocker.Docker()
@@ -275,10 +297,13 @@ class AgentRegistry:
         self.valkey_live = valkey_live
         self.valkey_image = valkey_image
         self.event_producer = event_producer
+        self._event_hub = event_hub
         self.storage_manager = storage_manager
         self.hook_plugin_ctx = hook_plugin_ctx
         self.network_plugin_ctx = network_plugin_ctx
         self._kernel_actual_allocated_resources = {}
+        self._scheduling_controller = scheduling_controller
+        self._use_sokovan = use_sokovan
         self.debug = debug
         self.rpc_keepalive_timeout = int(config_provider.config.network.rpc.keepalive_timeout)
         self.rpc_auth_manager_public_key = manager_public_key
@@ -291,7 +316,7 @@ class AgentRegistry:
             hook_plugin_ctx,
             self,
         )
-        self._client_pool = ClientPool(ClientConfig())
+        self._client_pool = ClientPool(tcp_client_session_factory)
 
     def _get_agent_client(
         self,
@@ -381,6 +406,41 @@ class AgentRegistry:
         agent = await self.get_instance(instance_id, agents.c.addr)
         agent_client = self._get_agent_client(agent["id"])
         return await agent_client.scan_gpu_alloc_map()
+
+    async def _wait_for_session_running(
+        self,
+        session_id: SessionId,
+        propagator: WithCachePropagator,
+        max_wait: int,
+    ) -> None:
+        cache_id = EventCacheDomain.SESSION_SCHEDULER.cache_id(str(session_id))
+        while True:
+            try:
+                with _timeout(DEFAULT_WAIT_TIMEOUT_SECONDS):
+                    async for event in propagator.receive(cache_id):
+                        if isinstance(event, SchedulingBroadcastEvent):
+                            if event.status_transition == str(SessionStatus.RUNNING):
+                                return
+                            if event.status_transition in (
+                                str(SessionStatus.TERMINATED),
+                                str(SessionStatus.CANCELLED),
+                            ):
+                                raise SessionNotFound("Session terminated during scheduling")
+            except asyncio.TimeoutError as e:
+                if max_wait > 0:
+                    raise e
+                async with self.db.begin_readonly_session() as db_session:
+                    query = sa.select(SessionRow.status).where(SessionRow.id == session_id)
+                    result = await db_session.execute(query)
+                    row = result.first()
+
+                    if row is None:
+                        raise SessionNotFound(f"Session {session_id} not found")
+
+                    if row.status == SessionStatus.RUNNING:
+                        return
+                    elif row.status in (SessionStatus.TERMINATED, SessionStatus.CANCELLED):
+                        raise SessionNotFound("Session terminated during scheduling")
 
     async def create_session(
         self,
@@ -544,8 +604,6 @@ class AgentRegistry:
             dependencies = []
 
         session_creation_id = secrets.token_urlsafe(16)
-        start_event = asyncio.Event()
-        self.session_creation_tracker[session_creation_id] = start_event
 
         async with self.db.begin_readonly_session() as db_session:
             conn = await db_session.connection()
@@ -622,14 +680,19 @@ class AgentRegistry:
             resp["created"] = True
 
             if not enqueue_only:
+                # Create and register propagator for event hub
+                # Create event fetcher and cache propagator
+                event_fetcher = EventFetcher(self.event_producer._msg_queue)
+                propagator = WithCachePropagator(event_fetcher)
                 self.pending_waits.add(current_task)
                 max_wait = max_wait_seconds
+
+                # Register propagator and ensure cleanup
+                self._event_hub.register_event_propagator(
+                    propagator, [(EventDomain.SESSION, str(session_id))]
+                )
                 try:
-                    if max_wait > 0:
-                        with _timeout(max_wait):
-                            await start_event.wait()
-                    else:
-                        await start_event.wait()
+                    await self._wait_for_session_running(session_id, propagator, max_wait)
                 except asyncio.TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:
@@ -658,12 +721,16 @@ class AgentRegistry:
                             resp["servicePorts"].append(response_dict)
                     else:
                         resp["status"] = row.status.name
+                finally:
+                    # Always unregister propagator
+                    self._event_hub.unregister_event_propagator(propagator.id())
             return resp
         except asyncio.CancelledError:
             raise
         finally:
             self.pending_waits.discard(current_task)
-            if not enqueue_only and session_creation_id in self.session_creation_tracker:
+            # Clean up old tracker if exists (for backward compatibility)
+            if session_creation_id in self.session_creation_tracker:
                 del self.session_creation_tracker[session_creation_id]
 
     async def create_cluster(
@@ -804,9 +871,7 @@ class AgentRegistry:
                 )
 
         session_creation_id = secrets.token_urlsafe(16)
-        start_event = asyncio.Event()
         kernel_id: Optional[KernelId] = None
-        self.session_creation_tracker[session_creation_id] = start_event
         current_task = asyncio.current_task()
         assert current_task is not None
 
@@ -846,14 +911,19 @@ class AgentRegistry:
             resp["created"] = True
 
             if not enqueue_only:
+                # Create and register propagator for event hub
+                # Create event fetcher and cache propagator
+                event_fetcher = EventFetcher(self.event_producer._msg_queue)
+                propagator = WithCachePropagator(event_fetcher)
                 self.pending_waits.add(current_task)
                 max_wait = max_wait_seconds
+
+                # Register propagator and ensure cleanup
+                self._event_hub.register_event_propagator(
+                    propagator, [(EventDomain.SESSION, str(session_id))]
+                )
                 try:
-                    if max_wait > 0:
-                        with _timeout(max_wait):
-                            await start_event.wait()
-                    else:
-                        await start_event.wait()
+                    await self._wait_for_session_running(session_id, propagator, max_wait)
                 except asyncio.TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:
@@ -886,13 +956,78 @@ class AgentRegistry:
                             resp["servicePorts"].append(response_dict)
                     else:
                         resp["status"] = row["status"].name
+                finally:
+                    # Always unregister propagator
+                    self._event_hub.unregister_event_propagator(propagator.id())
             return resp
         except asyncio.CancelledError:
             raise
         finally:
             self.pending_waits.discard(current_task)
+            # Clean up old tracker if exists (for backward compatibility)
             if session_creation_id in self.session_creation_tracker:
                 del self.session_creation_tracker[session_creation_id]
+
+    async def _enqueue_session_via_sokovan(
+        self,
+        session_creation_id: str,
+        session_name: str,
+        access_key: AccessKey,
+        session_enqueue_configs: SessionEnqueueingConfig,
+        scaling_group: Optional[str],
+        session_type: SessionTypes,
+        resource_policy: dict,
+        *,
+        user_scope: UserScope,
+        priority: int,
+        public_sgroup_only: bool,
+        cluster_mode: ClusterMode,
+        cluster_size: int,
+        session_tag: Optional[str],
+        internal_data: Optional[dict],
+        starts_at: Optional[datetime],
+        batch_timeout: Optional[timedelta],
+        agent_list: Optional[Sequence[str]],
+        dependency_sessions: Optional[Sequence[SessionId]],
+        callback_url: Optional[URL],
+        route_id: Optional[uuid.UUID],
+        sudo_session_enabled: bool,
+        network: NetworkRow | None,
+    ) -> SessionId:
+        """Enqueue session using Sokovan scheduling controller."""
+        kernel_enqueue_configs: List[KernelEnqueueingConfig] = session_enqueue_configs[
+            "kernel_configs"
+        ]
+
+        # Create SessionCreationSpec
+        spec = SessionCreationSpec(
+            session_creation_id=session_creation_id,
+            session_name=session_name,
+            access_key=access_key,
+            user_scope=user_scope,
+            session_type=session_type,
+            cluster_mode=cluster_mode,
+            cluster_size=cluster_size,
+            priority=priority,
+            resource_policy=resource_policy,
+            kernel_specs=kernel_enqueue_configs,
+            creation_spec=session_enqueue_configs["creation_config"],
+            scaling_group=scaling_group,
+            session_tag=session_tag,
+            starts_at=starts_at,
+            batch_timeout=batch_timeout,
+            dependency_sessions=list(dependency_sessions) if dependency_sessions else None,
+            callback_url=callback_url,
+            route_id=route_id,
+            sudo_session_enabled=sudo_session_enabled,
+            network=network,
+            designated_agent_list=list(agent_list) if agent_list else None,
+            internal_data=internal_data,
+            public_sgroup_only=public_sgroup_only,
+        )
+
+        # Delegate to scheduling controller
+        return await self._scheduling_controller.enqueue_session(spec)
 
     async def enqueue_session(
         self,
@@ -920,11 +1055,37 @@ class AgentRegistry:
         sudo_session_enabled: bool = False,
         network: NetworkRow | None = None,
     ) -> SessionId:
+        # Use sokovan scheduling controller if enabled
+        if self._use_sokovan:
+            return await self._enqueue_session_via_sokovan(
+                session_creation_id=session_creation_id,
+                session_name=session_name,
+                access_key=access_key,
+                session_enqueue_configs=session_enqueue_configs,
+                scaling_group=scaling_group,
+                session_type=session_type,
+                resource_policy=resource_policy,
+                user_scope=user_scope,
+                priority=priority,
+                public_sgroup_only=public_sgroup_only,
+                cluster_mode=cluster_mode,
+                cluster_size=cluster_size,
+                session_tag=session_tag,
+                internal_data=internal_data,
+                starts_at=starts_at,
+                batch_timeout=batch_timeout,
+                agent_list=agent_list,
+                dependency_sessions=dependency_sessions,
+                callback_url=callback_url,
+                route_id=route_id,
+                sudo_session_enabled=sudo_session_enabled,
+                network=network,
+            )
+
+        # Original implementation
         session_id = SessionId(uuid.uuid4())
 
-        kernel_enqueue_configs: List[KernelEnqueueingConfig] = session_enqueue_configs[
-            "kernel_configs"
-        ]
+        kernel_enqueue_configs = session_enqueue_configs["kernel_configs"]
         assert len(kernel_enqueue_configs) >= 1
         main_kernel_config = kernel_enqueue_configs[0]
         assert main_kernel_config["cluster_role"] == DEFAULT_ROLE
@@ -1641,7 +1802,8 @@ class AgentRegistry:
         log.debug("ssh connection info mapping: {}", cluster_ssh_port_mapping)
 
         if scheduled_session.network_type == NetworkType.VOLATILE:
-            async with self.db.begin_session() as db_sess:
+
+            async def _update_network_id(db_sess: AsyncSession) -> None:
                 query = (
                     sa.update(SessionRow)
                     .values({
@@ -1650,6 +1812,9 @@ class AgentRegistry:
                     .where(SessionRow.id == scheduled_session.id)
                 )
                 await db_sess.execute(query)
+
+            async with self.db.connect() as db_conn:
+                await execute_with_txn_retry(_update_network_id, self.db.begin_session, db_conn)
 
         keyfunc = lambda binding: binding.kernel.cluster_role
         replicas = {
@@ -2660,6 +2825,7 @@ class AgentRegistry:
 
         # Get the main container's agent info
 
+        # TODO: Separate VOLATILE network cleanup method
         if session.network_type == NetworkType.VOLATILE:
             if ClusterMode(session.cluster_mode) == ClusterMode.SINGLE_NODE:
                 if network_ref_name is not None:
@@ -3458,23 +3624,6 @@ class AgentRegistry:
 
         if result is None:
             return
-
-        access_key = cast(AccessKey, result.access_key)
-        agent = cast(AgentId, result.agent)
-
-        async def _recalc(db_session: AsyncSession) -> None:
-            log.debug(
-                "recalculate concurrency used in kernel termination (ak: {})",
-                access_key,
-            )
-            await recalc_concurrency_used(db_session, self.valkey_stat, access_key)
-            log.debug(
-                "recalculate agent resource occupancy in kernel termination (agent: {})",
-                agent,
-            )
-            await recalc_agent_resource_occupancy(db_session, agent)
-
-        await execute_with_txn_retry(_recalc, self.db.begin_session, db_conn)
         await self.session_lifecycle_mgr.register_status_updatable_session([session_id])
 
     async def mark_kernel_heartbeat(self, kernel_id: KernelId) -> None:
@@ -3545,7 +3694,7 @@ class AgentRegistry:
         """
         agent_client = self._get_agent_client(agent)
         return await agent_client.push_image(
-            str(image_ref),
+            image_ref,
             {**registry, "url": str(registry["url"])},
         )
 
@@ -3620,11 +3769,11 @@ class AgentRegistry:
 
     async def get_health_check_info(
         self, endpoint: EndpointData, model: VFolderRow
-    ) -> HealthCheckConfig | None:
-        _info: HealthCheckConfig | None = None
+    ) -> ModelHealthCheck | None:
+        _info: ModelHealthCheck | None = None
 
         if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
-            _info = HealthCheckConfig(path=_path)
+            _info = ModelHealthCheck(path=_path)
         elif endpoint.runtime_variant == RuntimeVariant.CUSTOM:
             model_definition_path = await ModelServiceHelper.validate_model_definition_file_exists(
                 self.storage_manager,
@@ -3641,7 +3790,7 @@ class AgentRegistry:
 
             for model_info in model_definition["models"]:
                 if health_check_info := model_info.get("service", {}).get("health_check"):
-                    _info = HealthCheckConfig(
+                    _info = ModelHealthCheck(
                         path=health_check_info["path"],
                         interval=health_check_info["interval"],
                         max_retries=health_check_info["max_retries"],
@@ -3672,27 +3821,25 @@ class AgentRegistry:
 
         health_check_config = await self.get_health_check_info(endpoint, model)
 
-        request_body = {
-            "version": "v2",
-            "service_name": endpoint.name,
-            "tags": {
-                "session": {
-                    "user_uuid": str(endpoint.session_owner_id),
-                    "group_id": str(endpoint.project),
-                    "domain_name": endpoint.domain,
-                },
-                "endpoint": {
-                    "id": str(endpoint.id),
-                    "runtime_variant": endpoint.runtime_variant.value,
-                    "existing_url": str(endpoint.url) if endpoint.url else None,
-                },
-            },
-            "apps": {},
-            "open_to_public": endpoint.open_to_public,
-            "health_check": health_check_config.model_dump(mode="json")
-            if health_check_config
-            else None,
-        }
+        request_body = CreateEndpointRequestBody(
+            version="v2",
+            service_name=endpoint.name,
+            tags=TagsModel(
+                session=SessionTagsModel(
+                    user_uuid=str(endpoint.session_owner_id),
+                    group_id=str(endpoint.project),
+                    domain_name=endpoint.domain,
+                ),
+                endpoint=EndpointTagsModel(
+                    id=str(endpoint.id),
+                    runtime_variant=endpoint.runtime_variant.value,
+                    existing_url=str(endpoint.url) if endpoint.url else None,
+                ),
+            ),
+            apps={},
+            open_to_public=endpoint.open_to_public,
+            health_check=health_check_config,
+        )
         endpoint_json = await wsproxy_client.create_endpoint(endpoint.id, request_body)
         return endpoint_json["endpoint"]
 
@@ -3721,7 +3868,7 @@ class AgentRegistry:
                 load_image=True,
                 load_routes=True,
             )
-            connection_info = await endpoint.generate_redis_route_info(db_sess)
+            connection_info = await endpoint.generate_route_info(db_sess)
             model = await VFolderRow.get(db_sess, endpoint.model)
             endpoint_data = endpoint.to_data()
 

@@ -20,8 +20,6 @@ from ai.backend.common import redis_helper as redis_helper
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.validators import TimeDuration
 from ai.backend.logging import BraceStyleAdapter, LogLevel
-from ai.backend.manager.models import error_logs
-from ai.backend.manager.models.utils import vacuum_db
 
 from .context import CLIContext, redis_ctx
 
@@ -109,7 +107,8 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
     Note that you do not have to specify connection-related options
     because the dbshell command fills out them from the manager configuration.
     """
-    db_config = cli_ctx.get_bootstrap_config().db
+    bootstrap_config = asyncio.run(cli_ctx.get_bootstrap_config())
+    db_config = bootstrap_config.db
     if psql_help:
         psql_args = ["--help"]
     if not container_name:
@@ -244,16 +243,17 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     from redis.asyncio import Redis
     from redis.asyncio.client import Pipeline
 
-    from ai.backend.manager.models import SessionRow, kernels
-    from ai.backend.manager.models.utils import connect_database
+    from ai.backend.manager.models import SessionRow, error_logs, kernels
+    from ai.backend.manager.models.utils import connect_database, vacuum_db
 
     today = datetime.now()
     duration = TimeDuration()
     expiration_date = today - duration.check_and_return(retention)
+    bootstrap_config = asyncio.run(cli_ctx.get_bootstrap_config())
 
     async def _clear_redis_history():
         try:
-            async with connect_database(cli_ctx.get_bootstrap_config().db) as db:
+            async with connect_database(bootstrap_config.db) as db:
                 async with db.begin_readonly() as conn:
                     query = (
                         sa.select([kernels.c.id])
@@ -313,9 +313,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
             log.exception("Unexpected error while cleaning up redis history")
 
     async def _clear_terminated_sessions():
-        async with connect_database(
-            cli_ctx.get_bootstrap_config().db, isolation_level="AUTOCOMMIT"
-        ) as db:
+        async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old records...")
                 result = (
@@ -344,9 +342,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
         )
 
     async def _clear_old_error_logs():
-        async with connect_database(
-            cli_ctx.get_bootstrap_config().db, isolation_level="AUTOCOMMIT"
-        ) as db:
+        async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
             async with db.begin() as conn:
                 log.info("Deleting old error logs...")
                 result = await conn.execute(
@@ -363,7 +359,7 @@ def clear_history(cli_ctx: CLIContext, retention, vacuum_full) -> None:
     asyncio.run(_clear_redis_history())
     asyncio.run(_clear_terminated_sessions())
     asyncio.run(_clear_old_error_logs())
-    asyncio.run(vacuum_db(cli_ctx.get_bootstrap_config(), vacuum_full))
+    asyncio.run(vacuum_db(bootstrap_config, vacuum_full))
 
 
 @main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dbschema:cli")

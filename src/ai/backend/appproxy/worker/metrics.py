@@ -12,8 +12,8 @@ from redis.asyncio.client import Pipeline
 
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.common import msgpack, redis_helper
-from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.common.types import MetricKey, ModelServiceStatus, RuntimeVariant
+from ai.backend.logging import BraceStyleAdapter
 
 from .types import (
     Circuit,

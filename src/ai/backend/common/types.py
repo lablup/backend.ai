@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import dataclasses
 import enum
 import ipaddress
@@ -14,6 +15,7 @@ from collections.abc import Iterable
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from decimal import Decimal
+from functools import lru_cache
 from ipaddress import ip_address, ip_network
 from pathlib import Path, PurePosixPath
 from ssl import SSLContext
@@ -48,7 +50,7 @@ import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
-from pydantic import BaseModel, ConfigDict, Field, PlainValidator
+from pydantic import BaseModel, ConfigDict, Field, PlainValidator, TypeAdapter
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
@@ -143,11 +145,12 @@ __all__ = (
     "MODEL_SERVICE_RUNTIME_PROFILES",
     "ItemResult",
     "ResultSet",
-    "safe_print_redis_target",
+    "safe_print_redis_config",
 )
 
 
 if TYPE_CHECKING:
+    from ai.backend.common.configs.redis import RedisConfig
     from ai.backend.common.data.vfolder.types import VFolderMountData
 
     from .docker import ImageRef
@@ -417,6 +420,21 @@ class SessionTypes(CIStrEnum):
     BATCH = "batch"
     INFERENCE = "inference"
     SYSTEM = "system"
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def private_types(cls) -> tuple[SessionTypes]:
+        """
+        Returns a set of private session types.
+        """
+        return (cls.SYSTEM,)
+
+    def is_private(self) -> bool:
+        """
+        Returns True if the session type is private.
+        Private session types are INTERACTIVE and BATCH.
+        """
+        return self in self.private_types()
 
 
 class SessionResult(CIStrEnum):
@@ -1386,6 +1404,10 @@ class KernelCreationResult(TypedDict):
 
 class KernelCreationConfig(TypedDict):
     image: ImageConfig
+    kernel_id: str  # the kernel's ID
+    session_id: str  # the session's ID
+    owner_user_id: str  # the owner user's ID
+    owner_project_id: Optional[str]  # the owner project's ID (for project-owned sessions)
     network_id: str
     auto_pull: AutoPullBehavior
     session_type: SessionTypes
@@ -1393,6 +1415,7 @@ class KernelCreationConfig(TypedDict):
     cluster_role: str  # the kernel's role in the cluster
     cluster_idx: int  # the kernel's index in the cluster
     cluster_hostname: str  # the kernel's hostname in the cluster
+    local_rank: int  # the kernel's local rank in the cluster
     uid: Optional[int]
     main_gid: Optional[int]
     supplementary_gids: list[int]
@@ -1452,12 +1475,37 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
 
 
 @dataclass
+class ValkeyTarget:
+    addr: Optional[str] = None
+    sentinel: Optional[list[str]] = None
+    service_name: Optional[str] = None
+    password: Optional[str] = None
+    request_timeout: Optional[int] = None
+    use_tls: bool = False
+    tls_skip_verify: bool = False
+
+    def __getitem__(self, key: str) -> Any:
+        return getattr(self, key)
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        setattr(self, key, value)
+
+    def __contains__(self, key: str) -> bool:
+        return hasattr(self, key)
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return getattr(self, key, default)
+
+
+@dataclass
 class RedisTarget:
     addr: Optional[HostPortPair] = None
     sentinel: Optional[Union[str, List[HostPortPair]]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
     redis_helper_config: Optional[RedisHelperConfig] = None
+    use_tls: bool = False
+    tls_skip_verify: bool = False
 
     def __getitem__(self, key: str) -> Any:
         return getattr(self, key)
@@ -1478,9 +1526,65 @@ class RedisTarget:
             service_name=self.service_name,
             password=self.password,
             redis_helper_config=self.redis_helper_config,
+            use_tls=self.use_tls,
+            tls_skip_verify=self.tls_skip_verify,
+        )
+
+    def to_valkey_target(self) -> ValkeyTarget:
+        addr = str(self.addr) if self.addr else None
+        sentinel_addrs: Optional[list[str]] = None
+        if self.sentinel:
+            sentinel_addrs = None
+            if isinstance(self.sentinel, list):
+                sentinel_addrs = [str(s) for s in self.sentinel]
+            else:
+                from ai.backend.common.typed_validators import CommaSeparatedStrList
+
+                adapter = TypeAdapter(CommaSeparatedStrList)
+                sentinel_addrs = adapter.validate_python(self.sentinel)
+
+        return ValkeyTarget(
+            addr=addr,
+            sentinel=sentinel_addrs,
+            service_name=self.service_name,
+            password=self.password,
+            request_timeout=None,
+            use_tls=self.use_tls,
+            tls_skip_verify=self.tls_skip_verify,
         )
 
 
+@dataclass
+class ValkeyProfileTarget:
+    _base_target: ValkeyTarget
+    _override_targets: Optional[Mapping[str, ValkeyTarget]]
+
+    def __init__(
+        self,
+        *,
+        addr: Optional[str] = None,
+        sentinel: Optional[list[str]] = None,
+        service_name: Optional[str] = None,
+        password: Optional[str] = None,
+        request_timeout: Optional[int] = None,
+        override_targets: Optional[Mapping[str, ValkeyTarget]] = None,
+    ) -> None:
+        self._base_target = ValkeyTarget(
+            addr=addr,
+            sentinel=sentinel,
+            service_name=service_name,
+            password=password,
+            request_timeout=request_timeout,
+        )
+        self._override_targets = override_targets
+
+    def profile_target(self, role: RedisRole) -> ValkeyTarget:
+        if self._override_targets and (role in self._override_targets):
+            return self._override_targets[role]
+        return self._base_target
+
+
+# TODO: Remove this type
 @dataclass
 class RedisProfileTarget:
     _base_target: RedisTarget
@@ -1495,6 +1599,8 @@ class RedisProfileTarget:
         password: Optional[str] = None,
         redis_helper_config: Optional[RedisHelperConfig] = None,
         override_targets: Optional[Mapping[str, RedisTarget]] = None,
+        use_tls: bool = False,
+        tls_skip_verify: bool = False,
     ) -> None:
         self._base_target = RedisTarget(
             addr=addr,
@@ -1502,6 +1608,8 @@ class RedisProfileTarget:
             service_name=service_name,
             password=password,
             redis_helper_config=redis_helper_config,
+            use_tls=use_tls,
+            tls_skip_verify=tls_skip_verify,
         )
         self._override_targets = override_targets
 
@@ -1509,6 +1617,19 @@ class RedisProfileTarget:
         if self._override_targets and (role in self._override_targets):
             return self._override_targets[role]
         return self._base_target
+
+    @staticmethod
+    def _parse_addr(addr_data) -> HostPortPair:
+        match addr_data:
+            case HostPortPair(host=host, port=port):
+                return HostPortPair(host, port)
+            case {"host": host, "port": port}:
+                return HostPortPair(host, port)
+            case (host, port):
+                return HostPortPair(host, port)
+            case _:
+                addr_data_parts = addr_data.split(":")
+                return HostPortPair(addr_data_parts[0], int(addr_data_parts[1]))
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Self:
@@ -1518,19 +1639,22 @@ class RedisProfileTarget:
                 target: RedisTarget(**cfg) for target, cfg in data["override_configs"].items()
             }
 
+            for key in override_targets.keys():
+                target = override_targets[key]
+                target.addr = RedisProfileTarget._parse_addr(target.addr)
+
         addr = None
-        # TODO: Remove this match statement after pydantic migration done.
-        if addr_data := data.get("addr"):
-            if isinstance(addr_data, HostPortPair):
-                addr = HostPortPair(addr_data.host, addr_data.port)
-            elif isinstance(addr_data, Mapping):
-                addr = HostPortPair(addr_data["host"], addr_data["port"])
-            else:
-                addr_data = addr_data.split(":")
-                addr = HostPortPair(addr_data[0], int(addr_data[1]))
+        if data.get("addr"):
+            addr = RedisProfileTarget._parse_addr(data.get("addr"))
+
+        sentinel = data.get("sentinel")
+        if sentinel:
+            if isinstance(sentinel, list):
+                sentinel = [HostPortPair(s["host"], s["port"]) for s in sentinel]
+
         return cls(
             addr=addr,
-            sentinel=data.get("sentinel"),
+            sentinel=sentinel,
             service_name=data.get("service_name"),
             password=data.get("password"),
             redis_helper_config=data.get("redis_helper_config"),
@@ -1538,10 +1662,10 @@ class RedisProfileTarget:
         )
 
 
-def safe_print_redis_target(config: RedisTarget) -> str:
-    safe_config = config.copy()
-    if "password" in safe_config:
-        safe_config["password"] = "********"
+def safe_print_redis_config(config: RedisConfig) -> str:
+    safe_config = copy.deepcopy(config)
+    if config.password:
+        safe_config.password = "********"
     return str(safe_config)
 
 

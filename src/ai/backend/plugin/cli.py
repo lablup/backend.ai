@@ -5,7 +5,7 @@ import itertools
 import json
 import logging
 from collections import defaultdict
-from typing import Any, Self
+from typing import Self
 
 import click
 import colorama
@@ -36,14 +36,7 @@ class CLIContext:
         self.log_level = log_level
 
     def __enter__(self) -> Self:
-        log_config: dict[str, Any] = {}
-        if self.log_level != LogLevel.NOTSET:
-            log_config["level"] = self.log_level
-            log_config["pkg-ns"] = {
-                "": LogLevel.WARNING,
-                "ai.backend": self.log_level,
-            }
-        self._logger = LocalLogger(log_config)
+        self._logger = LocalLogger(log_level=self.log_level)
         self._logger.__enter__()
         return self
 

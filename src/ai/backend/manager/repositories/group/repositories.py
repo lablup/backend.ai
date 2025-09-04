@@ -3,7 +3,7 @@ from typing import Self
 
 from ai.backend.manager.repositories.group.admin_repository import AdminGroupRepository
 from ai.backend.manager.repositories.group.repository import GroupRepository
-from ai.backend.manager.repositories.image.repositories import RepositoryArgs
+from ai.backend.manager.repositories.types import RepositoryArgs
 
 
 @dataclass

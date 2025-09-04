@@ -8,6 +8,7 @@ from sqlalchemy.orm import load_only, noload
 
 from ai.backend.common.types import ResourceSlot, SessionResult, SessionTypes
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.session.types import SessionStatus
 
 from ..models import (
     DefaultForUnspecified,
@@ -19,7 +20,6 @@ from ..models import (
     SessionRow,
     UserRow,
 )
-from ..models.session import SessionStatus
 from ..models.utils import execute_with_retry
 from .types import PredicateResult, SchedulingContext
 

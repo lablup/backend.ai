@@ -13,6 +13,7 @@ from dateutil.relativedelta import relativedelta
 from pydantic import (
     AfterValidator,
     BaseModel,
+    ConfigDict,
     DirectoryPath,
     Field,
     GetCoreSchemaHandler,
@@ -227,6 +228,8 @@ class HostPortPair(BaseModel):
     )
 
     _allow_blank_host: ClassVar[bool] = True
+
+    model_config = ConfigDict(frozen=True)
 
     @model_validator(mode="before")
     @classmethod

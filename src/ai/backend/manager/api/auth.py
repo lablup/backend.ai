@@ -9,6 +9,7 @@ from contextlib import ExitStack
 from datetime import datetime, timedelta
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Final, Iterable, Mapping, Tuple
+from urllib.parse import urlparse
 
 import aiohttp_cors
 import sqlalchemy as sa
@@ -360,12 +361,18 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
                 # read the whole body if neither streaming nor bodyless
                 body = await request.read()
         body_hash = hashlib.new(hash_type, body).hexdigest()
+        path = request.raw_path
+        host = request.host
+        if upstream_url := request.headers.get("X-Forwarded-URL", None):
+            parsed_url = urlparse(upstream_url)
+            path = parsed_url.path
+            host = parsed_url.netloc
 
         sign_bytes = "{0}\n{1}\n{2}\nhost:{3}\ncontent-type:{4}\nx-{name}-version:{5}\n{6}".format(
             request.method,
-            str(request.raw_path),
+            str(path),
             request["raw_date"],
-            request.host,
+            host,
             request.content_type,
             api_version,
             body_hash,
@@ -374,7 +381,7 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
         sign_key = hmac.new(
             secret_key.encode(), request["date"].strftime("%Y%m%d").encode(), hash_type
         ).digest()
-        sign_key = hmac.new(sign_key, request.host.encode(), hash_type).digest()
+        sign_key = hmac.new(sign_key, host.encode(), hash_type).digest()
         return hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
     except ValueError:
         raise AuthorizationFailed("Invalid signature")
@@ -538,25 +545,26 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
         request.update(auth_result)
 
     with ExitStack() as stack:
-        user_id = request.get("user", {}).get("uuid")
-        if user_id is not None:
-            stack.enter_context(
-                with_user(
-                    UserData(
-                        user_id=user_id,
-                        is_authorized=request.get("is_authorized", False),
-                        is_admin=request.get("is_admin", False),
-                        is_superadmin=request.get("is_superadmin", False),
-                        role=request["user"]["role"],
-                        domain_name=request["user"]["domain_name"],
+        if user := request.get("user"):
+            user_id = user.get("uuid")
+            if user_id is not None:
+                stack.enter_context(
+                    with_user(
+                        UserData(
+                            user_id=user_id,
+                            is_authorized=request.get("is_authorized", False),
+                            is_admin=request.get("is_admin", False),
+                            is_superadmin=request.get("is_superadmin", False),
+                            role=request["user"]["role"],
+                            domain_name=request["user"]["domain_name"],
+                        )
                     )
                 )
-            )
-            stack.enter_context(
-                with_log_context_fields({
-                    "user_id": str(user_id),
-                })
-            )
+                stack.enter_context(
+                    with_log_context_fields({
+                        "user_id": str(user_id),
+                    })
+                )
         # No matter if authenticated or not, pass-through to the handler.
         # (if it's required, `auth_required` decorator will handle the situation.)
         return await handler(request)
@@ -567,6 +575,18 @@ def auth_required(handler):
     async def wrapped(request, *args, **kwargs):
         if request.get("is_authorized", False):
             return await handler(request, *args, **kwargs)
+        raise AuthorizationFailed("Unauthorized access")
+
+    set_handler_attr(wrapped, "auth_required", True)
+    set_handler_attr(wrapped, "auth_scope", "user")
+    return wrapped
+
+
+def auth_required_for_method(method):
+    @functools.wraps(method)
+    async def wrapped(self, request, *args, **kwargs):
+        if request.get("is_authorized", False):
+            return await method(self, request, *args, **kwargs)
         raise AuthorizationFailed("Unauthorized access")
 
     set_handler_attr(wrapped, "auth_required", True)

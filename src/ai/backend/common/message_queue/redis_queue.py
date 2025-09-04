@@ -3,7 +3,7 @@ import hashlib
 import logging
 import socket
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, Mapping, Optional, Self
+from typing import Any, AsyncGenerator, Final, Mapping, Optional, Self
 
 import glide
 from aiotools.server import process_index
@@ -14,13 +14,13 @@ from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from .queue import AbstractMessageQueue
-from .types import BroadcastMessage, MessageId, MQMessage
+from .types import BroadcastMessage, BroadcastPayload, MessageId, MQMessage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _DEFAULT_AUTOCLAIM_IDLE_TIMEOUT = 300_000  # 5 minutes
 _DEFAULT_AUTOCLAIM_INTERVAL = 60_000
-_DEFAULT_READ_BLOCK_MS = 10_000  # 10 second
+_DEFAULT_READ_BLOCK_MS: Final[int] = 10_000  # 10 second
 _DEFAULT_READ_COUNT = 64
 
 
@@ -80,7 +80,7 @@ class RedisQueue(AbstractMessageQueue):
     @classmethod
     async def create(cls, redis_target: RedisTarget, args: RedisMQArgs) -> Self:
         client = await ValkeyStreamClient.create(
-            redis_target,
+            redis_target.to_valkey_target(),
             human_readable_name="event_producer.stream",
             db_id=args.db,
             pubsub_channels=args.subscribe_channels,
@@ -129,6 +129,15 @@ class RedisQueue(AbstractMessageQueue):
         if self._closed:
             raise RuntimeError("Queue is closed")
         return await self._client.fetch_cached_broadcast_message(cache_id)
+
+    async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
+        """
+        Broadcast multiple messages in a batch with optional caching.
+        This method broadcasts multiple messages to all subscribers.
+        """
+        if self._closed:
+            raise RuntimeError("Queue is closed")
+        await self._client.broadcast_batch(self._broadcast_channel, events)
 
     async def consume_queue(self) -> AsyncGenerator[MQMessage, None]:  # type: ignore
         """
@@ -227,8 +236,11 @@ class RedisQueue(AbstractMessageQueue):
 
     async def _read_messages_loop(self, stream_key: str) -> None:
         log.info("Starting read messages loop for stream {}", stream_key)
+        target = self._redis_target.to_valkey_target()
+        # Set the request timeout to be longer than the read block time
+        target.request_timeout = (_DEFAULT_READ_BLOCK_MS // 1000) + 1  # add 1 second buffer
         client = await ValkeyStreamClient.create(
-            self._redis_target,
+            target,
             human_readable_name="event_producer.stream",
             db_id=REDIS_STREAM_DB,
         )

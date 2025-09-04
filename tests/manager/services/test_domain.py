@@ -1,13 +1,20 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, AsyncGenerator
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.data.domain.types import (
+    DomainCreator,
+    DomainData,
+    DomainModifier,
+    DomainNodeModifier,
+    UserInfo,
+)
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -42,16 +49,9 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
-from ai.backend.manager.services.domain.types import (
-    DomainCreator,
-    DomainData,
-    DomainModifier,
-    DomainNodeModifier,
-    UserInfo,
-)
 from ai.backend.manager.types import OptionalState, TriState
 
-from .test_utils import TestScenario
+from .utils import ScenarioBase
 
 
 @pytest.fixture
@@ -63,6 +63,11 @@ def processors(database_fixture, database_engine) -> DomainProcessors:
         valkey_stat_client=MagicMock(),  # Not used by DomainRepositories
     )
     domain_repositories = DomainRepositories.create(repository_args)
+
+    # Create mock for _role_manager
+    mock_role_manager = MagicMock()
+    mock_role_manager.create_system_role = AsyncMock(return_value=None)
+    domain_repositories.repository._role_manager = mock_role_manager
     domain_service = DomainService(
         repository=domain_repositories.repository,
         admin_repository=domain_repositories.admin_repository,
@@ -125,7 +130,7 @@ async def create_domain(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Create a domain node",
             CreateDomainNodeAction(
                 creator=DomainCreator(
@@ -161,7 +166,7 @@ async def create_domain(
                 description="domain test-create-domain-node created",
             ),
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Create domain node with duplicated name",
             CreateDomainNodeAction(
                 creator=DomainCreator(
@@ -180,7 +185,7 @@ async def create_domain(
 )
 async def test_create_domain_node(
     processors: DomainProcessors,
-    test_scenario: TestScenario[CreateDomainNodeAction, CreateDomainNodeActionResult],
+    test_scenario: ScenarioBase[CreateDomainNodeAction, CreateDomainNodeActionResult],
 ) -> None:
     await test_scenario.test(processors.create_domain_node.wait_for_complete)
 
@@ -189,7 +194,7 @@ async def test_create_domain_node(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Modify a domain node",
             ModifyDomainNodeAction(
                 name="test-modify-domain-node",
@@ -219,7 +224,7 @@ async def test_create_domain_node(
                 description="domain test-modify-domain-node modified",
             ),
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Modify a domain not exists",
             ModifyDomainNodeAction(
                 name="not-exist-domain",
@@ -234,7 +239,7 @@ async def test_create_domain_node(
             ),
             ValueError,
         ),
-        TestScenario.failure(
+        ScenarioBase.failure(
             "Modify a domain without enough permission",
             ModifyDomainNodeAction(
                 name="not-exist-domain",
@@ -253,7 +258,7 @@ async def test_create_domain_node(
 )
 async def test_modify_domain_node(
     processors: DomainProcessors,
-    test_scenario: TestScenario[ModifyDomainNodeAction, ModifyDomainNodeActionResult],
+    test_scenario: ScenarioBase[ModifyDomainNodeAction, ModifyDomainNodeActionResult],
     database_engine,
 ) -> None:
     async with create_domain(database_engine, "test-modify-domain-node"):
@@ -264,7 +269,7 @@ async def test_modify_domain_node(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Create a domain",
             CreateDomainAction(
                 creator=DomainCreator(
@@ -294,7 +299,7 @@ async def test_modify_domain_node(
                 description="domain creation succeed",
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Create a domain with duplicated name, return none",
             CreateDomainAction(
                 creator=DomainCreator(
@@ -313,7 +318,7 @@ async def test_modify_domain_node(
                 description="integrity error",
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Create a domain with empty name, return failure",
             CreateDomainAction(
                 creator=DomainCreator(
@@ -332,7 +337,7 @@ async def test_modify_domain_node(
                 description="domain creation failed",
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Create a domain with complex resource slots",
             CreateDomainAction(
                 creator=DomainCreator(
@@ -379,7 +384,7 @@ async def test_modify_domain_node(
 )
 async def test_create_domain(
     processors: DomainProcessors,
-    test_scenario: TestScenario[CreateDomainAction, CreateDomainActionResult],
+    test_scenario: ScenarioBase[CreateDomainAction, CreateDomainActionResult],
 ) -> None:
     await test_scenario.test(processors.create_domain.wait_for_complete)
 
@@ -407,7 +412,7 @@ async def test_create_model_store_after_domain_created(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Modify domain",
             ModifyDomainAction(
                 domain_name="test-modify-domain",
@@ -437,7 +442,7 @@ async def test_create_model_store_after_domain_created(
                 description="domain modification succeed",
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Modify a domain not exists",
             ModifyDomainAction(
                 domain_name="not-exist-domain",
@@ -456,7 +461,7 @@ async def test_create_model_store_after_domain_created(
                 description="domain not found",
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Modify domain deactivation",
             ModifyDomainAction(
                 domain_name="test-modify-domain-deactivate",
@@ -486,7 +491,7 @@ async def test_create_model_store_after_domain_created(
                 description="domain modification succeed",
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Modify domain with nullify fields",
             ModifyDomainAction(
                 domain_name="test-modify-domain-nullify",
@@ -521,7 +526,7 @@ async def test_create_model_store_after_domain_created(
 )
 async def test_modify_domain(
     processors: DomainProcessors,
-    test_scenario: TestScenario[ModifyDomainAction, ModifyDomainActionResult],
+    test_scenario: ScenarioBase[ModifyDomainAction, ModifyDomainActionResult],
     database_engine,
 ) -> None:
     test_domain_name = test_scenario.input.domain_name
@@ -536,7 +541,7 @@ async def test_modify_domain(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Delete a domain",
             DeleteDomainAction(
                 name="test-delete-domain",
@@ -551,7 +556,7 @@ async def test_modify_domain(
                 description="domain test-delete-domain deleted successfully",
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Delete a domain not exists",
             DeleteDomainAction(
                 name="not-exist-domain",
@@ -570,7 +575,7 @@ async def test_modify_domain(
 )
 async def test_delete_domain(
     processors: DomainProcessors,
-    test_scenario: TestScenario[DeleteDomainAction, DeleteDomainActionResult],
+    test_scenario: ScenarioBase[DeleteDomainAction, DeleteDomainActionResult],
     database_engine,
 ) -> None:
     async with create_domain(database_engine, "test-delete-domain"):
@@ -617,7 +622,7 @@ async def test_delete_domain_in_db(
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Purge a domain",
             PurgeDomainAction(
                 name="test-purge-domain",
@@ -632,7 +637,7 @@ async def test_delete_domain_in_db(
                 description="domain test-purge-domain purged successfully",
             ),
         ),
-        TestScenario.success(
+        ScenarioBase.success(
             "Purge a domain not exists",
             PurgeDomainAction(
                 name="not-exist-domain",
@@ -651,7 +656,7 @@ async def test_delete_domain_in_db(
 )
 async def test_purge_domain(
     processors: DomainProcessors,
-    test_scenario: TestScenario[PurgeDomainAction, PurgeDomainActionResult],
+    test_scenario: ScenarioBase[PurgeDomainAction, PurgeDomainActionResult],
     database_engine,
 ) -> None:
     async with create_domain(database_engine, "test-purge-domain"):

@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Optional
 from uuid import UUID
 
-from ai.backend.manager.models.session import SessionStatus
+from ai.backend.manager.data.session.types import SessionStatus
 
 
 @dataclass

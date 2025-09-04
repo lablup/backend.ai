@@ -4,6 +4,7 @@ from typing import Any, Self
 
 from pydantic import BaseModel, Field
 
+from ai.backend.logging.config import LoggingConfig
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.config.unified import (
     DatabaseConfig,
@@ -46,8 +47,8 @@ class BootstrapConfig(BaseModel):
         Includes network settings, process management, and service parameters.
         """,
     )
-    logging: Any = Field(
-        default_factory=lambda: {},
+    logging: LoggingConfig = Field(
+        default_factory=LoggingConfig,
         description="""
         Logging system configuration.
         Controls how logs are formatted, filtered, and stored.
@@ -90,7 +91,6 @@ class BootstrapConfig(BaseModel):
             overrides += [
                 (("logging", "level"), log_level),
                 (("logging", "pkg-ns", "ai.backend"), log_level),
-                (("logging", "pkg-ns", "aiohttp"), log_level),
             ]
 
         file_loader = TomlConfigLoader(config_path, "manager")

@@ -9,13 +9,13 @@ from ai.backend.manager.services.container_registry.processors import ContainerR
 from ...fixtures import (
     CONTAINER_REGISTRY_FIXTURE_DICT,
 )
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Success Case",
             GetContainerRegistriesAction(),
             GetContainerRegistriesActionResult(
@@ -43,6 +43,6 @@ from ...test_utils import TestScenario
 )
 async def test_get_container_registries(
     processors: ContainerRegistryProcessors,
-    test_scenario: TestScenario[GetContainerRegistriesAction, GetContainerRegistriesActionResult],
+    test_scenario: ScenarioBase[GetContainerRegistriesAction, GetContainerRegistriesActionResult],
 ):
     await test_scenario.test(processors.get_container_registries.wait_for_complete)

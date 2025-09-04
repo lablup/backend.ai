@@ -15,7 +15,7 @@ from ...fixtures import (
     IMAGE_FIXTURE_DATA,
     IMAGE_FIXTURE_DICT,
 )
-from ...test_utils import TestScenario
+from ...utils import ScenarioBase
 
 EXPECTED_IMAGE_DATA = copy.deepcopy(IMAGE_FIXTURE_DATA)
 # Intrinsic cpu, and mem resource limits exist.
@@ -25,7 +25,7 @@ EXPECTED_IMAGE_DATA.resources.resources_data.pop(SlotName("cuda.device"))
 @pytest.mark.parametrize(
     "test_scenario",
     [
-        TestScenario.success(
+        ScenarioBase.success(
             "Success Case",
             ClearImageCustomResourceLimitAction(
                 image_canonical=IMAGE_FIXTURE_DATA.name,
@@ -49,7 +49,7 @@ EXPECTED_IMAGE_DATA.resources.resources_data.pop(SlotName("cuda.device"))
 )
 async def test_clear_image_custom_resource_limit(
     processors: ImageProcessors,
-    test_scenario: TestScenario[
+    test_scenario: ScenarioBase[
         ClearImageCustomResourceLimitAction, ClearImageCustomResourceLimitActionResult
     ],
 ):

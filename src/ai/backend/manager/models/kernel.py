@@ -26,7 +26,6 @@ from sqlalchemy.orm import foreign, load_only, noload, relationship, selectinloa
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
-    CIStrEnum,
     ClusterMode,
     KernelId,
     ResourceSlot,
@@ -36,7 +35,21 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.kernel.types import KernelData
+from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.kernel.types import (
+    ClusterConfig,
+    ImageInfo,
+    KernelInfo,
+    KernelStatus,
+    LifecycleStatus,
+    Metadata,
+    Metrics,
+    NetworkConfig,
+    RelatedSessionInfo,
+    ResourceInfo,
+    RuntimeConfig,
+    UserPermission,
+)
 
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -84,7 +97,6 @@ __all__ = (
     "KernelRow",
     "KERNEL_STATUS_TRANSITION_MAP",
     "KernelStatistics",
-    "KernelStatus",
     "AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES",
     "USER_RESOURCE_OCCUPYING_KERNEL_STATUSES",
     "RESOURCE_USAGE_KERNEL_STATUSES",
@@ -94,43 +106,6 @@ __all__ = (
 )
 
 log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
-
-
-class KernelStatus(CIStrEnum):
-    # values are only meaningful inside the manager
-    PENDING = "PENDING"
-    # ---
-    SCHEDULED = "SCHEDULED"
-    PREPARING = "PREPARING"
-    # ---
-    BUILDING = "BUILDING"
-    PULLING = "PULLING"
-    PREPARED = "PREPARED"
-    CREATING = "CREATING"
-    # ---
-    RUNNING = "RUNNING"
-    RESTARTING = "RESTARTING"
-    RESIZING = "RESIZING"
-    SUSPENDED = "SUSPENDED"
-    # ---
-    TERMINATING = "TERMINATING"
-    TERMINATED = "TERMINATED"
-    ERROR = "ERROR"
-    CANCELLED = "CANCELLED"
-
-    @classmethod
-    def having_containers(cls) -> set[KernelStatus]:
-        return {
-            cls.PULLING,
-            cls.CREATING,
-            cls.RUNNING,
-        }
-
-    def have_container(self) -> bool:
-        """
-        Check if the current status is one of the statuses that have containers.
-        """
-        return self in KernelStatus.having_containers()
 
 
 # statuses to consider when calculating current resource usage
@@ -150,7 +125,6 @@ USER_RESOURCE_OCCUPYING_KERNEL_STATUSES = tuple(
     for e in KernelStatus
     if e
     not in (
-        KernelStatus.TERMINATING,
         KernelStatus.TERMINATED,
         KernelStatus.PENDING,
         KernelStatus.CANCELLED,
@@ -584,73 +558,6 @@ class KernelRow(Base):
         foreign_keys="KernelRow.user_uuid",
     )
 
-    @classmethod
-    def from_dataclass(cls, data: KernelData) -> KernelRow:
-        raise NotImplementedError("KernelRow.from_dataclass() is not implemented.")
-
-    def to_dataclass(self) -> KernelData:
-        return KernelData(
-            id=self.id,
-            session_id=self.session_id,
-            session_creation_id=self.session_creation_id,
-            session_name=self.session_name,
-            session_type=self.session_type,
-            cluster_mode=self.cluster_mode,
-            cluster_size=self.cluster_size,
-            cluster_role=self.cluster_role,
-            cluster_idx=self.cluster_idx,
-            local_rank=self.local_rank,
-            cluster_hostname=self.cluster_hostname,
-            uid=self.uid,
-            main_gid=self.main_gid,
-            gids=self.gids,
-            scaling_group=self.scaling_group,
-            agent=self.agent_row.to_dataclass() if getattr(self, "agent_row", None) else None,
-            agent_addr=self.agent_addr,
-            domain_name=self.domain_name,
-            group_id=self.group_id,
-            user_uuid=self.user_uuid,
-            access_key=self.access_key,
-            image=self.image,
-            architecture=self.architecture,
-            registry=self.registry,
-            tag=self.tag,
-            container_id=self.container_id,
-            occupied_slots=self.occupied_slots,
-            requested_slots=self.requested_slots,
-            occupied_shares=self.occupied_shares,
-            environ=self.environ,
-            mounts=self.mounts,
-            mount_map=self.mount_map,
-            vfolder_mounts=self.vfolder_mounts,
-            attached_devices=self.attached_devices,
-            resource_opts=self.resource_opts,
-            bootstrap_script=self.bootstrap_script,
-            kernel_host=self.kernel_host or self.agent_addr,
-            repl_in_port=self.repl_in_port,
-            repl_out_port=self.repl_out_port,
-            stdin_port=self.stdin_port,
-            stdout_port=self.stdout_port,
-            service_ports=self.service_ports,
-            preopen_ports=self.preopen_ports,
-            use_host_network=self.use_host_network,
-            created_at=self.created_at,
-            terminated_at=self.terminated_at,
-            starts_at=self.starts_at,
-            status=self.status,
-            status_changed=self.status_changed,
-            status_info=self.status_info,
-            status_data=self.status_data,
-            status_history=self.status_history,
-            callback_url=str(self.callback_url) if self.callback_url else None,
-            startup_command=self.startup_command,
-            result=self.result,
-            internal_data=self.internal_data,
-            container_log=self.container_log,
-            num_queries=self.num_queries,
-            last_stat=self.last_stat,
-        )
-
     @property
     def image_ref(self) -> ImageRef | None:
         return self.image_row.image_ref if self.image_row else None
@@ -696,8 +603,19 @@ class KernelRow(Base):
     @staticmethod
     async def batch_load_by_session_id(
         session: SASession, session_ids: list[uuid.UUID]
-    ) -> list["KernelRow"]:
+    ) -> list[KernelRow]:
         query = sa.select(KernelRow).where(KernelRow.session_id.in_(session_ids))
+        return (await session.execute(query)).scalars().all()
+
+    @staticmethod
+    async def batch_load_main_kernels_by_session_id(
+        session: SASession, session_ids: list[uuid.UUID]
+    ) -> list[KernelRow]:
+        query = (
+            sa.select(KernelRow)
+            .where(KernelRow.session_id.in_(session_ids))
+            .where(KernelRow.cluster_role == DEFAULT_ROLE)
+        )
         return (await session.execute(query)).scalars().all()
 
     @staticmethod
@@ -895,6 +813,163 @@ class KernelRow(Base):
             return True
 
         return await execute_with_retry(_update)
+
+    @classmethod
+    def from_kernel_info(cls, info: KernelInfo) -> Self:
+        return cls(
+            id=info.id,
+            session_id=uuid.UUID(info.session.session_id),
+            session_creation_id=info.session.creation_id,
+            session_name=info.session.name,
+            session_type=info.session.session_type,
+            cluster_mode=info.cluster.cluster_mode,
+            cluster_size=info.cluster.cluster_size,
+            cluster_role=info.cluster.cluster_role,
+            cluster_idx=info.cluster.cluster_idx,
+            local_rank=info.cluster.local_rank,
+            cluster_hostname=info.cluster.cluster_hostname,
+            uid=info.user_permission.uid,
+            main_gid=info.user_permission.main_gid,
+            gids=info.user_permission.gids,
+            scaling_group=info.resource.scaling_group,
+            agent=info.resource.agent,
+            agent_addr=info.resource.agent_addr,
+            domain_name=info.user_permission.domain_name,
+            group_id=info.user_permission.group_id,
+            user_uuid=info.user_permission.user_uuid,
+            access_key=info.user_permission.access_key,
+            image=info.image.identifier.canonical if info.image.identifier else None,
+            architecture=info.image.identifier.architecture if info.image.identifier else None,
+            registry=info.image.registry,
+            tag=info.image.tag,
+            container_id=info.resource.container_id,
+            occupied_slots=ResourceSlot(info.resource.occupied_slots),
+            requested_slots=ResourceSlot(info.resource.requested_slots),
+            occupied_shares=info.resource.occupied_shares,
+            environ=info.runtime.environ,
+            mounts=info.runtime.mounts,
+            mount_map=info.runtime.mount_map,
+            vfolder_mounts=info.runtime.vfolder_mounts,
+            attached_devices=info.resource.attached_devices,
+            resource_opts=info.resource.resource_opts,
+            bootstrap_script=info.runtime.bootstrap_script,
+            kernel_host=info.network.kernel_host,
+            repl_in_port=info.network.repl_in_port,
+            repl_out_port=info.network.repl_out_port,
+            stdin_port=info.network.stdin_port,
+            stdout_port=info.network.stdout_port,
+            service_ports=info.network.service_ports,
+            preopen_ports=info.network.preopen_ports,
+            use_host_network=info.network.use_host_network,
+            created_at=info.lifecycle.created_at or datetime.now(tzutc()),
+            terminated_at=info.lifecycle.terminated_at,
+            starts_at=info.lifecycle.starts_at,
+            status=info.lifecycle.status or KernelStatus.PENDING,
+            status_changed=info.lifecycle.status_changed or datetime.now(tzutc()),
+            status_info=info.lifecycle.status_info,
+            status_data=info.lifecycle.status_data,
+            status_history=info.lifecycle.status_history
+            or {
+                (info.lifecycle.status or KernelStatus.PENDING).name: (
+                    info.lifecycle.status_changed or datetime.now(tzutc())
+                ).isoformat()
+            },
+            callback_url=info.metadata.callback_url,
+            startup_command=info.runtime.startup_command,
+            result=info.lifecycle.result,
+            internal_data=info.metadata.internal_data,
+            container_log=info.metrics.container_log,
+            num_queries=info.metrics.num_queries,
+            last_stat=info.metrics.last_stat,
+        )
+
+    def to_kernel_info(self) -> KernelInfo:
+        return KernelInfo(
+            id=self.id,
+            session=RelatedSessionInfo(
+                session_id=str(self.session_id),
+                creation_id=self.session_creation_id,
+                name=self.session_name,
+                session_type=self.session_type,
+            ),
+            user_permission=UserPermission(
+                user_uuid=self.user_uuid,
+                access_key=self.access_key,
+                domain_name=self.domain_name,
+                group_id=self.group_id,
+                uid=self.uid,
+                main_gid=self.main_gid,
+                gids=self.gids,
+            ),
+            image=ImageInfo(
+                identifier=ImageIdentifier(
+                    canonical=self.image,
+                    architecture=self.architecture,
+                )
+                if self.image
+                else None,
+                registry=self.registry,
+                tag=self.tag,
+            ),
+            network=NetworkConfig(
+                kernel_host=self.kernel_host,
+                repl_in_port=self.repl_in_port,
+                repl_out_port=self.repl_out_port,
+                stdin_port=self.stdin_port,
+                stdout_port=self.stdout_port,
+                service_ports=self.service_ports,
+                preopen_ports=self.preopen_ports,
+                use_host_network=self.use_host_network,
+            ),
+            cluster=ClusterConfig(
+                cluster_mode=self.cluster_mode,
+                cluster_size=self.cluster_size,
+                cluster_role=self.cluster_role,
+                cluster_idx=self.cluster_idx,
+                local_rank=self.local_rank,
+                cluster_hostname=self.cluster_hostname,
+            ),
+            resource=ResourceInfo(
+                scaling_group=self.scaling_group,
+                agent=self.agent,
+                agent_addr=self.agent_addr,
+                container_id=self.container_id,
+                occupied_slots=self.occupied_slots,
+                requested_slots=self.requested_slots,
+                occupied_shares=self.occupied_shares,
+                attached_devices=self.attached_devices,
+                resource_opts=self.resource_opts,
+            ),
+            runtime=RuntimeConfig(
+                environ=self.environ,
+                mounts=self.mounts,
+                mount_map=self.mount_map,
+                vfolder_mounts=self.vfolder_mounts,
+                bootstrap_script=self.bootstrap_script,
+                startup_command=self.startup_command,
+            ),
+            lifecycle=LifecycleStatus(
+                status=self.status,
+                result=self.result,
+                created_at=self.created_at,
+                terminated_at=self.terminated_at,
+                starts_at=self.starts_at,
+                status_changed=self.status_changed,
+                status_info=self.status_info,
+                status_data=self.status_data,
+                status_history=self.status_history,
+                last_seen=self.last_seen,
+            ),
+            metrics=Metrics(
+                num_queries=self.num_queries,
+                last_stat=self.last_stat,
+                container_log=self.container_log,
+            ),
+            metadata=Metadata(
+                callback_url=self.callback_url,
+                internal_data=self.internal_data,
+            ),
+        )
 
 
 # For compatibility

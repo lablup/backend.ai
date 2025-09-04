@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Self
 
-from ai.backend.manager.repositories.image.repositories import RepositoryArgs
+from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 

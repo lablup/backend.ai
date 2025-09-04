@@ -1,5 +1,18 @@
 from dataclasses import dataclass
-from typing import Self, override
+from typing import TYPE_CHECKING, Optional, Self, override
+
+from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
+from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
+from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
+from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
+from ai.backend.manager.services.deployment.processors import DeploymentProcessors
+from ai.backend.manager.services.deployment.service import DeploymentService
+from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
+from ai.backend.manager.services.object_storage.service import ObjectStorageService
+
+if TYPE_CHECKING:
+    from ai.backend.manager.sokovan.deployment import DeploymentController
+    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -20,6 +33,8 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.artifact.processors import ArtifactProcessors
+from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
@@ -43,6 +58,7 @@ from ai.backend.manager.services.model_serving.processors.auto_scaling import (
 )
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
+    ModelServingServiceProtocol,
 )
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.manager.services.model_serving.services.model_serving import (
@@ -87,6 +103,8 @@ class ServiceArgs:
     idle_checker_host: IdleCheckerHost
     event_dispatcher: EventDispatcher
     hook_plugin_ctx: HookPluginContext
+    scheduling_controller: "SchedulingController"
+    deployment_controller: Optional["DeploymentController"]
 
 
 @dataclass
@@ -106,9 +124,14 @@ class Services:
     project_resource_policy: ProjectResourcePolicyService
     resource_preset: ResourcePresetService
     utilization_metric: UtilizationMetricService
-    model_serving: ModelServingService
+    model_serving: ModelServingServiceProtocol
     model_serving_auto_scaling: AutoScalingService
     auth: AuthService
+    object_storage: ObjectStorageService
+    artifact: ArtifactService
+    artifact_revision: ArtifactRevisionService
+    artifact_registry: ArtifactRegistryService
+    deployment: Optional[DeploymentService]
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -171,6 +194,7 @@ class Services:
                 idle_checker_host=args.idle_checker_host,
                 session_repository=repositories.session.repository,
                 admin_session_repository=repositories.session.admin_repository,
+                scheduling_controller=args.scheduling_controller,
             )
         )
         keypair_resource_policy_service = KeypairResourcePolicyService(
@@ -191,6 +215,8 @@ class Services:
         utilization_metric_service = UtilizationMetricService(
             args.config_provider, repositories.metric.repository
         )
+
+        # Use deployment-based model serving if deployment_controller is available
         model_serving_service = ModelServingService(
             agent_registry=args.agent_registry,
             background_task_manager=args.background_task_manager,
@@ -201,6 +227,7 @@ class Services:
             repository=repositories.model_serving.repository,
             admin_repository=repositories.model_serving.admin_repository,
         )
+
         model_serving_auto_scaling = AutoScalingService(
             repository=repositories.model_serving.repository,
             admin_repository=repositories.model_serving.admin_repository,
@@ -209,6 +236,39 @@ class Services:
             hook_plugin_ctx=args.hook_plugin_ctx,
             auth_repository=repositories.auth.repository,
         )
+        object_storage_service = ObjectStorageService(
+            artifact_repository=repositories.artifact.repository,
+            object_storage_repository=repositories.object_storage.repository,
+            storage_manager=args.storage_manager,
+            config_provider=args.config_provider,
+        )
+        artifact_service = ArtifactService(
+            artifact_repository=repositories.artifact.repository,
+            artifact_registry_repository=repositories.artifact_registry.repository,
+            storage_manager=args.storage_manager,
+            object_storage_repository=repositories.object_storage.repository,
+            huggingface_registry_repository=repositories.huggingface_registry.repository,
+            config_provider=args.config_provider,
+            reservoir_registry_repository=repositories.reservoir_registry.repository,
+        )
+        artifact_revision_service = ArtifactRevisionService(
+            artifact_repository=repositories.artifact.repository,
+            storage_manager=args.storage_manager,
+            object_storage_repository=repositories.object_storage.repository,
+            huggingface_registry_repository=repositories.huggingface_registry.repository,
+            reservoir_registry_repository=repositories.reservoir_registry.repository,
+            config_provider=args.config_provider,
+        )
+        artifact_registry_service = ArtifactRegistryService(
+            repositories.huggingface_registry.repository,
+            repositories.reservoir_registry.repository,
+            repositories.artifact_registry.repository,
+        )
+
+        # Initialize deployment service if controller is available
+        deployment_service = None
+        if args.deployment_controller is not None:
+            deployment_service = DeploymentService(args.deployment_controller)
 
         return cls(
             agent=agent_service,
@@ -229,6 +289,11 @@ class Services:
             model_serving=model_serving_service,
             model_serving_auto_scaling=model_serving_auto_scaling,
             auth=auth,
+            object_storage=object_storage_service,
+            artifact=artifact_service,
+            artifact_revision=artifact_revision_service,
+            artifact_registry=artifact_registry_service,
+            deployment=deployment_service,
         )
 
 
@@ -257,6 +322,11 @@ class Processors(AbstractProcessorPackage):
     model_serving: ModelServingProcessors
     model_serving_auto_scaling: ModelServingAutoScalingProcessors
     auth: AuthProcessors
+    object_storage: ObjectStorageProcessors
+    artifact: ArtifactProcessors
+    artifact_registry: ArtifactRegistryProcessors
+    artifact_revision: ArtifactRevisionProcessors
+    deployment: Optional[DeploymentProcessors]
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -295,6 +365,22 @@ class Processors(AbstractProcessorPackage):
             services.utilization_metric, action_monitors
         )
         auth = AuthProcessors(services.auth, action_monitors)
+        object_storage_processors = ObjectStorageProcessors(
+            services.object_storage, action_monitors
+        )
+        artifact_processors = ArtifactProcessors(services.artifact, action_monitors)
+        artifact_registry_processors = ArtifactRegistryProcessors(
+            services.artifact_registry, action_monitors
+        )
+        artifact_revision_processors = ArtifactRevisionProcessors(
+            services.artifact_revision, action_monitors
+        )
+
+        # Initialize deployment processors if service is available
+        deployment_processors = None
+        if services.deployment is not None:
+            deployment_processors = DeploymentProcessors(services.deployment, action_monitors)
+
         return cls(
             agent=agent_processors,
             domain=domain_processors,
@@ -314,6 +400,11 @@ class Processors(AbstractProcessorPackage):
             model_serving=model_serving_processors,
             model_serving_auto_scaling=model_serving_auto_scaling_processors,
             auth=auth,
+            object_storage=object_storage_processors,
+            artifact=artifact_processors,
+            artifact_registry=artifact_registry_processors,
+            artifact_revision=artifact_revision_processors,
+            deployment=deployment_processors,
         )
 
     @override
@@ -336,4 +427,10 @@ class Processors(AbstractProcessorPackage):
             *self.utilization_metric.supported_actions(),
             *self.model_serving.supported_actions(),
             *self.model_serving_auto_scaling.supported_actions(),
+            *self.auth.supported_actions(),
+            *self.object_storage.supported_actions(),
+            *self.artifact_registry.supported_actions(),
+            *self.artifact_revision.supported_actions(),
+            *self.artifact.supported_actions(),
+            *(self.deployment.supported_actions() if self.deployment else []),
         ]

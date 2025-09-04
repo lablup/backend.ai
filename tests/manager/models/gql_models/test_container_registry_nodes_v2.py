@@ -5,7 +5,7 @@ from graphene.test import Client
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
-from ai.backend.manager.models.gql import GraphQueryContext, Mutations, Queries
+from ai.backend.manager.models.gql import GraphQueryContext, Mutation, Query
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.server import database_ctx
 
@@ -66,7 +66,7 @@ FIXTURES_WITH_ASSOC = [
 
 @pytest.fixture(scope="module")
 def client() -> Client:
-    return Client(Schema(query=Queries, mutation=Mutations, auto_camelcase=False))
+    return Client(Schema(query=Query, mutation=Mutation, auto_camelcase=False))
 
 
 def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQueryContext:
@@ -81,6 +81,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         valkey_stat=None,  # type: ignore
         valkey_image=None,  # type: ignore
         valkey_live=None,  # type: ignore
+        valkey_schedule=None,  # type: ignore
         manager_status=None,  # type: ignore
         known_slot_types=None,  # type: ignore
         background_task_manager=None,  # type: ignore
@@ -91,6 +92,7 @@ def get_graphquery_context(database_engine: ExtendedAsyncSAEngine) -> GraphQuery
         services_ctx=None,  # type: ignore
         metric_observer=GraphQLMetricObserver.instance(),
         processors=None,  # type: ignore
+        scheduler_repository=None,  # type: ignore
     )
 
 

@@ -51,7 +51,7 @@ class TimerNodeContext:
 @dataclass
 class EtcdLockContext:
     namespace: str
-    addr: HostPortPair
+    addrs: list[HostPortPair]
     lock_name: str
 
 
@@ -209,7 +209,7 @@ def etcd_timer_node_process(
         match etcd_client:
             case "etcd-client-py":
                 etcd = AsyncEtcd(
-                    addr=etcd_ctx.addr,
+                    addrs=etcd_ctx.addrs,
                     namespace=etcd_ctx.namespace,
                     scope_prefix_map={
                         ConfigScopes.GLOBAL: "global",

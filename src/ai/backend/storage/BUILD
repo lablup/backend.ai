@@ -1,8 +1,8 @@
 python_sources(
     name="src",
+    sources=["**/*.py"],
     dependencies=[
         ":resources",
-        "src/ai/backend/common/logging.py:src",  # not auto-inferred (due to lazy-loading plugins)
     ],
 )
 

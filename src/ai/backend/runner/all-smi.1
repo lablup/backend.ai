@@ -1,0 +1,226 @@
+.TH ALL-SMI 1 "August 2025" "all-smi 0.9.0" "User Commands"
+.SH NAME
+all-smi \- Command-line utility for monitoring GPU hardware
+.SH SYNOPSIS
+.B all-smi
+[\fBlocal\fR] [\fIOPTIONS\fR]
+.br
+.B all-smi
+\fBview\fR --hosts \fIURL\fR... | --hostfile \fIFILE\fR [\fIOPTIONS\fR]
+.br
+.B all-smi
+\fBapi\fR [\fIOPTIONS\fR]
+.br
+.B all-smi
+\fBhelp\fR [\fICOMMAND\fR]
+.SH DESCRIPTION
+.B all-smi
+is a comprehensive hardware monitoring tool that provides real-time information about GPU/NPU utilization, 
+memory usage, temperature, power consumption, and other metrics. It supports various hardware platforms 
+including NVIDIA GPUs, Apple Silicon, NVIDIA Jetson, Tenstorrent NPUs, Rebellions NPUs, and Furiosa NPUs.
+
+The tool can run in three primary modes:
+.TP
+.B local mode
+An interactive TUI for monitoring local GPUs/NPUs (default when no command specified)
+.TP
+.B view mode
+An interactive TUI for monitoring remote nodes via API endpoints
+.TP
+.B api mode
+A Prometheus-compatible metrics endpoint for integration with monitoring systems
+.SH COMMANDS
+.TP
+.B local
+Run in local mode, monitoring local GPUs/NPUs with an interactive TUI. This is the default mode if no command is specified.
+Requires sudo permissions on macOS for Apple Silicon metrics.
+.TP
+.B view
+Run in remote view mode, monitoring remote nodes via API endpoints. Requires either --hosts or --hostfile option.
+Does not require sudo permissions.
+.TP
+.B api
+Run in API mode, exposing metrics in Prometheus format via HTTP endpoint.
+Requires sudo permissions on macOS for Apple Silicon metrics.
+.TP
+.B help
+Display help information about all-smi or a specific command.
+.SH OPTIONS
+.SS Common Options
+.TP
+.B \-h, \-\-help
+Display help information
+.TP
+.B \-V, \-\-version
+Display version information
+.SS Local Mode Options
+.TP
+.B \-i, \-\-interval \fISECONDS\fR
+The interval in seconds at which to update the hardware information.
+Default: 1 second (Apple Silicon) or 2 seconds (others)
+.SS View Mode Options (Remote Monitoring)
+.TP
+.B \-\-hosts \fIURL\fR...
+(Required) A list of host addresses to connect to for remote monitoring. Multiple hosts can be specified.
+Format: http://hostname:port or https://hostname:port
+.TP
+.B \-\-hostfile \fIFILE\fR
+(Required) A CSV file containing a list of host addresses to connect to for remote monitoring.
+The file should contain one URL per line. Either this or --hosts must be specified.
+.TP
+.B \-i, \-\-interval \fISECONDS\fR
+The interval in seconds at which to update the hardware information. 
+If not specified, uses adaptive interval based on node count:
+.RS
+.IP \(bu 3
+1-10 remote nodes: 3 seconds
+.IP \(bu 3
+11-50 remote nodes: 4 seconds
+.IP \(bu 3
+51-100 remote nodes: 5 seconds
+.IP \(bu 3
+101+ remote nodes: 6 seconds
+.RE
+.SS API Mode Options
+.TP
+.B \-p, \-\-port \fIPORT\fR
+The port to listen on for the API server (default: 9090)
+.TP
+.B \-i, \-\-interval \fISECONDS\fR
+The interval in seconds at which to update the hardware information (default: 3)
+.TP
+.B \-\-processes
+Include the process list in the API output
+.SH INTERACTIVE CONTROLS (LOCAL/VIEW MODE)
+.TP
+.B Tab / Shift+Tab
+Navigate between different tabs (GPU, CPU, Memory, Network, Disk)
+.TP
+.B Up/Down Arrow Keys, j/k
+Navigate through items in the current tab
+.TP
+.B Left/Right Arrow Keys, h/l
+Scroll horizontally when content exceeds screen width
+.TP
+.B Page Up/Page Down
+Scroll through items page by page
+.TP
+.B Home/End
+Jump to the first/last item
+.TP
+.B r
+Refresh the display immediately
+.TP
+.B d
+Toggle debug log visibility
+.TP
+.B q, Ctrl+C
+Quit the application
+.SH SUPPORTED PLATFORMS
+.TP
+.B NVIDIA GPUs
+Full support via nvidia-smi, including CUDA information, PCIe status, and performance states
+.TP
+.B Apple Silicon
+Native support for M1/M2/M3/M4 series with Metal API integration, ANE power monitoring, and thermal pressure tracking
+.TP
+.B NVIDIA Jetson
+Tegra-specific metrics with DLA (Deep Learning Accelerator) support
+.TP
+.B Tenstorrent NPUs
+Support for Grayskull and Wormhole architectures with multiple temperature sensors and clock domains
+.TP
+.B Rebellions NPUs
+Support for ATOM, ATOM+, and ATOM Max variants with PCIe Gen4 interface
+.TP
+.B Furiosa NPUs
+Support for RNGD architecture with 8-core NPUs and PE utilization tracking
+.TP
+.B x86 CPUs
+Intel and AMD CPU monitoring on Linux systems
+.SH API ENDPOINTS (API MODE)
+.TP
+.B /metrics
+Prometheus-compatible metrics endpoint with hardware statistics
+.TP
+.B /health
+Health check endpoint returning "OK"
+.SH EXAMPLES
+.TP
+Monitor local hardware in interactive TUI:
+.B all-smi
+.br
+or
+.br
+.B all-smi local
+.TP
+Start API server on default port 9090:
+.B all-smi api
+.TP
+Start API server on custom port with 5-second interval:
+.B all-smi api --port 8080 --interval 5
+.TP
+Monitor local hardware with custom interval:
+.B all-smi local --interval 5
+.TP
+Monitor remote hosts (requires API endpoints):
+.B all-smi view --hosts http://node1:9090 http://node2:9090
+.TP
+Monitor hosts from file:
+.B all-smi view --hostfile cluster_hosts.csv
+.TP
+Monitor remote cluster with custom interval:
+.B all-smi view --hostfile hosts.csv --interval 10
+.SH FILES
+.TP
+.I hosts.csv
+Example hostfile format for remote monitoring. One URL per line:
+.RS
+.nf
+http://node001:9090
+http://node002:9090
+https://node003:9443
+.fi
+.RE
+.SH ENVIRONMENT
+.TP
+.B RUST_LOG
+Set logging level (e.g., debug, info, warn, error)
+.SH NOTES
+.IP \(bu 3
+On macOS, sudo permissions are required for accessing hardware metrics via the powermetrics command
+.IP \(bu 3
+Remote monitoring requires the target hosts to be running all-smi in API mode
+.IP \(bu 3
+The tool automatically detects available hardware and loads appropriate drivers
+.IP \(bu 3
+Connection limits are optimized for high-scale deployments (128+ nodes)
+.SH EXIT STATUS
+.TP
+.B 0
+Successful execution
+.TP
+.B 1
+General error or invalid arguments
+.TP
+.B 130
+Interrupted by Ctrl+C (SIGINT)
+.TP
+.B 143
+Terminated by SIGTERM
+.SH BUGS
+Report bugs at: https://github.com/inureyes/all-smi/issues
+.SH AUTHOR
+Written by Jeongkyu Shin <inureyes@gmail.com>
+.SH COPYRIGHT
+Copyright (C) 2025 Jeongkyu Shin.
+.br
+License: MIT OR Apache-2.0
+.br
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
+.SH SEE ALSO
+.BR nvidia-smi (1),
+.BR powermetrics (1)
+
+Project homepage: https://github.com/inureyes/all-smi

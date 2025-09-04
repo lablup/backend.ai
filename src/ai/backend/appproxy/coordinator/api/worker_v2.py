@@ -14,9 +14,9 @@ from aiohttp import web
 from dateutil.tz import tzutc
 from pydantic import BaseModel, Field
 
+from ai.backend.appproxy.common.config import get_default_redis_key_ttl
 from ai.backend.appproxy.common.events import DoCheckWorkerLostEvent, WorkerLostEvent
 from ai.backend.appproxy.common.exceptions import ObjectNotFound
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     AppMode,
     CORSOptions,
@@ -35,6 +35,7 @@ from ai.backend.common import redis_helper
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.types import AgentId
+from ai.backend.logging import BraceStyleAdapter
 
 from ..models import Token, Worker, WorkerAppFilter, WorkerStatus
 from ..models.utils import execute_with_txn_retry
@@ -43,6 +44,8 @@ from .types import CircuitListResponseModel, SlotModel, StubResponseModel
 from .utils import auth_required
 
 if TYPE_CHECKING:
+    from redis.asyncio import Redis
+    from redis.asyncio.client import Pipeline
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -295,10 +298,18 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
         result["slots"] = [
             SlotModel(**dataclasses.asdict(s)) for s in (await worker.list_slots(sess))
         ]
+
         # Update "last seen" timestamp for liveness tracking
+        def _hset_with_expiration(r: Redis) -> Pipeline:
+            pipe = r.pipeline(transaction=False)
+            pipe.hset("proxy-worker.last_seen", worker.authority, now.timestamp())
+            ttl = get_default_redis_key_ttl()
+            pipe.expire("proxy-worker.last_seen", ttl)
+            return pipe
+
         await redis_helper.execute(
             root_ctx.redis_live,
-            lambda r: r.hset("proxy-worker.last_seen", worker.authority, now.timestamp()),
+            _hset_with_expiration,
         )
         return result
 

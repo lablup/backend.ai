@@ -18,7 +18,6 @@ from ai.backend.appproxy.common.exceptions import (
     PortNotAvailable,
     WorkerNotAvailable,
 )
-from ai.backend.appproxy.common.logging_utils import BraceStyleAdapter
 from ai.backend.appproxy.common.types import (
     AppMode,
     EndpointConfig,
@@ -28,6 +27,7 @@ from ai.backend.appproxy.common.types import (
     SessionConfig,
     Slot,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from .base import Base, BaseMixin, EnumType, ForeignKeyIDColumn, IDColumn, StrEnumType
 from .circuit import Circuit
@@ -256,7 +256,7 @@ class Worker(Base, BaseMixin):
                         subdomain=c.subdomain,
                         circuit_id=c.id,
                     )
-                    for c in self.circuits
+                    for c in circuits
                 ]
             case _:
                 raise ValueError(f"Invalid frontend mode: {self.frontend_mode}")

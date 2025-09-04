@@ -1,7 +1,6 @@
 import enum
-import uuid
 from abc import ABC, abstractmethod
-from typing import Optional, Self, override
+from typing import Optional, Self, final, override
 
 from ai.backend.common.message_queue.types import MessagePayload
 
@@ -13,6 +12,7 @@ __all__ = (
     "AbstractEvent",
     "AbstractAnycastEvent",
     "AbstractBroadcastEvent",
+    "BatchBroadcastEvent",
 )
 
 
@@ -26,10 +26,28 @@ class EventDomain(enum.StrEnum):
     IDLE_CHECK = "idle_check"
     SESSION = "session"
     AGENT = "agent"
+    ARTIFACT = "artifact"
     VFOLDER = "vfolder"
     VOLUME = "volume"
     LOG = "log"
     WORKFLOW = "workflow"
+
+
+class EventCacheDomain(enum.StrEnum):
+    """
+    Enum for event cache domains.
+    This is used to identify the domain of the cached event.
+    """
+
+    BGTASK = "bgtask"
+    SESSION_SCHEDULER = "session_scheduler"
+
+    def cache_id(self, id: str) -> str:
+        """
+        Return the cache ID for the event.
+        The cache ID is a string that identifies the cached event.
+        """
+        return f"{self.value}.{id}"
 
 
 class DeliveryPattern(enum.StrEnum):
@@ -63,7 +81,7 @@ class AbstractEvent(ABC):
 
     @classmethod
     @abstractmethod
-    def event_domain(self) -> EventDomain:
+    def event_domain(cls) -> EventDomain:
         """
         Return the event domain.
         """
@@ -137,18 +155,49 @@ class AbstractBroadcastEvent(AbstractEvent):
     def delivery_pattern(cls) -> DeliveryPattern:
         return DeliveryPattern.BROADCAST
 
-
-class EventCacheDomain(enum.StrEnum):
-    """
-    Enum for event cache domains.
-    This is used to identify the domain of the cached event.
-    """
-
-    BGTASK = "bgtask"
-
-    def cache_id(self, id: uuid.UUID) -> str:
+    def generate_events(self) -> list["AbstractBroadcastEvent"]:
         """
-        Return the cache ID for the event.
-        The cache ID is a string that identifies the cached event.
+        Generate events to be propagated through EventHub.
+        Default implementation returns just this event itself.
+        Subclasses can override to generate multiple events.
         """
-        return f"{self.value}.{str(id)}"
+        return [self]
+
+    @classmethod
+    def cache_domain(cls) -> Optional[EventCacheDomain]:
+        """
+        Return the event domain.
+        """
+        return None
+
+    @final
+    def cache_id(self) -> Optional[str]:
+        """
+        Return the cache ID for this event.
+        If None is returned, the event will not be cached.
+        Subclasses can override to provide a cache ID.
+        """
+        cache_domain = self.cache_domain()
+        if cache_domain is None:
+            return None
+        domain_id = self.domain_id()
+        if domain_id is None:
+            return None
+        return cache_domain.cache_id(domain_id)
+
+
+class BatchBroadcastEvent(AbstractBroadcastEvent):
+    """
+    An event that generates multiple individual events for propagation.
+    Subclasses should override generate_events() to create individual events.
+    """
+
+    @override
+    @abstractmethod
+    def generate_events(self) -> list[AbstractBroadcastEvent]:
+        """
+        Generate individual events to be propagated through EventHub.
+        Each generated event will be broadcast separately.
+        Must be overridden by subclasses to generate multiple events.
+        """
+        raise NotImplementedError
