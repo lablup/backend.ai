@@ -177,7 +177,7 @@ from datetime import datetime, timezone
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Union
 
 from pydantic import (
     AliasChoices,
@@ -1700,6 +1700,62 @@ class ServiceDiscoveryConfig(BaseModel):
     )
 
 
+class ReservoirObjectStorageConfig(BaseModel):
+    storage_type: Literal["object_storage"] = Field(
+        default="object_storage",
+        description="""
+        Type of the storage configuration.
+        This is used to identify the specific storage type.
+        """,
+        alias="type",
+    )
+    bucket_name: str = Field(
+        default="OBJECT_STORAGE_BUCKET_NAME",
+        description="""
+        Name of the bucket to use for the reservoir.
+        """,
+        examples=["minio-bucket"],
+        validation_alias=AliasChoices("bucket-name", "bucket_name"),
+        serialization_alias="bucket-name",
+    )
+
+
+StorageSpecificConfig = Union[ReservoirObjectStorageConfig]
+
+
+class ReservoirStorageConfig(BaseModel):
+    storage_name: str = Field(
+        default="RESERVOIR_STORAGE_NAME",
+        description="""
+        Name of the reservoir storage configuration.
+        Used to identify this storage in the system.
+        """,
+        examples=["minio-storage", "gitlfs-storage", "vfs-storage"],
+        validation_alias=AliasChoices("storage-name", "storage_name"),
+        serialization_alias="storage-name",
+    )
+    config: StorageSpecificConfig = Field(
+        default_factory=ReservoirObjectStorageConfig,
+        discriminator="storage_type",
+        description="""
+        Configuration for the storage.
+        """,
+    )
+
+
+class ModelRegistryConfig(BaseModel):
+    model_registry: str = Field(
+        default="MODEL_REGISTRY_NAME",
+        description="""
+        Name of the Model registry configuration.
+        Used to identify this registry in the system.
+        """,
+        examples=["model-registry"],
+        validation_alias=AliasChoices("model-registry", "model_registry"),
+        serialization_alias="model-registry",
+    )
+
+
 class ManagerUnifiedConfig(BaseModel):
     # From legacy local config
     db: DatabaseConfig = Field(
@@ -1872,6 +1928,21 @@ class ManagerUnifiedConfig(BaseModel):
         description="""
         Service discovery configuration.
         Controls how services are discovered and connected within the Backend.AI system.
+        """,
+    )
+    artifact_registry: ModelRegistryConfig = Field(
+        default_factory=ModelRegistryConfig,
+        description="""
+        Default artifact registry config.
+        """,
+        validation_alias=AliasChoices("artifact_registry", "artifact-registry"),
+        serialization_alias="artifact-registry",
+    )
+    reservoir: ReservoirStorageConfig = Field(
+        default_factory=ReservoirStorageConfig,
+        description="""
+        Reservoir storage configuration.
+        Controls which storage backend is used for the reservoir.
         """,
     )
 

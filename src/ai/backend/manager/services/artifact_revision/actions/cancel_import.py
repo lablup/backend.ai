@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.services.artifact_revision.actions.base import ArtifactRevisionAction
 
 
@@ -22,8 +23,8 @@ class CancelImportAction(ArtifactRevisionAction):
 
 @dataclass
 class CancelImportActionResult(BaseActionResult):
-    artifact_revision_id: uuid.UUID
+    result: ArtifactRevisionData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.artifact_revision_id)
+        return str(self.result.id)

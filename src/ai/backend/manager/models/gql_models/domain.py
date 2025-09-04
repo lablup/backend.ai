@@ -21,6 +21,13 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.types import ResourceSlot, Sentinel
+from ai.backend.manager.data.domain.types import (
+    DomainCreator,
+    DomainData,
+    DomainModifier,
+    DomainNodeModifier,
+    UserInfo,
+)
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_node import (
     CreateDomainNodeAction,
@@ -33,13 +40,6 @@ from ai.backend.manager.services.domain.actions.modify_domain_node import (
     ModifyDomainNodeActionResult,
 )
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
-from ai.backend.manager.services.domain.types import (
-    DomainCreator,
-    DomainData,
-    DomainModifier,
-    DomainNodeModifier,
-    UserInfo,
-)
 from ai.backend.manager.types import OptionalState, TriState
 
 from ..base import (

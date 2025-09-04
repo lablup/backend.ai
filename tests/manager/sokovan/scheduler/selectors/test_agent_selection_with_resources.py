@@ -121,7 +121,7 @@ class TestAgentSelectionWithResources:
             agents_with_varied_resources,
             criteria,
             config,
-            designated_agent=None,
+            designated_agent_ids=None,
         )
 
         # For single-node, there should be one selection with aggregated resources
@@ -180,7 +180,7 @@ class TestAgentSelectionWithResources:
             agents_with_varied_resources,
             criteria,
             config,
-            designated_agent=None,
+            designated_agent_ids=None,
         )
 
         # For multi-node, should have 2 selections (one per kernel)
@@ -242,11 +242,11 @@ class TestAgentSelectionWithResources:
                 agents,
                 criteria,
                 config,
-                designated_agent=AgentId("designated"),
+                designated_agent_ids=[AgentId("designated")],
             )
 
         # Should raise error because designated agent lacks resources
-        assert "Designated agent 'designated' is not compatible" in str(exc_info.value)
+        assert "Designated agent '['designated']' is not compatible" in str(exc_info.value)
         assert "insufficient resources" in str(exc_info.value)
 
     @pytest.mark.asyncio
@@ -300,7 +300,7 @@ class TestAgentSelectionWithResources:
             agents,
             criteria,
             config,
-            designated_agent=None,
+            designated_agent_ids=None,
         )
 
         # Should select "available" agent since "busy" is at container limit
@@ -353,7 +353,7 @@ class TestAgentSelectionWithResources:
             agents,
             criteria,
             config,
-            designated_agent=None,
+            designated_agent_ids=None,
         )
 
         # Should select ARM agent

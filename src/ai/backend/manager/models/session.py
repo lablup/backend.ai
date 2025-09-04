@@ -701,6 +701,7 @@ class SessionRow(Base):
     )
     cluster_size = sa.Column("cluster_size", sa.Integer, nullable=False, default=1)
     agent_ids = sa.Column("agent_ids", sa.ARRAY(sa.String), nullable=True)
+    designated_agent_ids = sa.Column("designated_agent_ids", sa.ARRAY(sa.String), nullable=True)
     kernels = relationship("KernelRow", back_populates="session")
 
     # Resource ownership

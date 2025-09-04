@@ -16,6 +16,38 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.13.4 (2025-09-03)
+
+### Fixes
+* Add missing scheduler options to AllowedScalingGroup and update related components ([#5730](https://github.com/lablup/backend.ai/issues/5730))
+
+
+## 25.13.3 (2025-09-03)
+
+### Fixes
+* Improve HTTP request proxying in the webserver to be transparent with content-encoding ([#5709](https://github.com/lablup/backend.ai/issues/5709))
+* Add null-user check in resource usage query ([#5712](https://github.com/lablup/backend.ai/issues/5712))
+* Ensure id parameter of chown function is an int ([#5713](https://github.com/lablup/backend.ai/issues/5713))
+* Refresh agent fields in kernel when rescheduling ([#5717](https://github.com/lablup/backend.ai/issues/5717))
+* Fix issue where App-Proxy failed to query worker circuits due to incorrect variable reference ([#5718](https://github.com/lablup/backend.ai/issues/5718))
+* Add missing network cleanup when creating overlay network ([#5721](https://github.com/lablup/backend.ai/issues/5721))
+
+
+## 25.13.2 (2025-09-02)
+
+### Features
+* The mouse-selected or copy-mode selected texts in the intrinsic ttyd app with tmux are now directly copied to the user-side clipboard, without needing to `set mouse=off` in the tmux session ([#5688](https://github.com/lablup/backend.ai/issues/5688))
+* feat: Improvement redis keys command to scan_iter for manager cli ([#5704](https://github.com/lablup/backend.ai/issues/5704))
+
+### Fixes
+* Add missing all-smi manpage file in the wheel packages ([#5685](https://github.com/lablup/backend.ai/issues/5685))
+* Updated RedisProfileTarget to handle cases where 'addr' is missing or None in the input data, preventing errors during address parsing. ([#5695](https://github.com/lablup/backend.ai/issues/5695))
+* fixes a duplicate joins issue during serialization when using pydantic by removing the join filter from the TOMLStringListField's _transform method. ([#5700](https://github.com/lablup/backend.ai/issues/5700))
+* Fix coordinator not performing health check for all endpoints ([#5702](https://github.com/lablup/backend.ai/issues/5702))
+* Fix session creation failing with `not allowed scaling group` error ([#5706](https://github.com/lablup/backend.ai/issues/5706))
+* Enhance endpoint creation logic to update existing records and handle circuits ([#5707](https://github.com/lablup/backend.ai/issues/5707))
+
+
 ## 25.13.1 (2025-08-29)
 
 ### Fixes

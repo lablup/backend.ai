@@ -7,13 +7,21 @@ from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
     ApproveArtifactRevisionActionResult,
 )
+from ai.backend.manager.services.artifact_revision.actions.associate_with_storage import (
+    AssociateWithStorageAction,
+    AssociateWithStorageActionResult,
+)
 from ai.backend.manager.services.artifact_revision.actions.cancel_import import (
     CancelImportAction,
     CancelImportActionResult,
 )
-from ai.backend.manager.services.artifact_revision.actions.delete import (
-    DeleteArtifactRevisionAction,
-    DeleteArtifactRevisionActionResult,
+from ai.backend.manager.services.artifact_revision.actions.cleanup import (
+    CleanupArtifactRevisionAction,
+    CleanupArtifactRevisionActionResult,
+)
+from ai.backend.manager.services.artifact_revision.actions.disassociate_with_storage import (
+    DisassociateWithStorageAction,
+    DisassociateWithStorageActionResult,
 )
 from ai.backend.manager.services.artifact_revision.actions.get import (
     GetArtifactRevisionAction,
@@ -36,23 +44,37 @@ from ai.backend.manager.services.artifact_revision.service import ArtifactRevisi
 
 class ArtifactRevisionProcessors(AbstractProcessorPackage):
     get: ActionProcessor[GetArtifactRevisionAction, GetArtifactRevisionActionResult]
-    list_: ActionProcessor[ListArtifactRevisionsAction, ListArtifactRevisionsActionResult]
+    list_revision: ActionProcessor[ListArtifactRevisionsAction, ListArtifactRevisionsActionResult]
     approve: ActionProcessor[ApproveArtifactRevisionAction, ApproveArtifactRevisionActionResult]
     reject: ActionProcessor[RejectArtifactRevisionAction, RejectArtifactRevisionActionResult]
-    import_: ActionProcessor[ImportArtifactRevisionAction, ImportArtifactRevisionActionResult]
+    import_revision: ActionProcessor[
+        ImportArtifactRevisionAction, ImportArtifactRevisionActionResult
+    ]
     cancel_import: ActionProcessor[CancelImportAction, CancelImportActionResult]
-    delete: ActionProcessor[DeleteArtifactRevisionAction, DeleteArtifactRevisionActionResult]
+    cleanup: ActionProcessor[CleanupArtifactRevisionAction, CleanupArtifactRevisionActionResult]
+    associate_with_storage: ActionProcessor[
+        AssociateWithStorageAction, AssociateWithStorageActionResult
+    ]
+    disassociate_with_storage: ActionProcessor[
+        DisassociateWithStorageAction, DisassociateWithStorageActionResult
+    ]
 
     def __init__(
         self, service: ArtifactRevisionService, action_monitors: list[ActionMonitor]
     ) -> None:
         self.get = ActionProcessor(service.get, action_monitors)
-        self.list_ = ActionProcessor(service.list_revision, action_monitors)
+        self.list_revision = ActionProcessor(service.list_revision, action_monitors)
         self.approve = ActionProcessor(service.approve, action_monitors)
         self.reject = ActionProcessor(service.reject, action_monitors)
-        self.import_ = ActionProcessor(service.import_revision, action_monitors)
+        self.import_revision = ActionProcessor(service.import_revision, action_monitors)
         self.cancel_import = ActionProcessor(service.cancel_import, action_monitors)
-        self.delete = ActionProcessor(service.delete, action_monitors)
+        self.cleanup = ActionProcessor(service.cleanup, action_monitors)
+        self.associate_with_storage = ActionProcessor(
+            service.associate_with_storage, action_monitors
+        )
+        self.disassociate_with_storage = ActionProcessor(
+            service.disassociate_with_storage, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -63,5 +85,7 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
             RejectArtifactRevisionAction.spec(),
             ImportArtifactRevisionAction.spec(),
             CancelImportAction.spec(),
-            DeleteArtifactRevisionAction.spec(),
+            CleanupArtifactRevisionAction.spec(),
+            AssociateWithStorageAction.spec(),
+            DisassociateWithStorageAction.spec(),
         ]

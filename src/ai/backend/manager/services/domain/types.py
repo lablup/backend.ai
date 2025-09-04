@@ -1,3 +1,8 @@
+"""
+Data types for domain service.
+Deprecated: use `ai.backend.manager.data.domain.types` instead.
+"""
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime

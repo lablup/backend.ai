@@ -15,6 +15,7 @@ from typing import Any, Callable, Optional, Protocol
 import msgpack as _msgpack
 import temporenc
 
+from .typed_validators import AutoDirectoryPath
 from .types import BinarySize, ResourceSlot
 
 __all__ = ("packb", "unpackb")
@@ -31,6 +32,7 @@ class ExtTypes(enum.IntEnum):
     IMAGE_REF = 7
     RESOURCE_SLOT = 8
     BACKENDAI_BINARY_SIZE = 16
+    AUTO_DIRECTORY_PATH = 17
 
 
 def _default(obj: object) -> _msgpack.ExtType:
@@ -51,6 +53,8 @@ def _default(obj: object) -> _msgpack.ExtType:
             return _msgpack.ExtType(ExtTypes.POSIX_PATH, os.fsencode(obj))
         case PurePosixPath():
             return _msgpack.ExtType(ExtTypes.PURE_POSIX_PATH, os.fsencode(obj))
+        case AutoDirectoryPath():
+            return _msgpack.ExtType(ExtTypes.AUTO_DIRECTORY_PATH, os.fsencode(obj))
         case ResourceSlot():
             return _msgpack.ExtType(ExtTypes.RESOURCE_SLOT, pickle.dumps(obj, protocol=5))
         case enum.Enum():
@@ -71,6 +75,7 @@ _DEFAULT_EXT_HOOK: Mapping[ExtTypes, ExtFunc] = {
     ExtTypes.DECIMAL: lambda data: pickle.loads(data),
     ExtTypes.POSIX_PATH: lambda data: PosixPath(os.fsdecode(data)),
     ExtTypes.PURE_POSIX_PATH: lambda data: PurePosixPath(os.fsdecode(data)),
+    ExtTypes.AUTO_DIRECTORY_PATH: lambda data: AutoDirectoryPath(os.fsdecode(data)),
     ExtTypes.ENUM: lambda data: pickle.loads(data),
     ExtTypes.RESOURCE_SLOT: lambda data: pickle.loads(data),
     ExtTypes.BACKENDAI_BINARY_SIZE: lambda data: pickle.loads(data),

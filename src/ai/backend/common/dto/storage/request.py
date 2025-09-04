@@ -57,7 +57,7 @@ class DownloadObjectReq(BaseRequestModel):
 class PresignedUploadObjectReq(BaseRequestModel):
     """
     Data model for generating presigned upload URLs for object storage operations.
-    This is used to specify the target bucket, key, and optional parameters for the presigned
+    This is used to specify the target bucket, key, and optional parameters for the presigned URL.
     """
 
     key: str = Field(description="The object key (path) within the bucket to upload the file to.")
@@ -96,7 +96,6 @@ class GetObjectMetaReq(BaseRequestModel):
     )
 
 
-# HuggingFace API Request Models
 class HuggingFaceScanModelsReq(BaseRequestModel):
     """Request for scanning HuggingFace models."""
 
@@ -132,6 +131,27 @@ class HuggingFaceScanModelsReq(BaseRequestModel):
     )
 
 
+class HuggingFaceRetrieveModelsReq(BaseRequestModel):
+    """Request for retrieve HuggingFace models."""
+
+    registry_name: str = Field(
+        description="""
+        Name of the HuggingFace registry to scan.
+        This should match the configured registry name in the system.
+        """,
+        examples=["huggingface", "my-huggingface-registry"],
+    )
+    models: list[ModelTarget] = Field(
+        description="""
+        List of model targets to retrieve from the HuggingFace registry.
+        Each target must specify the model ID and optional revision.
+        """,
+        examples=[
+            {"model_id": "microsoft/DialoGPT-medium", "revision": "main"},
+        ],
+    )
+
+
 class HuggingFaceImportModelsReq(BaseRequestModel):
     """Request for batch importing multiple HuggingFace models to storage."""
 
@@ -153,6 +173,44 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         This should match the configured registry name in the system.
         """,
         examples=["huggingface", "my-huggingface"],
+    )
+    storage_name: str = Field(
+        description="""
+        Target storage name where all models will be imported.
+        Must be a configured and accessible storage backend.
+        """,
+        examples=["default-minio", "s3-storage", "local-storage"],
+    )
+    bucket_name: str = Field(
+        description="""
+        Target bucket name within the storage for all models.
+        The bucket must exist and be writable by the service.
+        """,
+        examples=["models", "huggingface-models", "ai-models"],
+    )
+
+
+class ReservoirImportModelsReq(BaseRequestModel):
+    """Request for batch importing multiple models to storage."""
+
+    models: list[ModelTarget] = Field(
+        description="""
+        List of models to import.
+        Each model must specify the model ID and optional revision.
+        """,
+        examples=[
+            [
+                {"model_id": "microsoft/DialoGPT-medium", "revision": "main"},
+                {"model_id": "openai/gpt-2", "revision": "v1.0"},
+            ]
+        ],
+    )
+    registry_name: str = Field(
+        description="""
+        Name of the Reservoir registry to import from.
+        This should match the configured registry name in the system.
+        """,
+        examples=["reservoir", "my-reservoir"],
     )
     storage_name: str = Field(
         description="""
