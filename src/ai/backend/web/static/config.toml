@@ -1,50 +1,52 @@
 [general]
-apiEndpoint = "[Default API Endpoint. If blank, user input field will be shown.]"
-apiEndpointText = "[Placeholder text instead of API endpoint input field.]"
-defaultSessionEnvironment = "[Default session kernel. If blank, alphabetically first kernel will be default.]"
-defaultImportEnvironment = "[Default kernel to use import features. If blank, cr.backend.ai/multiarch/python:3.9-ubuntu20.04 will be used.]"
-connectionMode = "[Connection mode. Default is API. Currenly supports API and SESSION]"
-allowChangeSigninMode = false           # Allows user to change signin mode between `API` and `SESSION`
-signupSupport = false                   # Enable/disable signup feature support. Manager plugin is required.
-allowSignout = false                    # Let users signout from service. Signup plugin is required.
-allowAnonymousChangePassword = false    # Enable/disable anonymous user can send change password email. Manager plugin is required.
-allowProjectResourceMonitor = true      # Allow users to look up its group monitor statistics
-allowManualImageNameForSession = false  # If true, user will be able to use the specific environment image by typing the exact name.
-allowSignupWithoutConfirmation = false  # If true, token received from confirmation message is ignored.
-autoLogout = false                      # If true, user will be automatically logout when they close all Backend.AI tab / window.
-#loginAttemptLimit = 5                  # The number of allowed login attempt for preventing from brute-force attacks
-#loginBlockTime = 180                   # The amount of time(sec.) for rejecting login attempt for preventing from brute-force attacks
-debug = false                           # Please refer to `[Debug mode](https://github.com/lablup/backend.ai-webui#debug-mode)` in README
-maskUserInfo = false                    # If true, then account information in header, session list will be masked
-#singleSignOnVendors = "saml"           # Comma-separated list of vendors that support single sign-on.
-enableContainerCommit = false           # If true, then user can request container commit corres ponding to the session in running status
-hideAgents = true                       # If false, show the `Agent Summary` menu in the sidebar.
-force2FA = false                        # (Deprecated since v25.9.0, This will be replaced by the false setting in the Totp plugin.) If true, user should be register the 2FA to use Backend.AI WebUI.
-appDownloadUrl = ""                     # URL to download the electron app. If blank, https://github.com/lablup/backend.ai-webui/releases/download will be used.
-allowAppDownloadPanel = true            # If true, display the download WebUI app panel on the summary page.
-systemSSHImage = ""                     # This image is used to launch ssh session from the filebrowser dialog to support fast uploading.
-directoryBasedUsage = false             # If true, display the amount of usage per directory such as folder capacity, and number of files and directories.
-isDirectorySizeVisible = true           # If false, directory size in folder explorer will show `-`. default value is set to true.
-maxCountForPreopenPorts = 10            # The maximum allowed number of preopen ports. If you set this option to 0, the feature of preopen ports is disabled.
-allowCustomResourceAllocation = true    # If true, display the custom allocation on the session launcher.
-eduAppNamePrefix = ""                   # The prefix of edu applauncher's app name. If the app name starts with this prefix, split it by '-' and use the tail as the name of image.
-enableExtendLoginSession = false        # If true, enables login session extension UI. (From Backend.AI 24.09)
-enableImportFromHuggingFace = false     # Enable import from Hugging Face feature. (From Backend.AI 24.09)
-enableInteractiveLoginAccountSwitch = true  # If false, hide the "Sign in with a different account" button from the interactive login page.
-enableModelFolders = true               # Enable model folders feature. (From Backend.AI 23.03)
-
+apiEndpoint = ""
+apiEndpointText = "testtest"
+defaultSessionEnvironment = ""
+defaultImportEnvironment = ""
+connectionMode = ""
+allowChangeSigninMode = true           
+signupSupport = true                   
+allowSignout = true                    
+allowAnonymousChangePassword = true    
+allowProjectResourceMonitor = true      
+allowManualImageNameForSession = true  
+allowSignupWithoutConfirmation = false  
+autoLogout = false                     
+loginAttemptLimit = 5                  
+loginBlockTime = 60
+debug = false                           
+maskUserInfo = false                    
+#singleSignOnVendors = "saml"        
+enableContainerCommit = true           
+hideAgents = false            
+enable2FA = true                              
+force2FA = false                
+appDownloadUrl = ""                     
+allowAppDownloadPanel = true            
+systemSSHImage = ""                     
+directoryBasedUsage = true             
+isDirectorySizeVisible = true           
+maxCountForPreopenPorts = 10            
+allowCustomResourceAllocation = true    
+eduAppNamePrefix = "awdawdawd"                           
+enableLLMPlayground = true             
+enableExtendLoginSession = false        
+enableImportFromHuggingFace = true
+showKernelList = true
+enableInteractiveLoginAccountSwitch = false
+ 
 [wsproxy]
-proxyURL = "[Proxy URL]"
+proxyURL = ""
 proxyBaseURL = "[Base URL of websocket proxy,]"
 proxyListenIP = "[Websocket proxy configuration IP.]"
 #disableCertCheck = false                # If true, It will disable certification check
-
+ 
 [menu]
-#blocklist = "" # Hide menus on the list which are separated by comma. please note that 'start' menu cannot be added to blocklist
+blocklist = ""
 #inactivelist = "summary,import,statistics" # Disable menus on the list which are separated by comma.
-
+ 
 [resources]
-openPortToPublic = false            # Show option to open app proxy port to anyone.
+openPortToPublic = true            
 allowPreferredPort = false          # Preferred web service port number. Backend.AI try to assign the entered port number first for the web service.
 maxCPUCoresPerContainer = 256       # Maximum CPU per container.
 maxMemoryPerContainer = 64          # Maximum memory per container.
@@ -60,28 +62,28 @@ maxWarboyDevicesPerContainer = 8    # Maximum Warboy devices per container.
 maxRNGDDevicesPerContainer = 8      # Maximum RNGD devices per container.
 maxHyperaccelLPUDevicesPerContainer = 8       # Maximum Hyperaccel LPU devices per container.
 maxShmPerContainer = 16             # Maximum shared memory per container.
-maxFileUploadSize = 4294967296      # Maximum size of single file upload. Set to -1 for unlimited upload.
-allowNonAuthTCP = false             # Expose TCP apps to be executable in web browser when set to true 
-
+maxFileUploadSize = 4294967296
+allowNonAuthTCP = true
+ 
 [environments]
 #allowlist = "" # Comma-separated image name. Image name should contain the repository (registry path and image name) part of the full image URL, excluding the protocol and tag
 # e.g. cr.backend.ai/stable/python
 # You should pick default_environment in general section too.
-showNonInstalledImages = false    # Show all environment images regardless of installation
-
+showNonInstalledImages = false
+ 
 [server]
-webServerURL = "[Web server website URL. App will use the site instead of local app.]"
+webServerURL = "http://127.0.0.1:8090"
                    # Uses websocket proxy in the app
-
+ 
 [plugin]
 # Reserved to load plugins
 #login = "signup-cloud.js"
 #sidebar = "report-cloud.js"
 #page = "test-plugin1,test-plugin2" # Show menus on the list which are separated by comma.
-
+ 
 #[license]
 #This field is generated by backend.ai-webserver.
-
+ 
 [pipeline]
 #endpoint = "http://mlops.com:9500"           # FastTrack API endpoint.
 #frontendEndpoint = "http://mlops.com:9500"   # FastTrack frontend endpoint.
