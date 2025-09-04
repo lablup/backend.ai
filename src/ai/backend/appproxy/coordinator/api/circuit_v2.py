@@ -18,7 +18,6 @@ from ai.backend.appproxy.common.types import (
     WebMiddleware,
 )
 from ai.backend.appproxy.common.utils import pydantic_api_handler, pydantic_api_response_handler
-from ai.backend.common import redis_helper
 
 from ..models import Circuit
 from ..models.utils import execute_with_txn_retry
@@ -123,22 +122,28 @@ async def get_circuit_statistics(request: web.Request) -> PydanticResponse[Circu
     async with root_ctx.db.begin_readonly_session() as sess:
         circuit = await Circuit.get(sess, UUID(request.match_info["circuit_id"]))
 
-    last_access, requests = await redis_helper.execute(
-        root_ctx.redis_live,
-        lambda r: r.mget([f"circuit.{circuit.id}.last_access", f"circuit.{circuit.id}.requests"]),
+    last_access, requests = await root_ctx.valkey_live.get_multiple_live_data([
+        f"circuit.{circuit.id}.last_access",
+        f"circuit.{circuit.id}.requests",
+    ])
+    # Handle bytes data from valkey
+    last_access_value = (
+        float(last_access.decode("utf-8")) if last_access else circuit.created_at.timestamp()
     )
+    requests_value = int(requests.decode("utf-8")) if requests else 0
+
     if circuit.app_mode != AppMode.INFERENCE:
         ttl = int(
             root_ctx.local_config.proxy_coordinator.unused_circuit_collection_timeout
-            - (time.time() - (float(last_access.decode()) or circuit.created_at.timestamp()))
+            - (time.time() - last_access_value)
         )
     else:
         ttl = None
     return PydanticResponse(
         CircuitStatisticsModel(
             ttl=ttl,
-            last_access=int(float(last_access.decode()) * 1000),
-            requests=int(requests.decode()) or 0,
+            last_access=int(last_access_value * 1000),
+            requests=requests_value,
             **circuit.dump_model(),
         )
     )
