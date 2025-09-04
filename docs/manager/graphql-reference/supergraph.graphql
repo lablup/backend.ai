@@ -4861,7 +4861,7 @@ input ScanArtifactModelsInput
   @join__type(graph: STRAWBERRY)
 {
   models: [ModelTarget!]!
-  registryId: UUID!
+  registryId: UUID = null
 }
 
 """Added in 25.14.0"""

@@ -214,7 +214,7 @@ class ModelTarget:
 @strawberry.input(description="Added in 25.14.0")
 class ScanArtifactModelsInput:
     models: list[ModelTarget]
-    registry_id: uuid.UUID
+    registry_id: Optional[uuid.UUID] = None
 
 
 # Object Types

@@ -951,7 +951,7 @@ type ScalingRule {
 """Added in 25.14.0"""
 input ScanArtifactModelsInput {
   models: [ModelTarget!]!
-  registryId: UUID!
+  registryId: UUID = null
 }
 
 """Added in 25.14.0"""
