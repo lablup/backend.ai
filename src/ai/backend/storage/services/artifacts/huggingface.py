@@ -339,7 +339,7 @@ class HuggingFaceService:
             await self._event_producer.anycast_event(
                 ModelImportDoneEvent(
                     model_id=model_id,
-                    revision=revision,
+                    revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
                     registry_name=registry_name,
                     registry_type=ArtifactRegistryType.HUGGINGFACE,
                     total_size=artifact_total_size,

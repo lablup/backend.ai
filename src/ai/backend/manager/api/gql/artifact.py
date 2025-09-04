@@ -205,7 +205,7 @@ class ArtifactStatusChangedInput:
 @strawberry.input(description="Added in 25.14.0")
 class ModelTarget:
     model_id: str
-    revision: str = "main"
+    revision: Optional[str] = None
 
     def to_dataclass(self) -> ModelTargetData:
         return ModelTargetData(model_id=self.model_id, revision=self.revision)

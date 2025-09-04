@@ -19,6 +19,7 @@ from ai.backend.storage.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.storage.exception import (
+    ArtifactRevisionEmptyError,
     ArtifactStorageEmptyError,
     ReservoirStorageConfigInvalidError,
     StorageBucketNotFoundError,
@@ -245,6 +246,9 @@ class ReservoirService:
             bucket_name: Target bucket name
             reporter: ProgressReporter for tracking progress
         """
+        if model.revision is None:
+            raise ArtifactRevisionEmptyError(f"Revision must be specified for model: {model}")
+
         if len(self._reservoir_registry_configs) == 0:
             raise ReservoirStorageConfigInvalidError("No reservoir registry configuration found.")
 

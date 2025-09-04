@@ -20,6 +20,7 @@ from huggingface_hub.errors import (
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
 from huggingface_hub.hf_api import RepoFile, RepoFolder
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
     ModelData,
@@ -276,20 +277,17 @@ class HuggingFaceScanner:
         Returns:
             ModelData object with model metadata and files
         """
-        model_id = model.model_id
-        revision = model.revision
-
         try:
             log.info(f"Scanning specific HuggingFace model: {model}")
             model_info = await self._client.scan_model(model)
-
             readme_content = await self._download_readme(model)
 
+            model_id = model.model_id
             result = ModelData(
                 id=model_id,
                 name=model_id.split("/")[-1],
                 author=model_info.author,
-                revision=revision,
+                revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
                 tags=model_info.tags or [],
                 created_at=model_info.created_at,
                 modified_at=model_info.last_modified,
