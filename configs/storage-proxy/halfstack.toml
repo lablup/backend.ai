@@ -108,10 +108,13 @@ log-level = "INFO"
 endpoint = "http://127.0.0.1:4317"
 
 [[registries]]
-name = "huggingface-hub"
+name = "reservoir"
 [registries.config]
-type = "huggingface"
-endpoint = "https://huggingface.co"
+type = "reservoir"
+endpoint = "http://192.168.0.48:9000"
+object-storage-access-key = "7twuioJPxeEp0vY8WK7k"
+object-storage-secret-key = "PoW8lb5OLPsziUDKwfVwdmV759z9csbqpuOZkGnQ"
+object-storage-region = "us-east-1"
 
 [[storages]]
 name = "minio-storage"

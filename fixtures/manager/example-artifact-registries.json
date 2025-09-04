@@ -1,16 +1,19 @@
 {
-    "artifact_registries": [
+    "reservoir_registries": [
         {
-            "id": "fe878f09-06cc-4b91-9242-4c71015cce04",
-            "registry_id": "fe878f09-06cc-4b91-9242-4c71015cce05",
-            "name": "huggingface-hub",
-            "type": "huggingface"
+            "id": "fe878f09-06cc-4b91-9242-4c71015cce09",
+            "endpoint": "http://10.122.10.108:8091",
+            "access_key": "AKIAIOSFODNN7EXAMPLE",
+            "secret_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+            "api_version": "v8.20240915"
         }
     ],
-    "huggingface_registries": [
+    "artifact_registries": [
         {
             "id": "fe878f09-06cc-4b91-9242-4c71015cce05",
-            "url": "https://huggingface.co"
+            "name": "reservoir-registry",
+            "registry_id": "fe878f09-06cc-4b91-9242-4c71015cce09",
+            "type": "reservoir"
         }
     ],
     "object_storages": [
