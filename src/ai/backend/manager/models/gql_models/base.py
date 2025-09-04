@@ -8,6 +8,7 @@ import graphene
 import graphql
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
+from graphene_federation import shareable
 from graphql import GraphQLError
 from graphql.language.ast import FloatValueNode, IntValueNode, ObjectValueNode, ValueNode
 from graphql.language.printer import print_ast
@@ -19,6 +20,7 @@ SAFE_MIN_INT = -9007199254740991
 SAFE_MAX_INT = 9007199254740991
 
 
+@shareable
 class ResourceLimit(graphene.ObjectType):
     key = graphene.String()
     min = graphene.String()
@@ -27,6 +29,7 @@ class ResourceLimit(graphene.ObjectType):
     )
 
 
+@shareable
 class KVPair(graphene.ObjectType):
     key = graphene.String()
     value = graphene.String()
