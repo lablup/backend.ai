@@ -11,7 +11,9 @@ from ai.backend.common.data.model_deployment.types import ActivenessStatus as Co
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
 from ai.backend.manager.api.gql.base import JSONString, OrderDirection
+from ai.backend.manager.api.gql.session import Session
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.models.gql_relay import AsyncNode
 
 from .model_revision import (
     ModelRevision,
@@ -82,9 +84,15 @@ class ReplicaOrderBy:
 class ModelReplica(Node):
     id: NodeID
     revision: ModelRevision
-    session_id: Optional[ID] = strawberry.field(
+    _session_id: strawberry.Private[UUID]
+
+    @strawberry.field(
         description="The session ID associated with the replica. This can be null right after replica creation."
     )
+    async def session(self, info: Info[StrawberryGQLContext]) -> "Session":
+        session_global_id = AsyncNode.to_global_id("ComputeSessionNode", self._session_id)
+        return Session(id=ID(session_global_id))
+
     readiness_status: ReadinessStatus = strawberry.field(
         description="This represents whether the replica has been checked and its health state.",
     )
@@ -120,7 +128,7 @@ class ModelReplicaConnection(Connection[ModelReplica]):
 mock_model_replica_1 = ModelReplica(
     id=UUID("b62f9890-228a-40c9-a614-63387805b9a7"),
     revision=mock_model_revision_1,
-    session_id=ID(str(uuid4())),
+    _session_id=uuid4(),
     readiness_status=CommonReadinessStatus.HEALTHY,
     liveness_status=CommonLivenessStatus.HEALTHY,
     activeness_status=CommonActivenessStatus.ACTIVE,
@@ -140,7 +148,7 @@ mock_model_replica_1 = ModelReplica(
 mock_model_replica_2 = ModelReplica(
     id=UUID("7562e9d4-a368-4e28-9092-65eb91534bac"),
     revision=mock_model_revision_1,
-    session_id=ID(str(uuid4())),
+    _session_id=uuid4(),
     readiness_status=CommonReadinessStatus.HEALTHY,
     liveness_status=CommonLivenessStatus.HEALTHY,
     activeness_status=CommonActivenessStatus.ACTIVE,
@@ -159,7 +167,7 @@ mock_model_replica_2 = ModelReplica(
 mock_model_replica_3 = ModelReplica(
     id=UUID("2a2388ea-a312-422a-b77e-0e0b61c48145"),
     revision=mock_model_revision_1,
-    session_id=ID(str(uuid4())),
+    _session_id=uuid4(),
     readiness_status=CommonReadinessStatus.UNHEALTHY,
     liveness_status=CommonLivenessStatus.HEALTHY,
     activeness_status=CommonActivenessStatus.INACTIVE,
@@ -185,7 +193,7 @@ async def replica(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelRep
     return ModelReplica(
         id=id,
         revision=mock_model_revision_1,
-        session_id=ID(str(uuid4())),
+        _session_id=uuid4(),
         readiness_status=CommonReadinessStatus.NOT_CHECKED,
         liveness_status=CommonLivenessStatus.HEALTHY,
         activeness_status=CommonActivenessStatus.ACTIVE,

@@ -555,6 +555,13 @@ enum ClusterMode {
   MULTI_NODE
 }
 
+<<<<<<< HEAD
+=======
+extend type ComputeSessionNode @key(fields: "id") {
+  id: ID! @external
+}
+
+>>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
 input CreateAccessTokenInput {
   """
   Added in 25.13.0: The ID of the model deployment for which the access token is created.
@@ -746,6 +753,7 @@ type DelegateScanArtifactsPayload {
 scalar Decimal
 >>>>>>> 16addb3b5 (feat: Modify gql schemas)
 
+<<<<<<< HEAD
 """Added in 25.15.0"""
 input DelegateeTarget {
   delegateeReservoirId: ID!
@@ -775,6 +783,8 @@ type DeleteArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
+=======
+>>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
 input DeleteAutoScalingRuleInput {
   id: ID!
 }
@@ -1150,11 +1160,6 @@ type ModelReplica implements Node {
   revision: ModelRevision!
 
   """
-  The session ID associated with the replica. This can be null right after replica creation.
-  """
-  sessionId: ID
-
-  """
   This represents whether the replica has been checked and its health state.
   """
   readinessStatus: ReadinessStatus!
@@ -1180,6 +1185,11 @@ type ModelReplica implements Node {
   live statistics of the routing node. e.g. "live_stat": "{\"cpu_util\": {\"current\": \"7.472\", \"capacity\": \"1000\", \"pct\": \"0.75\", \"unit_hint\": \"percent\"}}"
   """
   liveStat: JSONString!
+
+  """
+  The session ID associated with the replica. This can be null right after replica creation.
+  """
+  session: ComputeSessionNode!
 }
 
 """Added in 25.13.0"""
@@ -1672,14 +1682,30 @@ type Query {
 
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
+<<<<<<< HEAD
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   """Added in 25.15.0"""
   agentStats: AgentStats!
 =======
+=======
+=======
+<<<<<<< HEAD
+<<<<<<< HEAD
+
+  """Added in 25.14.0"""
+  defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
+=======
+=======
+=======
+
+>>>>>>> 37dfcaedc (feat: Add compute session node ref in model replica node)
+>>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
+>>>>>>> 9adb5c928 (feat: Add compute session node ref in model replica node)
   """
   Added in 25.13.0 Get configuration JSON Schemas for all inference runtimes
   """
@@ -1687,7 +1713,18 @@ type Query {
 
   """Added in 25.13.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON!
+<<<<<<< HEAD
 >>>>>>> 16addb3b5 (feat: Modify gql schemas)
+=======
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> Stashed changes
+>>>>>>> 59a2a2f4d (feat: Modify gql schemas)
+=======
+>>>>>>> 37dfcaedc (feat: Add compute session node ref in model replica node)
+>>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
+>>>>>>> 9adb5c928 (feat: Add compute session node ref in model replica node)
 }
 
 """
@@ -2250,7 +2287,7 @@ extend type VirtualFolderNode @key(fields: "id") {
 
 scalar _Any
 
-union _Entity = DomainNode | GroupNode | ImageNode | ScalingGroupNode | UserNode | VirtualFolderNode
+union _Entity = ComputeSessionNode | DomainNode | GroupNode | ImageNode | ScalingGroupNode | UserNode | VirtualFolderNode
 
 type _Service {
   sdl: String!

@@ -1213,75 +1213,76 @@ type ComputeSessionList implements PaginatedList
 """Added in 24.09.0."""
 type ComputeSessionNode implements Node
   @join__implements(graph: GRAPHENE, interface: "Node")
-  @join__type(graph: GRAPHENE)
+  @join__type(graph: GRAPHENE, key: "id")
+  @join__type(graph: STRAWBERRY, key: "id", extension: true)
 {
   """The ID of the object"""
   id: ID!
 
   """ID of session."""
-  row_id: UUID
-  tag: String
-  name: String
-  type: String
+  row_id: UUID @join__field(graph: GRAPHENE)
+  tag: String @join__field(graph: GRAPHENE)
+  name: String @join__field(graph: GRAPHENE)
+  type: String @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  priority: Int
-  cluster_template: String
-  cluster_mode: String
-  cluster_size: Int
-  domain_name: String
-  project_id: UUID
-  user_id: UUID
+  priority: Int @join__field(graph: GRAPHENE)
+  cluster_template: String @join__field(graph: GRAPHENE)
+  cluster_mode: String @join__field(graph: GRAPHENE)
+  cluster_size: Int @join__field(graph: GRAPHENE)
+  domain_name: String @join__field(graph: GRAPHENE)
+  project_id: UUID @join__field(graph: GRAPHENE)
+  user_id: UUID @join__field(graph: GRAPHENE)
 
   """Added in 25.13.0."""
-  owner: UserNode
-  access_key: String
+  owner: UserNode @join__field(graph: GRAPHENE)
+  access_key: String @join__field(graph: GRAPHENE)
 
   """
   One of ['read_attribute', 'update_attribute', 'delete_session', 'start_app', 'execute', 'convert_to_image'].
   """
-  permissions: [SessionPermissionValueField]
-  status: String
-  status_info: String
-  status_data: JSONString
-  status_history: JSONString
-  created_at: DateTime
-  terminated_at: DateTime
-  starts_at: DateTime
-  scheduled_at: DateTime
+  permissions: [SessionPermissionValueField] @join__field(graph: GRAPHENE)
+  status: String @join__field(graph: GRAPHENE)
+  status_info: String @join__field(graph: GRAPHENE)
+  status_data: JSONString @join__field(graph: GRAPHENE)
+  status_history: JSONString @join__field(graph: GRAPHENE)
+  created_at: DateTime @join__field(graph: GRAPHENE)
+  terminated_at: DateTime @join__field(graph: GRAPHENE)
+  starts_at: DateTime @join__field(graph: GRAPHENE)
+  scheduled_at: DateTime @join__field(graph: GRAPHENE)
 
   """Added in 25.13.0."""
-  queue_position: Int
-  startup_command: String
-  result: String
-  commit_status: String
-  abusing_reports: [JSONString]
-  idle_checks: JSONString
-  agent_ids: [String]
-  resource_opts: JSONString
-  scaling_group: String
-  service_ports: JSONString
-  vfolder_mounts: [String]
-  occupied_slots: JSONString
-  requested_slots: JSONString
+  queue_position: Int @join__field(graph: GRAPHENE)
+  startup_command: String @join__field(graph: GRAPHENE)
+  result: String @join__field(graph: GRAPHENE)
+  commit_status: String @join__field(graph: GRAPHENE)
+  abusing_reports: [JSONString] @join__field(graph: GRAPHENE)
+  idle_checks: JSONString @join__field(graph: GRAPHENE)
+  agent_ids: [String] @join__field(graph: GRAPHENE)
+  resource_opts: JSONString @join__field(graph: GRAPHENE)
+  scaling_group: String @join__field(graph: GRAPHENE)
+  service_ports: JSONString @join__field(graph: GRAPHENE)
+  vfolder_mounts: [String] @join__field(graph: GRAPHENE)
+  occupied_slots: JSONString @join__field(graph: GRAPHENE)
+  requested_slots: JSONString @join__field(graph: GRAPHENE)
 
   """Added in 25.4.0."""
-  image_references: [String]
+  image_references: [String] @join__field(graph: GRAPHENE)
 
   """Added in 25.4.0."""
-  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection
-  num_queries: BigInt
-  inference_metrics: JSONString
-  kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection
+  vfolder_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): VirtualFolderConnection @join__field(graph: GRAPHENE)
+  num_queries: BigInt @join__field(graph: GRAPHENE)
+  inference_metrics: JSONString @join__field(graph: GRAPHENE)
+  kernel_nodes(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): KernelConnection @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  dependents(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
+  dependents(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  dependees(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
+  dependees(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection @join__field(graph: GRAPHENE)
 
   """Added in 24.09.0."""
-  graph(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection
+  graph(filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ComputeSessionConnection @join__field(graph: GRAPHENE)
 }
 
 """Deprecated since 24.09.0. use `ContainerRegistryNode` instead"""
@@ -1867,6 +1868,7 @@ type DealiasImage
 scalar Decimal
   @join__type(graph: STRAWBERRY)
 
+<<<<<<< HEAD
 """Added in 25.15.0"""
 input DelegateeTarget
   @join__type(graph: STRAWBERRY)
@@ -1980,6 +1982,8 @@ type DeleteArtifactsPayload
   artifacts: [Artifact!]!
 }
 
+=======
+>>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
 input DeleteAutoScalingRuleInput
   @join__type(graph: STRAWBERRY)
 {
@@ -3510,11 +3514,6 @@ type ModelReplica implements Node
   revision: ModelRevision!
 
   """
-  The session ID associated with the replica. This can be null right after replica creation.
-  """
-  sessionId: ID
-
-  """
   This represents whether the replica has been checked and its health state.
   """
   readinessStatus: ReadinessStatus!
@@ -3540,6 +3539,11 @@ type ModelReplica implements Node
   live statistics of the routing node. e.g. "live_stat": "{\"cpu_util\": {\"current\": \"7.472\", \"capacity\": \"1000\", \"pct\": \"0.75\", \"unit_hint\": \"percent\"}}"
   """
   liveStat: JSONString!
+
+  """
+  The session ID associated with the replica. This can be null right after replica creation.
+  """
+  session: ComputeSessionNode!
 }
 
 """Added in 25.13.0"""
@@ -5434,14 +5438,30 @@ type Query
 
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
+<<<<<<< HEAD
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   """Added in 25.15.0"""
   agentStats: AgentStats! @join__field(graph: STRAWBERRY)
 =======
+=======
+=======
+<<<<<<< HEAD
+<<<<<<< HEAD
+
+  """Added in 25.14.0"""
+  defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
+=======
+=======
+=======
+
+>>>>>>> 37dfcaedc (feat: Add compute session node ref in model replica node)
+>>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
+>>>>>>> 9adb5c928 (feat: Add compute session node ref in model replica node)
   """
   Added in 25.13.0 Get configuration JSON Schemas for all inference runtimes
   """
@@ -5449,7 +5469,18 @@ type Query
 
   """Added in 25.13.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON! @join__field(graph: STRAWBERRY)
+<<<<<<< HEAD
 >>>>>>> 16addb3b5 (feat: Modify gql schemas)
+=======
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+>>>>>>> Stashed changes
+>>>>>>> 59a2a2f4d (feat: Modify gql schemas)
+=======
+>>>>>>> 37dfcaedc (feat: Add compute session node ref in model replica node)
+>>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
+>>>>>>> 9adb5c928 (feat: Add compute session node ref in model replica node)
 }
 
 type QuotaDetails
