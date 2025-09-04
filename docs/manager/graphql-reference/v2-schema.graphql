@@ -4,9 +4,6 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@externa
   subscription: Subscription
 }
 
-<<<<<<< Updated upstream
-"""Added in 25.14.0"""
-=======
 type AccessToken implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -71,8 +68,7 @@ type AddModelRevisionPayload {
   revision: ModelRevision!
 }
 
-"""Added in 25.13.0"""
->>>>>>> Stashed changes
+"""Added in 25.14.0"""
 input ApproveArtifactInput {
   artifactRevisionId: ID!
 }
@@ -318,9 +314,10 @@ enum ClusterMode {
   MULTI_NODE
 }
 
-<<<<<<< Updated upstream
-"""Added in 25.14.0"""
-=======
+extend type ComputeSessionNode @key(fields: "id") {
+  id: ID! @external
+}
+
 input CreateAccessTokenInput {
   """
   Added in 25.13.0: The ID of the model deployment for which the access token is created.
@@ -351,8 +348,7 @@ type CreateAutoScalingRulePayload {
   autoScalingRule: AutoScalingRule!
 }
 
-"""Added in 25.13.0"""
->>>>>>> Stashed changes
+"""Added in 25.14.0"""
 input CreateHuggingFaceRegistryInput {
   url: String!
   name: String!
@@ -426,27 +422,8 @@ type CreateReservoirRegistryPayload {
 """Date with time (isoformat)"""
 scalar DateTime
 
-<<<<<<< Updated upstream
-"""Added in 25.14.0"""
-=======
 """Decimal (fixed-point)"""
 scalar Decimal
-
-"""Added in 25.13.0"""
-input DeleteArtifactRevisionTarget {
-  artifactRevisionId: ID!
-  storageNamespaceId: ID!
-}
-
-"""Added in 25.13.0"""
-input DeleteArtifactRevisionsInput {
-  targets: [DeleteArtifactRevisionTarget!]!
-}
-
-"""Added in 25.13.0"""
-type DeleteArtifactRevisionsPayload {
-  artifactRevisionIds: [ID!]!
-}
 
 input DeleteAutoScalingRuleInput {
   id: ID!
@@ -456,8 +433,7 @@ type DeleteAutoScalingRulePayload {
   id: ID!
 }
 
-"""Added in 25.13.0"""
->>>>>>> Stashed changes
+"""Added in 25.14.0"""
 input DeleteHuggingFaceRegistryInput {
   id: ID!
 }
@@ -487,7 +463,6 @@ type DeleteObjectStoragePayload {
   id: ID!
 }
 
-<<<<<<< Updated upstream
 """Added in 25.14.0"""
 input DeleteReservoirRegistryInput {
   id: ID!
@@ -498,9 +473,7 @@ type DeleteReservoirRegistryPayload {
   id: ID!
 }
 
-=======
 """Added in 25.13.0"""
->>>>>>> Stashed changes
 input DeploymentFilter {
   name: StringFilter = null
   status: DeploymentStatusFilter = null
@@ -630,15 +603,11 @@ type GetPresignedUploadURLPayload {
   fields: String!
 }
 
-<<<<<<< Updated upstream
-"""Added in 25.14.0"""
-=======
 extend type GroupNode @key(fields: "id") {
   id: ID! @external
 }
 
-"""Added in 25.13.0"""
->>>>>>> Stashed changes
+"""Added in 25.14.0"""
 type HuggingFaceRegistry implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -807,11 +776,6 @@ type ModelReplica implements Node {
   revision: ModelRevision!
 
   """
-  The session ID associated with the replica. This can be null right after replica creation.
-  """
-  sessionId: ID
-
-  """
   This represents whether the replica has been checked and its health state.
   """
   readinessStatus: ReadinessStatus!
@@ -837,6 +801,11 @@ type ModelReplica implements Node {
   live statistics of the routing node. e.g. "live_stat": "{\"cpu_util\": {\"current\": \"7.472\", \"capacity\": \"1000\", \"pct\": \"0.75\", \"unit_hint\": \"percent\"}}"
   """
   liveStat: JSONString!
+
+  """
+  The session ID associated with the replica. This can be null right after replica creation.
+  """
+  session: ComputeSessionNode!
 }
 
 """Added in 25.13.0"""
@@ -986,9 +955,6 @@ type Mutation {
   """Added in 25.14.0"""
   updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload!
 
-<<<<<<< Updated upstream
-  """Added in 25.14.0"""
-=======
   """Added in 25.13.0"""
   createAutoScalingRule(input: CreateAutoScalingRuleInput!): CreateAutoScalingRulePayload!
 
@@ -998,8 +964,7 @@ type Mutation {
   """Added in 25.13.0"""
   deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload!
 
-  """Added in 25.13.0"""
->>>>>>> Stashed changes
+  """Added in 25.14.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
 
   """Added in 25.14.0"""
@@ -1173,13 +1138,12 @@ type Query {
   """Added in 25.14.0"""
   huggingfaceRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): HuggingFaceRegistryConnection!
 
-<<<<<<< Updated upstream
   """Added in 25.14.0"""
   reservoirRegistry(id: ID!): ReservoirRegistry
 
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
-=======
+
   """
   Added in 25.13.0 Get configuration JSON Schemas for all inference runtimes
   """
@@ -1187,7 +1151,6 @@ type Query {
 
   """Added in 25.13.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON!
->>>>>>> Stashed changes
 }
 
 """
@@ -1259,7 +1222,6 @@ type ReplicaStatusChangedPayload {
   replica: ModelReplica!
 }
 
-<<<<<<< Updated upstream
 """Added in 25.14.0"""
 type ReservoirRegistry implements Node {
   """The Globally Unique ID of this object"""
@@ -1290,9 +1252,7 @@ type ReservoirRegistryEdge {
   node: ReservoirRegistry!
 }
 
-=======
 """Added in 25.13.0"""
->>>>>>> Stashed changes
 type ResourceConfig {
   resourceGroup: ScalingGroupNode!
 
@@ -1360,14 +1320,7 @@ type ScanArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
-<<<<<<< Updated upstream
-"""Different service configurations for model runtime"""
-union ServiceConfig = RawServiceConfig
-
 """Added in 25.14.0"""
-=======
-"""Added in 25.13.0"""
->>>>>>> Stashed changes
 type SourceInfo {
   name: String
   url: String
@@ -1434,9 +1387,6 @@ type UpdateArtifactPayload {
   artifact: Artifact!
 }
 
-<<<<<<< Updated upstream
-"""Added in 25.14.0"""
-=======
 input UpdateAutoScalingRuleInput {
   id: ID!
   metricSource: AutoScalingMetricSource
@@ -1453,8 +1403,7 @@ type UpdateAutoScalingRulePayload {
   autoScalingRule: AutoScalingRule!
 }
 
-"""Added in 25.13.0"""
->>>>>>> Stashed changes
+"""Added in 25.14.0"""
 input UpdateHuggingFaceRegistryInput {
   id: ID!
   url: String
@@ -1525,7 +1474,7 @@ extend type VirtualFolderNode @key(fields: "id") {
 
 scalar _Any
 
-union _Entity = DomainNode | GroupNode | ImageNode | ScalingGroupNode | UserNode | VirtualFolderNode
+union _Entity = ComputeSessionNode | DomainNode | GroupNode | ImageNode | ScalingGroupNode | UserNode | VirtualFolderNode
 
 type _Service {
   sdl: String!
