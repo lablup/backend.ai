@@ -122,7 +122,7 @@ class ArtifactOrderingApplier(BaseOrderingApplier[ArtifactOrderingOptions]):
     @override
     def get_order_column(self, field) -> sa.Column:
         """Get the SQLAlchemy column for the given artifact field"""
-        return getattr(ArtifactRow, field.value, ArtifactRow.name)
+        return getattr(ArtifactRow, field.value.lower(), ArtifactRow.name)
 
 
 class ArtifactModelConverter:
