@@ -4,18 +4,18 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.manager.models import groups
-from ai.backend.manager.models.domain import DomainRow, domains
-from ai.backend.manager.models.group import ProjectType
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
-from ai.backend.manager.services.domain.types import (
+from ai.backend.manager.data.domain.types import (
     DomainCreator,
     DomainData,
     DomainModifier,
     UserInfo,
 )
+from ai.backend.manager.models import groups
+from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
+from ai.backend.manager.models.group import ProjectType
+from ai.backend.manager.models.kernel import kernels
+from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 
 class AdminDomainRepository:
@@ -47,7 +47,7 @@ class AdminDomainRepository:
                 raise RuntimeError(f"No domain created. rowcount: {result.rowcount}, data: {data}")
 
         assert row is not None
-        result = DomainData.from_row(row)
+        result = row_to_data(row)
         assert result is not None
         return result
 
@@ -72,7 +72,7 @@ class AdminDomainRepository:
             if result.rowcount == 0:
                 return None
 
-        return DomainData.from_row(row)
+        return row_to_data(row)
 
     async def soft_delete_domain_force(self, domain_name: str) -> bool:
         """
@@ -127,7 +127,7 @@ class AdminDomainRepository:
             if domain_row is None:
                 raise RuntimeError(f"Failed to create domain node: {creator.name}")
             assert domain_row is not None
-            result = DomainData.from_row(domain_row)
+            result = row_to_data(domain_row)
             assert result is not None
             return result
 
@@ -173,7 +173,7 @@ class AdminDomainRepository:
             )
 
             await session.commit()
-            return DomainData.from_row(domain_row) if domain_row else None
+            return row_to_data(domain_row) if domain_row else None
 
     async def _create_model_store_group(self, conn: SAConnection, domain_name: str) -> None:
         """
