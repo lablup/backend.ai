@@ -1,7 +1,7 @@
 """expand rbac tables
 
 Revision ID: 9adcd6f48ba1
-Revises: 4db74efaf82e
+Revises: 2cc8337d78a3
 Create Date: 2025-08-12 21:02:31.660415
 
 """
@@ -16,7 +16,7 @@ from ai.backend.manager.models.base import (
 
 # revision identifiers, used by Alembic.
 revision = "9adcd6f48ba1"
-down_revision = "4db74efaf82e"
+down_revision = "2cc8337d78a3"
 branch_labels = None
 depends_on = None
 
