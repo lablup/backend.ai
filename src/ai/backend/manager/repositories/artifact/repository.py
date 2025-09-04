@@ -745,7 +745,10 @@ class ArtifactRepository:
             result = await db_sess.execute(querybuild_result.data_query)
             rows = result.scalars().all()
 
+            # Build count query with same filters applied
             count_stmt = sa.select(sa.func.count()).select_from(ArtifactRow)
+            if filters is not None:
+                count_stmt = artifact_paginator.filter_applier.apply_filters(count_stmt, filters)
             count_result = await db_sess.execute(count_stmt)
             total_count = count_result.scalar()
 
@@ -803,7 +806,10 @@ class ArtifactRepository:
             result = await db_sess.execute(querybuild_result.data_query)
             rows = result.scalars().all()
 
+            # Build count query with same filters applied
             count_stmt = sa.select(sa.func.count()).select_from(ArtifactRow)
+            if filters is not None:
+                count_stmt = artifact_paginator.filter_applier.apply_filters(count_stmt, filters)
             count_result = await db_sess.execute(count_stmt)
             total_count = count_result.scalar()
 
