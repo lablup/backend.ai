@@ -282,6 +282,12 @@ type CreateReservoirRegistryPayload {
 scalar DateTime
 
 """Added in 25.14.0"""
+type DefaultArtifactRegistry {
+  """Name of the default artifact registry."""
+  name: String!
+}
+
+"""Added in 25.14.0"""
 input DeleteHuggingFaceRegistryInput {
   id: ID!
 }
@@ -842,6 +848,9 @@ type Query {
 
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
+
+  """Added in 25.14.0"""
+  defaultArtifactRegistry(artifactType: ArtifactType!): DefaultArtifactRegistry
 }
 
 type RawServiceConfig {
