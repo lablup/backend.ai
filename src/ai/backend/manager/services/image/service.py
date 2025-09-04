@@ -32,6 +32,10 @@ from ai.backend.manager.services.image.actions.forget_image_by_id import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.get_image_by_id import (
+    GetImageByIdAction,
+    GetImageByIdActionResult,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
@@ -82,6 +86,11 @@ class ImageService:
         self._agent_registry = agent_registry
         self._image_repository = image_repository
         self._admin_image_repository = admin_image_repository
+
+    async def get_image_by_id(self, action: GetImageByIdAction) -> GetImageByIdActionResult:
+        image = await self._image_repository.get_image_by_id(action.image_id)
+
+        return GetImageByIdActionResult(image=image)
 
     async def forget_image(self, action: ForgetImageAction) -> ForgetImageActionResult:
         if action.client_role == UserRole.SUPERADMIN:

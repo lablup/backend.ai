@@ -29,8 +29,7 @@ from ..models.gql import (
     GQLMetricMiddleware,
     GQLMutationPrivilegeCheckMiddleware,
     GraphQueryContext,
-    Mutation,
-    Query,
+    graphene_schema,
 )
 from .auth import auth_required
 from .manager import GQLMutationUnfrozenRequiredMiddleware
@@ -212,11 +211,7 @@ class PrivateContext:
 
 async def init(app: web.Application) -> None:
     app_ctx: PrivateContext = app["admin.context"]
-    app_ctx.gql_schema = graphene.Schema(
-        query=Query,
-        mutation=Mutation,
-        auto_camelcase=False,
-    )
+    app_ctx.gql_schema = graphene_schema
     app_ctx.gql_v2_schema = strawberry_schema
     root_ctx: RootContext = app["_root.context"]
     if root_ctx.config_provider.config.api.allow_graphql_schema_introspection:

@@ -20,6 +20,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.exception import UserNotFoundError
 from ai.backend.manager.data.user.types import (
     UserCreator,
     UserData,
@@ -191,6 +192,8 @@ class UserNode(graphene.ObjectType):
         query = sa.select(UserRow).where(UserRow.uuid == user_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_row = (await db_session.scalars(query)).first()
+            if user_row is None:
+                raise UserNotFoundError()
             return cls.from_row(graph_ctx, user_row)
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
@@ -337,6 +340,9 @@ class UserNode(graphene.ObjectType):
                 prj_row = cast(GroupRow, row)
                 result.append(GroupNode.from_row(graph_ctx, prj_row))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> "UserNode":
+        return await UserNode.get_node(info, self.id)
 
 
 class UserConnection(Connection):
