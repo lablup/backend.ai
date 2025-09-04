@@ -118,9 +118,11 @@ class ValkeyBgtaskClient:
         for tag in metadata.tags:
             tag_key = self._get_tag_key(tag)
             batch.sadd(tag_key, [metadata.task_id.hex])
+            batch.expire(tag_key, TASK_METADATA_TTL)
 
         server_key = self._get_server_key(metadata.server_id)
         batch.sadd(server_key, [metadata.task_id.hex])
+        batch.expire(server_key, TASK_METADATA_TTL)
         await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_decorator()
@@ -240,14 +242,28 @@ class ValkeyBgtaskClient:
         return result_type, metadata
 
     @valkey_decorator()
-    async def heartbeat(self, task_ids: Collection[TaskID]) -> None:
+    async def heartbeat(
+        self,
+        task_ids: Collection[TaskID],
+        server_id: Optional[str],
+        tags: Collection[str],
+    ) -> None:
         """
         Extend TTL to 24 hours for active tasks. Non-existent tasks are ignored.
         """
-        if not task_ids:
+        keys: list[str] = []
+
+        task_keys = [self._get_task_key(task_id) for task_id in task_ids]
+        keys.extend(task_keys)
+        if server_id is not None:
+            server_key = self._get_server_key(server_id)
+            keys.append(server_key)
+        tag_keys = [self._get_tag_key(tag) for tag in tags]
+        keys.extend(tag_keys)
+
+        if not keys:
             return
         batch = self._create_batch()
-        keys = [self._get_task_key(task_id) for task_id in task_ids]
         for key in keys:
             batch.expire(key, TASK_METADATA_TTL)
         await self._client.client.exec(batch, raise_on_error=True)
