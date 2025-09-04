@@ -271,6 +271,8 @@ enum ArtifactOrderField
   NAME @join__enumValue(graph: STRAWBERRY)
   TYPE @join__enumValue(graph: STRAWBERRY)
   SIZE @join__enumValue(graph: STRAWBERRY)
+  SCANNED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.14.0"""

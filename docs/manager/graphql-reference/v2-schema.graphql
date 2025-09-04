@@ -76,6 +76,8 @@ enum ArtifactOrderField {
   NAME
   TYPE
   SIZE
+  SCANNED_AT
+  UPDATED_AT
 }
 
 """Added in 25.14.0"""
