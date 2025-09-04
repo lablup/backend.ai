@@ -49,8 +49,12 @@ class ArtifactRow(Base):
     source_registry_type = sa.Column("source_registry_type", sa.String, nullable=False, index=True)
     description = sa.Column("description", sa.String, nullable=True)
     readonly = sa.Column("readonly", sa.Boolean, default=False, nullable=False)
-    scanned_at = sa.Column("scanned_at", sa.DateTime, nullable=False, server_default=sa.func.now())
-    updated_at = sa.Column("updated_at", sa.DateTime, nullable=False, server_default=sa.func.now())
+    scanned_at = sa.Column(
+        "scanned_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    )
+    updated_at = sa.Column(
+        "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    )
 
     huggingface_registry = relationship(
         "HuggingFaceRegistryRow",

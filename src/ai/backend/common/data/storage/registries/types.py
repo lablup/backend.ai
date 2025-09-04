@@ -16,6 +16,7 @@ class ModelSortKey(enum.StrEnum):
     LIKES = "likes"
 
 
+# TODO: Separate of the ModelTarget type used in the storage proxy and the one used in the manager
 class ModelTarget(BaseModel):
     model_id: str = Field(
         description="""
