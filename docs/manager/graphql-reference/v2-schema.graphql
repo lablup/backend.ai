@@ -81,6 +81,20 @@ enum ArtifactOrderField {
 }
 
 """Added in 25.14.0"""
+type ArtifactRegistry {
+  """Name of the default artifact registry."""
+  name: String!
+
+  """Type of the default artifact registry."""
+  type: ArtifactRegistryType!
+}
+
+enum ArtifactRegistryType {
+  HUGGINGFACE
+  RESERVOIR
+}
+
+"""Added in 25.14.0"""
 type ArtifactRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -280,12 +294,6 @@ type CreateReservoirRegistryPayload {
 
 """Date with time (isoformat)"""
 scalar DateTime
-
-"""Added in 25.14.0"""
-type DefaultArtifactRegistry {
-  """Name of the default artifact registry."""
-  name: String!
-}
 
 """Added in 25.14.0"""
 input DeleteHuggingFaceRegistryInput {
@@ -850,7 +858,7 @@ type Query {
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
 
   """Added in 25.14.0"""
-  defaultArtifactRegistry(artifactType: ArtifactType!): DefaultArtifactRegistry
+  defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
 }
 
 type RawServiceConfig {
