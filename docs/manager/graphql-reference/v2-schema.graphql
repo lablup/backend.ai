@@ -615,7 +615,7 @@ input ModelRuntimeConfigInput {
 """Added in 25.14.0"""
 input ModelTarget {
   modelId: String!
-  revision: String! = "main"
+  revision: String = null
 }
 
 type Mutation {

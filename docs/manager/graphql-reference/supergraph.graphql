@@ -2912,7 +2912,7 @@ input ModelTarget
   @join__type(graph: STRAWBERRY)
 {
   modelId: String!
-  revision: String! = "main"
+  revision: String = null
 }
 
 type ModifyAgent
