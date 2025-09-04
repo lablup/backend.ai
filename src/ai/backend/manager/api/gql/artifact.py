@@ -280,18 +280,6 @@ class Artifact(Node):
             offset=offset,
         )
 
-    # TODO: Is this necessary?
-    # @strawberry.field
-    # async def updated_at(self, info: Info[StrawberryGQLContext]) -> Optional[datetime]:
-    #     action_result = await info.context.processors.artifact.get_revisions.wait_for_complete(
-    #         GetArtifactRevisionsAction(uuid.UUID(self.id))
-    #     )
-
-    #     updated_at_list = [
-    #         r.updated_at for r in action_result.revisions if r.updated_at is not None
-    #     ]
-    #     return max(updated_at_list) if updated_at_list else None
-
 
 @strawberry.type(description="Added in 25.14.0")
 class ArtifactRevision(Node):
