@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional, override
 
 import sqlalchemy as sa
@@ -323,7 +323,7 @@ class ArtifactRepository:
                     has_changes = existing_artifact.description != artifact_data.description
                     if has_changes:
                         existing_artifact.description = artifact_data.description
-                        existing_artifact.updated_at = datetime.now()
+                        existing_artifact.updated_at = datetime.now(timezone.utc)
 
                     await db_sess.flush()
                     await db_sess.refresh(
