@@ -21,7 +21,7 @@ from sqlalchemy.orm import foreign, joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.user.types import UserData, UserRole, UserStatus
+from ai.backend.manager.data.user.types import UserCreator, UserData, UserRole, UserStatus
 
 from .base import (
     Base,
@@ -186,6 +186,33 @@ class UserRow(Base):
     )
 
     @classmethod
+    def from_creator(cls, creator: UserCreator) -> Self:
+        return cls(
+            username=creator.username,
+            email=creator.email,
+            password=creator.password,
+            need_password_change=creator.need_password_change
+            if creator.need_password_change is not None
+            else False,
+            full_name=creator.full_name,
+            description=creator.description,
+            status=creator.status if creator.status is not None else UserStatus.BEFORE_VERIFICATION,
+            domain_name=creator.domain_name,
+            role=creator.role if creator.role is not None else UserRole.USER,
+            resource_policy=creator.resource_policy
+            if creator.resource_policy is not None
+            else "default",
+            allowed_client_ip=creator.allowed_client_ip,
+            totp_activated=creator.totp_activated if creator.totp_activated is not None else False,
+            sudo_session_enabled=creator.sudo_session_enabled
+            if creator.sudo_session_enabled is not None
+            else False,
+            container_uid=creator.container_uid,
+            container_main_gid=creator.container_main_gid,
+            container_gids=creator.container_gids,
+        )
+
+    @classmethod
     def load_keypairs(cls) -> Callable:
         from .keypair import KeyPairRow
 
@@ -320,7 +347,7 @@ class UserRow(Base):
             domain_name=self.domain_name,
             role=self.role.value,
             resource_policy=self.resource_policy,
-            allowed_client_ip=self.allowed_client_ip or [],
+            allowed_client_ip=self.allowed_client_ip,
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,
