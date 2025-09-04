@@ -200,22 +200,22 @@ class GQLAPIHandler:
     async def handle_gql_strawberry(
         self,
         body: BodyParam[GraphQLReq],
-        config_ctx: GQLInspectionConfigCtx,
+        gql_config_ctx: GQLInspectionConfigCtx,
         config_provider_ctx: ConfigProviderCtx,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         rules = []
 
-        if not config_ctx.allow_graphql_schema_introspection:
+        if not gql_config_ctx.allow_graphql_schema_introspection:
             rules.append(CustomIntrospectionRule)
-        max_depth = cast(int | None, config_ctx.max_gql_query_depth)
+        max_depth = cast(int | None, gql_config_ctx.max_gql_query_depth)
         if max_depth is not None:
             rules.append(depth_limit_validator(max_depth=max_depth))
 
         if rules:
             validate_errors = validate(
                 # TODO: Instead of accessing private field, use another approach
-                schema=config_ctx.gql_v2_schema._schema,
+                schema=gql_config_ctx.gql_v2_schema._schema,
                 document_ast=parse(body.parsed.query),
                 rules=rules,
             )
@@ -239,7 +239,7 @@ class GQLAPIHandler:
             body.parsed.operation_name,
         )
 
-        result = await config_ctx.gql_v2_schema.execute(
+        result = await gql_config_ctx.gql_v2_schema.execute(
             query,
             root_value=None,
             variable_values=variables,
