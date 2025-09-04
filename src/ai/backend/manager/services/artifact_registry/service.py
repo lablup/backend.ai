@@ -226,7 +226,7 @@ class ArtifactRegistryService:
             )
         elif action.registry_name:
             registry_meta = (
-                await self._artifact_registry_repository.get_artifact_registry_data_by_name(  # noqa: E501
+                await self._artifact_registry_repository.get_artifact_registry_data_by_name(
                     action.registry_name
                 )
             )
