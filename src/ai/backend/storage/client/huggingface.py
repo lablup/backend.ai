@@ -124,7 +124,7 @@ class HuggingFaceClient:
             HfModelInfo object with model metadata
         """
         model_id = model.model_id
-        revision = model.revision
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
             result = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: model_info(model_id, revision=revision, token=self._token)
@@ -143,7 +143,7 @@ class HuggingFaceClient:
             List of file paths
         """
         model_id = model.model_id
-        revision = model.revision
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
             filepaths = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: list_repo_files(model_id, revision=revision, token=self._token)
@@ -165,7 +165,7 @@ class HuggingFaceClient:
             List of RepoFile or RepoFolder objects
         """
         model_id = model.model_id
-        revision = model.revision
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
 
         try:
             info = await asyncio.get_event_loop().run_in_executor(
@@ -191,7 +191,7 @@ class HuggingFaceClient:
         return hf_hub_url(
             repo_id=model.model_id,
             filename=filename,
-            revision=model.revision,
+            revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
             endpoint=self._endpoint,
             repo_type="model",
         )

@@ -294,7 +294,7 @@ class HuggingFaceService:
 
         artifact_total_size = 0
         model_id = model.model_id
-        revision = model.revision
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
             log.info(f"Rescanning model for latest metadata: {model}")
             scanner = self._make_scanner(registry_name)
@@ -339,7 +339,7 @@ class HuggingFaceService:
             await self._event_producer.anycast_event(
                 ModelImportDoneEvent(
                     model_id=model_id,
-                    revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
+                    revision=revision,
                     registry_name=registry_name,
                     registry_type=ArtifactRegistryType.HUGGINGFACE,
                     total_size=artifact_total_size,
@@ -349,9 +349,7 @@ class HuggingFaceService:
         except HuggingFaceModelNotFoundError:
             raise
         except Exception as e:
-            raise HuggingFaceAPIError(
-                f"Import failed for {model_id}, revision={revision}: {str(e)}"
-            ) from e
+            raise HuggingFaceAPIError(f"Import failed for {model}: {str(e)}") from e
 
     async def _download_readme_content(self, download_url: str) -> Optional[str]:
         """Download README content from the given URL.
@@ -630,7 +628,8 @@ class HuggingFaceService:
 
         try:
             # Create storage key path
-            storage_key = f"{model.model_id}/{model.revision}/{file_info.path}"
+            revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+            storage_key = f"{model.model_id}/{revision}/{file_info.path}"
 
             log.info(
                 f"[stream_hf2b] Starting file upload to {storage_name}: {model}, file_path={file_info.path}, "
