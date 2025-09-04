@@ -402,7 +402,7 @@
         "title": "HarborWebhookRequestModel",
         "type": "object"
       },
-      "VFolderPermission": {
+      "VFolderMountPermission": {
         "description": "Permissions for a virtual folder given to a specific access key.\nRW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.",
         "enum": [
           "ro",
@@ -410,7 +410,7 @@
           "wd",
           "wd"
         ],
-        "title": "VFolderPermission",
+        "title": "VFolderMountPermission",
         "type": "string"
       },
       "VFolderUsageMode": {
@@ -447,7 +447,7 @@
             "default": "general"
           },
           "permission": {
-            "$ref": "#/components/schemas/VFolderPermission",
+            "$ref": "#/components/schemas/VFolderMountPermission",
             "default": "rw"
           },
           "unmanagedPath": {
@@ -613,7 +613,7 @@
           "permission": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/VFolderPermission"
+                "$ref": "#/components/schemas/VFolderMountPermission"
               },
               {
                 "type": "null"
