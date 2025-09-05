@@ -1651,7 +1651,7 @@ type Query {
   revisions(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
 
   """Added in 25.13.0"""
-  revision(id: ID!): ModelRevision
+  revision(id: ID!): ModelRevision!
 
   """Added in 25.13.0"""
   replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection!

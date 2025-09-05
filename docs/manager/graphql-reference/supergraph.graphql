@@ -5407,7 +5407,7 @@ type Query
   revisions(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
-  revision(id: ID!): ModelRevision @join__field(graph: STRAWBERRY)
+  revision(id: ID!): ModelRevision! @join__field(graph: STRAWBERRY)
 
   """Added in 25.13.0"""
   replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection! @join__field(graph: STRAWBERRY)
