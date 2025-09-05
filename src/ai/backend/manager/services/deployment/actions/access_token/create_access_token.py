@@ -1,23 +1,19 @@
-"""Action for creating deployments."""
-
 from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.deployment.creator import NewDeploymentCreator
-from ai.backend.manager.data.deployment.types import ModelDeploymentData
+from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
+from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
 
 
 @dataclass
-class CreateDeploymentAction(DeploymentBaseAction):
-    """Action to create a new deployment(Model Service)."""
-
-    creator: NewDeploymentCreator
+class CreateAccessTokenAction(DeploymentBaseAction):
+    creator: ModelDeploymentAccessTokenCreator
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None  # New deployment doesn't have an ID yet
+        return str(self.creator.model_deployment_id)
 
     @override
     @classmethod
@@ -26,8 +22,8 @@ class CreateDeploymentAction(DeploymentBaseAction):
 
 
 @dataclass
-class CreateDeploymentActionResult(BaseActionResult):
-    data: ModelDeploymentData
+class CreateAccessTokenActionResult(BaseActionResult):
+    data: ModelDeploymentAccessTokenData
 
     @override
     def entity_id(self) -> Optional[str]:
