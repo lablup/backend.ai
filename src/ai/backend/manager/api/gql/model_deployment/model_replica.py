@@ -66,7 +66,6 @@ class ReplicaFilter:
     AND: Optional[list["ReplicaFilter"]] = None
     OR: Optional[list["ReplicaFilter"]] = None
     NOT: Optional[list["ReplicaFilter"]] = None
-    DISTINCT: Optional[bool] = None
 
 
 @strawberry.enum(description="Added in 25.13.0")
