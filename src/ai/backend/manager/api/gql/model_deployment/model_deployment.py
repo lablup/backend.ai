@@ -161,7 +161,6 @@ class DeploymentFilter:
     AND: Optional[list["DeploymentFilter"]] = None
     OR: Optional[list["DeploymentFilter"]] = None
     NOT: Optional[list["DeploymentFilter"]] = None
-    DISTINCT: Optional[bool] = None
 
 
 @strawberry.input(description="Added in 25.13.0")

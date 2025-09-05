@@ -101,7 +101,6 @@ class ModelRevisionFilter:
     AND: Optional[list["ModelRevisionFilter"]] = None
     OR: Optional[list["ModelRevisionFilter"]] = None
     NOT: Optional[list["ModelRevisionFilter"]] = None
-    DISTINCT: Optional[bool] = None
 
 
 @strawberry.enum(description="Added in 25.13.0")
