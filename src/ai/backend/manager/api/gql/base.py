@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional, Type
+from typing import TYPE_CHECKING, Any, Optional, Type, cast
 
 import orjson
 import strawberry
 from graphql import StringValueNode
 from graphql_relay.utils import base64, unbase64
 from strawberry.types import get_object_definition, has_object_definition
+
+from ai.backend.common.types import ResourceSlot
 
 if TYPE_CHECKING:
     from ai.backend.manager.types import (
@@ -133,33 +136,28 @@ class Ordering(StrEnum):
     DESC_NULLS_LAST = "DESC_NULLS_LAST"
 
 
-def serialize_json(value: Any) -> str:
-    if isinstance(value, (dict, list)):
-        return orjson.dumps(value).decode("utf-8")
-    elif isinstance(value, str):
-        return value
-    else:
-        return orjson.dumps(value).decode("utf-8")
-
-
-def parse_json(value: str | bytes) -> Any:
-    if isinstance(value, str):
-        return orjson.loads(value)
-    elif isinstance(value, bytes):
-        return orjson.loads(value)
-    else:
-        return value
-
-
-@strawberry.scalar(
-    name="JSONString",
-    description="A custom scalar for JSON strings using orjson",
-    serialize=serialize_json,
-    parse_value=parse_json,
-    parse_literal=lambda v: parse_json(v.value) if hasattr(v, "value") else v,
-)
+@strawberry.scalar(description="Added in 25.13.0")
 class JSONString:
-    pass
+    @staticmethod
+    def parse_value(value: str | bytes) -> Mapping[str, Any]:
+        if isinstance(value, str):
+            return orjson.loads(value)
+        if isinstance(value, bytes):
+            return orjson.loads(value)
+        return value
+
+    @staticmethod
+    def serialize(value: Any) -> JSONString:
+        if isinstance(value, (dict, list)):
+            return cast(JSONString, orjson.dumps(value).decode("utf-8"))
+        elif isinstance(value, str):
+            return cast(JSONString, value)
+        else:
+            return cast(JSONString, orjson.dumps(value).decode("utf-8"))
+
+    @staticmethod
+    def from_resource_slot(resource_slot: ResourceSlot) -> JSONString:
+        return JSONString.serialize(resource_slot.to_json())
 
 
 def to_global_id(type_: Type[Any], local_id: uuid.UUID | str) -> str:
