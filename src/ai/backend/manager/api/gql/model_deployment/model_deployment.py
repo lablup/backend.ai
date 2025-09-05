@@ -1,6 +1,5 @@
 from collections.abc import Sequence
 from datetime import datetime
-from enum import StrEnum
 from typing import AsyncGenerator, Optional
 from uuid import UUID, uuid4
 
@@ -46,6 +45,7 @@ from ai.backend.manager.data.deployment.modifier import NewDeploymentModifier
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentOrderField,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ReplicaSpec,
@@ -54,6 +54,13 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.models.gql_models.domain import DomainNode
 from ai.backend.manager.models.gql_models.group import GroupNode
 from ai.backend.manager.models.gql_models.user import UserNode
+from ai.backend.manager.repositories.deployment.types.types import (
+    DeploymentFilterOptions,
+    DeploymentStatusFilterType,
+)
+from ai.backend.manager.repositories.deployment.types.types import (
+    DeploymentStatusFilter as RepoDeploymentStatusFilter,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule_by_deployment_id import (
     GetAutoScalingRulesByDeploymentIdAction,
 )
@@ -92,13 +99,6 @@ DeploymentStrategyType = strawberry.enum(
     name="DeploymentStrategyType",
     description="Added in 25.13.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
 )
-
-
-@strawberry.enum(description="Added in 25.13.0")
-class DeploymentOrderField(StrEnum):
-    CREATED_AT = "CREATED_AT"
-    UPDATED_AT = "UPDATED_AT"
-    NAME = "NAME"
 
 
 @strawberry.type(description="Added in 25.13.0")
@@ -403,6 +403,36 @@ class DeploymentFilter:
     AND: Optional[list["DeploymentFilter"]] = None
     OR: Optional[list["DeploymentFilter"]] = None
     NOT: Optional[list["DeploymentFilter"]] = None
+
+    def to_repo_filter(self) -> DeploymentFilterOptions:
+        repo_filter = DeploymentFilterOptions()
+
+        repo_filter.name = self.name
+        repo_filter.open_to_public = self.open_to_public
+        repo_filter.tags = self.tags
+        repo_filter.endpoint_url = self.endpoint_url
+        repo_filter.id = UUID(self.id) if self.id else None
+        if self.status:
+            if self.status.in_ is not None:
+                repo_filter.status = RepoDeploymentStatusFilter(
+                    type=DeploymentStatusFilterType.IN,
+                    values=[CommonDeploymentStatus(status) for status in self.status.in_],
+                )
+            elif self.status.equals is not None:
+                repo_filter.status = RepoDeploymentStatusFilter(
+                    type=DeploymentStatusFilterType.EQUALS,
+                    values=[CommonDeploymentStatus(self.status.equals)],
+                )
+
+        # Handle logical operations
+        if self.AND:
+            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
+        if self.OR:
+            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
+        if self.NOT:
+            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
+
+        return repo_filter
 
 
 @strawberry.input(description="Added in 25.13.0")
