@@ -1775,6 +1775,106 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/artifact-registries/cancel-import": {
+      "post": {
+        "operationId": "artifact-registries.cancel_import_artifact",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifact-registries/approve": {
+      "post": {
+        "operationId": "artifact-registries.approve_artifact_revision",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifact-registries/reject": {
+      "post": {
+        "operationId": "artifact-registries.reject_artifact_revision",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifact-registries/import": {
+      "post": {
+        "operationId": "artifact-registries.import_artifacts",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifact-registries/update": {
+      "patch": {
+        "operationId": "artifact-registries.update_artifact",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/config/resource-slots": {
       "get": {
         "operationId": "config.get_resource_slots",
