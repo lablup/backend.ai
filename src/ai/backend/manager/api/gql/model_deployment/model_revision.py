@@ -440,7 +440,7 @@ async def revisions(
 
 
 @strawberry.field(description="Added in 25.13.0")
-async def revision(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelRevision]:
+async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision:
     """Get a specific revision by ID."""
     return mock_model_revision_1
 
