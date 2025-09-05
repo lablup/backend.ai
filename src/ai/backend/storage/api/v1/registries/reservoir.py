@@ -73,7 +73,7 @@ def create_app(ctx: RootContext) -> web.Application:
         ReservoirServiceArgs(
             background_task_manager=ctx.background_task_manager,
             event_producer=ctx.event_producer,
-            storage_configs=ctx.local_config.storages,
+            storage_pool=ctx.storage_pool,
             reservoir_registry_configs=reservoir_registry_configs,
         )
     )
