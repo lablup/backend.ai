@@ -220,6 +220,3 @@ async def test_delete_object_invalid_bucket(storages_service: ObjectStorageServi
     """Test object deletion with invalid bucket"""
     with pytest.raises(StorageBucketNotFoundError):
         await storages_service.delete_object("test_storage", "invalid-bucket", _TEST_KEY)
-
-
-# Removed obsolete _get_s3_client tests since the method is now internal to ObjectStorage
