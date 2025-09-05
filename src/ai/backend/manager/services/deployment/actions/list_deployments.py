@@ -1,34 +1,32 @@
-"""Action for creating deployments."""
-
 from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.deployment.creator import NewDeploymentCreator
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
+from ai.backend.manager.types import PaginationOptions
 
 
 @dataclass
-class CreateDeploymentAction(DeploymentBaseAction):
-    """Action to create a new deployment(Model Service)."""
-
-    creator: NewDeploymentCreator
+class ListDeploymentsAction(DeploymentBaseAction):
+    pagination: PaginationOptions
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None  # New deployment doesn't have an ID yet
+        return None
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "create"
+        return "list_deployments"
 
 
 @dataclass
-class CreateDeploymentActionResult(BaseActionResult):
-    data: ModelDeploymentData
+class ListDeploymentsActionResult(BaseActionResult):
+    data: list[ModelDeploymentData]
+    # Note: Total number of deployments, this is not equals to len(data)
+    total_count: int
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.data.id)
+        return None

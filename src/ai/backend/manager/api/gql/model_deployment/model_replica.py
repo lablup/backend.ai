@@ -1,23 +1,35 @@
-from datetime import datetime, timedelta
+from collections.abc import Sequence
+from datetime import datetime
 from enum import StrEnum
-from typing import AsyncGenerator, Optional, cast
-from uuid import UUID, uuid4
+from typing import AsyncGenerator, Optional
+from uuid import UUID
 
 import strawberry
+from aiotools import apartial
 from strawberry import ID, Info
+from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 
 from ai.backend.common.data.model_deployment.types import ActivenessStatus as CommonActivenessStatus
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
+from ai.backend.common.exception import ModelDeploymentUnavailableError
 from ai.backend.manager.api.gql.base import JSONString, OrderDirection
 from ai.backend.manager.api.gql.session import Session
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.data.deployment.types import ModelReplicaData
 from ai.backend.manager.models.gql_relay import AsyncNode
+from ai.backend.manager.services.deployment.actions.get_replicas_by_deployment_id import (
+    GetReplicasByDeploymentIdAction,
+)
+from ai.backend.manager.services.deployment.actions.get_replicas_by_revision_id import (
+    GetReplicasByRevisionIdAction,
+)
+from ai.backend.manager.services.deployment.actions.list_replicas import ListReplicasAction
+from ai.backend.manager.types import PaginationOptions
 
 from .model_revision import (
     ModelRevision,
-    mock_model_revision_1,
 )
 
 ReadinessStatus = strawberry.enum(
@@ -83,16 +95,8 @@ class ReplicaOrderBy:
 @strawberry.type(description="Added in 25.13.0")
 class ModelReplica(Node):
     id: NodeID
-    revision: ModelRevision
     _session_id: strawberry.Private[UUID]
-
-    @strawberry.field(
-        description="The session ID associated with the replica. This can be null right after replica creation."
-    )
-    async def session(self, info: Info[StrawberryGQLContext]) -> "Session":
-        session_global_id = AsyncNode.to_global_id("ComputeSessionNode", self._session_id)
-        return Session(id=ID(session_global_id))
-
+    _revision_id: strawberry.Private[UUID]
     readiness_status: ReadinessStatus = strawberry.field(
         description="This represents whether the replica has been checked and its health state.",
     )
@@ -111,6 +115,77 @@ class ModelReplica(Node):
         description='live statistics of the routing node. e.g. "live_stat": "{\\"cpu_util\\": {\\"current\\": \\"7.472\\", \\"capacity\\": \\"1000\\", \\"pct\\": \\"0.75\\", \\"unit_hint\\": \\"percent\\"}}"'
     )
 
+    @strawberry.field(
+        description="The session ID associated with the replica. This can be null right after replica creation."
+    )
+    async def session(self, info: Info[StrawberryGQLContext]) -> "Session":
+        session_global_id = AsyncNode.to_global_id("ComputeSessionNode", self._session_id)
+        return Session(id=ID(session_global_id))
+
+    @strawberry.field
+    async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision:
+        """Resolve revision using dataloader."""
+        revision_loader = DataLoader(apartial(ModelRevision.batch_load_by_ids, info.context))
+        revision: list[ModelRevision] = await revision_loader.load(self._revision_id)
+        return revision[0]
+
+    @classmethod
+    def from_dataclass(cls, data: ModelReplicaData) -> "ModelReplica":
+        return cls(
+            id=ID(str(data.id)),
+            _revision_id=data.revision_id,
+            _session_id=data.session_id,
+            readiness_status=ReadinessStatus(data.readiness_status),
+            liveness_status=LivenessStatus(data.liveness_status),
+            activeness_status=ActivenessStatus(data.activeness_status),
+            weight=data.weight,
+            detail=JSONString.serialize(data.detail),
+            created_at=data.created_at,
+            live_stat=JSONString.serialize(data.live_stat),
+        )
+
+    @classmethod
+    async def batch_load_by_deployment_ids(
+        cls, ctx: StrawberryGQLContext, deployment_ids: Sequence[UUID]
+    ) -> list["ModelReplica"]:
+        """Batch load replicas by their IDs."""
+        processor = ctx.processors.deployment
+        if processor is None:
+            raise ModelDeploymentUnavailableError(
+                "Model Deployment feature is unavailable. Please contact support."
+            )
+
+        replicas = []
+
+        for deployment_id in deployment_ids:
+            action_result = await processor.get_replicas_by_deployment_id.wait_for_complete(
+                GetReplicasByDeploymentIdAction(deployment_id=deployment_id)
+            )
+            replicas.extend(action_result.data)
+
+        return [cls.from_dataclass(data) for data in replicas]
+
+    @classmethod
+    async def batch_load_by_revision_ids(
+        cls, ctx: StrawberryGQLContext, revision_ids: Sequence[UUID]
+    ) -> list["ModelReplica"]:
+        """Batch load replicas by their revision IDs."""
+        processor = ctx.processors.deployment
+        if processor is None:
+            raise ModelDeploymentUnavailableError(
+                "Model Deployment feature is unavailable. Please contact support."
+            )
+
+        replicas = []
+
+        for revision_id in revision_ids:
+            action_result = await processor.get_replicas_by_revision_id.wait_for_complete(
+                GetReplicasByRevisionIdAction(revision_id=revision_id)
+            )
+            replicas.extend(action_result.data)
+
+        return [cls.from_dataclass(data) for data in replicas]
+
 
 ModelReplicaEdge = Edge[ModelReplica]
 
@@ -123,62 +198,19 @@ class ModelReplicaConnection(Connection[ModelReplica]):
         super().__init__(*args, **kwargs)
         self.count = count
 
+    @classmethod
+    def from_dataclass(cls, replicas_data: list[ModelReplicaData]) -> "ModelReplicaConnection":
+        nodes = [ModelReplica.from_dataclass(data) for data in replicas_data]
+        edges = [ModelReplicaEdge(node=node, cursor=str(node.id)) for node in nodes]
 
-# Mock Model Replicas
-mock_model_replica_1 = ModelReplica(
-    id=UUID("b62f9890-228a-40c9-a614-63387805b9a7"),
-    revision=mock_model_revision_1,
-    _session_id=uuid4(),
-    readiness_status=CommonReadinessStatus.HEALTHY,
-    liveness_status=CommonLivenessStatus.HEALTHY,
-    activeness_status=CommonActivenessStatus.ACTIVE,
-    weight=1,
-    detail=cast(
-        JSONString,
-        '{"type": "creation_success", "message": "Model replica created successfully", "status": "operational"}',
-    ),
-    created_at=datetime.now() - timedelta(days=5),
-    live_stat=cast(
-        JSONString,
-        '{"requests": 1523, "latency_ms": 187, "tokens_per_second": 42.5}',
-    ),
-)
+        page_info = PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        )
 
-
-mock_model_replica_2 = ModelReplica(
-    id=UUID("7562e9d4-a368-4e28-9092-65eb91534bac"),
-    revision=mock_model_revision_1,
-    _session_id=uuid4(),
-    readiness_status=CommonReadinessStatus.HEALTHY,
-    liveness_status=CommonLivenessStatus.HEALTHY,
-    activeness_status=CommonActivenessStatus.ACTIVE,
-    weight=2,
-    detail=cast(
-        JSONString,
-        '{"type": "creation_success", "message": "Model replica created successfully", "status": "operational"}',
-    ),
-    created_at=datetime.now() - timedelta(days=5),
-    live_stat=cast(
-        JSONString,
-        '{"requests": 1456, "latency_ms": 195, "tokens_per_second": 41.2}',
-    ),
-)
-
-mock_model_replica_3 = ModelReplica(
-    id=UUID("2a2388ea-a312-422a-b77e-0e0b61c48145"),
-    revision=mock_model_revision_1,
-    _session_id=uuid4(),
-    readiness_status=CommonReadinessStatus.UNHEALTHY,
-    liveness_status=CommonLivenessStatus.HEALTHY,
-    activeness_status=CommonActivenessStatus.INACTIVE,
-    weight=0,
-    detail=cast(
-        JSONString,
-        '{"type": "creation_failed", "errors": [{"src": "", "name": "InvalidAPIParameters", "repr": "<InvalidAPIParameters(400): Missing or invalid API parameters. (`mount-in-session` Not allowed in vfolder host(`seoul-h100:flash02`))>"}]}',
-    ),
-    created_at=datetime.now() - timedelta(days=2),
-    live_stat=cast(JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'),
-)
+        return cls(count=len(nodes), edges=edges, page_info=page_info)
 
 
 @strawberry.type(description="Added in 25.13.0")
@@ -189,19 +221,10 @@ class ReplicaStatusChangedPayload:
 @strawberry.field(description="Added in 25.13.0")
 async def replica(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelReplica]:
     """Get a specific replica by ID."""
-
-    return ModelReplica(
-        id=id,
-        revision=mock_model_revision_1,
-        _session_id=uuid4(),
-        readiness_status=CommonReadinessStatus.NOT_CHECKED,
-        liveness_status=CommonLivenessStatus.HEALTHY,
-        activeness_status=CommonActivenessStatus.ACTIVE,
-        weight=1,
-        detail=cast(JSONString, "{}"),
-        created_at=datetime.now() - timedelta(days=2),
-        live_stat=cast(JSONString, '{"requests": 0, "latency_ms": 0, "tokens_per_second": 0}'),
-    )
+    _, replica_id = AsyncNode.resolve_global_id(info, id)
+    replica_loader = DataLoader(apartial(ModelReplica.batch_load_by_revision_ids, info.context))
+    replicas: list[ModelReplica] = await replica_loader.load(UUID(replica_id))
+    return replicas[0]
 
 
 async def resolve_replicas(
@@ -215,18 +238,29 @@ async def resolve_replicas(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ModelReplicaConnection:
+    processor = info.context.processors.deployment
+    if processor is None:
+        raise ModelDeploymentUnavailableError(
+            "Model Deployment feature is unavailable. Please contact support."
+        )
+    action_result = await processor.list_replicas.wait_for_complete(
+        ListReplicasAction(pagination=PaginationOptions())
+    )
+    edges = []
+    for replica_data in action_result.data:
+        node = ModelReplica.from_dataclass(replica_data)
+        edge = ModelReplicaEdge(node=node, cursor=str(node.id))
+        edges.append(edge)
+
+    # Mock pagination info for demonstration purposes
     return ModelReplicaConnection(
-        count=3,
-        edges=[
-            ModelReplicaEdge(node=mock_model_replica_1, cursor="replica-cursor-1"),
-            ModelReplicaEdge(node=mock_model_replica_2, cursor="replica-cursor-2"),
-            ModelReplicaEdge(node=mock_model_replica_3, cursor="replica-cursor-3"),
-        ],
+        count=len(edges),
+        edges=edges,
         page_info=PageInfo(
             has_next_page=False,
             has_previous_page=False,
-            start_cursor="replica-cursor-1",
-            end_cursor="replica-cursor-3",
+            start_cursor=str(edges[0].node.id) if edges else None,
+            end_cursor=str(edges[-1].node.id) if edges else None,
         ),
     )
 
@@ -261,7 +295,5 @@ async def replica_status_changed(
     revision_id: ID,
 ) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:
     """Subscribe to replica status changes."""
-    replicas = [mock_model_replica_1, mock_model_replica_2, mock_model_replica_3]
-
-    for replica in replicas:
+    if False:  # Replace with actual subscription logic
         yield ReplicaStatusChangedPayload(replica=replica)
