@@ -5,6 +5,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelTarget
+from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import ArtifactType
 from ai.backend.manager.types import PaginationOptions
 
@@ -36,3 +37,28 @@ class CleanupArtifactsReq(BaseRequestModel):
     artifact_revision_ids: list[uuid.UUID] = Field(
         description="List of artifact revision IDs to cleanup."
     )
+
+
+class CancelImportArtifactReq(BaseRequestModel):
+    artifact_revision_id: uuid.UUID = Field(
+        description="The artifact revision ID to cancel import."
+    )
+
+
+class ApproveArtifactRevisionReq(BaseRequestModel):
+    artifact_revision_id: uuid.UUID = Field(description="The artifact revision ID to approve.")
+
+
+class RejectArtifactRevisionReq(BaseRequestModel):
+    artifact_revision_id: uuid.UUID = Field(description="The artifact revision ID to reject.")
+
+
+class ImportArtifactsReq(BaseRequestModel):
+    artifact_revision_ids: list[uuid.UUID] = Field(
+        description="List of artifact revision IDs to import."
+    )
+
+
+class UpdateArtifactReq(BaseRequestModel):
+    artifact_id: uuid.UUID = Field(description="The artifact ID to update.")
+    modifier: ArtifactModifier = Field(description="Fields to modify in the artifact.")
