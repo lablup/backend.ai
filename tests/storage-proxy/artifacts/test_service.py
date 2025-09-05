@@ -614,11 +614,16 @@ class TestReservoirService:
     def test_get_s3_client_storage_not_found(self, reservoir_service: ReservoirService) -> None:
         """Test S3 client creation with storage not found."""
         # Configure mock to raise KeyError for unknown storage
-        reservoir_service._storage_pool.get_storage.side_effect = lambda name: (
-            reservoir_service._storage_pool.get_storage.return_value
-            if name == "test_storage"
-            else (_ for _ in ()).throw(KeyError(name))
-        )
+        original_storage = reservoir_service._storage_pool.get_storage("test_storage")
+
+        def mock_get_storage(name: str):
+            if name == "test_storage":
+                return original_storage
+            else:
+                raise KeyError(name)
+
+        reservoir_service._storage_pool = Mock(spec=StoragePool)
+        reservoir_service._storage_pool.get_storage = Mock(side_effect=mock_get_storage)
 
         with pytest.raises(StorageNotFoundError):
             reservoir_service._get_s3_client("nonexistent_storage")
@@ -630,7 +635,8 @@ class TestReservoirService:
     ) -> None:
         """Test S3 client creation with no buckets configured."""
         # Mock storage with empty bucket (this would be invalid ObjectStorage config)
-        mock_storage = reservoir_service._storage_pool.get_storage.return_value
+        mock_storage = reservoir_service._storage_pool.get_storage("test_storage")
+        assert isinstance(mock_storage, MagicMock)  # Type narrowing for mypy
         mock_storage._bucket = ""  # Simulate no bucket configured
 
         with pytest.raises(StorageBucketNotFoundError):
