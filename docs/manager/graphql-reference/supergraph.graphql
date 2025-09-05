@@ -2991,11 +2991,11 @@ type ModelDeployment implements Node
   metadata: ModelDeploymentMetadata!
   networkAccess: ModelDeploymentNetworkAccess!
   revision: ModelRevision
-  revisionHistory: ModelRevisionConnection!
-  scalingRule: ScalingRule!
-  replicaState: ReplicaState!
   defaultDeploymentStrategy: DeploymentStrategy!
   createdUser: UserNode!
+  scalingRule: ScalingRule!
+  replicaState: ReplicaState!
+  revisionHistory: ModelRevisionConnection!
 }
 
 """Added in 25.13.0"""
@@ -3028,10 +3028,10 @@ type ModelDeploymentMetadata
   name: String!
   status: DeploymentStatus!
   tags: [String!]!
-  project: GroupNode!
-  domain: DomainNode!
   createdAt: DateTime!
   updatedAt: DateTime!
+  project: GroupNode!
+  domain: DomainNode!
 }
 
 """Added in 25.13.0"""
@@ -3066,9 +3066,9 @@ input ModelDeploymentNetworkAccessInput
 type ModelMountConfig
   @join__type(graph: STRAWBERRY)
 {
-  vfolder: VirtualFolderNode!
   mountDestination: String!
   definitionPath: String!
+  vfolder: VirtualFolderNode!
 }
 
 """Added in 25.13.0"""
@@ -3087,7 +3087,6 @@ type ModelReplica implements Node
 {
   """The Globally Unique ID of this object"""
   id: ID!
-  revision: ModelRevision!
 
   """
   This represents whether the replica has been checked and its health state.
@@ -3120,6 +3119,7 @@ type ModelReplica implements Node
   The session ID associated with the replica. This can be null right after replica creation.
   """
   session: ComputeSessionNode!
+  revision: ModelRevision!
 }
 
 """Added in 25.13.0"""
@@ -3158,8 +3158,8 @@ type ModelRevision implements Node
   modelRuntimeConfig: ModelRuntimeConfig!
   modelMountConfig: ModelMountConfig!
   extraMounts: ExtraVFolderMountConnection!
-  image: ImageNode!
   createdAt: DateTime!
+  image: ImageNode!
 }
 
 """Added in 25.13.0"""
@@ -4084,7 +4084,9 @@ type Mutation
   """Added in 25.13.0"""
   addModelRevision(input: AddModelRevisionInput!): AddModelRevisionPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.13.0"""
+  """
+  Added in 25.13.0. Create model revision which is not attached to any deployment.
+  """
   createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
@@ -5043,8 +5045,6 @@ type ReservoirRegistryEdge
 type ResourceConfig
   @join__type(graph: STRAWBERRY)
 {
-  resourceGroup: ScalingGroupNode!
-
   """
   Resource Slots are a JSON string that describes the resources allocated for the deployment. Example: "resourceSlots": "{\"cpu\": \"1\", \"mem\": \"1073741824\", \"cuda.device\": \"0\"}"
   """
@@ -5054,6 +5054,7 @@ type ResourceConfig
   Resource Options are a JSON string that describes additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\"shmem\": \"64m\"}"
   """
   resourceOpts: JSONString
+  resourceGroup: ScalingGroupNode!
 }
 
 """Added in 25.13.0"""

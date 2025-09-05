@@ -165,6 +165,7 @@ class ErrorDomain(enum.StrEnum):
     PERMISSION = "permission"
     METRIC = "metric"
     STORAGE_PROXY = "storage-proxy"
+    MODEL_DEPLOYMENT = "model-deployment"
 
 
 class ErrorOperation(enum.StrEnum):
@@ -642,4 +643,17 @@ class DomainNotFoundError(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ModelDeploymentUnavailableError(BackendAIError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/model-deployment-unavailable"
+    error_title = "Model Deployment Unavailable"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
