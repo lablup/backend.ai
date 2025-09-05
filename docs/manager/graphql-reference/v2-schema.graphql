@@ -853,10 +853,10 @@ input DeploymentFilter {
   openToPublic: Boolean = null
   tags: StringFilter = null
   endpointUrl: StringFilter = null
+  id: ID = null
   AND: [DeploymentFilter!] = null
   OR: [DeploymentFilter!] = null
   NOT: [DeploymentFilter!] = null
-  DISTINCT: Boolean = null
 }
 
 """Added in 25.13.0"""
@@ -1054,7 +1054,7 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
-"""A custom scalar for JSON strings using orjson"""
+"""Added in 25.13.0"""
 scalar JSONString
 
 """
@@ -1248,10 +1248,10 @@ type ModelRevisionEdge {
 input ModelRevisionFilter {
   name: StringFilter = null
   deploymentId: ID = null
+  id: ID = null
   AND: [ModelRevisionFilter!] = null
   OR: [ModelRevisionFilter!] = null
   NOT: [ModelRevisionFilter!] = null
-  DISTINCT: Boolean = null
 }
 
 """Added in 25.13.0"""
@@ -1791,7 +1791,6 @@ input ReplicaFilter {
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
   NOT: [ReplicaFilter!] = null
-  DISTINCT: Boolean = null
 }
 
 """Added in 25.13.0"""
