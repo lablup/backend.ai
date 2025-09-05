@@ -148,9 +148,7 @@ class ScalingRule:
     _scaling_rule_ids: strawberry.Private[list[UUID]]
 
     @strawberry.field
-    async def auto_scaling_rules(
-        parent: strawberry.Parent["ScalingRule"], info: Info[StrawberryGQLContext]
-    ) -> list[AutoScalingRule]:
+    async def auto_scaling_rules(self, info: Info[StrawberryGQLContext]) -> list[AutoScalingRule]:
         processor = info.context.processors.deployment
         if processor is None:
             raise ModelDeploymentUnavailableError(
@@ -158,7 +156,7 @@ class ScalingRule:
             )
 
         result = await processor.get_auto_scaling_rules_by_deployment_id.wait_for_complete(
-            GetAutoScalingRulesByDeploymentIdAction(deployment_id=UUID(str(parent._deployment_id)))
+            GetAutoScalingRulesByDeploymentIdAction(deployment_id=self._deployment_id)
         )
 
         return [AutoScalingRule.from_dataclass(rule) for rule in result.data]
