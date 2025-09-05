@@ -1,7 +1,7 @@
 from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from decimal import Decimal
-from enum import Enum, StrEnum
+from enum import StrEnum
 from pathlib import PurePosixPath
 from typing import Any, Optional, cast
 from uuid import UUID, uuid4
@@ -21,6 +21,8 @@ from ai.backend.manager.api.gql.base import (
     JSONString,
     OrderDirection,
     StringFilter,
+    build_page_info,
+    build_pagination_options,
     resolve_global_id,
     to_global_id,
 )
@@ -50,6 +52,7 @@ from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     ModelMountConfigData,
     ModelRevisionData,
+    ModelRevisionOrderField,
     ModelRuntimeConfigData,
     MountInfo,
     ResourceConfigData,
@@ -59,6 +62,10 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.models.gql_models.image import ImageNode
 from ai.backend.manager.models.gql_models.scaling_group import ScalingGroupNode
 from ai.backend.manager.models.gql_models.vfolder import VirtualFolderNode
+from ai.backend.manager.repositories.deployment.types.types import (
+    ModelRevisionFilterOptions,
+    ModelRevisionOrderingOptions,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
 )
@@ -71,7 +78,6 @@ from ai.backend.manager.services.deployment.actions.model_revision.get_revisions
 from ai.backend.manager.services.deployment.actions.model_revision.list_revisions import (
     ListRevisionsAction,
 )
-from ai.backend.manager.types import PaginationOptions
 
 MountPermission = strawberry.enum(
     CommonMountPermission,
@@ -251,12 +257,23 @@ class ModelRevisionFilter:
     OR: Optional[list["ModelRevisionFilter"]] = None
     NOT: Optional[list["ModelRevisionFilter"]] = None
 
+    def to_repo_filter(self) -> ModelRevisionFilterOptions:
+        repo_filter = ModelRevisionFilterOptions()
 
-@strawberry.enum(description="Added in 25.13.0")
-class ModelRevisionOrderField(Enum):
-    CREATED_AT = "CREATED_AT"
-    NAME = "NAME"
-    ID = "ID"
+        # Handle basic filters
+        repo_filter.name = self.name
+        repo_filter.deployment_id = UUID(self.deployment_id) if self.deployment_id else None
+        repo_filter.id = UUID(self.id) if self.id else None
+
+        # Handle logical operations
+        if self.AND:
+            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
+        if self.OR:
+            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
+        if self.NOT:
+            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
+
+        return repo_filter
 
 
 @strawberry.input(description="Added in 25.13.0")
@@ -526,6 +543,20 @@ async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
     return all_configs
 
 
+def _convert_gql_revision_ordering_to_repo_ordering(
+    order_by: Optional[list[ModelRevisionOrderBy]],
+) -> ModelRevisionOrderingOptions:
+    if order_by is None or len(order_by) == 0:
+        return ModelRevisionOrderingOptions()
+
+    repo_ordering = []
+    for order in order_by:
+        desc = order.direction == OrderDirection.DESC
+        repo_ordering.append((order.field, desc))
+
+    return ModelRevisionOrderingOptions(order_by=repo_ordering)
+
+
 async def resolve_revisions(
     info: Info[StrawberryGQLContext],
     filter: Optional[ModelRevisionFilter] = None,
@@ -537,30 +568,52 @@ async def resolve_revisions(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ModelRevisionConnection:
+    repo_filter = None
+    if filter:
+        repo_filter = filter.to_repo_filter()
+
+    repo_ordering = _convert_gql_revision_ordering_to_repo_ordering(order_by)
+
+    pagination_options = build_pagination_options(
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
+
     processor = info.context.processors.deployment
     if processor is None:
         raise ModelDeploymentUnavailableError(
             "Model Deployment feature is unavailable. Please contact support."
         )
     action_result = await processor.list_revisions.wait_for_complete(
-        ListRevisionsAction(pagination=PaginationOptions())
-    )
-    edges = []
-    for revision in action_result.data:
-        edges.append(
-            ModelRevisionEdge(node=ModelRevision.from_dataclass(revision), cursor=str(revision.id))
+        ListRevisionsAction(
+            pagination=pagination_options,
+            ordering=repo_ordering,
+            filters=repo_filter,
         )
+    )
+
+    edges = []
+    revisions = action_result.data
+    total_count = action_result.total_count
+    for revision in revisions:
+        edges.append(
+            ModelRevisionEdge(
+                node=ModelRevision.from_dataclass(revision),
+                cursor=to_global_id(ModelRevision, revision.id),
+            )
+        )
+
+    page_info = build_page_info(edges, total_count, pagination_options)
 
     # Mock pagination info for demonstration purposes
     connection = ModelRevisionConnection(
-        count=action_result.total_count,
+        count=total_count,
         edges=edges,
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor="revision-cursor-1",
-            end_cursor="revision-cursor-3",
-        ),
+        page_info=page_info.to_strawberry_page_info(),
     )
     return connection
 
