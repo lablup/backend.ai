@@ -1,32 +1,32 @@
-"""Action for creating deployments."""
-
 from dataclasses import dataclass
 from typing import Optional, override
+from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.deployment.creator import NewDeploymentCreator
+from ai.backend.manager.data.deployment.modifier import NewDeploymentModifier
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
 
 
 @dataclass
-class CreateDeploymentAction(DeploymentBaseAction):
-    """Action to create a new deployment(Model Service)."""
+class UpdateDeploymentAction(DeploymentBaseAction):
+    """Action to update an existing deployment."""
 
-    creator: NewDeploymentCreator
+    deployment_id: UUID
+    modifier: NewDeploymentModifier
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None  # New deployment doesn't have an ID yet
+        return str(self.deployment_id)
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "create"
+        return "update"
 
 
 @dataclass
-class CreateDeploymentActionResult(BaseActionResult):
+class UpdateDeploymentActionResult(BaseActionResult):
     data: ModelDeploymentData
 
     @override
