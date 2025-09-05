@@ -12,25 +12,13 @@ from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.request import (
-    ApproveArtifactRevisionReq,
-    CancelImportArtifactReq,
-    CleanupArtifactsReq,
-    ImportArtifactsReq,
-    RejectArtifactRevisionReq,
     ScanArtifactModelsReq,
     ScanArtifactsReq,
     SearchArtifactsReq,
-    UpdateArtifactReq,
 )
 from ai.backend.manager.dto.response import (
-    ApproveArtifactRevisionResponse,
-    CancelImportArtifactResponse,
-    CleanupArtifactsResponse,
-    ImportArtifactsResponse,
-    RejectArtifactRevisionResponse,
     ScanArtifactModelsResponse,
     SearchArtifactsResponse,
-    UpdateArtifactResponse,
 )
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
@@ -39,22 +27,6 @@ from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (
     RetrieveModelsAction,
 )
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
-from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
-from ai.backend.manager.services.artifact_revision.actions.approve import (
-    ApproveArtifactRevisionAction,
-)
-from ai.backend.manager.services.artifact_revision.actions.cancel_import import (
-    CancelImportAction,
-)
-from ai.backend.manager.services.artifact_revision.actions.cleanup import (
-    CleanupArtifactRevisionAction,
-)
-from ai.backend.manager.services.artifact_revision.actions.import_revision import (
-    ImportArtifactRevisionAction,
-)
-from ai.backend.manager.services.artifact_revision.actions.reject import (
-    RejectArtifactRevisionAction,
-)
 
 from .auth import auth_required_for_method
 from .types import CORSOptions, WebMiddleware
@@ -126,133 +98,6 @@ class APIHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
-    @auth_required_for_method
-    @api_handler
-    async def cleanup_artifacts(
-        self,
-        body: BodyParam[CleanupArtifactsReq],
-        processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
-        processors = processors_ctx.processors
-        cleaned_revisions = []
-
-        # Process each artifact revision sequentially
-        # TODO: Optimize with asyncio.gather() for parallel processing
-        for artifact_revision_id in body.parsed.artifact_revision_ids:
-            action_result = await processors.artifact_revision.cleanup.wait_for_complete(
-                CleanupArtifactRevisionAction(
-                    artifact_revision_id=artifact_revision_id,
-                )
-            )
-            cleaned_revisions.append(action_result.result)
-
-        resp = CleanupArtifactsResponse(
-            artifact_revisions=cleaned_revisions,
-        )
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
-
-    @auth_required_for_method
-    @api_handler
-    async def cancel_import_artifact(
-        self,
-        body: BodyParam[CancelImportArtifactReq],
-        processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
-        processors = processors_ctx.processors
-        action_result = await processors.artifact_revision.cancel_import.wait_for_complete(
-            CancelImportAction(
-                artifact_revision_id=body.parsed.artifact_revision_id,
-            )
-        )
-
-        resp = CancelImportArtifactResponse(
-            artifact_revision=action_result.result,
-        )
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
-
-    @auth_required_for_method
-    @api_handler
-    async def approve_artifact_revision(
-        self,
-        body: BodyParam[ApproveArtifactRevisionReq],
-        processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
-        processors = processors_ctx.processors
-        action_result = await processors.artifact_revision.approve.wait_for_complete(
-            ApproveArtifactRevisionAction(
-                artifact_revision_id=body.parsed.artifact_revision_id,
-            )
-        )
-
-        resp = ApproveArtifactRevisionResponse(
-            artifact_revision=action_result.result,
-        )
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
-
-    @auth_required_for_method
-    @api_handler
-    async def reject_artifact_revision(
-        self,
-        body: BodyParam[RejectArtifactRevisionReq],
-        processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
-        processors = processors_ctx.processors
-        action_result = await processors.artifact_revision.reject.wait_for_complete(
-            RejectArtifactRevisionAction(
-                artifact_revision_id=body.parsed.artifact_revision_id,
-            )
-        )
-
-        resp = RejectArtifactRevisionResponse(
-            artifact_revision=action_result.result,
-        )
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
-
-    @auth_required_for_method
-    @api_handler
-    async def import_artifacts(
-        self,
-        body: BodyParam[ImportArtifactsReq],
-        processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
-        processors = processors_ctx.processors
-        imported_revisions = []
-
-        # Process each artifact revision sequentially
-        # TODO: Optimize with asyncio.gather() for parallel processing
-        for artifact_revision_id in body.parsed.artifact_revision_ids:
-            action_result = await processors.artifact_revision.import_revision.wait_for_complete(
-                ImportArtifactRevisionAction(
-                    artifact_revision_id=artifact_revision_id,
-                )
-            )
-            imported_revisions.append(action_result.result)
-
-        resp = ImportArtifactsResponse(
-            artifact_revisions=imported_revisions,
-        )
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
-
-    @auth_required_for_method
-    @api_handler
-    async def update_artifact(
-        self,
-        body: BodyParam[UpdateArtifactReq],
-        processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
-        processors = processors_ctx.processors
-        action_result = await processors.artifact.update.wait_for_complete(
-            UpdateArtifactAction(
-                artifact_id=body.parsed.artifact_id,
-                modifier=body.parsed.modifier,
-            )
-        )
-
-        resp = UpdateArtifactResponse(
-            artifact=action_result.result,
-        )
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
-
 
 def create_app(
     default_cors_options: CORSOptions,
@@ -264,11 +109,5 @@ def create_app(
     api_handler = APIHandler()
     cors.add(app.router.add_route("POST", "/scan", api_handler.scan_artifacts))
     cors.add(app.router.add_route("POST", "/search", api_handler.search_artifacts))
-    cors.add(app.router.add_route("POST", "/scan/models", api_handler.scan_artifact_models))
-    cors.add(app.router.add_route("DELETE", "/cleanup", api_handler.cleanup_artifacts))
-    cors.add(app.router.add_route("POST", "/cancel-import", api_handler.cancel_import_artifact))
-    cors.add(app.router.add_route("POST", "/approve", api_handler.approve_artifact_revision))
-    cors.add(app.router.add_route("POST", "/reject", api_handler.reject_artifact_revision))
-    cors.add(app.router.add_route("POST", "/import", api_handler.import_artifacts))
-    cors.add(app.router.add_route("PATCH", "/update", api_handler.update_artifact))
+    cors.add(app.router.add_route("POST", "/models/batch", api_handler.scan_artifact_models))
     return app, []
