@@ -1794,7 +1794,6 @@ input DeploymentOrderBy
   direction: OrderDirection! = DESC
 }
 
-"""Added in 25.13.0"""
 enum DeploymentOrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -3205,7 +3204,6 @@ input ModelRevisionOrderBy
   direction: OrderDirection! = DESC
 }
 
-"""Added in 25.13.0"""
 enum ModelRevisionOrderField
   @join__type(graph: STRAWBERRY)
 {
@@ -4954,6 +4952,7 @@ input ReplicaFilter
   readinessStatus: ReadinessStatusFilter = null
   livenessStatus: LivenessStatusFilter = null
   activenessStatus: ActivenessStatusFilter = null
+  id: ID = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
   NOT: [ReplicaFilter!] = null
@@ -4967,11 +4966,11 @@ input ReplicaOrderBy
   direction: OrderDirection! = DESC
 }
 
-"""Added in 25.13.0"""
 enum ReplicaOrderField
   @join__type(graph: STRAWBERRY)
 {
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  ID @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.13.0"""
