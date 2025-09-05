@@ -36,6 +36,7 @@ from .plugin import (
     StoragePluginContext,
 )
 from .services.service import VolumeService
+from .storages.base import StoragePool
 from .types import VolumeInfo
 from .volumes.abc import AbstractVolume
 from .volumes.cephfs import CephFSVolume
@@ -117,6 +118,7 @@ class RootContext:
     local_config: StorageProxyUnifiedConfig
     dsn: str | None
     volume_pool: VolumePool
+    storage_pool: StoragePool
     event_producer: EventProducer
     event_dispatcher: EventDispatcher
     watcher: WatcherClient | None
@@ -132,6 +134,7 @@ class RootContext:
         etcd: AsyncEtcd,
         *,
         volume_pool: VolumePool,
+        storage_pool: StoragePool,
         background_task_manager: BackgroundTaskManager,
         event_producer: EventProducer,
         event_dispatcher: EventDispatcher,
@@ -158,6 +161,7 @@ class RootContext:
         }
         self.metric_registry = metric_registry
         self.volume_pool = volume_pool
+        self.storage_pool = storage_pool
         self.background_task_manager = background_task_manager
 
     async def __aenter__(self) -> None:
