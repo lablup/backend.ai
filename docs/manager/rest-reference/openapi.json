@@ -1735,6 +1735,46 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/artifact-registries/scan/models": {
+      "post": {
+        "operationId": "artifact-registries.scan_artifact_models",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifact-registries/cleanup": {
+      "delete": {
+        "operationId": "artifact-registries.cleanup_artifacts",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/config/resource-slots": {
       "get": {
         "operationId": "config.get_resource_slots",
