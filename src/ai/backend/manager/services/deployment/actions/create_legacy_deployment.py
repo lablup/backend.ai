@@ -1,19 +1,19 @@
-"""Action for creating deployments."""
+"""Action for creating legacy deployments(Model Service)."""
 
 from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.deployment.creator import NewDeploymentCreator
-from ai.backend.manager.data.deployment.types import ModelDeploymentData
+from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
 
 
 @dataclass
-class CreateDeploymentAction(DeploymentBaseAction):
-    """Action to create a new deployment(Model Service)."""
+class CreateLegacyDeploymentAction(DeploymentBaseAction):
+    """Action to create a new legacy deployment(Model Service)."""
 
-    creator: NewDeploymentCreator
+    creator: DeploymentCreator
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -26,8 +26,8 @@ class CreateDeploymentAction(DeploymentBaseAction):
 
 
 @dataclass
-class CreateDeploymentActionResult(BaseActionResult):
-    data: ModelDeploymentData
+class CreateLegacyDeploymentActionResult(BaseActionResult):
+    data: DeploymentInfo
 
     @override
     def entity_id(self) -> Optional[str]:

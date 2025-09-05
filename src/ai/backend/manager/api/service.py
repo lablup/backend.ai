@@ -56,9 +56,9 @@ from ai.backend.manager.data.model_serving.types import (
     ServiceConfig,
     ServiceInfo,
 )
-from ai.backend.manager.services.deployment.actions.create_deployment import (
-    CreateDeploymentAction,
-    CreateDeploymentActionResult,
+from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
+    CreateLegacyDeploymentAction,
+    CreateLegacyDeploymentActionResult,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
@@ -735,7 +735,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
         and root_ctx.processors.deployment is not None
     ):
         # Create deployment using the new deployment controller
-        deployment_action = CreateDeploymentAction(
+        deployment_action = CreateLegacyDeploymentAction(
             creator=DeploymentCreator(
                 metadata=DeploymentMetadata(
                     name=params.service_name,
@@ -756,8 +756,8 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
                 ),
             )
         )
-        deployment_result: CreateDeploymentActionResult = (
-            await root_ctx.processors.deployment.create_deployment.wait_for_complete(
+        deployment_result: CreateLegacyDeploymentActionResult = (
+            await root_ctx.processors.deployment.create_legacy_deployment.wait_for_complete(
                 deployment_action
             )
         )
