@@ -96,6 +96,7 @@ class ModelRevision(Node):
 class ModelRevisionFilter:
     name: Optional[StringFilter] = None
     deployment_id: Optional[ID] = None
+    id: Optional[ID] = None
 
     AND: Optional[list["ModelRevisionFilter"]] = None
     OR: Optional[list["ModelRevisionFilter"]] = None
