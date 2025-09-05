@@ -7,7 +7,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import ArtifactType
-from ai.backend.manager.types import PaginationOptions
+from ai.backend.manager.types import PaginationOptions, TriState
 
 
 class ScanArtifactsReq(BaseRequestModel):
@@ -61,4 +61,15 @@ class ImportArtifactsReq(BaseRequestModel):
 
 class UpdateArtifactReq(BaseRequestModel):
     artifact_id: uuid.UUID = Field(description="The artifact ID to update.")
-    modifier: ArtifactModifier = Field(description="Fields to modify in the artifact.")
+    readonly: Optional[bool] = Field(
+        default=None, description="Whether the artifact should be readonly."
+    )
+    description: Optional[str] = Field(default=None, description="Updated description")
+
+    def to_modifier(self) -> ArtifactModifier:
+        modifier = ArtifactModifier()
+        if self.readonly is not None:
+            modifier.readonly = TriState.update(self.readonly)
+        if self.description is not None:
+            modifier.description = TriState.update(self.description)
+        return modifier

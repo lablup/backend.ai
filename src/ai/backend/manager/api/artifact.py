@@ -168,7 +168,7 @@ class APIHandler:
         action_result = await processors.artifact.update.wait_for_complete(
             UpdateArtifactAction(
                 artifact_id=body.parsed.artifact_id,
-                modifier=body.parsed.modifier,
+                modifier=body.parsed.to_modifier(),
             )
         )
 
