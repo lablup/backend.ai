@@ -506,7 +506,6 @@ input DeploymentOrderBy {
   direction: OrderDirection! = DESC
 }
 
-"""Added in 25.13.0"""
 enum DeploymentOrderField {
   CREATED_AT
   UPDATED_AT
@@ -890,7 +889,6 @@ input ModelRevisionOrderBy {
   direction: OrderDirection! = DESC
 }
 
-"""Added in 25.13.0"""
 enum ModelRevisionOrderField {
   CREATED_AT
   NAME
@@ -1226,9 +1224,9 @@ input ReplicaOrderBy {
   direction: OrderDirection! = DESC
 }
 
-"""Added in 25.13.0"""
 enum ReplicaOrderField {
   CREATED_AT
+  ID
 }
 
 """Added in 25.13.0"""
