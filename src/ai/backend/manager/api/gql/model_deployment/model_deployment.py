@@ -156,6 +156,7 @@ class DeploymentFilter:
     open_to_public: Optional[bool] = None
     tags: Optional[StringFilter] = None
     endpoint_url: Optional[StringFilter] = None
+    id: Optional[ID] = None
 
     AND: Optional[list["DeploymentFilter"]] = None
     OR: Optional[list["DeploymentFilter"]] = None
