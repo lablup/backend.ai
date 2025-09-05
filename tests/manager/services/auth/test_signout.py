@@ -1,9 +1,8 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 from uuid import UUID
 
 import pytest
 
-from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.errors.common import GenericBadRequest, GenericForbidden
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.repository import AuthRepository
@@ -12,20 +11,16 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 @pytest.fixture
-def mock_hook_plugin_ctx():
-    return MagicMock(spec=HookPluginContext)
-
-
-@pytest.fixture
 def mock_auth_repository():
     return AsyncMock(spec=AuthRepository)
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository):
+def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
+        config_provider=mock_config_provider,
     )
 
 
@@ -44,7 +39,7 @@ async def test_signout_successful_with_valid_credentials(
     )
 
     # Setup valid credential check
-    mock_auth_repository.check_credential_validated.return_value = {
+    mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": "user@example.com",
         "role": UserRole.USER,
@@ -55,7 +50,7 @@ async def test_signout_successful_with_valid_credentials(
     result = await auth_service.signout(action)
 
     assert result.success is True
-    mock_auth_repository.check_credential_validated.assert_called_once()
+    mock_auth_repository.check_credential_without_migration.assert_called_once()
     mock_auth_repository.deactivate_user_and_keypairs_validated.assert_called_once()
 
 
@@ -91,9 +86,9 @@ async def test_signout_fails_with_invalid_credentials(
     )
 
     # Setup invalid credential check - returns None for invalid credentials
-    mock_auth_repository.check_credential_validated.return_value = None
+    mock_auth_repository.check_credential_without_migration.return_value = None
 
     with pytest.raises(GenericBadRequest):
         await auth_service.signout(action)
 
-    mock_auth_repository.check_credential_validated.assert_called_once()
+    mock_auth_repository.check_credential_without_migration.assert_called_once()

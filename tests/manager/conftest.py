@@ -60,6 +60,7 @@ from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models import (
     DomainRow,
@@ -84,6 +85,7 @@ from ai.backend.manager.models.base import (
     populate_fixture,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image import ImageAliasRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.models.session_template import session_templates
@@ -97,6 +99,17 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
     redis_container,
 )
 from ai.backend.testutils.pants import get_parallel_slot
+
+
+def create_test_password_info(password: str = "test_password") -> PasswordInfo:
+    """Create a PasswordInfo object for testing with default PBKDF2 algorithm."""
+    return PasswordInfo(
+        password=password,
+        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        rounds=100_000,
+        salt_size=32,
+    )
+
 
 here = Path(__file__).parent
 
@@ -1031,6 +1044,7 @@ async def registry_ctx(mocker):
 async def session_info(database_engine):
     user_uuid = str(uuid.uuid4()).replace("-", "")
     user_password = str(uuid.uuid4()).replace("-", "")
+    password_info = create_test_password_info(user_password)
     postfix = str(uuid.uuid4()).split("-")[1]
     domain_name = str(uuid.uuid4()).split("-")[0]
     group_id = str(uuid.uuid4()).replace("-", "")
@@ -1083,7 +1097,7 @@ async def session_info(database_engine):
             uuid=user_uuid,
             email=f"tc.runner-{postfix}@lablup.com",
             username=f"TestCaseRunner-{postfix}",
-            password=user_password,
+            password=password_info,
             domain_name=domain_name,
             resource_policy=resource_policy_name,
         )

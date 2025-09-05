@@ -11,12 +11,24 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserCreator, UserData
 from ai.backend.manager.errors.auth import UserNotFound
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.modify_user import UserModifier
+
+
+def create_test_password_info(password: str = "test_password") -> PasswordInfo:
+    """Create a PasswordInfo object for testing with default PBKDF2 algorithm."""
+    return PasswordInfo(
+        password=password,
+        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        rounds=100_000,
+        salt_size=32,
+    )
 
 
 class TestUserRepository:
@@ -39,7 +51,7 @@ class TestUserRepository:
             uuid=uuid.uuid4(),
             username="testuser",
             email="test@example.com",
-            password="hashed_password",
+            password=create_test_password_info("hashed_password"),
             need_password_change=False,
             full_name="Test User",
             description="Test Description",
@@ -63,10 +75,16 @@ class TestUserRepository:
     @pytest.fixture
     def sample_user_creator(self):
         """Create sample user creator for creation"""
+        password_info = PasswordInfo(
+            password="hashed_password",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
         return UserCreator(
             username="newuser",
             email="newuser@example.com",
-            password="hashed_password",
+            password=password_info,
             need_password_change=False,
             full_name="New User",
             description="New User Description",

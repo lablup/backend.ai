@@ -4,7 +4,7 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
+from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -16,11 +16,6 @@ from ai.backend.manager.services.auth.actions.update_password_no_auth import (
     UpdatePasswordNoAuthAction,
 )
 from ai.backend.manager.services.auth.service import AuthService
-
-
-@pytest.fixture
-def mock_hook_plugin_ctx():
-    return MagicMock(spec=HookPluginContext)
 
 
 @pytest.fixture
@@ -74,7 +69,7 @@ async def test_update_password_no_auth_successful(
     )
 
     # Setup successful credential check
-    mock_auth_repository.check_credential_validated.return_value = {
+    mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": action.email,
         "password": "hashed_current_pass",
@@ -146,7 +141,7 @@ async def test_update_password_no_auth_fails_with_incorrect_current_password(
     )
 
     # Invalid current password
-    mock_auth_repository.check_credential_validated.return_value = None
+    mock_auth_repository.check_credential_without_migration.return_value = None
 
     with pytest.raises(AuthorizationFailed):
         await auth_service.update_password_no_auth(action)
@@ -176,7 +171,7 @@ async def test_update_password_no_auth_fails_when_new_password_same_as_current(
     )
 
     # Setup credential check for same password
-    mock_auth_repository.check_credential_validated.return_value = {
+    mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": action.email,
         "password": "hashed_same_password",
@@ -207,7 +202,7 @@ async def test_update_password_no_auth_with_retry(
         request=MagicMock(),
     )
 
-    mock_auth_repository.check_credential_validated.return_value = {
+    mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": action.email,
         "password": "hashed_current",
@@ -227,9 +222,7 @@ async def test_update_password_no_auth_with_retry(
     mocker.patch(
         "ai.backend.manager.services.auth.service.compare_to_hashed_password", return_value=False
     )
-    mocker.patch(
-        "ai.backend.manager.services.auth.service.execute_with_retry", return_value=changed_at
-    )
+    # execute_with_retry doesn't exist in the service anymore
     result = await auth_service.update_password_no_auth(action)
 
     assert result.user_id == UUID("12345678-1234-5678-1234-567812345678")
@@ -252,7 +245,7 @@ async def test_update_password_no_auth_hook_rejection(
         request=MagicMock(),
     )
 
-    mock_auth_repository.check_credential_validated.return_value = {
+    mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": action.email,
         "password": "hashed_current",
