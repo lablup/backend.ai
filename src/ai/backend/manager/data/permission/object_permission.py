@@ -29,6 +29,23 @@ class ObjectPermissionCreateInput(Creator):
 
 
 @dataclass
+class ObjectPermissionCreateInputBeforeRoleCreation:
+    entity_type: EntityType
+    entity_id: str
+    operation: OperationType
+    status: PermissionStatus = PermissionStatus.ACTIVE
+
+    def to_input(self, role_id: uuid.UUID) -> ObjectPermissionCreateInput:
+        return ObjectPermissionCreateInput(
+            role_id=role_id,
+            entity_type=self.entity_type,
+            entity_id=self.entity_id,
+            operation=self.operation,
+            status=self.status,
+        )
+
+
+@dataclass
 class ObjectPermissionUpdater:
     id: uuid.UUID
     status: OptionalState[PermissionStatus]
