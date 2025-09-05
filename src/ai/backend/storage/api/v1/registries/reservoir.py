@@ -52,7 +52,6 @@ class ReservoirRegistryAPIHandler:
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
             storage_name=body.parsed.storage_name,
-            bucket_name=body.parsed.bucket_name,
         )
 
         return APIResponse.build(

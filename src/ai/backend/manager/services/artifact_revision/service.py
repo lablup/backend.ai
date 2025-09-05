@@ -172,7 +172,6 @@ class ArtifactRevisionService:
                         ],
                         registry_name=registry_data.name,
                         storage_name=storage_data.name,
-                        bucket_name=storage_namespace.bucket,
                     )
                 )
             case ArtifactRegistryType.RESERVOIR:
@@ -189,7 +188,6 @@ class ArtifactRevisionService:
                         ],
                         registry_name=registry_data.name,
                         storage_name=storage_data.name,
-                        bucket_name=storage_namespace.bucket,
                     )
                 )
             case _:

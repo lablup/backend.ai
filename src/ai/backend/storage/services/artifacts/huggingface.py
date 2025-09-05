@@ -32,7 +32,8 @@ from ai.backend.storage.exception import (
     ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
 )
-from ai.backend.storage.services.storages.object_storage import ObjectStorageService
+from ai.backend.storage.storages.base import StoragePool
+from ai.backend.storage.storages.object_storage import ObjectStorage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -121,20 +122,20 @@ def _make_download_progress_logger(
 class HuggingFaceServiceArgs:
     registry_configs: dict[str, HuggingfaceConfig]
     background_task_manager: BackgroundTaskManager
-    storage_service: ObjectStorageService
+    storage_pool: StoragePool
     event_producer: EventProducer
 
 
 class HuggingFaceService:
     """Service for HuggingFace model operations"""
 
-    _storages_service: ObjectStorageService
+    _storage_pool: StoragePool
     _background_task_manager: BackgroundTaskManager
     _registry_configs: dict[str, HuggingfaceConfig]
     _event_producer: EventProducer
 
     def __init__(self, args: HuggingFaceServiceArgs):
-        self._storages_service = args.storage_service
+        self._storage_pool = args.storage_pool
         self._background_task_manager = args.background_task_manager
         self._registry_configs = args.registry_configs
         self._event_producer = args.event_producer
@@ -272,7 +273,6 @@ class HuggingFaceService:
         registry_name: str,
         model: ModelTarget,
         storage_name: str,
-        bucket_name: str,
     ) -> None:
         """Import a HuggingFace model to storage.
 
@@ -280,7 +280,6 @@ class HuggingFaceService:
             registry_name: Name of the HuggingFace registry
             model: HuggingFace model to import
             storage_name: Target storage name
-            bucket_name: Target bucket name
 
         Raises:
             HuggingFaceModelNotFoundError: If model is not found
@@ -317,7 +316,6 @@ class HuggingFaceService:
                         file_info=file_info,
                         model=model,
                         storage_name=storage_name,
-                        bucket_name=bucket_name,
                         download_chunk_size=chunk_size,
                     )
 
@@ -377,7 +375,6 @@ class HuggingFaceService:
         registry_name: str,
         models: list[ModelTarget],
         storage_name: str,
-        bucket_name: str,
     ) -> uuid.UUID:
         """Import multiple HuggingFace models to storage in batch.
 
@@ -385,7 +382,6 @@ class HuggingFaceService:
             registry_name: Name of the HuggingFace registry
             models: List of HuggingFace models to import
             storage_name: Target storage name
-            bucket_name: Target bucket name
 
         Raises:
             HuggingFaceAPIError: If API call fails
@@ -401,7 +397,7 @@ class HuggingFaceService:
 
             log.info(
                 f"Starting batch model import: model_count={model_count}, "
-                f"(storage_name={storage_name}, bucket_name={bucket_name})"
+                f"storage_name={storage_name}"
             )
 
             try:
@@ -424,7 +420,6 @@ class HuggingFaceService:
                             registry_name,
                             model=model,
                             storage_name=storage_name,
-                            bucket_name=bucket_name,
                         )
 
                         successful_models += 1
@@ -610,7 +605,6 @@ class HuggingFaceService:
         model: ModelTarget,
         download_chunk_size: int,
         storage_name: str,
-        bucket_name: str,
     ) -> None:
         """Upload a single file to storage.
 
@@ -619,11 +613,18 @@ class HuggingFaceService:
             model: HuggingFace model target
             download_chunk_size: Chunk size for file download
             storage_name: Target storage name
-            bucket_name: Target bucket name
         """
-        if not self._storages_service:
+        if not self._storage_pool:
             raise ObjectStorageConfigInvalidError(
-                "Storage service not configured for import operations"
+                "Storage pool not configured for import operations"
+            )
+
+        # Get storage from pool and verify it's ObjectStorage type
+        storage = self._storage_pool.get_storage(storage_name)
+        if not isinstance(storage, ObjectStorage):
+            raise ObjectStorageConfigInvalidError(
+                f"Storage '{storage_name}' is not an ObjectStorage type. "
+                f"HuggingFace import requires ObjectStorage for bucket operations."
             )
 
         try:
@@ -641,10 +642,8 @@ class HuggingFaceService:
                 file_info.download_url, download_chunk_size
             )
 
-            # Upload to storage using existing service
-            await self._storages_service.stream_upload(
-                storage_name=storage_name,
-                bucket_name=bucket_name,
+            # Upload to storage using AbstractStorage interface
+            await storage.stream_upload(
                 filepath=storage_key,
                 data_stream=download_stream,
                 content_type=None,
