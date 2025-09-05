@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import Self
+from typing import TYPE_CHECKING, Optional, Self
 
 import sqlalchemy as sa
+from sqlalchemy.orm import relationship
 
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.object_permission import (
@@ -22,6 +23,9 @@ from ...base import (
     StrEnumType,
 )
 
+if TYPE_CHECKING:
+    from ..role import RoleRow
+
 
 class ObjectPermissionRow(Base):
     __tablename__ = "object_permissions"
@@ -38,6 +42,15 @@ class ObjectPermissionRow(Base):
     operation: OperationType = sa.Column(
         "operation", StrEnumType(OperationType, length=32), nullable=False
     )
+
+    role_row: Optional[RoleRow] = relationship(
+        "RoleRow",
+        back_populates="object_permission_rows",
+        primaryjoin="RoleRow.id == foreign(ObjectPermissionRow.role_id)",
+    )
+
+    def object_id(self) -> ObjectId:
+        return ObjectId(entity_type=self.entity_type, entity_id=self.entity_id)
 
     @classmethod
     def from_input(cls, input: ObjectPermissionCreateInput) -> Self:
@@ -62,6 +75,6 @@ class ObjectPermissionRow(Base):
         return ObjectPermissionData(
             id=self.id,
             role_id=self.role_id,
-            object_id=ObjectId(entity_type=self.entity_type, entity_id=self.entity_id),
+            object_id=self.object_id(),
             operation=self.operation,
         )

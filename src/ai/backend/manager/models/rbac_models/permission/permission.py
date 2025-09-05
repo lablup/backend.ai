@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import uuid
-from typing import Self
+from typing import TYPE_CHECKING, Optional, Self
 
 import sqlalchemy as sa
+from sqlalchemy.orm import relationship
 
 from ai.backend.manager.data.permission.permission import PermissionCreator, PermissionData
 from ai.backend.manager.data.permission.types import (
@@ -18,6 +19,9 @@ from ...base import (
     StrEnumType,
 )
 
+if TYPE_CHECKING:
+    from .permission_group import PermissionGroupRow
+
 
 class PermissionRow(Base):
     __tablename__ = "permissions"
@@ -30,6 +34,12 @@ class PermissionRow(Base):
     )
     operation: OperationType = sa.Column(
         "operation", StrEnumType(OperationType, length=32), nullable=False
+    )
+
+    permission_group_row: Optional[PermissionGroupRow] = relationship(
+        "PermissionGroupRow",
+        back_populates="permission_rows",
+        primaryjoin="PermissionGroupRow.id == foreign(PermissionRow.permission_group_id)",
     )
 
     @classmethod
