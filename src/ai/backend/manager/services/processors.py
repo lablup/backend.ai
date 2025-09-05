@@ -235,6 +235,7 @@ class Services:
         auth = AuthService(
             hook_plugin_ctx=args.hook_plugin_ctx,
             auth_repository=repositories.auth.repository,
+            config_provider=args.config_provider,
         )
         object_storage_service = ObjectStorageService(
             artifact_repository=repositories.artifact.repository,

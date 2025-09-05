@@ -16,6 +16,7 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     ScopeType,
 )
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.types import Creator
 
 
@@ -60,7 +61,7 @@ class UserRole(CIStrEnum):
 class UserCreator(Creator):
     email: str
     username: str
-    password: str
+    password: PasswordInfo  # Only accept PasswordInfo
     need_password_change: bool
     domain_name: str
     full_name: Optional[str] = None

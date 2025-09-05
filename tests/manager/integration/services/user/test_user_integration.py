@@ -10,9 +10,11 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserCreator, UserInfoContext
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.models.group import AssocGroupUserRow, GroupRow, ProjectType
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import (
     generate_keypair,
     generate_ssh_keypair,
@@ -143,10 +145,16 @@ class TestCreateUserIntegration:
         database_fixture: Any,
     ) -> None:
         """Test 1.1: Normal user creation with all required fields"""
+        password_info = PasswordInfo(
+            password="SecurePass123!",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
         action = CreateUserAction(
             creator=UserCreator(
                 email="testnewuser@example.com",
-                password="SecurePass123!",
+                password=password_info,
                 username="testnewuser",
                 full_name="New User",
                 role=UserRole.USER,
@@ -174,10 +182,16 @@ class TestCreateUserIntegration:
         database_fixture: Any,
     ) -> None:
         """Test 1.2: Admin user creation with sudo session enabled"""
+        password_info = PasswordInfo(
+            password="AdminPass123!",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
         action = CreateUserAction(
             creator=UserCreator(
                 email="testadmin@example.com",
-                password="AdminPass123!",
+                password=password_info,
                 username="testadmin",
                 full_name="Admin User",
                 role=UserRole.ADMIN,
@@ -201,10 +215,16 @@ class TestCreateUserIntegration:
         database_fixture: Any,
     ) -> None:
         """Test 1.5: Container UID/GID configuration"""
+        password_info = PasswordInfo(
+            password="ContainerPass123!",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
         action = CreateUserAction(
             creator=UserCreator(
                 email="testcontainer@example.com",
-                password="ContainerPass123!",
+                password=password_info,
                 username="testcontaineruser",
                 need_password_change=False,
                 domain_name="default",
@@ -229,10 +249,16 @@ class TestCreateUserIntegration:
         database_fixture: Any,
     ) -> None:
         """Test 1.6: Resource policy and IP restriction"""
+        password_info = PasswordInfo(
+            password="LimitedPass123!",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
         action = CreateUserAction(
             creator=UserCreator(
                 email="testlimited@example.com",
-                password="LimitedPass123!",
+                password=password_info,
                 username="testlimiteduser",
                 need_password_change=False,
                 domain_name="default",

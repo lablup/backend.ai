@@ -5,7 +5,9 @@ from uuid import UUID
 import pytest
 
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
-from ai.backend.manager.config.unified import AuthConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import GenericBadRequest, RejectedByHook
 from ai.backend.manager.models.user import UserRole, UserStatus
@@ -27,10 +29,24 @@ def mock_auth_repository():
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository):
+def mock_config_provider():
+    mock_provider = MagicMock(spec=ManagerConfigProvider)
+    mock_provider.config = MagicMock(spec=ManagerConfig)
+    mock_provider.config.auth = AuthConfig(
+        max_password_age=timedelta(days=90),
+        password_hash_algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        password_hash_rounds=100_000,
+        password_hash_salt_size=32,
+    )
+    return mock_provider
+
+
+@pytest.fixture
+def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
+        config_provider=mock_config_provider,
     )
 
 
@@ -47,9 +63,6 @@ async def test_update_password_no_auth_successful(
         email="user@example.com",
         current_password="current_pass",
         new_password="new_secure_password",
-        auth_config=AuthConfig(
-            max_password_age=timedelta(days=90),
-        ),
         request=MagicMock(),
     )
 
@@ -82,45 +95,20 @@ async def test_update_password_no_auth_successful(
 
 
 @pytest.mark.asyncio
-async def test_update_password_no_auth_fails_when_auth_config_is_none(
-    auth_service: AuthService,
-    mock_hook_plugin_ctx: MagicMock,
-):
-    """Test update password fails when auth config is None"""
-    action = UpdatePasswordNoAuthAction(
-        domain_name="default",
-        email="user@example.com",
-        current_password="pass",
-        new_password="newpass",
-        auth_config=None,
-        request=MagicMock(),
-    )
-
-    # Setup hook to pass
-    mock_hook_plugin_ctx.dispatch.return_value = HookResult(
-        status=HookResults.PASSED,
-        result=None,
-        reason=None,
-    )
-
-    with pytest.raises(GenericBadRequest):
-        await auth_service.update_password_no_auth(action)
-
-
-@pytest.mark.asyncio
 async def test_update_password_no_auth_fails_when_max_password_age_is_none(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
+    mock_config_provider: MagicMock,
 ):
     """Test update password fails when max_password_age is None"""
+    # Set max_password_age to None in the mock
+    mock_config_provider.config.auth.max_password_age = None
+
     action = UpdatePasswordNoAuthAction(
         domain_name="default",
         email="user@example.com",
         current_password="pass",
         new_password="newpass",
-        auth_config=AuthConfig(
-            max_password_age=None,
-        ),
         request=MagicMock(),
     )
 
@@ -147,9 +135,6 @@ async def test_update_password_no_auth_fails_with_incorrect_current_password(
         email="user@example.com",
         current_password="wrong_password",
         new_password="new_password",
-        auth_config=AuthConfig(
-            max_password_age=timedelta(days=90),
-        ),
         request=MagicMock(),
     )
 
@@ -180,9 +165,6 @@ async def test_update_password_no_auth_fails_when_new_password_same_as_current(
         email="user@example.com",
         current_password="same_password",
         new_password="same_password",
-        auth_config=AuthConfig(
-            max_password_age=timedelta(days=90),
-        ),
         request=MagicMock(),
     )
 
@@ -222,9 +204,6 @@ async def test_update_password_no_auth_with_retry(
         email="retry@example.com",
         current_password="current",
         new_password="new_password",
-        auth_config=AuthConfig(
-            max_password_age=timedelta(days=90),
-        ),
         request=MagicMock(),
     )
 
@@ -270,9 +249,6 @@ async def test_update_password_no_auth_hook_rejection(
         email="user@example.com",
         current_password="current",
         new_password="weak",
-        auth_config=AuthConfig(
-            max_password_age=timedelta(days=90),
-        ),
         request=MagicMock(),
     )
 
