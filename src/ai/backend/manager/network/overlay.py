@@ -66,6 +66,7 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
             )
         except DockerError as e:
             if e.status == HTTPStatus.NOT_FOUND:
+                # If not exists, proceed to create one.
                 pass
             else:
                 raise
