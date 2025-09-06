@@ -27,7 +27,6 @@ from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
 )
-from ai.backend.storage.services.storages.object_storage import ObjectStorageService
 
 from ....utils import log_client_api_entry
 
@@ -107,7 +106,6 @@ class HuggingFaceRegistryAPIHandler:
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
             storage_name=body.parsed.storage_name,
-            bucket_name=body.parsed.bucket_name,
         )
 
         response = HuggingFaceImportModelsResponse(
@@ -125,8 +123,6 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/registries/huggingface"
 
-    storage_service = ObjectStorageService(storage_configs=ctx.local_config.storages)
-
     huggingface_registry_configs = dict(
         (r.name, r.config)
         for r in ctx.local_config.registries
@@ -135,7 +131,7 @@ def create_app(ctx: RootContext) -> web.Application:
     huggingface_service = HuggingFaceService(
         HuggingFaceServiceArgs(
             background_task_manager=ctx.background_task_manager,
-            storage_service=storage_service,
+            storage_pool=ctx.storage_pool,
             registry_configs=huggingface_registry_configs,
             event_producer=ctx.event_producer,
         )
