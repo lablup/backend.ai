@@ -9,11 +9,13 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.types import GroupMembershipData, UserData
 from ai.backend.manager.errors.auth import (
     GroupMembershipNotFoundError,
     UserCreationError,
 )
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.auth.repository import AuthRepository
@@ -248,7 +250,13 @@ class TestAuthRepository:
     @pytest.mark.asyncio
     async def test_update_user_password_validated(self, auth_repository, mock_db_conn):
         """Test updating user password"""
-        await auth_repository.update_user_password_validated("user@example.com", "new_password")
+        password_info = PasswordInfo(
+            password="new_password",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
+        await auth_repository.update_user_password_validated("user@example.com", password_info)
 
         # Verify execute was called (for update query)
         mock_db_conn.execute.assert_called_once()
@@ -284,8 +292,10 @@ class TestAuthRepository:
         mock_db_conn.execute.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_check_credential_validated(self, auth_repository, mock_db_engine, mocker):
-        """Test credential validation"""
+    async def test_check_credential_without_migration(
+        self, auth_repository, mock_db_engine, mocker
+    ):
+        """Test credential validation without migration"""
         mock_check = mocker.patch(
             "ai.backend.manager.repositories.auth.repository.check_credential",
             return_value={
@@ -296,7 +306,7 @@ class TestAuthRepository:
             },
         )
 
-        result = await auth_repository.check_credential_validated(
+        result = await auth_repository.check_credential_without_migration(
             "default", "user@example.com", "password"
         )
 

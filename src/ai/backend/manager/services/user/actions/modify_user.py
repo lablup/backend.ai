@@ -3,6 +3,7 @@ from typing import Any, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.services.user.actions.base import UserAction
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
@@ -11,7 +12,7 @@ from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 @dataclass
 class UserModifier(PartialModifier):
     username: OptionalState[str] = field(default_factory=OptionalState.nop)
-    password: OptionalState[str] = field(default_factory=OptionalState.nop)
+    password: OptionalState[PasswordInfo] = field(default_factory=OptionalState.nop)
     need_password_change: OptionalState[bool] = field(default_factory=OptionalState.nop)
     full_name: OptionalState[str] = field(default_factory=OptionalState.nop)
     description: OptionalState[str] = field(default_factory=OptionalState.nop)

@@ -207,6 +207,7 @@ from ai.backend.common.typed_validators import (
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
 
@@ -401,6 +402,68 @@ class EtcdConfig(BaseModel):
             user=self.user,
             password=self.password,
         )
+
+
+class AuthConfig(BaseModel):
+    max_password_age: Optional[TimeDuration] = Field(
+        default=None,
+        description="""
+        Maximum password age before requiring a change.
+        Format is a duration string like "90d" for 90 days.
+        Set to None to disable password expiration.
+        """,
+        examples=[None, "90d", "180d"],
+        validation_alias=AliasChoices("max_password_age", "max-password-age"),
+        serialization_alias="max_password_age",
+    )
+    password_hash_algorithm: PasswordHashAlgorithm = Field(
+        default=PasswordHashAlgorithm.PBKDF2_SHA256,
+        description="""
+        The password hashing algorithm to use for new passwords.
+        Supported algorithms: bcrypt, sha256, sha3_256, pbkdf2_sha256.
+        Existing passwords with different algorithms will be gradually migrated.
+        """,
+        examples=[
+            PasswordHashAlgorithm.BCRYPT,
+            PasswordHashAlgorithm.SHA256,
+            PasswordHashAlgorithm.SHA3_256,
+            PasswordHashAlgorithm.PBKDF2_SHA256,
+        ],
+        validation_alias=AliasChoices("password-hash-algorithm", "password_hash_algorithm"),
+        serialization_alias="password-hash-algorithm",
+    )
+    password_hash_rounds: int = Field(
+        default=600_000,
+        ge=1,
+        le=2_000_000,
+        description="""
+        The number of rounds (iterations) for the password hashing algorithm.
+        Higher values are more secure but slower.
+        - bcrypt: valid range is 4-31 (will be automatically capped at 31)
+        - pbkdf2_sha256: recommended 100,000+ (default 100,000)
+        - sha256/sha3_256: any positive integer (100,000 may be too high for these)
+        The value will be automatically adjusted to fit the algorithm's constraints.
+        """,
+        examples=[12, 100_000, 600_000],
+        validation_alias=AliasChoices("password-hash-rounds", "password_hash_rounds"),
+        serialization_alias="password-hash-rounds",
+    )
+    password_hash_salt_size: int = Field(
+        default=32,
+        ge=16,
+        le=256,
+        description="""
+        The size of the salt in bytes for password hashing.
+        Larger salts provide better protection against rainbow table attacks.
+        - Minimum: 16 bytes (128 bits)
+        - Default: 32 bytes (256 bits) - recommended for most use cases
+        - Maximum: 256 bytes (2048 bits)
+        Note: bcrypt manages its own salt internally, so this setting doesn't apply to bcrypt.
+        """,
+        examples=[16, 32, 64],
+        validation_alias=AliasChoices("password-hash-salt-size", "password_hash_salt_size"),
+        serialization_alias="password-hash-salt-size",
+    )
 
 
 class ManagerConfig(BaseModel):
@@ -1395,20 +1458,6 @@ class WatcherConfig(BaseModel):
         examples=[60.0, 120.0],
         validation_alias=AliasChoices("file_io_timeout", "file-io-timeout"),
         serialization_alias="file-io-timeout",
-    )
-
-
-class AuthConfig(BaseModel):
-    max_password_age: Optional[TimeDuration] = Field(
-        default=None,
-        description="""
-        Maximum password age before requiring a change.
-        Format is a duration string like "90d" for 90 days.
-        Set to None to disable password expiration.
-        """,
-        examples=[None, "90d", "180d"],
-        validation_alias=AliasChoices("max_password_age", "max-password-age"),
-        serialization_alias="max_password_age",
     )
 
 
