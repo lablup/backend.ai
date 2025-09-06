@@ -1,9 +1,13 @@
+from __future__ import annotations
+
 import asyncio
 import uuid
+from http import HTTPStatus
 from typing import Any, Mapping
 
 import aiodocker
 import trafaret as t
+from aiodocker.exceptions import DockerError
 
 from ..plugin.network import AbstractNetworkManagerPlugin, NetworkInfo
 
@@ -48,6 +52,24 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
         network_name = f"bai-multinode-{ident}"
         mtu: int | None = self.plugin_config["mtu"]
 
+        try:
+            # Check and return if existing.
+            item = await self.docker.networks.get(network_name)
+            info = await item.show()
+            return NetworkInfo(
+                network_id=network_name,
+                options={
+                    "mode": info["Driver"],
+                    "network_name": network_name,
+                    "network_id": info["Id"],
+                },
+            )
+        except DockerError as e:
+            if e.status == HTTPStatus.NOT_FOUND:
+                pass
+            else:
+                raise
+
         # Overlay networks can only be created at the Swarm manager.
         create_options = {
             "Name": network_name,
@@ -59,15 +81,14 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
             "Options": {},
         }
         if mtu:
-            create_options["Options"] = {"com.docker.network.driver.mtu": str(mtu)}
-        await self.docker.networks.create(create_options)
-
+            create_options["Options"]["com.docker.network.driver.mtu"] = str(mtu)
+        result = await self.docker.networks.create(create_options)
         return NetworkInfo(
             network_id=network_name,
             options={
                 "mode": "overlay",
                 "network_name": network_name,
-                "network_id": network_name,
+                "network_id": result.id,
             },
         )
 
