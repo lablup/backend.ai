@@ -1177,3 +1177,36 @@ class ValkeyStatClient:
 
         if updates:
             await self.set_multiple_keys(updates)
+
+    @valkey_decorator()
+    async def store_inference_metrics(
+        self,
+        app_metrics_updates: dict[Any, dict[str, Any]],
+        replica_metrics_updates: dict[tuple[Any, Any], dict[str, Any]],
+        cache_lifespan: int = 120,
+    ) -> None:
+        """
+        Store inference metrics for apps and replicas with proper serialization and expiration.
+
+        :param app_metrics_updates: Dictionary mapping endpoint_id to app metrics
+        :param replica_metrics_updates: Dictionary mapping (endpoint_id, replica_id) to replica metrics
+        :param cache_lifespan: TTL in seconds for the stored metrics
+        """
+        if not app_metrics_updates and not replica_metrics_updates:
+            return
+
+        batch = self._create_batch()
+
+        # Store app metrics
+        for endpoint_id, app_measures in app_metrics_updates.items():
+            key = f"inference.{endpoint_id}.app"
+            value = msgpack.packb(app_measures)
+            batch.set(key, value, expiry=ExpirySet(ExpiryType.SEC, cache_lifespan))
+
+        # Store replica metrics
+        for (endpoint_id, replica_id), replica_measures in replica_metrics_updates.items():
+            key = f"inference.{endpoint_id}.replica.{replica_id}"
+            value = msgpack.packb(replica_measures)
+            batch.set(key, value, expiry=ExpirySet(ExpiryType.SEC, cache_lifespan))
+
+        await self._client.client.exec(batch, raise_on_error=True)

@@ -31,6 +31,7 @@ from ai.backend.appproxy.common.events import (
 from ai.backend.appproxy.common.exceptions import ServerMisconfiguredError, ServiceUnavailable
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo, SerializableCircuit
 from ai.backend.appproxy.coordinator.health_checker import HealthCheckEngine
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.lock import AbstractDistributedLock
 from ai.backend.common.metrics.metric import (
@@ -301,9 +302,9 @@ class RootContext:
     core_event_dispatcher: EventDispatcher
     core_event_producer: EventProducer
 
-    redis_live: RedisConnectionInfo
+    valkey_live: ValkeyLiveClient
     redis_lock: RedisConnectionInfo
-    core_redis_live: RedisConnectionInfo
+    core_valkey_live: ValkeyLiveClient
     local_config: ServerConfig
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
     traefik_etcd: TraefikEtcd | None
