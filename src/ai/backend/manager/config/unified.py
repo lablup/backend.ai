@@ -433,9 +433,9 @@ class AuthConfig(BaseModel):
         serialization_alias="password-hash-algorithm",
     )
     password_hash_rounds: int = Field(
-        default=100_000,
+        default=600_000,
         ge=1,
-        le=1_000_000,
+        le=2_000_000,
         description="""
         The number of rounds (iterations) for the password hashing algorithm.
         Higher values are more secure but slower.
@@ -444,20 +444,20 @@ class AuthConfig(BaseModel):
         - sha256/sha3_256: any positive integer (100,000 may be too high for these)
         The value will be automatically adjusted to fit the algorithm's constraints.
         """,
-        examples=[12, 100_000, 200_000],
+        examples=[12, 100_000, 600_000],
         validation_alias=AliasChoices("password-hash-rounds", "password_hash_rounds"),
         serialization_alias="password-hash-rounds",
     )
     password_hash_salt_size: int = Field(
         default=32,
         ge=16,
-        le=64,
+        le=256,
         description="""
         The size of the salt in bytes for password hashing.
         Larger salts provide better protection against rainbow table attacks.
         - Minimum: 16 bytes (128 bits)
         - Default: 32 bytes (256 bits) - recommended for most use cases
-        - Maximum: 64 bytes (512 bits)
+        - Maximum: 256 bytes (2048 bits)
         Note: bcrypt manages its own salt internally, so this setting doesn't apply to bcrypt.
         """,
         examples=[16, 32, 64],
