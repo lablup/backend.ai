@@ -71,7 +71,7 @@ class OverlayNetworkPlugin(AbstractNetworkManagerPlugin):
                 raise
 
         # Overlay networks can only be created at the Swarm manager.
-        create_options = {
+        create_options: dict[str, Any] = {
             "Name": network_name,
             "Driver": "overlay",
             "Attachable": True,
