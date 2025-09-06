@@ -73,6 +73,7 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionDataForStart,
     SessionDependencyInfo,
     SessionDependencySnapshot,
+    SessionRunningData,
     SessionsForPullWithImages,
     SessionsForStartWithImages,
     SessionTransitionData,
@@ -2331,6 +2332,7 @@ class ScheduleDBSource:
                         container_id=kernel.container_id,
                         startup_command=kernel.startup_command,
                         status_info=kernel.status_info,
+                        occupied_slots=kernel.occupied_slots,
                     )
                     for kernel in session.kernels
                 ]
@@ -2380,34 +2382,38 @@ class ScheduleDBSource:
 
             return ready_session_ids
 
-    async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
+    async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
         """
-        Update sessions from CREATING to RUNNING state.
+        Update sessions from CREATING to RUNNING state with occupying_slots.
         """
-        if not session_ids:
+        if not sessions_data:
             return
 
         async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
-            stmt = (
-                sa.update(SessionRow)
-                .where(
-                    sa.and_(
-                        SessionRow.id.in_(session_ids),
-                        SessionRow.status == SessionStatus.CREATING,
+
+            # Update each session individually with its calculated occupying_slots
+            for session_data in sessions_data:
+                stmt = (
+                    sa.update(SessionRow)
+                    .where(
+                        sa.and_(
+                            SessionRow.id == session_data.session_id,
+                            SessionRow.status == SessionStatus.CREATING,
+                        )
+                    )
+                    .values(
+                        status=SessionStatus.RUNNING,
+                        status_info=None,  # Clear any previous error status
+                        occupying_slots=session_data.occupying_slots,
+                        status_history=sql_json_merge(
+                            SessionRow.status_history,
+                            (),
+                            {SessionStatus.RUNNING.name: now.isoformat()},
+                        ),
                     )
                 )
-                .values(
-                    status=SessionStatus.RUNNING,
-                    status_info=None,  # Clear any previous error status
-                    status_history=sql_json_merge(
-                        SessionRow.status_history,
-                        (),
-                        {SessionStatus.RUNNING.name: now.isoformat()},
-                    ),
-                )
-            )
-            await db_sess.execute(stmt)
+                await db_sess.execute(stmt)
 
     async def get_sessions_ready_to_terminate(self) -> list[SessionId]:
         """

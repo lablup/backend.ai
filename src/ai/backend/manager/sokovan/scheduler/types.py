@@ -777,6 +777,7 @@ class KernelTransitionData:
     container_id: Optional[str]
     startup_command: Optional[str]
     status_info: Optional[str]
+    occupied_slots: Optional[ResourceSlot] = None
 
 
 @dataclass(frozen=True)
@@ -807,3 +808,14 @@ class SessionTransitionData:
         if len(main_kernels) == 0:
             raise ValueError(f"Session {self.session_id} has no main kernel")
         return main_kernels[0]
+
+
+@dataclass(frozen=True)
+class SessionRunningData:
+    """
+    Data for updating a session to RUNNING state.
+    Contains the calculated occupying_slots from all kernels.
+    """
+
+    session_id: SessionId
+    occupying_slots: ResourceSlot
