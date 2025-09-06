@@ -25,18 +25,27 @@ from .huggingface_registry import (
     huggingface_registry,
     update_huggingface_registry,
 )
+from .model_deployment.access_token import create_access_token
+from .model_deployment.auto_scaling_rule import (
+    create_auto_scaling_rule,
+    delete_auto_scaling_rule,
+    update_auto_scaling_rule,
+)
 from .model_deployment.model_deployment import (
     create_model_deployment,
     delete_model_deployment,
     deployment,
     deployment_status_changed,
     deployments,
-    replica,
-    replica_status_changed,
+    sync_replicas,
     update_model_deployment,
 )
+from .model_deployment.model_replica import replica, replica_status_changed, replicas
 from .model_deployment.model_revision import (
+    add_model_revision,
     create_model_revision,
+    inference_runtime_config,
+    inference_runtime_configs,
     revision,
     revisions,
 )
@@ -70,6 +79,7 @@ class Query:
     deployment = deployment
     revisions = revisions
     revision = revision
+    replicas = replicas
     replica = replica
     object_storage = object_storage
     object_storages = object_storages
@@ -77,6 +87,8 @@ class Query:
     huggingface_registries = huggingface_registries
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
+    inference_runtime_configs = inference_runtime_configs
+    inference_runtime_config = inference_runtime_config
 
 
 @strawberry.type
@@ -90,9 +102,14 @@ class Mutation:
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
+    sync_replicas = sync_replicas
+    add_model_revision = add_model_revision
     create_model_revision = create_model_revision
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
+    create_auto_scaling_rule = create_auto_scaling_rule
+    update_auto_scaling_rule = update_auto_scaling_rule
+    delete_auto_scaling_rule = delete_auto_scaling_rule
     delete_object_storage = delete_object_storage
     register_object_storage_bucket = register_object_storage_bucket
     unregister_object_storage_bucket = unregister_object_storage_bucket
@@ -106,6 +123,7 @@ class Mutation:
     get_presigned_upload_url = get_presigned_upload_url
     approve_artifact_revision = approve_artifact_revision
     reject_artifact_revision = reject_artifact_revision
+    create_access_token = create_access_token
 
 
 @strawberry.type
