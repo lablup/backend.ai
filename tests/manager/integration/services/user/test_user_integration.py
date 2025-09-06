@@ -60,9 +60,16 @@ async def created_user(
     email = f"testuser-{unique_suffix}@example.com"
     name = f"testuser-{unique_suffix}"
 
+    password_info = PasswordInfo(
+        password="sample_password",
+        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        rounds=600_000,
+        salt_size=32,
+    )
+
     user_data = {
         "username": name,
-        "password": "sample_password",
+        "password": password_info,
         "email": email,
         "need_password_change": False,
         "full_name": "Sample User",

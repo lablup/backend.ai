@@ -698,13 +698,23 @@ async def test_purge_domain_in_db(
 async def create_test_user(
     database_engine: ExtendedAsyncSAEngine, email: str, domain_name: str
 ) -> AsyncGenerator[UUID, None]:
+    from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+    from ai.backend.manager.models.hasher.types import PasswordInfo
+
     user_id = uuid4()
+    password_info = PasswordInfo(
+        password="password123",
+        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        rounds=600_000,
+        salt_size=32,
+    )
+
     async with database_engine.begin() as conn:
         user_data = {
             "uuid": user_id,
             "username": "testuser",
             "email": email,
-            "password": "password123",
+            "password": password_info,
             "need_password_change": False,
             "full_name": "Test User",
             "description": "Test user for domain tests",

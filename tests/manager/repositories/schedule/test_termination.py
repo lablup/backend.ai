@@ -196,11 +196,21 @@ async def sample_user_and_keypair(
         data["group"] = group
 
         # Create user
+        from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+        from ai.backend.manager.models.hasher.types import PasswordInfo
+
+        password_info = PasswordInfo(
+            password="dummy",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=600_000,
+            salt_size=32,
+        )
+
         user = UserRow(
             uuid=uuid.uuid4(),
             username="test-termination-user",
             email="termination@example.com",
-            password="dummy",
+            password=password_info,
             domain_name=domain.name,
             role=UserRole.USER,
             resource_policy="test-termination-policy",
