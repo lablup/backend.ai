@@ -64,8 +64,10 @@ class UpdateArtifactPathParam(BaseRequestModel):
 
 
 class UpdateArtifactReq(BaseRequestModel):
-    # Add fields as needed for artifact updates
     description: Optional[str] = Field(default=None, description="Updated description")
+    readonly: Optional[bool] = Field(
+        default=None, description="Whether the artifact should be readonly."
+    )
 
 
 class DeleteArtifactPathParam(BaseRequestModel):

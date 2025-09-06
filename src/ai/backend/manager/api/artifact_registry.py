@@ -12,14 +12,19 @@ from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.request import (
+    ScanArtifactModelsReq,
     ScanArtifactsReq,
     SearchArtifactsReq,
 )
 from ai.backend.manager.dto.response import (
+    ScanArtifactModelsResponse,
     SearchArtifactsResponse,
 )
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
+)
+from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (
+    RetrieveModelsAction,
 )
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 
@@ -73,6 +78,26 @@ class APIHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
+    @auth_required_for_method
+    @api_handler
+    async def scan_artifact_models(
+        self,
+        body: BodyParam[ScanArtifactModelsReq],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        processors = processors_ctx.processors
+        action_result = await processors.artifact.retrieve_models.wait_for_complete(
+            RetrieveModelsAction(
+                models=body.parsed.models,
+                registry_id=body.parsed.registry_id,
+            )
+        )
+
+        resp = ScanArtifactModelsResponse(
+            artifacts=action_result.result,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
 
 def create_app(
     default_cors_options: CORSOptions,
@@ -84,4 +109,5 @@ def create_app(
     api_handler = APIHandler()
     cors.add(app.router.add_route("POST", "/scan", api_handler.scan_artifacts))
     cors.add(app.router.add_route("POST", "/search", api_handler.search_artifacts))
+    cors.add(app.router.add_route("POST", "/models/batch", api_handler.scan_artifact_models))
     return app, []
