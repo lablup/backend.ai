@@ -9,7 +9,8 @@ from ai.backend.manager.services.artifact_registry.actions.base import ArtifactR
 
 @dataclass
 class GetArtifactRegistryMetaAction(ArtifactRegistryAction):
-    registry_id: uuid.UUID
+    registry_id: Optional[uuid.UUID] = None
+    registry_name: Optional[str] = None
 
     @override
     def entity_id(self) -> Optional[str]:
