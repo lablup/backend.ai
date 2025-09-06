@@ -1,6 +1,6 @@
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.actions.action import BaseAction, BaseActionTriggerMeta
-from ai.backend.manager.actions.validators.validator import ActionValidator
+from ai.backend.manager.actions.validator.base import ActionValidator
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.user import UserNotFound
 
