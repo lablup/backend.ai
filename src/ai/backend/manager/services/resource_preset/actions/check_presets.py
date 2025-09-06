@@ -1,7 +1,9 @@
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Mapping, Optional, override
+from typing import Any, Optional, override
 
+from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.resource_preset.actions.base import ResourcePresetAction
@@ -36,7 +38,7 @@ class CheckResourcePresetsActionResult(BaseActionResult):
     group_using: Mapping[str, str]
     group_remaining: Mapping[str, str]
     scaling_group_remaining: Mapping[str, str]
-    scaling_groups: dict[str | Any, dict[str, ResourceSlot]]
+    scaling_groups: Mapping[str | Any, Mapping[ResourceSlotState, ResourceSlot]]
 
     # TODO: Should return preset row ids after changing to batching.
     @override
