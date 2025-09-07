@@ -10,6 +10,10 @@ class SearchArtifactsResponse(BaseResponseModel):
     artifacts: list[ArtifactDataWithRevisions]
 
 
+class ScanArtifactsResponse(BaseResponseModel):
+    artifacts: list[ArtifactDataWithRevisions]
+
+
 class ScanArtifactModelsResponse(BaseResponseModel):
     artifacts: list[ArtifactDataWithRevisions]
 

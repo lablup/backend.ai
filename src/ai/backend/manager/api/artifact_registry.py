@@ -18,6 +18,7 @@ from ai.backend.manager.dto.request import (
 )
 from ai.backend.manager.dto.response import (
     ScanArtifactModelsResponse,
+    ScanArtifactsResponse,
     SearchArtifactsResponse,
 )
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
@@ -43,7 +44,7 @@ class APIHandler:
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         processors = processors_ctx.processors
-        await processors.artifact.scan.wait_for_complete(
+        action_result = await processors.artifact.scan.wait_for_complete(
             ScanArtifactsAction(
                 registry_id=body.parsed.registry_id,
                 artifact_type=body.parsed.artifact_type,
@@ -53,7 +54,10 @@ class APIHandler:
             )
         )
 
-        return APIResponse.no_content(status_code=HTTPStatus.OK)
+        resp = ScanArtifactsResponse(
+            artifacts=action_result.result,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     @auth_required_for_method
     @api_handler
