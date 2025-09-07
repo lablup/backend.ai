@@ -7,7 +7,7 @@ from typing import Iterable, Tuple
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, api_handler
+from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.request import (
@@ -16,7 +16,8 @@ from ai.backend.manager.dto.request import (
     CleanupArtifactsReq,
     ImportArtifactsReq,
     RejectArtifactRevisionReq,
-    UpdateArtifactReq,
+    UpdateArtifactReqBodyParam,
+    UpdateArtifactReqPathParam,
 )
 from ai.backend.manager.dto.response import (
     ApproveArtifactRevisionResponse,
@@ -99,13 +100,13 @@ class APIHandler:
     @api_handler
     async def approve_artifact_revision(
         self,
-        body: BodyParam[ApproveArtifactRevisionReq],
+        path: PathParam[ApproveArtifactRevisionReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         processors = processors_ctx.processors
         action_result = await processors.artifact_revision.approve.wait_for_complete(
             ApproveArtifactRevisionAction(
-                artifact_revision_id=body.parsed.artifact_revision_id,
+                artifact_revision_id=path.parsed.artifact_revision_id,
             )
         )
 
@@ -118,13 +119,13 @@ class APIHandler:
     @api_handler
     async def reject_artifact_revision(
         self,
-        body: BodyParam[RejectArtifactRevisionReq],
+        path: PathParam[RejectArtifactRevisionReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         processors = processors_ctx.processors
         action_result = await processors.artifact_revision.reject.wait_for_complete(
             RejectArtifactRevisionAction(
-                artifact_revision_id=body.parsed.artifact_revision_id,
+                artifact_revision_id=path.parsed.artifact_revision_id,
             )
         )
 
@@ -170,13 +171,14 @@ class APIHandler:
     @api_handler
     async def update_artifact(
         self,
-        body: BodyParam[UpdateArtifactReq],
+        path: PathParam[UpdateArtifactReqPathParam],
+        body: BodyParam[UpdateArtifactReqBodyParam],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         processors = processors_ctx.processors
         action_result = await processors.artifact.update.wait_for_complete(
             UpdateArtifactAction(
-                artifact_id=body.parsed.artifact_id,
+                artifact_id=path.parsed.artifact_id,
                 modifier=body.parsed.to_modifier(),
             )
         )
@@ -199,16 +201,20 @@ def create_app(
     cors.add(app.router.add_route("POST", "/revisions/cleanup", api_handler.cleanup_artifacts))
     cors.add(
         app.router.add_route(
-            "POST", "/revisions/{id}/approval", api_handler.approve_artifact_revision
+            "POST",
+            "/revisions/{artifact_revision_id}/approval",
+            api_handler.approve_artifact_revision,
         )
     )
     cors.add(
         app.router.add_route(
-            "POST", "/revisions/{id}/rejection", api_handler.reject_artifact_revision
+            "POST",
+            "/revisions/{artifact_revision_id}/rejection",
+            api_handler.reject_artifact_revision,
         )
     )
     cors.add(app.router.add_route("POST", "/task/cancel", api_handler.cancel_import_artifact))
     cors.add(app.router.add_route("POST", "/import", api_handler.import_artifacts))
-    cors.add(app.router.add_route("PATCH", "/{id}", api_handler.update_artifact))
+    cors.add(app.router.add_route("PATCH", "/{artifact_id}", api_handler.update_artifact))
 
     return app, []

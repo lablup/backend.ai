@@ -59,8 +59,11 @@ class ImportArtifactsReq(BaseRequestModel):
     )
 
 
-class UpdateArtifactReq(BaseRequestModel):
+class UpdateArtifactReqPathParam(BaseRequestModel):
     artifact_id: uuid.UUID = Field(description="The artifact ID to update.")
+
+
+class UpdateArtifactReqBodyParam(BaseRequestModel):
     readonly: Optional[bool] = Field(
         default=None, description="Whether the artifact should be readonly."
     )
