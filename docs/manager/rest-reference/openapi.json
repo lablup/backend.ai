@@ -1715,7 +1715,7 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/artifacts/revisions/{id}/approval": {
+    "/artifacts/revisions/{artifact_revision_id}/approval": {
       "post": {
         "operationId": "artifacts.approve_artifact_revision",
         "tags": [
@@ -1733,7 +1733,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
+            "name": "artifact_revision_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1744,7 +1744,7 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/artifacts/revisions/{id}/rejection": {
+    "/artifacts/revisions/{artifact_revision_id}/rejection": {
       "post": {
         "operationId": "artifacts.reject_artifact_revision",
         "tags": [
@@ -1762,7 +1762,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
+            "name": "artifact_revision_id",
             "in": "path",
             "required": true,
             "schema": {
@@ -1813,7 +1813,7 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
-    "/artifacts/{id}": {
+    "/artifacts/{artifact_id}": {
       "patch": {
         "operationId": "artifacts.update_artifact",
         "tags": [
@@ -1831,7 +1831,7 @@
         ],
         "parameters": [
           {
-            "name": "id",
+            "name": "artifact_id",
             "in": "path",
             "required": true,
             "schema": {
