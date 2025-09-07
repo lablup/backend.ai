@@ -20,6 +20,7 @@ from ai.backend.manager.dto.request import (
 )
 from ai.backend.manager.dto.response import (
     ApproveArtifactRevisionResponse,
+    ArtifactRevisionImportTask,
     CancelImportArtifactResponse,
     CleanupArtifactsResponse,
     ImportArtifactsResponse,
@@ -141,6 +142,7 @@ class APIHandler:
     ) -> APIResponse:
         processors = processors_ctx.processors
         imported_revisions = []
+        tasks = []
 
         # Process each artifact revision sequentially
         # TODO: Optimize with asyncio.gather() for parallel processing
@@ -151,9 +153,16 @@ class APIHandler:
                 )
             )
             imported_revisions.append(action_result.result)
+            tasks.append(
+                ArtifactRevisionImportTask(
+                    task_id=str(action_result.task_id),
+                    artifact_revision=action_result.result,
+                )
+            )
 
         resp = ImportArtifactsResponse(
             artifact_revisions=imported_revisions,
+            tasks=tasks,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 

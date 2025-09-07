@@ -6,6 +6,11 @@ from ai.backend.manager.data.artifact.types import (
 )
 
 
+class ArtifactRevisionImportTask(BaseResponseModel):
+    task_id: str
+    artifact_revision: ArtifactRevisionData
+
+
 class SearchArtifactsResponse(BaseResponseModel):
     artifacts: list[ArtifactDataWithRevisions]
 
@@ -36,6 +41,7 @@ class RejectArtifactRevisionResponse(BaseResponseModel):
 
 class ImportArtifactsResponse(BaseResponseModel):
     artifact_revisions: list[ArtifactRevisionData]
+    tasks: list[ArtifactRevisionImportTask]
 
 
 class UpdateArtifactResponse(BaseResponseModel):
