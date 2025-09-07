@@ -83,6 +83,7 @@ class PresignedDownloadObjectReq(BaseRequestModel):
     key: str = Field(
         description="The object key (path) within the bucket to download the file from."
     )
+    expiration: Optional[int] = Field(default=None, description="Token expiration time in seconds")
 
 
 class GetObjectMetaReq(BaseRequestModel):

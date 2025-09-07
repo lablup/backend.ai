@@ -219,6 +219,7 @@ class DeleteObjectStorageInput:
 class GetPresignedDownloadURLInput:
     artifact_revision_id: ID
     key: str
+    expiration: Optional[int] = None
 
 
 @strawberry.input(description="Added in 25.14.0")

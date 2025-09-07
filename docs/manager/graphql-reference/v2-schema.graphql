@@ -389,6 +389,7 @@ extend type EndpointToken @key(fields: "token") {
 input GetPresignedDownloadURLInput {
   artifactRevisionId: ID!
   key: String!
+  expiration: Int = null
 }
 
 """Added in 25.14.0"""

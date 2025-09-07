@@ -119,6 +119,7 @@ class GetPresignedDownloadURLReq(BaseRequestModel):
         description="The unique identifier of the artifact revision"
     )
     key: str = Field(description="Object key")
+    expiration: Optional[int] = Field(default=None, description="URL expiration time in seconds")
 
 
 class GetPresignedUploadURLReq(BaseRequestModel):
