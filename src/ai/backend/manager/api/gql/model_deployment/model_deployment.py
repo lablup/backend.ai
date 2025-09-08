@@ -229,11 +229,10 @@ class ModelDeploymentNetworkAccess:
                 ),
             )
 
-        _, deployment_id = resolve_global_id(str(self._deployment_id))
         access_token_loader = DataLoader(
             apartial(AccessToken.batch_load_by_deployment_ids, info.context)
         )
-        token_nodes: list[AccessToken] = await access_token_loader.load(deployment_id)
+        token_nodes: list[AccessToken] = await access_token_loader.load(self._deployment_id)
 
         edges = [
             AccessTokenEdge(node=token_node, cursor=str(token_node.id))
