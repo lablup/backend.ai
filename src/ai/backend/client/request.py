@@ -10,6 +10,7 @@ import uuid
 from collections import namedtuple
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 from pathlib import Path
 from typing import (
     Any,
@@ -30,6 +31,7 @@ import aiohttp
 import aiohttp.web
 import appdirs
 import attrs
+import orjson
 from aiohttp.client import _RequestContextManager, _WSRequestContextManager
 from dateutil.tz import tzutc
 from multidict import CIMultiDict
@@ -101,6 +103,11 @@ class ExtendedJSONEncoder(modjson.JSONEncoder):
         return super().default(obj)
 
 
+class SessionMode(StrEnum):
+    CLIENT = "CLIENT"
+    PROXY = "PROXY"
+
+
 class Request:
     """
     The API request object.
@@ -119,6 +126,7 @@ class Request:
         "_content",
         "_attached_files",
         "reporthook",
+        "session_mode",
     )
 
     _content: RequestContent
@@ -139,6 +147,7 @@ class Request:
         params: Optional[Mapping[str, Union[str, int]]] = None,
         reporthook: Optional[Callable] = None,
         override_api_version: Optional[str] = None,
+        session_mode: SessionMode = SessionMode.CLIENT,
     ) -> None:
         """
         Initialize an API request.
@@ -153,6 +162,9 @@ class Request:
 
         :param str content_type: Explicitly set the content type.  See also
                                  :func:`Request.set_content`.
+
+        :param SessionMode session_mode: The session mode, either CLIENT or PROXY.
+                                      This affects how the response decoding is handled.
         """
         self.session = api_session.get()
         self.config = self.session.config
@@ -175,6 +187,7 @@ class Request:
         self._attached_files = None
         self.set_content(content, content_type=content_type)
         self.reporthook = reporthook
+        self.session_mode = session_mode
 
     @property
     def content(self) -> RequestContent:
@@ -346,7 +359,7 @@ class Request:
                 allow_redirects=False,
             )
 
-        return FetchContextManager(self.session, _rqst_ctx_builder, **kwargs)
+        return FetchContextManager(self.session, _rqst_ctx_builder, self.session_mode, **kwargs)
 
     def connect_websocket(self, **kwargs) -> WebSocketContextManager:
         """
@@ -552,6 +565,7 @@ class FetchContextManager:
     __slots__ = (
         "session",
         "rqst_ctx_builder",
+        "session_mode",
         "response_cls",
         "check_status",
         "_async_mode",
@@ -564,6 +578,7 @@ class FetchContextManager:
         self,
         session: BaseSession,
         rqst_ctx_builder: Callable[[], _RequestContextManager],
+        session_mode: SessionMode = SessionMode.PROXY,
         *,
         response_cls: Type[Response] = Response,
         check_status: bool = True,
@@ -574,6 +589,7 @@ class FetchContextManager:
         self.response_cls = response_cls
         self._async_mode = isinstance(session, AsyncSession)
         self._rqst_ctx = None
+        self.session_mode = session_mode
 
     async def __aenter__(self) -> Response:
         max_retries = len(self.session.config.endpoints)
@@ -586,9 +602,14 @@ class FetchContextManager:
                 assert self._rqst_ctx is not None
                 raw_resp = await self._rqst_ctx.__aenter__()
                 if self.check_status and raw_resp.status // 100 not in [2, 3]:
-                    msg = await raw_resp.text()
-                    await raw_resp.__aexit__(None, None, None)
-                    raise BackendAPIError(raw_resp.status, raw_resp.reason or "", msg)
+                    match self.session_mode:
+                        case SessionMode.CLIENT:
+                            error_data = await raw_resp.json()
+                            msg = orjson.dumps(error_data).decode("utf-8")
+                            await raw_resp.__aexit__(None, None, None)
+                            raise BackendAPIError(raw_resp.status, raw_resp.reason or "", msg)
+                        case SessionMode.PROXY:
+                            pass
                 return self.response_cls(self.session, raw_resp, async_mode=self._async_mode)
             except aiohttp.ClientConnectionError as e:
                 if retry_count == max_retries:

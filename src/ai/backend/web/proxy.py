@@ -15,7 +15,7 @@ from multidict import CIMultiDict
 from trafaret import DataError
 
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
-from ai.backend.client.request import Request, RequestContent
+from ai.backend.client.request import Request, RequestContent, SessionMode
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging import BraceStyleAdapter
@@ -216,6 +216,7 @@ async def web_handler(
                 content,
                 params=frontend_rqst.query,
                 override_api_version=request_api_version,
+                session_mode=SessionMode.PROXY if api_session.proxy_mode else SessionMode.CLIENT,
             )
             if "Content-Type" in frontend_rqst.headers:
                 backend_rqst.content_type = frontend_rqst.content_type  # set for signing
@@ -322,6 +323,7 @@ async def web_plugin_handler(
                 params=frontend_rqst.query,
                 content_type=frontend_rqst.content_type,
                 override_api_version=request_api_version,
+                session_mode=SessionMode.PROXY if api_session.proxy_mode else SessionMode.CLIENT,
             )
             for key in HTTP_HEADERS_TO_FORWARD:
                 if (value := frontend_rqst.headers.get(key)) is not None:
