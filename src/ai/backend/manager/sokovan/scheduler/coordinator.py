@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from typing import Optional
@@ -24,7 +25,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import SchedulerOperationMetricObserver
 from ai.backend.manager.scheduler.types import ScheduleType
-from ai.backend.manager.sokovan.handlers import ScheduleHandler
 from ai.backend.manager.sokovan.scheduler.scheduler import Scheduler
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.types import DistributedLockFactory
@@ -36,6 +36,7 @@ from .handlers import (
     CheckTerminatingProgressHandler,
     RetryCreatingHandler,
     RetryPreparingHandler,
+    SchedulerHandler,
     ScheduleSessionsHandler,
     StartSessionsHandler,
     SweepSessionsHandler,
@@ -84,11 +85,12 @@ class ScheduleCoordinator:
     _valkey_schedule: ValkeyScheduleClient
     _scheduler: Scheduler
     _scheduling_controller: SchedulingController
-    _schedule_handlers: dict[ScheduleType, ScheduleHandler]
+    _schedule_handlers: Mapping[ScheduleType, SchedulerHandler]
     _operation_metrics: SchedulerOperationMetricObserver
     _kernel_state_engine: KernelStateEngine
     _lock_factory: DistributedLockFactory
     _config_provider: ManagerConfigProvider
+    _event_producer: EventProducer
 
     def __init__(
         self,
@@ -110,36 +112,46 @@ class ScheduleCoordinator:
         # Initialize kernel state engine with the scheduler's repository
         self._kernel_state_engine = KernelStateEngine(scheduler._repository)
 
-        # Initialize handlers for each schedule type
-        self._schedule_handlers = {
+        # Initialize handlers using a dedicated method
+        self._schedule_handlers = self._init_handlers()
+
+    def _init_handlers(self) -> Mapping[ScheduleType, SchedulerHandler]:
+        """Initialize and return the mapping of schedule types to their handlers."""
+        return {
             ScheduleType.SCHEDULE: ScheduleSessionsHandler(
-                scheduler, self._scheduling_controller, event_producer, scheduler._repository
+                self._scheduler,
+                self._scheduling_controller,
+                self._event_producer,
+                self._scheduler._repository,
             ),
             ScheduleType.CHECK_PRECONDITION: CheckPreconditionHandler(
-                scheduler, self._scheduling_controller, event_producer
+                self._scheduler, self._scheduling_controller, self._event_producer
             ),
-            ScheduleType.START: StartSessionsHandler(scheduler, event_producer),
+            ScheduleType.START: StartSessionsHandler(self._scheduler, self._event_producer),
             ScheduleType.TERMINATE: TerminateSessionsHandler(
-                scheduler,
+                self._scheduler,
                 self._scheduling_controller,
-                event_producer,
-                scheduler._repository,
+                self._event_producer,
+                self._scheduler._repository,
             ),
-            ScheduleType.SWEEP: SweepSessionsHandler(scheduler, scheduler._repository),
+            ScheduleType.SWEEP: SweepSessionsHandler(self._scheduler, self._scheduler._repository),
             ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressHandler(
-                scheduler, self._scheduling_controller, event_producer
+                self._scheduler, self._scheduling_controller, self._event_producer
             ),
             ScheduleType.CHECK_CREATING_PROGRESS: CheckCreatingProgressHandler(
-                scheduler, self._scheduling_controller, event_producer
+                self._scheduler, self._scheduling_controller, self._event_producer
             ),
             ScheduleType.CHECK_TERMINATING_PROGRESS: CheckTerminatingProgressHandler(
-                scheduler, self._scheduling_controller, event_producer, scheduler._repository
+                self._scheduler,
+                self._scheduling_controller,
+                self._event_producer,
+                self._scheduler._repository,
             ),
             ScheduleType.RETRY_PREPARING: RetryPreparingHandler(
-                scheduler, self._scheduling_controller, event_producer
+                self._scheduler, self._scheduling_controller, self._event_producer
             ),
             ScheduleType.RETRY_CREATING: RetryCreatingHandler(
-                scheduler, self._scheduling_controller, event_producer
+                self._scheduler, self._scheduling_controller, self._event_producer
             ),
         }
 
