@@ -578,7 +578,7 @@ class FetchContextManager:
         self,
         session: BaseSession,
         rqst_ctx_builder: Callable[[], _RequestContextManager],
-        session_mode: SessionMode = SessionMode.PROXY,
+        session_mode: SessionMode = SessionMode.CLIENT,
         *,
         response_cls: Type[Response] = Response,
         check_status: bool = True,
