@@ -621,20 +621,6 @@ class Scheduler:
 
             session_results.append(session_result)
 
-        # Batch update database with termination results
-        await self._repository.batch_update_terminated_status(session_results)
-
-        # Count successfully terminated sessions
-        terminated_session_count = sum(
-            1 for result in session_results if result.should_terminate_session
-        )
-
-        log.info(
-            "Terminated {} sessions (partial: {})",
-            terminated_session_count,
-            len(session_results) - terminated_session_count,
-        )
-
         # Convert only successfully terminated sessions to ScheduledSessionData format
         scheduled_data = [
             ScheduledSessionData(
@@ -850,6 +836,7 @@ class Scheduler:
             return ScheduleResult()
 
         sessions_to_update: list[SessionId] = []
+        log.info("session types to terminate: {}", [s.session_type for s in sessions_data])
 
         hook_coroutines = [
             self._hook_registry.get_hook(session_data.session_type).on_transition_to_terminated(

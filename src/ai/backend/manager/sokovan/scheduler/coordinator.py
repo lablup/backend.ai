@@ -314,7 +314,7 @@ class ScheduleCoordinator:
             )
             # Request scheduling to check if sessions can transition to RUNNING
             await self._scheduling_controller.mark_scheduling_needed(
-                ScheduleType.CHECK_CREATING_PROGRESS
+                ScheduleType.CHECK_PULLING_PROGRESS,
             )
 
     async def cancel_kernels_for_failed_image(

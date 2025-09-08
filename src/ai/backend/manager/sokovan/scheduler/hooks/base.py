@@ -78,10 +78,19 @@ class SessionHook(AbstractSessionHook):
                 str(e),
             )
         finally:
+            log.info(
+                "Running default cleanup for session transition data {}",
+                session,
+            )
             if session.network_type == NetworkType.VOLATILE:
                 await self._destroy_network(session)
 
     async def _destroy_network(self, session: SessionTransitionData) -> None:
+        log.info(
+            "Destroying network {} for session {} ...",
+            session.network_id,
+            session.session_id,
+        )
         network_id = session.network_id
         if network_id is None:
             log.debug(
@@ -89,8 +98,8 @@ class SessionHook(AbstractSessionHook):
                 session.session_id,
             )
             return
-        if session.network_type == NetworkType.VOLATILE:
-            if session.cluster_mode == ClusterMode.SINGLE_NODE:
+        match session.cluster_mode:
+            case ClusterMode.SINGLE_NODE:
                 try:
                     agent_client = self._agent_pool.get_agent_client(
                         session.main_kernel.agent_id,
@@ -99,17 +108,17 @@ class SessionHook(AbstractSessionHook):
                     await agent_client.destroy_local_network(network_id)
                 except Exception:
                     log.exception(f"Failed to destroy the agent-local network {network_id}")
-        elif session.cluster_mode == ClusterMode.MULTI_NODE:
-            if self._config_provider.config.network.inter_container.default_driver is None:
-                raise ValueError("No inter-container network driver is configured.")
+            case ClusterMode.MULTI_NODE:
+                if self._config_provider.config.network.inter_container.default_driver is None:
+                    raise ValueError("No inter-container network driver is configured.")
 
-            network_plugin = self._network_plugin_ctx.plugins[
-                self._config_provider.config.network.inter_container.default_driver
-            ]
-            try:
-                await network_plugin.destroy_network(network_id=network_id)
-            except Exception:
-                log.exception(f"Failed to destroy the overlay network {network_id}.")
+                network_plugin = self._network_plugin_ctx.plugins[
+                    self._config_provider.config.network.inter_container.default_driver
+                ]
+                try:
+                    await network_plugin.destroy_network(network_id=network_id)
+                except Exception:
+                    log.exception(f"Failed to destroy the overlay network {network_id}.")
 
 
 class NoOpSessionHook(AbstractSessionHook):
