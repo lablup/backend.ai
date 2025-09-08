@@ -421,6 +421,17 @@ class DeploymentRepository:
         """
         await self._db_source.update_desired_replicas_bulk(replica_updates)
 
+    async def update_endpoint_urls_bulk(
+        self,
+        url_updates: Mapping[uuid.UUID, str],
+    ) -> None:
+        """Update endpoint URLs for multiple endpoints.
+
+        Args:
+            url_updates: Mapping of endpoint IDs to their registered URLs
+        """
+        await self._db_source.update_endpoint_urls_bulk(url_updates)
+
     async def update_route_sessions(
         self,
         route_session_ids: Mapping[uuid.UUID, SessionId],

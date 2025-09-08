@@ -172,7 +172,7 @@ from ai.backend.manager.utils import query_userinfo
 
 from .agent_cache import AgentRPCCache
 from .clients.agent.client import AgentClient
-from .clients.wsproxy.client import WSProxyClient
+from .clients.wsproxy.client import AppProxyClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .errors.api import InvalidAPIParameters
 from .errors.common import GenericForbidden, RejectedByHook
@@ -353,14 +353,14 @@ class AgentRegistry:
         await self.database_ptask_group.shutdown()
         await self.webhook_ptask_group.shutdown()
 
-    def _load_wsproxy_client(self, address: str, token: str) -> WSProxyClient:
+    def _load_app_proxy_client(self, address: str, token: str) -> AppProxyClient:
         client_session = self._client_pool.load_client_session(
             ClientKey(
                 endpoint=address,
                 domain="wsproxy",
             )
         )
-        return WSProxyClient(client_session, address, token)
+        return AppProxyClient(client_session, address, token)
 
     async def get_instance(self, inst_id: AgentId, field=None):
         async with self.db.begin_readonly() as conn:
@@ -3815,7 +3815,7 @@ class AgentRegistry:
         sgroup = result.first()
         wsproxy_addr = sgroup["wsproxy_addr"]
         wsproxy_api_token = sgroup["wsproxy_api_token"]
-        wsproxy_client = self._load_wsproxy_client(wsproxy_addr, wsproxy_api_token)
+        wsproxy_client = self._load_app_proxy_client(wsproxy_addr, wsproxy_api_token)
 
         model = await VFolderRow.get(db_sess, endpoint.model)
 
@@ -3855,7 +3855,7 @@ class AgentRegistry:
         wsproxy_addr = sgroup["wsproxy_addr"]
         wsproxy_api_token = sgroup["wsproxy_api_token"]
 
-        wsproxy_client = self._load_wsproxy_client(wsproxy_addr, wsproxy_api_token)
+        wsproxy_client = self._load_app_proxy_client(wsproxy_addr, wsproxy_api_token)
         await wsproxy_client.delete_endpoint(endpoint.id)
 
     async def notify_endpoint_route_update_to_appproxy(self, endpoint_id: uuid.UUID) -> None:
