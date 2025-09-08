@@ -40,7 +40,6 @@ class ArtifactRevisionImportTask(BaseResponseModel):
 
 
 class ImportArtifactsResponse(BaseResponseModel):
-    artifact_revisions: list[ArtifactRevisionData]
     tasks: list[ArtifactRevisionImportTask]
 
 

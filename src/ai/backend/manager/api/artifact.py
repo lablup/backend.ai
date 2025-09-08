@@ -161,10 +161,7 @@ class APIHandler:
                 )
             )
 
-        resp = ImportArtifactsResponse(
-            artifact_revisions=imported_revisions,
-            tasks=tasks,
-        )
+        resp = ImportArtifactsResponse(tasks=tasks)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     @auth_required_for_method
