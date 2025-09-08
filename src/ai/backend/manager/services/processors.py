@@ -207,9 +207,6 @@ class Services:
             repositories.project_resource_policy.repository
         )
         resource_preset_service = ResourcePresetService(
-            args.db,
-            args.agent_registry,
-            args.config_provider,
             repositories.resource_preset.repository,
         )
         utilization_metric_service = UtilizationMetricService(
