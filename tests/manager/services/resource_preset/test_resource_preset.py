@@ -6,7 +6,7 @@ Tests the core resource preset service actions to verify compatibility with test
 import uuid
 from decimal import Decimal
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -190,8 +190,9 @@ class TestResourcePresetServiceCompatibility:
         self, resource_preset_service, mock_dependencies
     ) -> None:
         """Test duplicate preset name raises ResourcePresetConflict."""
+
         mock_dependencies["resource_preset_repository"].create_preset_validated = AsyncMock(
-            return_value=None
+            side_effect=ResourcePresetConflict("Duplicate preset")
         )
 
         action = CreateResourcePresetAction(
@@ -410,51 +411,38 @@ class TestResourcePresetServiceCompatibility:
         # Mock domain query
         mock_conn.scalar = AsyncMock(return_value={"cpu": "200", "mem": "200G", "gpu": "20"})
 
-        # Mock scaling group query
-        sgroup_mock = MagicMock()
-        sgroup_mock.name = "default"
-        with patch(
-            "ai.backend.manager.services.resource_preset.service.query_allowed_sgroups",
-            AsyncMock(return_value=[sgroup_mock]),
-        ):
-            # Mock agent registry methods
-            async def mock_get_keypair_occupancy(*args, **kwargs):
-                return ResourceSlot({
-                    "cpu": Decimal("10"),
-                    "mem": Decimal("10737418240"),
-                    "gpu": Decimal("1"),
-                })
+        # Mock scaling group query - this is now handled by repository
+        from ai.backend.common.types import ResourceSlot
+        from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+        from ai.backend.manager.repositories.resource_preset.db_source.types import (
+            PresetAllocatabilityData,
+        )
+        from ai.backend.manager.repositories.resource_preset.types import CheckPresetsResult
 
-            async def mock_get_group_occupancy(*args, **kwargs):
-                return ResourceSlot({"cpu": Decimal("5"), "mem": Decimal("5368709120")})
+        # Create mock preset data
+        preset_data = ResourcePresetData(
+            id=uuid.uuid4(),
+            name="test-preset",
+            resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
+            shared_memory=None,
+            scaling_group_name=None,
+        )
 
-            async def mock_get_domain_occupancy(*args, **kwargs):
-                return ResourceSlot({
-                    "cpu": Decimal("20"),
-                    "mem": Decimal("21474836480"),
-                    "gpu": Decimal("2"),
-                })
+        # Create mock result that the repository would return
+        mock_check_result = CheckPresetsResult(
+            presets=[PresetAllocatabilityData(preset=preset_data, allocatable=True)],
+            keypair_limits=ResourceSlot({"cpu": "100", "mem": "100G", "gpu": "10"}),
+            keypair_using=ResourceSlot({"cpu": "10", "mem": "10G", "gpu": "1"}),
+            keypair_remaining=ResourceSlot({"cpu": "90", "mem": "90G", "gpu": "9"}),
+            group_limits=ResourceSlot({"cpu": "100", "mem": "100G", "gpu": "10"}),
+            group_using=ResourceSlot({"cpu": "5", "mem": "5G"}),
+            group_remaining=ResourceSlot({"cpu": "95", "mem": "95G", "gpu": "10"}),
+            scaling_group_remaining=ResourceSlot({"cpu": "1000", "mem": "1000G", "gpu": "100"}),
+            scaling_groups={},
+        )
 
-            service._agent_registry.get_keypair_occupancy = mock_get_keypair_occupancy
-            service._agent_registry.get_group_occupancy = mock_get_group_occupancy
-            service._agent_registry.get_domain_occupancy = mock_get_domain_occupancy
-
-            # Mock stream queries
-            async def empty_stream():
-                return
-                yield
-
-            mock_conn.stream = AsyncMock(side_effect=[empty_stream(), empty_stream()])
-
-            # Mock presets
-            preset_data = ResourcePresetData(
-                id=uuid.uuid4(),
-                name="test-preset",
-                resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
-                shared_memory=None,
-                scaling_group_name=None,
-            )
-            deps["resource_preset_repository"].list_presets = AsyncMock(return_value=[preset_data])
+        # Mock the repository's check_presets method directly
+        deps["resource_preset_repository"].check_presets = AsyncMock(return_value=mock_check_result)
 
     @pytest.mark.asyncio
     async def test_custom_resource_types_support(
