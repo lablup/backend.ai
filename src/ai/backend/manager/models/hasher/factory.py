@@ -11,7 +11,7 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 
 from .base import PasswordHasher
 from .bcrypt import BcryptHasher
-from .pbkdf2 import PBKDF2_SHA256Hasher
+from .pbkdf2 import PBKDF2_SHA3_256Hasher, PBKDF2_SHA256Hasher
 from .sha import SHA3_256Hasher, SHA256Hasher
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -25,6 +25,7 @@ class PasswordHasherFactory:
         PasswordHashAlgorithm.SHA256: SHA256Hasher(),
         PasswordHashAlgorithm.SHA3_256: SHA3_256Hasher(),
         PasswordHashAlgorithm.PBKDF2_SHA256: PBKDF2_SHA256Hasher(),
+        PasswordHashAlgorithm.PBKDF2_SHA3_256: PBKDF2_SHA3_256Hasher(),
     }
 
     @classmethod
