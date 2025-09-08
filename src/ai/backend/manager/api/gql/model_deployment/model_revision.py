@@ -17,7 +17,12 @@ from ai.backend.common.exception import ModelDeploymentUnavailableError
 from ai.backend.common.types import ClusterMode as CommonClusterMode
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.common.types import RuntimeVariant
-from ai.backend.manager.api.gql.base import JSONString, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import (
+    JSONString,
+    OrderDirection,
+    StringFilter,
+    resolve_global_id,
+)
 from ai.backend.manager.api.gql.image import (
     Image,
 )
@@ -582,7 +587,7 @@ async def revisions(
 @strawberry.field(description="Added in 25.13.0")
 async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision:
     """Get a specific revision by ID."""
-    _, revision_id = AsyncNode.resolve_global_id(info, id)
+    _, revision_id = resolve_global_id(id)
     revision_loader = DataLoader(apartial(ModelRevision.batch_load_by_ids, info.context))
     revision: list[ModelRevision] = await revision_loader.load(revision_id)
     return revision[0]
