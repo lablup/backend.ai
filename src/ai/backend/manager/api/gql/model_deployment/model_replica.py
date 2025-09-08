@@ -14,11 +14,16 @@ from ai.backend.common.data.model_deployment.types import ActivenessStatus as Co
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
 from ai.backend.common.exception import ModelDeploymentUnavailableError
-from ai.backend.manager.api.gql.base import JSONString, OrderDirection, resolve_global_id
+from ai.backend.manager.api.gql.base import (
+    JSONString,
+    OrderDirection,
+    resolve_global_id,
+    to_global_id,
+)
 from ai.backend.manager.api.gql.session import Session
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import ModelReplicaData
-from ai.backend.manager.models.gql_relay import AsyncNode
+from ai.backend.manager.models.gql_models.session import ComputeSessionNode
 from ai.backend.manager.services.deployment.actions.get_replicas_by_deployment_id import (
     GetReplicasByDeploymentIdAction,
 )
@@ -119,7 +124,9 @@ class ModelReplica(Node):
         description="The session ID associated with the replica. This can be null right after replica creation."
     )
     async def session(self, info: Info[StrawberryGQLContext]) -> "Session":
-        session_global_id = AsyncNode.to_global_id("ComputeSessionNode", self._session_id)
+        session_global_id = to_global_id(
+            ComputeSessionNode, self._session_id, is_target_graphene_object=True
+        )
         return Session(id=ID(session_global_id))
 
     @strawberry.field

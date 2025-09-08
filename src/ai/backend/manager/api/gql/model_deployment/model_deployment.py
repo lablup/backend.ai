@@ -17,7 +17,12 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus as CommonDeploymentStatus,
 )
 from ai.backend.common.exception import ModelDeploymentUnavailableError
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, resolve_global_id
+from ai.backend.manager.api.gql.base import (
+    OrderDirection,
+    StringFilter,
+    resolve_global_id,
+    to_global_id,
+)
 from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.model_deployment.access_token import (
     AccessToken,
@@ -46,7 +51,9 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
     ReplicaStateData,
 )
-from ai.backend.manager.models.gql_relay import AsyncNode
+from ai.backend.manager.models.gql_models.domain import DomainNode
+from ai.backend.manager.models.gql_models.group import GroupNode
+from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule_by_deployment_id import (
     GetAutoScalingRulesByDeploymentIdAction,
 )
@@ -185,12 +192,16 @@ class ModelDeploymentMetadata:
 
     @strawberry.field
     async def project(self, info: Info[StrawberryGQLContext]) -> Project:
-        project_global_id = AsyncNode.to_global_id("GroupNode", self._project_id)
+        project_global_id = to_global_id(
+            GroupNode, self._project_id, is_target_graphene_object=True
+        )
         return Project(id=ID(project_global_id))
 
     @strawberry.field
     async def domain(self, info: Info[StrawberryGQLContext]) -> Domain:
-        domain_global_id = AsyncNode.to_global_id("DomainNode", self._domain_name)
+        domain_global_id = to_global_id(
+            DomainNode, self._domain_name, is_target_graphene_object=True
+        )
         return Domain(id=ID(domain_global_id))
 
     @classmethod
@@ -266,7 +277,9 @@ class ModelDeployment(Node):
 
     @strawberry.field
     async def created_user(self, info: Info[StrawberryGQLContext]) -> User:
-        user_global_id = AsyncNode.to_global_id("UserNode", self._created_user_id)
+        user_global_id = to_global_id(
+            UserNode, self._created_user_id, is_target_graphene_object=True
+        )
         return User(id=strawberry.ID(user_global_id))
 
     @strawberry.field
