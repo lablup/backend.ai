@@ -17,7 +17,9 @@ from ai.backend.common.data.storage.registries.types import (
     ModelTarget,
 )
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
+from ai.backend.common.events.event_types.artifact.anycast import (
+    ModelImportDoneEvent,
+)
 from ai.backend.common.types import DispatchResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.huggingface import (
@@ -179,6 +181,13 @@ class HuggingFaceService:
         models = await self._make_scanner(registry_name).scan_models(
             limit=limit, search=search, sort=sort
         )
+
+        # Start background task to download README files and fire event when complete
+        if models:
+            scanner = self._make_scanner(registry_name)
+            asyncio.create_task(
+                scanner.download_readmes_batch(models, registry_name, self._event_producer)
+            )
 
         return models
 

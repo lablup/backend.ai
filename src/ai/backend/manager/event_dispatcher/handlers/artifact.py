@@ -3,6 +3,7 @@ import logging
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.event_types.artifact.anycast import (
     ModelImportDoneEvent,
+    ModelsReadmeFetchDoneEvent,
 )
 from ai.backend.common.types import (
     AgentId,
@@ -85,3 +86,58 @@ class ArtifactEventHandler:
         await self._artifact_repository.update_artifact_revision_status(
             revision.id, ArtifactStatus.NEEDS_APPROVAL
         )
+
+    async def handle_models_readme_fetch_done(
+        self,
+        context: None,
+        source: AgentId,
+        event: ModelsReadmeFetchDoneEvent,
+    ) -> None:
+        """Handle readme fetch completion event and update model artifacts."""
+        log.info("Processing models readme fetch done event with {} models", len(event.models))
+
+        for model_info in event.models:
+            try:
+                registry_type = ArtifactRegistryType(model_info.registry_type)
+            except Exception:
+                raise InvalidArtifactRegistryTypeError(
+                    f"Unsupported artifact registry type: {model_info.registry_type}"
+                )
+
+            match registry_type:
+                case ArtifactRegistryType.HUGGINGFACE:
+                    registry_data = await self._huggingface_repository.get_registry_data_by_name(
+                        model_info.registry_name
+                    )
+                case ArtifactRegistryType.RESERVOIR:
+                    registry_data = await self._reservoir_repository.get_registry_data_by_name(
+                        model_info.registry_name
+                    )
+
+            artifact = await self._artifact_repository.get_model_artifact(
+                model_info.model_id, registry_id=registry_data.id
+            )
+
+            # Get the specific revision
+            revision = await self._artifact_repository.get_artifact_revision(
+                artifact.id, revision=model_info.revision
+            )
+
+            try:
+                # Update the README content
+                await self._artifact_repository.update_artifact_revision_readme(
+                    revision.id, model_info.readme_content
+                )
+
+                log.info(
+                    "Updated README for model: {} revision: {} in artifact: {}",
+                    model_info.model_id,
+                    model_info.revision,
+                    artifact.id,
+                )
+            except Exception as model_error:
+                log.error(
+                    "Failed to process README update for model: {} - {}",
+                    model_info.model_id,
+                    model_error,
+                )

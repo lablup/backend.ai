@@ -702,6 +702,19 @@ class ArtifactRepository:
             return artifact_revision_id
 
     @repository_decorator()
+    async def update_artifact_revision_readme(
+        self, artifact_revision_id: uuid.UUID, readme: str
+    ) -> uuid.UUID:
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(readme=readme)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    @repository_decorator()
     async def list_artifacts_paginated(
         self,
         *,

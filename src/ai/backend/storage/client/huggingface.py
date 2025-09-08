@@ -27,6 +27,11 @@ from ai.backend.common.data.storage.registries.types import (
     ModelSortKey,
     ModelTarget,
 )
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.artifact.anycast import (
+    ModelReadmeInfo,
+    ModelsReadmeFetchDoneEvent,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import HuggingFaceAPIError
 
@@ -388,3 +393,51 @@ class HuggingFaceScanner:
         except Exception as e:
             log.warning(f"Failed to download README for {model}: {str(e)}")
             return None
+
+    async def download_readmes_batch(
+        self,
+        models: list[ModelData],
+        registry_name: str,
+        event_producer: EventProducer,
+        max_concurrent: int = 5,
+    ) -> None:
+        """Download README files for all models and fire event when complete.
+
+        Args:
+            models: List of ModelData objects to download READMEs for
+            registry_name: Name of the registry (e.g., HuggingFace registry name)
+            event_producer: Event producer to fire the completion event
+            max_concurrent: Maximum number of concurrent README downloads (default: 5)
+        """
+        log.info(
+            f"Starting batch README download for {len(models)} models (max_concurrent={max_concurrent})"
+        )
+        readme_results = []
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def download_single_readme(model_data: ModelData) -> None:
+            """Download README for a single model and add to results."""
+            async with semaphore:
+                try:
+                    model_target = ModelTarget(model_id=model_data.id, revision=model_data.revision)
+                    readme_content = await self._download_readme(model_target)
+                    if readme_content:
+                        readme_info = ModelReadmeInfo(
+                            model_id=model_data.id,
+                            revision=model_data.revision,
+                            readme_content=readme_content,
+                            registry_type=ArtifactRegistryType.HUGGINGFACE,
+                            registry_name=registry_name,
+                        )
+                        readme_results.append(readme_info)
+                except Exception as e:
+                    log.warning(f"Failed to download README for {model_data.id}: {str(e)}")
+
+        # Download README files concurrently with semaphore limit
+        tasks = [download_single_readme(model) for model in models]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Fire the event with successful results
+        if readme_results:
+            await event_producer.anycast_event(ModelsReadmeFetchDoneEvent(models=readme_results))
+            log.info(f"Fired ModelsReadmeFetchDoneEvent for {len(readme_results)} models")
