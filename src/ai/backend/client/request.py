@@ -566,7 +566,7 @@ class FetchContextManager:
     __slots__ = (
         "session",
         "rqst_ctx_builder",
-        "session_mode",
+        "_session_mode",
         "response_cls",
         "check_status",
         "_async_mode",
@@ -590,7 +590,7 @@ class FetchContextManager:
         self.response_cls = response_cls
         self._async_mode = isinstance(session, AsyncSession)
         self._rqst_ctx = None
-        self.session_mode = session_mode
+        self._session_mode = session_mode
 
     async def __aenter__(self) -> Response:
         max_retries = len(self.session.config.endpoints)
@@ -603,7 +603,7 @@ class FetchContextManager:
                 assert self._rqst_ctx is not None
                 raw_resp = await self._rqst_ctx.__aenter__()
                 if self.check_status and raw_resp.status // 100 not in [2, 3]:
-                    match self.session_mode:
+                    match self._session_mode:
                         case SessionMode.CLIENT:
                             error_data = await raw_resp.json()
                             msg = dump_json_str(error_data)
