@@ -17,7 +17,7 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus as CommonDeploymentStatus,
 )
 from ai.backend.common.exception import ModelDeploymentUnavailableError
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, resolve_global_id
 from ai.backend.manager.api.gql.domain import Domain
 from ai.backend.manager.api.gql.model_deployment.access_token import (
     AccessToken,
@@ -229,7 +229,7 @@ class ModelDeploymentNetworkAccess:
                 ),
             )
 
-        _, deployment_id = AsyncNode.resolve_global_id(info, str(self._deployment_id))
+        _, deployment_id = resolve_global_id(str(self._deployment_id))
         access_token_loader = DataLoader(
             apartial(AccessToken.batch_load_by_deployment_ids, info.context)
         )
@@ -291,7 +291,7 @@ class ModelDeployment(Node):
 
     @strawberry.field
     async def replica_state(self, info: Info[StrawberryGQLContext]) -> ReplicaState:
-        _, deployment_id = AsyncNode.resolve_global_id(info, self.id)
+        _, deployment_id = resolve_global_id(self.id)
 
         return ReplicaState(
             _deployment_id=UUID(deployment_id),
@@ -606,7 +606,7 @@ async def deployments(
 @strawberry.field(description="Added in 25.13.0")
 async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelDeployment]:
     """Get a specific deployment by ID."""
-    _, deployment_id = AsyncNode.resolve_global_id(info, id)
+    _, deployment_id = resolve_global_id(id)
     dataloader = DataLoader(apartial(ModelDeployment.batch_load_by_ids, info.context))
     deployment: list[ModelDeployment] = await dataloader.load(deployment_id)
 
@@ -637,7 +637,7 @@ async def update_model_deployment(
     input: UpdateModelDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> UpdateModelDeploymentPayload:
     """Update an existing model deployment."""
-    _, deployment_id = AsyncNode.resolve_global_id(info, input.id)
+    _, deployment_id = resolve_global_id(input.id)
     deployment_processor = info.context.processors.deployment
     if deployment_processor is None:
         raise ModelDeploymentUnavailableError(
@@ -656,7 +656,7 @@ async def delete_model_deployment(
     input: DeleteModelDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> DeleteModelDeploymentPayload:
     """Delete a model deployment."""
-    _, deployment_id = AsyncNode.resolve_global_id(info, input.id)
+    _, deployment_id = resolve_global_id(input.id)
     deployment_processor = info.context.processors.deployment
     if deployment_processor is None:
         raise ModelDeploymentUnavailableError(
@@ -695,7 +695,7 @@ class SyncReplicaPayload:
 async def sync_replicas(
     input: SyncReplicaInput, info: Info[StrawberryGQLContext]
 ) -> SyncReplicaPayload:
-    _, deployment_id = AsyncNode.resolve_global_id(info, input.model_deployment_id)
+    _, deployment_id = resolve_global_id(input.model_deployment_id)
     deployment_processor = info.context.processors.deployment
     if deployment_processor is None:
         raise ModelDeploymentUnavailableError(
