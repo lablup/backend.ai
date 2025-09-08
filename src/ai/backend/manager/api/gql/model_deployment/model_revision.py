@@ -22,6 +22,7 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
     resolve_global_id,
+    to_global_id,
 )
 from ai.backend.manager.api.gql.image import (
     Image,
@@ -55,7 +56,9 @@ from ai.backend.manager.data.deployment.types import (
     ResourceSpec,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
-from ai.backend.manager.models.gql_relay import AsyncNode
+from ai.backend.manager.models.gql_models.image import ImageNode
+from ai.backend.manager.models.gql_models.scaling_group import ScalingGroupNode
+from ai.backend.manager.models.gql_models.vfolder import VirtualFolderNode
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
 )
@@ -91,7 +94,9 @@ class ModelMountConfig:
 
     @strawberry.field
     async def vfolder(self, info: Info[StrawberryGQLContext]) -> VFolder:
-        vfolder_global_id = AsyncNode.to_global_id("VirtualFolderNode", self._vfolder_id)
+        vfolder_global_id = to_global_id(
+            VirtualFolderNode, self._vfolder_id, is_target_graphene_object=True
+        )
         return VFolder(id=ID(vfolder_global_id))
 
     @classmethod
@@ -135,7 +140,9 @@ class ResourceConfig:
     @strawberry.field
     def resource_group(self) -> "ResourceGroup":
         """Resolves the federated ResourceGroup."""
-        global_id = AsyncNode.to_global_id("ScalingGroupNode", self._resource_group_name)
+        global_id = to_global_id(
+            ScalingGroupNode, self._resource_group_name, is_target_graphene_object=True
+        )
         return ResourceGroup(id=ID(global_id))
 
     @classmethod
@@ -174,7 +181,7 @@ class ModelRevision(Node):
 
     @strawberry.field
     async def image(self, info: Info[StrawberryGQLContext]) -> Image:
-        image_global_id = AsyncNode.to_global_id("ImageNode", self._image_id)
+        image_global_id = to_global_id(ImageNode, self._image_id, is_target_graphene_object=True)
         return Image(id=ID(image_global_id))
 
     @classmethod

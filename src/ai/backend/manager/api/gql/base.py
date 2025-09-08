@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Optional, Type, cast
 
+import graphene
 import orjson
 import strawberry
 from graphql import StringValueNode
@@ -160,7 +161,17 @@ class JSONString:
         return JSONString.serialize(resource_slot.to_json())
 
 
-def to_global_id(type_: Type[Any], local_id: uuid.UUID | str) -> str:
+def to_global_id(
+    type_: Type[Any], local_id: uuid.UUID | str, is_target_graphene_object: bool = False
+) -> str:
+    if is_target_graphene_object:
+        # For compatibility with existing Graphene-based global IDs
+        if not issubclass(type_, graphene.ObjectType):
+            raise TypeError(
+                "type_ must be a graphene ObjectType when is_target_graphene_object is True."
+            )
+        typename = type_.__name__
+        return base64(f"{typename}:{local_id}")
     if not has_object_definition(type_):
         raise TypeError("type_ must be a Strawberry object type (Node or Edge).")
     typename = get_object_definition(type_, strict=True).name
