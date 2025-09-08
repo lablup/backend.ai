@@ -32,10 +32,10 @@ from ai.backend.manager.api.gql.model_deployment.auto_scaling_rule import (
     AutoScalingRule,
 )
 from ai.backend.manager.api.gql.model_deployment.model_replica import (
-    ModelReplica,
     ModelReplicaConnection,
     ReplicaFilter,
     ReplicaOrderBy,
+    resolve_replicas,
 )
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -71,9 +71,6 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
 )
 from ai.backend.manager.services.deployment.actions.get_deployment import GetDeploymentAction
-from ai.backend.manager.services.deployment.actions.get_replicas_by_deployment_id import (
-    GetReplicasByDeploymentIdAction,
-)
 from ai.backend.manager.services.deployment.actions.list_deployments import ListDeploymentsAction
 from ai.backend.manager.services.deployment.actions.sync_replicas import SyncReplicaAction
 from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
@@ -125,30 +122,17 @@ class ReplicaState:
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ModelReplicaConnection:
-        processor = info.context.processors.deployment
-        if processor is None:
-            raise ModelDeploymentUnavailableError(
-                "Model Deployment feature is unavailable. Please contact support."
-            )
-
-        result = await processor.get_replicas_by_deployment_id.wait_for_complete(
-            GetReplicasByDeploymentIdAction(
-                deployment_id=self._deployment_id,
-            )
+        return await resolve_replicas(
+            info=info,
+            filter=filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
         )
-
-        nodes = [ModelReplica.from_dataclass(data) for data in result.data]
-
-        edges = [Edge(node=node, cursor=str(node.id)) for node in nodes]
-
-        page_info = PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        )
-
-        return ModelReplicaConnection(count=len(nodes), edges=edges, page_info=page_info)
 
 
 @strawberry.type(description="Added in 25.13.0")
