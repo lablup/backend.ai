@@ -14,7 +14,7 @@ from ai.backend.common.data.model_deployment.types import ActivenessStatus as Co
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
 from ai.backend.common.exception import ModelDeploymentUnavailableError
-from ai.backend.manager.api.gql.base import JSONString, OrderDirection
+from ai.backend.manager.api.gql.base import JSONString, OrderDirection, resolve_global_id
 from ai.backend.manager.api.gql.session import Session
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.types import ModelReplicaData
@@ -221,7 +221,7 @@ class ReplicaStatusChangedPayload:
 @strawberry.field(description="Added in 25.13.0")
 async def replica(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelReplica]:
     """Get a specific replica by ID."""
-    _, replica_id = AsyncNode.resolve_global_id(info, id)
+    _, replica_id = resolve_global_id(id)
     replica_loader = DataLoader(apartial(ModelReplica.batch_load_by_revision_ids, info.context))
     replicas: list[ModelReplica] = await replica_loader.load(UUID(replica_id))
     return replicas[0]
