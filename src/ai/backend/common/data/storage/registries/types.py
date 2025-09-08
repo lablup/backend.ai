@@ -146,3 +146,11 @@ class ModelData(BaseModel):
         Provides documentation and usage instructions for the model.
         """,
     )
+    size: Optional[int] = Field(
+        default=None,
+        description="""
+        Total size of the model repository in bytes, if available.
+        Helps in assessing storage requirements and download times.
+        """,
+        examples=[2048000, 512000000],
+    )

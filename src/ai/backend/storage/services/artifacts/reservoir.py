@@ -7,10 +7,8 @@ from dataclasses import dataclass
 from typing import Optional
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
 from ai.backend.common.types import DispatchResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.s3 import S3Client
@@ -255,7 +253,7 @@ class ReservoirService:
         reservoir_config = self._reservoir_registry_configs[0]
         prefix_key = f"{model.model_id}/{model.revision}"
 
-        copied_bytesize = await self._stream_bucket_to_bucket(
+        await self._stream_bucket_to_bucket(
             source_cfg=reservoir_config,
             storage_name=storage_name,
             bucket_name=bucket_name,
@@ -265,16 +263,6 @@ class ReservoirService:
             ),
             progress_reporter=reporter,
             key_prefix=prefix_key,
-        )
-
-        await self._event_producer.anycast_event(
-            ModelImportDoneEvent(
-                model_id=model.model_id,
-                revision=model.revision,
-                registry_name=registry_name,
-                registry_type=ArtifactRegistryType.RESERVOIR,
-                total_size=copied_bytesize,
-            )
         )
 
     async def import_models_batch(

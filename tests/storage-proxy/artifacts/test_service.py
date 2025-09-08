@@ -137,6 +137,7 @@ def mock_model_info() -> ModelData:
         tags=["pytorch", "text-generation"],
         created_at=datetime(2021, 1, 1),
         modified_at=datetime(2023, 6, 15),
+        size=2048000,
     )
 
 

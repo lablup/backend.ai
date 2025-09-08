@@ -20,8 +20,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
     DoAgentResourceCheckEvent,
 )
 from ai.backend.common.events.event_types.artifact.anycast import (
-    ModelImportDoneEvent,
-    ModelsReadmeFetchDoneEvent,
+    ModelsMetadataFetchDoneEvent,
 )
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
     DoScanReservoirRegistryEvent,
@@ -569,14 +568,9 @@ class Dispatchers:
     def _dispatch_artifact_events(self, event_dispatcher: EventDispatcher) -> None:
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(
-            ModelImportDoneEvent,
+            ModelsMetadataFetchDoneEvent,
             None,
-            self._artifact_event_handler.handle_artifact_import_done,
-        )
-        evd.consume(
-            ModelsReadmeFetchDoneEvent,
-            None,
-            self._artifact_event_handler.handle_models_readme_fetch_done,
+            self._artifact_event_handler.handle_models_metadata_fetch_done,
         )
 
     def _dispatch_artifact_registry_events(self, event_dispatcher: EventDispatcher) -> None:

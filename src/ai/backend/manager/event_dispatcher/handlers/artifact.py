@@ -2,14 +2,12 @@ import logging
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.event_types.artifact.anycast import (
-    ModelImportDoneEvent,
-    ModelsReadmeFetchDoneEvent,
+    ModelsMetadataFetchDoneEvent,
 )
 from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
@@ -35,66 +33,14 @@ class ArtifactEventHandler:
         self._huggingface_repository = huggingface_repository
         self._reservoir_repository = reservoir_repository
 
-    async def handle_artifact_import_done(
+    async def handle_models_metadata_fetch_done(
         self,
         context: None,
         source: AgentId,
-        event: ModelImportDoneEvent,
+        event: ModelsMetadataFetchDoneEvent,
     ) -> None:
-        model_id = event.model_id
-        artifact_total_size = event.total_size
-
-        try:
-            registry_type = ArtifactRegistryType(event.registry_type)
-        except Exception:
-            raise InvalidArtifactRegistryTypeError(
-                f"Unsupported artifact registry type: {event.registry_type}"
-            )
-
-        match registry_type:
-            case ArtifactRegistryType.HUGGINGFACE:
-                registry_data = await self._huggingface_repository.get_registry_data_by_name(
-                    event.registry_name
-                )
-            case ArtifactRegistryType.RESERVOIR:
-                registry_data = await self._reservoir_repository.get_registry_data_by_name(
-                    event.registry_name
-                )
-
-        artifact = await self._artifact_repository.get_model_artifact(
-            model_id, registry_id=registry_data.id
-        )
-
-        revision = await self._artifact_repository.get_artifact_revision(
-            artifact.id, revision=event.revision
-        )
-
-        await self._artifact_repository.update_artifact_revision_bytesize(
-            revision.id, artifact_total_size
-        )
-
-        await self._artifact_repository.update_artifact_revision_bytesize(
-            revision.id, artifact_total_size
-        )
-        await self._artifact_repository.update_artifact_revision_status(
-            revision.id, ArtifactStatus.PULLED
-        )
-        # TODO: Add verify step
-        await self._artifact_repository.update_artifact_revision_status(
-            revision.id, ArtifactStatus.VERIFYING
-        )
-        await self._artifact_repository.update_artifact_revision_status(
-            revision.id, ArtifactStatus.NEEDS_APPROVAL
-        )
-
-    async def handle_models_readme_fetch_done(
-        self,
-        context: None,
-        source: AgentId,
-        event: ModelsReadmeFetchDoneEvent,
-    ) -> None:
-        """Handle readme fetch completion event and update model artifacts."""
-        log.info("Processing models readme fetch done event with {} models", len(event.models))
+        """Handle metadata fetch completion event and update model artifacts."""
+        log.info("Processing models metadata fetch done event with {} models", len(event.models))
 
         for model_info in event.models:
             try:
@@ -129,15 +75,21 @@ class ArtifactEventHandler:
                     revision.id, model_info.readme_content
                 )
 
+                # Update the file size
+                await self._artifact_repository.update_artifact_revision_bytesize(
+                    revision.id, model_info.size
+                )
+
                 log.info(
-                    "Updated README for model: {} revision: {} in artifact: {}",
+                    "Updated metadata for model: {} revision: {} in artifact: {} (size: {} bytes)",
                     model_info.model_id,
                     model_info.revision,
                     artifact.id,
+                    model_info.size,
                 )
             except Exception as model_error:
                 log.error(
-                    "Failed to process README update for model: {} - {}",
+                    "Failed to process metadata update for model: {} - {}",
                     model_info.model_id,
                     model_error,
                 )
