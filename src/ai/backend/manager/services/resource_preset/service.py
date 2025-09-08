@@ -1,15 +1,14 @@
 import logging
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 import trafaret as t
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.exception import InvalidAPIParameters, ResourcePresetConflict
-from ai.backend.common.types import (
-    DefaultForUnspecified,
-    ResourceSlot,
-)
+from ai.backend.common.types import DefaultForUnspecified, ResourceSlot
+from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.agent import AgentStatus, agents
@@ -44,6 +43,12 @@ from ai.backend.manager.services.resource_preset.actions.modify_preset import (
     ModifyResourcePresetAction,
     ModifyResourcePresetActionResult,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from sqlalchemy.engine import Row
+
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -211,7 +216,9 @@ class ResourcePresetService:
                 )
 
             # Prepare per scaling group resource.
-            sgroups = await query_allowed_sgroups(conn, domain_name, group_id, access_key)
+            sgroups: Sequence[Row] = await query_allowed_sgroups(
+                conn, domain_name, group_id, access_key
+            )
             sgroup_names = [sg.name for sg in sgroups]
             if action.scaling_group is not None:
                 if action.scaling_group not in sgroup_names:
@@ -219,8 +226,12 @@ class ResourcePresetService:
                 sgroup_names = [action.scaling_group]
             per_sgroup = {
                 sgname: {
-                    "using": ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()}),
-                    "remaining": ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()}),
+                    ResourceSlotState.OCCUPIED: ResourceSlot({
+                        k: Decimal(0) for k in known_slot_types.keys()
+                    }),
+                    ResourceSlotState.AVAILABLE: ResourceSlot({
+                        k: Decimal(0) for k in known_slot_types.keys()
+                    }),
                 }
                 for sgname in sgroup_names
             }
@@ -237,7 +248,9 @@ class ResourcePresetService:
                 )
             )
             async for row in await conn.stream(query):
-                per_sgroup[row["scaling_group_name"]]["using"] += row["occupied_slots"]
+                per_sgroup[row["scaling_group_name"]][ResourceSlotState.OCCUPIED] += row[
+                    "occupied_slots"
+                ]
 
             # Per scaling group resource remaining from agents stats.
             sgroup_remaining = ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
@@ -259,12 +272,12 @@ class ResourcePresetService:
                 remaining += ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
                 sgroup_remaining += remaining
                 agent_slots.append(remaining)
-                per_sgroup[row["scaling_group"]]["remaining"] += remaining
+                per_sgroup[row["scaling_group"]][ResourceSlotState.AVAILABLE] += remaining
 
             # Take maximum allocatable resources per sgroup.
             for sgname, sgfields in per_sgroup.items():
                 for rtype, slots in sgfields.items():
-                    if rtype == "remaining":
+                    if rtype == ResourceSlotState.AVAILABLE:
                         for slot in known_slot_types.keys():
                             if slot in slots:
                                 slots[slot] = min(keypair_remaining[slot], slots[slot])
