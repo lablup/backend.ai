@@ -127,7 +127,7 @@ class Request:
         "_content",
         "_attached_files",
         "reporthook",
-        "session_mode",
+        "_session_mode",
     )
 
     _content: RequestContent
@@ -188,7 +188,7 @@ class Request:
         self._attached_files = None
         self.set_content(content, content_type=content_type)
         self.reporthook = reporthook
-        self.session_mode = session_mode
+        self._session_mode = session_mode
 
     @property
     def content(self) -> RequestContent:
@@ -360,7 +360,7 @@ class Request:
                 allow_redirects=False,
             )
 
-        return FetchContextManager(self.session, _rqst_ctx_builder, self.session_mode, **kwargs)
+        return FetchContextManager(self.session, _rqst_ctx_builder, self._session_mode, **kwargs)
 
     def connect_websocket(self, **kwargs) -> WebSocketContextManager:
         """
