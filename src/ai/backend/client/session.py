@@ -556,10 +556,6 @@ class AsyncSession(BaseSession):
         await self.close()
         return False  # raise up the inner exception
 
-    @property
-    def proxy_mode(self) -> bool:
-        return self._proxy_mode
-
 
 # TODO: Remove this after refactoring session management with contextvars
 @actxmgr
