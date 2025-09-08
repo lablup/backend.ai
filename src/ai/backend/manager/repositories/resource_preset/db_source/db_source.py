@@ -29,7 +29,6 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models import (
     AgentRow,
-    AgentStatus,
     KernelRow,
     SessionRow,
     association_groups_users,
@@ -334,7 +333,6 @@ class ResourcePresetDBSource:
         """
         per_sgroup_remaining = {sgname: ResourceSlot() for sgname in sgroup_names}
         agent_slots = []
-
         query = (
             sa.select([
                 AgentRow.available_slots,
@@ -343,7 +341,11 @@ class ResourcePresetDBSource:
             ])
             .select_from(AgentRow)
             .where(
-                (AgentRow.status == AgentStatus.ALIVE) & (AgentRow.scaling_group.in_(sgroup_names)),
+                sa.and_(
+                    AgentRow.available_slots.isnot(None),
+                    AgentRow.occupied_slots.isnot(None),
+                    AgentRow.schedulable == sa.true(),
+                )
             )
         )
 
