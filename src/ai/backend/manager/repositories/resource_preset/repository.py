@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal
 from typing import Mapping, Optional
 from uuid import UUID
@@ -7,6 +8,7 @@ import trafaret as t
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import AccessKey, ResourceSlot
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.decorators.repository_decorator import (
@@ -22,6 +24,8 @@ from .cache_source.cache_source import ResourcePresetCacheSource
 from .db_source.db_source import ResourcePresetDBSource
 from .types import CheckPresetsResult
 from .utils import suppress_with_log
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # Layer-specific decorator for resource_preset repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.RESOURCE_PRESET)
@@ -61,7 +65,7 @@ class ResourcePresetRepository:
     async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData:
         """
         Gets a resource preset by ID.
-        Raises ObjectNotFound if the preset doesn't exist.
+        Raises ResourcePresetNotFound if the preset doesn't exist.
         """
         # Try cache first
         with suppress_with_log([Exception], message=f"Failed to get preset {preset_id} from cache"):
@@ -79,7 +83,7 @@ class ResourcePresetRepository:
     async def get_preset_by_name(self, name: str) -> ResourcePresetData:
         """
         Gets a resource preset by name.
-        Raises ObjectNotFound if the preset doesn't exist.
+        Raises ResourcePresetNotFound if the preset doesn't exist.
         """
         # Try cache first
         with suppress_with_log([Exception], message=f"Failed to get preset '{name}' from cache"):
@@ -100,7 +104,7 @@ class ResourcePresetRepository:
         """
         Gets a resource preset by ID or name.
         ID takes precedence if both are provided.
-        Raises ObjectNotFound if the preset doesn't exist.
+        Raises ResourcePresetNotFound if the preset doesn't exist.
         """
         return await self._db_source.get_preset_by_id_or_name(preset_id, name)
 
@@ -110,7 +114,7 @@ class ResourcePresetRepository:
     ) -> ResourcePresetData:
         """
         Modifies an existing resource preset.
-        Raises ObjectNotFound if the preset doesn't exist.
+        Raises ResourcePresetNotFound if the preset doesn't exist.
         """
         preset = await self._db_source.modify_preset(preset_id, name, modifier)
         with suppress_with_log(
@@ -143,8 +147,21 @@ class ResourcePresetRepository:
         Lists all resource presets.
         If scaling_group_name is provided, returns presets for that scaling group and global presets.
         """
+        # Try cache first
+        with suppress_with_log([Exception], message="Failed to get preset list from cache"):
+            presets = await self._cache_source.get_preset_list(scaling_group_name)
+            if presets is not None:
+                return presets
+
+        # Fallback to DB
         await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
-        return await self._db_source.list_presets(scaling_group_name)
+        presets = await self._db_source.list_presets(scaling_group_name)
+
+        # Cache the result
+        with suppress_with_log([Exception], message="Failed to cache preset list"):
+            await self._cache_source.set_preset_list(presets, scaling_group_name)
+
+        return presets
 
     @repository_decorator()
     async def check_presets(
@@ -163,6 +180,23 @@ class ResourcePresetRepository:
         known_slot_types = (
             await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
         )
+        # Try to get from cache first
+        with suppress_with_log([Exception], message="Failed to get check presets data from cache"):
+            cached_data = await self._cache_source.get_check_presets_data(
+                access_key, group_name, domain_name, scaling_group
+            )
+            if cached_data:
+                log.info(
+                    "Cache hit for check_presets: {}, {}, {}", access_key, group_name, domain_name
+                )
+                return CheckPresetsResult.from_cache(cached_data)
+        log.info(
+            "Cache miss for check_presets, fetching from DB, {}, {}, {}",
+            access_key,
+            group_name,
+            domain_name,
+        )
+
         group_resource_visibility = await self._config_provider.legacy_etcd_config_loader.get_raw(
             "config/api/resources/group_resource_visibility"
         )
@@ -192,7 +226,7 @@ class ResourcePresetRepository:
             group_occupied = db_data.keypair_data.group_occupied
             group_remaining = db_data.keypair_data.group_remaining
 
-        return CheckPresetsResult(
+        result = CheckPresetsResult(
             presets=db_data.presets,
             keypair_limits=db_data.keypair_data.limits,
             keypair_using=db_data.keypair_data.occupied,
@@ -203,3 +237,16 @@ class ResourcePresetRepository:
             scaling_group_remaining=db_data.keypair_data.scaling_group_remaining,
             scaling_groups=db_data.per_sgroup_data,
         )
+
+        # Cache the result
+        with suppress_with_log([Exception], message="Failed to cache check presets data"):
+            cache_data = result.to_cache()
+            await self._cache_source.set_check_presets_data(
+                access_key,
+                group_name,
+                domain_name,
+                scaling_group,
+                cache_data,
+            )
+
+        return result

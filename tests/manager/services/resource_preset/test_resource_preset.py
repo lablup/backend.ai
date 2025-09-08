@@ -12,6 +12,7 @@ import pytest
 
 from ai.backend.common.exception import InvalidAPIParameters, ResourcePresetConflict
 from ai.backend.common.types import (
+    AccessKey,
     BinarySize,
     ResourceSlot,
     SlotName,
@@ -90,9 +91,6 @@ class TestResourcePresetServiceCompatibility:
     def resource_preset_service(self, mock_dependencies) -> ResourcePresetService:
         """Create ResourcePresetService instance with mocked dependencies."""
         return ResourcePresetService(
-            db=mock_dependencies["db"],
-            agent_registry=mock_dependencies["agent_registry"],
-            config_provider=mock_dependencies["config_provider"],
             resource_preset_repository=mock_dependencies["resource_preset_repository"],
         )
 
@@ -371,7 +369,7 @@ class TestResourcePresetServiceCompatibility:
     ) -> None:
         """Test check presets when resources are sufficient."""
         action = CheckResourcePresetsAction(
-            access_key="test-key",
+            access_key=AccessKey("test-key"),
             resource_policy={
                 "total_resource_slots": {"cpu": "100", "mem": "100G", "gpu": "10"},
                 "default_for_unspecified": "UNLIMITED",

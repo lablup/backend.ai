@@ -10,7 +10,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.exception import InvalidAPIParameters, ResourcePresetConflict
+from ai.backend.common.exception import ResourcePresetConflict
 from ai.backend.common.types import (
     AccessKey,
     DefaultForUnspecified,
@@ -21,7 +21,12 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.errors.resource import ResourcePresetNotFound
+from ai.backend.manager.errors.resource import (
+    DomainNotFound,
+    ProjectNotFound,
+    ResourcePresetNotFound,
+    ScalingGroupNotFound,
+)
 from ai.backend.manager.models import (
     AgentRow,
     AgentStatus,
@@ -44,6 +49,7 @@ from .types import (
     KeypairResourceData,
     PerScalingGroupResourceData,
     PresetAllocatabilityData,
+    ResourceUsageData,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -209,43 +215,209 @@ class ResourcePresetDBSource:
 
         return db_data
 
-    async def get_keypair_occupancy(
-        self, access_key: AccessKey, db_sess: SASession
-    ) -> ResourceSlot:
-        """Get keypair resource occupancy."""
-        query = sa.select([KernelRow.occupied_slots]).where(
-            (KernelRow.access_key == access_key)
-            & (KernelRow.status.in_(KernelStatus.resource_occupied_statuses()))
+    async def _get_group_info(
+        self,
+        db_sess: SASession,
+        user_id: UUID,
+        group_name: str,
+        domain_name: str,
+    ) -> tuple[UUID, Mapping[str, str]]:
+        """
+        Get group ID and resource slots for a user's group.
+
+        :param db_sess: Database session
+        :param user_id: User ID
+        :param group_name: Group name
+        :param domain_name: Domain name
+        :return: Tuple of (group_id, total_resource_slots)
+        :raises ProjectNotFound: If the group does not exist or the user is not a member
+        """
+        j = sa.join(
+            groups,
+            association_groups_users,
+            association_groups_users.c.group_id == groups.c.id,
         )
+        query = (
+            sa.select([groups.c.id, groups.c.total_resource_slots])
+            .select_from(j)
+            .where(
+                (association_groups_users.c.user_id == user_id)
+                & (groups.c.name == group_name)
+                & (groups.c.domain_name == domain_name),
+            )
+        )
+        result = await db_sess.execute(query)
+        row = result.first()
+        if row is None:
+            raise ProjectNotFound(f"Project not found (name: {group_name})")
+
+        return row["id"], row["total_resource_slots"]
+
+    async def _get_domain_resource_slots(
+        self,
+        db_sess: SASession,
+        domain_name: str,
+        known_slot_types: Mapping[SlotName, SlotTypes],
+    ) -> ResourceUsageData:
+        """
+        Get domain resource slots.
+
+        :param db_sess: Database session
+        :param domain_name: Domain name
+        :return: ResourceUsageData with domain resource slots
+        """
+        query = sa.select([domains.c.total_resource_slots]).where(domains.c.name == domain_name)
+        result = await db_sess.execute(query)
+        domain_resource_slots = result.first()[0]
+        if domain_resource_slots is None:
+            raise DomainNotFound(f"Domain not found (name: {domain_name})")
+        domain_resource_policy = {
+            "total_resource_slots": domain_resource_slots,
+            "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
+        }
+        limits = ResourceSlot.from_policy(domain_resource_policy, known_slot_types)
+        occupied = await self._get_resource_occupancy(db_sess, domain_name=domain_name)
+        remaining = limits - occupied
+        return ResourceUsageData(
+            limits=limits,
+            occupied=occupied,
+            remaining=remaining,
+        )
+
+    async def _get_user_session_occupancy_per_sgroup(
+        self,
+        db_sess: SASession,
+        user_id: UUID,
+        sgroup_names: list[str],
+        known_slot_types: Mapping[SlotName, SlotTypes],
+    ) -> dict[str, ResourceSlot]:
+        """
+        Get user's session resource occupancy per scaling group.
+
+        :param db_sess: Database session
+        :param user_id: User ID
+        :param sgroup_names: List of scaling group names
+        :param known_slot_types: Known slot types for initialization
+        :return: Dictionary of scaling group name to occupied resources
+        """
+        per_sgroup_occupancy = {sgname: ResourceSlot() for sgname in sgroup_names}
+
+        j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
+        query = (
+            sa.select([KernelRow.occupied_slots, SessionRow.scaling_group_name])
+            .select_from(j)
+            .where(
+                (KernelRow.user_uuid == user_id)
+                & (KernelRow.status.in_(KernelStatus.resource_occupied_statuses()))
+                & (SessionRow.scaling_group_name.in_(sgroup_names)),
+            )
+        )
+        async for row in await db_sess.stream(query):
+            if row["occupied_slots"]:
+                per_sgroup_occupancy[row["scaling_group_name"]] += row["occupied_slots"]
+
+        return per_sgroup_occupancy
+
+    async def _get_agent_available_resources(
+        self,
+        db_sess: SASession,
+        sgroup_names: list[str],
+        known_slot_types: Mapping[SlotName, SlotTypes],
+    ) -> tuple[dict[str, ResourceSlot], list[ResourceSlot]]:
+        """
+        Get available resources from agents in given scaling groups.
+
+        :param db_sess: Database session
+        :param sgroup_names: List of scaling group names
+        :param known_slot_types: Known slot types for initialization
+        :return: Tuple of (per_sgroup_remaining, agent_slots_list)
+        """
+        per_sgroup_remaining = {sgname: ResourceSlot() for sgname in sgroup_names}
+        agent_slots = []
+
+        query = (
+            sa.select([
+                AgentRow.available_slots,
+                AgentRow.occupied_slots,
+                AgentRow.scaling_group,
+            ])
+            .select_from(AgentRow)
+            .where(
+                (AgentRow.status == AgentStatus.ALIVE) & (AgentRow.scaling_group.in_(sgroup_names)),
+            )
+        )
+
+        async for row in await db_sess.stream(query):
+            remaining = row["available_slots"] - row["occupied_slots"]
+            agent_slots.append(remaining)
+            per_sgroup_remaining[row["scaling_group"]] += remaining
+
+        return per_sgroup_remaining, agent_slots
+
+    async def _get_resource_occupancy(self, db_sess: SASession, **filters) -> ResourceSlot:
+        """
+        Get resource occupancy for given filters.
+
+        :param db_sess: Database session
+        :param filters: Filter conditions (access_key, group_id, domain_name)
+        :return: Total occupied resources
+        """
+        conditions = [KernelRow.status.in_(KernelStatus.resource_occupied_statuses())]
+
+        if "access_key" in filters:
+            conditions.append(KernelRow.access_key == filters["access_key"])
+        if "group_id" in filters:
+            conditions.append(KernelRow.group_id == filters["group_id"])
+        if "domain_name" in filters:
+            conditions.append(KernelRow.domain_name == filters["domain_name"])
+
+        query = sa.select([KernelRow.occupied_slots]).where(sa.and_(*conditions))
+
         total = ResourceSlot()
         async for row in await db_sess.stream(query):
             if row[0]:  # occupied_slots might be null
                 total += row[0]
         return total
 
-    async def get_group_occupancy(self, group_id: UUID, db_sess: SASession) -> ResourceSlot:
-        """Get group resource occupancy."""
-        query = sa.select([KernelRow.occupied_slots]).where(
-            (KernelRow.group_id == group_id)
-            & (KernelRow.status.in_(KernelStatus.resource_occupied_statuses()))
-        )
-        total = ResourceSlot()
-        async for row in await db_sess.stream(query):
-            if row[0]:  # occupied_slots might be null
-                total += row[0]
-        return total
+    async def _get_keypair_resource_usage(
+        self,
+        db_sess: SASession,
+        access_key: AccessKey,
+        resource_policy: Mapping[str, str],
+        known_slot_types: Mapping[SlotName, SlotTypes],
+    ) -> ResourceUsageData:
+        """Get keypair resource usage (limits, occupied, remaining)."""
+        limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
+        occupied = await self._get_resource_occupancy(db_sess, access_key=access_key)
+        remaining = limits - occupied
 
-    async def get_domain_occupancy(self, domain_name: str, db_sess: SASession) -> ResourceSlot:
-        """Get domain resource occupancy."""
-        query = sa.select([KernelRow.occupied_slots]).where(
-            (KernelRow.domain_name == domain_name)
-            & (KernelRow.status.in_(KernelStatus.resource_occupied_statuses()))
+        return ResourceUsageData(
+            limits=limits,
+            occupied=occupied,
+            remaining=remaining,
         )
-        total = ResourceSlot()
-        async for row in await db_sess.stream(query):
-            if row[0]:  # occupied_slots might be null
-                total += row[0]
-        return total
+
+    async def _get_group_resource_usage(
+        self,
+        db_sess: SASession,
+        group_id: UUID,
+        group_resource_slots: Mapping[str, str],
+        known_slot_types: Mapping[SlotName, SlotTypes],
+    ) -> ResourceUsageData:
+        """Get group resource usage (limits, occupied, remaining)."""
+        group_resource_policy = {
+            "total_resource_slots": group_resource_slots,
+            "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
+        }
+        limits = ResourceSlot.from_policy(group_resource_policy, known_slot_types)
+        occupied = await self._get_resource_occupancy(db_sess, group_id=group_id)
+        remaining = limits - occupied
+
+        return ResourceUsageData(
+            limits=limits,
+            occupied=occupied,
+            remaining=remaining,
+        )
 
     async def _fetch_all_check_presets_data(
         self,
@@ -261,58 +433,28 @@ class ResourcePresetDBSource:
         """
         Fetch all data needed for check_presets in a single method.
         """
-        # Calculate keypair limits and occupancy
-        keypair_limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
-        keypair_occupied = await self.get_keypair_occupancy(access_key, conn)
-        keypair_remaining = keypair_limits - keypair_occupied
-
-        # Get group data
-        j = sa.join(
-            groups,
-            association_groups_users,
-            association_groups_users.c.group_id == groups.c.id,
+        # Get keypair resource usage
+        keypair_usage = await self._get_keypair_resource_usage(
+            conn, access_key, resource_policy, known_slot_types
         )
-        query = (
-            sa.select([groups.c.id, groups.c.total_resource_slots])
-            .select_from(j)
-            .where(
-                (association_groups_users.c.user_id == user_id)
-                & (groups.c.name == group_name)
-                & (groups.c.domain_name == domain_name),
-            )
+
+        # Get group info and resource usage
+        group_id, group_resource_slots = await self._get_group_info(
+            conn, user_id, group_name, domain_name
         )
-        result = await conn.execute(query)
-        row = result.first()
-        if row is None:
-            raise InvalidAPIParameters(f"Unknown project (name: {group_name})")
+        group_usage = await self._get_group_resource_usage(
+            conn, group_id, group_resource_slots, known_slot_types
+        )
 
-        group_id = row["id"]
-        group_resource_slots = row["total_resource_slots"]
-        group_resource_policy = {
-            "total_resource_slots": group_resource_slots,
-            "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
-        }
-        group_limits = ResourceSlot.from_policy(group_resource_policy, known_slot_types)
-        group_occupied = await self.get_group_occupancy(group_id, conn)
-        group_remaining = group_limits - group_occupied
-
-        # Get domain data
-        query = sa.select([domains.c.total_resource_slots]).where(domains.c.name == domain_name)
-        domain_resource_slots = await conn.scalar(query)
-        domain_resource_policy = {
-            "total_resource_slots": domain_resource_slots,
-            "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
-        }
-        domain_limits = ResourceSlot.from_policy(domain_resource_policy, known_slot_types)
-        domain_occupied = await self.get_domain_occupancy(domain_name, conn)
-        domain_remaining = domain_limits - domain_occupied
-
-        # Take minimum remaining resources
+        # Get domain resource slots and usage
+        domain_usage = await self._get_domain_resource_slots(conn, domain_name, known_slot_types)
+        # Take minimum remaining resources across all scopes
+        final_remaining = ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
         for slot in known_slot_types:
-            keypair_remaining[slot] = min(
-                keypair_remaining[slot],
-                group_remaining[slot],
-                domain_remaining[slot],
+            final_remaining[slot] = min(
+                keypair_usage.remaining[slot],
+                group_usage.remaining[slot],
+                domain_usage.remaining[slot],
             )
 
         # Get scaling groups
@@ -320,61 +462,43 @@ class ResourcePresetDBSource:
         sgroup_names = [sg.name for sg in sgroups]
         if scaling_group is not None:
             if scaling_group not in sgroup_names:
-                raise InvalidAPIParameters("Unknown scaling group")
+                raise ScalingGroupNotFound(
+                    f"Scaling group not found or not allowed (name: {scaling_group})"
+                )
             sgroup_names = [scaling_group]
 
-        # Initialize per scaling group data
-        per_sgroup = {
-            sgname: PerScalingGroupResourceData(
-                using=ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()}),
-                remaining=ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()}),
-            )
-            for sgname in sgroup_names
-        }
-
-        # Get per scaling group resource usage
-        j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
-        query = (
-            sa.select([KernelRow.occupied_slots, SessionRow.scaling_group_name])
-            .select_from(j)
-            .where(
-                (KernelRow.user_uuid == user_id)
-                & (KernelRow.status.in_(KernelStatus.resource_occupied_statuses()))
-                & (SessionRow.scaling_group_name.in_(sgroup_names)),
-            )
+        # Get user's session occupancy per scaling group
+        per_sgroup_occupancy = await self._get_user_session_occupancy_per_sgroup(
+            conn, user_id, sgroup_names, known_slot_types
         )
-        async for row in await conn.stream(query):
-            per_sgroup[row["scaling_group_name"]].using += row["occupied_slots"]
 
-        # Get per scaling group resource remaining from agents
+        # Get agent available resources per scaling group
+        per_sgroup_agent_remaining, agent_slots = await self._get_agent_available_resources(
+            conn, sgroup_names, known_slot_types
+        )
+
+        # Build per scaling group data
+        per_sgroup = {}
+        empty_slot = ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
+        for sgname in sgroup_names:
+            per_sgroup[sgname] = PerScalingGroupResourceData(
+                using=per_sgroup_occupancy.get(sgname, empty_slot),
+                remaining=per_sgroup_agent_remaining.get(sgname, empty_slot),
+            )
+
+        # Calculate total scaling group remaining
         sgroup_remaining = ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
-        query = (
-            sa.select([
-                AgentRow.available_slots,
-                AgentRow.occupied_slots,
-                AgentRow.scaling_group,
-            ])
-            .select_from(AgentRow)
-            .where(
-                (AgentRow.status == AgentStatus.ALIVE) & (AgentRow.scaling_group.in_(sgroup_names)),
-            )
-        )
-        agent_slots = []
-        async for row in await conn.stream(query):
-            remaining = row["available_slots"] - row["occupied_slots"]
-            remaining += ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
+        for remaining in per_sgroup_agent_remaining.values():
             sgroup_remaining += remaining
-            agent_slots.append(remaining)
-            per_sgroup[row["scaling_group"]].remaining += remaining
 
-        # Apply keypair limits to per scaling group remaining
+        # Apply final remaining limits to per scaling group remaining
         for sgname, sg_data in per_sgroup.items():
             for slot in known_slot_types.keys():
                 if slot in sg_data.remaining:
-                    sg_data.remaining[slot] = min(keypair_remaining[slot], sg_data.remaining[slot])
+                    sg_data.remaining[slot] = min(final_remaining[slot], sg_data.remaining[slot])
 
         for slot in known_slot_types.keys():
-            sgroup_remaining[slot] = min(keypair_remaining[slot], sgroup_remaining[slot])
+            sgroup_remaining[slot] = min(final_remaining[slot], sgroup_remaining[slot])
 
         # Fetch resource presets
         preset_data_list = await self.list_presets(scaling_group)
@@ -385,7 +509,7 @@ class ResourcePresetDBSource:
             allocatable = False
             preset_slots = preset_data.resource_slots.normalize_slots(ignore_unknown=True)
             for agent_slot in agent_slots:
-                if agent_slot >= preset_slots and keypair_remaining >= preset_slots:
+                if agent_slot >= preset_slots and final_remaining >= preset_slots:
                     allocatable = True
                     break
 
@@ -396,13 +520,14 @@ class ResourcePresetDBSource:
                 )
             )
 
+        # Build KeypairResourceData with all usage information
         keypair_data = KeypairResourceData(
-            limits=keypair_limits,
-            occupied=keypair_occupied,
-            remaining=keypair_remaining,
-            group_limits=group_limits,
-            group_occupied=group_occupied,
-            group_remaining=group_remaining,
+            limits=keypair_usage.limits,
+            occupied=keypair_usage.occupied,
+            remaining=final_remaining,  # Use the minimum remaining across all scopes
+            group_limits=group_usage.limits,
+            group_occupied=group_usage.occupied,
+            group_remaining=group_usage.remaining,
             scaling_group_remaining=sgroup_remaining,
         )
 

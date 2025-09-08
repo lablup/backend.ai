@@ -34,7 +34,9 @@ class TestResourcePresetRepository:
     @pytest.fixture
     def resource_preset_repository(self, mock_db_engine) -> ResourcePresetRepository:
         """Create ResourcePresetRepository instance with mocked database"""
-        return ResourcePresetRepository(db=mock_db_engine)
+        return ResourcePresetRepository(
+            db=mock_db_engine, valkey_stat=MagicMock(), config_provider=MagicMock()
+        )
 
     @pytest.fixture
     def sample_preset_row(self) -> MagicMock:
