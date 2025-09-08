@@ -991,6 +991,23 @@ class DeploymentDBSource:
                 )
                 await db_sess.execute(query)
 
+    async def update_endpoint_urls_bulk(
+        self,
+        url_updates: Mapping[uuid.UUID, str],
+    ) -> None:
+        """Batch update endpoint URLs for multiple endpoints.
+
+        Args:
+            url_updates: Mapping of endpoint IDs to their registered URLs
+        """
+        if not url_updates:
+            return
+
+        async with self._begin_session_read_committed() as db_sess:
+            for endpoint_id, url in url_updates.items():
+                query = sa.update(EndpointRow).where(EndpointRow.id == endpoint_id).values(url=url)
+                await db_sess.execute(query)
+
     async def update_route_sessions(
         self,
         route_session_ids: Mapping[uuid.UUID, SessionId],
