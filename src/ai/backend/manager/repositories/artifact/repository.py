@@ -226,7 +226,9 @@ class ArtifactRepository:
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactNotFoundError(f"Artifact with model ID {model_id} not found")
+                raise ArtifactNotFoundError(
+                    f"Artifact with model ID {model_id} not found under registry {registry_id}"
+                )
             return row.to_dataclass()
 
     @repository_decorator()
@@ -507,7 +509,9 @@ class ArtifactRepository:
                 artifact_data = artifact_row.to_dataclass()
                 revision_data_list = [revision.to_dataclass() for revision in revision_rows]
                 result.append(
-                    ArtifactDataWithRevisions(artifact=artifact_data, revisions=revision_data_list)
+                    ArtifactDataWithRevisions.from_dataclasses(
+                        artifact_data=artifact_data, revisions=revision_data_list
+                    )
                 )
 
         return result
@@ -819,7 +823,9 @@ class ArtifactRepository:
                 artifact_data = row.to_dataclass()
                 revisions_data = [revision.to_dataclass() for revision in row.revision_rows]
                 data_objects.append(
-                    ArtifactDataWithRevisions(artifact=artifact_data, revisions=revisions_data)
+                    ArtifactDataWithRevisions.from_dataclasses(
+                        artifact_data=artifact_data, revisions=revisions_data
+                    )
                 )
 
             return data_objects, total_count

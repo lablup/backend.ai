@@ -2,7 +2,7 @@ import enum
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Self
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 
@@ -56,9 +56,27 @@ class ArtifactRevisionData:
 
 
 @dataclass
-class ArtifactDataWithRevisions:
-    artifact: ArtifactData
+class ArtifactDataWithRevisions(ArtifactData):
     revisions: list[ArtifactRevisionData]
+
+    @classmethod
+    def from_dataclasses(
+        cls, artifact_data: ArtifactData, revisions: list[ArtifactRevisionData]
+    ) -> Self:
+        return cls(
+            id=artifact_data.id,
+            name=artifact_data.name,
+            type=artifact_data.type,
+            description=artifact_data.description,
+            registry_id=artifact_data.registry_id,
+            source_registry_id=artifact_data.source_registry_id,
+            registry_type=artifact_data.registry_type,
+            source_registry_type=artifact_data.source_registry_type,
+            scanned_at=artifact_data.scanned_at,
+            updated_at=artifact_data.updated_at,
+            readonly=artifact_data.readonly,
+            revisions=revisions,
+        )
 
 
 class ArtifactOrderField(enum.StrEnum):

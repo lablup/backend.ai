@@ -199,8 +199,8 @@ class ArtifactService:
                 if all_artifacts:
                     for artifact_data in all_artifacts:
                         # Override registry information
-                        artifact_data.artifact.registry_id = registry_id
-                        artifact_data.artifact.registry_type = ArtifactRegistryType.RESERVOIR
+                        artifact_data.registry_id = registry_id
+                        artifact_data.registry_type = ArtifactRegistryType.RESERVOIR
 
                     upsert_result = await self.upsert_artifacts_with_revisions(
                         UpsertArtifactsAction(data=all_artifacts)
@@ -254,7 +254,7 @@ class ArtifactService:
         for artifact_with_revisions in action.data:
             # Upsert artifact first
             upserted_artifacts = await self._artifact_repository.upsert_artifacts([
-                artifact_with_revisions.artifact
+                artifact_with_revisions
             ])
             upserted_artifact = upserted_artifacts[0]
 
@@ -265,7 +265,9 @@ class ArtifactService:
 
             # Combine into ArtifactDataWithRevisions
             result_data.append(
-                ArtifactDataWithRevisions(artifact=upserted_artifact, revisions=upserted_revisions)
+                ArtifactDataWithRevisions.from_dataclasses(
+                    artifact_data=upserted_artifact, revisions=upserted_revisions
+                )
             )
 
         return UpsertArtifactsActionResult(result=result_data)
