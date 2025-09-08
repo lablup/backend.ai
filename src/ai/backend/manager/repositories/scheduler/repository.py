@@ -24,6 +24,7 @@ from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KernelCreationInfo,
+    SessionRunningData,
     SessionsForPullWithImages,
     SessionsForStartWithImages,
     SessionTransitionData,
@@ -306,11 +307,11 @@ class SchedulerRepository:
         """
         return await self._db_source.get_sessions_for_transition(session_statuses, kernel_statuses)
 
-    async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
+    async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
         """
-        Update sessions from CREATING to RUNNING state.
+        Update sessions from CREATING to RUNNING state with occupying_slots.
         """
-        await self._db_source.update_sessions_to_running(session_ids)
+        await self._db_source.update_sessions_to_running(sessions_data)
 
     async def get_sessions_ready_to_terminate(self) -> list[SessionId]:
         """

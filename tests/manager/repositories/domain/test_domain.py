@@ -417,11 +417,21 @@ class TestDomainRepository:
             await conn.execute(sa.insert(domains).values(domain_data))
 
             # Create user in domain
+            from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+            from ai.backend.manager.models.hasher.types import PasswordInfo
+
+            password_info = PasswordInfo(
+                password="test_password",
+                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                rounds=600_000,
+                salt_size=32,
+            )
+
             user_data = {
                 "uuid": uuid.uuid4(),
                 "username": "testuser",
                 "email": "test@example.com",
-                "password": "hashed_password",
+                "password": password_info,
                 "need_password_change": False,
                 "full_name": "Test User",
                 "description": "Test user",

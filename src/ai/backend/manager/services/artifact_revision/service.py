@@ -233,7 +233,7 @@ class ArtifactRevisionService:
         )
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
 
-        key = f"{artifact_data.name}/{revision_data.version}"
+        key = f"{artifact_data.name}/{revision_data.version}/"
 
         try:
             await storage_proxy_client.delete_s3_object(
