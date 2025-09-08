@@ -217,18 +217,6 @@ class ModelDeploymentNetworkAccess:
     @strawberry.field
     async def access_tokens(self, info: Info[StrawberryGQLContext]) -> AccessTokenConnection:
         """Resolve access tokens using dataloader."""
-        if not self._access_token_ids:
-            return AccessTokenConnection(
-                count=0,
-                edges=[],
-                page_info=PageInfo(
-                    has_next_page=False,
-                    has_previous_page=False,
-                    start_cursor=None,
-                    end_cursor=None,
-                ),
-            )
-
         access_token_loader = DataLoader(
             apartial(AccessToken.batch_load_by_deployment_ids, info.context)
         )
