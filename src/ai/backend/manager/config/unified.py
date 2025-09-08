@@ -420,7 +420,7 @@ class AuthConfig(BaseModel):
         default=PasswordHashAlgorithm.PBKDF2_SHA256,
         description="""
         The password hashing algorithm to use for new passwords.
-        Supported algorithms: bcrypt, sha256, sha3_256, pbkdf2_sha256.
+        Supported algorithms: bcrypt, sha256, sha3_256, pbkdf2_sha256, pbkdf2_sha3_256.
         Existing passwords with different algorithms will be gradually migrated.
         """,
         examples=[
@@ -428,6 +428,7 @@ class AuthConfig(BaseModel):
             PasswordHashAlgorithm.SHA256,
             PasswordHashAlgorithm.SHA3_256,
             PasswordHashAlgorithm.PBKDF2_SHA256,
+            PasswordHashAlgorithm.PBKDF2_SHA3_256,
         ],
         validation_alias=AliasChoices("password-hash-algorithm", "password_hash_algorithm"),
         serialization_alias="password-hash-algorithm",
