@@ -19,6 +19,7 @@ from ai.backend.common.exception import ModelDeploymentUnavailableError
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
+    build_pagination_options,
     resolve_global_id,
     to_global_id,
 )
@@ -56,6 +57,7 @@ from ai.backend.manager.models.gql_models.group import GroupNode
 from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.repositories.deployment.types.types import (
     DeploymentFilterOptions,
+    DeploymentOrderingOptions,
     DeploymentStatusFilterType,
 )
 from ai.backend.manager.repositories.deployment.types.types import (
@@ -74,7 +76,7 @@ from ai.backend.manager.services.deployment.actions.get_deployment import GetDep
 from ai.backend.manager.services.deployment.actions.list_deployments import ListDeploymentsAction
 from ai.backend.manager.services.deployment.actions.sync_replicas import SyncReplicaAction
 from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
-from ai.backend.manager.types import OptionalState, PaginationOptions, TriState
+from ai.backend.manager.types import OptionalState, TriState
 
 from .model_revision import (
     CreateModelRevisionInput,
@@ -283,6 +285,7 @@ class ModelDeployment(Node):
             _replica_ids=self._replica_state_data.replica_ids,
         )
 
+    # TODO: Add pagination support?
     @strawberry.field
     async def revision_history(
         self,
@@ -489,7 +492,7 @@ class CreateModelDeploymentInput:
             domain=self.metadata.domain_name,
             project=UUID(str(self.metadata.project_id)),
             resource_group=self.initial_revision.resource_config.resource_group.name,
-            created_user=uuid4(),
+            created_user=uuid4(),  # Fix: use requester id context var?
             session_owner=uuid4(),
             created_at=None,
             tag=tag,
@@ -548,6 +551,19 @@ class ModelDeploymentConnection(Connection[ModelDeployment]):
         self.count = count
 
 
+def _convert_gql_deployment_ordering_to_repo(
+    order_by: Optional[list[DeploymentOrderBy]],
+) -> DeploymentOrderingOptions:
+    if order_by is None or len(order_by) == 0:
+        return DeploymentOrderingOptions()
+
+    repo_ordering = []
+    for order in order_by:
+        desc = order.direction == OrderDirection.DESC
+        repo_ordering.append((order.field, desc))
+    return DeploymentOrderingOptions(order_by=repo_ordering)
+
+
 async def resolve_deployments(
     info: Info[StrawberryGQLContext],
     filter: Optional[DeploymentFilter] = None,
@@ -559,13 +575,30 @@ async def resolve_deployments(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ModelDeploymentConnection:
+    repo_filter = None
+    if filter:
+        repo_filter = filter.to_repo_filter()
+
+    repo_ordering = _convert_gql_deployment_ordering_to_repo(order_by)
+
+    pagination_options = build_pagination_options(
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
+
     processor = info.context.processors.deployment
     if processor is None:
         raise ModelDeploymentUnavailableError(
             "Model Deployment feature is unavailable. Please contact support."
         )
     action_result = await processor.list_deployments.wait_for_complete(
-        ListDeploymentsAction(pagination=PaginationOptions())
+        ListDeploymentsAction(
+            pagination=pagination_options, ordering=repo_ordering, filters=repo_filter
+        )
     )
     edges = []
     for deployment in action_result.data:
