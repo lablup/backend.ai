@@ -318,6 +318,7 @@ async def get_presigned_download_url(
         GetDownloadPresignedURLAction(
             artifact_revision_id=uuid.UUID(input.artifact_revision_id),
             key=input.key,
+            expiration=input.expiration,
         )
     )
 
