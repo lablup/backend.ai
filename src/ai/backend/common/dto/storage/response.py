@@ -60,6 +60,10 @@ class VFolderCloneResponse(BaseResponseModel):
     bgtask_id: TaskID
 
 
+class VFolderDeleteResponse(BaseResponseModel):
+    bgtask_id: TaskID
+
+
 class HuggingFaceScanModelsResponse(BaseResponseModel):
     """Response for HuggingFace scan operation."""
 
