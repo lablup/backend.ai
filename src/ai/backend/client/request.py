@@ -31,11 +31,12 @@ import aiohttp
 import aiohttp.web
 import appdirs
 import attrs
-import orjson
 from aiohttp.client import _RequestContextManager, _WSRequestContextManager
 from dateutil.tz import tzutc
 from multidict import CIMultiDict
 from yarl import URL
+
+from ai.backend.common.json import dump_json_str
 
 from .auth import generate_signature
 from .exceptions import BackendAPIError, BackendClientError
@@ -605,7 +606,7 @@ class FetchContextManager:
                     match self.session_mode:
                         case SessionMode.CLIENT:
                             error_data = await raw_resp.json()
-                            msg = orjson.dumps(error_data).decode("utf-8")
+                            msg = dump_json_str(error_data)
                             await raw_resp.__aexit__(None, None, None)
                             raise BackendAPIError(raw_resp.status, raw_resp.reason or "", msg)
                         case SessionMode.PROXY:
