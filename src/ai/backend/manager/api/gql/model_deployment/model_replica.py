@@ -62,6 +62,7 @@ class ReplicaFilter:
     readiness_status: Optional[ReadinessStatusFilter] = None
     liveness_status: Optional[LivenessStatusFilter] = None
     activeness_status: Optional[ActivenessStatusFilter] = None
+    id: Optional[UUID] = None
 
     AND: Optional[list["ReplicaFilter"]] = None
     OR: Optional[list["ReplicaFilter"]] = None
