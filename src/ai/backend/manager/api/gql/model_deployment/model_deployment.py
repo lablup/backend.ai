@@ -9,6 +9,7 @@ from strawberry import ID, Info
 from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy as CommonDeploymentStrategy,
 )
@@ -52,6 +53,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaSpec,
     ReplicaStateData,
 )
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.gql_models.domain import DomainNode
 from ai.backend.manager.models.gql_models.group import GroupNode
 from ai.backend.manager.models.gql_models.user import UserNode
@@ -364,7 +366,7 @@ class ModelDeployment(Node):
             default_deployment_strategy=DeploymentStrategy(
                 type=DeploymentStrategyType(data.default_deployment_strategy)
             ),
-            _created_user_id=uuid4(),
+            _created_user_id=data.created_user_id,
             _revision_history_ids=data.revision_history_ids,
             _scaling_rule_ids=data.scaling_rule_ids,
             _replica_state_data=data.replica_state,
@@ -484,16 +486,18 @@ class CreateModelDeploymentInput:
     initial_revision: CreateModelRevisionInput
 
     def to_creator(self) -> NewDeploymentCreator:
-        # TODO: Need to check the name generation logic
         name = self.metadata.name or f"deployment-{uuid4().hex[:8]}"
         tag = ",".join(self.metadata.tags) if self.metadata.tags else None
+        user_data = current_user()
+        if user_data is None:
+            raise UserNotFound("User not found in context")
         metadata_for_creator = DeploymentMetadata(
             name=name,
             domain=self.metadata.domain_name,
             project=UUID(str(self.metadata.project_id)),
             resource_group=self.initial_revision.resource_config.resource_group.name,
-            created_user=uuid4(),  # Fix: use requester id context var?
-            session_owner=uuid4(),
+            created_user=user_data.user_id,
+            session_owner=user_data.user_id,
             created_at=None,
             tag=tag,
         )
@@ -607,7 +611,6 @@ async def resolve_deployments(
                 node=ModelDeployment.from_dataclass(deployment), cursor=str(deployment.id)
             )
         )
-
     # Mock pagination info for demonstration purposes
     connection = ModelDeploymentConnection(
         count=action_result.total_count,
