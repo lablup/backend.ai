@@ -7,12 +7,12 @@ from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Optional, Protocol, Type, TypeVar, cast
 
 import graphene
-import orjson
 import strawberry
 from graphql import StringValueNode
 from graphql_relay.utils import base64, unbase64
 from strawberry.types import get_object_definition, has_object_definition
 
+from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.types import ResourceSlot
 
 if TYPE_CHECKING:
@@ -143,19 +143,19 @@ class JSONString:
     @staticmethod
     def parse_value(value: str | bytes) -> Mapping[str, Any]:
         if isinstance(value, str):
-            return orjson.loads(value)
+            return load_json(value)
         if isinstance(value, bytes):
-            return orjson.loads(value)
+            return load_json(value)
         return value
 
     @staticmethod
     def serialize(value: Any) -> JSONString:
         if isinstance(value, (dict, list)):
-            return cast(JSONString, orjson.dumps(value).decode("utf-8"))
+            return cast(JSONString, dump_json_str(value))
         elif isinstance(value, str):
             return cast(JSONString, value)
         else:
-            return cast(JSONString, orjson.dumps(value).decode("utf-8"))
+            return cast(JSONString, dump_json_str(value))
 
     @staticmethod
     def from_resource_slot(resource_slot: ResourceSlot) -> JSONString:
