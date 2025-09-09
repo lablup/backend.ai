@@ -1803,7 +1803,7 @@ input ReplicaFilter {
   readinessStatus: ReadinessStatusFilter = null
   livenessStatus: LivenessStatusFilter = null
   activenessStatus: ActivenessStatusFilter = null
-  id: UUID = null
+  id: ID = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
   NOT: [ReplicaFilter!] = null
