@@ -894,6 +894,7 @@ input ModelRevisionOrderBy {
 enum ModelRevisionOrderField {
   CREATED_AT
   NAME
+  ID
 }
 
 """Added in 25.13.0"""
@@ -1222,6 +1223,7 @@ input ReplicaFilter {
   readinessStatus: ReadinessStatusFilter = null
   livenessStatus: LivenessStatusFilter = null
   activenessStatus: ActivenessStatusFilter = null
+  id: UUID = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
   NOT: [ReplicaFilter!] = null
