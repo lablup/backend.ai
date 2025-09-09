@@ -47,6 +47,8 @@ from .model_revision import (
     ModelRevision,
     ModelRevisionConnection,
     ModelRevisionEdge,
+    ModelRevisionFilter,
+    ModelRevisionOrderBy,
     mock_model_revision_1,
     mock_model_revision_2,
     mock_model_revision_3,
@@ -135,11 +137,31 @@ class ModelDeployment(Node):
     metadata: ModelDeploymentMetadata
     network_access: ModelDeploymentNetworkAccess
     revision: Optional[ModelRevision] = None
-    revision_history: ModelRevisionConnection
     scaling_rule: ScalingRule
     replica_state: ReplicaState
     default_deployment_strategy: DeploymentStrategy
     created_user: User
+
+    @strawberry.field
+    async def revision_history(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Optional[ModelRevisionFilter] = None,
+        order_by: Optional[list[ModelRevisionOrderBy]] = None,
+        before: Optional[str] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        last: Optional[int] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> ModelRevisionConnection:
+        return ModelRevisionConnection(
+            count=2,
+            edges=[
+                ModelRevisionEdge(node=mock_model_revision_1, cursor="rev-cursor-1"),
+                ModelRevisionEdge(node=mock_model_revision_2, cursor="rev-cursor-2"),
+            ],
+        )
 
 
 # Filter Types
@@ -273,19 +295,6 @@ mock_model_deployment_1 = ModelDeployment(
         ),
     ),
     revision=mock_model_revision_1,
-    revision_history=ModelRevisionConnection(
-        count=2,
-        edges=[
-            ModelRevisionEdge(node=mock_model_revision_1, cursor="rev-cursor-1"),
-            ModelRevisionEdge(node=mock_model_revision_2, cursor="rev-cursor-2"),
-        ],
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor="rev-cursor-1",
-            end_cursor="rev-cursor-2",
-        ),
-    ),
     scaling_rule=ScalingRule(auto_scaling_rules=[mock_scaling_rule_1, mock_scaling_rule_2]),
     replica_state=ReplicaState(
         desired_replica_count=3,
@@ -327,18 +336,6 @@ mock_model_deployment_2 = ModelDeployment(
         ),
     ),
     revision=mock_model_revision_3,
-    revision_history=ModelRevisionConnection(
-        count=1,
-        edges=[
-            ModelRevisionEdge(node=mock_model_revision_3, cursor="rev-cursor-3"),
-        ],
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor="rev-cursor-3",
-            end_cursor="rev-cursor-3",
-        ),
-    ),
     scaling_rule=ScalingRule(auto_scaling_rules=[]),
     replica_state=ReplicaState(
         desired_replica_count=1,
@@ -382,16 +379,6 @@ mock_model_deployment_3 = ModelDeployment(
         ),
     ),
     revision=None,
-    revision_history=ModelRevisionConnection(
-        count=0,
-        edges=[],
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor=None,
-            end_cursor=None,
-        ),
-    ),
     scaling_rule=ScalingRule(auto_scaling_rules=[]),
     replica_state=ReplicaState(
         desired_replica_count=0,
