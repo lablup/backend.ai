@@ -252,6 +252,7 @@ class ModelRevisionFilter:
     name: Optional[StringFilter] = None
     deployment_id: Optional[ID] = None
     id: Optional[ID] = None
+    ids_in: strawberry.Private[Optional[Sequence[UUID]]] = None
 
     AND: Optional[list["ModelRevisionFilter"]] = None
     OR: Optional[list["ModelRevisionFilter"]] = None
@@ -264,6 +265,7 @@ class ModelRevisionFilter:
         repo_filter.name = self.name
         repo_filter.deployment_id = UUID(self.deployment_id) if self.deployment_id else None
         repo_filter.id = UUID(self.id) if self.id else None
+        repo_filter.ids_in = list(self.ids_in) if self.ids_in is not None else None
 
         # Handle logical operations
         if self.AND:
