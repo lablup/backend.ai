@@ -57,7 +57,7 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
-from ..bgtask.tags import ROOT_PRIVILEGED_TAG
+from ..bgtask.tags import PRIVILEGED_WORKER_TAG
 from ..bgtask.tasks.clone import VFolderCloneTaskArgs
 from ..bgtask.tasks.delete import VFolderDeleteTaskArgs
 from ..exception import (
@@ -424,7 +424,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         task_id = await ctx.background_task_manager.start_retriable(
             TaskName.DELETE_VFOLDER,
             delete_args,
-            tags=[ROOT_PRIVILEGED_TAG],
+            tags=[PRIVILEGED_WORKER_TAG],
         )
         data = VFolderDeleteResponse(bgtask_id=task_id).model_dump(mode="json")
         return web.json_response(data, status=HTTPStatus.ACCEPTED)
