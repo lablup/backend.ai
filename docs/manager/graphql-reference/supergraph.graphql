@@ -4882,16 +4882,10 @@ type Query
 
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
-<<<<<<< HEAD
-<<<<<<< HEAD
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
-=======
-=======
-=======
 
->>>>>>> 37dfcaedc (feat: Add compute session node ref in model replica node)
   """
   Added in 25.13.0 Get configuration JSON Schemas for all inference runtimes
   """
@@ -4899,11 +4893,6 @@ type Query
 
   """Added in 25.13.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON! @join__field(graph: STRAWBERRY)
-<<<<<<< HEAD
->>>>>>> Stashed changes
->>>>>>> 59a2a2f4d (feat: Modify gql schemas)
-=======
->>>>>>> 37dfcaedc (feat: Add compute session node ref in model replica node)
 }
 
 type QuotaDetails
