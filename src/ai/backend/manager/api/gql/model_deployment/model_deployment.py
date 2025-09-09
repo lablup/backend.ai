@@ -20,6 +20,7 @@ from ai.backend.common.exception import ModelDeploymentUnavailableError
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
+    build_page_info,
     build_pagination_options,
     resolve_global_id,
     to_global_id,
@@ -611,16 +612,16 @@ async def resolve_deployments(
                 node=ModelDeployment.from_dataclass(deployment), cursor=str(deployment.id)
             )
         )
-    # Mock pagination info for demonstration purposes
+    page_info = build_page_info(
+        edges=edges,
+        total_count=action_result.total_count,
+        pagination_options=pagination_options,
+    )
+
     connection = ModelDeploymentConnection(
         count=action_result.total_count,
         edges=edges,
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor="deployment-cursor-1",
-            end_cursor="deployment-cursor-3",
-        ),
+        page_info=page_info.to_strawberry_page_info(),
     )
     return connection
 
