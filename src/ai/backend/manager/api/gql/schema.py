@@ -18,6 +18,7 @@ from .artifact import (
     scan_artifacts,
     update_artifact,
 )
+from .artifact_registry import default_artifact_registry
 from .huggingface_registry import (
     create_huggingface_registry,
     delete_huggingface_registry,
@@ -77,6 +78,7 @@ class Query:
     huggingface_registries = huggingface_registries
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
+    default_artifact_registry = default_artifact_registry
 
 
 @strawberry.type
