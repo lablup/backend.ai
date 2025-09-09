@@ -83,6 +83,7 @@ class ModelRevisionFilterOptions:
     name: Optional[StringFilter] = None
     deployment_id: Optional[UUID] = None
     id: Optional[UUID] = None
+    ids_in: Optional[list[UUID]] = None
 
     # Logical operations
     AND: Optional[list["ModelRevisionFilterOptions"]] = None
