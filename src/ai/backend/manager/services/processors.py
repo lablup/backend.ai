@@ -18,7 +18,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -102,6 +102,7 @@ class ServiceArgs:
     error_monitor: ErrorPluginContext
     idle_checker_host: IdleCheckerHost
     event_dispatcher: EventDispatcher
+    event_producer: EventProducer
     hook_plugin_ctx: HookPluginContext
     scheduling_controller: "SchedulingController"
     deployment_controller: Optional["DeploymentController"]
@@ -172,6 +173,7 @@ class Services:
             args.background_task_manager,
             repositories.vfolder.repository,
             repositories.user.repository,
+            args.event_producer,
         )
         vfolder_file_service = VFolderFileService(
             args.config_provider,

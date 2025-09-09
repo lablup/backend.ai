@@ -11,6 +11,8 @@ from sqlalchemy import exc as sa_exc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.defs import VFOLDER_GROUP_PERMISSION_MODE
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.vfolder.anycast import VFolderDeleteRequestEvent
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
@@ -101,6 +103,7 @@ class VFolderService:
     _background_task_manager: BackgroundTaskManager
     _vfolder_repository: VfolderRepository
     _user_repository: UserRepository
+    _event_producer: EventProducer
 
     def __init__(
         self,
@@ -109,12 +112,14 @@ class VFolderService:
         background_task_manager: BackgroundTaskManager,
         vfolder_repository: VfolderRepository,
         user_repository: UserRepository,
+        event_producer: EventProducer,
     ) -> None:
         self._config_provider = config_provider
         self._storage_manager = storage_manager
         self._vfolder_repository = vfolder_repository
         self._user_repository = user_repository
         self._background_task_manager = background_task_manager
+        self._event_producer = event_producer
 
     async def create(self, action: CreateVFolderAction) -> CreateVFolderActionResult:
         user_role = action.user_role
@@ -494,6 +499,7 @@ class VFolderService:
         return RestoreVFolderFromTrashActionResult(vfolder_uuid=action.vfolder_uuid)
 
     async def _remove_vfolder_from_storage(self, vfolder_data: VFolderData) -> None:
+        # TODO: Deprecate this function
         proxy_name, volume_name = self._storage_manager.get_proxy_and_volume(
             vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
         )
@@ -510,6 +516,13 @@ class VFolderService:
             # If the vfolder is not found, just delete it from the repository
             log.warning("VFolder {} not found: {}", vfolder_data.id, e)
 
+    async def _request_vfolder_deletion(self, vfolder_data: VFolderData) -> None:
+        _, volume_name = self._storage_manager.get_proxy_and_volume(
+            vfolder_data.host, is_unmanaged(vfolder_data.unmanaged_path)
+        )
+        vfid = VFolderID(vfolder_data.quota_scope_id, vfolder_data.id)
+        await self._event_producer.anycast_event(VFolderDeleteRequestEvent(vfid, volume_name))
+
     async def delete_forever(
         self, action: DeleteForeverVFolderAction
     ) -> DeleteForeverVFolderActionResult:
@@ -519,7 +532,7 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        await self._remove_vfolder_from_storage(vfolder_data)
+        await self._request_vfolder_deletion(vfolder_data)
         await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
         return DeleteForeverVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 
@@ -532,7 +545,7 @@ class VFolderService:
         vfolder_data = await self._vfolder_repository.get_by_id_validated(
             action.vfolder_uuid, user.id, user.domain_name
         )
-        await self._remove_vfolder_from_storage(vfolder_data)
+        await self._request_vfolder_deletion(vfolder_data)
         await self._vfolder_repository.delete_vfolders_forever([action.vfolder_uuid])
         return ForceDeleteVFolderActionResult(vfolder_uuid=action.vfolder_uuid)
 

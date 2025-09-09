@@ -107,3 +107,22 @@ class VFolderCloneFailureEvent(VFolderEvent):
     @classmethod
     def event_name(cls) -> str:
         return "vfolder_clone_failure"
+
+
+@dataclass
+class VFolderDeleteRequestEvent(VFolderEvent):
+    volume: str
+
+    def serialize(self) -> tuple:
+        return (str(self.vfid), self.volume)
+
+    @classmethod
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(
+            VFolderID.from_str(value[0]),
+            value[1],
+        )
+
+    @classmethod
+    def event_name(cls) -> str:
+        return "vfolder_delete_request"
