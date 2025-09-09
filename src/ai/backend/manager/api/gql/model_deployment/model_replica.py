@@ -359,7 +359,6 @@ async def resolve_replicas(
         edges=edges, total_count=action_result.total_count, pagination_options=pagination_options
     )
 
-    # Mock pagination info for demonstration purposes
     return ModelReplicaConnection(
         count=action_result.total_count,
         edges=edges,
