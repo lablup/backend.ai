@@ -892,7 +892,6 @@ input ModelRevisionOrderBy {
 enum ModelRevisionOrderField {
   CREATED_AT
   NAME
-  ID
 }
 
 """Added in 25.13.0"""
