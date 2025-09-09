@@ -65,6 +65,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
     AddModelRevisionAction,
     AddModelRevisionActionResult,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
+    CreateModelRevisionAction,
+    CreateModelRevisionActionResult,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_deployment_id import (
     GetRevisionByDeploymentIdAction,
     GetRevisionByDeploymentIdActionResult,
@@ -171,6 +175,10 @@ class DeploymentServiceProtocol(Protocol):
     async def list_replicas(self, action: ListReplicasAction) -> ListReplicasActionResult: ...
     async def list_revisions(self, action: ListRevisionsAction) -> ListRevisionsActionResult: ...
 
+    async def create_model_revision(
+        self, action: CreateModelRevisionAction
+    ) -> CreateModelRevisionActionResult: ...
+
 
 class DeploymentProcessors(AbstractProcessorPackage):
     """Processors for deployment operations."""
@@ -219,6 +227,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
     ]
     list_replicas: ActionProcessor[ListReplicasAction, ListReplicasActionResult]
     list_revisions: ActionProcessor[ListRevisionsAction, ListRevisionsActionResult]
+    create_model_revision: ActionProcessor[
+        CreateModelRevisionAction, CreateModelRevisionActionResult
+    ]
 
     def __init__(
         self, service: DeploymentServiceProtocol, action_monitors: list[ActionMonitor]
@@ -263,6 +274,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         )
         self.list_replicas = ActionProcessor(service.list_replicas, action_monitors)
         self.list_revisions = ActionProcessor(service.list_revisions, action_monitors)
+        self.create_model_revision = ActionProcessor(service.create_model_revision, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -288,4 +300,5 @@ class DeploymentProcessors(AbstractProcessorPackage):
             ListRevisionsAction.spec(),
             ListReplicasAction.spec(),
             CreateLegacyDeploymentAction.spec(),
+            CreateModelRevisionAction.spec(),
         ]

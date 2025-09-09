@@ -86,6 +86,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
     AddModelRevisionAction,
     AddModelRevisionActionResult,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
+    CreateModelRevisionAction,
+    CreateModelRevisionActionResult,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_deployment_id import (
     GetRevisionByDeploymentIdAction,
     GetRevisionByDeploymentIdActionResult,
@@ -422,6 +426,11 @@ class DeploymentService:
     ) -> GetReplicasByRevisionIdActionResult:
         # For now, return empty replica list
         return GetReplicasByRevisionIdActionResult(data=[])
+
+    async def create_model_revision(
+        self, action: CreateModelRevisionAction
+    ) -> CreateModelRevisionActionResult:
+        return CreateModelRevisionActionResult(revision=mock_revision_data_2)
 
 
 mock_revision_data_1 = ModelRevisionData(
