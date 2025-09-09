@@ -36,6 +36,7 @@ python_distribution(
         "backendai_cli_v10": {
             "storage": "ai.backend.storage.cli.__main__:main",
             "storage.start-server": "ai.backend.storage.server:main",
+            "storage.start-privileged-worker": "ai.backend.storage.privileged.server:main",
         },
     },
     generate_setup=True,
