@@ -107,6 +107,7 @@ class ModelRevisionFilter:
 class ModelRevisionOrderField(Enum):
     CREATED_AT = "CREATED_AT"
     NAME = "NAME"
+    ID = "ID"
 
 
 @strawberry.input(description="Added in 25.13.0")

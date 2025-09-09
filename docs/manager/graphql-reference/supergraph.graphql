@@ -3635,6 +3635,7 @@ enum ModelRevisionOrderField
 {
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   NAME @join__enumValue(graph: STRAWBERRY)
+  ID @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.13.0"""
@@ -5582,6 +5583,7 @@ input ReplicaFilter
   readinessStatus: ReadinessStatusFilter = null
   livenessStatus: LivenessStatusFilter = null
   activenessStatus: ActivenessStatusFilter = null
+  id: UUID = null
   AND: [ReplicaFilter!] = null
   OR: [ReplicaFilter!] = null
   NOT: [ReplicaFilter!] = null
