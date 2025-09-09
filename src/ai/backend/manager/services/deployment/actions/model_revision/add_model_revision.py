@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional, override
+from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
@@ -11,6 +12,7 @@ from ai.backend.manager.services.deployment.actions.model_revision.base import (
 
 @dataclass
 class AddModelRevisionAction(ModelRevisionBaseAction):
+    model_deployment_id: UUID
     adder: ModelRevisionCreator
 
     @override

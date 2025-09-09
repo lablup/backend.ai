@@ -668,7 +668,9 @@ async def add_model_revision(
         )
 
     result = await processor.add_model_revision.wait_for_complete(
-        AddModelRevisionAction(input.to_model_revision_creator())
+        AddModelRevisionAction(
+            model_deployment_id=UUID(input.deployment_id), adder=input.to_model_revision_creator()
+        )
     )
 
     return AddModelRevisionPayload(revision=ModelRevision.from_dataclass(result.revision))
