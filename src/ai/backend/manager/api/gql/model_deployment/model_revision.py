@@ -1,10 +1,9 @@
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta
-from decimal import Decimal
+from datetime import datetime
 from enum import StrEnum
 from pathlib import PurePosixPath
 from typing import Any, Optional, cast
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import strawberry
 from aiotools import apartial
@@ -35,10 +34,7 @@ from ai.backend.manager.api.gql.resource_group import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder import (
     ExtraVFolderMountConnection,
-    ExtraVFolderMountEdge,
     VFolder,
-    mock_extra_mount_1,
-    mock_extra_mount_2,
 )
 from ai.backend.manager.data.deployment.creator import ModelRevisionCreator, VFolderMountsCreator
 from ai.backend.manager.data.deployment.inference_runtime_config import (
@@ -68,6 +64,9 @@ from ai.backend.manager.repositories.deployment.types.types import (
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
+    CreateModelRevisionAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
@@ -282,23 +281,6 @@ class ModelRevisionFilter:
 class ModelRevisionOrderBy:
     field: ModelRevisionOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-
-# TODO: After implementing the actual logic, remove these mock objects
-# Mock Model Revisions
-mock_inference_runtime_config = {
-    "tp_size": 2,
-    "pp_size": 4,
-    "ep_enable": True,
-    "sp_size": 8,
-    "max_model_length": 4096,
-    "batch_size": 32,
-    "memory_util_percentage": Decimal("0.90"),
-    "kv_storage_dtype": "float16",
-    "trust_remote_code": True,
-    "tool_call_parser": "granite",
-    "reasoning_parser": "deepseek_r1",
-}
 
 
 # Payload Types
@@ -611,7 +593,6 @@ async def resolve_revisions(
 
     page_info = build_page_info(edges, total_count, pagination_options)
 
-    # Mock pagination info for demonstration purposes
     connection = ModelRevisionConnection(
         count=total_count,
         edges=edges,
@@ -682,44 +663,15 @@ async def add_model_revision(
 async def create_model_revision(
     input: CreateModelRevisionInput, info: Info[StrawberryGQLContext]
 ) -> CreateModelRevisionPayload:
-    """Create a new model revision."""
-    return CreateModelRevisionPayload(
-        revision=ModelRevision(
-            id=UUID("d19f8f78-f308-45a9-ab7b-1c63346024fd"),
-            name="llama-3-8b-instruct-v1.0",
-            cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
-            resource_config=ResourceConfig(
-                _resource_group_name="default",
-                resource_slots=cast(
-                    JSONString,
-                    '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
-                ),
-                resource_opts=cast(
-                    JSONString,
-                    '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
-                ),
-            ),
-            model_runtime_config=ModelRuntimeConfig(
-                runtime_variant="custom",
-                inference_runtime_config=mock_inference_runtime_config,
-                environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0"}'),
-            ),
-            model_mount_config=ModelMountConfig(
-                _vfolder_id=uuid4(),
-                mount_destination="/models",
-                definition_path="models/llama-3-8b/config.yaml",
-            ),
-            extra_mounts=ExtraVFolderMountConnection(
-                count=2,
-                edges=[
-                    ExtraVFolderMountEdge(node=mock_extra_mount_1, cursor="extra-mount-cursor-1"),
-                    ExtraVFolderMountEdge(node=mock_extra_mount_2, cursor="extra-mount-cursor-2"),
-                ],
-                page_info=PageInfo(
-                    has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
-                ),
-            ),
-            _image_id=uuid4(),
-            created_at=datetime.now() - timedelta(days=10),
+    """Create a new model revision without attaching it to any deployment."""
+    processor = info.context.processors.deployment
+    if processor is None:
+        raise ModelDeploymentUnavailableError(
+            "Model Deployment feature is unavailable. Please contact support."
         )
+
+    result = await processor.create_model_revision.wait_for_complete(
+        CreateModelRevisionAction(creator=input.to_model_revision_creator())
     )
+
+    return CreateModelRevisionPayload(revision=ModelRevision.from_dataclass(result.revision))
