@@ -3415,11 +3415,11 @@ type ModelDeployment implements Node
   metadata: ModelDeploymentMetadata!
   networkAccess: ModelDeploymentNetworkAccess!
   revision: ModelRevision
-  revisionHistory: ModelRevisionConnection!
   scalingRule: ScalingRule!
   replicaState: ReplicaState!
   defaultDeploymentStrategy: DeploymentStrategy!
   createdUser: UserNode!
+  revisionHistory(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
 }
 
 """Added in 25.13.0"""
