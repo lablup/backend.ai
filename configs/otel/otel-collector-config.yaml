@@ -5,15 +5,62 @@ receivers:
         endpoint: 0.0.0.0:4317
       http:
         endpoint: 0.0.0.0:4318
+  
+  filelog/docker:
+    include:
+      - /var/lib/docker/containers/*/*-json.log
+    include_file_path: true
+    include_file_name: false
+    operators:
+      # Parse JSON logs from Docker
+      - id: parser-docker
+        type: json_parser
+        timestamp:
+          parse_from: attributes.time
+          layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+      # Extract container ID from file path
+      - id: extract_metadata_from_filepath
+        type: regex_parser
+        regex: '^/var/lib/docker/containers/(?P<container_id>[^/]+)/(?P<container_id_short>[^/]+)-json\.log$'
+        parse_from: attributes["log.file.path"]
+      # Move parsed fields to resource attributes
+      - type: move
+        from: attributes.container_id
+        to: resource["container.id"]
+      - type: move
+        from: attributes.stream
+        to: attributes["log.iostream"]
+      # Clean up log body
+      - type: move
+        from: attributes.log
+        to: body
 
 processors:
   batch:
     timeout: 15s
     send_batch_size: 512
+  
+  attributes/docker:
+    actions:
+      - key: container.name
+        from_attribute: container_name
+        action: insert
+      - key: service.name
+        from_attribute: container_name  
+        action: insert
+      - key: log.source
+        value: docker
+        action: insert
 
 exporters:
   loki:
     endpoint: http://backendai-half-loki:3100/loki/api/v1/push
+    labels:
+      attributes:
+        container.id: container_id
+        container.name: container_name
+        log.iostream: stream
+        log.source: source
   otlp/tempo:
     endpoint: http://backendai-half-tempo:4317
     tls:
@@ -27,6 +74,6 @@ service:
       processors: [batch]
       exporters: [otlp/tempo]
     logs:
-      receivers: [otlp]
-      processors: [batch]
+      receivers: [otlp, filelog/docker]
+      processors: [batch, attributes/docker]
       exporters: [loki]
