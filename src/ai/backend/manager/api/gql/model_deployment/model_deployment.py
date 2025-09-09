@@ -85,9 +85,9 @@ from .model_revision import (
     CreateModelRevisionInput,
     ModelRevision,
     ModelRevisionConnection,
-    ModelRevisionEdge,
     ModelRevisionFilter,
     ModelRevisionOrderBy,
+    resolve_revisions,
 )
 
 DeploymentStatus = strawberry.enum(
@@ -288,7 +288,6 @@ class ModelDeployment(Node):
             _replica_ids=self._replica_state_data.replica_ids,
         )
 
-    # TODO: Add pagination support?
     @strawberry.field
     async def revision_history(
         self,
@@ -302,23 +301,20 @@ class ModelDeployment(Node):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ModelRevisionConnection:
-        """Resolve revision history with dataloader."""
-        replica_loader = DataLoader(apartial(ModelRevision.batch_load_by_ids, info.context))
-        revisions: list[ModelRevision] = await replica_loader.load(self._revision_history_ids)
+        final_filter = ModelRevisionFilter(ids_in=self._revision_history_ids)
+        if filter:
+            final_filter = ModelRevisionFilter(AND=[final_filter, filter])
 
-        edges = [
-            ModelRevisionEdge(node=revision, cursor=str(revision.id)) for revision in revisions
-        ]
-
-        return ModelRevisionConnection(
-            count=len(edges),
-            edges=edges,
-            page_info=PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
+        return await resolve_revisions(
+            info=info,
+            filter=final_filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
         )
 
     @classmethod
