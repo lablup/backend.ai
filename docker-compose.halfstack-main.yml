@@ -145,6 +145,24 @@ services:
       - "4317:4317"
       - "4318:4318"
 
+  backendai-half-fluentbit:
+    image: fluent/fluent-bit:3.2.4
+    restart: unless-stopped
+    networks:
+      - half
+    volumes:
+      - ./configs/fluentbit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./configs/fluentbit/parsers.conf:/fluent-bit/etc/parsers.conf:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "24224:24224"
+      - "24224:24224/udp"
+    environment:
+      - HOSTNAME=backendai-halfstack
+    depends_on:
+      - backendai-half-otel-collector
+
   backendai-half-loki:
     image: grafana/loki:3.5.0
     restart: unless-stopped
