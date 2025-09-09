@@ -1,10 +1,9 @@
 from collections.abc import Mapping, Sequence
-from datetime import datetime, timedelta
-from decimal import Decimal
-from enum import Enum, StrEnum
+from datetime import datetime
+from enum import StrEnum
 from pathlib import PurePosixPath
 from typing import Any, Optional, cast
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import strawberry
 from aiotools import apartial
@@ -21,6 +20,8 @@ from ai.backend.manager.api.gql.base import (
     JSONString,
     OrderDirection,
     StringFilter,
+    build_page_info,
+    build_pagination_options,
     resolve_global_id,
     to_global_id,
 )
@@ -33,10 +34,7 @@ from ai.backend.manager.api.gql.resource_group import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.vfolder import (
     ExtraVFolderMountConnection,
-    ExtraVFolderMountEdge,
     VFolder,
-    mock_extra_mount_1,
-    mock_extra_mount_2,
 )
 from ai.backend.manager.data.deployment.creator import ModelRevisionCreator, VFolderMountsCreator
 from ai.backend.manager.data.deployment.inference_runtime_config import (
@@ -50,6 +48,7 @@ from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     ModelMountConfigData,
     ModelRevisionData,
+    ModelRevisionOrderField,
     ModelRuntimeConfigData,
     MountInfo,
     ResourceConfigData,
@@ -59,8 +58,15 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.models.gql_models.image import ImageNode
 from ai.backend.manager.models.gql_models.scaling_group import ScalingGroupNode
 from ai.backend.manager.models.gql_models.vfolder import VirtualFolderNode
+from ai.backend.manager.repositories.deployment.types.types import (
+    ModelRevisionFilterOptions,
+    ModelRevisionOrderingOptions,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
+    CreateModelRevisionAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
@@ -71,7 +77,6 @@ from ai.backend.manager.services.deployment.actions.model_revision.get_revisions
 from ai.backend.manager.services.deployment.actions.model_revision.list_revisions import (
     ListRevisionsAction,
 )
-from ai.backend.manager.types import PaginationOptions
 
 MountPermission = strawberry.enum(
     CommonMountPermission,
@@ -246,40 +251,36 @@ class ModelRevisionFilter:
     name: Optional[StringFilter] = None
     deployment_id: Optional[ID] = None
     id: Optional[ID] = None
+    ids_in: strawberry.Private[Optional[Sequence[UUID]]] = None
 
     AND: Optional[list["ModelRevisionFilter"]] = None
     OR: Optional[list["ModelRevisionFilter"]] = None
     NOT: Optional[list["ModelRevisionFilter"]] = None
 
+    def to_repo_filter(self) -> ModelRevisionFilterOptions:
+        repo_filter = ModelRevisionFilterOptions()
 
-@strawberry.enum(description="Added in 25.13.0")
-class ModelRevisionOrderField(Enum):
-    CREATED_AT = "CREATED_AT"
-    NAME = "NAME"
-    ID = "ID"
+        # Handle basic filters
+        repo_filter.name = self.name
+        repo_filter.deployment_id = UUID(self.deployment_id) if self.deployment_id else None
+        repo_filter.id = UUID(self.id) if self.id else None
+        repo_filter.ids_in = list(self.ids_in) if self.ids_in is not None else None
+
+        # Handle logical operations
+        if self.AND:
+            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
+        if self.OR:
+            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
+        if self.NOT:
+            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
+
+        return repo_filter
 
 
 @strawberry.input(description="Added in 25.13.0")
 class ModelRevisionOrderBy:
     field: ModelRevisionOrderField
     direction: OrderDirection = OrderDirection.DESC
-
-
-# TODO: After implementing the actual logic, remove these mock objects
-# Mock Model Revisions
-mock_inference_runtime_config = {
-    "tp_size": 2,
-    "pp_size": 4,
-    "ep_enable": True,
-    "sp_size": 8,
-    "max_model_length": 4096,
-    "batch_size": 32,
-    "memory_util_percentage": Decimal("0.90"),
-    "kv_storage_dtype": "float16",
-    "trust_remote_code": True,
-    "tool_call_parser": "granite",
-    "reasoning_parser": "deepseek_r1",
-}
 
 
 # Payload Types
@@ -526,6 +527,20 @@ async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
     return all_configs
 
 
+def _convert_gql_revision_ordering_to_repo_ordering(
+    order_by: Optional[list[ModelRevisionOrderBy]],
+) -> ModelRevisionOrderingOptions:
+    if order_by is None or len(order_by) == 0:
+        return ModelRevisionOrderingOptions()
+
+    repo_ordering = []
+    for order in order_by:
+        desc = order.direction == OrderDirection.DESC
+        repo_ordering.append((order.field, desc))
+
+    return ModelRevisionOrderingOptions(order_by=repo_ordering)
+
+
 async def resolve_revisions(
     info: Info[StrawberryGQLContext],
     filter: Optional[ModelRevisionFilter] = None,
@@ -537,30 +552,51 @@ async def resolve_revisions(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ModelRevisionConnection:
+    repo_filter = None
+    if filter:
+        repo_filter = filter.to_repo_filter()
+
+    repo_ordering = _convert_gql_revision_ordering_to_repo_ordering(order_by)
+
+    pagination_options = build_pagination_options(
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
+
     processor = info.context.processors.deployment
     if processor is None:
         raise ModelDeploymentUnavailableError(
             "Model Deployment feature is unavailable. Please contact support."
         )
     action_result = await processor.list_revisions.wait_for_complete(
-        ListRevisionsAction(pagination=PaginationOptions())
+        ListRevisionsAction(
+            pagination=pagination_options,
+            ordering=repo_ordering,
+            filters=repo_filter,
+        )
     )
+
     edges = []
-    for revision in action_result.data:
+    revisions = action_result.data
+    total_count = action_result.total_count
+    for revision in revisions:
         edges.append(
-            ModelRevisionEdge(node=ModelRevision.from_dataclass(revision), cursor=str(revision.id))
+            ModelRevisionEdge(
+                node=ModelRevision.from_dataclass(revision),
+                cursor=to_global_id(ModelRevision, revision.id),
+            )
         )
 
-    # Mock pagination info for demonstration purposes
+    page_info = build_page_info(edges, total_count, pagination_options)
+
     connection = ModelRevisionConnection(
-        count=action_result.total_count,
+        count=total_count,
         edges=edges,
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor="revision-cursor-1",
-            end_cursor="revision-cursor-3",
-        ),
+        page_info=page_info.to_strawberry_page_info(),
     )
     return connection
 
@@ -613,7 +649,9 @@ async def add_model_revision(
         )
 
     result = await processor.add_model_revision.wait_for_complete(
-        AddModelRevisionAction(input.to_model_revision_creator())
+        AddModelRevisionAction(
+            model_deployment_id=UUID(input.deployment_id), adder=input.to_model_revision_creator()
+        )
     )
 
     return AddModelRevisionPayload(revision=ModelRevision.from_dataclass(result.revision))
@@ -625,44 +663,15 @@ async def add_model_revision(
 async def create_model_revision(
     input: CreateModelRevisionInput, info: Info[StrawberryGQLContext]
 ) -> CreateModelRevisionPayload:
-    """Create a new model revision."""
-    return CreateModelRevisionPayload(
-        revision=ModelRevision(
-            id=UUID("d19f8f78-f308-45a9-ab7b-1c63346024fd"),
-            name="llama-3-8b-instruct-v1.0",
-            cluster_config=ClusterConfig(mode=ClusterMode.SINGLE_NODE, size=1),
-            resource_config=ResourceConfig(
-                _resource_group_name="default",
-                resource_slots=cast(
-                    JSONString,
-                    '{"cpu": 8, "mem": "32G", "cuda.shares": 1, "cuda.device": 1}',
-                ),
-                resource_opts=cast(
-                    JSONString,
-                    '{"shmem": "2G", "reserved_time": "24h", "scaling_group": "us-east-1"}',
-                ),
-            ),
-            model_runtime_config=ModelRuntimeConfig(
-                runtime_variant="custom",
-                inference_runtime_config=mock_inference_runtime_config,
-                environ=cast(JSONString, '{"CUDA_VISIBLE_DEVICES": "0"}'),
-            ),
-            model_mount_config=ModelMountConfig(
-                _vfolder_id=uuid4(),
-                mount_destination="/models",
-                definition_path="models/llama-3-8b/config.yaml",
-            ),
-            extra_mounts=ExtraVFolderMountConnection(
-                count=2,
-                edges=[
-                    ExtraVFolderMountEdge(node=mock_extra_mount_1, cursor="extra-mount-cursor-1"),
-                    ExtraVFolderMountEdge(node=mock_extra_mount_2, cursor="extra-mount-cursor-2"),
-                ],
-                page_info=PageInfo(
-                    has_next_page=False, has_previous_page=False, start_cursor=None, end_cursor=None
-                ),
-            ),
-            _image_id=uuid4(),
-            created_at=datetime.now() - timedelta(days=10),
+    """Create a new model revision without attaching it to any deployment."""
+    processor = info.context.processors.deployment
+    if processor is None:
+        raise ModelDeploymentUnavailableError(
+            "Model Deployment feature is unavailable. Please contact support."
         )
+
+    result = await processor.create_model_revision.wait_for_complete(
+        CreateModelRevisionAction(creator=input.to_model_revision_creator())
     )
+
+    return CreateModelRevisionPayload(revision=ModelRevision.from_dataclass(result.revision))
