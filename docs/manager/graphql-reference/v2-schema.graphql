@@ -1185,6 +1185,7 @@ type Query {
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
 <<<<<<< HEAD
+<<<<<<< HEAD
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
@@ -1192,15 +1193,17 @@ type Query {
 =======
 <<<<<<< HEAD
 <<<<<<< HEAD
+=======
+>>>>>>> d3b85aadf (docs: Update gql schema docs)
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
-=======
-=======
-=======
 
+<<<<<<< HEAD
 >>>>>>> 37dfcaedc (feat: Add compute session node ref in model replica node)
 >>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
+=======
+>>>>>>> d3b85aadf (docs: Update gql schema docs)
   """
   Added in 25.13.0 Get configuration JSON Schemas for all inference runtimes
   """
@@ -1209,6 +1212,7 @@ type Query {
   """Added in 25.13.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON!
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 <<<<<<< HEAD
 >>>>>>> Stashed changes
@@ -1216,6 +1220,8 @@ type Query {
 =======
 >>>>>>> 37dfcaedc (feat: Add compute session node ref in model replica node)
 >>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
+=======
+>>>>>>> d3b85aadf (docs: Update gql schema docs)
 }
 
 """
