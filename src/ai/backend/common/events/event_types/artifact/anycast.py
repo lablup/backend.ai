@@ -29,8 +29,8 @@ class ModelMetadataInfo:
 
 
 @dataclass
-class ModelsMetadataFetchDoneEvent(BaseArtifactEvent):
-    models: list[ModelMetadataInfo]
+class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
+    model: ModelMetadataInfo
 
     @classmethod
     @override
@@ -39,33 +39,25 @@ class ModelsMetadataFetchDoneEvent(BaseArtifactEvent):
 
     def serialize(self) -> tuple:
         return (
-            tuple(
-                (
-                    model.model_id,
-                    model.revision,
-                    model.readme_content,
-                    model.registry_name,
-                    model.registry_type,
-                    model.size,
-                )
-                for model in self.models
-            ),
+            self.model.model_id,
+            self.model.revision,
+            self.model.readme_content,
+            self.model.registry_name,
+            self.model.registry_type,
+            self.model.size,
         )
 
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(
-            models=[
-                ModelMetadataInfo(
-                    model_id=m[0],
-                    revision=m[1],
-                    readme_content=m[2],
-                    registry_name=m[3],
-                    registry_type=m[4],
-                    size=m[5],
-                )
-                for m in value[0]
-            ]
+            model=ModelMetadataInfo(
+                model_id=value[0],
+                revision=value[1],
+                readme_content=value[2],
+                registry_name=value[3],
+                registry_type=value[4],
+                size=value[5],
+            )
         )
 
     @override

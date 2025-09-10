@@ -29,8 +29,8 @@ from ai.backend.common.data.storage.registries.types import (
 )
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.artifact.anycast import (
+    ModelMetadataFetchDoneEvent,
     ModelMetadataInfo,
-    ModelsMetadataFetchDoneEvent,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import HuggingFaceAPIError
@@ -422,7 +422,6 @@ class HuggingFaceScanner:
         log.info(
             f"Starting batch metadata processing for {len(models)} models (max_concurrent={max_concurrent})"
         )
-        metadata_results = []
         semaphore = asyncio.Semaphore(max_concurrent)
 
         async def download_metadata(model_data: ModelData) -> None:
@@ -443,22 +442,15 @@ class HuggingFaceScanner:
                             registry_name=registry_name,
                             size=total_size,
                         )
-                        metadata_results.append(metadata_info)
+                        await event_producer.anycast_event(
+                            ModelMetadataFetchDoneEvent(model=metadata_info)
+                        )
                 except Exception as e:
                     log.warning(f"Failed to download metadata for {model_data.id}: {str(e)}")
 
         # Download metadata concurrently with semaphore limit
         tasks = [download_metadata(model) for model in models]
         await asyncio.gather(*tasks, return_exceptions=True)
-
-        log.info(f"Completed metadata processing for {len(metadata_results)} models")
-
-        # Fire the event with successful results
-        if metadata_results:
-            await event_producer.anycast_event(
-                ModelsMetadataFetchDoneEvent(models=metadata_results)
-            )
-            log.info(f"Fired ModelsMetadataFetchDoneEvent for {len(metadata_results)} models")
 
     async def _download_readme(self, model: ModelTarget) -> Optional[str]:
         """Download README content for a model.

@@ -2,7 +2,7 @@ import logging
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.event_types.artifact.anycast import (
-    ModelsMetadataFetchDoneEvent,
+    ModelMetadataFetchDoneEvent,
 )
 from ai.backend.common.types import (
     AgentId,
@@ -33,62 +33,60 @@ class ArtifactEventHandler:
         self._huggingface_repository = huggingface_repository
         self._reservoir_repository = reservoir_repository
 
-    async def handle_models_metadata_fetch_done(
+    async def handle_model_metadata_fetch_done(
         self,
         context: None,
         source: AgentId,
-        event: ModelsMetadataFetchDoneEvent,
+        event: ModelMetadataFetchDoneEvent,
     ) -> None:
-        log.info("Processing models metadata fetch done event with {} models", len(event.models))
-
-        for model_info in event.models:
-            try:
-                registry_type = ArtifactRegistryType(model_info.registry_type)
-            except Exception:
-                raise InvalidArtifactRegistryTypeError(
-                    f"Unsupported artifact registry type: {model_info.registry_type}"
-                )
-
-            match registry_type:
-                case ArtifactRegistryType.HUGGINGFACE:
-                    registry_data = await self._huggingface_repository.get_registry_data_by_name(
-                        model_info.registry_name
-                    )
-                case ArtifactRegistryType.RESERVOIR:
-                    registry_data = await self._reservoir_repository.get_registry_data_by_name(
-                        model_info.registry_name
-                    )
-
-            artifact = await self._artifact_repository.get_model_artifact(
-                model_info.model_id, registry_id=registry_data.id
+        model_info = event.model
+        try:
+            registry_type = ArtifactRegistryType(model_info.registry_type)
+        except Exception:
+            raise InvalidArtifactRegistryTypeError(
+                f"Unsupported artifact registry type: {model_info.registry_type}"
             )
 
-            # Get the specific revision
-            revision = await self._artifact_repository.get_artifact_revision(
-                artifact.id, revision=model_info.revision
+        match registry_type:
+            case ArtifactRegistryType.HUGGINGFACE:
+                registry_data = await self._huggingface_repository.get_registry_data_by_name(
+                    model_info.registry_name
+                )
+            case ArtifactRegistryType.RESERVOIR:
+                registry_data = await self._reservoir_repository.get_registry_data_by_name(
+                    model_info.registry_name
+                )
+
+        artifact = await self._artifact_repository.get_model_artifact(
+            model_info.model_id, registry_id=registry_data.id
+        )
+
+        # Get the specific revision
+        revision = await self._artifact_repository.get_artifact_revision(
+            artifact.id, revision=model_info.revision
+        )
+
+        try:
+            # Update the README content
+            await self._artifact_repository.update_artifact_revision_readme(
+                revision.id, model_info.readme_content
             )
 
-            try:
-                # Update the README content
-                await self._artifact_repository.update_artifact_revision_readme(
-                    revision.id, model_info.readme_content
-                )
+            # Update the file size
+            await self._artifact_repository.update_artifact_revision_bytesize(
+                revision.id, model_info.size
+            )
 
-                # Update the file size
-                await self._artifact_repository.update_artifact_revision_bytesize(
-                    revision.id, model_info.size
-                )
-
-                log.info(
-                    "Updated metadata for model: {} revision: {} in artifact: {} (size: {} bytes)",
-                    model_info.model_id,
-                    model_info.revision,
-                    artifact.id,
-                    model_info.size,
-                )
-            except Exception as model_error:
-                log.error(
-                    "Failed to process metadata update for model: {} - {}",
-                    model_info.model_id,
-                    model_error,
-                )
+            log.trace(
+                "Updated metadata for model: {} revision: {} in artifact: {} (size: {} bytes)",
+                model_info.model_id,
+                model_info.revision,
+                artifact.id,
+                model_info.size,
+            )
+        except Exception as model_error:
+            log.error(
+                "Failed to process metadata update for model: {} - {}",
+                model_info.model_id,
+                model_error,
+            )
