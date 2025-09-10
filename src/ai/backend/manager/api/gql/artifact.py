@@ -162,7 +162,9 @@ class ArtifactRevisionOrderBy:
 @strawberry.input(description="Added in 25.14.0")
 class ScanArtifactsInput:
     registry_id: Optional[ID] = None
-    limit: int = strawberry.field(description="Maximum number of artifacts to scan (max: 500)")
+    limit: int = strawberry.field(
+        description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})"
+    )
     artifact_type: Optional[ArtifactType] = None
     search: Optional[str] = None
 
