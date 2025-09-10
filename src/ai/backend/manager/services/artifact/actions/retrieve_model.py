@@ -9,9 +9,9 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
 @dataclass
-class RetrieveModelsAction(ArtifactAction):
+class RetrieveModelAction(ArtifactAction):
     registry_id: Optional[uuid.UUID]
-    models: list[ModelTarget]
+    model: ModelTarget
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -20,13 +20,13 @@ class RetrieveModelsAction(ArtifactAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "retrieve_model_multi"
+        return "retrieve_model"
 
 
 @dataclass
-class RetrieveModelsActionResult(BaseActionResult):
-    result: list[ArtifactDataWithRevisions]
+class RetrieveModelActionResult(BaseActionResult):
+    result: ArtifactDataWithRevisions
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.result.id)

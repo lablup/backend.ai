@@ -7,6 +7,8 @@ from aiohttp.client_exceptions import ClientConnectorError
 from pydantic import TypeAdapter
 
 from ai.backend.common.dto.storage.request import (
+    HuggingFaceRetrieveModelReqPathParam,
+    HuggingFaceRetrieveModelReqQueryParam,
     HuggingFaceRetrieveModelsReq,
     HuggingFaceScanModelsReq,
 )
@@ -17,6 +19,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
     ArtifactRegistryType,
+    ArtifactRevisionData,
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
@@ -48,6 +51,10 @@ from ai.backend.manager.services.artifact.actions.list import (
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
     ListArtifactsWithRevisionsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.retrieve_model import (
+    RetrieveModelAction,
+    RetrieveModelActionResult,
 )
 from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (
     RetrieveModelsAction,
@@ -189,7 +196,54 @@ class ArtifactService:
                     if not parsed.artifacts:
                         break
 
-                    all_artifacts.extend(parsed.artifacts)
+                    # Convert response data back to full data with readme
+                    for response_artifact in parsed.artifacts:
+                        # Convert response revisions back to full revisions
+                        full_revisions = []
+                        for response_revision in response_artifact.revisions:
+                            # Get readme for this revision from reservoir
+                            try:
+                                readme = await remote_reservoir_client.get_readme(
+                                    response_revision.id
+                                )
+                            except Exception as e:
+                                log.warning(
+                                    "Failed to fetch readme for artifact {} revision {}: {}",
+                                    response_revision.artifact_id,
+                                    response_revision.version,
+                                    e,
+                                )
+                                readme = None
+
+                            # Create full revision data with readme
+                            full_revision = ArtifactRevisionData(
+                                id=response_revision.id,
+                                artifact_id=response_revision.artifact_id,
+                                version=response_revision.version,
+                                readme=readme,
+                                size=response_revision.size,
+                                status=response_revision.status,
+                                created_at=response_revision.created_at,
+                                updated_at=response_revision.updated_at,
+                            )
+                            full_revisions.append(full_revision)
+
+                        # Create full artifact data
+                        full_artifact = ArtifactDataWithRevisions(
+                            id=response_artifact.id,
+                            name=response_artifact.name,
+                            type=response_artifact.type,
+                            description=response_artifact.description,
+                            registry_id=response_artifact.registry_id,
+                            source_registry_id=response_artifact.source_registry_id,
+                            registry_type=response_artifact.registry_type,
+                            source_registry_type=response_artifact.source_registry_type,
+                            scanned_at=response_artifact.scanned_at,
+                            updated_at=response_artifact.updated_at,
+                            readonly=response_artifact.readonly,
+                            revisions=full_revisions,
+                        )
+                        all_artifacts.append(full_artifact)
 
                     if len(parsed.artifacts) < limit:
                         break
@@ -303,6 +357,42 @@ class ArtifactService:
         )
 
         return RetrieveModelsActionResult(result=scanned_models)
+
+    async def retrieve_single_model(self, action: RetrieveModelAction) -> RetrieveModelActionResult:
+        registry_meta = await self._resolve_artifact_registry_meta(
+            ArtifactType.MODEL, action.registry_id
+        )
+        registry_type = registry_meta.type
+        registry_id = registry_meta.registry_id
+
+        if registry_type != ArtifactRegistryType.HUGGINGFACE:
+            raise NotImplementedError("Only HuggingFace registry is supported for model retrieval")
+
+        reservoir_config = self._config_provider.config.reservoir
+        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
+
+        # TODO: Abstract remote registry client layer (scan, import)
+        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+
+        registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
+            registry_id
+        )
+
+        path = HuggingFaceRetrieveModelReqPathParam(
+            model_id=action.model.model_id,
+        )
+        query = HuggingFaceRetrieveModelReqQueryParam(
+            registry_name=registry_data.name,
+            revision=action.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
+        )
+
+        resp = await storage_proxy_client.retrieve_huggingface_model(path, query)
+        scanned_models = await self._artifact_repository.upsert_huggingface_model_artifacts(
+            [resp.model],
+            registry_id=registry_data.id,
+        )
+
+        return RetrieveModelActionResult(result=scanned_models[0])
 
     async def _resolve_artifact_registry_meta(
         self, artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]

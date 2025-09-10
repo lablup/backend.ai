@@ -404,47 +404,12 @@ class HuggingFaceScanner:
         except Exception as e:
             raise HuggingFaceAPIError(f"Failed to list files for model {model}: {str(e)}") from e
 
-    async def _download_readme(self, model: ModelTarget) -> Optional[str]:
-        """Download README content for a model.
-
-        Args:
-            model: HuggingFace model to download README for
-
-        Returns:
-            README content as string, or None if download fails
-        """
-        try:
-            readme_url = self._client.get_download_url(model, "README.md")
-
-            async with aiohttp.ClientSession() as session:
-                async with session.get(readme_url) as response:
-                    if response.status == 200:
-                        content = await response.text()
-                        return content
-                    else:
-                        log.warning(
-                            f"Failed to download README for {model}, status code: {response.status}"
-                        )
-                        return None
-
-        except Exception as e:
-            log.warning(f"Failed to download README for {model}: {str(e)}")
-            return None
-
-    async def _calculate_model_size(self, model: ModelTarget) -> int:
-        try:
-            file_infos = await self.list_model_files_info(model)
-            return sum(file.size for file in file_infos)
-        except Exception as size_error:
-            log.warning(f"Failed to calculate size for {model}: {str(size_error)}")
-            return 0
-
     async def download_metadata_batch(
         self,
         models: list[ModelData],
         registry_name: str,
         event_producer: EventProducer,
-        max_concurrent: int = 5,
+        max_concurrent: int = 8,
     ) -> None:
         """Download metadata (README and file size) for all models and fire event when complete.
 
@@ -452,7 +417,7 @@ class HuggingFaceScanner:
             models: List of ModelData objects to download metadata for
             registry_name: Name of the registry (e.g., HuggingFace registry name)
             event_producer: Event producer to fire the completion event
-            max_concurrent: Maximum number of concurrent metadata downloads (default: 5)
+            max_concurrent: Maximum number of concurrent metadata downloads (default: 8)
         """
         log.info(
             f"Starting batch metadata processing for {len(models)} models (max_concurrent={max_concurrent})"
@@ -494,3 +459,38 @@ class HuggingFaceScanner:
                 ModelsMetadataFetchDoneEvent(models=metadata_results)
             )
             log.info(f"Fired ModelsMetadataFetchDoneEvent for {len(metadata_results)} models")
+
+    async def _download_readme(self, model: ModelTarget) -> Optional[str]:
+        """Download README content for a model.
+
+        Args:
+            model: HuggingFace model to download README for
+
+        Returns:
+            README content as string, or None if download fails
+        """
+        try:
+            readme_url = self._client.get_download_url(model, "README.md")
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(readme_url) as response:
+                    if response.status == 200:
+                        content = await response.text()
+                        return content
+                    else:
+                        log.warning(
+                            f"Failed to download README for {model}, status code: {response.status}"
+                        )
+                        return None
+
+        except Exception as e:
+            log.warning(f"Failed to download README for {model}: {str(e)}")
+            return None
+
+    async def _calculate_model_size(self, model: ModelTarget) -> int:
+        try:
+            file_infos = await self.list_model_files_info(model)
+            return sum(file.size for file in file_infos)
+        except Exception as size_error:
+            log.warning(f"Failed to calculate size for {model}: {str(size_error)}")
+            return 0

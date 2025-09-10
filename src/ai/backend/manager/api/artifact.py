@@ -9,11 +9,13 @@ from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.request import (
     ApproveArtifactRevisionReq,
     CancelImportArtifactReq,
     CleanupArtifactsReq,
+    GetArtifactRevisionReadmeReq,
     ImportArtifactsReq,
     RejectArtifactRevisionReq,
     UpdateArtifactReqBodyParam,
@@ -24,6 +26,7 @@ from ai.backend.manager.dto.response import (
     ArtifactRevisionImportTask,
     CancelImportArtifactResponse,
     CleanupArtifactsResponse,
+    GetArtifactRevisionReadmeResponse,
     ImportArtifactsResponse,
     RejectArtifactRevisionResponse,
     UpdateArtifactResponse,
@@ -37,6 +40,9 @@ from ai.backend.manager.services.artifact_revision.actions.cancel_import import 
 )
 from ai.backend.manager.services.artifact_revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.get_readme import (
+    GetArtifactRevisionReadmeAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
     ImportArtifactRevisionAction,
@@ -73,7 +79,10 @@ class APIHandler:
             cleaned_revisions.append(action_result.result)
 
         resp = CleanupArtifactsResponse(
-            artifact_revisions=cleaned_revisions,
+            artifact_revisions=[
+                ArtifactRevisionResponseData.from_revision_data(revision)
+                for revision in cleaned_revisions
+            ],
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -92,7 +101,7 @@ class APIHandler:
         )
 
         resp = CancelImportArtifactResponse(
-            artifact_revision=action_result.result,
+            artifact_revision=ArtifactRevisionResponseData.from_revision_data(action_result.result),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -111,7 +120,7 @@ class APIHandler:
         )
 
         resp = ApproveArtifactRevisionResponse(
-            artifact_revision=action_result.result,
+            artifact_revision=ArtifactRevisionResponseData.from_revision_data(action_result.result),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -130,7 +139,7 @@ class APIHandler:
         )
 
         resp = RejectArtifactRevisionResponse(
-            artifact_revision=action_result.result,
+            artifact_revision=ArtifactRevisionResponseData.from_revision_data(action_result.result),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -157,7 +166,9 @@ class APIHandler:
             tasks.append(
                 ArtifactRevisionImportTask(
                     task_id=str(action_result.task_id),
-                    artifact_revision=action_result.result,
+                    artifact_revision=ArtifactRevisionResponseData.from_revision_data(
+                        action_result.result
+                    ),
                 )
             )
 
@@ -182,6 +193,25 @@ class APIHandler:
 
         resp = UpdateArtifactResponse(
             artifact=action_result.result,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def get_artifact_revision_readme(
+        self,
+        path: PathParam[GetArtifactRevisionReadmeReq],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        processors = processors_ctx.processors
+        action_result = await processors.artifact_revision.get_readme.wait_for_complete(
+            GetArtifactRevisionReadmeAction(
+                artifact_revision_id=path.parsed.artifact_revision_id,
+            )
+        )
+
+        resp = GetArtifactRevisionReadmeResponse(
+            readme=action_result.readme_data.readme,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -213,5 +243,12 @@ def create_app(
     cors.add(app.router.add_route("POST", "/task/cancel", api_handler.cancel_import_artifact))
     cors.add(app.router.add_route("POST", "/import", api_handler.import_artifacts))
     cors.add(app.router.add_route("PATCH", "/{artifact_id}", api_handler.update_artifact))
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/revisions/{artifact_revision_id}/readme",
+            api_handler.get_artifact_revision_readme,
+        )
+    )
 
     return app, []

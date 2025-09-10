@@ -88,6 +88,17 @@ class HuggingFaceRetrieveModelsResponse(BaseResponseModel):
     )
 
 
+class HuggingFaceRetrieveModelResponse(BaseResponseModel):
+    """Response for HuggingFace retrieve operation."""
+
+    model: ModelData = Field(
+        description="""
+        HuggingFace model scanned and retrieved.
+        The model includes comprehensive metadata and file information.
+        """,
+    )
+
+
 class HuggingFaceImportModelsResponse(BaseResponseModel):
     """Response for HuggingFace batch model import operation."""
 

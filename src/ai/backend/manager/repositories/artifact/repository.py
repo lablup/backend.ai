@@ -715,6 +715,21 @@ class ArtifactRepository:
             return artifact_revision_id
 
     @repository_decorator()
+    async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> Optional[str]:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRevisionRow.readme).where(
+                    ArtifactRevisionRow.id == artifact_revision_id
+                )
+            )
+            readme = result.scalar_one_or_none()
+            if readme is None:
+                raise ArtifactRevisionNotFoundError(
+                    f"Artifact revision with ID {artifact_revision_id} not found"
+                )
+            return readme
+
+    @repository_decorator()
     async def list_artifacts_paginated(
         self,
         *,

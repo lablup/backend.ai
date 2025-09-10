@@ -33,6 +33,17 @@ class ScanArtifactModelsReq(BaseRequestModel):
     )
 
 
+class ScanArtifactModelPathParam(BaseRequestModel):
+    model_id: str = Field(description="The model to scan from the registry.")
+
+
+class ScanArtifactModelQueryParam(BaseRequestModel):
+    revision: Optional[str] = Field(description="The model revision to scan from the registry.")
+    registry_id: Optional[uuid.UUID] = Field(
+        default=None, description="The unique identifier of the artifact registry to scan."
+    )
+
+
 class CleanupArtifactsReq(BaseRequestModel):
     artifact_revision_ids: list[uuid.UUID] = Field(
         description="List of artifact revision IDs to cleanup."
@@ -47,6 +58,10 @@ class CancelImportArtifactReq(BaseRequestModel):
 
 class ApproveArtifactRevisionReq(BaseRequestModel):
     artifact_revision_id: uuid.UUID = Field(description="The artifact revision ID to approve.")
+
+
+class GetArtifactRevisionReadmeReq(BaseRequestModel):
+    artifact_revision_id: uuid.UUID = Field(description="The artifact revision ID to get readme.")
 
 
 class RejectArtifactRevisionReq(BaseRequestModel):

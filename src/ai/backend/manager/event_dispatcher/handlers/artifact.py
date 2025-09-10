@@ -39,7 +39,6 @@ class ArtifactEventHandler:
         source: AgentId,
         event: ModelsMetadataFetchDoneEvent,
     ) -> None:
-        """Handle metadata fetch completion event and update model artifacts."""
         log.info("Processing models metadata fetch done event with {} models", len(event.models))
 
         for model_info in event.models:

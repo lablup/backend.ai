@@ -7,16 +7,26 @@ from typing import Iterable, Tuple
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, api_handler
-from ai.backend.common.data.storage.registries.types import ModelSortKey
+from ai.backend.common.api_handlers import (
+    APIResponse,
+    BodyParam,
+    PathParam,
+    QueryParam,
+    api_handler,
+)
+from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisionsResponse
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.request import (
+    ScanArtifactModelPathParam,
+    ScanArtifactModelQueryParam,
     ScanArtifactModelsReq,
     ScanArtifactsReq,
     SearchArtifactsReq,
 )
 from ai.backend.manager.dto.response import (
+    RetreiveArtifactModelResponse,
     ScanArtifactModelsResponse,
     ScanArtifactsResponse,
     SearchArtifactsResponse,
@@ -24,6 +34,7 @@ from ai.backend.manager.dto.response import (
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
 )
+from ai.backend.manager.services.artifact.actions.retrieve_model import RetrieveModelAction
 from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (
     RetrieveModelsAction,
 )
@@ -55,7 +66,10 @@ class APIHandler:
         )
 
         resp = ScanArtifactsResponse(
-            artifacts=action_result.result,
+            artifacts=[
+                ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(artifact)
+                for artifact in action_result.result
+            ],
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -78,13 +92,16 @@ class APIHandler:
         )
 
         resp = SearchArtifactsResponse(
-            artifacts=action_result.data,
+            artifacts=[
+                ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(artifact)
+                for artifact in action_result.data
+            ],
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     @auth_required_for_method
     @api_handler
-    async def scan_artifact_models(
+    async def scan_models(
         self,
         body: BodyParam[ScanArtifactModelsReq],
         processors_ctx: ProcessorsCtx,
@@ -98,7 +115,37 @@ class APIHandler:
         )
 
         resp = ScanArtifactModelsResponse(
-            artifacts=action_result.result,
+            artifacts=[
+                ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(artifact)
+                for artifact in action_result.result
+            ],
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def scan_single_model(
+        self,
+        path: PathParam[ScanArtifactModelPathParam],
+        query: QueryParam[ScanArtifactModelQueryParam],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        processors = processors_ctx.processors
+        model = ModelTarget(
+            model_id=path.parsed.model_id,
+            revision=query.parsed.revision,
+        )
+        action_result = await processors.artifact.retrieve_single_model.wait_for_complete(
+            RetrieveModelAction(
+                model=model,
+                registry_id=query.parsed.registry_id,
+            )
+        )
+
+        resp = RetreiveArtifactModelResponse(
+            artifact=ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(
+                action_result.result
+            )
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -113,5 +160,7 @@ def create_app(
     api_handler = APIHandler()
     cors.add(app.router.add_route("POST", "/scan", api_handler.scan_artifacts))
     cors.add(app.router.add_route("POST", "/search", api_handler.search_artifacts))
-    cors.add(app.router.add_route("POST", "/models/batch", api_handler.scan_artifact_models))
+
+    cors.add(app.router.add_route("GET", "/model/{model_id}", api_handler.scan_single_model))
+    cors.add(app.router.add_route("POST", "/models/batch", api_handler.scan_models))
     return app, []
