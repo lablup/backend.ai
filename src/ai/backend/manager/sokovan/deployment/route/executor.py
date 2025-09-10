@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -31,11 +32,13 @@ class RouteExecutor:
         scheduling_controller: SchedulingController,
         config_provider: ManagerConfigProvider,
         client_pool: ClientPool,
+        valkey_schedule: ValkeyScheduleClient,
     ):
         self._deployment_repo = deployment_repo
         self._scheduling_controller = scheduling_controller
         self._config_provider = config_provider
         self._client_pool = client_pool
+        self._valkey_schedule = valkey_schedule
 
     async def provision_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Provision routes by creating sessions.
@@ -154,6 +157,58 @@ class RouteExecutor:
                 )
                 continue
             successes.append(route)
+        return RouteExecutionResult(
+            successes=successes,
+            errors=errors,
+        )
+
+    async def check_route_health(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """
+        Check health status of routes using Redis health data.
+
+        Args:
+            routes: Routes to check health for
+
+        Returns:
+            Result containing healthy and unhealthy routes
+        """
+        successes: list[RouteData] = []
+        errors: list[RouteExecutionError] = []
+
+        # Get health status for all routes from Redis
+        route_ids = [str(route.route_id) for route in routes]
+        health_statuses = await self._valkey_schedule.get_routes_health_status(route_ids)
+
+        for route in routes:
+            route_id_str = str(route.route_id)
+            health_status = health_statuses.get(route_id_str, None)
+            if not health_status:
+                # No health data - Redis TTL expired, mark as unhealthy
+                errors.append(
+                    RouteExecutionError(
+                        route_info=route,
+                        reason="No health data available",
+                        error_detail="Health check data expired or not found",
+                    )
+                )
+                continue
+            if health_status.is_alive():
+                successes.append(route)
+            else:
+                # One or both checks failed
+                failure_reasons = []
+                if not health_status.readiness:
+                    failure_reasons.append("readiness check failed")
+                if not health_status.liveness:
+                    failure_reasons.append("liveness check failed")
+                errors.append(
+                    RouteExecutionError(
+                        route_info=route,
+                        reason="Health check failed",
+                        error_detail=", ".join(failure_reasons),
+                    )
+                )
+
         return RouteExecutionResult(
             successes=successes,
             errors=errors,

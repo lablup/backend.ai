@@ -1,5 +1,6 @@
-from collections.abc import Sequence
-from typing import Optional, Self
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from typing import Optional, Self, cast
 from uuid import UUID
 
 from glide import Batch, ExpirySet, ExpiryType
@@ -18,6 +19,18 @@ PENDING_QUEUE_EXPIRY_SEC = 600  # 10 minutes
 
 # Layer-specific decorator for valkey_schedule client
 valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_SCHEDULE)
+
+
+@dataclass
+class HealthStatus:
+    """Health status data for a route."""
+
+    readiness: bool
+    liveness: bool
+
+    def is_alive(self) -> bool:
+        """Check if the route is considered alive (both readiness and liveness are true)."""
+        return self.readiness and self.liveness
 
 
 class ValkeyScheduleClient:
@@ -83,6 +96,15 @@ class ValkeyScheduleClient:
         :return: The formatted key string
         """
         return f"route:{lifecycle_type}"
+
+    def _get_route_health_key(self, route_id: str) -> str:
+        """
+        Generate the Redis key for route health status.
+
+        :param route_id: The route ID
+        :return: The formatted key string
+        """
+        return f"route:health:{route_id}"
 
     @valkey_decorator()
     async def mark_schedule_needed(self, schedule_type: str) -> None:
@@ -244,6 +266,118 @@ class ValkeyScheduleClient:
         if results and len(results) > 0:
             return results[0] is not None
         return False
+
+    @valkey_decorator()
+    async def get_route_health_status(self, route_id: str) -> Optional[HealthStatus]:
+        """
+        Get health status for a route from Redis.
+
+        :param route_id: The route ID to check
+        :return: HealthStatus object or None if not found
+        """
+        key = self._get_route_health_key(route_id)
+        result = await self._client.client.hgetall(key)
+        if not result:
+            return None
+
+        # Convert bytes to strings and parse
+        data = {k.decode(): v.decode() for k, v in result.items()}
+
+        # Parse boolean values
+        readiness = data.get("readiness") == "1"
+        liveness = data.get("liveness") == "1"
+
+        return HealthStatus(readiness=readiness, liveness=liveness)
+
+    @valkey_decorator()
+    async def initialize_route_health_status(self, route_id: str, ttl: int = 120) -> None:
+        """
+        Initialize health status for a route in Redis with TTL.
+        This should only be called during initial route creation.
+        Always initializes with readiness=False and liveness=False.
+
+        :param route_id: The route ID to initialize
+        :param ttl: Time to live in seconds (default: 120)
+        """
+        key = self._get_route_health_key(route_id)
+        data: Mapping[str | bytes, str | bytes] = {
+            "readiness": "0",
+            "liveness": "0",
+        }
+        batch = Batch(is_atomic=True)
+        batch.hset(key, data)
+        batch.expire(key, ttl)
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_decorator()
+    async def get_routes_health_status(
+        self, route_ids: list[str]
+    ) -> Mapping[str, Optional[HealthStatus]]:
+        """
+        Get health status for multiple routes from Redis.
+
+        :param route_ids: List of route IDs to check
+        :return: Mapping of route ID to HealthStatus object or None if not found
+        """
+        if not route_ids:
+            return {}
+
+        batch = Batch(is_atomic=False)
+        for route_id in route_ids:
+            key = self._get_route_health_key(route_id)
+            batch.hgetall(key)
+        results = await self._client.client.exec(batch, raise_on_error=False)
+        if results is None:
+            return {route_id: None for route_id in route_ids}
+
+        health_statuses: dict[str, Optional[HealthStatus]] = {}
+        for route_id, result in zip(route_ids, results):
+            result = cast(dict[bytes, bytes], result)
+            if not result:
+                health_statuses[route_id] = None
+                continue
+            data = {k.decode(): v.decode() for k, v in result.items()}
+            health_statuses[route_id] = HealthStatus(
+                readiness=data.get("readiness") == "1", liveness=data.get("liveness") == "1"
+            )
+
+        return health_statuses
+
+    @valkey_decorator()
+    async def update_route_readiness(self, route_id: str, readiness: bool, ttl: int = 120) -> None:
+        """
+        Update readiness status for a route in Redis.
+        This should be called by app proxy after health check.
+
+        :param route_id: The route ID to update
+        :param readiness: Whether the route is ready
+        :param ttl: Time to live in seconds (default: 120)
+        """
+        key = self._get_route_health_key(route_id)
+        data: Mapping[str | bytes, str | bytes] = {"readiness": "1" if readiness else "0"}
+
+        batch = Batch(is_atomic=True)
+        batch.hset(key, data)
+        batch.expire(key, ttl)
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_decorator()
+    async def update_route_liveness(self, route_id: str, liveness: bool, ttl: int = 120) -> None:
+        """
+        Update liveness status for a route in Redis.
+        This should be called by agent after liveness check.
+
+        :param route_id: The route ID to update
+        :param liveness: Whether the route is alive
+        :param ttl: Time to live in seconds (default: 120)
+        """
+        key = self._get_route_health_key(route_id)
+        data: Mapping[str | bytes, str | bytes] = {"liveness": "1" if liveness else "0"}
+
+        batch = Batch(is_atomic=True)
+        batch.hset(key, data)
+        batch.expire(key, ttl)
+        await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_decorator()
     async def close(self) -> None:
