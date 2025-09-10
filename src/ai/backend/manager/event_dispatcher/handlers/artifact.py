@@ -2,13 +2,12 @@ import logging
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.event_types.artifact.anycast import (
-    ModelImportDoneEvent,
+    ModelMetadataFetchDoneEvent,
 )
 from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
@@ -34,54 +33,60 @@ class ArtifactEventHandler:
         self._huggingface_repository = huggingface_repository
         self._reservoir_repository = reservoir_repository
 
-    async def handle_artifact_import_done(
+    async def handle_model_metadata_fetch_done(
         self,
         context: None,
         source: AgentId,
-        event: ModelImportDoneEvent,
+        event: ModelMetadataFetchDoneEvent,
     ) -> None:
-        model_id = event.model_id
-        artifact_total_size = event.total_size
-
+        model_info = event.model
         try:
-            registry_type = ArtifactRegistryType(event.registry_type)
+            registry_type = ArtifactRegistryType(model_info.registry_type)
         except Exception:
             raise InvalidArtifactRegistryTypeError(
-                f"Unsupported artifact registry type: {event.registry_type}"
+                f"Unsupported artifact registry type: {model_info.registry_type}"
             )
 
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
                 registry_data = await self._huggingface_repository.get_registry_data_by_name(
-                    event.registry_name
+                    model_info.registry_name
                 )
             case ArtifactRegistryType.RESERVOIR:
                 registry_data = await self._reservoir_repository.get_registry_data_by_name(
-                    event.registry_name
+                    model_info.registry_name
                 )
 
         artifact = await self._artifact_repository.get_model_artifact(
-            model_id, registry_id=registry_data.id
+            model_info.model_id, registry_id=registry_data.id
         )
 
+        # Get the specific revision
         revision = await self._artifact_repository.get_artifact_revision(
-            artifact.id, revision=event.revision
+            artifact.id, revision=model_info.revision
         )
 
-        await self._artifact_repository.update_artifact_revision_bytesize(
-            revision.id, artifact_total_size
-        )
+        try:
+            # Update the README content
+            await self._artifact_repository.update_artifact_revision_readme(
+                revision.id, model_info.readme_content
+            )
 
-        await self._artifact_repository.update_artifact_revision_bytesize(
-            revision.id, artifact_total_size
-        )
-        await self._artifact_repository.update_artifact_revision_status(
-            revision.id, ArtifactStatus.PULLED
-        )
-        # TODO: Add verify step
-        await self._artifact_repository.update_artifact_revision_status(
-            revision.id, ArtifactStatus.VERIFYING
-        )
-        await self._artifact_repository.update_artifact_revision_status(
-            revision.id, ArtifactStatus.NEEDS_APPROVAL
-        )
+            # Update the file size
+            await self._artifact_repository.update_artifact_revision_bytesize(
+                revision.id, model_info.size
+            )
+
+            log.trace(
+                "Updated metadata for model: {} revision: {} in artifact: {} (size: {} bytes)",
+                model_info.model_id,
+                model_info.revision,
+                artifact.id,
+                model_info.size,
+            )
+        except Exception as model_error:
+            log.error(
+                "Failed to process metadata update for model: {} - {}",
+                model_info.model_id,
+                model_error,
+            )

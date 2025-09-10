@@ -3,22 +3,29 @@ from __future__ import annotations
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING
+from urllib.parse import unquote
 
 from aiohttp import web
 
 from ai.backend.common.api_handlers import (
     APIResponse,
     BodyParam,
+    PathParam,
+    QueryParam,
     api_handler,
 )
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
+    HuggingFaceRetrieveModelReqPathParam,
+    HuggingFaceRetrieveModelReqQueryParam,
     HuggingFaceRetrieveModelsReq,
     HuggingFaceScanModelsReq,
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
+    HuggingFaceRetrieveModelResponse,
     HuggingFaceRetrieveModelsResponse,
     HuggingFaceScanModelsResponse,
 )
@@ -51,7 +58,7 @@ class HuggingFaceRegistryAPIHandler:
         """
         Scan HuggingFace registry and return metadata.
         """
-        await log_client_api_entry(log, "scan", body.parsed)
+        await log_client_api_entry(log, "scan_models", body.parsed)
 
         models = await self._huggingface_service.scan_models(
             registry_name=body.parsed.registry_name,
@@ -70,6 +77,35 @@ class HuggingFaceRegistryAPIHandler:
         )
 
     @api_handler
+    async def retrieve_model(
+        self,
+        path: PathParam[HuggingFaceRetrieveModelReqPathParam],
+        query: QueryParam[HuggingFaceRetrieveModelReqQueryParam],
+    ) -> APIResponse:
+        """
+        Retrieve HuggingFace registry model data.
+        """
+        await log_client_api_entry(log, "retrieve_model", path.parsed.model_id)
+
+        model_id = unquote(path.parsed.model_id)
+        model_data = await self._huggingface_service.retrieve_model(
+            registry_name=query.parsed.registry_name,
+            model=ModelTarget(
+                model_id=model_id,
+                revision=query.parsed.revision,
+            ),
+        )
+
+        response = HuggingFaceRetrieveModelResponse(
+            model=model_data,
+        )
+
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=response,
+        )
+
+    @api_handler
     async def retrieve_models(
         self,
         body: BodyParam[HuggingFaceRetrieveModelsReq],
@@ -77,7 +113,7 @@ class HuggingFaceRegistryAPIHandler:
         """
         Retrieve HuggingFace registry model data.
         """
-        await log_client_api_entry(log, "retrieve", body.parsed)
+        await log_client_api_entry(log, "retrieve_models", body.parsed)
 
         model_datas = await self._huggingface_service.retrieve_models(
             registry_name=body.parsed.registry_name,
@@ -101,7 +137,7 @@ class HuggingFaceRegistryAPIHandler:
         """
         Import multiple HuggingFace models to storage in batch.
         """
-        await log_client_api_entry(log, "import_models_batch", body.parsed)
+        await log_client_api_entry(log, "import_models", body.parsed)
 
         task_id = await self._huggingface_service.import_models_batch(
             registry_name=body.parsed.registry_name,
@@ -145,5 +181,6 @@ def create_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/scan", huggingface_api_handler.scan_models)
     app.router.add_route("POST", "/import", huggingface_api_handler.import_models)
 
+    app.router.add_route("GET", "/model/{model_id}", huggingface_api_handler.retrieve_model)
     app.router.add_route("POST", "/models/batch", huggingface_api_handler.retrieve_models)
     return app

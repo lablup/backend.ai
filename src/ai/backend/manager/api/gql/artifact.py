@@ -765,11 +765,9 @@ async def scan_artifacts(
 
     artifacts = []
     for item in action_result.result:
-        registry_data = await registry_meta_loader.load(item.artifact.registry_id)
-        source_registry_data = await registry_meta_loader.load(item.artifact.source_registry_id)
-        artifacts.append(
-            Artifact.from_dataclass(item.artifact, registry_data.url, source_registry_data.url)
-        )
+        registry_data = await registry_meta_loader.load(item.registry_id)
+        source_registry_data = await registry_meta_loader.load(item.source_registry_id)
+        artifacts.append(Artifact.from_dataclass(item, registry_data.url, source_registry_data.url))
     return ScanArtifactsPayload(artifacts=artifacts)
 
 

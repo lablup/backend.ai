@@ -83,6 +83,7 @@ class PresignedDownloadObjectReq(BaseRequestModel):
     key: str = Field(
         description="The object key (path) within the bucket to download the file from."
     )
+    expiration: Optional[int] = Field(default=None, description="Token expiration time in seconds")
 
 
 class GetObjectMetaReq(BaseRequestModel):
@@ -150,6 +151,29 @@ class HuggingFaceRetrieveModelsReq(BaseRequestModel):
             {"model_id": "microsoft/DialoGPT-medium", "revision": "main"},
         ],
     )
+
+
+class HuggingFaceRetrieveModelReqPathParam(BaseRequestModel):
+    """
+    Path parameters for retrieving a specific HuggingFace model.
+    """
+
+    model_id: str = Field(description="The model to scan from the registry.")
+
+
+class HuggingFaceRetrieveModelReqQueryParam(BaseRequestModel):
+    """
+    Query parameters for retrieving a specific HuggingFace model.
+    """
+
+    registry_name: str = Field(
+        description="""
+        Name of the HuggingFace registry to scan.
+        This should match the configured registry name in the system.
+        """,
+        examples=["huggingface", "my-huggingface-registry"],
+    )
+    revision: str = Field(description="The model revision to scan from the registry.")
 
 
 class HuggingFaceImportModelsReq(BaseRequestModel):

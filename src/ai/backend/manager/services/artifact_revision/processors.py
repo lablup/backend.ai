@@ -27,6 +27,10 @@ from ai.backend.manager.services.artifact_revision.actions.get import (
     GetArtifactRevisionAction,
     GetArtifactRevisionActionResult,
 )
+from ai.backend.manager.services.artifact_revision.actions.get_readme import (
+    GetArtifactRevisionReadmeAction,
+    GetArtifactRevisionReadmeActionResult,
+)
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
     ImportArtifactRevisionAction,
     ImportArtifactRevisionActionResult,
@@ -44,6 +48,9 @@ from ai.backend.manager.services.artifact_revision.service import ArtifactRevisi
 
 class ArtifactRevisionProcessors(AbstractProcessorPackage):
     get: ActionProcessor[GetArtifactRevisionAction, GetArtifactRevisionActionResult]
+    get_readme: ActionProcessor[
+        GetArtifactRevisionReadmeAction, GetArtifactRevisionReadmeActionResult
+    ]
     list_revision: ActionProcessor[ListArtifactRevisionsAction, ListArtifactRevisionsActionResult]
     approve: ActionProcessor[ApproveArtifactRevisionAction, ApproveArtifactRevisionActionResult]
     reject: ActionProcessor[RejectArtifactRevisionAction, RejectArtifactRevisionActionResult]
@@ -63,6 +70,7 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
         self, service: ArtifactRevisionService, action_monitors: list[ActionMonitor]
     ) -> None:
         self.get = ActionProcessor(service.get, action_monitors)
+        self.get_readme = ActionProcessor(service.get_readme, action_monitors)
         self.list_revision = ActionProcessor(service.list_revision, action_monitors)
         self.approve = ActionProcessor(service.approve, action_monitors)
         self.reject = ActionProcessor(service.reject, action_monitors)
@@ -80,6 +88,7 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             GetArtifactRevisionAction.spec(),
+            GetArtifactRevisionReadmeAction.spec(),
             ListArtifactRevisionsAction.spec(),
             ApproveArtifactRevisionAction.spec(),
             RejectArtifactRevisionAction.spec(),

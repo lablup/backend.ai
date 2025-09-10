@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from contextlib import asynccontextmanager as actxmgr
 from typing import Any, AsyncIterator, Optional
+from urllib.parse import quote
 
 import aiohttp
 
@@ -10,6 +11,8 @@ from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     DownloadObjectReq,
     HuggingFaceImportModelsReq,
+    HuggingFaceRetrieveModelReqPathParam,
+    HuggingFaceRetrieveModelReqQueryParam,
     HuggingFaceRetrieveModelsReq,
     HuggingFaceScanModelsReq,
     PresignedDownloadObjectReq,
@@ -18,6 +21,7 @@ from ai.backend.common.dto.storage.request import (
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
+    HuggingFaceRetrieveModelResponse,
     HuggingFaceRetrieveModelsResponse,
     HuggingFaceScanModelsResponse,
     PresignedDownloadObjectResponse,
@@ -680,6 +684,27 @@ class StorageProxyManagerFacingClient:
             body=req.model_dump(by_alias=True),
         )
         return HuggingFaceRetrieveModelsResponse.model_validate(resp)
+
+    @client_decorator()
+    async def retrieve_huggingface_model(
+        self,
+        path: HuggingFaceRetrieveModelReqPathParam,
+        query: HuggingFaceRetrieveModelReqQueryParam,
+    ) -> HuggingFaceRetrieveModelResponse:
+        """
+        Retreive HuggingFace single model in the specified registry.
+        """
+        encoded_model_id = quote(path.model_id, safe="")
+
+        resp = await self._client.request_with_response(
+            "GET",
+            f"v1/registries/huggingface/model/{encoded_model_id}",
+            params={
+                "registry_name": query.registry_name,
+                "revision": query.revision,
+            },
+        )
+        return HuggingFaceRetrieveModelResponse.model_validate(resp)
 
     @client_decorator()
     async def import_huggingface_models(

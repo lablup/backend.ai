@@ -1695,6 +1695,182 @@
         "description": "\n**Preconditions:**\n* Manager status required: RUNNING\n"
       }
     },
+    "/artifacts/revisions/cleanup": {
+      "post": {
+        "operationId": "artifacts.cleanup_artifacts",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifacts/revisions/{artifact_revision_id}/approval": {
+      "post": {
+        "operationId": "artifacts.approve_artifact_revision",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifacts/revisions/{artifact_revision_id}/rejection": {
+      "post": {
+        "operationId": "artifacts.reject_artifact_revision",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifacts/task/cancel": {
+      "post": {
+        "operationId": "artifacts.cancel_import_artifact",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifacts/import": {
+      "post": {
+        "operationId": "artifacts.import_artifacts",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifacts/{artifact_id}": {
+      "patch": {
+        "operationId": "artifacts.update_artifact",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifacts/revisions/{artifact_revision_id}/readme": {
+      "get": {
+        "operationId": "artifacts.get_artifact_revision_readme",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/artifact-registries/scan": {
       "post": {
         "operationId": "artifact-registries.scan_artifacts",
@@ -1718,6 +1894,55 @@
     "/artifact-registries/search": {
       "post": {
         "operationId": "artifact-registries.search_artifacts",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifact-registries/model/{model_id}": {
+      "get": {
+        "operationId": "artifact-registries.scan_single_model",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifact-registries/models/batch": {
+      "post": {
+        "operationId": "artifact-registries.scan_models",
         "tags": [
           "artifact-registries"
         ],

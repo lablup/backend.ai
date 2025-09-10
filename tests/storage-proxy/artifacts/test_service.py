@@ -137,6 +137,7 @@ def mock_model_info() -> ModelData:
         tags=["pytorch", "text-generation"],
         created_at=datetime(2021, 1, 1),
         modified_at=datetime(2023, 6, 15),
+        size=2048000,
     )
 
 
@@ -756,9 +757,6 @@ class TestReservoirService:
 
         with (
             patch.object(reservoir_service, "_stream_bucket_to_bucket") as mock_stream,
-            patch.object(
-                reservoir_service._event_producer, "anycast_event", new=AsyncMock()
-            ) as mock_event,
         ):
             mock_stream.return_value = 1000
 
@@ -771,7 +769,6 @@ class TestReservoirService:
             )
 
             mock_stream.assert_called_once()
-            mock_event.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_import_model_no_registry_config(self) -> None:
