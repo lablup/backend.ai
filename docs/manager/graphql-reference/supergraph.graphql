@@ -4705,7 +4705,6 @@ type ResourceLimit
 {
   key: String
   min: String
-  max: String
 }
 
 input ResourceLimitInput
@@ -4713,7 +4712,6 @@ input ResourceLimitInput
 {
   key: String
   min: String
-  max: String
 }
 
 type ResourcePreset

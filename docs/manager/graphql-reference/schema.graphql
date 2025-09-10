@@ -644,7 +644,6 @@ scalar BigInt
 type ResourceLimit {
   key: String
   min: String
-  max: String
 }
 
 """
@@ -2913,7 +2912,6 @@ input KVPairInput {
 input ResourceLimitInput {
   key: String
   min: String
-  max: String
 }
 
 """Added in 25.6.0."""
