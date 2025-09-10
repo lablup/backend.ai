@@ -31,6 +31,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
+from ai.backend.manager.errors.artifact import ArtifactScanLimitExceededError
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
     ArtifactOrderingOptions,
@@ -752,7 +753,7 @@ async def scan_artifacts(
     input: ScanArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ScanArtifactsPayload:
     if input.limit > ARTIFACT_MAX_SCAN_LIMIT:
-        raise ValueError(f"Limit cannot exceed {ARTIFACT_MAX_SCAN_LIMIT}")
+        raise ArtifactScanLimitExceededError(f"Limit cannot exceed {ARTIFACT_MAX_SCAN_LIMIT}")
 
     action_result = await info.context.processors.artifact.scan.wait_for_complete(
         ScanArtifactsAction(
