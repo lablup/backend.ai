@@ -715,7 +715,7 @@ class ArtifactRepository:
             return artifact_revision_id
 
     @repository_decorator()
-    async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> Optional[str]:
+    async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> str:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
                 sa.select(ArtifactRevisionRow.readme).where(
