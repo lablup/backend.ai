@@ -67,6 +67,8 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.models.hasher.types import PasswordInfo
 
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import GenericForbidden
@@ -1356,6 +1358,8 @@ async def populate_fixture(
         if not rows:
             return
         log.debug("Loading the fixture table {0} (mode:{1})", table_name, op_mode.name)
+        from .user import PasswordColumn
+
         async with engine.begin() as conn:
             # Apply typedecorator manually for required columns
             for col in table.columns:
@@ -1387,6 +1391,17 @@ async def populate_fixture(
                                 else col.type._schema.from_json(item)
                                 for item in row[col.name]
                             ]
+                elif isinstance(col.type, PasswordColumn):
+                    for row in rows:
+                        if col.name in row and row[col.name] is not None:
+                            # Convert raw password string to PasswordInfo
+                            # Using default algorithm and parameters for fixtures
+                            row[col.name] = PasswordInfo(
+                                password=row[col.name],
+                                algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                                rounds=600_000,
+                                salt_size=32,
+                            )
 
             match op_mode:
                 case FixtureOpModes.INSERT:

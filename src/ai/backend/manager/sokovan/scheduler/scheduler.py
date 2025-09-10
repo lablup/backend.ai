@@ -79,6 +79,7 @@ from .types import (
     SessionAllocation,
     SessionDataForPull,
     SessionDataForStart,
+    SessionRunningData,
     SessionWorkload,
     SystemSnapshot,
 )
@@ -620,20 +621,6 @@ class Scheduler:
 
             session_results.append(session_result)
 
-        # Batch update database with termination results
-        await self._repository.batch_update_terminated_status(session_results)
-
-        # Count successfully terminated sessions
-        terminated_session_count = sum(
-            1 for result in session_results if result.should_terminate_session
-        )
-
-        log.info(
-            "Terminated {} sessions (partial: {})",
-            terminated_session_count,
-            len(session_results) - terminated_session_count,
-        )
-
         # Convert only successfully terminated sessions to ScheduledSessionData format
         scheduled_data = [
             ScheduledSessionData(
@@ -783,7 +770,7 @@ class Scheduler:
         if not sessions_data:
             return ScheduleResult()
 
-        sessions_to_update: list[SessionId] = []
+        sessions_running_data: list[SessionRunningData] = []
 
         hook_coroutines = [
             self._hook_registry.get_hook(session_data.session_type).on_transition_to_running(
@@ -802,20 +789,32 @@ class Scheduler:
                     result,
                 )
                 continue
-            sessions_to_update.append(session_data.session_id)
 
-        if sessions_to_update:
-            await self._repository.update_sessions_to_running(sessions_to_update)
+            # Calculate total occupying_slots from all kernels
+            total_occupying_slots = ResourceSlot()
+            for kernel in session_data.kernels:
+                if kernel.occupied_slots:
+                    total_occupying_slots += kernel.occupied_slots
+
+            sessions_running_data.append(
+                SessionRunningData(
+                    session_id=session_data.session_id,
+                    occupying_slots=total_occupying_slots,
+                )
+            )
+
+        if sessions_running_data:
+            await self._repository.update_sessions_to_running(sessions_running_data)
             # Convert updated sessions to ScheduledSessionData format
             scheduled_data = [
                 ScheduledSessionData(
-                    session_id=session.session_id,
-                    creation_id=session.creation_id,
-                    access_key=session.access_key,
+                    session_id=session_data.session_id,
+                    creation_id=session_data.creation_id,
+                    access_key=session_data.access_key,
                     reason="triggered-by-scheduler",
                 )
-                for session in sessions_data
-                if session.session_id in sessions_to_update
+                for session_data in sessions_data
+                if any(srd.session_id == session_data.session_id for srd in sessions_running_data)
             ]
             return ScheduleResult(scheduled_sessions=scheduled_data)
 
@@ -837,6 +836,7 @@ class Scheduler:
             return ScheduleResult()
 
         sessions_to_update: list[SessionId] = []
+        log.info("session types to terminate: {}", [s.session_type for s in sessions_data])
 
         hook_coroutines = [
             self._hook_registry.get_hook(session_data.session_type).on_transition_to_terminated(

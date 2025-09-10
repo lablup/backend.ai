@@ -115,7 +115,7 @@ class ArtifactRevisionRow(Base):
             artifact_id=artifact_id,
             version=model_data.revision,
             readme=model_data.readme,
-            size=None,  # will be populated later
+            size=model_data.size,
             status=ArtifactStatus.SCANNED.value,
             created_at=model_data.created_at,
             updated_at=model_data.modified_at,

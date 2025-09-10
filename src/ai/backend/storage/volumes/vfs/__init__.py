@@ -230,14 +230,11 @@ class BaseFSOpModel(AbstractFSOpModel):
         self,
         path: Path,
     ) -> None:
-        if self.watcher is not None:
-            await self.watcher.request_task(DeletePathTask(path))
-        else:
-            loop = asyncio.get_running_loop()
-            try:
-                await loop.run_in_executor(None, lambda: shutil.rmtree(path))
-            except FileNotFoundError:
-                pass
+        loop = asyncio.get_running_loop()
+        try:
+            await loop.run_in_executor(None, lambda: shutil.rmtree(path))
+        except FileNotFoundError:
+            pass
 
     def scan_tree(
         self,

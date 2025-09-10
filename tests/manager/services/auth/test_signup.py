@@ -4,7 +4,7 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
+from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.errors.auth import EmailAlreadyExistsError, UserCreationError
 from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.models.user import UserRole, UserStatus
@@ -20,20 +20,16 @@ def generate_fake_keypair():
 
 
 @pytest.fixture
-def mock_hook_plugin_ctx():
-    return MagicMock(spec=HookPluginContext)
-
-
-@pytest.fixture
 def mock_auth_repository():
     return AsyncMock(spec=AuthRepository)
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository):
+def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
+        config_provider=mock_config_provider,
     )
 
 

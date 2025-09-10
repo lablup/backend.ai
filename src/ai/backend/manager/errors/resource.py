@@ -187,3 +187,15 @@ class ScalingGroupProxyTargetNotFound(ObjectNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class ResourcePresetNotFound(ObjectNotFound):
+    object_name = "resource preset"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.RESOURCE_PRESET,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )

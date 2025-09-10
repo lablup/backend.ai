@@ -8,7 +8,7 @@ from ai.backend.common.dto.storage.request import (
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.artifact.types import ArtifactStatus
+from ai.backend.manager.data.artifact.types import ArtifactRevisionReadme, ArtifactStatus
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
@@ -43,6 +43,10 @@ from ai.backend.manager.services.artifact_revision.actions.disassociate_with_sto
 from ai.backend.manager.services.artifact_revision.actions.get import (
     GetArtifactRevisionAction,
     GetArtifactRevisionActionResult,
+)
+from ai.backend.manager.services.artifact_revision.actions.get_readme import (
+    GetArtifactRevisionReadmeAction,
+    GetArtifactRevisionReadmeActionResult,
 )
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
     ImportArtifactRevisionAction,
@@ -87,6 +91,15 @@ class ArtifactRevisionService:
             action.artifact_revision_id
         )
         return GetArtifactRevisionActionResult(revision=revision)
+
+    async def get_readme(
+        self, action: GetArtifactRevisionReadmeAction
+    ) -> GetArtifactRevisionReadmeActionResult:
+        readme = await self._artifact_repository.get_artifact_revision_readme(
+            action.artifact_revision_id
+        )
+        readme_data = ArtifactRevisionReadme(readme=readme)
+        return GetArtifactRevisionReadmeActionResult(readme_data=readme_data)
 
     async def list_revision(
         self, action: ListArtifactRevisionsAction
@@ -233,7 +246,7 @@ class ArtifactRevisionService:
         )
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
 
-        key = f"{artifact_data.name}/{revision_data.version}"
+        key = f"{artifact_data.name}/{revision_data.version}/"
 
         try:
             await storage_proxy_client.delete_s3_object(

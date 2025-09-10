@@ -5,7 +5,6 @@ from aiohttp import web
 
 from ai.backend.common.dto.manager.auth.field import AuthTokenType
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.types import AuthorizationResult
 from ai.backend.manager.services.auth.actions.base import AuthAction
 
@@ -18,7 +17,6 @@ class AuthorizeAction(AuthAction):
     email: str
     password: str
     stoken: Optional[str]
-    auth_config: Optional[AuthConfig]
 
     @override
     def entity_id(self) -> Optional[str]:

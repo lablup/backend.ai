@@ -81,6 +81,20 @@ enum ArtifactOrderField {
 }
 
 """Added in 25.14.0"""
+type ArtifactRegistry {
+  """Name of the default artifact registry."""
+  name: String!
+
+  """Type of the default artifact registry."""
+  type: ArtifactRegistryType!
+}
+
+enum ArtifactRegistryType {
+  HUGGINGFACE
+  RESERVOIR
+}
+
+"""Added in 25.14.0"""
 type ArtifactRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -375,6 +389,7 @@ extend type EndpointToken @key(fields: "token") {
 input GetPresignedDownloadURLInput {
   artifactRevisionId: ID!
   key: String!
+  expiration: Int = null
 }
 
 """Added in 25.14.0"""
@@ -842,6 +857,9 @@ type Query {
 
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
+
+  """Added in 25.14.0"""
+  defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
 }
 
 type RawServiceConfig {

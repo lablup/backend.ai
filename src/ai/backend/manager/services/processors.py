@@ -207,9 +207,6 @@ class Services:
             repositories.project_resource_policy.repository
         )
         resource_preset_service = ResourcePresetService(
-            args.db,
-            args.agent_registry,
-            args.config_provider,
             repositories.resource_preset.repository,
         )
         utilization_metric_service = UtilizationMetricService(
@@ -235,6 +232,7 @@ class Services:
         auth = AuthService(
             hook_plugin_ctx=args.hook_plugin_ctx,
             auth_repository=repositories.auth.repository,
+            config_provider=args.config_provider,
         )
         object_storage_service = ObjectStorageService(
             artifact_repository=repositories.artifact.repository,

@@ -155,7 +155,7 @@ class ObjectStorageService:
         result = await storage_proxy_client.get_s3_presigned_download_url(
             storage_data.name,
             storage_namespace.bucket,
-            PresignedDownloadObjectReq(key=str(object_path)),
+            PresignedDownloadObjectReq(key=str(object_path), expiration=action.expiration),
         )
 
         return GetDownloadPresignedURLActionResult(

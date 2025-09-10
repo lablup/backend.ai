@@ -17,7 +17,6 @@ from ai.backend.common.data.storage.registries.types import (
     ModelTarget,
 )
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
 from ai.backend.common.types import DispatchResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.huggingface import (
@@ -180,7 +179,40 @@ class HuggingFaceService:
             limit=limit, search=search, sort=sort
         )
 
+        # Start background task to download metadata and fire event when complete
+        if models:
+            scanner = self._make_scanner(registry_name)
+            asyncio.create_task(
+                scanner.download_metadata_batch(models, registry_name, self._event_producer)
+            )
+
         return models
+
+    async def retrieve_model(
+        self,
+        registry_name: str,
+        model: ModelTarget,
+    ) -> ModelData:
+        """
+        Retrieve specific model by their model_id and revision.
+        For single model, fetch metadata immediately with full data
+
+        Args:
+            registry_name: Name of the HuggingFace registry
+            model: ModelTarget object with model_id and revision
+
+        Returns:
+            List of ModelData objects with complete metadata
+
+        Raises:
+            HuggingFaceModelNotFoundError: If any model is not found
+            HuggingFaceAPIError: If API call fails
+        """
+        log.info("Retrieving single HuggingFace model: {}", model)
+        scanner = self._make_scanner(registry_name)
+        model_data = await scanner.scan_model(model)
+        log.debug(f"Successfully retrieved single model with metadata: {model}")
+        return model_data
 
     async def retrieve_models(
         self,
@@ -204,15 +236,23 @@ class HuggingFaceService:
 
         scanner = self._make_scanner(registry_name)
         retrieved_models = []
-
+        # For multiple models, get basic model data first then start background metadata processing
         for model in models:
             try:
-                model_data = await scanner.scan_model(model)
+                model_data = await scanner.scan_model_without_metadata(model)
                 retrieved_models.append(model_data)
-                log.debug(f"Successfully retrieved model: {model}")
+                log.debug(f"Successfully retrieved basic model data: {model}")
             except Exception as e:
                 log.error(f"Failed to retrieve model {model}: {str(e)}")
                 raise
+
+        # Start background metadata processing for multiple models
+        if retrieved_models:
+            asyncio.create_task(
+                scanner.download_metadata_batch(
+                    retrieved_models, registry_name, self._event_producer
+                )
+            )
 
         log.info(f"Successfully retrieved {len(retrieved_models)} models")
         return retrieved_models
@@ -293,8 +333,6 @@ class HuggingFaceService:
         chunk_size = registry_config.download_chunk_size
 
         artifact_total_size = 0
-        model_id = model.model_id
-        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
             log.info(f"Rescanning model for latest metadata: {model}")
             scanner = self._make_scanner(registry_name)
@@ -335,16 +373,6 @@ class HuggingFaceService:
 
             if failed_uploads > 0:
                 log.warning(f"Some files failed to import: {model}, failed_count={failed_uploads}")
-
-            await self._event_producer.anycast_event(
-                ModelImportDoneEvent(
-                    model_id=model_id,
-                    revision=revision,
-                    registry_name=registry_name,
-                    registry_type=ArtifactRegistryType.HUGGINGFACE,
-                    total_size=artifact_total_size,
-                )
-            )
 
         except HuggingFaceModelNotFoundError:
             raise
