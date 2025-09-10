@@ -38,7 +38,6 @@ class ModelsMetadataFetchDoneEvent(BaseArtifactEvent):
         return "models_metadata_fetch_done"
 
     def serialize(self) -> tuple:
-        """Serialize the event data to tuple"""
         return (
             tuple(
                 (
