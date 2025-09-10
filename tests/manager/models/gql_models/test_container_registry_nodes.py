@@ -65,6 +65,7 @@ async def get_graphquery_context(
         metric_observer=GraphQLMetricObserver.instance(),
         processors=None,  # type: ignore
         scheduler_repository=None,  # type: ignore
+        user_repository=None,  # type: ignore
     )
 
 
