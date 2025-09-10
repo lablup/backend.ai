@@ -8,7 +8,6 @@ from typing import (
 )
 
 import graphene
-import graphene_federation
 
 from ai.backend.common.contexts.user import current_user
 
@@ -21,7 +20,6 @@ if TYPE_CHECKING:
 __all__ = ("Viewer",)
 
 
-@graphene_federation.key("user_id")
 class Viewer(graphene.ObjectType):
     class Meta:
         description = "Added in 25.14.0."
