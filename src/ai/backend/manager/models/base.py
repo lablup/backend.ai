@@ -800,7 +800,6 @@ class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
 class ResourceLimit(graphene.ObjectType):
     key = graphene.String()
     min = graphene.String()
-    max = graphene.String()
 
 
 class KVPair(graphene.ObjectType):
@@ -811,7 +810,6 @@ class KVPair(graphene.ObjectType):
 class ResourceLimitInput(graphene.InputObjectType):
     key = graphene.String()
     min = graphene.String()
-    max = graphene.String()
 
 
 class KVPairInput(graphene.InputObjectType):
