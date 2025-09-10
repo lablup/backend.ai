@@ -16,7 +16,9 @@ from ai.backend.common.api_handlers import (
 )
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisionsResponse
+from ai.backend.manager.data.artifact.types import (
+    ArtifactDataWithRevisionsResponse,
+)
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.request import (
     ScanArtifactModelPathParam,
@@ -142,11 +144,7 @@ class APIHandler:
             )
         )
 
-        resp = RetreiveArtifactModelResponse(
-            artifact=ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(
-                action_result.result
-            )
-        )
+        resp = RetreiveArtifactModelResponse(artifact=action_result.result)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
 

@@ -3,6 +3,7 @@ from typing import Optional
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
+    ArtifactDataWithRevisions,
     ArtifactDataWithRevisionsResponse,
     ArtifactRevisionResponseData,
 )
@@ -25,7 +26,7 @@ class RetreiveArtifactModelsResponse(BaseResponseModel):
 
 
 class RetreiveArtifactModelResponse(BaseResponseModel):
-    artifact: ArtifactDataWithRevisionsResponse
+    artifact: ArtifactDataWithRevisions
 
 
 class CleanupArtifactsResponse(BaseResponseModel):
