@@ -30,6 +30,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
     ArtifactType,
 )
+from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
     ArtifactOrderingOptions,
@@ -161,7 +162,7 @@ class ArtifactRevisionOrderBy:
 @strawberry.input(description="Added in 25.14.0")
 class ScanArtifactsInput:
     registry_id: Optional[ID] = None
-    limit: int
+    limit: int = strawberry.field(description="Maximum number of artifacts to scan (max: 500)")
     artifact_type: Optional[ArtifactType] = None
     search: Optional[str] = None
 
@@ -748,6 +749,9 @@ async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Optiona
 async def scan_artifacts(
     input: ScanArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ScanArtifactsPayload:
+    if input.limit > ARTIFACT_MAX_SCAN_LIMIT:
+        raise ValueError(f"Limit cannot exceed {ARTIFACT_MAX_SCAN_LIMIT}")
+
     action_result = await info.context.processors.artifact.scan.wait_for_complete(
         ScanArtifactsAction(
             artifact_type=input.artifact_type,
