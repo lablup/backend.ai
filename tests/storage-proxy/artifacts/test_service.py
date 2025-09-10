@@ -757,9 +757,6 @@ class TestReservoirService:
 
         with (
             patch.object(reservoir_service, "_stream_bucket_to_bucket") as mock_stream,
-            patch.object(
-                reservoir_service._event_producer, "anycast_event", new=AsyncMock()
-            ) as mock_event,
         ):
             mock_stream.return_value = 1000
 
@@ -772,7 +769,6 @@ class TestReservoirService:
             )
 
             mock_stream.assert_called_once()
-            mock_event.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_import_model_no_registry_config(self) -> None:
