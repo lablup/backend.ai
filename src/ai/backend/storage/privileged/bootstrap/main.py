@@ -31,6 +31,12 @@ from .stage.event_dispatcher import (
     EventDispatcherSpecGenerator,
     EventDispatcherStage,
 )
+from .stage.event_registry import (
+    EventRegistryProvisioner,
+    EventRegistrySpec,
+    EventRegistrySpecGenerator,
+    EventRegistryStage,
+)
 from .stage.logger import (
     LoggerProvisioner,
     LoggerResult,
@@ -175,6 +181,14 @@ class BootstrapProvisioner(Provisioner[BootstrapSpec, BootstrapResult]):
         )
         await bgtask_manager_stage.setup(BgtaskManagerSpecGenerator(bgtask_manager_spec))
         bgtask_manager_result = await bgtask_manager_stage.wait_for_resource()
+
+        event_registry_stage = EventRegistryStage(EventRegistryProvisioner())
+        event_registry_spec = EventRegistrySpec(
+            bgtask_mgr=bgtask_manager_result.bgtask_mgr,
+            event_dispatcher=event_dispatcher_result.event_dispatcher,
+        )
+        await event_registry_stage.setup(EventRegistrySpecGenerator(event_registry_spec))
+        await event_registry_stage.wait_for_resource()
 
         return BootstrapResult(
             logger=logger_result,

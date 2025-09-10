@@ -398,6 +398,8 @@ async def create_vfolder(request: web.Request) -> web.Response:
 
 
 async def delete_vfolder(request: web.Request) -> web.Response:
+    # TODO: Deprecate this function
+
     class Params(TypedDict):
         volume: str
         vfid: VFolderID
@@ -1190,7 +1192,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("PATCH", "/quota-scope", update_quota_scope)
     app.router.add_route("DELETE", "/quota-scope/quota", unset_quota)
     app.router.add_route("POST", "/folder/create", create_vfolder)
-    app.router.add_route("POST", "/folder/delete", delete_vfolder)
+    app.router.add_route("POST", "/folder/delete", delete_vfolder)  # TODO: Deprecate this API
     app.router.add_route("POST", "/folder/clone", clone_vfolder)
     app.router.add_route("GET", "/folder/mount", get_vfolder_mount)
     app.router.add_route("GET", "/volume/performance-metric", get_performance_metric)
