@@ -1842,6 +1842,35 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/artifacts/revisions/{artifact_revision_id}/readme": {
+      "get": {
+        "operationId": "artifacts.get_artifact_revision_readme",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/artifact-registries/scan": {
       "post": {
         "operationId": "artifact-registries.scan_artifacts",
@@ -1882,9 +1911,38 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/artifact-registries/model/{model_id}": {
+      "get": {
+        "operationId": "artifact-registries.scan_single_model",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "model_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/artifact-registries/models/batch": {
       "post": {
-        "operationId": "artifact-registries.scan_artifact_models",
+        "operationId": "artifact-registries.scan_models",
         "tags": [
           "artifact-registries"
         ],
