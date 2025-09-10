@@ -4900,6 +4900,8 @@ input ScanArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
   registryId: ID = null
+
+  """Maximum number of artifacts to scan (max: 500)"""
   limit: Int!
   artifactType: ArtifactType = null
   search: String = null

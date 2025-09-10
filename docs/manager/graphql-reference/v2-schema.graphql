@@ -982,6 +982,8 @@ type ScanArtifactModelsPayload {
 """Added in 25.14.0"""
 input ScanArtifactsInput {
   registryId: ID = null
+
+  """Maximum number of artifacts to scan (max: 500)"""
   limit: Int!
   artifactType: ArtifactType = null
   search: String = null
