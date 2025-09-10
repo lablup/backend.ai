@@ -203,9 +203,10 @@ class ArtifactService:
                         for response_revision in response_artifact.revisions:
                             # Get readme for this revision from reservoir
                             try:
-                                readme = await remote_reservoir_client.get_readme(
+                                readme_resp = await remote_reservoir_client.get_readme(
                                     response_revision.id
                                 )
+                                readme = readme_resp.readme
                             except Exception as e:
                                 log.warning(
                                     "Failed to fetch readme for artifact {} revision {}: {}",
