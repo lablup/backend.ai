@@ -4705,7 +4705,7 @@ type ResourceLimit
 {
   key: String
   min: String
-  max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed.")
+  max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete.")
 }
 
 input ResourceLimitInput
@@ -4713,7 +4713,7 @@ input ResourceLimitInput
 {
   key: String
   min: String
-  max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed.")
+  max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete.")
 }
 
 type ResourcePreset
