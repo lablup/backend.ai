@@ -7,6 +7,7 @@ from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import ArtifactType
+from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
 from ai.backend.manager.types import PaginationOptions, TriState
 
 
@@ -15,7 +16,10 @@ class ScanArtifactsReq(BaseRequestModel):
         default=None, description="The unique identifier of the artifact registry to scan."
     )
     artifact_type: Optional[ArtifactType] = None
-    limit: int
+    limit: int = Field(
+        lt=ARTIFACT_MAX_SCAN_LIMIT,
+        description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})",
+    )
     search: Optional[str] = None
 
 
