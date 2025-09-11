@@ -74,7 +74,7 @@ async def gather_prometheus_inference_measures(
             continue
         async with aiohttp.ClientSession() as session:
             async with session.get(
-                f"http://{route.kernel_host}:{route.kernel_port}/metrics"
+                f"http://{route.current_kernel_host}:{route.kernel_port}/metrics"
             ) as resp:
                 resp.raise_for_status()
                 metrics_text = await resp.text()

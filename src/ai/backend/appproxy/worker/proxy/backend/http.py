@@ -93,10 +93,10 @@ class HTTPBackend(BaseBackend):
         self, route: RouteInfo, request: HttpRequest
     ) -> AsyncIterator[aiohttp.ClientResponse]:
         metrics = self.root_context.metrics
-        remote = f"{route.kernel_host}:{route.kernel_port}"
+        remote = f"{route.current_kernel_host}:{route.kernel_port}"
         metrics.proxy.observe_upstream_http_request(remote=remote, total_bytes_size=0)
         client_key = ClientKey(
-            endpoint=f"http://{route.kernel_host}:{route.kernel_port}",
+            endpoint=f"http://{route.current_kernel_host}:{route.kernel_port}",
             domain=str(route.route_id),
         )
         client_session = self.client_pool.load_client_session(client_key)
@@ -117,7 +117,7 @@ class HTTPBackend(BaseBackend):
         self, route: RouteInfo, request: web.Request, protocols: list[str] = []
     ) -> AsyncIterator[aiohttp.ClientWebSocketResponse]:
         client_key = ClientKey(
-            endpoint=f"http://{route.kernel_host}:{route.kernel_port}",
+            endpoint=f"http://{route.current_kernel_host}:{route.kernel_port}",
             domain=str(route.route_id),
         )
         client_session = self.client_pool.load_client_session(client_key)
@@ -174,7 +174,7 @@ class HTTPBackend(BaseBackend):
             "proxying {} {} HTTP Request to {}:{}",
             frontend_request.method,
             frontend_request.rel_url,
-            route.kernel_host,
+            route.current_kernel_host,
             route.kernel_port,
         )
         try:
@@ -272,7 +272,7 @@ class HTTPBackend(BaseBackend):
             "Proxying {} {} WS Request to {}:{}",
             request.method,
             request.path or "/",
-            route.kernel_host,
+            route.current_kernel_host,
             route.kernel_port,
         )
 
