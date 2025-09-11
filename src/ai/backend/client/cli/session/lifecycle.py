@@ -91,7 +91,7 @@ def _create_cmd(docs: Optional[str] = None):
     @click.option(
         "--depends",
         metavar="SESSION_ID",
-        type=UUID,
+        type=click.UUID,
         multiple=True,
         help=(
             "Set the list of session ID or names that the newly created session depends on. "
