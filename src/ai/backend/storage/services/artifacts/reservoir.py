@@ -9,7 +9,7 @@ from typing import Optional
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.types import DispatchResult
+from ai.backend.common.types import DispatchResult, ErrorResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.unified import (
@@ -17,6 +17,7 @@ from ai.backend.storage.config.unified import (
     ReservoirConfig,
 )
 from ai.backend.storage.exception import (
+    ArtifactImportError,
     ArtifactRevisionEmptyError,
     ArtifactStorageEmptyError,
     ReservoirStorageConfigInvalidError,
@@ -276,7 +277,9 @@ class ReservoirService:
             model_count = len(models)
             if not model_count:
                 log.warning("No models to import")
-                return DispatchResult.error("No models provided for batch import")
+                return DispatchResult.error(
+                    ArtifactImportError.error_code(), "No models provided for batch import"
+                )
 
             reporter.total_progress = model_count
 
@@ -318,7 +321,9 @@ class ReservoirService:
                         log.error(
                             f"Failed to import model in batch: {str(e)}, model_id={model_id}, progress={idx}/{model_count}"
                         )
-                        errors.append(str(e))
+                        errors.append(
+                            ErrorResult(code=ArtifactImportError.error_code(), message=str(e))
+                        )
                     finally:
                         await reporter.update(
                             1,
@@ -337,7 +342,9 @@ class ReservoirService:
                     return DispatchResult.partial_success(None, errors=errors)
             except Exception as e:
                 log.error(f"Batch model import failed: {str(e)}")
-                return DispatchResult.error(f"Batch import failed: {str(e)}")
+                return DispatchResult.error(
+                    ArtifactImportError.error_code(), f"Batch import failed: {str(e)}"
+                )
 
             return DispatchResult.success(None)
 
