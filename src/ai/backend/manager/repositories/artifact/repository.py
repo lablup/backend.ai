@@ -12,6 +12,7 @@ from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
+    ArtifactAvailability,
     ArtifactData,
     ArtifactDataWithRevisions,
     ArtifactRevisionData,
@@ -112,6 +113,14 @@ class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
             conditions.append(ArtifactRow.source_registry_id == filters.source_registry_id)
         if filters.source_registry_type is not None:
             conditions.append(ArtifactRow.source_registry_type == filters.source_registry_type)
+
+        # Handle availability filter
+        if filters.availability and len(filters.availability) > 0:
+            availability_values = [availability.value for availability in filters.availability]
+            if len(availability_values) == 1:
+                conditions.append(ArtifactRow.availability == availability_values[0])
+            else:
+                conditions.append(ArtifactRow.availability.in_(availability_values))
 
         return conditions, stmt
 
@@ -687,6 +696,23 @@ class ArtifactRepository:
             )
             await db_sess.execute(stmt)
             return artifact_revision_id
+
+    @repository_decorator()
+    async def delete_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
+        async with self._db.begin_session() as db_sess:
+            # Update availability to DELETED for the given artifact IDs
+            await db_sess.execute(
+                sa.update(ArtifactRow)
+                .where(ArtifactRow.id.in_(artifact_ids))
+                .values(availability=ArtifactAvailability.DELETED.value)
+            )
+
+            # Fetch and return the updated artifacts
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(ArtifactRow.id.in_(artifact_ids))
+            )
+            rows: list[ArtifactRow] = result.scalars().all()
+            return [row.to_dataclass() for row in rows]
 
     @repository_decorator()
     async def update_artifact_revision_bytesize(

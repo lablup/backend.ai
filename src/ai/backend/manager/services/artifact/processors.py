@@ -3,6 +3,10 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.services.artifact.actions.delete_multi import (
+    DeleteArtifactsAction,
+    DeleteArtifactsActionResult,
+)
 from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
@@ -57,6 +61,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
     ]
     retrieve_models: ActionProcessor[RetrieveModelsAction, RetrieveModelsActionResult]
     retrieve_single_model: ActionProcessor[RetrieveModelAction, RetrieveModelActionResult]
+    delete_artifacts: ActionProcessor[DeleteArtifactsAction, DeleteArtifactsActionResult]
 
     def __init__(self, service: ArtifactService, action_monitors: list[ActionMonitor]) -> None:
         # TODO: Move scan action to ArtifactRegistryService
@@ -73,6 +78,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
         )
         self.retrieve_models = ActionProcessor(service.retrieve_models, action_monitors)
         self.retrieve_single_model = ActionProcessor(service.retrieve_single_model, action_monitors)
+        self.delete_artifacts = ActionProcessor(service.delete_artifacts, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

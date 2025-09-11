@@ -36,6 +36,10 @@ from ai.backend.manager.repositories.object_storage.repository import ObjectStor
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
+from ai.backend.manager.services.artifact.actions.delete_multi import (
+    DeleteArtifactsAction,
+    DeleteArtifactsActionResult,
+)
 from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
@@ -394,6 +398,10 @@ class ArtifactService:
         )
 
         return RetrieveModelActionResult(result=scanned_models[0])
+
+    async def delete_artifacts(self, action: DeleteArtifactsAction) -> DeleteArtifactsActionResult:
+        deleted_artifacts = await self._artifact_repository.delete_artifacts(action.artifact_ids)
+        return DeleteArtifactsActionResult(artifacts=deleted_artifacts)
 
     async def _resolve_artifact_registry_meta(
         self, artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
