@@ -16,10 +16,8 @@ from ai.backend.appproxy.coordinator.models.utils import (
     execute_with_txn_retry,
 )
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    ModelServiceStatusAnycastEvent,
-)
 from ai.backend.common.events.event_types.model_serving.broadcast import (
     ModelServiceStatusBroadcastEvent,
 )
@@ -46,6 +44,7 @@ class HealthCheckEngine:
     event_producer: EventProducer
     valkey_live: ValkeyLiveClient
     circuit_manager: "CircuitManager"
+    valkey_schedule: ValkeyScheduleClient
 
     health_check_timer_interval: float
 
@@ -56,12 +55,14 @@ class HealthCheckEngine:
         valkey_live: ValkeyLiveClient,
         circuit_manager: "CircuitManager",
         health_check_timer_interval: float,
+        valkey_schedule: ValkeyScheduleClient,
     ) -> None:
         self.db = db
         self.event_producer = event_producer
         self.valkey_live = valkey_live
         self.circuit_manager = circuit_manager
         self.health_check_timer_interval = health_check_timer_interval
+        self.valkey_schedule = valkey_schedule
         self._session: Optional[aiohttp.ClientSession] = None
 
     async def start(self) -> None:
@@ -138,12 +139,11 @@ class HealthCheckEngine:
             return
 
         # Check health for each individual container in the circuit's route_info
-        route_health_results: dict[UUID, tuple[ModelServiceStatus | None, float, int]] = {}
-
+        route_health_results: dict[UUID, tuple[Optional[ModelServiceStatus], float, int]] = {}
+        status_changed = False
         for route in circuit.route_info:
             if not route.route_id:
                 continue
-
             # Check individual container health via route_info
             is_healthy = await self._check_individual_container_health(route, config)
 
@@ -153,10 +153,12 @@ class HealthCheckEngine:
                 log.debug(
                     "Route {} health check passed for endpoint {}", route.route_id, endpoint.id
                 )
+                if route.health_status != ModelServiceStatus.HEALTHY:
+                    status_changed = True
             else:
                 # Health check failed - increment consecutive failures
                 new_consecutive_failures = route.consecutive_failures + 1
-                new_status: ModelServiceStatus | None
+                new_status: Optional[ModelServiceStatus]
 
                 # Only mark as UNHEALTHY if consecutive failures exceed max_retries
                 if new_consecutive_failures > config.max_retries:
@@ -177,7 +179,8 @@ class HealthCheckEngine:
                         config.max_retries,
                         new_status or "Undetermined",
                     )
-
+                if route.health_status != new_status:
+                    status_changed = True
                 route_health_results[route.route_id] = (
                     new_status,
                     time.time(),
@@ -200,6 +203,23 @@ class HealthCheckEngine:
                 len(route_health_results),
                 endpoint.id,
             )
+
+            # Update readiness status in Redis for manager to consume
+            route_readiness: dict[str, bool] = {}
+            for route_id, (status, _, _) in route_health_results.items():
+                # Consider route ready if it's healthy
+                route_readiness[str(route_id)] = status == ModelServiceStatus.HEALTHY
+
+            try:
+                await self.valkey_schedule.update_routes_readiness_batch(route_readiness)
+                log.debug(
+                    "Updated readiness status in Redis for {} routes",
+                    len(route_readiness),
+                )
+                if status_changed:
+                    await self.valkey_schedule.mark_route_needed("health_check")
+            except Exception as e:
+                log.error("Failed to update readiness status in Redis: {}", e)
 
         # Record that we performed a health check for this endpoint
         await self._record_endpoint_check_time(endpoint.id)
@@ -224,7 +244,7 @@ class HealthCheckEngine:
         # Construct health check URL directly to the container
         try:
             health_check_url = (
-                f"http://{route.kernel_host}:{route.kernel_port}/{config.path.lstrip('/')}"
+                f"http://{route.current_kernel_host}:{route.kernel_port}/{config.path.lstrip('/')}"
             )
 
             # Validate URL scheme
@@ -243,7 +263,6 @@ class HealthCheckEngine:
         # Perform the health check request
         try:
             timeout = aiohttp.ClientTimeout(total=config.max_wait_time)
-
             async with self._session.get(health_check_url, timeout=timeout) as response:
                 if response.status == config.expected_status_code:
                     log.debug(
@@ -253,17 +272,15 @@ class HealthCheckEngine:
                         response.status,
                     )
                     return True
-                else:
-                    log.warning(
-                        "Container health check failed for route {} at {} (expected: {}, got: {}, failures: {})",
-                        route.route_id,
-                        health_check_url,
-                        config.expected_status_code,
-                        response.status,
-                        route.consecutive_failures + 1,
-                    )
-                    return False
-
+                log.warning(
+                    "Container health check failed for route {} at {} (expected: {}, got: {}, failures: {})",
+                    route.route_id,
+                    health_check_url,
+                    config.expected_status_code,
+                    response.status,
+                    route.consecutive_failures + 1,
+                )
+                return False
         except asyncio.TimeoutError:
             log.warning(
                 "Container health check timeout for route {} at {} (timeout: {}s, failures: {})",
@@ -1054,21 +1071,11 @@ class HealthCheckEngine:
                     old_status,
                     new_status,
                 )
-
-                # Create anycast event (MyPy expects additional fields, but runtime only needs session_id and new_status)
-                anycast_event = ModelServiceStatusAnycastEvent(
-                    session_id=session_id_obj,
-                    new_status=new_status,
-                )
-
                 # Create broadcast event (MyPy expects additional fields, but runtime only needs session_id and new_status)
                 broadcast_event = ModelServiceStatusBroadcastEvent(
                     session_id=session_id_obj,
                     new_status=new_status,
                 )
-
-                # Publish both events using core_event_producer
-                await self.event_producer.anycast_event(anycast_event)
                 await self.event_producer.broadcast_event(broadcast_event)
 
                 log.debug(

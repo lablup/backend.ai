@@ -13,6 +13,8 @@ import tomli
 from pydantic import HttpUrl
 from ruamel.yaml import YAML
 
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
@@ -69,16 +71,22 @@ class DeploymentRepository:
     _db_source: DeploymentDBSource
     _storage_source: DeploymentStorageSource
     _valkey_stat: ValkeyStatClient
+    _valkey_live: ValkeyLiveClient
+    _valkey_schedule: ValkeyScheduleClient
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         storage_manager: StorageSessionManager,
         valkey_stat: ValkeyStatClient,
+        valkey_live: ValkeyLiveClient,
+        valkey_schedule: ValkeyScheduleClient,
     ) -> None:
-        self._db_source = DeploymentDBSource(db)
+        self._db_source = DeploymentDBSource(db, storage_manager)
         self._storage_source = DeploymentStorageSource(storage_manager)
         self._valkey_stat = valkey_stat
+        self._valkey_live = valkey_live
+        self._valkey_schedule = valkey_schedule
 
     # Endpoint operations
 
@@ -436,12 +444,15 @@ class DeploymentRepository:
         self,
         route_session_ids: Mapping[uuid.UUID, SessionId],
     ) -> None:
-        """Update session IDs for multiple routes.
+        """Update session IDs for multiple routes and initialize their health status.
 
         Args:
             route_session_ids: Mapping of route IDs to new session IDs
         """
+        # Update sessions in database
         await self._db_source.update_route_sessions(route_session_ids)
+        route_id_strings = [str(route_id) for route_id in route_session_ids.keys()]
+        await self._valkey_schedule.initialize_routes_health_status_batch(route_id_strings)
 
     async def delete_routes_by_route_ids(
         self,
@@ -728,3 +739,35 @@ class DeploymentRepository:
     ) -> Mapping[uuid.UUID, Optional[SessionStatus]]:
         """Fetch session IDs for multiple routes."""
         return await self._db_source.fetch_session_statuses_by_route_ids(route_ids)
+
+    async def update_endpoint_route_info(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> None:
+        # Generate route connection info
+        connection_info = await self._db_source.generate_route_connection_info(endpoint_id)
+
+        # Get health check config
+        health_check_config = await self._db_source.get_endpoint_health_check_config(endpoint_id)
+
+        # Update Redis with route info
+        await self._valkey_live.update_appproxy_redis_info(
+            endpoint_id,
+            connection_info,
+            health_check_config,
+        )
+
+    async def get_endpoint_id_by_session(
+        self,
+        session_id: uuid.UUID,
+    ) -> Optional[uuid.UUID]:
+        """
+        Get endpoint ID associated with a session.
+
+        Args:
+            session_id: ID of the session
+
+        Returns:
+            Endpoint ID if found, None otherwise
+        """
+        return await self._db_source.get_endpoint_id_by_session(session_id)

@@ -1,4 +1,4 @@
-"""Handler for provisioning routes."""
+"""Handler for checking route health status."""
 
 import logging
 from collections.abc import Sequence
@@ -17,8 +17,8 @@ from .base import RouteHandler
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
-class ProvisioningRouteHandler(RouteHandler):
-    """Handler for provisioning routes (PROVISIONING -> UNHEALTHY)."""
+class HealthCheckRouteHandler(RouteHandler):
+    """Handler for checking route health status (readiness and liveness)."""
 
     def __init__(
         self,
@@ -31,40 +31,50 @@ class ProvisioningRouteHandler(RouteHandler):
     @classmethod
     def name(cls) -> str:
         """Get the name of the handler."""
-        return "provision-routes"
+        return "health-check-routes"
 
     @property
     def lock_id(self) -> Optional[LockID]:
-        """No lock needed for provisioning routes."""
+        """No lock needed for health check."""
         return None
 
     @classmethod
     def target_statuses(cls) -> list[RouteStatus]:
         """Get the target route statuses for this handler."""
-        return [RouteStatus.PROVISIONING]
+        return [RouteStatus.HEALTHY, RouteStatus.UNHEALTHY]
 
     @classmethod
     def next_status(cls) -> Optional[RouteStatus]:
-        """Get the next route status after this handler's operation."""
-        return RouteStatus.UNHEALTHY
+        """Routes that pass health check become HEALTHY."""
+        return RouteStatus.HEALTHY
 
     @classmethod
     def failure_status(cls) -> Optional[RouteStatus]:
-        """Get the failure route status if applicable."""
-        return RouteStatus.FAILED_TO_START
+        """Routes that fail health check become UNHEALTHY."""
+        return RouteStatus.UNHEALTHY
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
-        """Execute provisioning for routes."""
-        log.debug("Provisioning {} routes", len(routes))
+        """Execute health check for routes."""
+        log.debug("Checking health for {} routes", len(routes))
 
-        # Execute route provisioning logic via executor
-        result = await self._route_executor.provision_routes(routes)
+        # Execute route health check logic via executor
+        result = await self._route_executor.check_route_health(routes)
         return result
 
     async def post_process(self, result: RouteExecutionResult) -> None:
-        """Handle post-processing after provisioning routes."""
-        log.info(
-            "Provisioned {} routes successfully, {} failed",
-            len(result.successes),
-            len(result.errors),
-        )
+        """Handle post-processing after health check."""
+        healthy_count = len(result.successes)
+        unhealthy_count = len(result.errors)
+
+        if unhealthy_count > 0:
+            log.debug(
+                "Health check complete: {} healthy, {} unhealthy routes",
+                healthy_count,
+                unhealthy_count,
+            )
+
+            # Log details of unhealthy routes
+            for error in result.errors:
+                log.trace("Route {} is unhealthy: {}", error.route_info.route_id, error.reason)
+        else:
+            log.trace("All {} routes are healthy", healthy_count)

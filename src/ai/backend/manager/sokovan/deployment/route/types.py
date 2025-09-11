@@ -11,6 +11,7 @@ class RouteLifecycleType(StrEnum):
 
     PROVISIONING = "provisioning"
     RUNNING = "running"
+    HEALTH_CHECK = "health_check"
     TERMINATING = "terminating"
 
 
