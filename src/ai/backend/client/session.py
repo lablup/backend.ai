@@ -242,6 +242,7 @@ class BaseSession(metaclass=abc.ABCMeta):
     """
 
     __slots__ = (
+        "_aiohttp_session_injected",  # "_using_external_session"
         "_config",
         "_closed",
         "_context_token",
@@ -292,11 +293,21 @@ class BaseSession(metaclass=abc.ABCMeta):
         *,
         config: Optional[APIConfig] = None,
         proxy_mode: bool = False,
+        aiohttp_session: Optional[aiohttp.ClientSession] = None,
     ) -> None:
         self._closed = False
         self._config = config if config else get_config()
         self._proxy_mode = proxy_mode
         self.api_version = parse_api_version(self._config.version)
+
+        if aiohttp_session:
+            self.aiohttp_session = aiohttp_session
+            self._aiohttp_session_injected = True
+        else:
+            self.aiohttp_session = _default_http_client_session(
+                self._config.skip_sslcert_validation
+            )
+            self._aiohttp_session_injected = False
 
         from .func.acl import Permission
         from .func.admin import Admin
@@ -421,22 +432,14 @@ class Session(BaseSession):
         *,
         config: Optional[APIConfig] = None,
         proxy_mode: bool = False,
+        aiohttp_session: Optional[aiohttp.ClientSession] = None,
     ) -> None:
-        super().__init__(config=config, proxy_mode=proxy_mode)
+        super().__init__(config=config, proxy_mode=proxy_mode, aiohttp_session=aiohttp_session)
         self._worker_thread = _SyncWorkerThread()
-        self._worker_thread.start()
-
-        async def _create_aiohttp_session() -> aiohttp.ClientSession:
-            ssl: SSLContextType = True
-            if self._config.skip_sslcert_validation:
-                ssl = False
-            connector = aiohttp.TCPConnector(ssl=ssl)
-            return aiohttp.ClientSession(connector=connector)
-
-        self.aiohttp_session = self.worker_thread.execute(_create_aiohttp_session())
 
     def open(self) -> None:
         self._context_token = api_session.set(self)
+        self.worker_thread.start()
         if not self._proxy_mode:
             self.api_version = self.worker_thread.execute(
                 _negotiate_api_version(self.aiohttp_session, self.config)
@@ -453,7 +456,8 @@ class Session(BaseSession):
             return
         self._closed = True
         self._worker_thread.interrupt_generator()
-        self._worker_thread.execute(_close_aiohttp_session(self.aiohttp_session))
+        if not self._aiohttp_session_injected:
+            self._worker_thread.execute(_close_aiohttp_session(self.aiohttp_session))
         self._worker_thread.work_queue.put(sentinel)
         self._worker_thread.join()
         api_session.reset(self._context_token)
@@ -502,23 +506,6 @@ class AsyncSession(BaseSession):
     You may call all APIs as coroutines.
     WebSocket-based APIs and SSE-based APIs returns special response types.
     """
-
-    def __init__(
-        self,
-        *,
-        config: Optional[APIConfig] = None,
-        proxy_mode: bool = False,
-        aiohttp_session: Optional[aiohttp.ClientSession] = None,
-    ) -> None:
-        super().__init__(config=config, proxy_mode=proxy_mode)
-        if aiohttp_session is not None:
-            self.aiohttp_session = aiohttp_session
-            self._aiohttp_session_injected = True
-        else:
-            self.aiohttp_session = _default_http_client_session(
-                self._config.skip_sslcert_validation
-            )
-            self._aiohttp_session_injected = False
 
     async def _aopen(self) -> None:
         self._context_token = api_session.set(self)
