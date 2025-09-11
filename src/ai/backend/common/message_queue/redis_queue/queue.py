@@ -92,16 +92,18 @@ class RedisQueue(AbstractMessageQueue):
 
     # Anycaster methods
 
+    @override
     async def send(self, payload: dict[bytes, bytes]) -> None:
         """
         Send a message to the anycast queue.
         If the queue is full, the oldest message will be removed.
         The new message will be added to the end of the queue.
         """
-        await self._anycaster.send(payload)
+        await self._anycaster.anycast(payload)
 
     # Broadcaster methods
 
+    @override
     async def broadcast(self, payload: Mapping[str, Any]) -> None:
         """
         Broadcast a message to all subscribers.
@@ -109,6 +111,7 @@ class RedisQueue(AbstractMessageQueue):
         """
         await self._broadcaster.broadcast(payload)
 
+    @override
     async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, str]) -> None:
         """
         Broadcast a message to all subscribers with cache.
@@ -116,6 +119,7 @@ class RedisQueue(AbstractMessageQueue):
         """
         await self._broadcaster.broadcast_with_cache(cache_id, payload)
 
+    @override
     async def fetch_cached_broadcast_message(self, cache_id: str) -> Optional[Mapping[str, str]]:
         """
         Fetch a cached broadcast message by cache_id.
@@ -123,6 +127,7 @@ class RedisQueue(AbstractMessageQueue):
         """
         return await self._broadcaster.fetch_cached_broadcast_message(cache_id)
 
+    @override
     async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
         """
         Broadcast multiple messages in a batch with optional caching.
@@ -148,6 +153,7 @@ class RedisQueue(AbstractMessageQueue):
         async for message in self._consumer.consume_queue():  # type: ignore[attr-defined]
             yield message
 
+    @override
     async def done(self, msg_id: MessageId) -> None:
         """
         Acknowledge that a message has been processed successfully.

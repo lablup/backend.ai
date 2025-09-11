@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Self
+from typing import Self, override
 
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.types import RedisTarget
@@ -58,7 +58,8 @@ class RedisAnycaster(AbstractAnycaster):
         )
         return cls(client, stream_key)
 
-    async def send(self, payload: dict[bytes, bytes]) -> None:
+    @override
+    async def anycast(self, payload: dict[bytes, bytes]) -> None:
         """
         Send a message to the anycast stream.
 
@@ -78,6 +79,7 @@ class RedisAnycaster(AbstractAnycaster):
         await self._client.enqueue_stream_message(self._stream_key, payload)
         log.debug("Message sent to stream {}", self._stream_key)
 
+    @override
     async def close(self) -> None:
         """
         Close the anycaster and cleanup resources.

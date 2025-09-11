@@ -10,7 +10,7 @@ class AbstractAnycaster(ABC):
     """
 
     @abstractmethod
-    async def send(self, payload: dict[bytes, bytes]) -> None:
+    async def anycast(self, payload: dict[bytes, bytes]) -> None:
         """
         Send a message to the anycast queue.
 

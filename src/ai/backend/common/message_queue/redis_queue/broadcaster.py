@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Mapping, Optional, Self
+from typing import Any, Mapping, Optional, Self, override
 
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.types import RedisTarget
@@ -58,6 +58,7 @@ class RedisBroadcaster(AbstractBroadcaster):
         )
         return cls(client, channel)
 
+    @override
     async def broadcast(self, payload: Mapping[str, Any]) -> None:
         """
         Broadcast a message to all subscribers.
@@ -77,6 +78,7 @@ class RedisBroadcaster(AbstractBroadcaster):
         await self._client.broadcast(self._channel, payload)
         log.debug("Message broadcasted to channel {}", self._channel)
 
+    @override
     async def broadcast_with_cache(self, cache_id: str, payload: Mapping[str, str]) -> None:
         """
         Broadcast a message with caching support.
@@ -99,6 +101,7 @@ class RedisBroadcaster(AbstractBroadcaster):
             "Cached message broadcasted to channel {} with cache_id {}", self._channel, cache_id
         )
 
+    @override
     async def fetch_cached_broadcast_message(self, cache_id: str) -> Optional[Mapping[str, str]]:
         """
         Retrieve a cached broadcast message.
@@ -126,6 +129,7 @@ class RedisBroadcaster(AbstractBroadcaster):
         )
         return message
 
+    @override
     async def broadcast_batch(self, events: list[BroadcastPayload]) -> None:
         """
         Broadcast multiple messages in a batch.
@@ -145,6 +149,7 @@ class RedisBroadcaster(AbstractBroadcaster):
         await self._client.broadcast_batch(self._channel, events)
         log.debug("Batch of {} messages broadcasted to channel {}", len(events), self._channel)
 
+    @override
     async def close(self) -> None:
         """
         Close the broadcaster and cleanup resources.

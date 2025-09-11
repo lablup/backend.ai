@@ -16,5 +16,5 @@ class MessageQueueClosedError(BackendAIError):
         return ErrorCode(
             domain=ErrorDomain.MESSAGE_QUEUE,
             operation=ErrorOperation.SETUP,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
