@@ -1,3 +1,4 @@
+import json
 import logging
 from dataclasses import dataclass, field
 from http import HTTPStatus
@@ -12,6 +13,7 @@ from aiohttp import web
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.common import (
+    InternalServerError,
     ObjectNotFound,
     ServerMisconfiguredError,
 )
@@ -43,7 +45,12 @@ async def query_wsproxy_status(
             wsproxy_addr + "/status",
             headers={"Accept": "application/json"},
         ) as resp:
-            return await resp.json()
+            try:
+                result = await resp.json()
+            except (aiohttp.ContentTypeError, json.JSONDecodeError) as e:
+                log.error("Failed to parse wsproxy status response from {}: {}", wsproxy_addr, e)
+                raise InternalServerError("Got invalid response from wsproxy when querying status")
+            return result
 
 
 @auth_required
