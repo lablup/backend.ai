@@ -176,3 +176,16 @@ class ArtifactScanLimitExceededError(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
+
+
+class ArtifactImportError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/artifact-import-failed"
+    error_title = "Artifact Import Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.CREATE,  # Is CREATE proper?
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

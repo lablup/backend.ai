@@ -65,6 +65,7 @@ from ai.backend.manager.errors.kernel import (
     KernelNotReady,
     QuotaExceeded,
     SessionAlreadyExists,
+    SessionCommitError,
     SessionNotFound,
     TooManySessionsMatched,
 )
@@ -498,7 +499,8 @@ class SessionService:
             if len(rescan_result.images) == 0:
                 rescan_errors = ",".join(rescan_result.errors)
                 return DispatchResult.error(
-                    f"Session commit succeeded, but no image was rescanned, Error: {rescan_errors}"
+                    SessionCommitError.error_code(),
+                    f"Session commit succeeded, but no image was rescanned, Error: {rescan_errors}",
                 )
             elif len(rescan_result.images) > 1:
                 log.warning(

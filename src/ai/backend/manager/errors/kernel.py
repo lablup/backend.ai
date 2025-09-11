@@ -278,3 +278,16 @@ class KernelExecutionFailed(BackendAgentError, web.HTTPInternalServerError):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class SessionCommitError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/session-commit-failed"
+    error_title = "Session commit failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.EXECUTE,  # Is this proper?
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
