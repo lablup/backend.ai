@@ -800,6 +800,9 @@ class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
 class ResourceLimit(graphene.ObjectType):
     key = graphene.String()
     min = graphene.String()
+    max = graphene.String(
+        deprecation_reason="Deprecated since 25.14.0. The max slot limit validation has been removed."
+    )
 
 
 class KVPair(graphene.ObjectType):
@@ -810,6 +813,9 @@ class KVPair(graphene.ObjectType):
 class ResourceLimitInput(graphene.InputObjectType):
     key = graphene.String()
     min = graphene.String()
+    max = graphene.String(
+        deprecation_reason="Deprecated since 25.14.0. The max slot limit validation has been removed."
+    )
 
 
 class KVPairInput(graphene.InputObjectType):
