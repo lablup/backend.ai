@@ -14,6 +14,7 @@ from ai.backend.common.events.user_event.user_bgtask_event import (
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.types import ErrorResult
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -224,7 +225,7 @@ class BgtaskFailedEvent(BaseBgtaskDoneEvent):
 
 @dataclass
 class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
-    errors: list[str] = field(default_factory=list)
+    errors: list[ErrorResult] = field(default_factory=list)
 
     @override
     def serialize(self) -> tuple:
@@ -250,8 +251,7 @@ class BgtaskPartialSuccessEvent(BaseBgtaskDoneEvent):
 
     @override
     def status(self) -> BgtaskStatus:
-        # TODO: When client side is ready, we can change this to `TaskStatus.PARTIAL_SUCCESS`
-        return BgtaskStatus.DONE
+        return BgtaskStatus.PARTIAL_SUCCESS
 
     @override
     def user_event(self) -> Optional[UserEvent]:

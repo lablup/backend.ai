@@ -187,3 +187,29 @@ class PurgeImageActionByIdObjectDBError(BackendAIError, web.HTTPInternalServerEr
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class ImageRescanError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/image-rescan-failed"
+    error_title = "Image rescan failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ImagePurgeError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/image-purge-failed"
+    error_title = "Image purge failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.IMAGE,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

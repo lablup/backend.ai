@@ -77,6 +77,32 @@ class VFolderCreationError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class VFolderDeletionError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/storage/vfolder/deletion-failed"
+    error_title = "VFolder Creation Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.SOFT_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class VFolderCloneError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/storage/vfolder/clone-failed"
+    error_title = "VFolder Clone Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class VFolderNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/vfolder/not-found"
     error_title = "VFolder Not Found"

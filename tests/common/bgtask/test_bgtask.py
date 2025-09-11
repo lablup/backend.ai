@@ -25,8 +25,8 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskFailedEvent,
     BgtaskPartialSuccessEvent,
 )
-from ai.backend.common.exception import BgtaskFailedError
-from ai.backend.common.types import DispatchResult
+from ai.backend.common.exception import BgtaskFailedError, ErrorCode
+from ai.backend.common.types import DispatchResult, ErrorResult
 
 # Use actual TaskName enum values as string constants to avoid direct enum references
 MOCK_TASK = "clone_vfolder"  # Matches TaskName.CLONE_VFOLDER value
@@ -283,7 +283,16 @@ class TestBackgroundTaskManager:
         event = background_task_manager._convert_bgtask_to_event(task_id, result)
         assert isinstance(event, BgtaskDoneEvent)
 
-        result_with_error = DispatchResult(result={"test": "data"}, errors=["test error"])
+        result_with_error = DispatchResult(
+            result={"test": "data"},
+            errors=[
+                ErrorResult(
+                    code=ErrorCode.default(),
+                    message="Something went wrong",
+                )
+            ],
+        )
+
         event = background_task_manager._convert_bgtask_to_event(task_id, result_with_error)
         assert isinstance(event, BgtaskPartialSuccessEvent)
         assert event.errors == ["test error"]

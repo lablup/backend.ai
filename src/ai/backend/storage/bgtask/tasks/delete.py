@@ -13,6 +13,7 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 )
 from ai.backend.common.types import DispatchResult, VFolderID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.exception import VFolderDeletionError
 
 from ...volumes.pool import VolumePool
 
@@ -73,7 +74,9 @@ class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteTaskArgs])
                     str(e),
                 )
             )
-            return DispatchResult(errors=[str(e)])
+            return DispatchResult.error(
+                error_code=VFolderDeletionError.error_code(), error_message=str(e)
+            )
         else:
             await self._event_producer.anycast_event(
                 VFolderDeletionSuccessEvent(

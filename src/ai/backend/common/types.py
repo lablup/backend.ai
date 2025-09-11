@@ -54,7 +54,7 @@ from pydantic import BaseModel, ConfigDict, Field, PlainValidator, TypeAdapter
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
-from .exception import InvalidIpAddressValue
+from .exception import ErrorCode, InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
 
 __all__ = (
@@ -1841,9 +1841,15 @@ ResultType = TypeVar("ResultType")
 
 
 @dataclass
+class ErrorResult:
+    code: ErrorCode
+    message: str
+
+
+@dataclass
 class DispatchResult(Generic[ResultType]):
     result: Optional[ResultType] = None
-    errors: list[str] = field(default_factory=list)
+    errors: list[ErrorResult] = field(default_factory=list)
 
     def is_success(self) -> bool:
         return not self.errors
@@ -1855,21 +1861,23 @@ class DispatchResult(Generic[ResultType]):
         if self.is_success():
             return str(self.result)
         if self.result is not None:
-            return f"result: {str(self.result)}\nerrors: " + "\n".join(self.errors)
+            error_strings = [f"[{error.code}] {error.message}" for error in self.errors]
+            return f"result: {str(self.result)}\nerrors: " + "\n".join(error_strings)
         else:
-            return "errors: " + "\n".join(self.errors)
+            error_strings = [f"[{error.code}] {error.message}" for error in self.errors]
+            return "errors: " + "\n".join(error_strings)
 
     @classmethod
     def success(cls, result_type: ResultType) -> DispatchResult[ResultType]:
         return cls(result=result_type)
 
     @classmethod
-    def error(cls, error_message: str) -> DispatchResult[ResultType]:
-        return cls(errors=[error_message])
+    def error(cls, error_code: ErrorCode, error_message: str) -> DispatchResult[ResultType]:
+        return cls(errors=[ErrorResult(code=error_code, message=error_message)])
 
     @classmethod
     def partial_success(
-        cls, result_type: ResultType, errors: list[str]
+        cls, result_type: ResultType, errors: list[ErrorResult]
     ) -> DispatchResult[ResultType]:
         return cls(result=result_type, errors=errors)
 
