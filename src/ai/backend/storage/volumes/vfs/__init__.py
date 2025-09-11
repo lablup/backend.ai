@@ -21,10 +21,10 @@ from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
 from ...exception import (
-    ExecutionError,
     InvalidAPIParameters,
     InvalidQuotaScopeError,
-    NotEmptyError,
+    ProcessExecutionError,
+    QuotaDirectoryNotEmptyError,
     QuotaScopeNotFoundError,
 )
 from ...subproc import run
@@ -123,7 +123,9 @@ class BaseQuotaModel(AbstractQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
-            raise NotEmptyError(quota_scope_id)
+            raise QuotaDirectoryNotEmptyError(
+                f"Cannot delete quota scope '{quota_scope_id}': directory not empty"
+            )
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
@@ -182,7 +184,9 @@ class SetGIDQuotaModel(BaseQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
-            raise NotEmptyError(quota_scope_id)
+            raise QuotaDirectoryNotEmptyError(
+                f"Cannot delete quota scope '{quota_scope_id}': directory not empty"
+            )
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
@@ -442,7 +446,7 @@ class BaseVolume(AbstractVolume):
         fs_usage = await self.get_fs_usage()
         vfolder_usage = await self.get_usage(src_vfid)
         if vfolder_usage.used_bytes > fs_usage.capacity_bytes - fs_usage.used_bytes:
-            raise ExecutionError("Not enough space available for clone.")
+            raise ProcessExecutionError("Not enough space available for clone.")
 
         # create the target vfolder
         src_vfpath = self.mangle_vfpath(src_vfid)
@@ -455,7 +459,7 @@ class BaseVolume(AbstractVolume):
         except Exception:
             await self.delete_vfolder(dst_vfid)
             log.exception("clone_vfolder: error during copy_tree()")
-            raise ExecutionError("Copying files from source directories failed.")
+            raise ProcessExecutionError("Copying files from source directories failed.")
 
     @final
     async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:
@@ -565,7 +569,7 @@ class BaseVolume(AbstractVolume):
         src_path = self.sanitize_vfpath(vfid, src)
         if not src_path.is_dir():
             raise InvalidAPIParameters(
-                msg=f"source path {str(src_path)} is not a directory",
+                extra_msg=f"source path {str(src_path)} is not a directory",
             )
         dst_path = self.sanitize_vfpath(vfid, dst)
         await self.fsop_model.move_tree(src_path, dst_path)
@@ -578,7 +582,7 @@ class BaseVolume(AbstractVolume):
     ) -> None:
         src_path = self.sanitize_vfpath(vfid, src)
         if not src_path.is_file():
-            raise InvalidAPIParameters(msg=f"source path {str(src_path)} is not a file")
+            raise InvalidAPIParameters(extra_msg=f"source path {str(src_path)} is not a file")
         dst_path = self.sanitize_vfpath(vfid, dst)
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(

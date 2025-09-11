@@ -31,9 +31,9 @@ from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
 from ...exception import (
-    ExecutionError,
     InvalidQuotaScopeError,
-    NotEmptyError,
+    ProcessExecutionError,
+    QuotaDirectoryNotEmptyError,
     QuotaScopeNotFoundError,
 )
 from ...subproc import spawn_and_watch
@@ -163,7 +163,9 @@ class QTreeQuotaModel(BaseQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
-            raise NotEmptyError(quota_scope_id)
+            raise QuotaDirectoryNotEmptyError(
+                f"Cannot delete quota scope '{quota_scope_id}': directory not empty"
+            )
         # QTree and quota rule is automatically removed
         # when the corresponding directory is deleted.
         await aiofiles.os.rmdir(qspath)
@@ -358,7 +360,7 @@ class XCPFSOpModel(BaseFSOpModel):
                     if line.startswith(error_msg_prefix):
                         error_msg = line.removeprefix(error_msg_prefix).decode()
                         break
-                raise ExecutionError(f"Running XCP has failed: {error_msg}")
+                raise ProcessExecutionError(f"Running XCP has failed: {error_msg}")
 
         return aiter()
 
@@ -399,7 +401,7 @@ class XCPFSOpModel(BaseFSOpModel):
                         if line.startswith(error_msg_prefix):
                             error_msg = line.removeprefix(error_msg_prefix).rstrip().decode()
                             break
-                    raise ExecutionError(f"Running XCP has failed: {error_msg}")
+                    raise ProcessExecutionError(f"Running XCP has failed: {error_msg}")
         except asyncio.TimeoutError:
             # -1 indicates "too many"
             total_size = -1
