@@ -140,6 +140,7 @@ class HealthCheckEngine:
 
         # Check health for each individual container in the circuit's route_info
         route_health_results: dict[UUID, tuple[Optional[ModelServiceStatus], float, int]] = {}
+        status_changed = False
         for route in circuit.route_info:
             if not route.route_id:
                 continue
@@ -152,6 +153,8 @@ class HealthCheckEngine:
                 log.debug(
                     "Route {} health check passed for endpoint {}", route.route_id, endpoint.id
                 )
+                if route.health_status != ModelServiceStatus.HEALTHY:
+                    status_changed = True
             else:
                 # Health check failed - increment consecutive failures
                 new_consecutive_failures = route.consecutive_failures + 1
@@ -176,7 +179,8 @@ class HealthCheckEngine:
                         config.max_retries,
                         new_status or "Undetermined",
                     )
-
+                if route.health_status != new_status:
+                    status_changed = True
                 route_health_results[route.route_id] = (
                     new_status,
                     time.time(),
@@ -212,6 +216,8 @@ class HealthCheckEngine:
                     "Updated readiness status in Redis for {} routes",
                     len(route_readiness),
                 )
+                if status_changed:
+                    await self.valkey_schedule.mark_route_needed("health_check")
             except Exception as e:
                 log.error("Failed to update readiness status in Redis: {}", e)
 
