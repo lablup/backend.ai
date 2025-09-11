@@ -72,6 +72,7 @@ def scheduler(mock_repository, mock_agent_pool):
         lock_factory=MagicMock(),
         agent_pool=mock_agent_pool,
         network_plugin_ctx=MagicMock(),
+        event_producer=MagicMock(),
         valkey_schedule=MagicMock(),
     )
     return Scheduler(args)

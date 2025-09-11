@@ -248,6 +248,7 @@ class TestSchedulerAllocation:
             lock_factory=MagicMock(),
             agent_pool=MagicMock(),
             network_plugin_ctx=MagicMock(),
+            event_producer=MagicMock(),
             valkey_schedule=None,  # type: ignore
         )
         return Scheduler(args)
