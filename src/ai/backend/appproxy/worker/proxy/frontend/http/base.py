@@ -62,10 +62,10 @@ class BaseHTTPFrontend(Generic[TCircuitKey], BaseFrontend[HTTPBackend, TCircuitK
                         algorithms=["HS256"],
                     )
                 except jwt.PyJWTError as e:
-                    raise InvalidCredentials from e
+                    raise InvalidCredentials(f"E20008: Invalid authorization token ({e})") from e
 
                 if decoded.get("id") != str(circuit.id):
-                    raise InvalidCredentials("E20008: Authorization token mismatch")
+                    raise InvalidCredentials("E20009: Authorization token mismatch")
 
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> HTTPBackend:
         return HTTPBackend(routes, self.root_context, circuit)

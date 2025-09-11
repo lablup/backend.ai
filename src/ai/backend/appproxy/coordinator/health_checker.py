@@ -731,7 +731,7 @@ class HealthCheckEngine:
         # Construct health check URL
         try:
             health_check_url = (
-                f"http://{route.kernel_host}:{route.kernel_port}/{config.path.lstrip('/')}"
+                f"http://{route.current_kernel_host}:{route.kernel_port}/{config.path.lstrip('/')}"
             )
 
             # Validate URL scheme
