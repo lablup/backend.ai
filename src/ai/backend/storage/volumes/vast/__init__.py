@@ -89,7 +89,9 @@ class VASTQuotaModel(BaseQuotaModel):
         except VASTInvalidParameterError:
             raise InvalidQuotaConfig
         except VASTUnknownError as e:
-            raise ExternalStorageServiceError(str(e))
+            raise ExternalStorageServiceError(
+                f"VAST API unknown error during quota modification: {e}"
+            )
 
     async def create_quota_scope(
         self,
@@ -130,7 +132,9 @@ class VASTQuotaModel(BaseQuotaModel):
                 )
                 return existing_quota
             except VASTUnknownError as e:
-                raise ExternalStorageServiceError(str(e))
+                raise ExternalStorageServiceError(
+                    f"VAST API unknown error during quota creation: {e}"
+                )
             return quota
 
         try:

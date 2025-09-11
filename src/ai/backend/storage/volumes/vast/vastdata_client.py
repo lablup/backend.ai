@@ -471,7 +471,9 @@ class VASTAPIClient:
         for path, info in infos:
             if path == root_dir:
                 return _parse(info)
-        raise ExternalStorageServiceError("No capacity data found from vast API")
+        raise ExternalStorageServiceError(
+            f"No capacity data found for root directory '{root_dir}' from VAST API"
+        )
 
 
 # GET /capacity/
