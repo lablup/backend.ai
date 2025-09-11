@@ -18,6 +18,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..abc import AbstractConsumer
 from ..types import MessageId, MQMessage
+from .exceptions import MessageQueueClosedError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -145,9 +146,6 @@ class RedisConsumer(AbstractConsumer):
 
         Yields:
             MQMessage: Messages from the streams
-
-        Raises:
-            RuntimeError: If the consumer is closed
         """
         while not self._closed:
             try:
@@ -164,10 +162,10 @@ class RedisConsumer(AbstractConsumer):
             msg_id: The message identifier to acknowledge
 
         Raises:
-            RuntimeError: If the consumer is closed
+            MessageQueueClosedError: If the consumer is closed
         """
         if self._closed:
-            raise RuntimeError("Consumer is closed")
+            raise MessageQueueClosedError("Consumer is closed")
 
         # Note: We acknowledge on the first stream key as the message could be from any stream
         # In practice, msg_id should be unique across streams so this should work
@@ -382,11 +380,11 @@ def _generate_consumer_id(node_id: Optional[str]) -> str:
     Returns:
         Unique consumer ID string
     """
-    h = hashlib.sha1()
+    h = hashlib.sha256()
     h.update(str(node_id or socket.getfqdn()).encode("utf8"))
     hostname_hash = h.hexdigest()
 
-    h = hashlib.sha1()
+    h = hashlib.sha256()
     h.update(__file__.encode("utf8"))
     installation_path_hash = h.hexdigest()
 

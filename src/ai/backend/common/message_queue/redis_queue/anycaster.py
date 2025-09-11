@@ -8,6 +8,7 @@ from ai.backend.common.types import RedisTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..abc import AbstractAnycaster
+from .exceptions import MessageQueueClosedError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -69,10 +70,10 @@ class RedisAnycaster(AbstractAnycaster):
             payload: Message payload as a dictionary of bytes
 
         Raises:
-            RuntimeError: If the anycaster is closed
+            MessageQueueClosedError: If the anycaster is closed
         """
         if self._closed:
-            raise RuntimeError("Anycaster is closed")
+            raise MessageQueueClosedError("Anycaster is closed")
 
         await self._client.enqueue_stream_message(self._stream_key, payload)
         log.debug("Message sent to stream {}", self._stream_key)

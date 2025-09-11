@@ -9,6 +9,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..abc import AbstractBroadcaster
 from ..types import BroadcastPayload
+from .exceptions import MessageQueueClosedError
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -68,10 +69,10 @@ class RedisBroadcaster(AbstractBroadcaster):
             payload: Message payload as a mapping
 
         Raises:
-            RuntimeError: If the broadcaster is closed
+            MessageQueueClosedError: If the broadcaster is closed
         """
         if self._closed:
-            raise RuntimeError("Broadcaster is closed")
+            raise MessageQueueClosedError("Broadcaster is closed")
 
         await self._client.broadcast(self._channel, payload)
         log.debug("Message broadcasted to channel {}", self._channel)
@@ -88,10 +89,10 @@ class RedisBroadcaster(AbstractBroadcaster):
             payload: Message payload as string mapping
 
         Raises:
-            RuntimeError: If the broadcaster is closed
+            MessageQueueClosedError: If the broadcaster is closed
         """
         if self._closed:
-            raise RuntimeError("Broadcaster is closed")
+            raise MessageQueueClosedError("Broadcaster is closed")
 
         await self._client.broadcast_with_cache(self._channel, cache_id, payload)
         log.debug(
@@ -112,10 +113,10 @@ class RedisBroadcaster(AbstractBroadcaster):
             The cached message payload or None if not found
 
         Raises:
-            RuntimeError: If the broadcaster is closed
+            MessageQueueClosedError: If the broadcaster is closed
         """
         if self._closed:
-            raise RuntimeError("Broadcaster is closed")
+            raise MessageQueueClosedError("Broadcaster is closed")
 
         message = await self._client.fetch_cached_broadcast_message(cache_id)
         log.debug(
@@ -136,10 +137,10 @@ class RedisBroadcaster(AbstractBroadcaster):
             events: List of broadcast payloads, each optionally with cache_id
 
         Raises:
-            RuntimeError: If the broadcaster is closed
+            MessageQueueClosedError: If the broadcaster is closed
         """
         if self._closed:
-            raise RuntimeError("Broadcaster is closed")
+            raise MessageQueueClosedError("Broadcaster is closed")
 
         await self._client.broadcast_batch(self._channel, events)
         log.debug("Batch of {} messages broadcasted to channel {}", len(events), self._channel)
