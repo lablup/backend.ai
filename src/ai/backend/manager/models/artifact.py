@@ -61,6 +61,7 @@ class ArtifactRow(Base):
         sa.String,
         nullable=False,
         default=ArtifactAvailability.ALIVE.value,
+        server_default=ArtifactAvailability.ALIVE.value,
         index=True,
     )
 
