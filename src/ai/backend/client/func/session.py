@@ -12,13 +12,7 @@ from collections.abc import (
     Sequence,
 )
 from pathlib import Path
-from typing import (
-    Any,
-    Optional,
-    Self,
-    Union,
-    cast,
-)
+from typing import Any, Optional, Self, cast
 from uuid import UUID
 
 import aiohttp
@@ -209,7 +203,7 @@ class ComputeSession(BaseFunction):
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
-        dependencies: Optional[Sequence[str]] = None,
+        dependencies: Optional[Sequence[UUID]] = None,
         callback_url: Optional[str] = None,
         mounts: Optional[list[str]] = None,
         mount_map: Optional[Mapping[str, str]] = None,
@@ -414,7 +408,7 @@ class ComputeSession(BaseFunction):
         starts_at: str | None = None,  # not included in templates
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
-        dependencies: Sequence[str] | None = None,  # cannot be stored in templates
+        dependencies: Sequence[UUID] | None = None,  # cannot be stored in templates
         callback_url: str | Undefined = undefined,
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
@@ -1381,7 +1375,7 @@ class InferenceSession(BaseFunction):
         enqueue_only: bool = False,
         max_wait: int = 0,
         no_reuse: bool = False,
-        dependencies: Optional[Sequence[str]] = None,
+        dependencies: Optional[Sequence[UUID]] = None,
         callback_url: Optional[str] = None,
         mounts: Optional[list[str]] = None,
         mount_map: Optional[Mapping[str, str]] = None,
@@ -1391,7 +1385,7 @@ class InferenceSession(BaseFunction):
         envs: Optional[Mapping[str, str]] = None,
         startup_command: Optional[str] = None,
         resources: Optional[Mapping[str, str]] = None,
-        resource_opts: Optional[Mapping[str, Union[str, int, bool]]] = None,
+        resource_opts: Optional[Mapping[str, str | int | bool]] = None,
         cluster_size: int = 1,
         cluster_mode: ClusterMode = ClusterMode.SINGLE_NODE,
         domain_name: Optional[str] = None,
@@ -1420,7 +1414,7 @@ class InferenceSession(BaseFunction):
         starts_at: Optional[str] = None,
         enqueue_only: bool | Undefined = undefined,
         max_wait: int | Undefined = undefined,
-        dependencies: Optional[Sequence[str]] = None,  # cannot be stored in templates
+        dependencies: Optional[Sequence[UUID]] = None,  # cannot be stored in templates
         no_reuse: bool | Undefined = undefined,
         image: str | Undefined = undefined,
         mounts: list[str] | Undefined = undefined,
@@ -1428,7 +1422,7 @@ class InferenceSession(BaseFunction):
         envs: Mapping[str, str] | Undefined = undefined,
         startup_command: str | Undefined = undefined,
         resources: Mapping[str, int] | Undefined = undefined,
-        resource_opts: Mapping[str, Union[str, int, bool]] | Undefined = undefined,
+        resource_opts: Mapping[str, str | int | bool] | Undefined = undefined,
         cluster_size: int | Undefined = undefined,
         cluster_mode: ClusterMode | Undefined = undefined,
         domain_name: str | Undefined = undefined,
