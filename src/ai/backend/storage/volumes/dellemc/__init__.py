@@ -114,7 +114,9 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         quota_id = await self._get_quota_id(qspath)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
             # Check if any directory exists in the quota scope path
-            raise QuotaDirectoryNotEmptyError(str(quota_scope_id))
+            raise QuotaDirectoryNotEmptyError(
+                f"Cannot delete quota scope '{quota_scope_id}': directory not empty"
+            )
         if quota_id is not None:
             await self.api_client.delete_quota(quota_id)
             await self._unset_quota_id(qspath)

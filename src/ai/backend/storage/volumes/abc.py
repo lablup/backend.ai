@@ -252,10 +252,10 @@ class AbstractVolume(metaclass=ABCMeta):
     ) -> Path:
         vfpath = self.mangle_vfpath(vfid).resolve()
         if not (vfpath.exists() and vfpath.is_dir()):
-            raise VFolderNotFoundError(str(vfid))
+            raise VFolderNotFoundError(f"VFolder not found or not a directory: {vfid}")
         target_path = (vfpath / relpath).resolve()
         if not target_path.is_relative_to(vfpath):
-            raise InvalidSubpathError(vfid, relpath)
+            raise InvalidSubpathError(f"Invalid subpath '{relpath}' for VFolder {vfid}")
         return target_path
 
     @final
