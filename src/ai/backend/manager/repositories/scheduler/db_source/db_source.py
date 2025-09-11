@@ -73,6 +73,7 @@ from ai.backend.manager.sokovan.scheduler.types import (
     SessionDataForStart,
     SessionDependencyInfo,
     SessionDependencySnapshot,
+    SessionRunningData,
     SessionsForPullWithImages,
     SessionsForStartWithImages,
     SessionTransitionData,
@@ -262,6 +263,7 @@ class ScheduleDBSource:
                 SessionRow.priority,
                 SessionRow.session_type,
                 SessionRow.cluster_mode,
+                SessionRow.designated_agent_ids,
                 SessionRow.starts_at,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.image.label("kernel_image"),
@@ -298,6 +300,7 @@ class ScheduleDBSource:
                     cluster_mode=row.cluster_mode,
                     starts_at=row.starts_at,
                     is_private=row.session_type in SessionTypes.private_types(),
+                    designated_agent_ids=row.designated_agent_ids,
                     kernels=[],
                 )
 
@@ -959,6 +962,7 @@ class ScheduleDBSource:
                 images=session_data.images,
                 network_type=session_data.network_type,
                 network_id=session_data.network_id,
+                designated_agent_ids=session_data.designated_agent_list,
                 bootstrap_script=session_data.bootstrap_script,
                 use_host_network=session_data.use_host_network,
                 timeout=session_data.timeout,
@@ -979,7 +983,6 @@ class ScheduleDBSource:
                     cluster_idx=kernel.cluster_idx,
                     local_rank=kernel.local_rank,
                     cluster_hostname=kernel.cluster_hostname,
-                    agent=kernel.agent,
                     scaling_group=kernel.scaling_group,
                     domain_name=kernel.domain_name,
                     group_id=kernel.group_id,
@@ -1371,7 +1374,7 @@ class ScheduleDBSource:
         allowed_sgroups = await query_allowed_sgroups(
             db_sess,
             domain_name,
-            group_id,
+            UUID(group_id),
             access_key,
         )
 
@@ -1379,6 +1382,7 @@ class ScheduleDBSource:
             AllowedScalingGroup(
                 name=sg.name,
                 is_private=not sg.is_public,  # Convert is_public to is_private
+                scheduler_opts=sg.scheduler_opts,
             )
             for sg in allowed_sgroups
         ]
@@ -2328,6 +2332,7 @@ class ScheduleDBSource:
                         container_id=kernel.container_id,
                         startup_command=kernel.startup_command,
                         status_info=kernel.status_info,
+                        occupied_slots=kernel.occupied_slots,
                     )
                     for kernel in session.kernels
                 ]
@@ -2337,6 +2342,8 @@ class ScheduleDBSource:
                     session_id=session.id,
                     creation_id=session.creation_id,
                     session_name=session.name,
+                    network_type=session.network_type,
+                    network_id=session.network_id,
                     session_type=session.session_type,
                     access_key=session.access_key,
                     cluster_mode=session.cluster_mode,
@@ -2375,34 +2382,38 @@ class ScheduleDBSource:
 
             return ready_session_ids
 
-    async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
+    async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
         """
-        Update sessions from CREATING to RUNNING state.
+        Update sessions from CREATING to RUNNING state with occupying_slots.
         """
-        if not session_ids:
+        if not sessions_data:
             return
 
         async with self._begin_session_read_committed() as db_sess:
             now = datetime.now(tzutc())
-            stmt = (
-                sa.update(SessionRow)
-                .where(
-                    sa.and_(
-                        SessionRow.id.in_(session_ids),
-                        SessionRow.status == SessionStatus.CREATING,
+
+            # Update each session individually with its calculated occupying_slots
+            for session_data in sessions_data:
+                stmt = (
+                    sa.update(SessionRow)
+                    .where(
+                        sa.and_(
+                            SessionRow.id == session_data.session_id,
+                            SessionRow.status == SessionStatus.CREATING,
+                        )
+                    )
+                    .values(
+                        status=SessionStatus.RUNNING,
+                        status_info=None,  # Clear any previous error status
+                        occupying_slots=session_data.occupying_slots,
+                        status_history=sql_json_merge(
+                            SessionRow.status_history,
+                            (),
+                            {SessionStatus.RUNNING.name: now.isoformat()},
+                        ),
                     )
                 )
-                .values(
-                    status=SessionStatus.RUNNING,
-                    status_info=None,  # Clear any previous error status
-                    status_history=sql_json_merge(
-                        SessionRow.status_history,
-                        (),
-                        {SessionStatus.RUNNING.name: now.isoformat()},
-                    ),
-                )
-            )
-            await db_sess.execute(stmt)
+                await db_sess.execute(stmt)
 
     async def get_sessions_ready_to_terminate(self) -> list[SessionId]:
         """
@@ -3135,7 +3146,12 @@ class ScheduleDBSource:
             # Update session to PENDING with reset retry count
             update_stmt = (
                 sa.update(SessionRow)
-                .where(SessionRow.id == session_id)
+                .where(
+                    sa.and_(
+                        SessionRow.id == session_id,
+                        SessionRow.status.in_(SessionStatus.retriable_statuses()),
+                    )
+                )
                 .values(
                     status=SessionStatus.PENDING,
                     status_data=sql_json_merge(
@@ -3150,8 +3166,15 @@ class ScheduleDBSource:
             # Also update kernel status to PENDING
             kernel_stmt = (
                 sa.update(KernelRow)
-                .where(KernelRow.session_id == session_id)
+                .where(
+                    sa.and_(
+                        KernelRow.session_id == session_id,
+                        KernelRow.status.in_(KernelStatus.retriable_statuses()),
+                    )
+                )
                 .values(
+                    agent=None,
+                    agent_addr=None,
                     status=KernelStatus.PENDING,
                     status_data=sql_json_merge(
                         KernelRow.status_data,
@@ -3298,3 +3321,24 @@ class ScheduleDBSource:
             sftp_count = sftp_result.scalar() or 0
 
             return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
+
+    async def update_session_network_id(
+        self,
+        session_id: SessionId,
+        network_id: Optional[str],
+    ) -> None:
+        """
+        Update session's network information in the database.
+
+        :param session_id: The session ID to update
+        :param network_id: The network ID to set (or None to clear)
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            update_stmt = (
+                sa.update(SessionRow)
+                .where(SessionRow.id == session_id)
+                .values(
+                    network_id=network_id,
+                )
+            )
+            await db_sess.execute(update_stmt)

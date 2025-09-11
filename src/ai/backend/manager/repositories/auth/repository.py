@@ -15,8 +15,15 @@ from ai.backend.manager.errors.auth import (
     UserCreationError,
 )
 from ai.backend.manager.models.group import association_groups_users, groups
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.user import UserRow, UserStatus, check_credential, users
+from ai.backend.manager.models.user import (
+    UserRow,
+    UserStatus,
+    check_credential,
+    check_credential_with_migration,
+    users,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 # Layer-specific decorator for auth repository
@@ -140,10 +147,10 @@ class AuthRepository:
             return True
 
     @repository_decorator()
-    async def update_user_password_validated(self, email: str, password: str) -> None:
+    async def update_user_password_validated(self, email: str, password_info: PasswordInfo) -> None:
         async with self._db.begin() as conn:
             data = {
-                "password": password,
+                "password": password_info,  # PasswordColumn will handle the conversion
                 "need_password_change": False,
                 "password_changed_at": sa.func.now(),
             }
@@ -152,11 +159,11 @@ class AuthRepository:
 
     @repository_decorator()
     async def update_user_password_by_uuid_validated(
-        self, user_uuid: UUID, password: str
+        self, user_uuid: UUID, password_info: PasswordInfo
     ) -> datetime:
         async with self._db.begin() as conn:
             data = {
-                "password": password,
+                "password": password_info,  # PasswordColumn will handle the conversion
                 "need_password_change": False,
                 "password_changed_at": sa.func.now(),
             }
@@ -227,9 +234,27 @@ class AuthRepository:
         )
 
     @repository_decorator()
-    async def check_credential_validated(
-        self, domain_name: str, email: str, password: str
+    async def check_credential_with_migration(
+        self,
+        domain_name: str,
+        email: str,
+        target_password_info: PasswordInfo,
     ) -> Optional[dict]:
+        return await check_credential_with_migration(
+            db=self._db,
+            domain=domain_name,
+            email=email,
+            target_password_info=target_password_info,
+        )
+
+    @repository_decorator()
+    async def check_credential_without_migration(
+        self,
+        domain_name: str,
+        email: str,
+        password: str,
+    ) -> Optional[dict]:
+        """Check credentials without password migration (for signout, etc.)"""
         return await check_credential(
             db=self._db,
             domain=domain_name,

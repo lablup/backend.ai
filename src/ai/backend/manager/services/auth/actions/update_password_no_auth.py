@@ -6,7 +6,6 @@ from typing import Optional, override
 from aiohttp import web
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.services.auth.actions.base import AuthAction
 
 
@@ -17,7 +16,6 @@ class UpdatePasswordNoAuthAction(AuthAction):
     email: str
     current_password: str
     new_password: str
-    auth_config: Optional[AuthConfig]
 
     @override
     def entity_id(self) -> Optional[str]:

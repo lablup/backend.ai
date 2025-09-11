@@ -28,17 +28,25 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class GPFSQuotaModel(BaseQuotaModel):
+    _fileset_prefix: str
+
     def __init__(
         self,
         mount_path: Path,
         api_client: GPFSAPIClient,
         fs: str,
         gpfs_owner: str,
+        *,
+        fileset_prefix: Optional[str] = None,
     ) -> None:
         super().__init__(mount_path)
         self.api_client = api_client
         self.fs = fs
         self.gpfs_owner = gpfs_owner
+        self._fileset_prefix = fileset_prefix or ""
+
+    def _get_fileset_name(self, quota_scope_id: QuotaScopeID) -> str:
+        return self._fileset_prefix + quota_scope_id.pathname
 
     async def create_quota_scope(
         self,
@@ -49,7 +57,7 @@ class GPFSQuotaModel(BaseQuotaModel):
         qspath = self.mangle_qspath(quota_scope_id)
         await self.api_client.create_fileset(
             self.fs,
-            quota_scope_id.pathname,
+            self._get_fileset_name(quota_scope_id),
             path=qspath,
             owner=self.gpfs_owner,
         )
@@ -57,13 +65,20 @@ class GPFSQuotaModel(BaseQuotaModel):
             await self.update_quota_scope(quota_scope_id, options)
 
     async def update_quota_scope(self, quota_scope_id: QuotaScopeID, config: QuotaConfig) -> None:
-        await self.api_client.set_quota(self.fs, quota_scope_id.pathname, config.limit_bytes)
+        await self.api_client.set_quota(
+            self.fs,
+            self._get_fileset_name(quota_scope_id),
+            config.limit_bytes,
+        )
 
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> Optional[QuotaUsage]:
         if not self.mangle_qspath(quota_scope_id).exists():
             return None
 
-        quotas = await self.api_client.list_fileset_quotas(self.fs, quota_scope_id.pathname)
+        quotas = await self.api_client.list_fileset_quotas(
+            self.fs,
+            self._get_fileset_name(quota_scope_id),
+        )
         custom_defined_quotas = [q for q in quotas if not q.isDefaultQuota]
         if len(custom_defined_quotas) == 0:
             return QuotaUsage(-1, -1)
@@ -75,10 +90,10 @@ class GPFSQuotaModel(BaseQuotaModel):
         )
 
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
-        await self.api_client.remove_quota(self.fs, quota_scope_id.pathname)
+        await self.api_client.remove_quota(self.fs, self._get_fileset_name(quota_scope_id))
 
     async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:
-        await self.api_client.remove_fileset(self.fs, quota_scope_id.pathname)
+        await self.api_client.remove_fileset(self.fs, self._get_fileset_name(quota_scope_id))
 
 
 class GPFSOpModel(BaseFSOpModel):
@@ -152,6 +167,7 @@ class GPFSVolume(BaseVolume):
             self.api_client,
             self.fs,
             self.gpfs_owner,
+            fileset_prefix=self.config.get("gpfs_fileset_prefix"),
         )
 
     async def create_fsop_model(self) -> AbstractFSOpModel:

@@ -13,6 +13,7 @@ from pydantic import (
     FilePath,
 )
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
@@ -622,6 +623,8 @@ class ObjectStorageConfig(BaseModel):
         Should be greater than or equal to 5 MiB due to S3 requirements.
         """,
         examples=[5 * 1024 * 1024],
+        validation_alias=AliasChoices("upload-chunk-size", "upload_chunk_size"),
+        serialization_alias="upload-chunk-size",
     )
     download_chunk_size: int = Field(
         default=8192,
@@ -629,6 +632,19 @@ class ObjectStorageConfig(BaseModel):
         Chunk size (in bytes) for downloading files from the object storage.
         """,
         examples=[8192],
+        validation_alias=AliasChoices("download-chunk-size", "download_chunk_size"),
+        serialization_alias="download-chunk-size",
+    )
+    reservoir_download_chunk_size: int = Field(
+        default=8192,
+        description="""
+        Chunk size (in bytes) for downloading files from the remote reservoir storage.
+        """,
+        examples=[8192],
+        validation_alias=AliasChoices(
+            "reservoir-download-chunk-size", "reservoir_download_chunk_size"
+        ),
+        serialization_alias="reservoir-download-chunk-size",
     )
 
 
@@ -662,10 +678,53 @@ class HuggingfaceConfig(BaseModel):
         Chunk size (in bytes) for downloading files from the HuggingFace API.
         """,
         examples=[8192],
+        validation_alias=AliasChoices("download-chunk-size", "download_chunk_size"),
+        serialization_alias="download-chunk-size",
     )
 
 
-RegistrySpecificConfig = Union[HuggingfaceConfig]
+class ReservoirConfig(BaseModel):
+    registry_type: Literal["reservoir"] = Field(
+        description="""
+        Type of the registry configuration.
+        This is used to identify the specific registry type.
+        """,
+        alias="type",
+    )
+    endpoint: str = Field(
+        default="https://huggingface.co",
+        description="""
+        Custom endpoint for the reservoir registry API.
+        """,
+        examples=["https://huggingface.co"],
+    )
+    object_storage_access_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Access key for authenticating with the reservoir registry's object storage API.
+        """,
+        validation_alias=AliasChoices("object-storage-access-key", "object_storage_access_key"),
+        serialization_alias="object-storage-access-key",
+    )
+    object_storage_secret_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Secret key for authenticating with the reservoir registry's object storage API.
+        """,
+        validation_alias=AliasChoices("object-storage-secret-key", "object_storage_secret_key"),
+        serialization_alias="object-storage-secret-key",
+    )
+    object_storage_region: Optional[str] = Field(
+        default=None,
+        description="""
+        Region for the reservoir registry's object storage.
+        """,
+        validation_alias=AliasChoices("object-storage-region", "object_storage_region"),
+        serialization_alias="object-storage-region",
+    )
+
+
+RegistrySpecificConfig = Union[HuggingfaceConfig, ReservoirConfig]
 
 
 class ArtifactRegistryConfig(BaseModel):
@@ -674,7 +733,7 @@ class ArtifactRegistryConfig(BaseModel):
         Name of the artifact registry configuration.
         Used to identify this registry in the system.
         """,
-        examples=["huggingface"],
+        examples=[typ.value for typ in ArtifactRegistryType],
     )
     config: RegistrySpecificConfig = Field(
         discriminator="registry_type",

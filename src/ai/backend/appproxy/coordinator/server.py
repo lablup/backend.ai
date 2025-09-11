@@ -68,6 +68,7 @@ from ai.backend.appproxy.common.utils import (
 )
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
 from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import ConfigScopes
@@ -225,31 +226,31 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         (root_ctx.local_config.core_redis or root_ctx.local_config.redis).to_dict()
     )
 
-    root_ctx.redis_live = redis_helper.get_redis_object(
-        redis_profile_target.profile_target(RedisRole.LIVE),
-        name="live",  # tracking live status of various entities
-        db=REDIS_LIVE_DB,
+    # Create valkey clients for live data access
+    root_ctx.valkey_live = await ValkeyLiveClient.create(
+        valkey_target=redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+        db_id=REDIS_LIVE_DB,
+        human_readable_name="appproxy-coordinator-live",
     )
+    root_ctx.core_valkey_live = await ValkeyLiveClient.create(
+        valkey_target=core_redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+        db_id=REDIS_LIVE_DB,
+        human_readable_name="appproxy-coordinator-core-live",
+    )
+
+    # Keep redis_lock for distributed locking (not yet migrated)
     root_ctx.redis_lock = redis_helper.get_redis_object(
         redis_profile_target.profile_target(RedisRole.STREAM),
         name="lock",  # distributed locks
         db=REDIS_STREAM_LOCK,
     )
-    root_ctx.core_redis_live = redis_helper.get_redis_object(
-        core_redis_profile_target.profile_target(RedisRole.LIVE),
-        name="live",  # tracking live status of various entities
-        db=REDIS_LIVE_DB,
-    )
-    for redis_info in (
-        root_ctx.redis_live,
-        root_ctx.redis_lock,
-        root_ctx.core_redis_live,
-    ):
-        await ping_redis_connection(redis_info)
+    await ping_redis_connection(root_ctx.redis_lock)
+
     yield
+
+    await root_ctx.valkey_live.close()
+    await root_ctx.core_valkey_live.close()
     await root_ctx.redis_lock.close()
-    await root_ctx.redis_live.close()
-    await root_ctx.core_redis_live.close()
 
 
 async def _make_message_queue(
@@ -382,14 +383,11 @@ async def on_route_update_event(
         route_connection_info_json,
         health_check_enabled_str,
         health_check_config_json,
-    ) = await redis_helper.execute(
-        context.core_redis_live,
-        lambda r: r.mget(
-            f"endpoint.{event.endpoint_id}.route_connection_info",
-            f"endpoint.{event.endpoint_id}.health_check_enabled",
-            f"endpoint.{event.endpoint_id}.health_check_config",
-        ),
-    )
+    ) = await context.core_valkey_live.get_multiple_live_data([
+        f"endpoint.{event.endpoint_id}.route_connection_info",
+        f"endpoint.{event.endpoint_id}.health_check_enabled",
+        f"endpoint.{event.endpoint_id}.health_check_config",
+    ])
     assert route_connection_info_json, (
         f"EndpointRouteListUpdatedEvent fired but no route info present on redis - expected 'endpoint.{event.endpoint_id}.route_connection_info' key to be present on redis_live"
     )
@@ -398,13 +396,15 @@ async def on_route_update_event(
     )
     route_connection_info = InferenceAppConfigDict.validate_json(route_connection_info_json)
 
-    health_check_enabled = health_check_enabled_str == "true"
+    health_check_enabled = health_check_enabled_str.decode("utf-8") == "true"
     health_check_config: HealthCheckConfig | None
     if health_check_enabled:
         assert health_check_config_json, (
             f"EndpointRouteListUpdatedEvent fired but invalid health check configuration provided - expected 'endpoint.{event.endpoint_id}.health_check_config' key to be present on redis_live"
         )
-        health_check_config = HealthCheckConfig.model_validate_json(health_check_config_json)
+        health_check_config = HealthCheckConfig.model_validate_json(
+            health_check_config_json.decode("utf-8")
+        )
     else:
         health_check_config = None
 
@@ -419,21 +419,20 @@ async def on_route_update_event(
     async def _update(db_sess: SASession) -> None:
         endpoint = await Endpoint.get(db_sess, event.endpoint_id)
         circuit = await Circuit.get_by_endpoint(db_sess, endpoint.id)
-        traffic_ratios = await redis_helper.execute(
-            context.core_redis_live,
-            lambda r: r.mget(*[
+        old_routes = circuit.route_info or []
+        if new_routes:
+            traffic_ratios = await context.core_valkey_live.get_multiple_live_data([
                 f"endpoint.{event.endpoint_id}.session.{route.session_id}.traffic_ratio"
                 for route in new_routes.values()
-            ]),
-        )
-        for idx, route in enumerate(new_routes.values()):
-            route.traffic_ratio = float(traffic_ratios[idx] or 1.0)
-        old_routes = circuit.route_info or []
-        for route in old_routes:
-            if _duplicate_route := new_routes.get(route.session_id):
-                _duplicate_route.health_status = route.health_status
-                _duplicate_route.last_health_check = route.last_health_check
-                _duplicate_route.consecutive_failures = route.consecutive_failures
+            ])
+            for idx, route in enumerate(new_routes.values()):
+                ratio_bytes = traffic_ratios[idx]
+                route.traffic_ratio = float(ratio_bytes.decode("utf-8")) if ratio_bytes else 1.0
+            for route in old_routes:
+                if _duplicate_route := new_routes.get(route.session_id):
+                    _duplicate_route.health_status = route.health_status
+                    _duplicate_route.last_health_check = route.last_health_check
+                    _duplicate_route.consecutive_failures = route.consecutive_failures
         circuit.route_info = list(new_routes.values())
 
         endpoint.health_check_enabled = health_check_enabled
@@ -448,8 +447,8 @@ async def on_route_update_event(
                 (r.session_id, None, ModelServiceStatus.HEALTHY) for r in circuit.route_info
             ])
 
-            # Propagate updated route information to AppProxy workers
-            await context.health_engine.propagate_route_updates_to_workers(circuit, old_routes)
+        # Propagate updated route information to AppProxy workers
+        await context.health_engine.propagate_route_updates_to_workers(circuit, old_routes)
 
     async with context.db.connect() as db_conn:
         await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
@@ -494,7 +493,7 @@ async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     health_engine = HealthCheckEngine(
         root_ctx.db,
         root_ctx.core_event_producer,
-        root_ctx.redis_live,
+        root_ctx.valkey_live,
         root_ctx.circuit_manager,
         root_ctx.local_config.proxy_coordinator.health_check_timer_interval,
     )
@@ -547,19 +546,16 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
                 ]
                 if len(non_inference_http_circuits) == 0:
                     return []
-                last_access = await redis_helper.execute(
-                    root_ctx.redis_live,
-                    lambda r: r.mget([
-                        f"circuit.{str(c.id)}.last_access" for c in non_inference_http_circuits
-                    ]),
-                )
+                last_access = await root_ctx.valkey_live.get_multiple_live_data([
+                    f"circuit.{str(c.id)}.last_access" for c in non_inference_http_circuits
+                ])
                 unused_circuits = [
                     non_inference_http_circuits[idx]
                     for idx in range(len(last_access))
                     if (
                         time.time()
                         - (
-                            float(last_access[idx])
+                            float(last_access[idx].decode("utf-8"))
                             if last_access[idx]
                             else non_inference_http_circuits[idx].created_at.timestamp()
                         )

@@ -11,6 +11,7 @@ from typing import AsyncIterator, Final, override
 import aiohttp
 import aiotools
 from aiohttp import ClientConnectorError, web
+from multidict import CIMultiDict
 from yarl import URL
 
 from ai.backend.appproxy.common.exceptions import ContainerConnectionRefused, WorkerNotAvailable
@@ -26,8 +27,16 @@ from .base import BaseBackend, HttpRequest
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-CHUNK_SIZE = 1 * 1024 * 1024  # 1 KiB
-SKIP_HEADERS: Final[set[str]] = {"connection"}
+HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
+    ("Connection", 1),
+    ("Keep-Alive", 1),
+    ("Proxy-Authenticate", 1),
+    ("Proxy-Authorization", 1),
+    ("TE", 1),
+    ("Trailers", 1),
+    ("Transfer-Encoding", 1),
+    ("Upgrade", 1),
+])
 
 
 class HTTPBackend(BaseBackend):
@@ -47,7 +56,7 @@ class HTTPBackend(BaseBackend):
             partial(
                 tcp_client_session_factory,
                 timeout=client_timeout,
-                auto_decompress=False,
+                auto_decompress=False,  # transparently pass the response body
             ),
             cleanup_interval_seconds=cleanup_interval,
         )
@@ -85,14 +94,7 @@ class HTTPBackend(BaseBackend):
     ) -> AsyncIterator[aiohttp.ClientResponse]:
         metrics = self.root_context.metrics
         remote = f"{route.kernel_host}:{route.kernel_port}"
-        headers = dict(request.headers)
-
-        if headers.get("Transfer-Encoding", "").lower() == "chunked":
-            del headers["Transfer-Encoding"]
-
-        metrics.proxy.observe_upstream_http_request(
-            remote=remote, total_bytes_size=request.body.total_bytes
-        )
+        metrics.proxy.observe_upstream_http_request(remote=remote, total_bytes_size=0)
         client_key = ClientKey(
             endpoint=f"http://{route.kernel_host}:{route.kernel_port}",
             domain=str(route.route_id),
@@ -101,12 +103,13 @@ class HTTPBackend(BaseBackend):
         async with client_session.request(
             request.method,
             request.path,
-            headers=headers,
+            headers=request.headers,
+            allow_redirects=False,
             data=request.body,
+            auto_decompress=False,  # transparently pass the response body
+            compress=None,  # transparently pass the request body
         ) as response:
-            metrics.proxy.observe_upstream_http_response(
-                remote=remote, total_bytes_size=response.content.total_bytes
-            )
+            metrics.proxy.observe_upstream_http_response(remote=remote, total_bytes_size=0)
             yield response
 
     @asynccontextmanager
@@ -118,72 +121,99 @@ class HTTPBackend(BaseBackend):
             domain=str(route.route_id),
         )
         client_session = self.client_pool.load_client_session(client_key)
-        log.debug("connecting to {}", URL(client_key.endpoint).with_path(request.path))
+        log.trace("connecting to {}", URL(client_key.endpoint).with_path(request.path))
         async with client_session.ws_connect(request.rel_url, protocols=protocols) as ws:
-            log.debug("connected")
             yield ws
 
-    async def proxy_http(self, request: web.Request) -> web.StreamResponse:
-        protocol = self.get_x_forwarded_proto(request)
-        host = self.get_x_forwarded_host(request)
+    async def proxy_http(self, frontend_request: web.Request) -> web.StreamResponse:
+        protocol = self.get_x_forwarded_proto(frontend_request)
+        host = self.get_x_forwarded_host(frontend_request)
         remote_host, remote_port = (
-            request.transport.get_extra_info("peername") if request.transport else None,
+            frontend_request.transport.get_extra_info("peername")
+            if frontend_request.transport
+            else None,
             None,
         )
-        headers = {
-            "x-forwarded-proto": protocol,
-        }
+        backend_rqst_hdrs = {}
+        # copy frontend request headers without hop-by-hop headers
+        for key, value in frontend_request.headers.items():
+            if key not in HOP_ONLY_HEADERS:
+                backend_rqst_hdrs[key] = value
+        # overwrite proxy-related headers
+        backend_rqst_hdrs["x-forwarded-proto"] = protocol
         if self.circuit.app == "rstudio":
-            headers["x-rstudio-proto"] = protocol
+            backend_rqst_hdrs["x-rstudio-proto"] = protocol
         if host:
-            headers["forwarded"] = f"host={host};proto={protocol}"
-            headers["x-forwarded-host"] = host
+            backend_rqst_hdrs["forwarded"] = f"host={host};proto={protocol}"
+            backend_rqst_hdrs["x-forwarded-host"] = host
             if self.circuit.app == "rstudio":
-                headers["x-rstudio-request"] = f"{protocol}://{host}{request.path or ''}"
+                backend_rqst_hdrs["x-rstudio-request"] = (
+                    f"{protocol}://{host}{frontend_request.path or ''}"
+                )
             split = host.split(":")
             if len(split) >= 2:
-                headers["x-forwarded-port"] = split[1]
+                backend_rqst_hdrs["x-forwarded-port"] = split[1]
             elif remote_port:
-                headers["x-forwarded-port"] = remote_port
+                backend_rqst_hdrs["x-forwarded-port"] = remote_port
         if remote_host:
-            headers["x-forwarded-for"] = f"{remote_host[0]}:{remote_host[1]}"
-        headers_to_skip = set(headers.keys()) | SKIP_HEADERS
-        for key, value in request.headers.items():
-            if key.lower() not in headers_to_skip:
-                headers[key] = value
-        upstream_request = HttpRequest(
-            request.method,
-            request.rel_url,
-            headers,
-            request.content,
+            backend_rqst_hdrs["x-forwarded-for"] = f"{remote_host[0]}:{remote_host[1]}"
+        if frontend_request.body_exists:
+            backend_rqst_body = frontend_request.content.iter_any()
+        else:
+            backend_rqst_body = None
+        backend_request = HttpRequest(
+            frontend_request.method,
+            frontend_request.rel_url,
+            backend_rqst_hdrs,
+            backend_rqst_body,
         )
         route = self.selected_route
         await self.mark_last_used_time(route)
         await self.increase_request_counter()
-        log.debug(
-            "Proxying {} {} HTTP Request to {}:{}",
-            request.method,
-            request.rel_url,
+        log.trace(
+            "proxying {} {} HTTP Request to {}:{}",
+            frontend_request.method,
+            frontend_request.rel_url,
             route.kernel_host,
             route.kernel_port,
         )
-
         try:
-            async with self.request_http(route, upstream_request) as backend_response:
-                response = web.StreamResponse(
+            async with self.request_http(route, backend_request) as backend_response:
+                frontend_resp_hdrs = {}
+                for key, value in backend_response.headers.items():
+                    if key not in HOP_ONLY_HEADERS:
+                        frontend_resp_hdrs[key] = value
+                frontend_resp_hdrs["Access-Control-Allow-Origin"] = "*"
+                frontend_response = web.StreamResponse(
                     status=backend_response.status,
-                    headers={**backend_response.headers, "Access-Control-Allow-Origin": "*"},
+                    reason=backend_response.reason,
+                    headers=frontend_resp_hdrs,
                 )
-                await response.prepare(request)
-                async for data in backend_response.content.iter_chunked(CHUNK_SIZE):
-                    await response.write(data)
-                return response
+                if "Content-Length" not in backend_response.headers:
+                    frontend_response.enable_chunked_encoding()
+                await frontend_response.prepare(frontend_request)
+                recv_len = 0
+                try:
+                    async for data in backend_response.content.iter_any():
+                        recv_len += len(data)
+                        await frontend_response.write(data)
+                except aiohttp.ClientPayloadError as e:
+                    log.exception(
+                        "{!r} (recv-len: {}, content-length: {}, headers: {!r})",
+                        e,
+                        recv_len,
+                        backend_response.content_length,
+                        frontend_resp_hdrs,
+                    )
+                finally:
+                    await frontend_response.write_eof()
+                return frontend_response
         except ConnectionResetError:
             raise asyncio.CancelledError()
         except aiohttp.ClientOSError as e:
             raise ContainerConnectionRefused from e
         except:
-            log.exception("")
+            log.exception("Unhandled exception while proxying HTTP request")
             raise
 
     async def proxy_ws(self, request: web.Request) -> web.WebSocketResponse:
@@ -238,7 +268,7 @@ class HTTPBackend(BaseBackend):
             await self.mark_last_used_time(route)
 
         route = self.selected_route
-        log.debug(
+        log.trace(
             "Proxying {} {} WS Request to {}:{}",
             request.method,
             request.path or "/",
@@ -273,16 +303,15 @@ class HTTPBackend(BaseBackend):
                         log.debug("created tasks, now waiting until one of two tasks end")
                         await stop_event.wait()
                 finally:
-                    log.debug("tasks ended")
                     marker_task.cancel()
                     await marker_task
                     if not downstream_ws.closed:
                         await downstream_ws.close()
                     if not upstream_ws.closed:
                         await upstream_ws.close()
-            log.debug("websocket connection closed")
+            log.trace("websocket connection closed")
         except ClientConnectorError:
-            log.debug("upstream connection closed")
+            log.trace("upstream connection closed")
             if not downstream_ws.closed:
                 await downstream_ws.close()
         finally:

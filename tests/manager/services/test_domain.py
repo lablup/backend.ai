@@ -1,13 +1,20 @@
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any, AsyncGenerator
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.data.domain.types import (
+    DomainCreator,
+    DomainData,
+    DomainModifier,
+    DomainNodeModifier,
+    UserInfo,
+)
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -42,13 +49,6 @@ from ai.backend.manager.services.domain.actions.purge_domain import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
-from ai.backend.manager.services.domain.types import (
-    DomainCreator,
-    DomainData,
-    DomainModifier,
-    DomainNodeModifier,
-    UserInfo,
-)
 from ai.backend.manager.types import OptionalState, TriState
 
 from .utils import ScenarioBase
@@ -63,6 +63,11 @@ def processors(database_fixture, database_engine) -> DomainProcessors:
         valkey_stat_client=MagicMock(),  # Not used by DomainRepositories
     )
     domain_repositories = DomainRepositories.create(repository_args)
+
+    # Create mock for _role_manager
+    mock_role_manager = MagicMock()
+    mock_role_manager.create_system_role = AsyncMock(return_value=None)
+    domain_repositories.repository._role_manager = mock_role_manager
     domain_service = DomainService(
         repository=domain_repositories.repository,
         admin_repository=domain_repositories.admin_repository,
@@ -693,13 +698,23 @@ async def test_purge_domain_in_db(
 async def create_test_user(
     database_engine: ExtendedAsyncSAEngine, email: str, domain_name: str
 ) -> AsyncGenerator[UUID, None]:
+    from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+    from ai.backend.manager.models.hasher.types import PasswordInfo
+
     user_id = uuid4()
+    password_info = PasswordInfo(
+        password="password123",
+        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        rounds=600_000,
+        salt_size=32,
+    )
+
     async with database_engine.begin() as conn:
         user_data = {
             "uuid": user_id,
             "username": "testuser",
             "email": email,
-            "password": "password123",
+            "password": password_info,
             "need_password_change": False,
             "full_name": "Test User",
             "description": "Test user for domain tests",

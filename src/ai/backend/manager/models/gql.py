@@ -2572,6 +2572,7 @@ class Query(graphene.ObjectType):
         # TODO: Clean up this function
         graph_ctx: GraphQueryContext = info.context
         pending_sessions = await graph_ctx.valkey_schedule.get_pending_queue(resource_group_id)
+        session_order = {sid: idx for idx, sid in enumerate(pending_sessions)}
         result: list[ComputeSessionNode] = []
         async with graph_ctx.db.begin_readonly_session() as db_session:
             stmt = (
@@ -2583,6 +2584,7 @@ class Query(graphene.ObjectType):
             for row in query_result:
                 node = ComputeSessionNode.from_row(graph_ctx, row)
                 result.append(node)
+        result.sort(key=lambda node: session_order[SessionId(node.row_id)])
         total_count = len(result)
         page_size: Optional[int] = None
         cursor: Optional[str] = None

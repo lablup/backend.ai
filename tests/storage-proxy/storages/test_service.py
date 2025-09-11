@@ -4,7 +4,7 @@ from ai.backend.common.dto.storage.request import PresignedUploadObjectReq
 from ai.backend.common.dto.storage.response import (
     PresignedUploadObjectResponse,
 )
-from ai.backend.storage.config.unified import ObjectStorageConfig
+from ai.backend.storage.config.unified import ObjectStorageConfig, ReservoirConfig
 from ai.backend.storage.exception import (
     FileStreamDownloadError,
     FileStreamUploadError,
@@ -14,7 +14,7 @@ from ai.backend.storage.exception import (
     StorageBucketNotFoundError,
     StorageNotFoundError,
 )
-from ai.backend.storage.services.storages import StorageService
+from ai.backend.storage.services.storages.object_storage import ObjectStorageService
 
 _BUCKET_FIXTURE_NAME = "test-bucket"
 
@@ -33,8 +33,20 @@ def storage_config(minio_container) -> ObjectStorageConfig:
 
 
 @pytest.fixture
-def storages_service(storage_config) -> StorageService:
-    return StorageService([storage_config])
+def storages_service(storage_config) -> ObjectStorageService:
+    return ObjectStorageService([storage_config])
+
+
+@pytest.fixture
+def reservoir_config(minio_container) -> ReservoirConfig:
+    container_id, host_port = minio_container
+    return ReservoirConfig(
+        type="reservoir",
+        endpoint=f"http://{host_port.host}:{host_port.port}",
+        object_storage_access_key="minioadmin",
+        object_storage_secret_key="minioadmin",
+        object_storage_region="us-east-1",
+    )
 
 
 # Test configuration constants
@@ -44,7 +56,7 @@ _PRESIGNED_TEST_KEY = "presigned-test-key"
 
 
 @pytest.mark.asyncio
-async def test_stream_upload_success(s3_client, storages_service: StorageService):
+async def test_stream_upload_success(s3_client, storages_service: ObjectStorageService):
     """Test successful stream upload"""
 
     async def mock_data_stream():
@@ -61,7 +73,7 @@ async def test_stream_upload_success(s3_client, storages_service: StorageService
 
 
 @pytest.mark.asyncio
-async def test_stream_upload_invalid_storage(storages_service: StorageService):
+async def test_stream_upload_invalid_storage(storages_service: ObjectStorageService):
     """Test stream upload with invalid storage name"""
 
     async def mock_data_stream():
@@ -78,7 +90,7 @@ async def test_stream_upload_invalid_storage(storages_service: StorageService):
 
 
 @pytest.mark.asyncio
-async def test_stream_upload_invalid_bucket(storages_service: StorageService):
+async def test_stream_upload_invalid_bucket(storages_service: ObjectStorageService):
     """Test stream upload with invalid bucket name"""
 
     async def mock_data_stream():
@@ -95,7 +107,7 @@ async def test_stream_upload_invalid_bucket(storages_service: StorageService):
 
 
 @pytest.mark.asyncio
-async def test_stream_download_success(s3_client, storages_service: StorageService):
+async def test_stream_download_success(s3_client, storages_service: ObjectStorageService):
     """Test successful stream download after upload"""
 
     # First upload a test file
@@ -121,7 +133,7 @@ async def test_stream_download_success(s3_client, storages_service: StorageServi
 
 
 @pytest.mark.asyncio
-async def test_stream_download_nonexistent_file(s3_client, storages_service: StorageService):
+async def test_stream_download_nonexistent_file(s3_client, storages_service: ObjectStorageService):
     """Test stream download of nonexistent file"""
     with pytest.raises(FileStreamDownloadError):
         async for chunk in storages_service.stream_download(
@@ -131,7 +143,9 @@ async def test_stream_download_nonexistent_file(s3_client, storages_service: Sto
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_upload_url_success(s3_client, storages_service: StorageService):
+async def test_generate_presigned_upload_url_success(
+    s3_client, storages_service: ObjectStorageService
+):
     """Test successful presigned upload URL generation and actual upload"""
     import aiohttp
 
@@ -182,7 +196,9 @@ async def test_generate_presigned_upload_url_success(s3_client, storages_service
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_upload_url_invalid_storage(storages_service: StorageService):
+async def test_generate_presigned_upload_url_invalid_storage(
+    storages_service: ObjectStorageService,
+):
     """Test presigned upload URL generation with invalid storage"""
     presigned_request = PresignedUploadObjectReq(
         key=_PRESIGNED_TEST_KEY,
@@ -198,7 +214,7 @@ async def test_generate_presigned_upload_url_invalid_storage(storages_service: S
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_upload_url_invalid_bucket(storages_service: StorageService):
+async def test_generate_presigned_upload_url_invalid_bucket(storages_service: ObjectStorageService):
     """Test presigned upload URL generation with invalid bucket"""
     presigned_request = PresignedUploadObjectReq(
         key=_PRESIGNED_TEST_KEY,
@@ -214,7 +230,9 @@ async def test_generate_presigned_upload_url_invalid_bucket(storages_service: St
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_download_url_success(s3_client, storages_service: StorageService):
+async def test_generate_presigned_download_url_success(
+    s3_client, storages_service: ObjectStorageService
+):
     """Test successful presigned download URL generation and actual download"""
     import aiohttp
 
@@ -252,7 +270,9 @@ async def test_generate_presigned_download_url_success(s3_client, storages_servi
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_download_url_invalid_storage(storages_service: StorageService):
+async def test_generate_presigned_download_url_invalid_storage(
+    storages_service: ObjectStorageService,
+):
     """Test presigned download URL generation with invalid storage"""
     with pytest.raises(PresignedDownloadURLGenerationError):
         await storages_service.generate_presigned_download_url(
@@ -261,7 +281,9 @@ async def test_generate_presigned_download_url_invalid_storage(storages_service:
 
 
 @pytest.mark.asyncio
-async def test_generate_presigned_download_url_invalid_bucket(storages_service: StorageService):
+async def test_generate_presigned_download_url_invalid_bucket(
+    storages_service: ObjectStorageService,
+):
     """Test presigned download URL generation with invalid bucket"""
     with pytest.raises(PresignedDownloadURLGenerationError):
         await storages_service.generate_presigned_download_url(
@@ -270,7 +292,7 @@ async def test_generate_presigned_download_url_invalid_bucket(storages_service: 
 
 
 @pytest.mark.asyncio
-async def test_get_object_info_success(s3_client, storages_service: StorageService):
+async def test_get_object_info_success(s3_client, storages_service: ObjectStorageService):
     """Test successful object info retrieval"""
 
     # First upload a test file
@@ -292,7 +314,7 @@ async def test_get_object_info_success(s3_client, storages_service: StorageServi
 
 
 @pytest.mark.asyncio
-async def test_get_object_info_nonexistent_file(s3_client, storages_service: StorageService):
+async def test_get_object_info_nonexistent_file(s3_client, storages_service: ObjectStorageService):
     """Test object info retrieval for nonexistent file"""
     with pytest.raises(ObjectInfoFetchError):
         await storages_service.get_object_info(
@@ -301,21 +323,21 @@ async def test_get_object_info_nonexistent_file(s3_client, storages_service: Sto
 
 
 @pytest.mark.asyncio
-async def test_get_object_info_invalid_storage(storages_service: StorageService):
+async def test_get_object_info_invalid_storage(storages_service: ObjectStorageService):
     """Test object info retrieval with invalid storage"""
     with pytest.raises(ObjectInfoFetchError):
         await storages_service.get_object_info("invalid_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
 
 
 @pytest.mark.asyncio
-async def test_get_object_info_invalid_bucket(storages_service: StorageService):
+async def test_get_object_info_invalid_bucket(storages_service: ObjectStorageService):
     """Test object info retrieval with invalid bucket"""
     with pytest.raises(ObjectInfoFetchError):
         await storages_service.get_object_info("test_storage", "invalid-bucket", _TEST_KEY)
 
 
 @pytest.mark.asyncio
-async def test_delete_object_success(s3_client, storages_service: StorageService):
+async def test_delete_object_success(s3_client, storages_service: ObjectStorageService):
     """Test successful object deletion"""
 
     # First upload a test file
@@ -327,36 +349,36 @@ async def test_delete_object_success(s3_client, storages_service: StorageService
     )
 
     # Delete the object
-    await storages_service.delete_file("test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
+    await storages_service.delete_object("test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
 
 
 @pytest.mark.asyncio
-async def test_delete_object_nonexistent_file(s3_client, storages_service: StorageService):
+async def test_delete_object_nonexistent_file(s3_client, storages_service: ObjectStorageService):
     """Test deletion of nonexistent file (should still return success)"""
-    await storages_service.delete_file("test_storage", _BUCKET_FIXTURE_NAME, "nonexistent-key")
+    await storages_service.delete_object("test_storage", _BUCKET_FIXTURE_NAME, "nonexistent-key")
 
 
 @pytest.mark.asyncio
-async def test_delete_object_invalid_storage(storages_service: StorageService):
+async def test_delete_object_invalid_storage(storages_service: ObjectStorageService):
     """Test object deletion with invalid storage"""
     with pytest.raises(StorageBucketNotFoundError):
-        await storages_service.delete_file("invalid_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
+        await storages_service.delete_object("invalid_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY)
 
 
 @pytest.mark.asyncio
-async def test_delete_object_invalid_bucket(storages_service: StorageService):
+async def test_delete_object_invalid_bucket(storages_service: ObjectStorageService):
     """Test object deletion with invalid bucket"""
     with pytest.raises(StorageBucketNotFoundError):
-        await storages_service.delete_file("test_storage", "invalid-bucket", _TEST_KEY)
+        await storages_service.delete_object("test_storage", "invalid-bucket", _TEST_KEY)
 
 
-def test_get_s3_client_no_storage_config(storages_service: StorageService):
+def test_get_s3_client_no_storage_config(storages_service: ObjectStorageService):
     """Test S3 client creation with nonexistent storage config"""
     with pytest.raises(StorageNotFoundError):
         storages_service._get_s3_client("nonexistent-storage", _BUCKET_FIXTURE_NAME)
 
 
-def test_get_s3_client_invalid_bucket(storages_service: StorageService):
+def test_get_s3_client_invalid_bucket(storages_service: ObjectStorageService):
     """Test S3 client creation with invalid bucket"""
     with pytest.raises(StorageBucketNotFoundError):
         storages_service._get_s3_client("test_storage", "invalid-bucket")

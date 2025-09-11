@@ -5,13 +5,14 @@ import logging
 import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
-    ArtifactRegistryType,
     ArtifactType,
 )
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 
 from .base import (
     GUID,
@@ -48,11 +49,25 @@ class ArtifactRow(Base):
     source_registry_type = sa.Column("source_registry_type", sa.String, nullable=False, index=True)
     description = sa.Column("description", sa.String, nullable=True)
     readonly = sa.Column("readonly", sa.Boolean, default=False, nullable=False)
+    scanned_at = sa.Column(
+        "scanned_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    )
+    updated_at = sa.Column(
+        "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
+    )
 
     huggingface_registry = relationship(
         "HuggingFaceRegistryRow",
         back_populates="artifacts",
         primaryjoin=lambda: foreign(ArtifactRow.registry_id) == HuggingFaceRegistryRow.id,
+        overlaps="reservoir_registry,artifacts",
+    )
+
+    reservoir_registry = relationship(
+        "ReservoirRegistryRow",
+        back_populates="artifacts",
+        primaryjoin=lambda: foreign(ArtifactRow.registry_id) == ReservoirRegistryRow.id,
+        overlaps="huggingface_registry,artifacts",
     )
 
     revision_rows = relationship(
@@ -72,6 +87,8 @@ class ArtifactRow(Base):
             f"source_registry_id={self.source_registry_id}, "
             f"source_registry_type={self.source_registry_type}, "
             f"description={self.description}, "
+            f"scanned_at={self.scanned_at}, "
+            f"updated_at={self.updated_at}, "
             f"readonly={self.readonly})"
         )
 
@@ -88,5 +105,7 @@ class ArtifactRow(Base):
             source_registry_id=self.source_registry_id,
             source_registry_type=ArtifactRegistryType(self.source_registry_type),
             description=self.description,
+            scanned_at=self.scanned_at,
+            updated_at=self.updated_at,
             readonly=self.readonly,
         )

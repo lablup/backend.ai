@@ -207,9 +207,6 @@ class Services:
             repositories.project_resource_policy.repository
         )
         resource_preset_service = ResourcePresetService(
-            args.db,
-            args.agent_registry,
-            args.config_provider,
             repositories.resource_preset.repository,
         )
         utilization_metric_service = UtilizationMetricService(
@@ -235,24 +232,35 @@ class Services:
         auth = AuthService(
             hook_plugin_ctx=args.hook_plugin_ctx,
             auth_repository=repositories.auth.repository,
+            config_provider=args.config_provider,
         )
         object_storage_service = ObjectStorageService(
             artifact_repository=repositories.artifact.repository,
             object_storage_repository=repositories.object_storage.repository,
             storage_manager=args.storage_manager,
+            config_provider=args.config_provider,
         )
-        artifact_registry = ArtifactRegistryService(repositories.huggingface_registry.repository)
         artifact_service = ArtifactService(
             artifact_repository=repositories.artifact.repository,
+            artifact_registry_repository=repositories.artifact_registry.repository,
             storage_manager=args.storage_manager,
             object_storage_repository=repositories.object_storage.repository,
             huggingface_registry_repository=repositories.huggingface_registry.repository,
+            config_provider=args.config_provider,
+            reservoir_registry_repository=repositories.reservoir_registry.repository,
         )
         artifact_revision_service = ArtifactRevisionService(
             artifact_repository=repositories.artifact.repository,
             storage_manager=args.storage_manager,
             object_storage_repository=repositories.object_storage.repository,
             huggingface_registry_repository=repositories.huggingface_registry.repository,
+            reservoir_registry_repository=repositories.reservoir_registry.repository,
+            config_provider=args.config_provider,
+        )
+        artifact_registry_service = ArtifactRegistryService(
+            repositories.huggingface_registry.repository,
+            repositories.reservoir_registry.repository,
+            repositories.artifact_registry.repository,
         )
 
         # Initialize deployment service if controller is available
@@ -282,7 +290,7 @@ class Services:
             object_storage=object_storage_service,
             artifact=artifact_service,
             artifact_revision=artifact_revision_service,
-            artifact_registry=artifact_registry,
+            artifact_registry=artifact_registry_service,
             deployment=deployment_service,
         )
 

@@ -497,7 +497,8 @@ class AgentRPCServer(aobject):
         redis_config_dict = self._redis_config.copy()
         if isinstance(self._redis_config.get("addr"), object):
             addr = self._redis_config["addr"]
-            redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
+            if addr is not None:
+                redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
 
         redis_config = RedisConfig.model_validate(redis_config_dict)
         self.local_config.redis = redis_config

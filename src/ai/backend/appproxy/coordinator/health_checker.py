@@ -15,6 +15,7 @@ from ai.backend.appproxy.coordinator.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_txn_retry,
 )
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
@@ -22,7 +23,7 @@ from ai.backend.common.events.event_types.model_serving.anycast import (
 from ai.backend.common.events.event_types.model_serving.broadcast import (
     ModelServiceStatusBroadcastEvent,
 )
-from ai.backend.common.types import ModelServiceStatus, RedisConnectionInfo, SessionId
+from ai.backend.common.types import ModelServiceStatus, SessionId
 from ai.backend.logging import BraceStyleAdapter
 
 from .models import Circuit, Endpoint
@@ -43,7 +44,7 @@ class HealthCheckEngine:
 
     db: ExtendedAsyncSAEngine
     event_producer: EventProducer
-    redis_live: RedisConnectionInfo
+    valkey_live: ValkeyLiveClient
     circuit_manager: "CircuitManager"
 
     health_check_timer_interval: float
@@ -52,13 +53,13 @@ class HealthCheckEngine:
         self,
         db: ExtendedAsyncSAEngine,
         event_producer: EventProducer,
-        redis_live: RedisConnectionInfo,
+        valkey_live: ValkeyLiveClient,
         circuit_manager: "CircuitManager",
         health_check_timer_interval: float,
     ) -> None:
         self.db = db
         self.event_producer = event_producer
-        self.redis_live = redis_live
+        self.valkey_live = valkey_live
         self.circuit_manager = circuit_manager
         self.health_check_timer_interval = health_check_timer_interval
         self._session: Optional[aiohttp.ClientSession] = None
@@ -482,7 +483,7 @@ class HealthCheckEngine:
         """
         Check if enough time has elapsed since the last health check for this endpoint
 
-        Uses Redis to store last check times with TTL to handle multi-process coordination
+        Uses Valkey to store last check times with TTL to handle multi-process coordination
 
         Args:
             endpoint_id: Endpoint to check
@@ -492,13 +493,12 @@ class HealthCheckEngine:
             True if health check should be performed, False if interval hasn't elapsed
         """
         try:
-            from ai.backend.common import redis_helper
-
-            # Redis key for storing last check time
+            # Valkey key for storing last check time
             redis_key = f"endpoint.{endpoint_id}.last_health_check"
 
-            # Get last check time from Redis
-            last_check_str = await redis_helper.execute(self.redis_live, lambda r: r.get(redis_key))
+            # Get last check time from Valkey
+            last_check_bytes = await self.valkey_live.get_live_data(redis_key)
+            last_check_str = last_check_bytes.decode("utf-8") if last_check_bytes else None
 
             current_time = time.time()
 
@@ -538,24 +538,22 @@ class HealthCheckEngine:
 
         except Exception as e:
             log.error(
-                "Failed to check last health check time for endpoint {} from Redis: {} - will check now",
+                "Failed to check last health check time for endpoint {} from Valkey: {} - will check now",
                 endpoint_id,
                 e,
             )
-            # On Redis errors, default to checking (fail-safe)
+            # On Valkey errors, default to checking (fail-safe)
             return True
 
     async def _record_endpoint_check_time(self, endpoint_id: UUID) -> None:
         """
-        Record the current time as the last health check time for this endpoint in Redis
+        Record the current time as the last health check time for this endpoint in Valkey
 
         Args:
             endpoint_id: Endpoint that was just checked
         """
         try:
-            from ai.backend.common import redis_helper
-
-            # Redis key for storing last check time
+            # Valkey key for storing last check time
             redis_key = f"endpoint.{endpoint_id}.last_health_check"
             current_time = time.time()
 
@@ -563,20 +561,21 @@ class HealthCheckEngine:
             # TTL should be longer than the longest expected health check interval
             ttl_seconds = 300
 
-            await redis_helper.execute(
-                self.redis_live,
-                lambda r: r.setex(redis_key, ttl_seconds, str(current_time)),
+            await self.valkey_live.store_live_data(
+                redis_key,
+                str(current_time),
+                ex=ttl_seconds,
             )
 
             log.debug(
-                "Recorded health check time for endpoint {} in Redis (TTL: {}s)",
+                "Recorded health check time for endpoint {} in Valkey (TTL: {}s)",
                 endpoint_id,
                 ttl_seconds,
             )
 
         except Exception as e:
             log.error(
-                "Failed to record health check time for endpoint {} in Redis: {}",
+                "Failed to record health check time for endpoint {} in Valkey: {}",
                 endpoint_id,
                 e,
             )

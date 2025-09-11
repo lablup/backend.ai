@@ -24,6 +24,7 @@ from ai.backend.manager.sokovan.scheduler.results import ScheduledSessionData
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     KernelCreationInfo,
+    SessionRunningData,
     SessionsForPullWithImages,
     SessionsForStartWithImages,
     SessionTransitionData,
@@ -306,11 +307,11 @@ class SchedulerRepository:
         """
         return await self._db_source.get_sessions_for_transition(session_statuses, kernel_statuses)
 
-    async def update_sessions_to_running(self, session_ids: list[SessionId]) -> None:
+    async def update_sessions_to_running(self, sessions_data: list[SessionRunningData]) -> None:
         """
-        Update sessions from CREATING to RUNNING state.
+        Update sessions from CREATING to RUNNING state with occupying_slots.
         """
-        await self._db_source.update_sessions_to_running(session_ids)
+        await self._db_source.update_sessions_to_running(sessions_data)
 
     async def get_sessions_ready_to_terminate(self) -> list[SessionId]:
         """
@@ -550,3 +551,18 @@ class SchedulerRepository:
         :param access_keys: List of access keys to invalidate cache for
         """
         await self._cache_source.invalidate_keypair_concurrencies(access_keys)
+
+    async def update_session_network_id(
+        self,
+        session_id: SessionId,
+        network_id: Optional[str],
+    ) -> None:
+        """
+        Update the network ID associated with a session.
+        :param session_id: The session ID to update
+        :param network_id: The new network ID to set (or None to clear)
+        """
+        await self._db_source.update_session_network_id(
+            session_id,
+            network_id,
+        )

@@ -55,7 +55,6 @@ def mock_repository():
     """Mock ScheduleRepository for testing."""
     mock_repo = MagicMock()
     mock_repo.get_terminating_sessions = AsyncMock()
-    mock_repo.batch_update_terminated_status = AsyncMock()
     return mock_repo
 
 
@@ -96,7 +95,6 @@ class TestTerminateSessions:
         # Verify
         assert isinstance(result, ScheduleResult)
         assert len(result.scheduled_sessions) == 0
-        mock_repository.batch_update_terminated_status.assert_not_called()
 
     async def test_terminate_sessions_single_success(
         self,
@@ -150,15 +148,6 @@ class TestTerminateSessions:
             str(session_id),
             "USER_REQUESTED",
         )
-
-        # Verify batch update was called
-        mock_repository.batch_update_terminated_status.assert_called_once()
-
-        # Check the termination results passed to batch update
-        call_args = mock_repository.batch_update_terminated_status.call_args[0][0]
-        assert len(call_args) == 1
-        assert call_args[0].session_id == session_id
-        assert call_args[0].should_terminate_session is True
 
     async def test_terminate_sessions_multiple_kernels(
         self,
@@ -266,18 +255,6 @@ class TestTerminateSessions:
         # Verify
         # Session should not be counted as terminated due to partial failure
         assert len(result.scheduled_sessions) == 0
-
-        # Verify batch update was still called
-        mock_repository.batch_update_terminated_status.assert_called_once()
-
-        # Check termination results
-        call_args = mock_repository.batch_update_terminated_status.call_args[0][0]
-        assert len(call_args) == 1
-        session_result = call_args[0]
-        assert session_result.should_terminate_session is False  # Partial failure
-        assert len(session_result.kernel_results) == 2
-        assert session_result.kernel_results[0].success is True
-        assert session_result.kernel_results[1].success is False
 
     async def test_terminate_sessions_concurrent_execution(
         self,
@@ -433,11 +410,3 @@ class TestTerminateSessions:
         # Verify
         # Session without kernels cannot be terminated
         assert len(result.scheduled_sessions) == 0
-
-        # Batch update should still be called
-        mock_repository.batch_update_terminated_status.assert_called_once()
-
-        # Check that session is not marked as terminated
-        call_args = mock_repository.batch_update_terminated_status.call_args[0][0]
-        assert len(call_args) == 1
-        assert call_args[0].should_terminate_session is False

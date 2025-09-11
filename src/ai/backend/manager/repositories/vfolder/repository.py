@@ -8,6 +8,8 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import VFolderHostPermission, VFolderID
+from ai.backend.manager.data.permission.id import ObjectId, ScopeId
+from ai.backend.manager.data.permission.types import EntityType, OperationType, ScopeType
 from ai.backend.manager.data.vfolder.types import (
     VFolderAccessInfo,
     VFolderCreateParams,
@@ -45,15 +47,19 @@ from ai.backend.manager.models.vfolder import (
 )
 from ai.backend.manager.services.vfolder.exceptions import VFolderInvalidParameter
 
+from ..permission_controller.role_manager import RoleManager
+
 # Layer-specific decorator for vfolder repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.VFOLDER)
 
 
 class VfolderRepository:
     _db: ExtendedAsyncSAEngine
+    _role_manager: RoleManager
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+        self._role_manager = RoleManager()
 
     @repository_decorator()
     async def get_by_id_validated(
@@ -201,41 +207,6 @@ class VfolderRepository:
             return VFolderListResult(vfolders=vfolder_access_infos)
 
     @repository_decorator()
-    async def create_vfolder(self, params: VFolderCreateParams) -> VFolderData:
-        """
-        Create a new VFolder with the given parameters.
-        Returns the created VFolderData.
-        """
-        async with self._db.begin_session() as session:
-            insert_values = {
-                "id": params.id.hex,
-                "name": params.name,
-                "domain_name": params.domain_name,
-                "quota_scope_id": params.quota_scope_id,
-                "usage_mode": params.usage_mode,
-                "permission": params.permission,
-                "last_used": None,
-                "host": params.host,
-                "creator": params.creator,
-                "ownership_type": params.ownership_type,
-                "user": params.user,
-                "group": params.group,
-                "unmanaged_path": params.unmanaged_path,
-                "cloneable": params.cloneable,
-                "status": params.status,
-            }
-
-            query = sa.insert(VFolderRow, insert_values)
-            result = await session.execute(query)
-            assert result.rowcount == 1
-
-            # Return the created vfolder data
-            created_vfolder = await self._get_vfolder_by_id(session, params.id)
-            if not created_vfolder:
-                raise VFolderNotFound()
-            return self._vfolder_row_to_data(created_vfolder)
-
-    @repository_decorator()
     async def create_vfolder_with_permission(
         self, params: VFolderCreateParams, create_owner_permission: bool = False
     ) -> VFolderData:
@@ -266,6 +237,19 @@ class VfolderRepository:
             query = sa.insert(VFolderRow, insert_values)
             result = await session.execute(query)
             assert result.rowcount == 1
+            match params.ownership_type:
+                case VFolderOwnershipType.USER:
+                    scope_id = ScopeId(ScopeType.USER, str(params.user))
+                case VFolderOwnershipType.GROUP:
+                    scope_id = ScopeId(ScopeType.PROJECT, str(params.group))
+            await self._role_manager.map_entity_to_scope(
+                session,
+                entity_id=ObjectId(
+                    entity_type=EntityType.VFOLDER,
+                    entity_id=str(params.id),
+                ),
+                scope_id=scope_id,
+            )
 
             # Create owner permission if requested
             if create_owner_permission and params.user:
@@ -275,6 +259,23 @@ class VfolderRepository:
                     "permission": VFolderPermission.OWNER_PERM,
                 })
                 await session.execute(permission_insert)
+                await self._role_manager.map_entity_to_scope(
+                    session,
+                    entity_id=ObjectId(
+                        entity_type=EntityType.VFOLDER,
+                        entity_id=str(params.id),
+                    ),
+                    scope_id=ScopeId(ScopeType.USER, str(params.user)),
+                )
+                await self._role_manager.add_object_permission_to_user_role(
+                    session,
+                    user_id=params.user,
+                    entity_id=ObjectId(
+                        entity_type=EntityType.VFOLDER,
+                        entity_id=str(params.id),
+                    ),
+                    operations=[OperationType.READ],
+                )
 
             # Return the created vfolder data
             created_vfolder = await self._get_vfolder_by_id(session, params.id)
@@ -428,6 +429,24 @@ class VfolderRepository:
 
             query = sa.insert(VFolderPermissionRow, insert_values)
             await session.execute(query)
+
+            await self._role_manager.map_entity_to_scope(
+                session,
+                entity_id=ObjectId(
+                    entity_type=EntityType.VFOLDER,
+                    entity_id=str(vfolder_id),
+                ),
+                scope_id=ScopeId(ScopeType.USER, str(user_id)),
+            )
+            await self._role_manager.add_object_permission_to_user_role(
+                session,
+                user_id=user_id,
+                entity_id=ObjectId(
+                    entity_type=EntityType.VFOLDER,
+                    entity_id=str(vfolder_id),
+                ),
+                operations=permission.to_rbac_operation(),
+            )
 
             return VFolderPermissionData(
                 id=permission_id,

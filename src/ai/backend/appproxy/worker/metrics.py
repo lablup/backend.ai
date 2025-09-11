@@ -7,11 +7,8 @@ from uuid import UUID
 
 import aiohttp
 from prometheus_client.parser import text_string_to_metric_families
-from redis.asyncio import Redis
-from redis.asyncio.client import Pipeline
 
 from ai.backend.appproxy.common.types import RouteInfo
-from ai.backend.common import msgpack, redis_helper
 from ai.backend.common.types import MetricKey, ModelServiceStatus, RuntimeVariant
 from ai.backend.logging import BraceStyleAdapter
 
@@ -357,19 +354,11 @@ async def collect_inference_metric(root_ctx: RootContext, interval: float) -> No
                 replica_metrics_updates,
             )
 
-        async def _pipe_builder(r: Redis) -> Pipeline:
-            pipe = r.pipeline()
-            for endpoint_id, app_measures in app_metrics_updates.items():
-                await pipe.set(f"inference.{endpoint_id}.app", msgpack.packb(app_measures))
-                await pipe.expire(f"inference.{endpoint_id}.app", CACHE_LIFESPAN)
-            for (endpoint_id, replica_id), replica_measures in replica_metrics_updates.items():
-                await pipe.set(
-                    f"inference.{endpoint_id}.replica.{replica_id}", msgpack.packb(replica_measures)
-                )
-                await pipe.expire(f"inference.{endpoint_id}.replica.{replica_id}", CACHE_LIFESPAN)
-            return pipe
-
-        await redis_helper.execute(root_ctx.redis_stat, _pipe_builder)
+        await root_ctx.valkey_stat.store_inference_metrics(
+            app_metrics_updates,
+            replica_metrics_updates,
+            CACHE_LIFESPAN,
+        )
     except Exception:
         log.exception("collect_inference_metrics(): error while collecting metric:")
         raise

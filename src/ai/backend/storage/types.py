@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path, PurePath
 from typing import Any, Final, Mapping, Optional
@@ -105,3 +106,9 @@ class DirEntry:
     type: DirEntryType
     stat: Stat
     symlink_target: str
+
+
+@dataclass
+class BucketCopyOptions:
+    concurrency: int
+    progress_log_interval_bytes: int

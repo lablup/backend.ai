@@ -177,7 +177,7 @@ from datetime import datetime, timezone
 from ipaddress import IPv4Network
 from pathlib import Path
 from pprint import pformat
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Union
 
 from pydantic import (
     AliasChoices,
@@ -207,6 +207,7 @@ from ai.backend.common.typed_validators import (
 from ai.backend.common.types import ServiceDiscoveryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
 
@@ -401,6 +402,69 @@ class EtcdConfig(BaseModel):
             user=self.user,
             password=self.password,
         )
+
+
+class AuthConfig(BaseModel):
+    max_password_age: Optional[TimeDuration] = Field(
+        default=None,
+        description="""
+        Maximum password age before requiring a change.
+        Format is a duration string like "90d" for 90 days.
+        Set to None to disable password expiration.
+        """,
+        examples=[None, "90d", "180d"],
+        validation_alias=AliasChoices("max_password_age", "max-password-age"),
+        serialization_alias="max_password_age",
+    )
+    password_hash_algorithm: PasswordHashAlgorithm = Field(
+        default=PasswordHashAlgorithm.PBKDF2_SHA256,
+        description="""
+        The password hashing algorithm to use for new passwords.
+        Supported algorithms: bcrypt, sha256, sha3_256, pbkdf2_sha256, pbkdf2_sha3_256.
+        Existing passwords with different algorithms will be gradually migrated.
+        """,
+        examples=[
+            PasswordHashAlgorithm.BCRYPT,
+            PasswordHashAlgorithm.SHA256,
+            PasswordHashAlgorithm.SHA3_256,
+            PasswordHashAlgorithm.PBKDF2_SHA256,
+            PasswordHashAlgorithm.PBKDF2_SHA3_256,
+        ],
+        validation_alias=AliasChoices("password-hash-algorithm", "password_hash_algorithm"),
+        serialization_alias="password-hash-algorithm",
+    )
+    password_hash_rounds: int = Field(
+        default=600_000,
+        ge=1,
+        le=2_000_000,
+        description="""
+        The number of rounds (iterations) for the password hashing algorithm.
+        Higher values are more secure but slower.
+        - bcrypt: valid range is 4-31 (will be automatically capped at 31)
+        - pbkdf2_sha256: recommended 100,000+ (default 100,000)
+        - sha256/sha3_256: any positive integer (100,000 may be too high for these)
+        The value will be automatically adjusted to fit the algorithm's constraints.
+        """,
+        examples=[12, 100_000, 600_000],
+        validation_alias=AliasChoices("password-hash-rounds", "password_hash_rounds"),
+        serialization_alias="password-hash-rounds",
+    )
+    password_hash_salt_size: int = Field(
+        default=32,
+        ge=16,
+        le=256,
+        description="""
+        The size of the salt in bytes for password hashing.
+        Larger salts provide better protection against rainbow table attacks.
+        - Minimum: 16 bytes (128 bits)
+        - Default: 32 bytes (256 bits) - recommended for most use cases
+        - Maximum: 256 bytes (2048 bits)
+        Note: bcrypt manages its own salt internally, so this setting doesn't apply to bcrypt.
+        """,
+        examples=[16, 32, 64],
+        validation_alias=AliasChoices("password-hash-salt-size", "password_hash_salt_size"),
+        serialization_alias="password-hash-salt-size",
+    )
 
 
 class ManagerConfig(BaseModel):
@@ -1398,20 +1462,6 @@ class WatcherConfig(BaseModel):
     )
 
 
-class AuthConfig(BaseModel):
-    max_password_age: Optional[TimeDuration] = Field(
-        default=None,
-        description="""
-        Maximum password age before requiring a change.
-        Format is a duration string like "90d" for 90 days.
-        Set to None to disable password expiration.
-        """,
-        examples=[None, "90d", "180d"],
-        validation_alias=AliasChoices("max_password_age", "max-password-age"),
-        serialization_alias="max_password_age",
-    )
-
-
 class HangToleranceThresholdConfig(BaseModel):
     PREPARING: Optional[datetime] = Field(
         default=None,
@@ -1700,6 +1750,62 @@ class ServiceDiscoveryConfig(BaseModel):
     )
 
 
+class ReservoirObjectStorageConfig(BaseModel):
+    storage_type: Literal["object_storage"] = Field(
+        default="object_storage",
+        description="""
+        Type of the storage configuration.
+        This is used to identify the specific storage type.
+        """,
+        alias="type",
+    )
+    bucket_name: str = Field(
+        default="OBJECT_STORAGE_BUCKET_NAME",
+        description="""
+        Name of the bucket to use for the reservoir.
+        """,
+        examples=["minio-bucket"],
+        validation_alias=AliasChoices("bucket-name", "bucket_name"),
+        serialization_alias="bucket-name",
+    )
+
+
+StorageSpecificConfig = Union[ReservoirObjectStorageConfig]
+
+
+class ReservoirStorageConfig(BaseModel):
+    storage_name: str = Field(
+        default="RESERVOIR_STORAGE_NAME",
+        description="""
+        Name of the reservoir storage configuration.
+        Used to identify this storage in the system.
+        """,
+        examples=["minio-storage", "gitlfs-storage", "vfs-storage"],
+        validation_alias=AliasChoices("storage-name", "storage_name"),
+        serialization_alias="storage-name",
+    )
+    config: StorageSpecificConfig = Field(
+        default_factory=ReservoirObjectStorageConfig,
+        discriminator="storage_type",
+        description="""
+        Configuration for the storage.
+        """,
+    )
+
+
+class ModelRegistryConfig(BaseModel):
+    model_registry: str = Field(
+        default="MODEL_REGISTRY_NAME",
+        description="""
+        Name of the Model registry configuration.
+        Used to identify this registry in the system.
+        """,
+        examples=["model-registry"],
+        validation_alias=AliasChoices("model-registry", "model_registry"),
+        serialization_alias="model-registry",
+    )
+
+
 class ManagerUnifiedConfig(BaseModel):
     # From legacy local config
     db: DatabaseConfig = Field(
@@ -1872,6 +1978,21 @@ class ManagerUnifiedConfig(BaseModel):
         description="""
         Service discovery configuration.
         Controls how services are discovered and connected within the Backend.AI system.
+        """,
+    )
+    artifact_registry: ModelRegistryConfig = Field(
+        default_factory=ModelRegistryConfig,
+        description="""
+        Default artifact registry config.
+        """,
+        validation_alias=AliasChoices("artifact_registry", "artifact-registry"),
+        serialization_alias="artifact-registry",
+    )
+    reservoir: ReservoirStorageConfig = Field(
+        default_factory=ReservoirStorageConfig,
+        description="""
+        Reservoir storage configuration.
+        Controls which storage backend is used for the reservoir.
         """,
     )
 

@@ -14,14 +14,23 @@ from huggingface_hub import (
     list_repo_refs,
     model_info,
 )
+from huggingface_hub.errors import (
+    GatedRepoError,
+)
 from huggingface_hub.hf_api import ModelInfo as HfModelInfo
 from huggingface_hub.hf_api import RepoFile, RepoFolder
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
     ModelData,
     ModelSortKey,
     ModelTarget,
+)
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.artifact.anycast import (
+    ModelMetadataFetchDoneEvent,
+    ModelMetadataInfo,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import HuggingFaceAPIError
@@ -78,7 +87,6 @@ class HuggingFaceClient:
             )
             return list(models)
         except Exception as e:
-            log.error(f"Failed to list models: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to list models: {str(e)}") from e
 
     async def list_model_revisions(self, model_id: str) -> list[str]:
@@ -94,16 +102,20 @@ class HuggingFaceClient:
             refs = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: list_repo_refs(model_id, token=self._token)
             )
-            revisions = []
+            revisions = set()
             for branch in refs.branches:
-                revisions.append(branch.name)
-
-            # TODO: Should we consider tag?
-            # for tag in refs.tags:
-            #     revisions.append(tag.name)
-            return revisions
+                revisions.add(branch.name)
+            for tag in refs.tags:
+                revisions.add(tag.name)
+            return list(revisions)
+        except GatedRepoError:
+            # Just return the main branch for gated repos
+            return ["main"]
         except Exception as e:
-            log.error(f"Failed to list revisions for {model_id}: {str(e)}")
+            # TODO: Improve exception handling
+            log.warning(
+                f"Failed to list revisions for {model_id}: {str(e)}, skipping and fallback to main..."
+            )
             # Fall back to main revision if revision listing fails
             return ["main"]
 
@@ -117,17 +129,14 @@ class HuggingFaceClient:
             HfModelInfo object with model metadata
         """
         model_id = model.model_id
-        revision = model.revision
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
             result = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: model_info(model_id, revision=revision, token=self._token)
             )
             return result
         except Exception as e:
-            log.error(f"Failed to get model info for {model_id}@{revision}: {str(e)}")
-            raise HuggingFaceAPIError(
-                f"Failed to get model info for {model_id}@{revision}: {str(e)}"
-            ) from e
+            raise HuggingFaceAPIError(f"Failed to get model info for {model}: {str(e)}") from e
 
     async def list_model_filepaths(self, model: ModelTarget) -> list[str]:
         """List files in a model repository.
@@ -139,17 +148,14 @@ class HuggingFaceClient:
             List of file paths
         """
         model_id = model.model_id
-        revision = model.revision
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
         try:
             filepaths = await asyncio.get_event_loop().run_in_executor(
                 None, lambda: list_repo_files(model_id, revision=revision, token=self._token)
             )
             return filepaths
         except Exception as e:
-            log.error(f"Failed to list files for {model_id}@{revision}: {str(e)}")
-            raise HuggingFaceAPIError(
-                f"Failed to list files for {model_id}@{revision}: {str(e)}"
-            ) from e
+            raise HuggingFaceAPIError(f"Failed to list files for {model}: {str(e)}") from e
 
     async def list_model_files_info(
         self, model: ModelTarget, paths: list[str]
@@ -164,7 +170,7 @@ class HuggingFaceClient:
             List of RepoFile or RepoFolder objects
         """
         model_id = model.model_id
-        revision = model.revision
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
 
         try:
             info = await asyncio.get_event_loop().run_in_executor(
@@ -175,10 +181,7 @@ class HuggingFaceClient:
             )
             return info
         except Exception as e:
-            log.error(f"Failed to get paths info for {model_id}@{revision} ({paths}): {str(e)}")
-            raise HuggingFaceAPIError(
-                f'Failed to get paths info for "{model_id}@{revision}": {str(e)}'
-            ) from e
+            raise HuggingFaceAPIError(f'Failed to get paths info for "{model}": {str(e)}') from e
 
     def get_download_url(self, model: ModelTarget, filename: str) -> str:
         """Generate download URL for a specific file.
@@ -190,16 +193,13 @@ class HuggingFaceClient:
         Returns:
             Download URL
         """
-        try:
-            return hf_hub_url(repo_id=model.model_id, filename=filename, revision=model.revision)
-        except Exception:
-            # Fallback URL
-            return f"https://huggingface.co/{model.model_id}/resolve/{model.revision}/{filename}"
-
-
-@dataclass
-class HuggingFaceScannerArgs:
-    client: HuggingFaceClient
+        return hf_hub_url(
+            repo_id=model.model_id,
+            filename=filename,
+            revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
+            endpoint=self._endpoint,
+            repo_type="model",
+        )
 
 
 class HuggingFaceScanner:
@@ -229,7 +229,7 @@ class HuggingFaceScanner:
                 log.info("No models returned from scan_models()")
                 return []
 
-            async def build_model_data_for_revisions(model: HfModelInfo) -> list[ModelData]:
+            async def build_model_data_per_revision(model: HfModelInfo) -> list[ModelData]:
                 """Build ModelData objects for all revisions of a single model."""
                 model_data_list = []
                 try:
@@ -247,6 +247,7 @@ class HuggingFaceScanner:
                             created_at=model.created_at,
                             modified_at=model.last_modified,
                             readme=None,
+                            size=None,
                         )
                         model_data_list.append(model_data)
 
@@ -259,19 +260,18 @@ class HuggingFaceScanner:
                 return model_data_list
 
             # Fire tasks concurrently and collect results
-            tasks = [asyncio.create_task(build_model_data_for_revisions(m)) for m in models]
-            results = await asyncio.gather(*tasks, return_exceptions=False)
+            tasks = [asyncio.create_task(build_model_data_per_revision(m)) for m in models]
+            task_results = await asyncio.gather(*tasks, return_exceptions=False)
 
             # Flatten the list of lists
-            model_infos: list[ModelData] = []
-            for model_data_list in results:
-                model_infos.extend(model_data_list)
+            result: list[ModelData] = []
+            for model_data_list in task_results:
+                result.extend(model_data_list)
 
-            log.info(f"Successfully scanned HuggingFace models: count={len(model_infos)}")
-            return model_infos
+            log.info(f"Successfully scanned HuggingFace models: count={len(result)}")
+            return result
 
         except Exception as e:
-            log.error(f"Failed to scan HuggingFace models: {str(e)}")
             raise HuggingFaceAPIError(f"Failed to scan models: {str(e)}") from e
 
     async def scan_model(self, model: ModelTarget) -> ModelData:
@@ -283,36 +283,66 @@ class HuggingFaceScanner:
         Returns:
             ModelData object with model metadata and files
         """
-        model_id = model.model_id
-        revision = model.revision
-
         try:
-            log.info(f"Scanning specific HuggingFace model: model_id={model_id}@{revision}")
+            log.info(f"Scanning specific HuggingFace model: {model}")
             model_info = await self._client.scan_model(model)
-
+            total_size = await self._calculate_model_size(model)
             readme_content = await self._download_readme(model)
 
+            model_id = model.model_id
             result = ModelData(
                 id=model_id,
                 name=model_id.split("/")[-1],
                 author=model_info.author,
-                revision=revision,
+                revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
                 tags=model_info.tags or [],
                 created_at=model_info.created_at,
                 modified_at=model_info.last_modified,
                 readme=readme_content,
+                size=total_size,
             )
 
             log.info(
-                f"Successfully scanned HuggingFace model: model_id={model_id}@{revision}",
+                f"Successfully scanned HuggingFace model: {model}",
             )
             return result
 
         except Exception as e:
-            log.error(f"Failed to scan HuggingFace model {model_id}@{revision}: {str(e)}")
-            raise HuggingFaceAPIError(
-                f"Failed to scan model {model_id}@{revision}: {str(e)}"
-            ) from e
+            raise HuggingFaceAPIError(f"Failed to scan model {model}: {str(e)}") from e
+
+    async def scan_model_without_metadata(self, model: ModelTarget) -> ModelData:
+        """Scan a specific model by ID without README and size metadata.
+
+        Args:
+            model: HuggingFace model to scan
+
+        Returns:
+            ModelData object with basic metadata only (without README and size)
+        """
+        try:
+            log.info(f"Scanning HuggingFace model without metadata: {model}")
+            model_info = await self._client.scan_model(model)
+
+            model_id = model.model_id
+            result = ModelData(
+                id=model_id,
+                name=model_id.split("/")[-1],
+                author=model_info.author,
+                revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
+                tags=model_info.tags or [],
+                created_at=model_info.created_at,
+                modified_at=model_info.last_modified,
+                readme=None,
+                size=None,
+            )
+
+            log.info(
+                f"Successfully scanned HuggingFace model without metadata: {model}",
+            )
+            return result
+
+        except Exception as e:
+            raise HuggingFaceAPIError(f"Failed to scan model {model}: {str(e)}") from e
 
     def get_download_url(self, model: ModelTarget, filename: str) -> str:
         """Generate download URL for a specific file.
@@ -333,11 +363,8 @@ class HuggingFaceScanner:
             model: HuggingFace model
 
         Returns:
-            List of FileInfo objects
+            List of FileObjectData
         """
-        model_id = model.model_id
-        revision = model.revision
-
         try:
             filepaths = await self._client.list_model_filepaths(model)
             model_files = await self._client.list_model_files_info(model, filepaths)
@@ -368,17 +395,62 @@ class HuggingFaceScanner:
                 except Exception as e:
                     path = getattr(file, "path", "unknown")
                     log.error(
-                        f"Error processing file {path} info for model {model_id}@{revision}. Details: {str(e)}"
+                        f"Error processing file {path} info for model {model}. Details: {str(e)}"
                     )
                     continue
 
             return file_infos
 
         except Exception as e:
-            log.error(f"Failed to list files for model {model_id}@{revision}: {str(e)}")
-            raise HuggingFaceAPIError(
-                f"Failed to list files for model {model_id}@{revision}: {str(e)}"
-            ) from e
+            raise HuggingFaceAPIError(f"Failed to list files for model {model}: {str(e)}") from e
+
+    async def download_metadata_batch(
+        self,
+        models: list[ModelData],
+        registry_name: str,
+        event_producer: EventProducer,
+        max_concurrent: int = 8,
+    ) -> None:
+        """Download metadata (README and file size) for all models and fire event when complete.
+
+        Args:
+            models: List of ModelData objects to download metadata for
+            registry_name: Name of the registry (e.g., HuggingFace registry name)
+            event_producer: Event producer to fire the completion event
+            max_concurrent: Maximum number of concurrent metadata downloads (default: 8)
+        """
+        log.info(
+            f"Starting batch metadata processing for {len(models)} models (max_concurrent={max_concurrent})"
+        )
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def download_metadata(model_data: ModelData) -> None:
+            """Download metadata (README and file size) for a single model."""
+            async with semaphore:
+                try:
+                    model_target = ModelTarget(model_id=model_data.id, revision=model_data.revision)
+                    total_size = await self._calculate_model_size(model_target)
+                    readme_content = await self._download_readme(model_target)
+
+                    # Only add to results if we have README content
+                    if readme_content:
+                        metadata_info = ModelMetadataInfo(
+                            model_id=model_data.id,
+                            revision=model_data.revision,
+                            readme_content=readme_content,
+                            registry_type=ArtifactRegistryType.HUGGINGFACE,
+                            registry_name=registry_name,
+                            size=total_size,
+                        )
+                        await event_producer.anycast_event(
+                            ModelMetadataFetchDoneEvent(model=metadata_info)
+                        )
+                except Exception as e:
+                    log.warning(f"Failed to download metadata for {model_data.id}: {str(e)}")
+
+        # Download metadata concurrently with semaphore limit
+        tasks = [download_metadata(model) for model in models]
+        await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _download_readme(self, model: ModelTarget) -> Optional[str]:
         """Download README content for a model.
@@ -399,12 +471,18 @@ class HuggingFaceScanner:
                         return content
                     else:
                         log.warning(
-                            f"Failed to download README for {model.model_id}@{model.revision}: HTTP {response.status}"
+                            f"Failed to download README for {model}, status code: {response.status}"
                         )
                         return None
 
         except Exception as e:
-            log.warning(
-                f"Failed to download README for {model.model_id}@{model.revision}: {str(e)}"
-            )
+            log.warning(f"Failed to download README for {model}: {str(e)}")
             return None
+
+    async def _calculate_model_size(self, model: ModelTarget) -> int:
+        try:
+            file_infos = await self.list_model_files_info(model)
+            return sum(file.size for file in file_infos)
+        except Exception as size_error:
+            log.warning(f"Failed to calculate size for {model}: {str(size_error)}")
+            return 0
