@@ -69,6 +69,7 @@ from ai.backend.appproxy.common.utils import (
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
 from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import ConfigScopes
@@ -246,10 +247,19 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     await ping_redis_connection(root_ctx.redis_lock)
 
+    # Initialize ValkeyScheduleClient for health status updates
+    root_ctx.valkey_schedule = await ValkeyScheduleClient.create(
+        valkey_target=core_redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
+        db_id=REDIS_LIVE_DB,
+        human_readable_name="appproxy-schedule",
+    )
+    log.info("ValkeyScheduleClient initialized for health status updates")
+
     yield
 
     await root_ctx.valkey_live.close()
     await root_ctx.core_valkey_live.close()
+    await root_ctx.valkey_schedule.close()
     await root_ctx.redis_lock.close()
 
 
@@ -496,6 +506,7 @@ async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.valkey_live,
         root_ctx.circuit_manager,
         root_ctx.local_config.proxy_coordinator.health_check_timer_interval,
+        root_ctx.valkey_schedule,
     )
     root_ctx.health_engine = health_engine
     await health_engine.start()

@@ -16,6 +16,7 @@ from ai.backend.appproxy.coordinator.models.utils import (
     execute_with_txn_retry,
 )
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
@@ -46,6 +47,7 @@ class HealthCheckEngine:
     event_producer: EventProducer
     valkey_live: ValkeyLiveClient
     circuit_manager: "CircuitManager"
+    valkey_schedule: ValkeyScheduleClient
 
     health_check_timer_interval: float
 
@@ -56,12 +58,14 @@ class HealthCheckEngine:
         valkey_live: ValkeyLiveClient,
         circuit_manager: "CircuitManager",
         health_check_timer_interval: float,
+        valkey_schedule: ValkeyScheduleClient,
     ) -> None:
         self.db = db
         self.event_producer = event_producer
         self.valkey_live = valkey_live
         self.circuit_manager = circuit_manager
         self.health_check_timer_interval = health_check_timer_interval
+        self.valkey_schedule = valkey_schedule
         self._session: Optional[aiohttp.ClientSession] = None
 
     async def start(self) -> None:
@@ -201,6 +205,21 @@ class HealthCheckEngine:
                 endpoint.id,
             )
 
+            # Update readiness status in Redis for manager to consume
+            route_readiness: dict[str, bool] = {}
+            for route_id, (status, _, _) in route_health_results.items():
+                # Consider route ready if it's healthy
+                route_readiness[str(route_id)] = status == ModelServiceStatus.HEALTHY
+
+            try:
+                await self.valkey_schedule.update_routes_readiness_batch(route_readiness)
+                log.debug(
+                    "Updated readiness status in Redis for {} routes",
+                    len(route_readiness),
+                )
+            except Exception as e:
+                log.error("Failed to update readiness status in Redis: {}", e)
+
         # Record that we performed a health check for this endpoint
         await self._record_endpoint_check_time(endpoint.id)
 
@@ -243,7 +262,6 @@ class HealthCheckEngine:
         # Perform the health check request
         try:
             timeout = aiohttp.ClientTimeout(total=config.max_wait_time)
-
             async with self._session.get(health_check_url, timeout=timeout) as response:
                 if response.status == config.expected_status_code:
                     log.debug(
@@ -253,17 +271,15 @@ class HealthCheckEngine:
                         response.status,
                     )
                     return True
-                else:
-                    log.warning(
-                        "Container health check failed for route {} at {} (expected: {}, got: {}, failures: {})",
-                        route.route_id,
-                        health_check_url,
-                        config.expected_status_code,
-                        response.status,
-                        route.consecutive_failures + 1,
-                    )
-                    return False
-
+                log.warning(
+                    "Container health check failed for route {} at {} (expected: {}, got: {}, failures: {})",
+                    route.route_id,
+                    health_check_url,
+                    config.expected_status_code,
+                    response.status,
+                    route.consecutive_failures + 1,
+                )
+                return False
         except asyncio.TimeoutError:
             log.warning(
                 "Container health check timeout for route {} at {} (timeout: {}s, failures: {})",
