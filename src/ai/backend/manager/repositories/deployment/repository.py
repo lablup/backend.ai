@@ -13,6 +13,7 @@ import tomli
 from pydantic import HttpUrl
 from ruamel.yaml import YAML
 
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
@@ -69,16 +70,19 @@ class DeploymentRepository:
     _db_source: DeploymentDBSource
     _storage_source: DeploymentStorageSource
     _valkey_stat: ValkeyStatClient
+    _valkey_live: ValkeyLiveClient
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
         storage_manager: StorageSessionManager,
         valkey_stat: ValkeyStatClient,
+        valkey_live: ValkeyLiveClient,
     ) -> None:
-        self._db_source = DeploymentDBSource(db)
+        self._db_source = DeploymentDBSource(db, storage_manager)
         self._storage_source = DeploymentStorageSource(storage_manager)
         self._valkey_stat = valkey_stat
+        self._valkey_live = valkey_live
 
     # Endpoint operations
 
@@ -728,3 +732,44 @@ class DeploymentRepository:
     ) -> Mapping[uuid.UUID, Optional[SessionStatus]]:
         """Fetch session IDs for multiple routes."""
         return await self._db_source.fetch_session_statuses_by_route_ids(route_ids)
+
+    async def update_endpoint_route_info(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> None:
+        """
+        Update endpoint route information in Redis for app proxy.
+
+        Args:
+            endpoint_id: ID of the endpoint whose routes have been updated
+
+        Raises:
+            EndpointNotFound: If the endpoint does not exist
+        """
+        # Generate route connection info
+        connection_info = await self._db_source.generate_route_connection_info(endpoint_id)
+
+        # Get health check config
+        health_check_config = await self._db_source.get_endpoint_health_check_config(endpoint_id)
+
+        # Update Redis with route info
+        await self._valkey_live.update_appproxy_redis_info(
+            endpoint_id,
+            connection_info,
+            health_check_config,
+        )
+
+    async def get_endpoint_id_by_session(
+        self,
+        session_id: uuid.UUID,
+    ) -> Optional[uuid.UUID]:
+        """
+        Get endpoint ID associated with a session.
+
+        Args:
+            session_id: ID of the session
+
+        Returns:
+            Endpoint ID if found, None otherwise
+        """
+        return await self._db_source.get_endpoint_id_by_session(session_id)

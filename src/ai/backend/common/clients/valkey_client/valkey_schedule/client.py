@@ -29,10 +29,12 @@ class HealthStatus:
 
     readiness: bool
     liveness: bool
+    last_check: int  # Unix timestamp of last check by manager
 
     def is_alive(self) -> bool:
         """Check if the route is considered alive (both readiness and liveness are true)."""
-        return self.readiness and self.liveness
+        # TODO: Use liveness too after applying liveness checks in agent
+        return self.readiness
 
 
 class ValkeyScheduleClient:
@@ -285,11 +287,12 @@ class ValkeyScheduleClient:
         # Convert bytes to strings and parse
         data = {k.decode(): v.decode() for k, v in result.items()}
 
-        # Parse boolean values
+        # Parse boolean values and timestamp
         readiness = data.get("readiness") == "1"
         liveness = data.get("liveness") == "1"
+        last_check = int(data["last_check"]) if "last_check" in data else 0
 
-        return HealthStatus(readiness=readiness, liveness=liveness)
+        return HealthStatus(readiness=readiness, liveness=liveness, last_check=last_check)
 
     @valkey_decorator()
     async def initialize_route_health_status(self, route_id: str) -> None:
@@ -301,48 +304,16 @@ class ValkeyScheduleClient:
         :param route_id: The route ID to initialize
         """
         key = self._get_route_health_key(route_id)
+        current_time = str(int(time()))
         data: Mapping[str | bytes, str | bytes] = {
             "readiness": "0",
             "liveness": "0",
+            "last_check": current_time,
         }
-        batch = Batch(is_atomic=True)
+        batch = Batch(is_atomic=False)
         batch.hset(key, data)
         batch.expire(key, ROUTE_HEALTH_TTL_SEC)
         await self._client.client.exec(batch, raise_on_error=True)
-
-    @valkey_decorator()
-    async def get_routes_health_status(
-        self, route_ids: list[str]
-    ) -> Mapping[str, Optional[HealthStatus]]:
-        """
-        Get health status for multiple routes from Redis.
-
-        :param route_ids: List of route IDs to check
-        :return: Mapping of route ID to HealthStatus object or None if not found
-        """
-        if not route_ids:
-            return {}
-
-        batch = Batch(is_atomic=False)
-        for route_id in route_ids:
-            key = self._get_route_health_key(route_id)
-            batch.hgetall(key)
-        results = await self._client.client.exec(batch, raise_on_error=False)
-        if results is None:
-            return {route_id: None for route_id in route_ids}
-
-        health_statuses: dict[str, Optional[HealthStatus]] = {}
-        for route_id, result in zip(route_ids, results):
-            result = cast(dict[bytes, bytes], result)
-            if not result:
-                health_statuses[route_id] = None
-                continue
-            data = {k.decode(): v.decode() for k, v in result.items()}
-            health_statuses[route_id] = HealthStatus(
-                readiness=data.get("readiness") == "1", liveness=data.get("liveness") == "1"
-            )
-
-        return health_statuses
 
     @valkey_decorator()
     async def update_route_readiness(self, route_id: str, readiness: bool) -> None:
@@ -356,7 +327,7 @@ class ValkeyScheduleClient:
         key = self._get_route_health_key(route_id)
         data: Mapping[str | bytes, str | bytes] = {"readiness": "1" if readiness else "0"}
 
-        batch = Batch(is_atomic=True)
+        batch = Batch(is_atomic=False)
         batch.hset(key, data)
         batch.expire(key, ROUTE_HEALTH_TTL_SEC)
         await self._client.client.exec(batch, raise_on_error=True)
@@ -373,7 +344,7 @@ class ValkeyScheduleClient:
         key = self._get_route_health_key(route_id)
         data: Mapping[str | bytes, str | bytes] = {"liveness": "1" if liveness else "0"}
 
-        batch = Batch(is_atomic=True)
+        batch = Batch(is_atomic=False)
         batch.hset(key, data)
         batch.expire(key, ROUTE_HEALTH_TTL_SEC)
         await self._client.client.exec(batch, raise_on_error=True)
@@ -424,7 +395,9 @@ class ValkeyScheduleClient:
             # Parse existing data
             data = {k.decode(): v.decode() for k, v in result.items()}
             health_statuses[route_id] = HealthStatus(
-                readiness=data.get("readiness") == "1", liveness=data.get("liveness") == "1"
+                readiness=data.get("readiness") == "1",
+                liveness=data.get("liveness") == "1",
+                last_check=int(data["last_check"]) if "last_check" in data else 0,
             )
 
         return health_statuses

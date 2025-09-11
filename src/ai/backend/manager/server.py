@@ -870,6 +870,7 @@ async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             storage_manager=root_ctx.storage_manager,
             config_provider=root_ctx.config_provider,
             valkey_stat_client=root_ctx.valkey_stat,
+            valkey_live_client=root_ctx.valkey_live,
         )
     )
     root_ctx.repositories = repositories
@@ -1102,6 +1103,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         root_ctx.distributed_lock_factory,
         agent_pool,
         root_ctx.network_plugin_ctx,
+        root_ctx.event_producer,
         root_ctx.valkey_schedule,
     )
 

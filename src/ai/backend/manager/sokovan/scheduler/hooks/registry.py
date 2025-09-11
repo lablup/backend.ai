@@ -7,6 +7,7 @@ import logging
 from collections import defaultdict
 from dataclasses import dataclass
 
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import SessionTypes
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentPool
@@ -29,6 +30,7 @@ class HookRegistryArgs:
     agent_pool: AgentPool
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
+    event_producer: EventProducer
 
 
 class HookRegistry:
@@ -36,6 +38,7 @@ class HookRegistry:
     _agent_pool: AgentPool
     _network_plugin_ctx: NetworkPluginContext
     _config_provider: ManagerConfigProvider
+    _event_producer: EventProducer
     _hooks: defaultdict[SessionTypes, AbstractSessionHook]
 
     def __init__(self, args: HookRegistryArgs) -> None:
@@ -43,6 +46,7 @@ class HookRegistry:
         self._agent_pool = args.agent_pool
         self._network_plugin_ctx = args.network_plugin_ctx
         self._config_provider = args.config_provider
+        self._event_producer = args.event_producer
         self._hooks = defaultdict(NoOpSessionHook)
         self._initialize_hooks()
 
@@ -55,7 +59,7 @@ class HookRegistry:
         self._hooks[SessionTypes.INTERACTIVE] = SessionHook(InteractiveSessionHook(), args)
         self._hooks[SessionTypes.BATCH] = SessionHook(BatchSessionHook(self._agent_pool), args)
         self._hooks[SessionTypes.INFERENCE] = SessionHook(
-            InferenceSessionHook(self._repository), args
+            InferenceSessionHook(self._repository, self._event_producer), args
         )
         self._hooks[SessionTypes.SYSTEM] = SessionHook(SystemSessionHook(), args)
 

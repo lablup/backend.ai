@@ -177,7 +177,7 @@ class RouteExecutor:
 
         # Get health status for all routes from Redis
         route_ids = [str(route.route_id) for route in routes]
-        health_statuses = await self._valkey_schedule.get_routes_health_status(route_ids)
+        health_statuses = await self._valkey_schedule.check_route_health_status(route_ids)
 
         for route in routes:
             route_id_str = str(route.route_id)
