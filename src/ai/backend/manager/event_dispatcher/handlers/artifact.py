@@ -9,6 +9,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
@@ -88,6 +89,15 @@ class ArtifactEventHandler:
                 artifact.id,
                 model_info.size,
             )
+
+            if self._config_provider.config.reservoir.enable_approve_process:
+                await self._artifact_repository.update_artifact_revision_status(
+                    revision.id, ArtifactStatus.NEEDS_APPROVAL
+                )
+            else:
+                await self._artifact_repository.update_artifact_revision_status(
+                    revision.id, ArtifactStatus.AVAILABLE
+                )
         except Exception as model_error:
             log.error(
                 "Failed to process metadata update for model: {} - {}",
