@@ -1,4 +1,4 @@
-from typing import Any
+from pathlib import PurePosixPath
 
 from aiohttp import web
 
@@ -9,6 +9,7 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
+from ai.backend.common.types import VFolderID
 
 
 class StorageProxyError(BackendAIError, web.HTTPInternalServerError):
@@ -132,15 +133,9 @@ class InvalidSubpathError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/subpath/invalid"
     error_title = "Invalid Subpath"
 
-    def __init__(self, vfid: Any = None, relpath: Any = None) -> None:
-        if vfid is not None:
-            if relpath is not None:
-                msg_str = f"{vfid}/{relpath}"
-            else:
-                msg_str = str(vfid)
-            super().__init__(extra_msg=msg_str, extra_data=msg_str)
-        else:
-            super().__init__()
+    def __init__(self, vfid: VFolderID, relpath: PurePosixPath) -> None:
+        msg_str = f"Invalid Subpath (vfid={vfid}, relpath={relpath})"
+        super().__init__(extra_msg=msg_str, extra_data=msg_str)
 
     @classmethod
     def error_code(cls) -> ErrorCode:
