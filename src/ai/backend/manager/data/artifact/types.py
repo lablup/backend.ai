@@ -28,6 +28,15 @@ class ArtifactStatus(enum.StrEnum):
     REJECTED = "REJECTED"
 
 
+class ArtifactAvailability(enum.StrEnum):
+    """
+    Artifact's availability.
+    """
+
+    ALIVE = "ALIVE"
+    DELETED = "DELETED"
+
+
 @dataclass
 class ArtifactData:
     id: uuid.UUID
@@ -38,6 +47,7 @@ class ArtifactData:
     source_registry_id: uuid.UUID
     registry_type: ArtifactRegistryType
     source_registry_type: ArtifactRegistryType
+    availability: ArtifactAvailability
     scanned_at: datetime
     updated_at: datetime
     readonly: bool

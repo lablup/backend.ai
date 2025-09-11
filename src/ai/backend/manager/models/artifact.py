@@ -8,6 +8,7 @@ from sqlalchemy.orm import foreign, relationship
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
+    ArtifactAvailability,
     ArtifactData,
     ArtifactType,
 )
@@ -55,6 +56,13 @@ class ArtifactRow(Base):
     updated_at = sa.Column(
         "updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
+    availability = sa.Column(
+        "availability",
+        sa.String,
+        nullable=False,
+        default=ArtifactAvailability.ALIVE.value,
+        index=True,
+    )
 
     huggingface_registry = relationship(
         "HuggingFaceRegistryRow",
@@ -87,6 +95,7 @@ class ArtifactRow(Base):
             f"source_registry_id={self.source_registry_id}, "
             f"source_registry_type={self.source_registry_type}, "
             f"description={self.description}, "
+            f"availability={self.availability}, "
             f"scanned_at={self.scanned_at}, "
             f"updated_at={self.updated_at}, "
             f"readonly={self.readonly})"
@@ -105,6 +114,7 @@ class ArtifactRow(Base):
             source_registry_id=self.source_registry_id,
             source_registry_type=ArtifactRegistryType(self.source_registry_type),
             description=self.description,
+            availability=ArtifactAvailability(self.availability),
             scanned_at=self.scanned_at,
             updated_at=self.updated_at,
             readonly=self.readonly,

@@ -209,7 +209,15 @@ type Artifact implements Node
   readonly: Boolean!
   scannedAt: DateTime!
   updatedAt: DateTime!
+  availability: ArtifactAvailability!
   revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
+}
+
+enum ArtifactAvailability
+  @join__type(graph: STRAWBERRY)
+{
+  ALIVE @join__enumValue(graph: STRAWBERRY)
+  DELETED @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.14.0"""
@@ -243,6 +251,7 @@ input ArtifactFilter
   name: StringFilter = null
   registry: StringFilter = null
   source: StringFilter = null
+  availability: [ArtifactAvailability!] = null
   AND: [ArtifactFilter!] = null
   OR: [ArtifactFilter!] = null
   NOT: [ArtifactFilter!] = null
