@@ -4,7 +4,8 @@ Place it under `manager` directory and then run it with manager's python interpr
 """
 
 import asyncio
-from typing import TYPE_CHECKING
+from collections.abc import Coroutine
+from typing import Optional
 from urllib.parse import quote_plus as urlquote
 from uuid import UUID
 
@@ -31,13 +32,10 @@ from ai.backend.manager.models import (
 from ai.backend.manager.models.endpoint import ModelServiceHelper
 from ai.backend.manager.models.utils import create_async_engine
 
-if TYPE_CHECKING:
-    from typing import Coroutine
-
 
 async def get_health_check_info(
     storage_manager: StorageSessionManager, endpoint: EndpointRow, model: VFolderRow
-) -> HealthCheckConfig | None:
+) -> Optional[HealthCheckConfig]:
     if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
         return HealthCheckConfig(path=_path)
     elif endpoint.runtime_variant == RuntimeVariant.CUSTOM:
@@ -91,7 +89,7 @@ async def update_appproxy_endpoint_entity(
                     pass
 
 
-async def main(get_bootstrap_config_coro: "Coroutine[None, None, BootstrapConfig]") -> None:
+async def main(get_bootstrap_config_coro: Coroutine[None, None, BootstrapConfig]) -> None:
     config: BootstrapConfig = await get_bootstrap_config_coro
     etcd = AsyncEtcd.initialize(config.etcd.to_dataclass())
     raw_volumes_config = await etcd.get_prefix("volumes")
