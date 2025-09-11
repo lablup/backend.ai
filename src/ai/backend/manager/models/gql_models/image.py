@@ -222,7 +222,8 @@ class Image(graphene.ObjectType):
             size_bytes=row.size_bytes,
             status=row.status,
             resource_limits=[
-                ResourceLimit(key=k, min=v.get("min", Decimal(0))) for k, v in row.resources.items()
+                ResourceLimit(key=k, min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
+                for k, v in row.resources.items()
             ],
             supported_accelerators=(row.accelerators or "").split(","),
             installed=len(installed_agents) > 0,
@@ -570,7 +571,8 @@ class ImageNode(graphene.ObjectType):
             labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
             size_bytes=row.size_bytes,
             resource_limits=[
-                ResourceLimit(key=k, min=v.get("min", Decimal(0))) for k, v in row.resources.items()
+                ResourceLimit(key=k, min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
+                for k, v in row.resources.items()
             ],
             supported_accelerators=(row.accelerators or "").split(","),
             aliases=[alias_row.alias for alias_row in row.aliases],
