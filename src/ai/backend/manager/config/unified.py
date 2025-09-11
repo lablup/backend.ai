@@ -1997,7 +1997,6 @@ class ManagerUnifiedConfig(BaseModel):
         default_factory=ArtifactServiceConfig,
         description="""
         Artifact service configuration.
-        Controls settings related to artifact uploads and management.
         """,
         validation_alias=AliasChoices("artifact_service", "artifact-service"),
         serialization_alias="artifact-service",
