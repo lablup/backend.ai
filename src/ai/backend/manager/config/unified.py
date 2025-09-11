@@ -1793,6 +1793,19 @@ class ReservoirStorageConfig(BaseModel):
     )
 
 
+class ArtifactServiceConfig(BaseModel):
+    enable_approve_process: bool = Field(
+        default=False,
+        description="""
+        Whether to enable the approval process for artifact uploads.
+        When enabled, artifacts require approval before being available.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices("enable-approve-process", "enable_approve_process"),
+        serialization_alias="enable-approve-process",
+    )
+
+
 class ModelRegistryConfig(BaseModel):
     model_registry: str = Field(
         default="MODEL_REGISTRY_NAME",
@@ -1979,6 +1992,15 @@ class ManagerUnifiedConfig(BaseModel):
         Service discovery configuration.
         Controls how services are discovered and connected within the Backend.AI system.
         """,
+    )
+    artifact_service: ArtifactServiceConfig = Field(
+        default_factory=ArtifactServiceConfig,
+        description="""
+        Artifact service configuration.
+        Controls settings related to artifact uploads and management.
+        """,
+        validation_alias=AliasChoices("artifact_service", "artifact-service"),
+        serialization_alias="artifact-service",
     )
     artifact_registry: ModelRegistryConfig = Field(
         default_factory=ModelRegistryConfig,

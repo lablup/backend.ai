@@ -95,6 +95,7 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.event_dispatcher.handlers.artifact import ArtifactEventHandler
 from ai.backend.manager.event_dispatcher.handlers.artifact_registry import (
     ArtifactRegistryEventHandler,
@@ -142,6 +143,7 @@ class DispatcherArgs:
     repositories: Repositories
     processors_factory: Callable[[], Processors]
     storage_manager: StorageSessionManager
+    config_provider: ManagerConfigProvider
     use_sokovan: bool = True
 
 
@@ -206,6 +208,7 @@ class Dispatchers:
             args.repositories.artifact.repository,
             args.repositories.huggingface_registry.repository,
             args.repositories.reservoir_registry.repository,
+            args.config_provider,
         )
         self._artifact_registry_event_handler = ArtifactRegistryEventHandler(
             args.processors_factory,
