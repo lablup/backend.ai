@@ -11,7 +11,10 @@ from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.common import ObjectNotFound, ServerMisconfiguredError
+from ai.backend.manager.errors.common import (
+    ObjectNotFound,
+    ServerMisconfiguredError,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ..models import query_allowed_sgroups
@@ -36,7 +39,10 @@ async def query_wsproxy_status(
     wsproxy_addr: str,
 ) -> dict[str, Any]:
     async with aiohttp.ClientSession() as session:
-        async with session.get(wsproxy_addr + "/status") as resp:
+        async with session.get(
+            wsproxy_addr + "/status",
+            headers={"Accept": "application/json"},
+        ) as resp:
             return await resp.json()
 
 
