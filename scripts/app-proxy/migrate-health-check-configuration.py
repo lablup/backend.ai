@@ -5,6 +5,7 @@ Place it under `manager` directory and then run it with manager's python interpr
 
 import asyncio
 from collections.abc import Coroutine
+from http import HTTPStatus
 from typing import Optional
 from urllib.parse import quote_plus as urlquote
 from uuid import UUID
@@ -85,7 +86,7 @@ async def update_appproxy_endpoint_entity(
             try:
                 resp.raise_for_status()
             except aiohttp.ClientResponseError as e:
-                if e.status == 404:
+                if e.status == HTTPStatus.NOT_FOUND:
                     pass
 
 
