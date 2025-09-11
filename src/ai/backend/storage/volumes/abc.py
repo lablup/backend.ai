@@ -255,7 +255,7 @@ class AbstractVolume(metaclass=ABCMeta):
             raise VFolderNotFoundError(f"VFolder not found or not a directory: {vfid}")
         target_path = (vfpath / relpath).resolve()
         if not target_path.is_relative_to(vfpath):
-            raise InvalidSubpathError(f"Invalid subpath '{relpath}' for VFolder {vfid}")
+            raise InvalidSubpathError(vfid, relpath)
         return target_path
 
     @final
