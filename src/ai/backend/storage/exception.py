@@ -1,4 +1,4 @@
-from typing import Any
+from pathlib import PurePosixPath
 
 from aiohttp import web
 
@@ -9,30 +9,40 @@ from ai.backend.common.exception import (
     ErrorDomain,
     ErrorOperation,
 )
-from ai.backend.common.json import dump_json_str
+from ai.backend.common.types import VFolderID
 
 
-class StorageBackendAIError(BackendAIError):
-    """
-    Base class for storage-related errors with flexible constructor for backward compatibility.
-    """
+class ExecutionError(BackendAIError, web.HTTPInternalServerError):
+    """Base exception for storage operation execution failures"""
 
-    def __init__(self, msg: Any = None) -> None:
-        payload = {
-            "type": self.error_type,
-            "title": self.error_title,
-        }
-        if msg is not None:
-            msg_str = str(msg)
-            payload["title"] = f"{self.error_title} ({msg_str})"
-            payload["data"] = msg_str
-        super().__init__(
-            text=dump_json_str(payload),
-            content_type="application/problem+json",
+    error_type = "https://api.backend.ai/probs/storage/execution/failed"
+    error_title = "Storage Operation Execution Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
-class StorageProxyError(StorageBackendAIError, web.HTTPInternalServerError):
+class ExternalError(BackendAIError, web.HTTPInternalServerError):
+    """Base exception for external system operation failures"""
+
+    error_type = "https://api.backend.ai/probs/storage/external/failed"
+    error_title = "External Operation Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class StorageProxyError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/generic"
     error_title = "Storage Proxy Error"
 
@@ -45,22 +55,9 @@ class StorageProxyError(StorageBackendAIError, web.HTTPInternalServerError):
         )
 
 
-class ExecutionError(StorageBackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/storage/execution-failed"
-    error_title = "Storage Execution Error"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.STORAGE_PROXY,
-            operation=ErrorOperation.EXECUTE,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
-
-
-class ExternalError(StorageBackendAIError, web.HTTPServiceUnavailable):
-    error_type = "https://api.backend.ai/probs/storage/external-error"
-    error_title = "Storage External Error"
+class VastAPIError(ExternalError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/storage/vast/api-error"
+    error_title = "VAST Data API Error"
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -71,9 +68,61 @@ class ExternalError(StorageBackendAIError, web.HTTPServiceUnavailable):
         )
 
 
-class NotEmptyError(StorageBackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/storage/not-empty"
-    error_title = "Storage Not Empty"
+class VastCapacityDataNotFoundError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/storage/vast/capacity-data-not-found"
+    error_title = "VAST Capacity Data Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class NetAppClientError(ExternalError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/storage/netapp/api-error"
+    error_title = "NetApp API Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class GPFSAPIError(ExternalError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/storage/gpfs/api-error"
+    error_title = "GPFS Scale API Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class QuotaScopeProvisioningError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/storage/quota/provisioning-failed"
+    error_title = "Quota Provisioning Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class QuotaDirectoryNotEmptyError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/storage/quota-directory-not-empty"
+    error_title = "Quota Directory Not Empty"
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -84,7 +133,7 @@ class NotEmptyError(StorageBackendAIError, web.HTTPConflict):
         )
 
 
-class VFolderCreationError(StorageBackendAIError, web.HTTPInternalServerError):
+class VFolderCreationError(ExecutionError):
     error_type = "https://api.backend.ai/probs/storage/vfolder/creation-failed"
     error_title = "VFolder Creation Failed"
 
@@ -97,7 +146,7 @@ class VFolderCreationError(StorageBackendAIError, web.HTTPInternalServerError):
         )
 
 
-class VFolderNotFoundError(StorageBackendAIError, web.HTTPNotFound):
+class VFolderNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/vfolder/not-found"
     error_title = "VFolder Not Found"
 
@@ -110,7 +159,7 @@ class VFolderNotFoundError(StorageBackendAIError, web.HTTPNotFound):
         )
 
 
-class QuotaScopeNotFoundError(StorageBackendAIError, web.HTTPNotFound):
+class QuotaScopeNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/quota/scope/not-found"
     error_title = "Quota Scope Not Found"
 
@@ -123,7 +172,7 @@ class QuotaScopeNotFoundError(StorageBackendAIError, web.HTTPNotFound):
         )
 
 
-class QuotaScopeAlreadyExists(StorageBackendAIError, web.HTTPConflict):
+class QuotaScopeAlreadyExists(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/storage/quota/scope/already-exists"
     error_title = "Quota Scope Already Exists"
 
@@ -136,7 +185,7 @@ class QuotaScopeAlreadyExists(StorageBackendAIError, web.HTTPConflict):
         )
 
 
-class InvalidQuotaConfig(StorageBackendAIError, web.HTTPBadRequest):
+class InvalidQuotaConfig(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/quota/config/invalid"
     error_title = "Invalid Quota Config"
 
@@ -153,22 +202,9 @@ class InvalidSubpathError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/subpath/invalid"
     error_title = "Invalid Subpath"
 
-    def __init__(self, vfid: Any = None, relpath: Any = None) -> None:
-        payload = {
-            "type": self.error_type,
-            "title": self.error_title,
-        }
-        if vfid is not None:
-            if relpath is not None:
-                msg_str = f"{vfid}/{relpath}"
-            else:
-                msg_str = str(vfid)
-            payload["title"] = f"{self.error_title} ({msg_str})"
-            payload["data"] = msg_str
-        super().__init__(
-            text=dump_json_str(payload),
-            content_type="application/problem+json",
-        )
+    def __init__(self, vfid: VFolderID, relpath: PurePosixPath) -> None:
+        msg_str = f"Invalid Subpath (vfid={vfid}, relpath={relpath})"
+        super().__init__(extra_msg=msg_str, extra_data=msg_str)
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -179,7 +215,7 @@ class InvalidSubpathError(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class InvalidQuotaScopeError(StorageBackendAIError, web.HTTPBadRequest):
+class InvalidQuotaScopeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/quota/scope/invalid"
     error_title = "Invalid Quota Scope"
 
@@ -192,7 +228,7 @@ class InvalidQuotaScopeError(StorageBackendAIError, web.HTTPBadRequest):
         )
 
 
-class InvalidVolumeError(StorageBackendAIError, web.HTTPBadRequest):
+class InvalidVolumeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/volume/invalid"
     error_title = "Invalid Volume"
 
@@ -205,7 +241,7 @@ class InvalidVolumeError(StorageBackendAIError, web.HTTPBadRequest):
         )
 
 
-class WatcherClientError(StorageBackendAIError, web.HTTPInternalServerError):
+class WatcherClientError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/watcher/client-error"
     error_title = "Watcher Client Error"
 
@@ -231,7 +267,7 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class FileStreamUploadError(StorageBackendAIError, web.HTTPInternalServerError):
+class FileStreamUploadError(ExecutionError):
     error_type = "https://api.backend.ai/probs/storage/file-stream-upload-failed"
     error_title = "Failed to upload file stream"
 
@@ -244,7 +280,7 @@ class FileStreamUploadError(StorageBackendAIError, web.HTTPInternalServerError):
         )
 
 
-class FileStreamDownloadError(StorageBackendAIError, web.HTTPInternalServerError):
+class FileStreamDownloadError(ExecutionError):
     error_type = "https://api.backend.ai/probs/storage/file-stream-download-failed"
     error_title = "Failed to download file stream"
 
@@ -257,7 +293,7 @@ class FileStreamDownloadError(StorageBackendAIError, web.HTTPInternalServerError
         )
 
 
-class PresignedUploadURLGenerationError(StorageBackendAIError, web.HTTPInternalServerError):
+class PresignedUploadURLGenerationError(ExecutionError):
     error_type = "https://api.backend.ai/probs/storage/presigned-upload-url-generation-failed"
     error_title = "Failed to generate presigned upload URL"
 
@@ -270,7 +306,7 @@ class PresignedUploadURLGenerationError(StorageBackendAIError, web.HTTPInternalS
         )
 
 
-class PresignedDownloadURLGenerationError(StorageBackendAIError, web.HTTPInternalServerError):
+class PresignedDownloadURLGenerationError(ExecutionError):
     error_type = "https://api.backend.ai/probs/storage/presigned-download-url-generation-failed"
     error_title = "Failed to generate presigned download URL"
 
@@ -283,7 +319,7 @@ class PresignedDownloadURLGenerationError(StorageBackendAIError, web.HTTPInterna
         )
 
 
-class ObjectInfoFetchError(StorageBackendAIError, web.HTTPInternalServerError):
+class ObjectInfoFetchError(ExecutionError):
     error_type = "https://api.backend.ai/probs/storage/object-info-fetch-failed"
     error_title = "Failed to fetch object info"
 
@@ -296,7 +332,7 @@ class ObjectInfoFetchError(StorageBackendAIError, web.HTTPInternalServerError):
         )
 
 
-class StorageNotFoundError(StorageBackendAIError, web.HTTPNotFound):
+class StorageNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/object-not-found"
     error_title = "Storage Config Not Found"
 
@@ -309,7 +345,7 @@ class StorageNotFoundError(StorageBackendAIError, web.HTTPNotFound):
         )
 
 
-class StorageBucketNotFoundError(StorageBackendAIError, web.HTTPNotFound):
+class StorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/bucket/object-not-found"
     error_title = "Storage Bucket Not Found"
 
@@ -322,7 +358,7 @@ class StorageBucketNotFoundError(StorageBackendAIError, web.HTTPNotFound):
         )
 
 
-class StorageBucketFileNotFoundError(StorageBackendAIError, web.HTTPNotFound):
+class StorageBucketFileNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/bucket/file/object-not-found"
     error_title = "Storage Bucket File Not Found"
 
@@ -335,7 +371,7 @@ class StorageBucketFileNotFoundError(StorageBackendAIError, web.HTTPNotFound):
         )
 
 
-class RegistryNotFoundError(StorageBackendAIError, web.HTTPNotFound):
+class RegistryNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/registries/registry-not-found"
     error_title = "Registry Not Found"
 
@@ -348,7 +384,7 @@ class RegistryNotFoundError(StorageBackendAIError, web.HTTPNotFound):
         )
 
 
-class HuggingFaceAPIError(StorageBackendAIError, web.HTTPInternalServerError):
+class HuggingFaceAPIError(ExternalError):
     error_type = "https://api.backend.ai/probs/registries/huggingface/api-error"
     error_title = "HuggingFace API Error"
 
@@ -361,7 +397,7 @@ class HuggingFaceAPIError(StorageBackendAIError, web.HTTPInternalServerError):
         )
 
 
-class HuggingFaceModelNotFoundError(StorageBackendAIError, web.HTTPNotFound):
+class HuggingFaceModelNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/registries/huggingface/model-not-found"
     error_title = "HuggingFace Model Not Found"
 
@@ -374,7 +410,7 @@ class HuggingFaceModelNotFoundError(StorageBackendAIError, web.HTTPNotFound):
         )
 
 
-class ObjectStorageConfigInvalidError(StorageBackendAIError, web.HTTPBadRequest):
+class ObjectStorageConfigInvalidError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/object/config/invalid"
     error_title = "Object Storage Config Invalid"
 
@@ -387,7 +423,7 @@ class ObjectStorageConfigInvalidError(StorageBackendAIError, web.HTTPBadRequest)
         )
 
 
-class ReservoirStorageConfigInvalidError(StorageBackendAIError, web.HTTPBadRequest):
+class ReservoirStorageConfigInvalidError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/reservoir/config/invalid"
     error_title = "Reservoir Storage Config Invalid"
 
@@ -400,7 +436,7 @@ class ReservoirStorageConfigInvalidError(StorageBackendAIError, web.HTTPBadReque
         )
 
 
-class ArtifactStorageEmptyError(StorageBackendAIError, web.HTTPNotFound):
+class ArtifactStorageEmptyError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/artifact/config/invalid"
     error_title = "Artifact Storage Empty"
 
@@ -413,7 +449,7 @@ class ArtifactStorageEmptyError(StorageBackendAIError, web.HTTPNotFound):
         )
 
 
-class ArtifactRevisionEmptyError(StorageBackendAIError, web.HTTPBadRequest):
+class ArtifactRevisionEmptyError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/artifact/revision/empty"
     error_title = "Artifact Revision Empty"
 
@@ -426,7 +462,7 @@ class ArtifactRevisionEmptyError(StorageBackendAIError, web.HTTPBadRequest):
         )
 
 
-class ArtifactImportError(StorageBackendAIError, web.HTTPInternalServerError):
+class ArtifactImportError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/artifact/import/failed"
     error_title = "Artifact Import Failed"
 

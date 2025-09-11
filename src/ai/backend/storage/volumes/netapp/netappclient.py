@@ -75,7 +75,7 @@ from typing import (
 
 import aiohttp
 
-from ...exception import ExternalError
+from ...exception import NetAppClientError
 from ...types import QuotaConfig, QuotaUsage
 
 StorageID: TypeAlias = uuid.UUID
@@ -120,10 +120,6 @@ class QTreeInfo(TypedDict):
     security_style: NotRequired[str]
     export_policy: NotRequired[dict[str, Any]]
     statistics: NotRequired[dict[str, Any]]
-
-
-class NetAppClientError(ExternalError):
-    pass
 
 
 class NetAppClient:

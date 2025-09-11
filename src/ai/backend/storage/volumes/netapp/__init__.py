@@ -33,7 +33,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ...exception import (
     ExecutionError,
     InvalidQuotaScopeError,
-    NotEmptyError,
+    QuotaDirectoryNotEmptyError,
     QuotaScopeNotFoundError,
 )
 from ...subproc import spawn_and_watch
@@ -163,7 +163,7 @@ class QTreeQuotaModel(BaseQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
-            raise NotEmptyError(quota_scope_id)
+            raise QuotaDirectoryNotEmptyError(str(quota_scope_id))
         # QTree and quota rule is automatically removed
         # when the corresponding directory is deleted.
         await aiofiles.os.rmdir(qspath)
