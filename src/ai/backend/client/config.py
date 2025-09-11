@@ -2,20 +2,9 @@ import enum
 import os
 import random
 import re
+from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
-from typing import (
-    Any,
-    Callable,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Sequence,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, Callable, Optional, TypeVar, cast
 
 import appdirs
 from dotenv import find_dotenv, load_dotenv
@@ -49,7 +38,7 @@ local_state_path = Path(appdirs.user_state_dir("backend.ai", "Lablup"))
 local_cache_path = Path(appdirs.user_cache_dir("backend.ai", "Lablup"))
 
 
-def parse_api_version(value: str) -> Tuple[int, str]:
+def parse_api_version(value: str) -> tuple[int, str]:
     match = re.search(r"^v(?P<major>\d+)\.(?P<date>\d{8})$", value)
     if match is not None:
         return int(match.group(1)), match.group(2)
@@ -65,7 +54,7 @@ def default_clean(v: T | Any) -> T:
 
 def get_env(
     key: str,
-    default: Union[str, Mapping, Undefined] = _undefined,
+    default: str | Mapping | Undefined = _undefined,
     *,
     clean: Callable[[Any], T] = default_clean,
 ) -> T:
@@ -106,7 +95,7 @@ def bool_env(v: str) -> bool:
     raise ValueError("Unrecognized value of boolean environment variable", v)
 
 
-def _clean_urls(v: Union[URL, str]) -> List[URL]:
+def _clean_urls(v: URL | str) -> list[URL]:
     if isinstance(v, URL):
         return [v]
     urls = []
@@ -119,13 +108,13 @@ def _clean_urls(v: Union[URL, str]) -> List[URL]:
     return urls
 
 
-def _clean_tokens(v: str) -> Tuple[str, ...]:
+def _clean_tokens(v: str) -> tuple[str, ...]:
     if not v:
         return tuple()
     return tuple(v.split(","))
 
 
-def _clean_address_map(v: Union[str, Mapping]) -> Mapping:
+def _clean_address_map(v: str | Mapping) -> Mapping:
     if isinstance(v, dict):
         return v
     if not isinstance(v, str):
@@ -182,7 +171,7 @@ class APIConfig:
         <ai.backend.client.kernel.Kernel.get_or_create>` calls.
     """
 
-    DEFAULTS: Mapping[str, Union[str, Mapping]] = {
+    DEFAULTS: Mapping[str, str | Mapping] = {
         "endpoint": "https://api.cloud.backend.ai",
         "endpoint_type": "api",
         "version": f"v{API_VERSION[0]}.{API_VERSION[1]}",
@@ -198,7 +187,7 @@ class APIConfig:
     except the access and secret keys.
     """
 
-    _endpoints: List[URL]
+    _endpoints: list[URL]
     _group: str
     _hash_type: str
     _skip_sslcert_validation: bool
@@ -207,7 +196,7 @@ class APIConfig:
     def __init__(
         self,
         *,
-        endpoint: Optional[Union[URL, str]] = None,
+        endpoint: Optional[URL | str] = None,
         endpoint_type: Optional[str] = None,
         domain: Optional[str] = None,
         group: Optional[str] = None,
