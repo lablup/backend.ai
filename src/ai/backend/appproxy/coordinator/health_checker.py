@@ -18,9 +18,6 @@ from ai.backend.appproxy.coordinator.models.utils import (
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.model_serving.anycast import (
-    ModelServiceStatusAnycastEvent,
-)
 from ai.backend.common.events.event_types.model_serving.broadcast import (
     ModelServiceStatusBroadcastEvent,
 )
@@ -142,12 +139,10 @@ class HealthCheckEngine:
             return
 
         # Check health for each individual container in the circuit's route_info
-        route_health_results: dict[UUID, tuple[ModelServiceStatus | None, float, int]] = {}
-
+        route_health_results: dict[UUID, tuple[Optional[ModelServiceStatus], float, int]] = {}
         for route in circuit.route_info:
             if not route.route_id:
                 continue
-
             # Check individual container health via route_info
             is_healthy = await self._check_individual_container_health(route, config)
 
@@ -160,7 +155,7 @@ class HealthCheckEngine:
             else:
                 # Health check failed - increment consecutive failures
                 new_consecutive_failures = route.consecutive_failures + 1
-                new_status: ModelServiceStatus | None
+                new_status: Optional[ModelServiceStatus]
 
                 # Only mark as UNHEALTHY if consecutive failures exceed max_retries
                 if new_consecutive_failures > config.max_retries:
@@ -243,7 +238,7 @@ class HealthCheckEngine:
         # Construct health check URL directly to the container
         try:
             health_check_url = (
-                f"http://{route.kernel_host}:{route.kernel_port}/{config.path.lstrip('/')}"
+                f"http://{route.current_kernel_host}:{route.kernel_port}/{config.path.lstrip('/')}"
             )
 
             # Validate URL scheme
@@ -1070,21 +1065,11 @@ class HealthCheckEngine:
                     old_status,
                     new_status,
                 )
-
-                # Create anycast event (MyPy expects additional fields, but runtime only needs session_id and new_status)
-                anycast_event = ModelServiceStatusAnycastEvent(
-                    session_id=session_id_obj,
-                    new_status=new_status,
-                )
-
                 # Create broadcast event (MyPy expects additional fields, but runtime only needs session_id and new_status)
                 broadcast_event = ModelServiceStatusBroadcastEvent(
                     session_id=session_id_obj,
                     new_status=new_status,
                 )
-
-                # Publish both events using core_event_producer
-                await self.event_producer.anycast_event(anycast_event)
                 await self.event_producer.broadcast_event(broadcast_event)
 
                 log.debug(

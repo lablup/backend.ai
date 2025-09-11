@@ -24,7 +24,7 @@ from ai.backend.common.clients.valkey_client.client import (
     create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
-from ai.backend.common.data.config.types import HealthCheckConfig
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -510,7 +510,7 @@ class ValkeyLiveClient:
         self,
         endpoint_id: UUID,
         connection_info: dict[str, Any],
-        health_check_config: HealthCheckConfig | None,
+        health_check_config: Optional[ModelHealthCheck],
     ) -> None:
         pipe = self._create_batch()
         pipe.set(
@@ -523,13 +523,14 @@ class ValkeyLiveClient:
             "true" if health_check_config is not None else "false",
             expiry=ExpirySet(ExpiryType.SEC, 3600),
         )
+        # TODO: Don't update health_check_config when route is updated.
         if health_check_config:
             pipe.set(
                 f"endpoint.{endpoint_id}.health_check_config",
                 health_check_config.model_dump_json(),
                 expiry=ExpirySet(ExpiryType.SEC, 3600),
             )
-        await self._client.client.exec(pipe, True)
+        await self._client.client.exec(pipe, raise_on_error=True)
 
     @valkey_decorator()
     async def delete_key(self, key: str) -> int:

@@ -14,6 +14,7 @@ from pydantic import HttpUrl
 from ruamel.yaml import YAML
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
@@ -71,6 +72,7 @@ class DeploymentRepository:
     _storage_source: DeploymentStorageSource
     _valkey_stat: ValkeyStatClient
     _valkey_live: ValkeyLiveClient
+    _valkey_schedule: ValkeyScheduleClient
 
     def __init__(
         self,
@@ -78,11 +80,13 @@ class DeploymentRepository:
         storage_manager: StorageSessionManager,
         valkey_stat: ValkeyStatClient,
         valkey_live: ValkeyLiveClient,
+        valkey_schedule: ValkeyScheduleClient,
     ) -> None:
         self._db_source = DeploymentDBSource(db, storage_manager)
         self._storage_source = DeploymentStorageSource(storage_manager)
         self._valkey_stat = valkey_stat
         self._valkey_live = valkey_live
+        self._valkey_schedule = valkey_schedule
 
     # Endpoint operations
 
@@ -440,12 +444,15 @@ class DeploymentRepository:
         self,
         route_session_ids: Mapping[uuid.UUID, SessionId],
     ) -> None:
-        """Update session IDs for multiple routes.
+        """Update session IDs for multiple routes and initialize their health status.
 
         Args:
             route_session_ids: Mapping of route IDs to new session IDs
         """
+        # Update sessions in database
         await self._db_source.update_route_sessions(route_session_ids)
+        route_id_strings = [str(route_id) for route_id in route_session_ids.keys()]
+        await self._valkey_schedule.initialize_routes_health_status_batch(route_id_strings)
 
     async def delete_routes_by_route_ids(
         self,
@@ -737,15 +744,6 @@ class DeploymentRepository:
         self,
         endpoint_id: uuid.UUID,
     ) -> None:
-        """
-        Update endpoint route information in Redis for app proxy.
-
-        Args:
-            endpoint_id: ID of the endpoint whose routes have been updated
-
-        Raises:
-            EndpointNotFound: If the endpoint does not exist
-        """
         # Generate route connection info
         connection_info = await self._db_source.generate_route_connection_info(endpoint_id)
 

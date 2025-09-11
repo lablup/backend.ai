@@ -1220,18 +1220,6 @@ class DeploymentDBSource:
         self,
         endpoint_id: uuid.UUID,
     ) -> dict[str, Any]:
-        """
-        Generate route connection information for an endpoint.
-
-        Args:
-            endpoint_id: ID of the endpoint
-
-        Returns:
-            Dictionary containing route connection information
-
-        Raises:
-            EndpointNotFound: If the endpoint does not exist
-        """
         async with self._begin_readonly_session_read_committed() as db_sess:
             endpoint = await EndpointRow.get(
                 db_sess,
@@ -1246,22 +1234,14 @@ class DeploymentDBSource:
         self,
         endpoint_id: uuid.UUID,
     ) -> Optional[ModelHealthCheck]:
-        """
-        Get health check configuration for an endpoint.
-
-        Args:
-            endpoint_id: ID of the endpoint
-
-        Returns:
-            Health check configuration or None if not configured
-
-        Raises:
-            EndpointNotFound: If the endpoint does not exist
-        """
         async with self._begin_readonly_session_read_committed() as db_sess:
             endpoint = await EndpointRow.get(
                 db_sess,
                 endpoint_id,
+                load_created_user=True,
+                load_session_owner=True,
+                load_image=True,
+                load_routes=True,
             )
             if not endpoint:
                 raise EndpointNotFound(str(endpoint_id))

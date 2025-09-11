@@ -12,6 +12,7 @@ from typing import (
     Generic,
     Iterable,
     Mapping,
+    Optional,
     Sequence,
     TypeAlias,
     TypeVar,
@@ -21,7 +22,7 @@ from uuid import UUID
 
 import aiohttp_cors
 from aiohttp import web
-from pydantic import AnyUrl, BaseModel, Field
+from pydantic import AliasChoices, AnyUrl, BaseModel, Field
 
 from ai.backend.common.types import ModelServiceStatus, RuntimeVariant
 
@@ -103,11 +104,53 @@ class RouteInfo(BaseModel):
     route_info JSON column for efficient filtering and atomic updates.
     """
 
-    route_id: Annotated[UUID | None, Field(default=None)]
-    session_id: UUID
-    session_name: Annotated[str | None, Field(default=None)]
-    kernel_host: str
-    kernel_port: int
+    route_id: Annotated[
+        Optional[UUID],
+        Field(
+            default=None,
+            description="Unique identifier for the route. If None, indicates a temporary route.",
+            validation_alias=AliasChoices("route-id", "route_id"),
+            serialization_alias="route_id",
+        ),
+    ]
+    session_id: Annotated[
+        UUID,
+        Field(
+            ...,
+            description="ID of the session associated with this route.",
+            validation_alias=AliasChoices("session-id", "session_id"),
+            serialization_alias="session_id",
+        ),
+    ]
+    session_name: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            description="Name of the session associated with this route.",
+            validation_alias=AliasChoices("session-name", "session_name"),
+            serialization_alias="session_name",
+        ),
+    ]
+    kernel_host: Annotated[
+        Optional[str],
+        Field(
+            ...,
+            description="Host/IP address of the kernel. This is the address that the proxy will use to connect to the kernel.",
+            validation_alias=AliasChoices("kernel-host", "kernel_host"),
+            serialization_alias="kernel_host",
+        ),
+    ]
+    kernel_port: Annotated[
+        int,
+        Field(
+            ...,
+            description="Port number of the kernel. This is the port that the proxy will use to connect to the kernel.",
+            ge=1,
+            le=65535,
+            validation_alias=AliasChoices("kernel-port", "kernel_port"),
+            serialization_alias="kernel_port",
+        ),
+    ]
     protocol: ProxyProtocol
     traffic_ratio: Annotated[float, Field(default=1.0)]
     health_status: Annotated[
@@ -134,6 +177,10 @@ class RouteInfo(BaseModel):
 
     def __hash__(self) -> int:
         return hash(json.dumps(self.model_dump(mode="json")))
+
+    @property
+    def current_kernel_host(self) -> str:
+        return self.kernel_host or "localhost"
 
 
 class SerializableCircuit(BaseModel):

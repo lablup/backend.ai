@@ -295,24 +295,30 @@ class ValkeyScheduleClient:
         return HealthStatus(readiness=readiness, liveness=liveness, last_check=last_check)
 
     @valkey_decorator()
-    async def initialize_route_health_status(self, route_id: str) -> None:
+    async def initialize_routes_health_status_batch(self, route_ids: list[str]) -> None:
         """
-        Initialize health status for a route in Redis with TTL.
+        Batch initialize health status for multiple routes in Redis with TTL.
         This should only be called during initial route creation.
         Always initializes with readiness=False and liveness=False.
 
-        :param route_id: The route ID to initialize
+        :param route_ids: List of route IDs to initialize
         """
-        key = self._get_route_health_key(route_id)
+        if not route_ids:
+            return
+
         current_time = str(int(time()))
-        data: Mapping[str | bytes, str | bytes] = {
-            "readiness": "0",
-            "liveness": "0",
-            "last_check": current_time,
-        }
         batch = Batch(is_atomic=False)
-        batch.hset(key, data)
-        batch.expire(key, ROUTE_HEALTH_TTL_SEC)
+
+        for route_id in route_ids:
+            key = self._get_route_health_key(route_id)
+            data: Mapping[str | bytes, str | bytes] = {
+                "readiness": "0",
+                "liveness": "0",
+                "last_check": current_time,
+            }
+            batch.hset(key, data)
+            batch.expire(key, ROUTE_HEALTH_TTL_SEC)
+
         await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_decorator()

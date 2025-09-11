@@ -871,6 +871,7 @@ async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             config_provider=root_ctx.config_provider,
             valkey_stat_client=root_ctx.valkey_stat,
             valkey_live_client=root_ctx.valkey_live,
+            valkey_schedule_client=root_ctx.valkey_schedule,
         )
     )
     root_ctx.repositories = repositories

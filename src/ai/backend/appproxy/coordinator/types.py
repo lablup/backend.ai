@@ -19,7 +19,7 @@ from uuid import UUID
 import aiohttp_cors
 import attrs
 from prometheus_client import generate_latest
-from pydantic import BaseModel, Field, TypeAdapter
+from pydantic import AliasChoices, BaseModel, Field, TypeAdapter
 
 from ai.backend.appproxy.common.etcd import TraefikEtcd, convert_to_etcd_dict
 from ai.backend.appproxy.common.events import (
@@ -321,12 +321,64 @@ CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]
 
 
 class InferenceAppConfig(BaseModel):
-    session_id: UUID
-    route_id: Annotated[UUID | None, Field(default=None)]
-    kernel_host: str
-    kernel_port: int
-    protocol: Annotated[ProxyProtocol, Field(default=ProxyProtocol.HTTP)]
-    traffic_ratio: Annotated[float, Field(ge=0.0, le=1.0, default=1.0)]
+    session_id: Annotated[
+        UUID,
+        Field(
+            ...,
+            description="ID of the session associated with the inference app.",
+            validation_alias=AliasChoices("session-id", "session_id"),
+            serialization_alias="session-id",
+        ),
+    ]
+    route_id: Annotated[
+        Optional[UUID],
+        Field(
+            default=None,
+            description="ID of the route. This is optional and may not be present for older routes.",
+            validation_alias=AliasChoices("route-id", "route_id"),
+            serialization_alias="route-id",
+        ),
+    ]
+    kernel_host: Annotated[
+        Optional[str],
+        Field(
+            ...,
+            description="Host/IP address of the kernel. This is the address that the proxy will use to connect to the kernel.",
+            validation_alias=AliasChoices("kernel-host", "kernel_host"),
+            serialization_alias="kernel-host",
+        ),
+    ]
+    kernel_port: Annotated[
+        int,
+        Field(
+            ...,
+            ge=1,
+            le=65535,
+            description="Port number of the kernel. This is the port that the proxy will use to connect to the kernel.",
+            validation_alias=AliasChoices("kernel-port", "kernel_port"),
+            serialization_alias="kernel-port",
+        ),
+    ]
+    protocol: Annotated[
+        ProxyProtocol,
+        Field(
+            default=ProxyProtocol.HTTP,
+            description="Protocol used to connect to the kernel. Supported protocols are HTTP and WebSocket.",
+            validation_alias=AliasChoices("protocol"),
+            serialization_alias="protocol",
+        ),
+    ]
+    traffic_ratio: Annotated[
+        float,
+        Field(
+            ge=0.0,
+            le=1.0,
+            default=1.0,
+            description="Traffic ratio for the inference app. This is used for load balancing between multiple apps.",
+            validation_alias=AliasChoices("traffic-ratio", "traffic_ratio"),
+            serialization_alias="traffic-ratio",
+        ),
+    ]
 
 
 InferenceAppConfigDict = TypeAdapter(dict[str, list[InferenceAppConfig]])

@@ -89,7 +89,7 @@ class InferenceSessionHook(AbstractSessionHook):
                 session.session_id,
             )
         except Exception as e:
-            log.error(
+            log.exception(
                 "Unexpected error updating route info for endpoint {} (session {}): {}",
                 endpoint_id,
                 session.session_id,
@@ -126,7 +126,7 @@ class InferenceSessionHook(AbstractSessionHook):
                 session.session_id,
             )
         except Exception as e:
-            log.error(
+            log.exception(
                 "Unexpected error updating route info for endpoint {} (session {}): {}",
                 endpoint_id,
                 session.session_id,
