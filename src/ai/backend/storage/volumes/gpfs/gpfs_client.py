@@ -18,7 +18,7 @@ from tenacity import (
 
 from ai.backend.common.types import BinarySize
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.exception import ExternalError
+from ai.backend.storage.exception import ExternalStorageServiceError
 
 from .exceptions import (
     GPFSAPIError,
@@ -70,7 +70,7 @@ async def base_response_handler(response: aiohttp.ClientResponse) -> aiohttp.Cli
                 msg_detail = str(data)
             except json.decoder.JSONDecodeError:
                 msg_detail = "Unable to decode response body."
-            raise ExternalError(
+            raise ExternalStorageServiceError(
                 f"GPFS API server error. (status code: {response.status}, detail: {msg_detail})"
             )
     return response
@@ -310,7 +310,7 @@ class GPFSAPIClient:
                     log.warning(f"GPFS fileset already exists. Skip create. (name: {fileset_name})")
                     return
                 case _:
-                    raise ExternalError(
+                    raise ExternalStorageServiceError(
                         f"Cannot create GPFS fileset. status code: {response.status}"
                     )
             data = await response.json()

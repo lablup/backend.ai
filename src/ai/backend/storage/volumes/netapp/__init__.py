@@ -31,8 +31,8 @@ from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
 from ...exception import (
-    ExecutionError,
     InvalidQuotaScopeError,
+    ProcessExecutionError,
     QuotaDirectoryNotEmptyError,
     QuotaScopeNotFoundError,
 )
@@ -358,7 +358,7 @@ class XCPFSOpModel(BaseFSOpModel):
                     if line.startswith(error_msg_prefix):
                         error_msg = line.removeprefix(error_msg_prefix).decode()
                         break
-                raise ExecutionError(f"Running XCP has failed: {error_msg}")
+                raise ProcessExecutionError(f"Running XCP has failed: {error_msg}")
 
         return aiter()
 
@@ -399,7 +399,7 @@ class XCPFSOpModel(BaseFSOpModel):
                         if line.startswith(error_msg_prefix):
                             error_msg = line.removeprefix(error_msg_prefix).rstrip().decode()
                             break
-                    raise ExecutionError(f"Running XCP has failed: {error_msg}")
+                    raise ProcessExecutionError(f"Running XCP has failed: {error_msg}")
         except asyncio.TimeoutError:
             # -1 indicates "too many"
             total_size = -1

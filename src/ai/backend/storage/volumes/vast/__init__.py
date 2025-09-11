@@ -15,7 +15,7 @@ from ai.backend.common.types import HardwareMetadata, QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
 from ...exception import (
-    ExternalError,
+    ExternalStorageServiceError,
     InvalidQuotaConfig,
     QuotaScopeNotFoundError,
     StorageProxyError,
@@ -89,7 +89,7 @@ class VASTQuotaModel(BaseQuotaModel):
         except VASTInvalidParameterError:
             raise InvalidQuotaConfig
         except VASTUnknownError as e:
-            raise ExternalError(str(e))
+            raise ExternalStorageServiceError(str(e))
 
     async def create_quota_scope(
         self,
@@ -130,7 +130,7 @@ class VASTQuotaModel(BaseQuotaModel):
                 )
                 return existing_quota
             except VASTUnknownError as e:
-                raise ExternalError(str(e))
+                raise ExternalStorageServiceError(str(e))
             return quota
 
         try:

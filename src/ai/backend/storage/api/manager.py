@@ -61,10 +61,10 @@ from ..bgtask.tags import ROOT_PRIVILEGED_TAG
 from ..bgtask.tasks.clone import VFolderCloneTaskArgs
 from ..bgtask.tasks.delete import VFolderDeleteTaskArgs
 from ..exception import (
-    ExecutionError,
-    ExternalError,
+    ExternalStorageServiceError,
     InvalidQuotaConfig,
     InvalidSubpathError,
+    ProcessExecutionError,
     QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
     StorageProxyError,
@@ -158,7 +158,7 @@ def handle_fs_errors(
 def handle_external_errors() -> Iterator[None]:
     try:
         yield
-    except ExternalError as e:
+    except ExternalStorageServiceError as e:
         raise web.HTTPInternalServerError(
             text=dump_json_str({
                 "msg": str(e),
@@ -393,7 +393,9 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 try:
                     await volume.create_vfolder(params["vfid"], mode=perm_mode)
                 except QuotaScopeNotFoundError:
-                    raise ExternalError("Failed to create vfolder due to quota scope not found.")
+                    raise ExternalStorageServiceError(
+                        "Failed to create vfolder due to quota scope not found."
+                    )
             return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -708,7 +710,7 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
                         "used_bytes": usage.used_bytes,
                     },
                 )
-        except ExecutionError:
+        except ProcessExecutionError:
             return web.Response(
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 reason="Storage server is busy. Please try again",
@@ -742,7 +744,7 @@ async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
                         "used_bytes": usage,
                     },
                 )
-        except ExecutionError:
+        except ProcessExecutionError:
             return web.Response(
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 reason="Storage server is busy. Please try again",

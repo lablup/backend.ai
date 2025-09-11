@@ -21,9 +21,9 @@ from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
 from ...exception import (
-    ExecutionError,
     InvalidAPIParameters,
     InvalidQuotaScopeError,
+    ProcessExecutionError,
     QuotaDirectoryNotEmptyError,
     QuotaScopeNotFoundError,
 )
@@ -442,7 +442,7 @@ class BaseVolume(AbstractVolume):
         fs_usage = await self.get_fs_usage()
         vfolder_usage = await self.get_usage(src_vfid)
         if vfolder_usage.used_bytes > fs_usage.capacity_bytes - fs_usage.used_bytes:
-            raise ExecutionError("Not enough space available for clone.")
+            raise ProcessExecutionError("Not enough space available for clone.")
 
         # create the target vfolder
         src_vfpath = self.mangle_vfpath(src_vfid)
@@ -455,7 +455,7 @@ class BaseVolume(AbstractVolume):
         except Exception:
             await self.delete_vfolder(dst_vfid)
             log.exception("clone_vfolder: error during copy_tree()")
-            raise ExecutionError("Copying files from source directories failed.")
+            raise ProcessExecutionError("Copying files from source directories failed.")
 
     @final
     async def get_vfolder_mount(self, vfid: VFolderID, subpath: str) -> Path:
