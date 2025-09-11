@@ -93,11 +93,9 @@ endpoint = "http://127.0.0.1:4317"
 [artifact-registry]
 model-registry = "huggingface-hub"
 
-[artifact-service]
-enable-approve-process = false
-
 [reservoir]
 storage-name = "minio-storage"
+enable-approve-process = false
 
 [reservoir.config]
 type = "object_storage"
