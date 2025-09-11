@@ -163,7 +163,7 @@ class QTreeQuotaModel(BaseQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
-            raise NotEmptyError(quota_scope_id)
+            raise NotEmptyError(str(quota_scope_id))
         # QTree and quota rule is automatically removed
         # when the corresponding directory is deleted.
         await aiofiles.os.rmdir(qspath)
