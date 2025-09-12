@@ -58,6 +58,7 @@ Alias keys are also URL-quoted in the same way.
        - app-streaming-packet-timeout: "5m"  # in seconds; idleness of app-streaming TCP connections
          # NOTE: idle checkers get activated AFTER the app-streaming packet timeout has passed.
        - checkers
+         + "threshold": time duration to stay under the thresholds
          + "utilization"
            + resource-thresholds
              + "cpu_util"
@@ -70,7 +71,6 @@ Alias keys are also URL-quoted in the same way.
                - average: 30  # in percent
                # NOTE: To use "cuda.mem" criteria, user programs must use
                #       an incremental allocation strategy for CUDA memory.
-           - threshold: time duration to stay under the thresholds
            - thresholds-check-operator: "and"
              # "and" (default, so any other words except the "or"):
              #     garbage collect a session only when ALL of the resources are
