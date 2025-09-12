@@ -34,6 +34,7 @@ from ai.backend.manager.services.model_serving.processors.model_serving import (
 )
 from ai.backend.manager.services.model_serving.services.auto_scaling import AutoScalingService
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
+from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 
 
 @pytest.fixture
@@ -97,6 +98,13 @@ def mock_valkey_live():
 
 
 @pytest.fixture
+def mock_deployment_controller():
+    mock_deployment_controller = MagicMock(spec=DeploymentController)
+    mock_deployment_controller.mark_lifecycle_needed = AsyncMock()
+    return mock_deployment_controller
+
+
+@pytest.fixture
 def model_serving_service(
     database_fixture,
     database_engine,
@@ -107,6 +115,7 @@ def model_serving_service(
     mock_config_provider,
     mock_valkey_live,
     mock_repositories,
+    mock_deployment_controller,
 ) -> ModelServingService:
     return ModelServingService(
         agent_registry=mock_agent_registry,
@@ -117,6 +126,7 @@ def model_serving_service(
         valkey_live=mock_valkey_live,
         repository=mock_repositories.repository,
         admin_repository=mock_repositories.admin_repository,
+        deployment_controller=mock_deployment_controller,
     )
 
 
