@@ -242,7 +242,6 @@ class BaseSession(metaclass=abc.ABCMeta):
     """
 
     __slots__ = (
-        # "_aiohttp_session_injected",  # "_using_external_session"
         "_config",
         "_closed",
         "_context_token",
@@ -416,7 +415,7 @@ class Session(BaseSession):
     but cannot use streaming APIs based on WebSocket and Server-Sent Events.
     """
 
-    __slots__ = ("_aiohttp_session_injected", "_worker_thread")
+    __slots__ = ("_owns_session", "_worker_thread")
 
     def __init__(
         self,
@@ -431,14 +430,14 @@ class Session(BaseSession):
 
         if aiohttp_session is not None:
             self.aiohttp_session = aiohttp_session
-            self._aiohttp_session_injected = True
+            self._owns_session = False
         else:
 
             async def _create_aiohttp_session() -> aiohttp.ClientSession:
                 return _default_http_client_session(self._config.skip_sslcert_validation)
 
             self.aiohttp_session = self.worker_thread.execute(_create_aiohttp_session())
-            self._aiohttp_session_injected = False
+            self._owns_session = True
 
     def open(self) -> None:
         self._context_token = api_session.set(self)
@@ -458,7 +457,7 @@ class Session(BaseSession):
             return
         self._closed = True
         self._worker_thread.interrupt_generator()
-        if not self._aiohttp_session_injected:
+        if self._owns_session:
             self._worker_thread.execute(_close_aiohttp_session(self.aiohttp_session))
         self._worker_thread.work_queue.put(sentinel)
         self._worker_thread.join()
@@ -519,12 +518,12 @@ class AsyncSession(BaseSession):
         super().__init__(config=config, proxy_mode=proxy_mode)
         if aiohttp_session is not None:
             self.aiohttp_session = aiohttp_session
-            self._aiohttp_session_injected = True  # TODO: _using_external_session
+            self._owns_session = False
         else:
             self.aiohttp_session = _default_http_client_session(
                 self._config.skip_sslcert_validation
             )
-            self._aiohttp_session_injected = False
+            self._owns_session = True
 
     async def _aopen(self) -> None:
         self._context_token = api_session.set(self)
@@ -538,7 +537,7 @@ class AsyncSession(BaseSession):
         if self._closed:
             return
         self._closed = True
-        if not self._aiohttp_session_injected:
+        if self._owns_session:
             await _close_aiohttp_session(self.aiohttp_session)
         api_session.reset(self._context_token)
 
