@@ -102,7 +102,7 @@ class KernelNode(graphene.ObjectType):
             local_rank=row.local_rank,
             cluster_role=row.cluster_role,
             session_id=row.session_id,
-            status=row.status,
+            status=row.status.name,
             status_changed=row.status_changed,
             status_info=row.status_info,
             status_data=row.status_data,
