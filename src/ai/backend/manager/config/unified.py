@@ -70,6 +70,7 @@ Alias keys are also URL-quoted in the same way.
                - average: 30  # in percent
                # NOTE: To use "cuda.mem" criteria, user programs must use
                #       an incremental allocation strategy for CUDA memory.
+           - threshold: time duration to stay under the thresholds
            - thresholds-check-operator: "and"
              # "and" (default, so any other words except the "or"):
              #     garbage collect a session only when ALL of the resources are
@@ -1504,6 +1505,7 @@ class IdleCheckerConfig(BaseModel):
         """,
         examples=[
             {
+                "threshold": "10m",
                 "utilization": {
                     "resource-thresholds": {
                         "cpu_util": {
