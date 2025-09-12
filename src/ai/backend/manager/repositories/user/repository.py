@@ -187,7 +187,6 @@ class UserRepository:
 
             # Handle role changes
             prev_role = current_user.role
-            prev_domain_name = current_user.domain_name
             role = modifier.role.optional_value()
             if role is not None and role != prev_role:
                 await self._sync_keypair_roles(conn, updated_user.uuid, role)
@@ -196,7 +195,7 @@ class UserRepository:
             if prev_role != updated_user.role and group_ids is None:
                 await self._clear_user_groups(conn, updated_user.uuid)
 
-            if prev_domain_name != updated_user.domain_name and group_ids is not None:
+            if group_ids is not None:
                 await self._update_user_groups(
                     conn, updated_user.uuid, updated_user.domain_name, group_ids
                 )
