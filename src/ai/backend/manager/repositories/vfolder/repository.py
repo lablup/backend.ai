@@ -340,7 +340,7 @@ class VfolderRepository:
                     session, VFolderID.from_row(vfolder_row)
                 )
                 if mount_sessions:
-                    session_ids = [str(s) for s in mount_sessions]
+                    session_ids = [str(session_id) for session_id in mount_sessions]
                     raise VFolderDeletionNotAllowed(
                         "Cannot delete the vfolder. "
                         f"The vfolder(id: {vfolder_row.id}) is mounted on sessions(ids: {session_ids})."
