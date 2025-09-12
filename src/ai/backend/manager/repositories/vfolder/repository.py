@@ -466,6 +466,19 @@ class VfolderRepository:
                 & (VFolderPermissionRow.user == user_id)
             )
             await session.execute(query)
+            await self._role_manager.unmap_entity_from_scope(
+                session,
+                entity_id=ObjectId(
+                    entity_type=EntityType.VFOLDER,
+                    entity_id=str(vfolder_id),
+                ),
+                scope_id=ScopeId(ScopeType.USER, str(user_id)),
+            )
+            await self._role_manager.delete_object_permission_of_user(
+                session,
+                user_id,
+                vfolder_id,
+            )
 
     @repository_decorator()
     async def get_vfolder_invitations_by_vfolder(
