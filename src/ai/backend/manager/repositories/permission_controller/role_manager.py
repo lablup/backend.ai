@@ -3,7 +3,6 @@ from collections.abc import Iterable, Mapping
 from typing import Protocol
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.manager.data.permission.association_scopes_entities import (
@@ -138,9 +137,7 @@ class RoleManager:
         operations: Iterable[OperationType],
     ) -> list[ObjectPermissionData]:
         permission_group = await db_session.scalar(
-            sa.select(PermissionGroupRow).where(
-                sa.cast(PermissionGroupRow.scope_id, PGUUID) == user_id
-            )
+            sa.select(PermissionGroupRow).where(PermissionGroupRow.scope_id == str(user_id))
         )
         role_id = permission_group.role_id
 
@@ -156,6 +153,9 @@ class RoleManager:
         rows = [ObjectPermissionRow.from_input(creator) for creator in creators]
         db_session.add_all(rows)
         await db_session.flush()
-        await db_session.refresh(rows)
+        result: list[ObjectPermissionData] = []
+        for row in rows:
+            await db_session.refresh(row)
+            result.append(row.to_data())
 
-        return [row.to_data() for row in rows]
+        return result
