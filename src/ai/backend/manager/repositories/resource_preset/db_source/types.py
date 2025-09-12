@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Mapping
 from uuid import UUID
 
-from ai.backend.common.types import BinarySize, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
+from ai.backend.manager.models import KernelRow
 
 
 @dataclass
@@ -102,3 +104,42 @@ class CheckPresetsDBData:
     keypair_data: KeypairResourceData
     per_sgroup_data: dict[str, PerScalingGroupResourceData]
     presets: list[PresetAllocatabilityData]
+
+
+class ResourceOccupancyFilter(ABC):
+    """Abstract base class for resource occupancy filters."""
+
+    @abstractmethod
+    def get_condition(self) -> Any:
+        """Return SQLAlchemy condition for this filter."""
+        pass
+
+
+class AccessKeyFilter(ResourceOccupancyFilter):
+    """Filter for access key."""
+
+    def __init__(self, access_key: AccessKey):
+        self.access_key = access_key
+
+    def get_condition(self) -> Any:
+        return KernelRow.access_key == self.access_key
+
+
+class GroupIdFilter(ResourceOccupancyFilter):
+    """Filter for group ID."""
+
+    def __init__(self, group_id: UUID):
+        self.group_id = group_id
+
+    def get_condition(self) -> Any:
+        return KernelRow.group_id == self.group_id
+
+
+class DomainNameFilter(ResourceOccupancyFilter):
+    """Filter for domain name."""
+
+    def __init__(self, domain_name: str):
+        self.domain_name = domain_name
+
+    def get_condition(self) -> Any:
+        return KernelRow.domain_name == self.domain_name
