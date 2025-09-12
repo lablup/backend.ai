@@ -44,10 +44,14 @@ from ai.backend.manager.services.resource_preset.types import (
 )
 
 from .types import (
+    AccessKeyFilter,
     CheckPresetsDBData,
+    DomainNameFilter,
+    GroupIdFilter,
     KeypairResourceData,
     PerScalingGroupResourceData,
     PresetAllocatabilityData,
+    ResourceOccupancyFilter,
     ResourceUsageData,
 )
 
@@ -275,7 +279,9 @@ class ResourcePresetDBSource:
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
         limits = ResourceSlot.from_policy(domain_resource_policy, known_slot_types)
-        occupied = await self._get_resource_occupancy(db_sess, domain_name=domain_name)
+        occupied = await self._get_resource_occupancy(
+            db_sess, known_slot_types, filters=[DomainNameFilter(domain_name)]
+        )
         remaining = limits - occupied
         return ResourceUsageData(
             limits=limits,
@@ -356,26 +362,29 @@ class ResourcePresetDBSource:
 
         return per_sgroup_remaining, agent_slots
 
-    async def _get_resource_occupancy(self, db_sess: SASession, **filters) -> ResourceSlot:
+    async def _get_resource_occupancy(
+        self,
+        db_sess: SASession,
+        known_slot_types: Mapping[SlotName, SlotTypes],
+        filters: list[ResourceOccupancyFilter] | None = None,
+    ) -> ResourceSlot:
         """
-        Get resource occupancy for given filters.
+        Get resource occupancy with filters.
 
         :param db_sess: Database session
-        :param filters: Filter conditions (access_key, group_id, domain_name)
+        :param known_slot_types: Known slot types for initialization
+        :param filters: List of filter objects to apply
         :return: Total occupied resources
         """
         conditions = [KernelRow.status.in_(KernelStatus.resource_occupied_statuses())]
 
-        if "access_key" in filters:
-            conditions.append(KernelRow.access_key == filters["access_key"])
-        if "group_id" in filters:
-            conditions.append(KernelRow.group_id == filters["group_id"])
-        if "domain_name" in filters:
-            conditions.append(KernelRow.domain_name == filters["domain_name"])
+        if filters:
+            for filter_obj in filters:
+                conditions.append(filter_obj.get_condition())
 
         query = sa.select([KernelRow.occupied_slots]).where(sa.and_(*conditions))
 
-        total = ResourceSlot()
+        total = ResourceSlot.from_known_slots(known_slot_types)
         async for row in await db_sess.stream(query):
             if row[0]:  # occupied_slots might be null
                 total += row[0]
@@ -390,7 +399,9 @@ class ResourcePresetDBSource:
     ) -> ResourceUsageData:
         """Get keypair resource usage (limits, occupied, remaining)."""
         limits = ResourceSlot.from_policy(resource_policy, known_slot_types)
-        occupied = await self._get_resource_occupancy(db_sess, access_key=access_key)
+        occupied = await self._get_resource_occupancy(
+            db_sess, known_slot_types, filters=[AccessKeyFilter(access_key)]
+        )
         remaining = limits - occupied
 
         return ResourceUsageData(
@@ -412,7 +423,9 @@ class ResourcePresetDBSource:
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
         }
         limits = ResourceSlot.from_policy(group_resource_policy, known_slot_types)
-        occupied = await self._get_resource_occupancy(db_sess, group_id=group_id)
+        occupied = await self._get_resource_occupancy(
+            db_sess, known_slot_types, filters=[GroupIdFilter(group_id)]
+        )
         remaining = limits - occupied
 
         return ResourceUsageData(
@@ -451,7 +464,7 @@ class ResourcePresetDBSource:
         # Get domain resource slots and usage
         domain_usage = await self._get_domain_resource_slots(conn, domain_name, known_slot_types)
         # Take minimum remaining resources across all scopes
-        final_remaining = ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
+        final_remaining = ResourceSlot.from_known_slots(known_slot_types)
         for slot in known_slot_types:
             final_remaining[slot] = min(
                 keypair_usage.remaining[slot],

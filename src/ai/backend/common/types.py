@@ -816,6 +816,10 @@ class ResourceSlot(UserDict):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
 
+    @classmethod
+    def from_known_slots(cls, known_slots: Mapping[SlotName, SlotTypes]) -> ResourceSlot:
+        return cls({k: Decimal(0) for k in known_slots.keys()})
+
     def sync_keys(self, other: ResourceSlot) -> None:
         self_only_keys = self.data.keys() - other.data.keys()
         other_only_keys = other.data.keys() - self.data.keys()
