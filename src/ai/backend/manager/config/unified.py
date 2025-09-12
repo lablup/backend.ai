@@ -59,7 +59,7 @@ Alias keys are also URL-quoted in the same way.
          # NOTE: idle checkers get activated AFTER the app-streaming packet timeout has passed.
        - checkers
          + "network-timeout"
-           + "threshold": "10m"  # time duration to stay under the thresholds
+           - "threshold": "10m"  # time duration to stay under the thresholds
          + "utilization"
            + resource-thresholds
              + "cpu_util"
