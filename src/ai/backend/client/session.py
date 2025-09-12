@@ -292,7 +292,6 @@ class BaseSession(metaclass=abc.ABCMeta):
         *,
         config: Optional[APIConfig] = None,
         proxy_mode: bool = False,
-        # aiohttp_session: Optional[aiohttp.ClientSession] = None,
     ) -> None:
         self._closed = False
         self._config = config if config else get_config()
