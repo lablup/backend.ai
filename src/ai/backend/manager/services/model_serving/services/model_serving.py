@@ -121,6 +121,8 @@ from ai.backend.manager.services.model_serving.types import (
     RouteInfo,
     ServiceInfo,
 )
+from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
+from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.types import UserScope
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -136,6 +138,7 @@ class ModelServingService:
     _admin_repository: AdminModelServingRepository
 
     _valkey_live: ValkeyLiveClient
+    _deployment_controller: DeploymentController
 
     def __init__(
         self,
@@ -147,6 +150,7 @@ class ModelServingService:
         valkey_live: ValkeyLiveClient,
         repository: ModelServingRepository,
         admin_repository: AdminModelServingRepository,
+        deployment_controller: DeploymentController,
     ) -> None:
         self._agent_registry = agent_registry
         self._background_task_manager = background_task_manager
@@ -156,6 +160,7 @@ class ModelServingService:
         self._valkey_live = valkey_live
         self._repository = repository
         self._admin_repository = admin_repository
+        self._deployment_controller = deployment_controller
 
     async def _fetch_file_from_storage_proxy(
         self,
@@ -816,4 +821,9 @@ class ModelServingService:
             self._config_provider.legacy_etcd_config_loader,
             self._storage_manager,
         )
+        if action.modifier.replica_count_modified():
+            # Notify appproxy to update routing info
+            await self._deployment_controller.mark_lifecycle_needed(
+                DeploymentLifecycleType.CHECK_REPLICA,
+            )
         return ModifyEndpointActionResult(success=result.success, data=result.data)

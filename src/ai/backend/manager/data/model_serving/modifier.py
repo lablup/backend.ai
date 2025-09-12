@@ -69,3 +69,6 @@ class EndpointModifier(PartialModifier):
         self.replicas.update_dict(to_update, "replicas")
         self.environ.update_dict(to_update, "environ")
         return to_update
+
+    def replica_count_modified(self) -> bool:
+        return self.replicas.optional_value() is not None
