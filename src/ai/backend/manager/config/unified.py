@@ -58,7 +58,7 @@ Alias keys are also URL-quoted in the same way.
        - app-streaming-packet-timeout: "5m"  # in seconds; idleness of app-streaming TCP connections
          # NOTE: idle checkers get activated AFTER the app-streaming packet timeout has passed.
        - checkers
-         + "network-timeout"
+         + "network_timeout"
            - threshold: "10m"  # time duration to stay under the thresholds
          + "utilization"
            + resource-thresholds
@@ -1506,7 +1506,9 @@ class IdleCheckerConfig(BaseModel):
         """,
         examples=[
             {
-                "threshold": "10m",
+                "network_timeout": {
+                    "threshold": "10m",
+                },
                 "utilization": {
                     "resource-thresholds": {
                         "cpu_util": {
