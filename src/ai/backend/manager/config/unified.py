@@ -1506,9 +1506,6 @@ class IdleCheckerConfig(BaseModel):
         """,
         examples=[
             {
-                "timeout": {
-                    "threshold": "10m",
-                },
                 "utilization": {
                     "resource-thresholds": {
                         "cpu_util": {
