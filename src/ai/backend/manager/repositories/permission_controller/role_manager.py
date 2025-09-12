@@ -129,6 +129,23 @@ class RoleManager:
             sa.insert(AssociationScopesEntitiesRow).values(creator.fields_to_store())
         )
 
+    async def unmap_entity_from_scope(
+        self,
+        db_session: SASession,
+        entity_id: ObjectId,
+        scope_id: ScopeId,
+    ) -> None:
+        await db_session.execute(
+            sa.delete(AssociationScopesEntitiesRow).where(
+                sa.and_(
+                    AssociationScopesEntitiesRow.scope_type == scope_id.scope_type,
+                    AssociationScopesEntitiesRow.scope_id == scope_id.scope_id,
+                    AssociationScopesEntitiesRow.entity_type == entity_id.entity_type,
+                    AssociationScopesEntitiesRow.entity_id == entity_id.entity_id,
+                )
+            )
+        )
+
     async def add_object_permission_to_user_role(
         self,
         db_session: SASession,
@@ -157,3 +174,22 @@ class RoleManager:
         )
         result = [ObjectPermissionData.from_sa_row(row) for row in rows]
         return result
+
+    async def delete_object_permission_of_user(
+        self,
+        db_session: SASession,
+        user_id: uuid.UUID,
+        entity_id: uuid.UUID,
+    ) -> None:
+        permission_group = await db_session.scalar(
+            sa.select(PermissionGroupRow).where(PermissionGroupRow.scope_id == str(user_id))
+        )
+        role_id = permission_group.role_id
+        await db_session.execute(
+            sa.delete(ObjectPermissionRow).where(
+                sa.and_(
+                    ObjectPermissionRow.role_id == role_id,
+                    ObjectPermissionRow.entity_id == str(entity_id),
+                )
+            )
+        )
