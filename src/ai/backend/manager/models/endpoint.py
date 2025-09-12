@@ -516,7 +516,7 @@ class EndpointRow(Base):
                 for r in active_routes
                 if r.status in RouteStatus.active_route_statuses()
                 and r.session
-                and r.session_row.status == SessionStatus.RUNNING
+                and r.session_row.status in [SessionStatus.RUNNING, SessionStatus.CREATING]
             ],
         )
         if (num_routes_without_session := len(active_routes) - len(running_main_kernels)) > 0:

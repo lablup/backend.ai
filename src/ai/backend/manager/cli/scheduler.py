@@ -61,9 +61,15 @@ def last_execution_time(
         _manager_id = manager_id or bootstrap_config.manager.id
         async with redis_ctx(cli_ctx) as redis_conn_set:
             if not scheduler_name:
-                keys = await redis_helper.execute(
-                    redis_conn_set.live, lambda r: r.keys(f"manager.{_manager_id}.*")
-                )
+                keys = []
+
+                async def _scan_keys(r: Redis) -> list[bytes]:
+                    result = []
+                    async for key in r.scan_iter(match=f"manager.{_manager_id}.*"):
+                        result.append(key)
+                    return result
+
+                keys = await redis_helper.execute(redis_conn_set.live, _scan_keys)
                 if len(keys) == 0:
                     log.warn(
                         "Failed to fetch scheduler information manager {}. Please check if you have mentioned manager ID correctly and the specified manager is up and running.",
@@ -72,7 +78,7 @@ def last_execution_time(
                     return
 
                 def _pipeline(r: Redis) -> Pipeline:
-                    pipe = r.pipeline()
+                    pipe = r.pipeline(transaction=True)
                     for k in keys:
                         pipe.hgetall(k)
                     return pipe

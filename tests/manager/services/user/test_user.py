@@ -9,7 +9,9 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserCreator, UserInfoContext
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.user.admin_repository import AdminUserRepository
@@ -79,12 +81,17 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].create_user_validated = AsyncMock(
             return_value=mock_user_data
         )
-
+        password_info = PasswordInfo(
+            password="SecurePass123!",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
         # Test 1.1: Normal user creation
         action = CreateUserAction(
             creator=UserCreator(
                 email="test@example.com",
-                password="SecurePass123!",
+                password=password_info,
                 username="testuser",
                 full_name="Test User",
                 role=UserRole.USER,
@@ -105,11 +112,16 @@ class TestUserServiceCompatibility:
         mock_dependencies["user_repository"].create_user_validated = AsyncMock(
             return_value=mock_user_data
         )
-
+        password_info = PasswordInfo(
+            password="ContainerPass123!",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
         action = CreateUserAction(
             creator=UserCreator(
                 email="container@example.com",
-                password="ContainerPass123!",
+                password=password_info,
                 username="containeruser",
                 need_password_change=False,
                 domain_name="default",
@@ -236,9 +248,15 @@ class TestUserServiceCompatibility:
     def test_user_creator_fields(self):
         """Test that UserCreator has all expected fields from test scenarios."""
         # Test that UserCreator can be created with all scenario fields
+        password_info = PasswordInfo(
+            password="password123",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
         creator = UserCreator(
             email="test@example.com",
-            password="password123",
+            password=password_info,
             username="testuser",
             full_name="Test User",
             description="Test Description",

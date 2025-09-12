@@ -193,6 +193,7 @@ class _PendingSessionData:
     cluster_mode: ClusterMode
     starts_at: Optional[datetime]
     is_private: bool
+    designated_agent_ids: Optional[list[AgentId]]
     kernels: list["KernelData"]  # Will be populated from JOIN
 
 
@@ -2052,6 +2053,7 @@ class ScheduleRepository:
                 SessionRow.domain_name,
                 SessionRow.scaling_group_name,
                 SessionRow.priority,
+                SessionRow.designated_agent_ids,
                 SessionRow.session_type,
                 SessionRow.cluster_mode,
                 SessionRow.starts_at,
@@ -2093,6 +2095,7 @@ class ScheduleRepository:
                     cluster_mode=row.cluster_mode,
                     starts_at=row.starts_at,
                     is_private=row.session_type in PRIVATE_SESSION_TYPES,
+                    designated_agent_ids=row.designated_agent_ids,
                     kernels=[],
                 )
 
@@ -2445,7 +2448,7 @@ class ScheduleRepository:
                 starts_at=session.starts_at,
                 is_private=session.is_private,
                 kernels=kernel_workloads,
-                designated_agent=session.kernels[0].agent if session.kernels else None,
+                designated_agent_ids=session.designated_agent_ids,
             )
             workloads.append(workload)
         return workloads

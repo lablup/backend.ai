@@ -3,6 +3,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 
 from ..volumes.pool import VolumePool
 from .tasks.clone import VFolderCloneTaskHandler
+from .tasks.delete import VFolderDeleteTaskHandler
 
 
 class BgtaskHandlerRegistryCreator:
@@ -13,5 +14,6 @@ class BgtaskHandlerRegistryCreator:
     def create(self) -> BackgroundTaskHandlerRegistry:
         registry = BackgroundTaskHandlerRegistry()
         registry.register(VFolderCloneTaskHandler(self._volume_pool, self._event_producer))
+        registry.register(VFolderDeleteTaskHandler(self._volume_pool, self._event_producer))
 
         return registry

@@ -8,25 +8,12 @@ import asyncio
 import functools
 import json
 import logging
-import uuid
+from collections.abc import Iterable, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
-from typing import (
-    TYPE_CHECKING,
-    Annotated,
-    Any,
-    Dict,
-    Iterable,
-    List,
-    Mapping,
-    Optional,
-    Set,
-    Tuple,
-    Union,
-    cast,
-    get_args,
-)
+from typing import TYPE_CHECKING, Annotated, Any, Optional, cast, get_args
+from uuid import UUID
 
 import aiohttp_cors
 import aiotools
@@ -376,7 +363,7 @@ async def query_userinfo(
     request: web.Request,
     params: Any,
     conn: SAConnection,
-) -> Tuple[uuid.UUID, uuid.UUID, dict]:
+) -> tuple[UUID, UUID, dict]:
     try:
         return await _query_userinfo(
             conn,
@@ -598,7 +585,7 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
                 "You are not allowed to manually assign agents for your session."
             )
         agent_count = len(agent_list)
-        if params["cluster_mode"] == "multi-node":
+        if params["cluster_mode"] == ClusterMode.MULTI_NODE:
             if agent_count != params["cluster_size"]:
                 raise InvalidAPIParameters(
                     "For multi-node cluster sessions, the number of manually assigned"
@@ -853,7 +840,7 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
 
 
 class TransitSessionStatusRequestModel(LegacyBaseRequestModel):
-    ids: list[uuid.UUID] = Field(
+    ids: list[UUID] = Field(
         validation_alias=AliasChoices("session_ids", "sessionIds", "SessionIds"),
         description="ID array of sessions to check and transit status.",
     )
@@ -872,7 +859,7 @@ async def check_and_transit_status(
     root_ctx: RootContext = request.app["_root.context"]
     session_ids = [SessionId(id) for id in params.ids]
     user_role = cast(UserRole, request["user"]["role"])
-    user_id = cast(uuid.UUID, request["user"]["uuid"])
+    user_id = cast(UUID, request["user"]["uuid"])
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
     log.info("TRANSIT_STATUS (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_ids)
 
@@ -903,7 +890,7 @@ async def commit_session(request: web.Request, params: Mapping[str, Any]) -> web
     root_ctx: RootContext = request.app["_root.context"]
     session_name: str = request.match_info["session_name"]
     requester_access_key, owner_access_key = await get_access_key_scopes(request)
-    filename: str | None = params["filename"]
+    filename: Optional[str] = params["filename"]
 
     log.info(
         "COMMIT_SESSION (ak:{}/{}, s:{})", requester_access_key, owner_access_key, session_name
@@ -925,7 +912,7 @@ class ConvertSessionToImageRequesteModel(LegacyBaseRequestModel):
         pattern=r"[a-zA-Z0-9\.\-_]+",
         description="Name of the image to be created.",
     )
-    login_session_token: Annotated[str | None, Field(default=None)]
+    login_session_token: Annotated[Optional[str], Field(default=None)]
     image_visibility: CustomizedImageVisibilityScope = Field(
         default=CustomizedImageVisibilityScope.USER,
         description="Visibility scope of newly created image. currently only supports `USER` scope. Setting this to value other than `USER` will raise error.",
@@ -1322,19 +1309,19 @@ async def shutdown_service(request: web.Request, params: Any) -> web.Response:
 
 
 async def find_dependent_sessions(
-    root_session_name_or_id: str | uuid.UUID,
+    root_session_name_or_id: str | UUID,
     db_session: SASession,
     access_key: AccessKey,
     *,
     allow_stale: bool = False,
-) -> Set[uuid.UUID]:
-    async def _find_dependent_sessions(session_id: uuid.UUID) -> Set[uuid.UUID]:
+) -> set[UUID]:
+    async def _find_dependent_sessions(session_id: UUID) -> set[UUID]:
         result = await db_session.execute(
             sa.select(SessionDependencyRow).where(SessionDependencyRow.depends_on == session_id)
         )
-        dependent_sessions: set[uuid.UUID] = {x.session_id for x in result.scalars()}
+        dependent_sessions: set[UUID] = {x.session_id for x in result.scalars()}
 
-        recursive_dependent_sessions: List[Set[uuid.UUID]] = [
+        recursive_dependent_sessions: list[set[UUID]] = [
             await _find_dependent_sessions(dependent_session)
             for dependent_session in dependent_sessions
         ]
@@ -1350,12 +1337,12 @@ async def find_dependent_sessions(
         access_key=access_key,
         allow_stale=allow_stale,
     )
-    return await _find_dependent_sessions(cast(uuid.UUID, root_session.id))
+    return await _find_dependent_sessions(cast(UUID, root_session.id))
 
 
 @aiotools.lru_cache(maxsize=100)
 async def _find_dependency_sessions(
-    session_name_or_id: uuid.UUID | str,
+    session_name_or_id: UUID | str,
     db_session: SASession,
     access_key: AccessKey,
 ):
@@ -1370,7 +1357,7 @@ async def _find_dependency_sessions(
     session_id = str(sessions[0].id)
     session_name = sessions[0].name
 
-    assert isinstance(session_id, get_args(uuid.UUID | str))
+    assert isinstance(session_id, get_args(UUID | str))
     assert isinstance(session_name, str)
 
     kernel_query = (
@@ -1395,7 +1382,7 @@ async def _find_dependency_sessions(
 
     kernel_query_result = (await db_session.execute(kernel_query)).first()
 
-    session_info: Dict[str, Union[List, str]] = {
+    session_info: dict[str, list | str] = {
         "session_id": session_id,
         "session_name": session_name,
         "status": str(kernel_query_result[0]),
@@ -1410,7 +1397,7 @@ async def _find_dependency_sessions(
 
 
 async def find_dependency_sessions(
-    session_name_or_id: uuid.UUID | str,
+    session_name_or_id: UUID | str,
     db_session: SASession,
     access_key: AccessKey,
 ):
@@ -1566,11 +1553,11 @@ async def list_files(request: web.Request) -> web.Response:
 
 
 class ContainerLogRequestModel(LegacyBaseRequestModel):
-    owner_access_key: str | None = Field(
+    owner_access_key: Optional[str] = Field(
         default=None,
         alias="ownerAccessKey",
     )
-    kernel_id: uuid.UUID | None = Field(
+    kernel_id: Optional[UUID] = Field(
         description="Target kernel to get container logs.",
         default=None,
         alias="kernelId",
@@ -1715,7 +1702,7 @@ async def shutdown(app: web.Application) -> None:
 
 def create_app(
     default_cors_options: CORSOptions,
-) -> Tuple[web.Application, Iterable[WebMiddleware]]:
+) -> tuple[web.Application, Iterable[WebMiddleware]]:
     app = web.Application()
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)

@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
@@ -52,7 +53,7 @@ from ai.backend.manager.repositories.scheduler import (
 from ai.backend.manager.types import DistributedLockFactory
 
 from .allocators.allocator import SchedulingAllocator
-from .hooks.registry import HookRegistry
+from .hooks.registry import HookRegistry, HookRegistryArgs
 from .results import ScheduledSessionData, ScheduleResult
 from .selectors.concentrated import ConcentratedAgentSelector
 from .selectors.dispersed import DispersedAgentSelector
@@ -79,6 +80,7 @@ from .types import (
     SessionAllocation,
     SessionDataForPull,
     SessionDataForStart,
+    SessionRunningData,
     SessionWorkload,
     SystemSnapshot,
 )
@@ -108,7 +110,7 @@ class SchedulerArgs:
     lock_factory: DistributedLockFactory
     agent_pool: AgentPool
     network_plugin_ctx: NetworkPluginContext
-
+    event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
 
 
@@ -144,7 +146,15 @@ class Scheduler:
             args.config_provider.config.manager.agent_selection_resource_priority
         )
         self._phase_metrics = SchedulerPhaseMetricObserver.instance()
-        self._hook_registry = HookRegistry(args.deployment_repository, args.agent_pool)
+        self._hook_registry = HookRegistry(
+            HookRegistryArgs(
+                repository=args.deployment_repository,
+                agent_pool=args.agent_pool,
+                network_plugin_ctx=args.network_plugin_ctx,
+                config_provider=args.config_provider,
+                event_producer=args.event_producer,
+            )
+        )
         self._valkey_schedule = args.valkey_schedule
 
     @classmethod
@@ -529,7 +539,7 @@ class Scheduler:
             agents_info,
             criteria,
             selection_config,
-            session_workload.designated_agent,
+            session_workload.designated_agent_ids,
         )
 
         # Build session allocation from selections
@@ -612,20 +622,6 @@ class Scheduler:
                 session_result.kernel_results.extend(kernel_results)
 
             session_results.append(session_result)
-
-        # Batch update database with termination results
-        await self._repository.batch_update_terminated_status(session_results)
-
-        # Count successfully terminated sessions
-        terminated_session_count = sum(
-            1 for result in session_results if result.should_terminate_session
-        )
-
-        log.info(
-            "Terminated {} sessions (partial: {})",
-            terminated_session_count,
-            len(session_results) - terminated_session_count,
-        )
 
         # Convert only successfully terminated sessions to ScheduledSessionData format
         scheduled_data = [
@@ -776,7 +772,7 @@ class Scheduler:
         if not sessions_data:
             return ScheduleResult()
 
-        sessions_to_update: list[SessionId] = []
+        sessions_running_data: list[SessionRunningData] = []
 
         hook_coroutines = [
             self._hook_registry.get_hook(session_data.session_type).on_transition_to_running(
@@ -795,20 +791,32 @@ class Scheduler:
                     result,
                 )
                 continue
-            sessions_to_update.append(session_data.session_id)
 
-        if sessions_to_update:
-            await self._repository.update_sessions_to_running(sessions_to_update)
+            # Calculate total occupying_slots from all kernels
+            total_occupying_slots = ResourceSlot()
+            for kernel in session_data.kernels:
+                if kernel.occupied_slots:
+                    total_occupying_slots += kernel.occupied_slots
+
+            sessions_running_data.append(
+                SessionRunningData(
+                    session_id=session_data.session_id,
+                    occupying_slots=total_occupying_slots,
+                )
+            )
+
+        if sessions_running_data:
+            await self._repository.update_sessions_to_running(sessions_running_data)
             # Convert updated sessions to ScheduledSessionData format
             scheduled_data = [
                 ScheduledSessionData(
-                    session_id=session.session_id,
-                    creation_id=session.creation_id,
-                    access_key=session.access_key,
+                    session_id=session_data.session_id,
+                    creation_id=session_data.creation_id,
+                    access_key=session_data.access_key,
                     reason="triggered-by-scheduler",
                 )
-                for session in sessions_data
-                if session.session_id in sessions_to_update
+                for session_data in sessions_data
+                if any(srd.session_id == session_data.session_id for srd in sessions_running_data)
             ]
             return ScheduleResult(scheduled_sessions=scheduled_data)
 
@@ -830,6 +838,7 @@ class Scheduler:
             return ScheduleResult()
 
         sessions_to_update: list[SessionId] = []
+        log.info("session types to terminate: {}", [s.session_type for s in sessions_data])
 
         hook_coroutines = [
             self._hook_registry.get_hook(session_data.session_type).on_transition_to_terminated(
@@ -1318,6 +1327,10 @@ class Scheduler:
                     port_mapping[cluster_hostname] = (agent_host, port)
                 cluster_ssh_port_mapping = ClusterSSHPortMapping(port_mapping)
 
+        await self._repository.update_session_network_id(
+            session.session_id,
+            network_name,
+        )
         return NetworkSetup(
             network_name=network_name,
             network_config=network_config,

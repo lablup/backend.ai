@@ -7,6 +7,7 @@ import pytest
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import QuotaExceeded
+from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
     AllowedScalingGroup,
     ContainerUserInfo,
@@ -30,8 +31,12 @@ def basic_context():
     return SessionCreationContext(
         scaling_group_network=None,
         allowed_scaling_groups=[
-            AllowedScalingGroup(name="public-sg", is_private=False),
-            AllowedScalingGroup(name="private-sg", is_private=True),
+            AllowedScalingGroup(
+                name="public-sg", is_private=False, scheduler_opts=ScalingGroupOpts()
+            ),
+            AllowedScalingGroup(
+                name="private-sg", is_private=True, scheduler_opts=ScalingGroupOpts()
+            ),
         ],
         image_infos={
             "test-image": ImageInfo(

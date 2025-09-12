@@ -4,16 +4,16 @@ from typing import Optional, override
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions
+from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions, ArtifactType
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
 @dataclass
 class ScanArtifactsAction(ArtifactAction):
-    registry_id: uuid.UUID
-    storage_namespace_id: uuid.UUID
-    limit: int
-    order: ModelSortKey
+    artifact_type: Optional[ArtifactType]
+    registry_id: Optional[uuid.UUID]
+    limit: Optional[int]
+    order: Optional[ModelSortKey]
     search: Optional[str]
 
     @override

@@ -120,16 +120,24 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
         )
     )
 
+    # Convert ResourceSlot objects to JSON for API response
+    scaling_groups_json = {}
+    for sgname, sg_data in result.scaling_groups.items():
+        scaling_groups_json[sgname] = {
+            "using": sg_data["using"].to_json(),
+            "remaining": sg_data["remaining"].to_json(),
+        }
+
     resp = {
         "presets": result.presets,
-        "keypair_limits": result.keypair_limits,
-        "keypair_using": result.keypair_using,
-        "keypair_remaining": result.keypair_remaining,
-        "group_limits": result.group_limits,
-        "group_using": result.group_using,
-        "group_remaining": result.group_remaining,
-        "scaling_group_remaining": result.scaling_group_remaining,
-        "scaling_groups": result.scaling_groups,
+        "keypair_limits": result.keypair_limits.to_json(),
+        "keypair_using": result.keypair_using.to_json(),
+        "keypair_remaining": result.keypair_remaining.to_json(),
+        "group_limits": result.group_limits.to_json(),
+        "group_using": result.group_using.to_json(),
+        "group_remaining": result.group_remaining.to_json(),
+        "scaling_group_remaining": result.scaling_group_remaining.to_json(),
+        "scaling_groups": scaling_groups_json,
     }
 
     return web.json_response(resp, status=HTTPStatus.OK)

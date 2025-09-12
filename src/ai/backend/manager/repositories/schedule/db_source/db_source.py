@@ -178,6 +178,7 @@ class ScheduleDBSource:
                 SessionRow.priority,
                 SessionRow.session_type,
                 SessionRow.cluster_mode,
+                SessionRow.designated_agent_ids,
                 SessionRow.starts_at,
                 KernelRow.id.label("kernel_id"),
                 KernelRow.image.label("kernel_image"),
@@ -213,6 +214,7 @@ class ScheduleDBSource:
                     cluster_mode=row.cluster_mode,
                     starts_at=row.starts_at,
                     is_private=row.session_type in SessionTypes.private_types(),
+                    designated_agent_ids=row.designated_agent_ids,
                     kernels=[],
                 )
 

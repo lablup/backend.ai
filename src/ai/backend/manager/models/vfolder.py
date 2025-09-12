@@ -40,13 +40,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, relationship, selectinload
 
 from ai.backend.common.defs import MODEL_VFOLDER_LENGTH_LIMIT
-from ai.backend.common.dto.manager.field import (
-    VFolderOperationStatusField,
-    VFolderOwnershipTypeField,
-    VFolderPermissionField,
-)
 from ai.backend.common.types import (
-    CIStrEnum,
     MountPermission,
     QuotaScopeID,
     QuotaScopeType,
@@ -58,6 +52,13 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.vfolder.types import (
+    VFolderData,
+    VFolderInvitationState,
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+)
+from ai.backend.manager.data.vfolder.types import VFolderMountPermission as VFolderPermission
 
 from ..defs import (
     RESERVED_VFOLDER_PATTERNS,
@@ -154,122 +155,11 @@ __all__: Sequence[str] = (
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class VFolderOwnershipType(CIStrEnum):
-    """
-    Ownership type of virtual folder.
-    """
-
-    USER = "user"
-    GROUP = "group"
-
-    def to_field(self) -> VFolderOwnershipTypeField:
-        return VFolderOwnershipTypeField(self)
-
-
-class VFolderPermission(enum.StrEnum):
-    # TODO: Replace this class with VFolderRBACPermission
-    # Or rename this class to VFolderMountPermission
-    """
-    Permissions for a virtual folder given to a specific access key.
-    RW_DELETE includes READ_WRITE and READ_WRITE includes READ_ONLY.
-    """
-
-    READ_ONLY = "ro"
-    READ_WRITE = "rw"
-    RW_DELETE = "wd"
-    OWNER_PERM = "wd"  # resolved as RW_DELETE
-
-    def to_field(self) -> VFolderPermissionField:
-        return VFolderPermissionField(self)
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Optional[VFolderPermission]:
-        assert isinstance(value, str)
-        match value.upper():
-            case "RO" | "READ_ONLY":
-                return cls.READ_ONLY
-            case "RW" | "READ_WRITE":
-                return cls.READ_WRITE
-            case "RW_DELETE":
-                return cls.RW_DELETE
-            case "WD" | "OWNER_PERM":
-                return cls.OWNER_PERM
-        return None
-
-
 class VFolderPermissionValidator(t.Trafaret):
     def check_and_return(self, value: Any) -> VFolderPermission:
         if value not in ["ro", "rw", "wd"]:
             self._failure('one of "ro", "rw", or "wd" required', value=value)
         return VFolderPermission(value)
-
-
-class VFolderInvitationState(enum.StrEnum):
-    """
-    Virtual Folder invitation state.
-    """
-
-    PENDING = "pending"
-    CANCELED = "canceled"  # canceled by inviter
-    ACCEPTED = "accepted"
-    REJECTED = "rejected"  # rejected by invitee
-
-
-class VFolderOperationStatus(enum.StrEnum):
-    """
-    Introduce virtual folder current status for storage-proxy operations.
-    """
-
-    READY = "ready"
-    PERFORMING = "performing"
-    CLONING = "cloning"
-    MOUNTED = "mounted"
-    ERROR = "error"
-
-    DELETE_PENDING = "delete-pending"  # vfolder is in trash bin
-    DELETE_ONGOING = "delete-ongoing"  # vfolder is being deleted in storage
-    DELETE_COMPLETE = "delete-complete"  # vfolder is deleted permanently, only DB row remains
-    DELETE_ERROR = "delete-error"
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Optional[VFolderOperationStatus]:
-        assert isinstance(value, str)
-        match value.upper():
-            case "READY":
-                return cls.READY
-            case "PERFORMING":
-                return cls.PERFORMING
-            case "CLONING":
-                return cls.CLONING
-            case "MOUNTED":
-                return cls.MOUNTED
-            case "ERROR":
-                return cls.ERROR
-            case "DELETE_PENDING" | "DELETE-PENDING":
-                return cls.DELETE_PENDING
-            case "DELETE_ONGOING" | "DELETE-ONGOING":
-                return cls.DELETE_ONGOING
-            case "DELETE_COMPLETE" | "DELETE-COMPLETE":
-                return cls.DELETE_COMPLETE
-            case "DELETE_ERROR" | "DELETE-ERROR":
-                return cls.DELETE_ERROR
-        return None
-
-    def is_deletable(self, force: bool = False) -> bool:
-        if force:
-            return self in {
-                VFolderOperationStatus.READY,
-                VFolderOperationStatus.DELETE_PENDING,
-                VFolderOperationStatus.DELETE_ONGOING,
-                VFolderOperationStatus.DELETE_ERROR,
-            }
-        else:
-            return self == VFolderOperationStatus.DELETE_PENDING
-
-    def to_field(self) -> VFolderOperationStatusField:
-        return VFolderOperationStatusField(self)
 
 
 class VFolderStatusSet(enum.StrEnum):
@@ -582,6 +472,30 @@ class VFolderRow(Base):
     @property
     def vfid(self) -> VFolderID:
         return VFolderID(self.quota_scope_id, self.id)
+
+    def to_data(self) -> VFolderData:
+        return VFolderData(
+            id=self.id,
+            name=self.name,
+            domain_name=self.domain_name,
+            quota_scope_id=self.quota_scope_id,
+            usage_mode=self.usage_mode,
+            permission=self.permission,
+            host=self.host,
+            max_files=self.max_files,
+            max_size=self.max_size,
+            num_files=self.num_files,
+            cur_size=self.cur_size,
+            created_at=self.created_at,
+            last_used=self.last_used,
+            creator=self.creator,
+            unmanaged_path=self.unmanaged_path,
+            ownership_type=self.ownership_type,
+            user=self.user,
+            group=self.group,
+            cloneable=self.cloneable,
+            status=self.status,
+        )
 
 
 def is_unmanaged(unmanaged_path: Optional[str]) -> bool:

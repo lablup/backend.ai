@@ -58,8 +58,6 @@ class KernelStatus(CIStrEnum):
         """
         return frozenset((
             cls.RUNNING,
-            cls.RESTARTING,
-            cls.RESIZING,
             cls.TERMINATING,
         ))
 
@@ -88,6 +86,26 @@ class KernelStatus(CIStrEnum):
             cls.TERMINATED,
             cls.CANCELLED,
         ))
+
+    @classmethod
+    @lru_cache(maxsize=1)
+    def retriable_statuses(cls) -> frozenset["KernelStatus"]:
+        """
+        Returns a set of kernel statuses that are considered retriable.
+        """
+        return frozenset(
+            (
+                status
+                for status in cls
+                if status
+                not in (
+                    cls.RUNNING,
+                    cls.TERMINATING,
+                    cls.TERMINATED,
+                    cls.CANCELLED,
+                )
+            )
+        )
 
 
 @dataclass

@@ -7,6 +7,8 @@ import sqlalchemy as sa
 from sqlalchemy.sql import Select
 from sqlalchemy.sql.elements import BooleanClauseList
 
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidCursorTypeError
 from ai.backend.manager.api.gql.base import resolve_global_id
@@ -15,6 +17,7 @@ from ai.backend.manager.models.base import DEFAULT_PAGE_SIZE, validate_connectio
 from ai.backend.manager.models.gql_relay import ConnectionPaginationOrder
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.types import PaginationOptions
 
 
 @dataclass
@@ -23,37 +26,8 @@ class RepositoryArgs:
     storage_manager: "StorageSessionManager"
     config_provider: "ManagerConfigProvider"
     valkey_stat_client: "ValkeyStatClient"
-
-
-@dataclass
-class OffsetBasedPaginationOptions:
-    """Standard offset/limit pagination options."""
-
-    offset: Optional[int] = None
-    limit: Optional[int] = None
-
-
-@dataclass
-class ForwardPaginationOptions:
-    """Forward pagination: fetch items after a given cursor."""
-
-    after: Optional[str] = None
-    first: Optional[int] = None
-
-
-@dataclass
-class BackwardPaginationOptions:
-    """Backward pagination: fetch items before a given cursor."""
-
-    before: Optional[str] = None
-    last: Optional[int] = None
-
-
-@dataclass
-class PaginationOptions:
-    forward: Optional[ForwardPaginationOptions] = None
-    backward: Optional[BackwardPaginationOptions] = None
-    offset: Optional[OffsetBasedPaginationOptions] = None
+    valkey_live_client: "ValkeyLiveClient"
+    valkey_schedule_client: "ValkeyScheduleClient"
 
 
 # Generic types for pagination

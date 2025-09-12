@@ -249,3 +249,34 @@ class OptionalState(Generic[TVal]):
 class SMTPTriggerPolicy(enum.StrEnum):
     ALL = "ALL"
     ON_ERROR = "ON_ERROR"
+
+
+@dataclass
+class OffsetBasedPaginationOptions:
+    """Standard offset/limit pagination options."""
+
+    offset: Optional[int] = None
+    limit: Optional[int] = None
+
+
+@dataclass
+class ForwardPaginationOptions:
+    """Forward pagination: fetch items after a given cursor."""
+
+    after: Optional[str] = None
+    first: Optional[int] = None
+
+
+@dataclass
+class BackwardPaginationOptions:
+    """Backward pagination: fetch items before a given cursor."""
+
+    before: Optional[str] = None
+    last: Optional[int] = None
+
+
+@dataclass
+class PaginationOptions:
+    forward: Optional[ForwardPaginationOptions] = None
+    backward: Optional[BackwardPaginationOptions] = None
+    offset: Optional[OffsetBasedPaginationOptions] = None

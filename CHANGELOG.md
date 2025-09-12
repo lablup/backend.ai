@@ -16,6 +16,87 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.14.0rc1 (2025-09-11)
+
+### Breaking Changes
+* Implement password hashing system with multiple algorithms ([#5753](https://github.com/lablup/backend.ai/issues/5753))
+
+### Features
+* Add data migration script from VFolder to RBAC tables ([#5340](https://github.com/lablup/backend.ai/issues/5340))
+* Migrate existing user/project records to RBAC data ([#5417](https://github.com/lablup/backend.ai/issues/5417))
+* Expand RBAC tables by adding `permission_groups` table to group permissions with the same target ([#5465](https://github.com/lablup/backend.ai/issues/5465))
+* Add `reservoir_registries` DB table, service, and CRUD GQL mutations ([#5644](https://github.com/lablup/backend.ai/issues/5644))
+* Add `artifact_registries` DB table to store common information of the various artifact registries ([#5656](https://github.com/lablup/backend.ai/issues/5656))
+* Implement Reservoir registry, and Sync APIs between Managers ([#5660](https://github.com/lablup/backend.ai/issues/5660))
+* Add config to set GPFS fileset name prefix ([#5684](https://github.com/lablup/backend.ai/issues/5684))
+* Add RBAC repositoy functions to manage scopes and entity DB records ([#5699](https://github.com/lablup/backend.ai/issues/5699))
+* Allow `__typename` type query for advanced GraphQL features(GQL Federation, `@connection` directive) by introducing custom introspection rule ([#5705](https://github.com/lablup/backend.ai/issues/5705))
+* Align the reported agent memory size so that the reserved memory absorbs tiny memory size deviation originating from various firmware/kernel settings and make the memory size of same-hardware agents consistent, preventing inadvertent resource allocation failures in large clusters ([#5729](https://github.com/lablup/backend.ai/issues/5729))
+* Set expiry to set records of Bgtask metadata ids ([#5736](https://github.com/lablup/backend.ai/issues/5736))
+* Add `defaultArtifactRegistry` GQL resolver to fetch the default artifact registry information ([#5739](https://github.com/lablup/backend.ai/issues/5739))
+* Add `Artifact`, `ArtifactRegistry` REST API ([#5747](https://github.com/lablup/backend.ai/issues/5747))
+* Add session mode(Client, Proxy) based error handling in FetchContextManager ([#5774](https://github.com/lablup/backend.ai/issues/5774))
+* Add VFolder delete Background Task ([#5778](https://github.com/lablup/backend.ai/issues/5778))
+* Apply cache layer for resource presets ([#5781](https://github.com/lablup/backend.ai/issues/5781))
+* Add PBKDF2-SHA3-256 password hashing implementation and update supported algorithms ([#5785](https://github.com/lablup/backend.ai/issues/5785))
+* Remove obsolete max slot limit validation during session creation ([#5807](https://github.com/lablup/backend.ai/issues/5807))
+* Implement health check functionality for route management ([#5811](https://github.com/lablup/backend.ai/issues/5811))
+
+### Improvements
+* Migrate legacy redis clients to valkey clients in App Proxy ([#5741](https://github.com/lablup/backend.ai/issues/5741))
+
+### Fixes
+* Add missing `restart: unless-stopped` policy to all services in docker compose file ([#5694](https://github.com/lablup/backend.ai/issues/5694))
+* Add missing session live stat update ([#5762](https://github.com/lablup/backend.ai/issues/5762))
+* Make overlay network creation idempotent so that retries due to errors after this step does not make infinite retry loop ([#5765](https://github.com/lablup/backend.ai/issues/5765))
+* Clean up dangling docker networks ([#5770](https://github.com/lablup/backend.ai/issues/5770))
+* Add missing update when app proxy registered endpoint ([#5783](https://github.com/lablup/backend.ai/issues/5783))
+* Restrict `limit` to `scan_artifacts` API ([#5801](https://github.com/lablup/backend.ai/issues/5801))
+* Update client SDK to reflect UUID-only restriction in session dependencies ([#5809](https://github.com/lablup/backend.ai/issues/5809))
+
+### Miscellaneous
+* Refactor scheduler handlers: Split into individual files and create a base handler class ([#5766](https://github.com/lablup/backend.ai/issues/5766))
+
+
+## 25.13.4 (2025-09-03)
+
+### Fixes
+* Add missing scheduler options to AllowedScalingGroup and update related components ([#5730](https://github.com/lablup/backend.ai/issues/5730))
+
+
+## 25.13.3 (2025-09-03)
+
+### Fixes
+* Improve HTTP request proxying in the webserver to be transparent with content-encoding ([#5709](https://github.com/lablup/backend.ai/issues/5709))
+* Add null-user check in resource usage query ([#5712](https://github.com/lablup/backend.ai/issues/5712))
+* Ensure id parameter of chown function is an int ([#5713](https://github.com/lablup/backend.ai/issues/5713))
+* Refresh agent fields in kernel when rescheduling ([#5717](https://github.com/lablup/backend.ai/issues/5717))
+* Fix issue where App-Proxy failed to query worker circuits due to incorrect variable reference ([#5718](https://github.com/lablup/backend.ai/issues/5718))
+* Add missing network cleanup when creating overlay network ([#5721](https://github.com/lablup/backend.ai/issues/5721))
+
+
+## 25.13.2 (2025-09-02)
+
+### Features
+* The mouse-selected or copy-mode selected texts in the intrinsic ttyd app with tmux are now directly copied to the user-side clipboard, without needing to `set mouse=off` in the tmux session ([#5688](https://github.com/lablup/backend.ai/issues/5688))
+* feat: Improvement redis keys command to scan_iter for manager cli ([#5704](https://github.com/lablup/backend.ai/issues/5704))
+
+### Fixes
+* Add missing all-smi manpage file in the wheel packages ([#5685](https://github.com/lablup/backend.ai/issues/5685))
+* Updated RedisProfileTarget to handle cases where 'addr' is missing or None in the input data, preventing errors during address parsing. ([#5695](https://github.com/lablup/backend.ai/issues/5695))
+* fixes a duplicate joins issue during serialization when using pydantic by removing the join filter from the TOMLStringListField's _transform method. ([#5700](https://github.com/lablup/backend.ai/issues/5700))
+* Fix coordinator not performing health check for all endpoints ([#5702](https://github.com/lablup/backend.ai/issues/5702))
+* Fix session creation failing with `not allowed scaling group` error ([#5706](https://github.com/lablup/backend.ai/issues/5706))
+* Enhance endpoint creation logic to update existing records and handle circuits ([#5707](https://github.com/lablup/backend.ai/issues/5707))
+
+
+## 25.13.1 (2025-08-29)
+
+### Fixes
+* Fix session ordering in session_pending_queue query resolver ([#5682](https://github.com/lablup/backend.ai/issues/5682))
+* fix: Ensure redis address is nullable ([#5683](https://github.com/lablup/backend.ai/issues/5683))
+
+
 ## 25.13.0 (2025-08-29)
 
 ### Features

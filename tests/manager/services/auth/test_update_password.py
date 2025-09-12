@@ -3,7 +3,7 @@ from uuid import UUID
 
 import pytest
 
-from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
+from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.models.user import UserRole, UserStatus
@@ -15,20 +15,16 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 @pytest.fixture
-def mock_hook_plugin_ctx():
-    return MagicMock(spec=HookPluginContext)
-
-
-@pytest.fixture
 def mock_auth_repository():
     return AsyncMock(spec=AuthRepository)
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository):
+def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
+        config_provider=mock_config_provider,
     )
 
 
@@ -57,7 +53,7 @@ async def test_update_password_successful(
     )
 
     # Valid old password
-    mock_auth_repository.check_credential_validated.return_value = {
+    mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": "12345678-1234-5678-1234-567812345678",
         "email": action.email,
         "role": UserRole.USER,
@@ -71,7 +67,7 @@ async def test_update_password_successful(
 
     assert result.success is True
     assert result.message == "Password updated successfully"
-    mock_auth_repository.check_credential_validated.assert_called_once()
+    mock_auth_repository.check_credential_without_migration.assert_called_once()
     mock_auth_repository.update_user_password_validated.assert_called_once()
 
 
@@ -100,7 +96,7 @@ async def test_update_password_fails_when_new_passwords_dont_match(
     )
 
     # Valid old password
-    mock_auth_repository.check_credential_validated.return_value = {
+    mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": "12345678-1234-5678-1234-567812345678",
         "email": action.email,
         "role": UserRole.USER,
@@ -111,7 +107,8 @@ async def test_update_password_fails_when_new_passwords_dont_match(
 
     assert result.success is False
     assert result.message == "new password mismatch"
-    mock_auth_repository.check_credential_validated.assert_called_once()
+    # When passwords don't match, we return early without checking old password
+    mock_auth_repository.check_credential_without_migration.assert_not_called()
     # Password update should not be called when passwords don't match
     mock_auth_repository.update_user_password_validated.assert_not_called()
 
@@ -141,12 +138,12 @@ async def test_update_password_fails_with_incorrect_old_password(
     )
 
     # Invalid old password
-    mock_auth_repository.check_credential_validated.return_value = None
+    mock_auth_repository.check_credential_without_migration.return_value = None
 
     with pytest.raises(AuthorizationFailed):
         await auth_service.update_password(action)
 
-    mock_auth_repository.check_credential_validated.assert_called_once()
+    mock_auth_repository.check_credential_without_migration.assert_called_once()
     # Password update should not be called when credential check fails
     mock_auth_repository.update_user_password_validated.assert_not_called()
 
@@ -169,7 +166,7 @@ async def test_update_password_with_hook_rejection(
     )
 
     # Valid old password
-    mock_auth_repository.check_credential_validated.return_value = {
+    mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": "test-uuid",
         "email": action.email,
         "role": UserRole.USER,
@@ -207,7 +204,7 @@ async def test_update_password_repository_call(
     )
 
     # Setup successful scenario
-    mock_auth_repository.check_credential_validated.return_value = {
+    mock_auth_repository.check_credential_without_migration.return_value = {
         "uuid": "test-uuid",
         "email": action.email,
         "role": UserRole.USER,
@@ -222,15 +219,17 @@ async def test_update_password_repository_call(
     result = await auth_service.update_password(action)
 
     # Verify repository calls
-    mock_auth_repository.check_credential_validated.assert_called_once_with(
+    mock_auth_repository.check_credential_without_migration.assert_called_once_with(
         "test-domain",
         "update@example.com",
         "old_pass",
     )
-    mock_auth_repository.update_user_password_validated.assert_called_once_with(
-        "update@example.com",
-        "new_pass123",
-    )
+    # Verify password was updated with PasswordInfo
+    call_args = mock_auth_repository.update_user_password_validated.call_args
+    assert call_args[0][0] == "update@example.com"
+    password_info = call_args[0][1]
+    assert password_info.password == "new_pass123"
+    assert password_info.algorithm is not None  # Should be set from config
 
     # Verify hook was called
     mock_hook_plugin_ctx.dispatch.assert_called_once()

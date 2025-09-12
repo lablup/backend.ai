@@ -13,7 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import selectinload, sessionmaker
 
-from ai.backend.common.types import AccessKey, KernelId, SessionId
+from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.types import (
+    MODEL_SERVICE_RUNTIME_PROFILES,
+    AccessKey,
+    KernelId,
+    RuntimeVariant,
+    SessionId,
+)
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
 from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
@@ -39,12 +46,14 @@ from ai.backend.manager.errors.storage import VFolderNotFound
 from ai.backend.manager.models.endpoint import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
+    ModelServiceHelper,
 )
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import scaling_groups
+from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder import VFolderRow
@@ -73,9 +82,15 @@ class DeploymentDBSource:
     """Database source for deployment-related operations."""
 
     _db: ExtendedAsyncSAEngine
+    _storage_manager: StorageSessionManager
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        storage_manager: StorageSessionManager,
+    ) -> None:
         self._db = db
+        self._storage_manager = storage_manager
 
     @actxmgr
     async def _begin_readonly_read_committed(self) -> AsyncIterator[SAConnection]:
@@ -585,6 +600,25 @@ class DeploymentDBSource:
             result = await db_sess.execute(query)
             return result.rowcount > 0
 
+    async def get_endpoint_id_by_session(
+        self,
+        session_id: uuid.UUID,
+    ) -> Optional[uuid.UUID]:
+        """
+        Get endpoint ID associated with a session.
+
+        Args:
+            session_id: ID of the session
+
+        Returns:
+            Endpoint ID if found, None otherwise
+        """
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(RoutingRow.endpoint).where(RoutingRow.session == session_id)
+            result = await db_sess.execute(query)
+            endpoint_id = result.scalar_one_or_none()
+            return endpoint_id
+
     async def _delete_routes_and_endpoint(
         self,
         db_sess: SASession,
@@ -991,6 +1025,23 @@ class DeploymentDBSource:
                 )
                 await db_sess.execute(query)
 
+    async def update_endpoint_urls_bulk(
+        self,
+        url_updates: Mapping[uuid.UUID, str],
+    ) -> None:
+        """Batch update endpoint URLs for multiple endpoints.
+
+        Args:
+            url_updates: Mapping of endpoint IDs to their registered URLs
+        """
+        if not url_updates:
+            return
+
+        async with self._begin_session_read_committed() as db_sess:
+            for endpoint_id, url in url_updates.items():
+                query = sa.update(EndpointRow).where(EndpointRow.id == endpoint_id).values(url=url)
+                await db_sess.execute(query)
+
     async def update_route_sessions(
         self,
         route_session_ids: Mapping[uuid.UUID, SessionId],
@@ -1164,3 +1215,77 @@ class DeploymentDBSource:
                 status_map[route_id] = session_status
 
             return status_map
+
+    async def generate_route_connection_info(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> dict[str, Any]:
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            endpoint = await EndpointRow.get(
+                db_sess,
+                endpoint_id,
+                load_routes=True,
+            )
+            if not endpoint:
+                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
+            return await endpoint.generate_route_info(db_sess)
+
+    async def get_endpoint_health_check_config(
+        self,
+        endpoint_id: uuid.UUID,
+    ) -> Optional[ModelHealthCheck]:
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            endpoint = await EndpointRow.get(
+                db_sess,
+                endpoint_id,
+                load_created_user=True,
+                load_session_owner=True,
+                load_image=True,
+                load_routes=True,
+            )
+            if not endpoint:
+                raise EndpointNotFound(str(endpoint_id))
+
+            # Get model vfolder for health check config
+            model = await VFolderRow.get(db_sess, endpoint.model)
+            if not model:
+                return None
+
+            endpoint_data = endpoint.to_data()
+            _info: ModelHealthCheck | None = None
+
+            # Check runtime profile for health check endpoint
+            if _path := MODEL_SERVICE_RUNTIME_PROFILES[
+                endpoint_data.runtime_variant
+            ].health_check_endpoint:
+                _info = ModelHealthCheck(path=_path)
+            elif endpoint_data.runtime_variant == RuntimeVariant.CUSTOM:
+                # For custom runtime, check model definition file
+                model_definition_path = (
+                    await ModelServiceHelper.validate_model_definition_file_exists(
+                        self._storage_manager,
+                        model.host,
+                        model.vfid,
+                        endpoint_data.model_definition_path,
+                    )
+                )
+                model_definition = await ModelServiceHelper.validate_model_definition(
+                    self._storage_manager,
+                    model.host,
+                    model.vfid,
+                    model_definition_path,
+                )
+
+                # Check each model in the definition for health check config
+                for model_info in model_definition["models"]:
+                    if health_check_info := model_info.get("service", {}).get("health_check"):
+                        _info = ModelHealthCheck(
+                            path=health_check_info["path"],
+                            interval=health_check_info.get("interval"),
+                            max_retries=health_check_info.get("max_retries"),
+                            max_wait_time=health_check_info.get("max_wait_time"),
+                            expected_status_code=health_check_info.get("expected_status_code"),
+                        )
+                        break
+
+            return _info

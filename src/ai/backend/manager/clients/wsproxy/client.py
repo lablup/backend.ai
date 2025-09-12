@@ -11,7 +11,7 @@ from .types import CreateEndpointRequestBody
 client_decorator = create_layer_aware_client_decorator(LayerType.WSPROXY_CLIENT)
 
 
-class WSProxyClient:
+class AppProxyClient:
     _client_session: aiohttp.ClientSession
     _address: str
     _token: str

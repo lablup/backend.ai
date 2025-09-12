@@ -680,7 +680,6 @@ async def authorize(request: web.Request, params: Any) -> web.StreamResponse:
         email=params["username"],
         password=params["password"],
         stoken=stoken,
-        auth_config=root_ctx.config_provider.config.auth,
     )
     result = await root_ctx.processors.auth.authorize.wait_for_complete(action)
 
@@ -845,7 +844,6 @@ async def update_password_no_auth(request: web.Request, params: Any) -> web.Resp
         email=params["username"],
         current_password=params["current_password"],
         new_password=params["new_password"],
-        auth_config=root_ctx.config_provider.config.auth,
     )
     result = await root_ctx.processors.auth.update_password_no_auth.wait_for_complete(action)
     return web.json_response(

@@ -1,5 +1,3 @@
-"""HuggingFace model scanner implementation for Backend.AI storage."""
-
 import asyncio
 import logging
 import ssl
@@ -11,6 +9,7 @@ from typing import Callable, Optional, Protocol
 import aiohttp
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
     ModelData,
@@ -18,7 +17,6 @@ from ai.backend.common.data.storage.registries.types import (
     ModelTarget,
 )
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
 from ai.backend.common.types import DispatchResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.huggingface import (
@@ -30,9 +28,10 @@ from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.exception import (
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
+    ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
 )
-from ai.backend.storage.services.storages import StorageService
+from ai.backend.storage.services.storages.object_storage import ObjectStorageService
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -100,13 +99,13 @@ def _make_download_progress_logger(
             eta_str = _fmt_eta(eta_sec)
 
             log.trace(
-                "Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
+                "[stream_hf2b] Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
                     pct, offset / _MiB, total / _MiB, inst_mibs, eta_str
                 )
             )
         else:
             log.trace(
-                "Downloading... {:,.1f} MiB (total unknown) inst={:.2f} MiB/s".format(
+                "[stream_hf2b] Downloading... {:,.1f} MiB (total unknown) inst={:.2f} MiB/s".format(
                     offset / _MiB, inst_mibs
                 )
             )
@@ -121,14 +120,14 @@ def _make_download_progress_logger(
 class HuggingFaceServiceArgs:
     registry_configs: dict[str, HuggingfaceConfig]
     background_task_manager: BackgroundTaskManager
-    storage_service: StorageService
+    storage_service: ObjectStorageService
     event_producer: EventProducer
 
 
 class HuggingFaceService:
     """Service for HuggingFace model operations"""
 
-    _storages_service: StorageService
+    _storages_service: ObjectStorageService
     _background_task_manager: BackgroundTaskManager
     _registry_configs: dict[str, HuggingfaceConfig]
     _event_producer: EventProducer
@@ -180,7 +179,83 @@ class HuggingFaceService:
             limit=limit, search=search, sort=sort
         )
 
+        # Start background task to download metadata and fire event when complete
+        if models:
+            scanner = self._make_scanner(registry_name)
+            asyncio.create_task(
+                scanner.download_metadata_batch(models, registry_name, self._event_producer)
+            )
+
         return models
+
+    async def retrieve_model(
+        self,
+        registry_name: str,
+        model: ModelTarget,
+    ) -> ModelData:
+        """
+        Retrieve specific model by their model_id and revision.
+        For single model, fetch metadata immediately with full data
+
+        Args:
+            registry_name: Name of the HuggingFace registry
+            model: ModelTarget object with model_id and revision
+
+        Returns:
+            List of ModelData objects with complete metadata
+
+        Raises:
+            HuggingFaceModelNotFoundError: If any model is not found
+            HuggingFaceAPIError: If API call fails
+        """
+        log.info("Retrieving single HuggingFace model: {}", model)
+        scanner = self._make_scanner(registry_name)
+        model_data = await scanner.scan_model(model)
+        log.debug(f"Successfully retrieved single model with metadata: {model}")
+        return model_data
+
+    async def retrieve_models(
+        self,
+        registry_name: str,
+        models: list[ModelTarget],
+    ) -> list[ModelData]:
+        """Retrieve specific models by their model_id and revision.
+
+        Args:
+            registry_name: Name of the HuggingFace registry
+            models: List of ModelTarget objects with model_id and revision
+
+        Returns:
+            List of ModelData objects with complete metadata
+
+        Raises:
+            HuggingFaceModelNotFoundError: If any model is not found
+            HuggingFaceAPIError: If API call fails
+        """
+        log.info(f"Retrieving {len(models)} HuggingFace models")
+
+        scanner = self._make_scanner(registry_name)
+        retrieved_models = []
+        # For multiple models, get basic model data first then start background metadata processing
+        for model in models:
+            try:
+                model_data = await scanner.scan_model_without_metadata(model)
+                retrieved_models.append(model_data)
+                log.debug(f"Successfully retrieved basic model data: {model}")
+            except Exception as e:
+                log.error(f"Failed to retrieve model {model}: {str(e)}")
+                raise
+
+        # Start background metadata processing for multiple models
+        if retrieved_models:
+            asyncio.create_task(
+                scanner.download_metadata_batch(
+                    retrieved_models, registry_name, self._event_producer
+                )
+            )
+
+        log.info(f"Successfully retrieved {len(retrieved_models)} models")
+        return retrieved_models
 
     async def scan_model(self, registry_name: str, model: ModelTarget) -> ModelData:
         """Get detailed information about a specific model.
@@ -196,7 +271,7 @@ class HuggingFaceService:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
-        log.info(f"Scanning HuggingFace model: model_id={model.model_id}@{model.revision}")
+        log.info(f"Scanning HuggingFace model: {model}")
         return await self._make_scanner(registry_name).scan_model(model)
 
     async def list_model_files(
@@ -215,10 +290,10 @@ class HuggingFaceService:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
-        log.info(f"Listing model files: model_id={model.model_id}@{model.revision}")
+        log.info(f"Listing model files: {model}")
         return await self._make_scanner(registry_name).list_model_files_info(model)
 
-    async def get_download_url(self, registry_name: str, model: ModelTarget, filename: str) -> str:
+    def get_download_url(self, registry_name: str, model: ModelTarget, filename: str) -> str:
         """Get download URL for a specific file.
 
         Args:
@@ -229,9 +304,7 @@ class HuggingFaceService:
         Returns:
             Download URL string
         """
-        log.info(
-            f"Getting download URL: model_id={model.model_id}@{model.revision}, filename={filename}"
-        )
+        log.info(f"Getting download URL: {model}, filename={filename}")
         return self._make_scanner(registry_name).get_download_url(model, filename)
 
     async def import_model(
@@ -240,7 +313,7 @@ class HuggingFaceService:
         model: ModelTarget,
         storage_name: str,
         bucket_name: str,
-    ) -> uuid.UUID:
+    ) -> None:
         """Import a HuggingFace model to storage.
 
         Args:
@@ -259,82 +332,52 @@ class HuggingFaceService:
             raise RegistryNotFoundError(f"Unknown registry: {registry_name}")
         chunk_size = registry_config.download_chunk_size
 
-        async def _import_model(reporter: ProgressReporter) -> None:
-            artifact_total_size = 0
-            model_id = model.model_id
-            revision = model.revision
-            try:
-                log.info(f"Rescanning model for latest metadata: model_id={model_id}@{revision}")
-                scanner = self._make_scanner(registry_name)
-                file_infos = await scanner.list_model_files_info(model)
+        artifact_total_size = 0
+        try:
+            log.info(f"Rescanning model for latest metadata: {model}")
+            scanner = self._make_scanner(registry_name)
+            file_infos = await scanner.list_model_files_info(model)
 
-                file_count = len(file_infos)
-                reporter.total_progress = file_count
-                file_total_size = sum(file.size for file in file_infos)
-                log.info(
-                    f"Found files to import: model_id={model_id}@{revision}, file_count={file_count}, "
-                    f"total_size={file_total_size / (1024 * 1024)} MB"
-                )
-                artifact_total_size += file_total_size
+            file_count = len(file_infos)
+            file_total_size = sum(file.size for file in file_infos)
+            log.info(
+                f"Found files to import: model={model}, file_count={file_count}, "
+                f"total_size={file_total_size / (1024 * 1024)} MB"
+            )
+            artifact_total_size += file_total_size
 
-                successful_uploads = 0
-                failed_uploads = 0
+            successful_uploads = 0
+            failed_uploads = 0
 
-                for file_info in file_infos:
-                    try:
-                        await self._pipe_single_file_to_storage(
-                            file_info=file_info,
-                            model_id=model_id,
-                            revision=revision,
-                            storage_name=storage_name,
-                            bucket_name=bucket_name,
-                            download_chunk_size=chunk_size,
-                        )
-
-                        successful_uploads += 1
-                    except Exception as e:
-                        log.error(
-                            f"Failed to upload file: {str(e)}, model_id={model_id}@{revision}, file_path={file_info.path}"
-                        )
-                        failed_uploads += 1
-                    finally:
-                        await reporter.update(
-                            1,
-                            message=f"Uploaded file: {file_info.path} to {storage_name} (bucket: {bucket_name})",
-                        )
-
-                log.info(
-                    f"Model import completed: model_id={model_id}@{revision}, successful_uploads={successful_uploads}, "
-                    f"failed_uploads={failed_uploads}, total_files={len(file_infos)}"
-                )
-
-                if failed_uploads > 0:
-                    log.warning(
-                        f"Some files failed to import: model_id={model_id}@{revision}, failed_count={failed_uploads}"
+            for file_info in file_infos:
+                try:
+                    await self._pipe_single_file_to_storage(
+                        file_info=file_info,
+                        model=model,
+                        storage_name=storage_name,
+                        bucket_name=bucket_name,
+                        download_chunk_size=chunk_size,
                     )
 
-                await self._event_producer.anycast_event(
-                    ModelImportDoneEvent(
-                        model_id=model_id,
-                        revision=revision,
-                        registry_name=registry_name,
-                        # TODO: Use ArtifactRegistryType
-                        registry_type="huggingface",
-                        total_size=artifact_total_size,
+                    successful_uploads += 1
+                except Exception as e:
+                    log.error(
+                        f"Failed to upload file: {str(e)}, {model}, file_path={file_info.path}"
                     )
-                )
+                    failed_uploads += 1
 
-            except HuggingFaceModelNotFoundError:
-                log.error(f"Model not found: model_id={model_id}@{revision}")
-                raise
-            except Exception as e:
-                log.error(f"Model import failed: error={str(e)}, model_id={model_id}@{revision}")
-                raise HuggingFaceAPIError(
-                    f"Import failed for {model_id}@{revision}: {str(e)}"
-                ) from e
+            log.info(
+                f"Model import completed: {model}, successful_uploads={successful_uploads}, "
+                f"failed_uploads={failed_uploads}, total_files={len(file_infos)}"
+            )
 
-        bgtask_id = await self._background_task_manager.start(_import_model)
-        return bgtask_id
+            if failed_uploads > 0:
+                log.warning(f"Some files failed to import: {model}, failed_count={failed_uploads}")
+
+        except HuggingFaceModelNotFoundError:
+            raise
+        except Exception as e:
+            raise HuggingFaceAPIError(f"Import failed for {model}: {str(e)}") from e
 
     async def _download_readme_content(self, download_url: str) -> Optional[str]:
         """Download README content from the given URL.
@@ -592,8 +635,7 @@ class HuggingFaceService:
         self,
         *,
         file_info: FileObjectData,
-        model_id: str,
-        revision: str,
+        model: ModelTarget,
         download_chunk_size: int,
         storage_name: str,
         bucket_name: str,
@@ -602,22 +644,23 @@ class HuggingFaceService:
 
         Args:
             file_info: File information with download URL
-            model_id: HuggingFace model ID
-            revision: Git revision (branch, tag, or commit hash)
+            model: HuggingFace model target
             download_chunk_size: Chunk size for file download
             storage_name: Target storage name
             bucket_name: Target bucket name
         """
         if not self._storages_service:
-            # TODO: Add new exception type for missing storage service
-            raise HuggingFaceAPIError("Storage service not configured for import operations")
+            raise ObjectStorageConfigInvalidError(
+                "Storage service not configured for import operations"
+            )
 
         try:
-            # Create storage key path: {model_id}/{revision}/{file_path}
-            storage_key = f"{model_id}/{revision}/{file_info.path}"
+            # Create storage key path
+            revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+            storage_key = f"{model.model_id}/{revision}/{file_info.path}"
 
             log.info(
-                f"Starting file upload to {storage_name}: model_id={model_id}@{revision}, file_path={file_info.path}, "
+                f"[stream_hf2b] Starting file upload to {storage_name}: {model}, file_path={file_info.path}, "
                 f"storage_key={storage_key}, file_size={file_info.size}"
             )
 
@@ -636,7 +679,7 @@ class HuggingFaceService:
             )
 
             log.info(
-                f"Successfully uploaded file to {storage_name}: model_id={model_id}@{revision}, file_path={file_info.path}, "
+                f"Successfully uploaded file to {storage_name}: {model}, file_path={file_info.path}, "
                 f"storage_key={storage_key}"
             )
 

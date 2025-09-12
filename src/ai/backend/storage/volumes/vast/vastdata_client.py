@@ -14,7 +14,7 @@ from yarl import URL
 
 from ai.backend.logging import BraceStyleAdapter
 
-from ...exception import ExternalError, QuotaScopeAlreadyExists
+from ...exception import ExternalStorageServiceError, QuotaScopeAlreadyExists
 from ...types import CapacityUsage
 from .config import APIVersion
 from .exceptions import (
@@ -471,7 +471,9 @@ class VASTAPIClient:
         for path, info in infos:
             if path == root_dir:
                 return _parse(info)
-        raise ExternalError("No capacity data found from vast API")
+        raise ExternalStorageServiceError(
+            f"No capacity data found for root directory '{root_dir}' from VAST API"
+        )
 
 
 # GET /capacity/

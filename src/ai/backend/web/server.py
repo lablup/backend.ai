@@ -1,6 +1,5 @@
 import asyncio
 import json
-import logging
 import logging.config
 import os
 import re
@@ -19,6 +18,7 @@ from pprint import pprint
 from typing import Any, AsyncGenerator, AsyncIterator, Mapping, Optional, cast
 from uuid import uuid4
 
+import aiohttp
 import aiohttp_cors
 import aiotools
 import click
@@ -31,7 +31,7 @@ from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common import config
-from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
+from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dto.manager.auth.field import (
@@ -674,10 +674,13 @@ async def server_main(
     )
     app["config"] = config
     app["client_pool"] = ClientPool(
-        partial(
-            tcp_client_session_factory,
-            ssl=config.api.ssl_verify,
-            limit=config.api.connection_limit,
+        lambda key: aiohttp.ClientSession(
+            connector=aiohttp.TCPConnector(
+                ssl=config.api.ssl_verify,
+                limit=config.api.connection_limit,
+            ),
+            base_url=key.endpoint,
+            auto_decompress=False,
         )
     )
     request_policy_config: list[str] = config.security.request_policies

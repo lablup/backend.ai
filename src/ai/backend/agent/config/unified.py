@@ -724,26 +724,46 @@ class ContainerConfig(BaseModel):
 class ResourceConfig(BaseModel):
     reserved_cpu: int = Field(
         default=1,
-        description="Reserved CPU cores",
+        description="The number of CPU cores reserved for the operating system and the agent service.",
         examples=[1, 2],
         validation_alias=AliasChoices("reserved-cpu", "reserved_cpu"),
         serialization_alias="reserved-cpu",
     )
     reserved_mem: BinarySizeField = Field(
         default=BinarySize.finite_from_str("1G"),
-        description="Reserved memory",
+        description=(
+            "The memory space reserved for the operating system and the agent service. "
+            "It is subtracted from the reported main memory size and not available for user workload allocation. "
+            "Depending on the memory-align-size option and system configuration, "
+            "this may not be the exact value but have slightly less or more values within the memory-align-size."
+        ),
         examples=["1G", "2G"],
         validation_alias=AliasChoices("reserved-mem", "reserved_mem"),
         serialization_alias="reserved-mem",
     )
     reserved_disk: BinarySizeField = Field(
         default=BinarySize.finite_from_str("8G"),
-        description="Reserved disk space",
+        description=(
+            "The disk space reserved for the operating system and the agent service. "
+            "Currently this value is unused. "
+            "In future releases, it may be used to preserve the minimum disk space "
+            "from the scratch disk allocation via loopback files."
+        ),
         examples=["8G", "16G"],
         validation_alias=AliasChoices("reserved-disk", "reserved_disk"),
         serialization_alias="reserved-disk",
     )
-
+    memory_align_size: BinarySizeField = Field(
+        default=BinarySize.finite_from_str("16M"),
+        description=(
+            "The alignment of the reported main memory size to absorb tiny deviations "
+            "from per-node firwmare/hardware settings. "
+            "Recommended to be multiple of the page/hugepage size (e.g., 2 MiB)."
+        ),
+        examples=["2M", "32M"],
+        validation_alias=AliasChoices("memory-align-size", "memory_align_size"),
+        serialization_alias="memory-align-size",
+    )
     allocation_order: list[str] = Field(
         default=["cuda", "rocm", "tpu", "cpu", "mem"],
         description="Resource allocation order",

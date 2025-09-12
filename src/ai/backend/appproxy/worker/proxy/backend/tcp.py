@@ -77,7 +77,7 @@ class TCPBackend(BaseBackend):
         route = self.selected_route
         log.debug(
             "Proxying TCP Request to {}:{}",
-            route.kernel_host,
+            route.current_kernel_host,
             route.kernel_port,
         )
 
@@ -89,13 +89,13 @@ class TCPBackend(BaseBackend):
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             # unlike .frontend.tcp this has a chance of being a blocking call since kernel host can be a domain
             await asyncio.get_running_loop().run_in_executor(
-                None, sock.connect, (route.kernel_host, route.kernel_port)
+                None, sock.connect, (route.current_kernel_host, route.kernel_port)
             )
 
             up_reader, up_writer = await asyncio.open_connection(sock=sock)
             log.debug(
                 "Connected to {}:{}",
-                route.kernel_host,
+                route.current_kernel_host,
                 route.kernel_port,
             )
             async with asyncio.TaskGroup() as group:

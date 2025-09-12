@@ -21,6 +21,7 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
 from ai.backend.manager.data.user.types import UserCreator, UserData, UserInfoContext
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -753,17 +754,25 @@ class UserInput(graphene.InputObjectType):
     # When creating, you MUST set all fields.
     # When modifying, set the field to "None" to skip setting the value.
 
-    def to_action(self, email: str) -> CreateUserAction:
+    def to_action(self, email: str, graph_ctx: GraphQueryContext) -> CreateUserAction:
         def value_or_none(value: Any) -> Optional[Any]:
             return value if value is not Undefined else None
 
+        auth_config = graph_ctx.config_provider.config.auth
+        password_info = PasswordInfo(
+            password=str(self.password),
+            algorithm=auth_config.password_hash_algorithm,
+            rounds=auth_config.password_hash_rounds,
+            salt_size=auth_config.password_hash_salt_size,
+        )
+
         return CreateUserAction(
             creator=UserCreator(
-                username=self.username,
-                password=self.password,
+                username=str(self.username),
+                password=password_info,
                 email=email,
-                need_password_change=self.need_password_change,
-                domain_name=self.domain_name,
+                need_password_change=bool(self.need_password_change),
+                domain_name=str(self.domain_name),
                 full_name=value_or_none(self.full_name),
                 description=value_or_none(self.description),
                 is_active=value_or_none(self.is_active),
@@ -811,16 +820,26 @@ class ModifyUserInput(graphene.InputObjectType):
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
-    def to_action(self, email: str) -> ModifyUserAction:
+    def to_action(self, email: str, graph_ctx: GraphQueryContext) -> ModifyUserAction:
+        # Create PasswordInfo if password is being changed
+        password_state = OptionalState[PasswordInfo].nop()
+        if self.password is not Undefined and self.password is not None:
+            auth_config = graph_ctx.config_provider.config.auth
+            password_info = PasswordInfo(
+                password=str(self.password),
+                algorithm=auth_config.password_hash_algorithm,
+                rounds=auth_config.password_hash_rounds,
+                salt_size=auth_config.password_hash_salt_size,
+            )
+            password_state = OptionalState[PasswordInfo].from_graphql(password_info)
+
         return ModifyUserAction(
             email=email,
             modifier=UserModifier(
                 username=OptionalState[str].from_graphql(
                     self.username,
                 ),
-                password=OptionalState[str].from_graphql(
-                    self.password,
-                ),
+                password=password_state,
                 need_password_change=OptionalState[bool].from_graphql(
                     self.need_password_change,
                 ),
@@ -919,7 +938,7 @@ class CreateUser(graphene.Mutation):
         props: UserInput,
     ) -> CreateUser:
         graph_ctx: GraphQueryContext = info.context
-        action: CreateUserAction = props.to_action(email)
+        action: CreateUserAction = props.to_action(email, graph_ctx)
 
         action_result = await graph_ctx.processors.user.create_user.wait_for_complete(action)
 
@@ -951,7 +970,7 @@ class ModifyUser(graphene.Mutation):
     ) -> ModifyUser:
         graph_ctx: GraphQueryContext = info.context
 
-        action: ModifyUserAction = props.to_action(email)
+        action: ModifyUserAction = props.to_action(email, graph_ctx)
         res: ModifyUserActionResult = await graph_ctx.processors.user.modify_user.wait_for_complete(
             action
         )

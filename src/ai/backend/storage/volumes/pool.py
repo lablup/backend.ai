@@ -148,7 +148,7 @@ class VolumePool:
 
     def get_volume_info(self, volume_id: VolumeID) -> VolumeInfo:
         if volume_id not in self._volumes:
-            raise InvalidVolumeError(volume_id)
+            raise InvalidVolumeError(f"Volume not found: {volume_id}")
         return self._volumes[volume_id].info()
 
     @actxmgr
@@ -156,7 +156,7 @@ class VolumePool:
         try:
             yield self._volumes[volume_id]
         except KeyError:
-            raise InvalidVolumeError(volume_id)
+            raise InvalidVolumeError(f"Volume not found: {volume_id}")
 
     @actxmgr
     async def get_volume_by_name(self, name: str) -> AsyncIterator[AbstractVolume]:

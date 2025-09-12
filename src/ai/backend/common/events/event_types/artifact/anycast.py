@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     EventDomain,
@@ -16,35 +17,47 @@ class BaseArtifactEvent(AbstractAnycastEvent):
 
 
 @dataclass
-class ModelImportDoneEvent(BaseArtifactEvent):
+class ModelMetadataInfo:
+    """Individual model metadata information including README and file size"""
+
     model_id: str
     revision: str
+    readme_content: str
+    registry_type: ArtifactRegistryType
     registry_name: str
-    registry_type: str
-    total_size: int
+    size: int
+
+
+@dataclass
+class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
+    model: ModelMetadataInfo
 
     @classmethod
     @override
     def event_name(cls) -> str:
-        return "model_import_done"
+        return "models_metadata_fetch_done"
 
     def serialize(self) -> tuple:
         return (
-            self.model_id,
-            self.revision,
-            self.registry_name,
-            self.registry_type,
-            self.total_size,
+            self.model.model_id,
+            self.model.revision,
+            self.model.readme_content,
+            self.model.registry_name,
+            self.model.registry_type,
+            self.model.size,
         )
 
     @classmethod
     def deserialize(cls, value: tuple):
         return cls(
-            model_id=value[0],
-            revision=value[1],
-            registry_name=value[2],
-            registry_type=value[3],
-            total_size=value[4],
+            model=ModelMetadataInfo(
+                model_id=value[0],
+                revision=value[1],
+                readme_content=value[2],
+                registry_name=value[3],
+                registry_type=value[4],
+                size=value[5],
+            )
         )
 
     @override

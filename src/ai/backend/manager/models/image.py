@@ -735,13 +735,9 @@ class ImageRow(Base):
 
         return ImageRow._resources.type._schema.check(resources)
 
-    async def get_slot_ranges(
-        self,
-        etcd_loader: LegacyEtcdLoader,
-    ) -> tuple[ResourceSlot, ResourceSlot]:
+    async def get_min_slot(self, etcd_loader: LegacyEtcdLoader) -> ResourceSlot:
         slot_units = await etcd_loader.get_resource_slots()
         min_slot = ResourceSlot()
-        max_slot = ResourceSlot()
 
         for slot_key, resource in self.resources.items():
             slot_unit = slot_units.get(slot_key)
@@ -751,30 +747,20 @@ class ImageRow(Base):
             min_value = resource.get("min")
             if min_value is None:
                 min_value = Decimal(0)
-            max_value = resource.get("max")
-            if max_value is None:
-                max_value = Decimal("Infinity")
             if slot_unit == "bytes":
                 if not isinstance(min_value, Decimal):
                     min_value = BinarySize.from_str(min_value)
-                if not isinstance(max_value, Decimal):
-                    max_value = BinarySize.from_str(max_value)
             else:
                 if not isinstance(min_value, Decimal):
                     min_value = Decimal(min_value)
-                if not isinstance(max_value, Decimal):
-                    max_value = Decimal(max_value)
             min_slot[slot_key] = min_value
-            max_slot[slot_key] = max_value
 
         # fill missing
         for slot_key in slot_units.keys():
             if slot_key not in min_slot:
                 min_slot[slot_key] = Decimal(0)
-            if slot_key not in max_slot:
-                max_slot[slot_key] = Decimal("Infinity")
 
-        return min_slot, max_slot
+        return min_slot
 
     def _parse_row(self):
         res_limits = []

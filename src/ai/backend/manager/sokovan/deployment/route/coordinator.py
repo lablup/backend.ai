@@ -19,6 +19,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.handlers import (
+    HealthCheckRouteHandler,
     ProvisioningRouteHandler,
     RouteHandler,
     TerminatingRouteHandler,
@@ -94,6 +95,7 @@ class RouteCoordinator:
             scheduling_controller=scheduling_controller,
             config_provider=self._config_provider,
             client_pool=client_pool,
+            valkey_schedule=self._valkey_schedule,
         )
         self._route_handlers = self._init_handlers(executor)
 
@@ -105,6 +107,10 @@ class RouteCoordinator:
                 event_producer=self._event_producer,
             ),
             RouteLifecycleType.RUNNING: RunningRouteHandler(
+                route_executor=executor,
+                event_producer=self._event_producer,
+            ),
+            RouteLifecycleType.HEALTH_CHECK: HealthCheckRouteHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
             ),
@@ -199,6 +205,13 @@ class RouteCoordinator:
                 short_interval=10.0,
                 long_interval=60.0,
                 initial_delay=10.0,
+            ),
+            # Health check routes - frequent checking
+            RouteTaskSpec(
+                RouteLifecycleType.HEALTH_CHECK,
+                short_interval=5.0,
+                long_interval=60.0,
+                initial_delay=20.0,
             ),
             # Terminate routes - only long cycle
             RouteTaskSpec(

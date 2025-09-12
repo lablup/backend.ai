@@ -1,8 +1,7 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.services.auth.actions.update_full_name import (
     UpdateFullNameAction,
@@ -11,20 +10,16 @@ from ai.backend.manager.services.auth.service import AuthService
 
 
 @pytest.fixture
-def mock_hook_plugin_ctx():
-    return MagicMock(spec=HookPluginContext)
-
-
-@pytest.fixture
 def mock_auth_repository():
     return AsyncMock(spec=AuthRepository)
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository):
+def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
+        config_provider=mock_config_provider,
     )
 
 

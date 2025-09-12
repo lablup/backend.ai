@@ -1,3 +1,4 @@
+import uuid
 from typing import Any, Optional
 
 from graphql import GraphQLFormattedError
@@ -44,7 +45,6 @@ GraphQLResponse.model_rebuild(
 )
 
 
-# Artifact API Response Models
 class ImportArtifactResponse(BaseResponseModel):
     artifact_id: str = Field(description="ID of the imported artifact")
     name: str = Field(description="Name of the artifact")
@@ -63,7 +63,6 @@ class DeleteArtifactResponse(BaseResponseModel):
     message: str = Field(description="Deletion confirmation message")
 
 
-# ObjectStorage API Response Models
 class ObjectStorageResponse(BaseResponseModel):
     id: str = Field(description="ID of the object storage")
     name: str = Field(description="Name of the object storage")
@@ -78,22 +77,21 @@ class ObjectStorageListResponse(BaseResponseModel):
     storages: list[ObjectStorageResponse] = Field(description="List of object storages")
 
 
-class DeleteObjectStorageResponse(BaseResponseModel):
-    pass
+class GetPresignedDownloadURLResponse(BaseResponseModel):
+    presigned_url: str = Field(description="The presigned download URL")
 
 
-# Association Artifact-Storage API Response Models
-class AssociationArtifactStorageResponse(BaseResponseModel):
-    id: str = Field(description="ID of the association")
-    artifact_id: str = Field(description="ID of the associated artifact")
-    storage_id: str = Field(description="ID of the associated storage")
+class GetPresignedUploadURLResponse(BaseResponseModel):
+    presigned_url: str = Field(description="The presigned upload URL")
+    # TODO: Remove fields if not needed
+    fields: str = Field(description="JSON string containing the form fields")
 
 
-class AssociateArtifactWithStorageResponse(BaseResponseModel):
-    association: AssociationArtifactStorageResponse = Field(description="Created association")
-    message: str = Field(description="Success message")
+class ObjectStorageBucketsResponse(BaseResponseModel):
+    buckets: list[str] = Field(description="List of bucket names for a specific storage")
 
 
-class DisassociateArtifactWithStorageResponse(BaseResponseModel):
-    association: AssociationArtifactStorageResponse = Field(description="Removed association")
-    message: str = Field(description="Success message")
+class ObjectStorageAllBucketsResponse(BaseResponseModel):
+    buckets_by_storage: dict[uuid.UUID, list[str]] = Field(
+        description="Mapping of storage IDs to bucket lists"
+    )

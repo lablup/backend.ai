@@ -1,4 +1,5 @@
-:host > *, html {
+:host > *,
+html {
 }
 
 backend-ai-webui {

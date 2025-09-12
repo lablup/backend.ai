@@ -17,7 +17,7 @@ from ai.backend.common.types import QuotaConfig, VFolderID, VolumeID
 from ai.backend.logging.utils import BraceStyleAdapter
 
 from ..exception import (
-    ExternalError,
+    ExternalStorageServiceError,
     InvalidQuotaConfig,
     InvalidQuotaScopeError,
     InvalidSubpathError,
@@ -60,7 +60,7 @@ class VolumeService:
     async def _handle_external_errors(self) -> AsyncIterator[None]:
         try:
             yield
-        except ExternalError as e:
+        except ExternalStorageServiceError as e:
             log.exception("An external error occurred: %s", str(e))
             # TODO: Extract exception handling to middleware
             raise web.HTTPInternalServerError(
@@ -207,7 +207,9 @@ class VolumeService:
                 try:
                     await volume.create_vfolder(vfolder_id)
                 except QuotaScopeNotFoundError:
-                    raise ExternalError("Failed to create vfolder due to quota scope not found")
+                    raise ExternalStorageServiceError(
+                        "Failed to create vfolder due to quota scope not found"
+                    )
 
     async def clone_vfolder(self, vfolder_key: VFolderKey, dst_vfolder_id: VFolderID) -> None:
         await log_manager_api_entry_new(log, "clone_vfolder", vfolder_key)

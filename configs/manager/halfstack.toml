@@ -89,3 +89,13 @@ enabled = false
 enabled = true
 log-level = "INFO"
 endpoint = "http://127.0.0.1:4317"
+
+[artifact-registry]
+model-registry = "huggingface-hub"
+
+[reservoir]
+storage-name = "minio-storage"
+
+[reservoir.config]
+type = "object_storage"
+bucket-name = "backendai-storage"

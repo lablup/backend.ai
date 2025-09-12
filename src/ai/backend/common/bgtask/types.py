@@ -23,6 +23,7 @@ class BgtaskStatus(enum.StrEnum):
 
 class TaskName(enum.StrEnum):
     CLONE_VFOLDER = "clone_vfolder"
+    DELETE_VFOLDER = "delete_vfolder"
 
     PUSH_IMAGE = "push_image"
 

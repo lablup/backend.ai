@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Annotated, Iterable
+from typing import TYPE_CHECKING, Annotated, Iterable, Optional
 from uuid import UUID
 
 import jwt
@@ -106,7 +106,7 @@ async def proxy(
     otherwise coordinator will try to automatically redirect callee via `Location: ` response header.
     """
 
-    existing_circuit: Circuit | None = None
+    existing_circuit: Optional[Circuit] = None
     reuse = False
 
     root_ctx: RootContext = request.app["_root.context"]
@@ -122,7 +122,7 @@ async def proxy(
             session_id,
             token.session_id,
         )
-        raise InvalidCredentials
+        raise InvalidCredentials("E20007: Session ID mismatch")
 
     if not params.no_reuse:
         async with root_ctx.db.begin_readonly_session() as sess:

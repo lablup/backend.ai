@@ -10,7 +10,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaScopeID
 
-from ...exception import NotEmptyError
+from ...exception import QuotaDirectoryNotEmptyError
 from ...types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ...watcher import WatcherClient
 from ..abc import CAP_FAST_FS_SIZE, CAP_METRIC, CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
@@ -114,7 +114,9 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         quota_id = await self._get_quota_id(qspath)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
             # Check if any directory exists in the quota scope path
-            raise NotEmptyError(quota_scope_id)
+            raise QuotaDirectoryNotEmptyError(
+                f"Cannot delete quota scope '{quota_scope_id}': directory not empty"
+            )
         if quota_id is not None:
             await self.api_client.delete_quota(quota_id)
             await self._unset_quota_id(qspath)

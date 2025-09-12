@@ -222,11 +222,7 @@ class Image(graphene.ObjectType):
             size_bytes=row.size_bytes,
             status=row.status,
             resource_limits=[
-                ResourceLimit(
-                    key=k,
-                    min=v.get("min", Decimal(0)),
-                    max=v.get("max", Decimal("Infinity")),
-                )
+                ResourceLimit(key=k, min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
                 for k, v in row.resources.items()
             ],
             supported_accelerators=(row.accelerators or "").split(","),
@@ -575,11 +571,7 @@ class ImageNode(graphene.ObjectType):
             labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
             size_bytes=row.size_bytes,
             resource_limits=[
-                ResourceLimit(
-                    key=k,
-                    min=v.get("min", Decimal(0)),
-                    max=v.get("max", Decimal("Infinity")),
-                )
+                ResourceLimit(key=k, min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
                 for k, v in row.resources.items()
             ],
             supported_accelerators=(row.accelerators or "").split(","),

@@ -20,7 +20,7 @@ class ScalingGroupResolver:
         self,
         spec: SessionCreationSpec,
         allowed_groups: list[AllowedScalingGroup],
-    ) -> str:
+    ) -> AllowedScalingGroup:
         """
         Resolve the scaling group name for the session.
 
@@ -37,11 +37,6 @@ class ScalingGroupResolver:
         Raises:
             InvalidAPIParameters: If no accessible scaling group is available
         """
-        # Quick resolution if scaling group is specified
-        if spec.scaling_group:
-            log.debug(f"Using specified scaling group: {spec.scaling_group}")
-            return spec.scaling_group
-
         # Auto-select scaling group based on session type
         public_sgroup_only = spec.session_type not in PRIVATE_SESSION_TYPES
 
@@ -50,12 +45,12 @@ class ScalingGroupResolver:
             for sg in allowed_groups:
                 if not sg.is_private:
                     log.debug(f"Auto-selected public scaling group: {sg.name}")
-                    return sg.name
+                    return sg
 
         # Fall back to first allowed scaling group
         if allowed_groups:
-            selected = allowed_groups[0].name
-            log.debug(f"Auto-selected first available scaling group: {selected}")
+            selected = allowed_groups[0]
+            log.debug(f"Auto-selected first available scaling group: {selected.name}")
             return selected
 
         raise InvalidAPIParameters("No accessible scaling group available")

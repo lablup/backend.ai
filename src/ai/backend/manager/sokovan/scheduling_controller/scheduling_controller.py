@@ -25,6 +25,7 @@ from ai.backend.manager.repositories.scheduler import (
     SchedulerRepository,
 )
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
+    AllowedScalingGroup,
     SessionCreationSpec,
 )
 from ai.backend.manager.scheduler.types import ScheduleType
@@ -120,7 +121,7 @@ class SchedulingController:
     async def _resolve_scaling_group(
         self,
         session_spec: SessionCreationSpec,
-    ) -> str:
+    ) -> AllowedScalingGroup:
         """
         Resolve the scaling group for the session.
 
@@ -133,15 +134,19 @@ class SchedulingController:
         Returns:
             str: The resolved scaling group name
         """
-        if session_spec.scaling_group:
-            return session_spec.scaling_group
-
         # Fetch allowed groups to determine the scaling group
         allowed_groups = await self._repository.query_allowed_scaling_groups(
             session_spec.user_scope.domain_name,
             str(session_spec.user_scope.group_id),
             session_spec.access_key,
         )
+        if session_spec.scaling_group:
+            for sg in allowed_groups:
+                if sg.name == session_spec.scaling_group:
+                    return sg
+            raise InvalidAPIParameters(
+                f"Scaling group '{session_spec.scaling_group}' is not accessible"
+            )
 
         # Resolve the scaling group
         return self._scaling_group_resolver.resolve(
@@ -177,22 +182,21 @@ class SchedulingController:
 
         # Phase 2: Fetch all required data
         with self._metric_observer.measure_phase(
-            "scheduling_controller", validated_scaling_group, "fetch_data"
+            "scheduling_controller", validated_scaling_group.name, "fetch_data"
         ):
             allowed_vfolder_types = list(
                 await self._config_provider.legacy_etcd_config_loader.get_vfolder_types()
             )
-
             creation_context = await self._repository.fetch_session_creation_data(
                 session_spec,
-                validated_scaling_group,
+                validated_scaling_group.name,
                 self._storage_manager,
                 allowed_vfolder_types,
             )
 
         # Phase 3: Validate
         with self._metric_observer.measure_phase(
-            "scheduling_controller", validated_scaling_group, "validation"
+            "scheduling_controller", validated_scaling_group.name, "validation"
         ):
             self._validator.validate(
                 session_spec,
@@ -201,10 +205,11 @@ class SchedulingController:
 
         # Phase 4: Calculate resources and prepare session data
         with self._metric_observer.measure_phase(
-            "scheduling_controller", validated_scaling_group, "preparation"
+            "scheduling_controller", validated_scaling_group.name, "preparation"
         ):
             # Pre-calculate resources
             calculated_resources = await self._resource_calculator.calculate(
+                validated_scaling_group,
                 session_spec,
                 creation_context,
             )
@@ -219,7 +224,7 @@ class SchedulingController:
 
         # Phase 5: Enqueue in repository
         with self._metric_observer.measure_phase(
-            "scheduling_controller", validated_scaling_group, "enqueue"
+            "scheduling_controller", validated_scaling_group.name, "enqueue"
         ):
             session_id = await self._repository.enqueue_session(session_data)
 

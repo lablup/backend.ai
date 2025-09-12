@@ -1,16 +1,28 @@
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional, override
+
+from ai.backend.manager.types import Creator
 
 from .role import RoleData
 
 
 @dataclass
-class UserRoleCreateInput:
+class UserRoleCreateInput(Creator):
     user_id: uuid.UUID
     role_id: uuid.UUID
     granted_by: Optional[uuid.UUID] = None
+
+    @override
+    def fields_to_store(self) -> dict[str, Any]:
+        data = {
+            "user_id": self.user_id,
+            "role_id": self.role_id,
+        }
+        if self.granted_by is not None:
+            data["granted_by"] = self.granted_by
+        return data
 
 
 @dataclass

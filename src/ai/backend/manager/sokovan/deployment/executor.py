@@ -3,7 +3,7 @@
 import asyncio
 import logging
 from collections.abc import Sequence
-from typing import Optional
+from typing import Any, Coroutine, Optional
 from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import (
@@ -16,7 +16,7 @@ from ai.backend.common.types import (
     RuntimeVariant,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.wsproxy.client import WSProxyClient
+from ai.backend.manager.clients.wsproxy.client import AppProxyClient
 from ai.backend.manager.clients.wsproxy.types import (
     CreateEndpointRequestBody,
     EndpointTagsModel,
@@ -77,7 +77,7 @@ class DeploymentExecutor:
         )
 
         # Collect registration tasks
-        registration_tasks = []
+        registration_tasks: list[Coroutine[Any, Any, str]] = []
         for deployment in deployments:
             target_revision = deployment.target_revision()
             if not target_revision:
@@ -97,8 +97,10 @@ class DeploymentExecutor:
             registration_tasks.append(self._register_endpoint(deployment, targets))
 
         # Wait for all tasks to complete
-        successful_deployments: list[DeploymentInfo] = []
+        successful_deployments = []
         errors: list[DeploymentExecutionError] = []
+        url_updates: dict[UUID, str] = {}
+
         if registration_tasks:
             results = await asyncio.gather(*registration_tasks, return_exceptions=True)
             for deployment, result in zip(deployments, results):
@@ -116,11 +118,19 @@ class DeploymentExecutor:
                         )
                     )
                 else:
+                    # Result is the endpoint URL string returned from _register_endpoint
+                    url_updates[deployment.id] = result
                     successful_deployments.append(deployment)
                     log.info(
-                        "Successfully registered endpoint for deployment {}",
+                        "Successfully registered endpoint for deployment {} with URL: {}",
                         deployment.id,
+                        result,
                     )
+
+        # Batch update all endpoint URLs in the database
+        if url_updates:
+            await self._deployment_repo.update_endpoint_urls_bulk(url_updates)
+
         return DeploymentExecutionResult(
             successes=successful_deployments,
             errors=errors,
@@ -338,19 +348,19 @@ class DeploymentExecutor:
             existing_url=deployment.network.url,
             open_to_public=deployment.network.open_to_public,
             health_check_config=health_check_config,
-            wsproxy_addr=scaling_group_target.addr,
-            wsproxy_api_token=scaling_group_target.api_token,
+            app_proxy_addr=scaling_group_target.addr,
+            app_proxy_api_token=scaling_group_target.api_token,
         )
 
-    def _load_wsproxy_client(self, address: str, token: str) -> WSProxyClient:
-        """Load or create a WSProxy client for the given address."""
+    def _load_app_proxy_client(self, address: str, token: str) -> AppProxyClient:
+        """Load or create a App Proxy client for the given address."""
         client_session = self._client_pool.load_client_session(
             ClientKey(
                 endpoint=address,
                 domain="wsproxy",
             )
         )
-        return WSProxyClient(client_session, address, token)
+        return AppProxyClient(client_session, address, token)
 
     async def _create_endpoint_in_proxy(
         self,
@@ -363,8 +373,8 @@ class DeploymentExecutor:
         existing_url: Optional[str],
         open_to_public: bool,
         health_check_config: Optional[ModelHealthCheck],
-        wsproxy_addr: str,
-        wsproxy_api_token: str,
+        app_proxy_addr: str,
+        app_proxy_api_token: str,
     ) -> str:
         """
         Create an endpoint in WSProxy service.
@@ -385,7 +395,7 @@ class DeploymentExecutor:
         Returns:
             Response from WSProxy service
         """
-        wsproxy_client = self._load_wsproxy_client(wsproxy_addr, wsproxy_api_token)
+        app_proxy_client = self._load_app_proxy_client(app_proxy_addr, app_proxy_api_token)
 
         # Create request body using Pydantic model
         request_body = CreateEndpointRequestBody(
@@ -408,14 +418,14 @@ class DeploymentExecutor:
             health_check=health_check_config,
         )
 
-        res = await wsproxy_client.create_endpoint(endpoint_id, request_body)
+        res = await app_proxy_client.create_endpoint(endpoint_id, request_body)
         return res["endpoint"]
 
     async def _delete_endpoint_from_wsproxy(
         self,
         endpoint_id: UUID,
-        wsproxy_addr: str,
-        wsproxy_api_token: str,
+        app_proxy_addr: str,
+        app_proxy_api_token: str,
     ) -> None:
         """
         Delete an endpoint from WSProxy service.
@@ -425,5 +435,5 @@ class DeploymentExecutor:
             wsproxy_addr: WSProxy service address
             wsproxy_api_token: WSProxy API token
         """
-        wsproxy_client = self._load_wsproxy_client(wsproxy_addr, wsproxy_api_token)
-        await wsproxy_client.delete_endpoint(endpoint_id)
+        app_proxy_client = self._load_app_proxy_client(app_proxy_addr, app_proxy_api_token)
+        await app_proxy_client.delete_endpoint(endpoint_id)

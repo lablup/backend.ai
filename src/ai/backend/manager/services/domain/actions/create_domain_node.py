@@ -2,12 +2,12 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.domain.actions.base import DomainAction
-from ai.backend.manager.services.domain.types import (
+from ai.backend.manager.data.domain.types import (
     DomainCreator,
     DomainData,
     UserInfo,
 )
+from ai.backend.manager.services.domain.actions.base import DomainAction
 
 
 @dataclass

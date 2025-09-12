@@ -1,6 +1,7 @@
 """Factory functions for creating scheduler components."""
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.manager.clients.agent import AgentPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -48,6 +49,7 @@ def create_default_scheduler(
     lock_factory: DistributedLockFactory,
     agent_pool: AgentPool,
     network_plugin_ctx: NetworkPluginContext,
+    event_producer: EventProducer,
     valkey_schedule: ValkeyScheduleClient,
 ) -> Scheduler:
     """
@@ -55,10 +57,13 @@ def create_default_scheduler(
 
     Args:
         repository: The repository for accessing system data
+        deployment_repository: The deployment repository
         config_provider: The manager configuration provider
         lock_factory: Factory for creating distributed locks
         agent_pool: Pool for managing agent clients
         network_plugin_ctx: Network plugin context for network management
+        event_producer: Event producer for publishing events
+        valkey_schedule: Valkey client for scheduling operations
 
     Returns:
         A configured Scheduler instance
@@ -90,6 +95,7 @@ def create_default_scheduler(
             lock_factory=lock_factory,
             agent_pool=agent_pool,
             network_plugin_ctx=network_plugin_ctx,
+            event_producer=event_producer,
             valkey_schedule=valkey_schedule,
         )
     )

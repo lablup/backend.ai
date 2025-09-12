@@ -14,6 +14,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
     ImageInfo,
@@ -31,10 +32,22 @@ from ai.backend.manager.data.kernel.types import (
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.data.user.types import UserData, UserRole
 from ai.backend.manager.models.agent import AgentRow, AgentStatus
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.user import UserRow
+
+
+def create_test_password_info(password: str = "test_password") -> PasswordInfo:
+    """Create a PasswordInfo object for testing with default PBKDF2 algorithm."""
+    return PasswordInfo(
+        password=password,
+        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        rounds=100_000,
+        salt_size=32,
+    )
+
 
 AGENT_ROW_FIXTURE = AgentRow(
     id="i-ubuntu",
@@ -56,7 +69,7 @@ USER_ROW_FIXTURE = UserRow(
     uuid=uuid4(),
     username=f"test_user_{uuid4()}",
     email=f"test-{uuid4()}@example.com",
-    password="test_password",
+    password=create_test_password_info("test_password"),
     need_password_change=False,
     full_name="Test User",
     description="Test user for fixtures",

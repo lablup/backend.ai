@@ -232,6 +232,7 @@ from .resources import (
     ComputerContext,
     KernelResourceSpec,
     Mount,
+    align_memory,
     allocate,
     known_slot_types,
 )
@@ -592,10 +593,14 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
             _mount(MountTypes.BIND, resolved_path, target_path)
 
         mount_static_binary(f"su-exec.{arch}.bin", "/opt/kernel/su-exec")
+        # /opt/kernel is for private executables not exposed in the user's PATH.
+        # /usr/local/bin is for public executables to be exposed in the user's PATH.
         mount_versioned_binary(f"libbaihook.*.{arch}.so", "/opt/kernel/libbaihook.so")
         mount_static_binary(f"dropbearmulti.{arch}.bin", "/opt/kernel/dropbearmulti")
         mount_static_binary(f"sftp-server.{arch}.bin", "/opt/kernel/sftp-server")
         mount_static_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
+        mount_static_binary(f"ttyd_linux.{arch}.bin", "/opt/kernel/ttyd")
+        mount_static_binary("yank.sh", "/opt/kernel/yank.sh")
         mount_static_binary(f"all-smi.{arch}.bin", "/usr/local/bin/all-smi")
         mount_static_binary("all-smi.1", "/usr/local/share/man/man1/all-smi.1", skip_missing=True)
 
@@ -936,10 +941,10 @@ class AbstractAgent(
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
             metadatas.append(computer.get_metadata())
 
-        self.slots = await self.scan_available_resources()
+        self.slots = await self.update_slots()
         log.info("Resource slots: {!r}", self.slots)
         log.info("Slot types: {!r}", known_slot_types)
-        self.timer_tasks.append(aiotools.create_timer(self.update_slots, 30.0))
+        self.timer_tasks.append(aiotools.create_timer(self.update_slots_periodically, 30.0))
 
         # Use ValkeyStatClient batch operations for better performance
         field_value_map = {}
@@ -1903,9 +1908,47 @@ class AbstractAgent(
 
     async def update_slots(
         self,
+    ) -> Mapping[SlotName, Decimal]:
+        """
+        Finalize the resource slots from the resource slots scanned by each device plugin,
+        excluding reserved capacities for the system and agent itself.
+        """
+        scanned_slots = await self.scan_available_resources()
+        usable_slots: dict[SlotName, Decimal] = {}
+        reserved_slots = {
+            SlotName("cpu"): Decimal(self.local_config.resource.reserved_cpu),
+            SlotName("mem"): Decimal(self.local_config.resource.reserved_mem),
+            SlotName("disk"): Decimal(self.local_config.resource.reserved_disk),
+        }
+        for slot_name, slot_capacity in scanned_slots.items():
+            if slot_name == SlotName("mem"):
+                mem_reserved = int(reserved_slots.get(slot_name, 0))
+                mem_align = int(self.local_config.resource.memory_align_size)
+                mem_usable, mem_reserved = align_memory(
+                    int(slot_capacity), mem_reserved, align=mem_align
+                )
+                usable_capacity = Decimal(mem_usable)
+                log.debug(
+                    "usable-mem: {:m}, reserved-mem: {:m} after {:m} alignment",
+                    BinarySize(mem_usable),
+                    BinarySize(mem_reserved),
+                    BinarySize(mem_align),
+                )
+            else:
+                usable_capacity = max(
+                    Decimal(0), slot_capacity - reserved_slots.get(slot_name, Decimal(0))
+                )
+            usable_slots[slot_name] = usable_capacity
+        return usable_slots
+
+    async def update_slots_periodically(
+        self,
         interval: float,
     ) -> None:
-        self.slots = await self.scan_available_resources()
+        """
+        A timer function to periodically scan and update the resource slots.
+        """
+        self.slots = await self.update_slots()
         log.debug("slots: {!r}", self.slots)
 
     async def gather_hwinfo(self) -> Mapping[str, HardwareMetadata]:

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Callable
 
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -18,7 +19,12 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
-from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
+from ai.backend.common.events.event_types.artifact.anycast import (
+    ModelMetadataFetchDoneEvent,
+)
+from ai.backend.common.events.event_types.artifact_registry.anycast import (
+    DoScanReservoirRegistryEvent,
+)
 from ai.backend.common.events.event_types.bgtask.broadcast import (
     BgtaskCancelledEvent,
     BgtaskDoneEvent,
@@ -88,7 +94,11 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 )
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.event_dispatcher.handlers.artifact import ArtifactEventHandler
+from ai.backend.manager.event_dispatcher.handlers.artifact_registry import (
+    ArtifactRegistryEventHandler,
+)
 from ai.backend.manager.event_dispatcher.handlers.propagator import PropagatorEventHandler
 from ai.backend.manager.event_dispatcher.handlers.schedule import ScheduleEventHandler
 from ai.backend.manager.idle import IdleCheckerHost
@@ -96,6 +106,7 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.scheduler.dispatcher import SchedulerDispatcher
+from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
@@ -129,6 +140,8 @@ class DispatcherArgs:
     idle_checker_host: IdleCheckerHost
     event_dispatcher_plugin_ctx: EventDispatcherPluginContext
     repositories: Repositories
+    processors_factory: Callable[[], Processors]
+    storage_manager: StorageSessionManager
     use_sokovan: bool = True
 
 
@@ -144,6 +157,7 @@ class Dispatchers:
     _vfolder_event_handler: VFolderEventHandler
     _idle_check_event_handler: IdleCheckEventHandler
     _artifact_event_handler: ArtifactEventHandler
+    _artifact_registry_event_handler: ArtifactRegistryEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
         """
@@ -191,6 +205,15 @@ class Dispatchers:
         self._artifact_event_handler = ArtifactEventHandler(
             args.repositories.artifact.repository,
             args.repositories.huggingface_registry.repository,
+            args.repositories.reservoir_registry.repository,
+        )
+        self._artifact_registry_event_handler = ArtifactRegistryEventHandler(
+            args.processors_factory,
+            args.repositories.artifact.repository,
+            args.repositories.artifact_registry.repository,
+            args.repositories.reservoir_registry.repository,
+            args.repositories.object_storage.repository,
+            args.storage_manager,
         )
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
@@ -207,6 +230,7 @@ class Dispatchers:
         self._dispatch_vfolder_events(event_dispatcher)
         self._dispatch_idle_check_events(event_dispatcher)
         self._dispatch_artifact_events(event_dispatcher)
+        self._dispatch_artifact_registry_events(event_dispatcher)
 
     def _dispatch_bgtask_events(
         self,
@@ -544,9 +568,17 @@ class Dispatchers:
     def _dispatch_artifact_events(self, event_dispatcher: EventDispatcher) -> None:
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(
-            ModelImportDoneEvent,
+            ModelMetadataFetchDoneEvent,
             None,
-            self._artifact_event_handler.handle_artifact_import_done,
+            self._artifact_event_handler.handle_model_metadata_fetch_done,
+        )
+
+    def _dispatch_artifact_registry_events(self, event_dispatcher: EventDispatcher) -> None:
+        evd = event_dispatcher.with_reporters([EventLogger(self._db)])
+        evd.consume(
+            DoScanReservoirRegistryEvent,
+            None,
+            self._artifact_registry_event_handler.handle_artifact_registry_scan,
         )
 
     def _dispatch_idle_check_events(

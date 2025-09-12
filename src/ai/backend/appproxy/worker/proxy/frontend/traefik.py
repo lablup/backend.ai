@@ -14,10 +14,6 @@ from ai.backend.appproxy.common.config import get_default_redis_key_ttl
 from ai.backend.appproxy.common.exceptions import ServerMisconfiguredError
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.proxy.backend.traefik import TraefikBackend
-from ai.backend.common import redis_helper
-from ai.backend.common.defs import REDIS_LIVE_DB, RedisRole
-from ai.backend.common.redis_client import RedisConnection
-from ai.backend.common.types import RedisProfileTarget
 from ai.backend.logging import BraceStyleAdapter
 
 from ...types import (
@@ -31,8 +27,7 @@ from ...types import (
 from .base import BaseFrontend
 
 if TYPE_CHECKING:
-    from redis.asyncio import Redis
-    from redis.asyncio.client import Pipeline
+    pass
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 MSetType: TypeAlias = Mapping[Union[str, bytes], Union[bytes, float, int, str]]
@@ -75,16 +70,10 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
         site = web.UnixSite(self.runner, path)
         await site.start()
 
-        if self.root_context.local_config.proxy_worker.use_experimental_redis_event_dispatcher:
-            self.last_used_time_marker_writer_task = aiotools.create_timer(
-                self._last_used_time_marker_writer_experimental,
-                10.0,
-            )
-        else:
-            self.last_used_time_marker_writer_task = aiotools.create_timer(
-                self._last_used_time_marker_writer_redispy,
-                10.0,
-            )
+        self.last_used_time_marker_writer_task = aiotools.create_timer(
+            self._last_used_time_marker_writer,
+            10.0,
+        )
         self.active_circuit_writer_task = aiotools.create_timer(
             self._active_circuit_writer,
             5.0,
@@ -100,32 +89,7 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
         await self.last_used_time_marker_writer_task
         await self.active_circuit_writer_task
 
-    async def _last_used_time_marker_writer_experimental(self, interval: float) -> None:
-        redis_profile_target = RedisProfileTarget.from_dict(
-            self.root_context.local_config.redis.to_dict()
-        )
-        try:
-            async with RedisConnection(
-                redis_profile_target.profile_target(RedisRole.LIVE),
-                db=REDIS_LIVE_DB,
-            ) as client:
-                async with self.redis_keys_lock:
-                    if len(self.redis_keys) == 0:
-                        return
-                    keys = self.redis_keys
-                    self.redis_keys = {}
-
-                command: list[str | float] = ["MSET"]
-                for key, value in keys.items():
-                    command.extend([key, value])
-
-                await client.execute(command)
-                log.debug("Wrote {} keys", len(keys))
-        except Exception:
-            log.exception("_last_used_time_marker_writer():")
-            raise
-
-    async def _last_used_time_marker_writer_redispy(self, interval: float) -> None:
+    async def _last_used_time_marker_writer(self, interval: float) -> None:
         try:
             async with self.redis_keys_lock:
                 if len(self.redis_keys) == 0:
@@ -133,15 +97,9 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
                 keys = self.redis_keys
                 self.redis_keys = {}
 
+            data = {key: str(value) for key, value in keys.items()}
             ttl = get_default_redis_key_ttl()
-
-            async def _pipe(r: Redis) -> Pipeline:
-                pipe = r.pipeline(transaction=False)
-                for k, v in keys.items():
-                    pipe.set(k, v, ex=ttl)
-                return pipe
-
-            await redis_helper.execute(self.root_context.redis_live, _pipe)
+            await self.root_context.valkey_live.store_multiple_live_data(data, ex=ttl)
 
             log.debug("Wrote {} keys", len(keys))
         except Exception:

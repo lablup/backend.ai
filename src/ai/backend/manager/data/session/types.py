@@ -72,6 +72,23 @@ class SessionStatus(CIStrEnum):
             cls.CANCELLED,
         ))
 
+    @classmethod
+    @lru_cache(maxsize=1)
+    def retriable_statuses(cls) -> frozenset["SessionStatus"]:
+        return frozenset(
+            (
+                status
+                for status in cls
+                if status
+                not in (
+                    cls.RUNNING,
+                    cls.TERMINATING,
+                    cls.TERMINATED,
+                    cls.CANCELLED,
+                )
+            )
+        )
+
     def is_terminal(self) -> bool:
         return self in self.terminal_statuses()
 

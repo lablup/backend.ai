@@ -681,3 +681,21 @@ def allocate(
         for dev in ordered_dev_names:
             computers[dev].alloc_map.allocations = current_dev_alloc_maps[dev]
         raise
+
+
+def align_memory(orig: int, reserved: int, *, align: int) -> tuple[int, int]:
+    """
+    Calculate the usable/reserved memory sizes based on the given original size,
+    the desired reserved space size, and the alignment.
+
+    The alignment differences are absorbed by the reserved space, so the
+    calculated reserved space may differ from the given input.
+    """
+    if orig % align != 0:
+        usable = orig + (orig % align)
+    else:
+        usable = orig
+    usable = usable - reserved
+    usable -= usable % align
+    actual_reserved = orig - usable
+    return usable, actual_reserved

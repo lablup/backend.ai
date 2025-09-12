@@ -8,7 +8,9 @@ from aiohttp import web
 from ai.backend.common.dto.manager.auth.field import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
-from ai.backend.manager.config.unified import AuthConfig
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.config.unified import AuthConfig, ManagerConfig
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
 from ai.backend.manager.models.user import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.repository import AuthRepository
@@ -29,10 +31,24 @@ def mock_auth_repository():
 
 
 @pytest.fixture
-def auth_service(mock_hook_plugin_ctx, mock_auth_repository):
+def mock_config_provider():
+    mock_provider = MagicMock(spec=ManagerConfigProvider)
+    mock_provider.config = MagicMock(spec=ManagerConfig)
+    mock_provider.config.auth = AuthConfig(
+        max_password_age=timedelta(days=90),
+        password_hash_algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        password_hash_rounds=100_000,
+        password_hash_salt_size=32,
+    )
+    return mock_provider
+
+
+@pytest.fixture
+def auth_service(mock_hook_plugin_ctx, mock_auth_repository, mock_config_provider):
     return AuthService(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         auth_repository=mock_auth_repository,
+        config_provider=mock_config_provider,
     )
 
 
@@ -41,7 +57,7 @@ def setup_successful_auth(mock_auth_repository, mock_hook_plugin_ctx):
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED, result=None, reason=None
     )
-    mock_auth_repository.check_credential_validated.return_value = {
+    mock_auth_repository.check_credential_with_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": "test@example.com",
         "role": UserRole.USER,
@@ -66,7 +82,6 @@ async def test_authorize_success(auth_service, setup_successful_auth):
         password="correct_password",
         request=MagicMock(),
         stoken=None,
-        auth_config=None,
     )
 
     result = await auth_service.authorize(action)
@@ -88,7 +103,6 @@ async def test_authorize_invalid_token_type(auth_service, mock_hook_plugin_ctx):
         password="password",
         request=MagicMock(),
         stoken=None,
-        auth_config=None,
     )
 
     with pytest.raises(InvalidAPIParameters):
@@ -102,7 +116,7 @@ async def test_authorize_invalid_credentials(
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED, result=None, reason=None
     )
-    mock_auth_repository.check_credential_validated.return_value = None
+    mock_auth_repository.check_credential_with_migration.return_value = None
 
     action = AuthorizeAction(
         type=AuthTokenType.KEYPAIR,
@@ -111,7 +125,6 @@ async def test_authorize_invalid_credentials(
         password="wrong_password",
         request=MagicMock(),
         stoken=None,
-        auth_config=None,
     )
 
     with pytest.raises(AuthorizationFailed):
@@ -132,7 +145,6 @@ async def test_authorize_with_hook_authorization(
         password="any_password",
         request=MagicMock(),
         stoken=None,
-        auth_config=None,
     )
 
     # Hook returns user data
@@ -172,11 +184,10 @@ async def test_authorize_with_password_expiry(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,
     mock_auth_repository: AsyncMock,
+    mock_config_provider: MagicMock,
 ):
     """Test authorization fails when password is expired"""
-    auth_config = AuthConfig(
-        max_password_age=timedelta(days=90),
-    )
+    # The mock_config_provider already has max_password_age set to 90 days
 
     action = AuthorizeAction(
         type=AuthTokenType.KEYPAIR,
@@ -185,12 +196,11 @@ async def test_authorize_with_password_expiry(
         password="old_password",
         request=MagicMock(),
         stoken=None,
-        auth_config=auth_config,
     )
 
     # Setup expired password
     password_changed_at = datetime.now() - timedelta(days=100)
-    mock_auth_repository.check_credential_validated.return_value = {
+    mock_auth_repository.check_credential_with_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": "expired@example.com",
         "role": UserRole.USER,
@@ -223,11 +233,10 @@ async def test_authorize_with_post_hook_response(
         password="password",
         request=MagicMock(),
         stoken=None,
-        auth_config=None,
     )
 
     # Setup successful credential check
-    mock_auth_repository.check_credential_validated.return_value = {
+    mock_auth_repository.check_credential_with_migration.return_value = {
         "uuid": UUID("12345678-1234-5678-1234-567812345678"),
         "email": "test@example.com",
         "role": UserRole.USER,

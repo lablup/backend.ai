@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import uuid
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Type
 
 import orjson
 import strawberry
 from graphql import StringValueNode
-from graphql_relay.utils import unbase64
+from graphql_relay.utils import base64, unbase64
+from strawberry.types import get_object_definition, has_object_definition
 
 if TYPE_CHECKING:
-    from ai.backend.manager.repositories.types import (
+    from ai.backend.manager.types import (
         PaginationOptions,
     )
 
@@ -22,12 +24,10 @@ class ByteSize(str):
 
     @staticmethod
     def parse_value(value: str) -> str:
-        # TODO: Implement this
         return value
 
     @staticmethod
     def parse_literal(ast) -> str:
-        # TODO: Implement this
         if not isinstance(ast, StringValueNode):
             raise ValueError("ByteSize must be provided as a string literal")
         value = ast.value
@@ -82,6 +82,41 @@ class StringFilter:
         return None
 
 
+@strawberry.input
+class IntFilter:
+    equals: Optional[int] = None
+    not_equals: Optional[int] = None
+    greater_than: Optional[int] = None
+    greater_than_or_equal: Optional[int] = None
+    less_than: Optional[int] = None
+    less_than_or_equal: Optional[int] = None
+
+    def apply_to_column(self, column):
+        """Apply this int filter to a SQLAlchemy column and return the condition.
+
+        Args:
+            column: SQLAlchemy column to apply the filter to
+
+        Returns:
+            SQLAlchemy condition expression or None if no filter is set
+        """
+
+        if self.equals is not None:
+            return column == self.equals
+        elif self.not_equals is not None:
+            return column != self.not_equals
+        elif self.greater_than is not None:
+            return column > self.greater_than
+        elif self.greater_than_or_equal is not None:
+            return column >= self.greater_than_or_equal
+        elif self.less_than is not None:
+            return column < self.less_than
+        elif self.less_than_or_equal is not None:
+            return column <= self.less_than_or_equal
+
+        return None
+
+
 @strawberry.enum
 class OrderDirection(StrEnum):
     ASC = "ASC"
@@ -127,6 +162,13 @@ class JSONString:
     pass
 
 
+def to_global_id(type_: Type[Any], local_id: uuid.UUID | str) -> str:
+    if not has_object_definition(type_):
+        raise TypeError("type_ must be a Strawberry object type (Node or Edge).")
+    typename = get_object_definition(type_, strict=True).name
+    return base64(f"{typename}:{local_id}")
+
+
 def resolve_global_id(global_id: str) -> tuple[str, str]:
     unbased_global_id = unbase64(global_id)
     type_, _, id_ = unbased_global_id.partition(":")
@@ -141,7 +183,7 @@ def build_pagination_options(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> PaginationOptions:
-    from ai.backend.manager.repositories.types import (
+    from ai.backend.manager.types import (
         BackwardPaginationOptions,
         ForwardPaginationOptions,
         OffsetBasedPaginationOptions,

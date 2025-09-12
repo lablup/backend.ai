@@ -12,7 +12,6 @@ from typing import (
 )
 from uuid import UUID
 
-import bcrypt
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.ext.asyncio import AsyncEngine as SAEngine
@@ -21,7 +20,9 @@ from sqlalchemy.orm import foreign, joinedload, relationship, selectinload
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.user.types import UserData, UserRole, UserStatus
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.user.types import UserCreator, UserData, UserRole, UserStatus
+from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 
 from .base import (
     Base,
@@ -31,6 +32,7 @@ from .base import (
     mapper_registry,
 )
 from .exceptions import ObjectNotFound
+from .hasher import PasswordHasherFactory
 from .types import (
     QueryCondition,
     QueryOption,
@@ -43,7 +45,6 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-
 __all__: Sequence[str] = (
     "users",
     "UserRow",
@@ -51,14 +52,36 @@ __all__: Sequence[str] = (
     "UserStatus",  # For compatibility with existing code
     "ACTIVE_USER_STATUSES",
     "INACTIVE_USER_STATUSES",
+    "PasswordHashAlgorithm",
+    "compare_to_hashed_password",
+    "check_credential_with_migration",
+    "check_credential",
 )
 
 
 class PasswordColumn(TypeDecorator):
-    impl = VARCHAR
+    """Custom column type that prevents direct password assignment.
 
-    def process_bind_param(self, value, dialect):
-        return _hash_password(value)
+    Passwords should be set using proper functions that have access to config:
+    - Use check_credential() for login with gradual migration
+    - Use explicit UPDATE queries with pre-hashed passwords
+
+    This column type is kept for backward compatibility but should not be used
+    for setting passwords directly.
+    """
+
+    impl = VARCHAR
+    cache_ok = True
+
+    def process_bind_param(self, value: Any, dialect: Any) -> Optional[str]:
+        if value is None:
+            return None
+
+        if not isinstance(value, PasswordInfo):
+            raise ValueError("Password must be set using PasswordInfo for hashing.")
+
+        hash_info = value.generate_new_hash()
+        return hash_info.to_string()
 
 
 ACTIVE_USER_STATUSES = (UserStatus.ACTIVE,)
@@ -184,6 +207,33 @@ class UserRow(Base):
         back_populates="user_row",
         primaryjoin="UserRow.uuid == foreign(UserRoleRow.user_id)",
     )
+
+    @classmethod
+    def from_creator(cls, creator: UserCreator) -> Self:
+        return cls(
+            username=creator.username,
+            email=creator.email,
+            password=creator.password,
+            need_password_change=creator.need_password_change
+            if creator.need_password_change is not None
+            else False,
+            full_name=creator.full_name,
+            description=creator.description,
+            status=creator.status if creator.status is not None else UserStatus.BEFORE_VERIFICATION,
+            domain_name=creator.domain_name,
+            role=creator.role if creator.role is not None else UserRole.USER,
+            resource_policy=creator.resource_policy
+            if creator.resource_policy is not None
+            else "default",
+            allowed_client_ip=creator.allowed_client_ip,
+            totp_activated=creator.totp_activated if creator.totp_activated is not None else False,
+            sudo_session_enabled=creator.sudo_session_enabled
+            if creator.sudo_session_enabled is not None
+            else False,
+            container_uid=creator.container_uid,
+            container_main_gid=creator.container_main_gid,
+            container_gids=creator.container_gids,
+        )
 
     @classmethod
     def load_keypairs(cls) -> Callable:
@@ -320,7 +370,7 @@ class UserRow(Base):
             domain_name=self.domain_name,
             role=self.role.value,
             resource_policy=self.resource_policy,
-            allowed_client_ip=self.allowed_client_ip or [],
+            allowed_client_ip=self.allowed_client_ip,
             totp_activated=self.totp_activated,
             totp_activated_at=self.totp_activated_at,
             sudo_session_enabled=self.sudo_session_enabled,
@@ -364,27 +414,38 @@ def by_user_email(
     return _by_email
 
 
-def _hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf8"), bcrypt.gensalt(rounds=12)).decode("utf8")
-
-
 def _verify_password(guess: str, hashed: str) -> bool:
-    return bcrypt.checkpw(guess.encode("utf8"), hashed.encode("utf8"))
+    """Verify a password against a hashed password."""
+    hash_info = HashInfo.from_hash_string(hashed)
+    hasher = PasswordHasherFactory.get_hasher(hash_info.algorithm)
+    return hasher.verify(guess, hash_info)
 
 
 def compare_to_hashed_password(raw_password: str, hashed_password: str) -> bool:
     """
-    Compare a raw string password value to hased password.
+    Compare a raw string password value to hashed password.
     """
     return _verify_password(raw_password, hashed_password)
 
 
-async def check_credential(
+async def check_credential_with_migration(
     db: SAEngine,
     domain: str,
     email: str,
-    password: str,
+    target_password_info: PasswordInfo,
 ) -> Any:
+    """
+    Check user credentials and optionally migrate password hash if needed.
+
+    Args:
+        db: Database engine
+        domain: User's domain
+        email: User's email
+        target_password_info: Password configuration containing password and target hash settings
+
+    Returns:
+        User row if credentials are valid, None otherwise
+    """
     async with db.begin_readonly() as conn:
         result = await conn.execute(
             sa.select([users])
@@ -399,9 +460,69 @@ async def check_credential(
     if row["password"] is None:
         # user password is not set.
         return None
+
     try:
-        if _verify_password(password, row["password"]):
-            return row
+        if not _verify_password(target_password_info.password, row["password"]):
+            return None
     except ValueError:
         return None
-    return None
+
+    # Password is valid, check if we need to migrate the hash
+    current_hash_info = HashInfo.from_hash_string(row["password"])
+    if current_hash_info is None:
+        # Shouldn't happen since password was just verified
+        return row
+
+    if target_password_info.need_migration(current_hash_info):
+        # Re-hash the password with the new algorithm using the provided PasswordInfo
+        # Update the user's password hash asynchronously
+        async with db.begin() as conn:
+            await conn.execute(
+                sa.update(users)
+                .where((users.c.email == email) & (users.c.domain_name == domain))
+                .values(password=target_password_info)
+            )
+
+    return row
+
+
+async def check_credential(
+    db: SAEngine,
+    domain: str,
+    email: str,
+    password: str,
+) -> Any:
+    """
+    Check user credentials without migration (for signout, update password, etc.)
+
+    Args:
+        db: Database engine
+        domain: User's domain
+        email: User's email
+        password: Plain text password to verify
+
+    Returns:
+        User row if credentials are valid, None otherwise
+    """
+    async with db.begin_readonly() as conn:
+        result = await conn.execute(
+            sa.select([users])
+            .select_from(users)
+            .where(
+                (users.c.email == email) & (users.c.domain_name == domain),
+            ),
+        )
+    row = result.first()
+    if row is None:
+        return None
+    if row["password"] is None:
+        # user password is not set.
+        return None
+
+    try:
+        if not _verify_password(password, row["password"]):
+            return None
+    except ValueError:
+        return None
+
+    return row

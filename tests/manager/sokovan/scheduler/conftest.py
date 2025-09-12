@@ -41,7 +41,7 @@ def basic_session_workload() -> SessionWorkload:
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -63,7 +63,7 @@ def batch_session_workload() -> SessionWorkload:
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -85,7 +85,7 @@ def inference_session_workload() -> SessionWorkload:
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -107,7 +107,7 @@ def minimal_resource_workload() -> SessionWorkload:
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -129,7 +129,7 @@ def small_resource_workload() -> SessionWorkload:
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -151,7 +151,7 @@ def medium_resource_workload() -> SessionWorkload:
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -173,7 +173,7 @@ def large_resource_workload() -> SessionWorkload:
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -201,7 +201,7 @@ def test_domain_small_resource_workload(test_domain_name: str) -> SessionWorkloa
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -223,7 +223,7 @@ def test_domain_medium_resource_workload(test_domain_name: str) -> SessionWorklo
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -245,7 +245,7 @@ def test_domain_large_resource_workload(test_domain_name: str) -> SessionWorkloa
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -267,7 +267,7 @@ def user1_minimal_workload() -> SessionWorkload:
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -295,7 +295,7 @@ def user_specific_small_workload(test_user_id: uuid.UUID) -> SessionWorkload:
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -317,7 +317,7 @@ def user_specific_medium_workload(test_user_id: uuid.UUID) -> SessionWorkload:
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -339,7 +339,7 @@ def user_specific_minimal_workload(test_user_id: uuid.UUID) -> SessionWorkload:
         starts_at=None,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -366,7 +366,7 @@ def batch_session_past_start_time() -> SessionWorkload:
         starts_at=past_time,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 
@@ -393,7 +393,7 @@ def batch_session_future_start_time() -> SessionWorkload:
         starts_at=future_time,
         is_private=False,
         kernels=[],
-        designated_agent=None,
+        designated_agent_ids=None,
         kernel_counts_at_endpoint=None,
     )
 

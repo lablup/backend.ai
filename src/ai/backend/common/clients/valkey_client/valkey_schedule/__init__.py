@@ -1,3 +1,3 @@
-from .client import ValkeyScheduleClient
+from .client import HealthStatus, ValkeyScheduleClient
 
-__all__ = ["ValkeyScheduleClient"]
+__all__ = ["HealthStatus", "ValkeyScheduleClient"]

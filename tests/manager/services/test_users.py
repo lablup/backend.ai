@@ -1,7 +1,7 @@
 import uuid
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserCreator, UserInfoContext
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.user import UserConflict, UserCreationBadRequest
@@ -17,6 +18,7 @@ from ai.backend.manager.models.group import (
     GroupRow,
     ProjectType,
 )
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import (
     KeyPairRow,
     generate_keypair,
@@ -65,6 +67,16 @@ def processors(
 ) -> UserProcessors:
     agent_registry_mock = MagicMock()
     user_repository = UserRepository(db=database_engine)
+
+    # Mock the _role_manager with all required methods
+    mock_role_manager = MagicMock()
+    mock_role = MagicMock()
+    mock_role.id = uuid.uuid4()
+    mock_role_manager.create_system_role = AsyncMock(return_value=mock_role)
+    mock_role_manager.map_user_to_role = AsyncMock(return_value=None)
+    mock_role_manager.map_entity_to_scope = AsyncMock(return_value=None)
+    user_repository._role_manager = mock_role_manager
+
     admin_user_repository = AdminUserRepository(db=database_engine)
     user_service = UserService(
         storage_manager=mock_storage_manager,
@@ -98,9 +110,15 @@ def create_user(
         sudo_session_enabled: bool = False,
         is_active: bool = True,
     ) -> AsyncGenerator[uuid.UUID, None]:
+        password_info = PasswordInfo(
+            password=password,
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
         user_data = {
             "username": name,
-            "password": password,
+            "password": password_info,
             "email": email,
             "need_password_change": need_password_change,
             "full_name": full_name,
@@ -181,10 +199,16 @@ async def test_create_user(
     database_fixture,
 ) -> None:
     """Test successful user creation with valid data"""
+    password_info = PasswordInfo(
+        password="password123",
+        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        rounds=100_000,
+        salt_size=32,
+    )
     action = CreateUserAction(
         creator=UserCreator(
             username="testuser",
-            password="password123",
+            password=password_info,
             email="test_user@test.com",
             need_password_change=False,
             domain_name="default",
@@ -229,10 +253,16 @@ async def test_create_user_non_existing_domain(
     processors: UserProcessors,
 ) -> None:
     """Test user creation with non-existing domain"""
+    password_info = PasswordInfo(
+        password="password123",
+        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        rounds=100_000,
+        salt_size=32,
+    )
     action = CreateUserAction(
         creator=UserCreator(
             username="test_user_not_existing_domain",
-            password="password123",
+            password=password_info,
             email="test@test.com",
             need_password_change=False,
             domain_name="non_existing_domain",
@@ -265,10 +295,16 @@ async def test_create_user_duplicate_email(
     user_email = "duplicate@test.com"
     async with create_user(email=user_email, name="existing_user", domain_name="default"):
         # Try to create another user with the same email
+        password_info = PasswordInfo(
+            password="password123",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
         action = CreateUserAction(
             creator=UserCreator(
                 username="new_user",
-                password="password123",
+                password=password_info,
                 email=user_email,  # Same email as existing user
                 need_password_change=False,
                 domain_name="default",
@@ -301,10 +337,16 @@ async def test_create_user_duplicate_username(
     username = "duplicate_username"
     async with create_user(email="existing@test.com", name=username, domain_name="default"):
         # Try to create another user with the same username
+        password_info = PasswordInfo(
+            password="password123",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=100_000,
+            salt_size=32,
+        )
         action = CreateUserAction(
             creator=UserCreator(
                 username=username,  # Same username as existing user
-                password="password123",
+                password=password_info,
                 email="new_user@test.com",
                 need_password_change=False,
                 domain_name="default",

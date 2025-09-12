@@ -3,12 +3,12 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.object_storage_meta.types import ObjectStorageNamespaceData
+from ai.backend.manager.data.object_storage_namespace.types import ObjectStorageNamespaceData
 from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
 
 
 @dataclass
-class GetObjectStorageBucketsAction(ObjectStorageAction):
+class GetBucketsAction(ObjectStorageAction):
     storage_id: uuid.UUID
 
     @override
@@ -22,7 +22,7 @@ class GetObjectStorageBucketsAction(ObjectStorageAction):
 
 
 @dataclass
-class GetObjectStorageBucketsActionResult(BaseActionResult):
+class GetBucketsActionResult(BaseActionResult):
     result: list[ObjectStorageNamespaceData]
 
     @override

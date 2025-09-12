@@ -427,7 +427,9 @@ class Circuit(Base, BaseMixin):
                     base.update({
                         f"bai_session_{r.session_id}_{self.id}": {
                             "loadBalancer": {
-                                "servers": [{"url": f"http://{r.kernel_host}:{r.kernel_port}/"}],
+                                "servers": [
+                                    {"url": f"http://{r.current_kernel_host}:{r.kernel_port}/"}
+                                ],
                             }
                         }
                     })
@@ -436,7 +438,9 @@ class Circuit(Base, BaseMixin):
                     base.update({
                         f"bai_session_{r.session_id}_{self.id}": {
                             "loadBalancer": {
-                                "servers": [{"address": f"{r.kernel_host}:{r.kernel_port}"}],
+                                "servers": [
+                                    {"address": f"{r.current_kernel_host}:{r.kernel_port}"}
+                                ],
                             }
                         }
                     })

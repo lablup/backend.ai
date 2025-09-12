@@ -133,6 +133,7 @@ services:
 
   backendai-half-otel-collector:
     image: otel/opentelemetry-collector-contrib:0.126.0
+    restart: unless-stopped
     networks:
       - half
     command: ["--config=/etc/otel-collector-config.yaml"]
@@ -144,6 +145,7 @@ services:
 
   backendai-half-loki:
     image: grafana/loki:3.5.0
+    restart: unless-stopped
     networks:
       - half
     command: -config.file=/etc/loki/local-config.yaml
@@ -154,6 +156,7 @@ services:
 
   backendai-half-tempo:
     image: grafana/tempo:2.7.2
+    restart: unless-stopped
     networks:
       - half
     command: [ "-config.file=/etc/tempo.yaml" ]
@@ -166,6 +169,7 @@ services:
 
   backendai-half-apollo-router:
     image: ghcr.io/apollographql/router:v1.61.9
+    restart: unless-stopped
     networks:
       - half
     ports:

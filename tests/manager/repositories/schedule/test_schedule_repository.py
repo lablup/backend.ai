@@ -236,11 +236,21 @@ async def sample_sessions_and_kernels(
         data["groups"].append(group)
 
         # Create user
+        from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+        from ai.backend.manager.models.hasher.types import PasswordInfo
+
+        password_info = PasswordInfo(
+            password="dummy",
+            algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+            rounds=600_000,
+            salt_size=32,
+        )
+
         user = UserRow(
             uuid=uuid.uuid4(),
             username="testuser",
             email="test@example.com",
-            password="dummy",
+            password=password_info,
             domain_name=domain.name,
             role=UserRole.USER,
             resource_policy=sample_resource_policies["keypair_policy"].name,

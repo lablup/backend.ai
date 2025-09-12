@@ -253,7 +253,7 @@ class AgentSelector:
         agents: Sequence[AgentInfo],
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-        designated_agent: Optional[AgentId] = None,
+        designated_agent_ids: Optional[list[AgentId]] = None,
     ) -> list[AgentSelection]:
         """
         Select agents for a batch of resource requirements.
@@ -266,7 +266,7 @@ class AgentSelector:
             agents: Available agents to choose from (will be modified with diff updates)
             criteria: Selection criteria including kernel requirements
             config: Configuration for agent selection
-            designated_agent: Manually designated agent (for superadmin)
+            designated_agent_ids: Optional list of designated agents for the session
 
         Returns:
             List of AgentSelection objects pairing requirements with selected agents
@@ -297,7 +297,7 @@ class AgentSelector:
                 resource_req,
                 criteria,
                 config,
-                designated_agent,
+                designated_agent_ids,
             )
 
             # Update state tracker with diff for the selected agent
@@ -326,10 +326,10 @@ class AgentSelector:
         resource_req: ResourceRequirements,
         criteria: AgentSelectionCriteria,
         config: AgentSelectionConfig,
-        designated_agent: Optional[AgentId] = None,
+        designated_agent_ids: Optional[list[AgentId]] = None,
     ) -> AgentStateTracker:
         # First pass: filter by architecture (binary compatibility check)
-        arch_compatible_trackers = []
+        arch_compatible_trackers: list[AgentStateTracker] = []
         for tracker in state_trackers:
             agent = tracker.original_agent
             if agent.architecture == resource_req.required_architecture:
@@ -344,7 +344,7 @@ class AgentSelector:
             )
 
         # Second pass: filter by resource availability (quantitative check)
-        compatible_trackers = []
+        compatible_trackers: list[AgentStateTracker] = []
         error_messages: defaultdict[str, int] = defaultdict(int)
         agent_errors: dict[AgentId, str] = {}
         for tracker in arch_compatible_trackers:
@@ -366,13 +366,20 @@ class AgentSelector:
             raise NoAvailableAgentError(f"no available agents. Details: {error_messages_summary}")
 
         # Handle designated agent if specified
-        if designated_agent:
+        if designated_agent_ids:
             for tracker in compatible_trackers:
-                if tracker.original_agent.agent_id == designated_agent:
+                if tracker.original_agent.agent_id in designated_agent_ids:
                     return tracker
-            error_message = agent_errors.get(designated_agent, "Designated agent not found")
+
+            error_messages_list = []
+            for designated_agent_id in designated_agent_ids:
+                if designated_agent_id in agent_errors:
+                    error_messages_list.append(
+                        f"Designated agent '{designated_agent_id}' is not compatible. Details: {agent_errors[designated_agent_id]}"
+                    )
+            error_message = " ".join(error_messages) if error_messages else "not found"
             raise NoAvailableAgentError(
-                f"Designated agent '{designated_agent}' is not compatible. Details: {error_message}"
+                f"Designated agent '{designated_agent_ids}' is not compatible. Details: {error_message}"
             )
 
         # Use strategy to select from compatible trackers

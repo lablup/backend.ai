@@ -5,12 +5,12 @@ import json
 import secrets
 import subprocess
 import sys
-import uuid
 from collections import OrderedDict, defaultdict
 from datetime import datetime, timedelta
 from graphlib import TopologicalSorter
 from pathlib import Path
-from typing import IO, List, Literal, Optional, Sequence
+from typing import IO, Literal, Optional, Sequence
+from uuid import UUID
 
 import click
 import inquirer
@@ -91,7 +91,7 @@ def _create_cmd(docs: Optional[str] = None):
     @click.option(
         "--depends",
         metavar="SESSION_ID",
-        type=str,
+        type=click.UUID,
         multiple=True,
         help=(
             "Set the list of session ID or names that the newly created session depends on. "
@@ -141,38 +141,38 @@ def _create_cmd(docs: Optional[str] = None):
     def create(
         # base args
         image: str,
-        name: str | None,  # click_start_option
-        owner: str | None,
+        name: Optional[str],  # click_start_option
+        owner: Optional[str],
         # job scheduling options
         type: Literal["batch", "interactive"],  # click_start_option
-        starts_at: str | None,  # click_start_option
-        startup_command: str | None,
-        timeout: str | None,
+        starts_at: Optional[str],  # click_start_option
+        startup_command: Optional[str],
+        timeout: Optional[str],
         enqueue_only: bool,  # click_start_option
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
-        depends: Sequence[str],
-        priority: int | None,  # click_start_option
+        depends: Sequence[UUID],
+        priority: Optional[int],  # click_start_option
         callback_url: str,  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        bootstrap_script: IO | None,
-        tag: str | None,  # click_start_option
+        bootstrap_script: Optional[IO],
+        tag: Optional[str],  # click_start_option
         architecture: str,
         # resource spec
         mount: Sequence[str],  # click_start_option
-        scaling_group: str | None,  # click_start_option
+        scaling_group: Optional[str],  # click_start_option
         resources: Sequence[str],  # click_start_option
         cluster_size: int,  # click_start_option
-        cluster_mode: Literal["single-node", "multi-node"],
+        cluster_mode: ClusterMode,
         resource_opts: Sequence[str],  # click_start_option
-        preopen: str | None,
-        assign_agent: str | None,
+        preopen: Optional[str],
+        assign_agent: Optional[str],
         # resource grouping
-        domain: str | None,  # click_start_option
-        group: str | None,  # click_start_option
-        network: str | None,  # click_start_option
+        domain: Optional[str],  # click_start_option
+        group: Optional[str],  # click_start_option
+        network: Optional[str],  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -203,7 +203,7 @@ def _create_cmd(docs: Optional[str] = None):
             try:
                 if network:
                     try:
-                        network_info = session.Network(uuid.UUID(network)).get()
+                        network_info = session.Network(UUID(network)).get()
                     except (ValueError, BackendAPIError):
                         networks = session.Network.paginated_list(
                             filter=f'name == "{network}"',
@@ -455,24 +455,24 @@ def _create_from_template_cmd(docs: Optional[str] = None):
     def create_from_template(
         # base args
         template_id: str,
-        name: str | None,  # click_start_option
+        name: Optional[str],  # click_start_option
         owner: str | Undefined,
         # job scheduling options
         type: Literal["batch", "interactive"],  # click_start_option
-        priority: int | None,  # click_start_option
-        starts_at: str | None,  # click_start_option
+        priority: Optional[int],  # click_start_option
+        starts_at: Optional[str],  # click_start_option
         image: str | Undefined,
         startup_command: str | Undefined,
         timeout: str | Undefined,
         enqueue_only: bool,  # click_start_option
         max_wait: int,  # click_start_option
         no_reuse: bool,  # click_start_option
-        depends: Sequence[str],
-        callback_url: str | None,  # click_start_option
+        depends: Sequence[UUID],
+        callback_url: Optional[str],  # click_start_option
         # execution environment
         env: Sequence[str],  # click_start_option
         # extra options
-        tag: str | None,  # click_start_option
+        tag: Optional[str],  # click_start_option
         # resource spec
         mount: Sequence[str],  # click_start_option
         scaling_group: str | Undefined,
@@ -486,7 +486,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         no_mount: bool,
         no_env: bool,
         no_resource: bool,
-        network: str | None,  # click_start_option
+        network: Optional[str],  # click_start_option
     ) -> None:
         """
         Prepare and start a single compute session without executing codes.
@@ -544,7 +544,7 @@ def _create_from_template_cmd(docs: Optional[str] = None):
         with Session() as session:
             if network:
                 try:
-                    network_info = session.Network(uuid.UUID(network)).get()
+                    network_info = session.Network(UUID(network)).get()
                 except (ValueError, BackendAPIError):
                     networks = session.Network.paginated_list(
                         filter=f'name == "{network}"',
@@ -868,14 +868,14 @@ def ls(session_id, path):
     default=None,
     help="The target kernel id of logs. Default value is None, in which case logs of a main kernel are fetched.",
 )
-def logs(session_id: str, kernel: str | None) -> None:
+def logs(session_id: str, kernel: Optional[str]) -> None:
     """
     Shows the full console log of a compute session.
 
     \b
     SESSID: Session ID or its alias given when creating the session.
     """
-    _kernel_id = uuid.UUID(kernel) if kernel is not None else None
+    _kernel_id = UUID(kernel) if kernel is not None else None
     with Session() as session:
         try:
             print_wait("Retrieving live container logs...")
@@ -1096,7 +1096,7 @@ def abuse_history(session_id: str) -> None:
             sys.exit(ExitCode.FAILURE)
 
 
-def _ssh_cmd(docs: str | None = None):
+def _ssh_cmd(docs: Optional[str] = None):
     @click.argument("session_ref", type=str, metavar="SESSION_REF")
     @click.option(
         "-p", "--port", type=int, metavar="PORT", default=9922, help="the port number for localhost"
@@ -1350,7 +1350,7 @@ def _fetch_session_names() -> tuple[str]:
         "TERMINATING",
         "ERROR",
     ])
-    fields: List[FieldSpec] = [
+    fields: Sequence[FieldSpec] = [
         session_fields["name"],
         session_fields["session_id"],
         session_fields["group_name"],
@@ -1485,7 +1485,7 @@ def _watch_cmd(docs: Optional[str] = None):
         async def _run_events():
             async with AsyncSession() as session:
                 try:
-                    session_id = uuid.UUID(session_name_or_id)
+                    session_id = UUID(session_name_or_id)
                     compute_session = session.ComputeSession.from_session_id(session_id)
                 except ValueError:
                     compute_session = session.ComputeSession(session_name_or_id, owner_access_key)
@@ -1516,7 +1516,7 @@ def _watch_cmd(docs: Optional[str] = None):
     return watch
 
 
-def get_dependency_session_table(root_node: OrderedDict) -> List[OrderedDict]:
+def get_dependency_session_table(root_node: OrderedDict) -> list[OrderedDict]:
     ts: TopologicalSorter = TopologicalSorter()
     session_info_dict = {}
     visited = {}
@@ -1605,7 +1605,7 @@ def get_dependency_session_tree(root_node: OrderedDict) -> treelib.Tree:
 @session.command("show-graph")
 @click.argument("session_id", metavar="SESSID")
 @click.option("--table", "-t", is_flag=True, help="Show the dependency graph as a form of table.")
-def show_dependency_graph(session_id: uuid.UUID | str, table: bool):
+def show_dependency_graph(session_id: UUID | str, table: bool):
     """
     Shows the dependency graph of a compute session.
     \b

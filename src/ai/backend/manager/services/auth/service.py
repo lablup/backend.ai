@@ -9,6 +9,7 @@ from ai.backend.common.dto.manager.auth.field import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.types import AuthorizationResult, SSHKeypair
 from ai.backend.manager.errors.auth import (
@@ -26,6 +27,7 @@ from ai.backend.manager.errors.common import (
     ObjectNotFound,
     RejectedByHook,
 )
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair import (
     generate_keypair,
     generate_ssh_keypair,
@@ -37,7 +39,6 @@ from ai.backend.manager.models.user import (
     UserStatus,
     compare_to_hashed_password,
 )
-from ai.backend.manager.models.utils import execute_with_retry
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.services.auth.actions.authorize import (
     AuthorizeAction,
@@ -77,14 +78,17 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class AuthService:
     _hook_plugin_ctx: HookPluginContext
     _auth_repository: AuthRepository
+    _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
         hook_plugin_ctx: HookPluginContext,
         auth_repository: AuthRepository,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._auth_repository = auth_repository
+        self._config_provider = config_provider
 
     async def get_role(self, action: GetRoleAction) -> GetRoleActionResult:
         group_role = None
@@ -118,6 +122,7 @@ class AuthService:
             (action.request, params),
             return_when=FIRST_COMPLETED,
         )
+        auth_config = self._config_provider.config.auth
         if hook_result.status != PASSED:
             raise RejectedByHook.from_hook_result(hook_result)
         elif hook_result.result:
@@ -125,10 +130,16 @@ class AuthService:
             user = hook_result.result
         else:
             # No AUTHORIZE hook is defined (proceed with normal login)
-            user = await self._auth_repository.check_credential_validated(
+            target_password_info = PasswordInfo(
+                password=action.password,
+                algorithm=auth_config.password_hash_algorithm,
+                rounds=auth_config.password_hash_rounds,
+                salt_size=auth_config.password_hash_salt_size,
+            )
+            user = await self._auth_repository.check_credential_with_migration(
                 action.domain_name,
                 action.email,
-                action.password,
+                target_password_info=target_password_info,
             )
         if user is None:
             raise AuthorizationFailed("User credential mismatch.")
@@ -136,7 +147,7 @@ class AuthService:
             raise AuthorizationFailed("This account needs email verification.")
         if user["status"] in INACTIVE_USER_STATUSES:
             raise AuthorizationFailed("User credential mismatch.")
-        await self._check_password_age(user, action.auth_config)
+        await self._check_password_age(user, auth_config)
         user_row = await self._auth_repository.get_user_row_by_uuid_validated(user["uuid"])
         if user_row is None:
             raise UserNotFound(extra_data=user["uuid"])
@@ -200,11 +211,20 @@ class AuthService:
             raise EmailAlreadyExistsError("Email already exists")
 
         # Create a user.
+        # Create PasswordInfo for the new user's password
+        auth_config = self._config_provider.config.auth
+        password_info = PasswordInfo(
+            password=action.password,
+            algorithm=auth_config.password_hash_algorithm,
+            rounds=auth_config.password_hash_rounds,
+            salt_size=auth_config.password_hash_salt_size,
+        )
+
         data = {
             "domain_name": action.domain_name,
             "username": action.username if action.username is not None else action.email,
             "email": action.email,
-            "password": action.password,
+            "password": password_info,  # Pass PasswordInfo object
             "need_password_change": False,
             "full_name": action.full_name if action.full_name is not None else "",
             "description": action.description if action.description is not None else "",
@@ -270,7 +290,7 @@ class AuthService:
         if action.email != action.requester_email:
             raise GenericForbidden("Not the account owner")
         email = action.email
-        result = await self._auth_repository.check_credential_validated(
+        result = await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             email,
             action.password,
@@ -292,7 +312,13 @@ class AuthService:
         email = action.email
         log_fmt = "AUTH.UPDATE_PASSWORD(d:{}, email:{})"
         log_args = (domain_name, email)
-        user = await self._auth_repository.check_credential_validated(
+        if action.new_password != action.new_password_confirm:
+            log.info(log_fmt + ": new password mismtach", *log_args)
+            return UpdatePasswordActionResult(
+                success=False,
+                message="new password mismatch",
+            )
+        user = await self._auth_repository.check_credential_without_migration(
             domain_name,
             email,
             action.old_password,
@@ -300,12 +326,6 @@ class AuthService:
         if user is None:
             log.info(log_fmt + ": old password mismtach", *log_args)
             raise AuthorizationFailed("Old password mismatch")
-        if action.new_password != action.new_password_confirm:
-            log.info(log_fmt + ": new password mismtach", *log_args)
-            return UpdatePasswordActionResult(
-                success=False,
-                message="new password mismatch",
-            )
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
         # The hook handlers should accept the request and whole ``params` dict.
@@ -320,7 +340,15 @@ class AuthService:
             hook_result.reason = hook_result.reason or "invalid password format"
             raise RejectedByHook.from_hook_result(hook_result)
 
-        await self._auth_repository.update_user_password_validated(email, action.new_password)
+        # Create PasswordInfo with config values
+        auth_config = self._config_provider.config.auth
+        password_info = PasswordInfo(
+            password=action.new_password,
+            algorithm=auth_config.password_hash_algorithm,
+            rounds=auth_config.password_hash_rounds,
+            salt_size=auth_config.password_hash_salt_size,
+        )
+        await self._auth_repository.update_user_password_validated(email, password_info)
 
         return UpdatePasswordActionResult(
             success=True,
@@ -330,13 +358,13 @@ class AuthService:
     async def update_password_no_auth(
         self, action: UpdatePasswordNoAuthAction
     ) -> UpdatePasswordNoAuthActionResult:
-        if action.auth_config is None or action.auth_config.max_password_age is None:
+        auth_config = self._config_provider.config.auth
+        if auth_config.max_password_age is None:
             raise GenericBadRequest("Unsupported function.")
-
-        checked_user = await self._auth_repository.check_credential_validated(
+        checked_user = await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             action.email,
-            action.current_password,
+            password=action.current_password,
         )
         if checked_user is None:
             raise AuthorizationFailed("User credential mismatch.")
@@ -357,12 +385,15 @@ class AuthService:
             hook_result.reason = hook_result.reason or "invalid password format"
             raise RejectedByHook.from_hook_result(hook_result)
 
-        async def _update() -> datetime:
-            return await self._auth_repository.update_user_password_by_uuid_validated(
-                checked_user["uuid"], new_password
-            )
-
-        changed_at = await execute_with_retry(_update)
+        password_info = PasswordInfo(
+            password=new_password,
+            algorithm=auth_config.password_hash_algorithm,
+            rounds=auth_config.password_hash_rounds,
+            salt_size=auth_config.password_hash_salt_size,
+        )
+        changed_at = await self._auth_repository.update_user_password_by_uuid_validated(
+            checked_user["uuid"], password_info
+        )
 
         return UpdatePasswordNoAuthActionResult(
             user_id=checked_user["uuid"],
@@ -409,7 +440,9 @@ class AuthService:
             auth_config is not None
             and (max_password_age := auth_config.max_password_age) is not None
         ):
-            password_changed_at: datetime = user["password_changed_at"]
+            password_changed_at: Optional[datetime] = user["password_changed_at"]
+            if password_changed_at is None:
+                return  # Skip check if password_changed_at is not set
 
             current_dt: datetime = await self._auth_repository.get_current_time_validated()
             if password_changed_at + max_password_age < current_dt:
