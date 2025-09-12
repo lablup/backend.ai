@@ -150,12 +150,10 @@ class RoleManager:
             )
             for operation in operations
         ]
-        rows = [ObjectPermissionRow.from_input(creator) for creator in creators]
-        db_session.add_all(rows)
-        await db_session.flush()
-        result: list[ObjectPermissionData] = []
-        for row in rows:
-            await db_session.refresh(row)
-            result.append(row.to_data())
 
+        rows = await db_session.execute(
+            sa.insert(ObjectPermissionRow).returning(ObjectPermissionRow),
+            [input.fields_to_store() for input in creators],
+        )
+        result = [ObjectPermissionData.from_sa_row(row) for row in rows]
         return result

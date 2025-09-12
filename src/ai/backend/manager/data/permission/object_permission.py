@@ -1,7 +1,10 @@
 import uuid
 from dataclasses import dataclass
+from typing import Any, Self, override
 
-from ai.backend.manager.types import OptionalState
+from sqlalchemy.engine import Row
+
+from ai.backend.manager.types import Creator, OptionalState
 
 from .id import ObjectId
 from .status import PermissionStatus
@@ -9,12 +12,22 @@ from .types import EntityType, OperationType
 
 
 @dataclass
-class ObjectPermissionCreateInput:
+class ObjectPermissionCreateInput(Creator):
     role_id: uuid.UUID
     entity_type: EntityType
     entity_id: str
     operation: OperationType
     status: PermissionStatus = PermissionStatus.ACTIVE
+
+    @override
+    def fields_to_store(self) -> dict[str, Any]:
+        return {
+            "role_id": self.role_id,
+            "entity_type": self.entity_type,
+            "entity_id": self.entity_id,
+            "operation": self.operation,
+            "status": self.status,
+        }
 
 
 @dataclass
@@ -35,3 +48,12 @@ class ObjectPermissionData:
     role_id: uuid.UUID
     object_id: ObjectId
     operation: OperationType
+
+    @classmethod
+    def from_sa_row(cls, row: Row) -> Self:
+        return cls(
+            id=row.id,
+            role_id=row.role_id,
+            object_id=ObjectId(entity_type=row.entity_type, entity_id=row.entity_id),
+            operation=row.operation,
+        )
