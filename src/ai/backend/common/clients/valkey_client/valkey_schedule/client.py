@@ -155,8 +155,6 @@ class ValkeyScheduleClient:
         """
         Set up the pending queue for a specific resource group and store the position of sessions in the pending queue.
         """
-        if not session_ids:
-            return
         batch = Batch(is_atomic=False)
         key = self._pending_queue_key(resource_group_id)
         value = dump_json_str([str(sid) for sid in session_ids])
