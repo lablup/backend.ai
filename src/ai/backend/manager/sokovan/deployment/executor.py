@@ -30,7 +30,7 @@ from ai.backend.manager.data.deployment.types import (
     ScaleOutDecision,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
-from ai.backend.manager.errors.service import ModelDefinitionNotFound, ScalingImpossible
+from ai.backend.manager.errors.service import ModelDefinitionNotFound
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -157,8 +157,12 @@ class DeploymentExecutor:
                         )
                     )
                 elif len(routes) > target_count:
+                    termination_route_candidates = sorted(
+                        routes, key=lambda r: (r.status.termination_priority())
+                    )
+                    candidates = termination_route_candidates[: len(routes) - target_count]
                     scale_ins.extend(
-                        self._scale_in_targets(deployment, routes, len(routes) - target_count)
+                        candidates,
                     )
                 successes.append(deployment)
             except Exception as e:
@@ -175,20 +179,6 @@ class DeploymentExecutor:
             successes=successes,
             errors=errors,
         )
-
-    def _scale_in_targets(
-        self, deployment: DeploymentInfo, routes: Sequence[RouteInfo], target_count: int
-    ) -> Sequence[RouteInfo]:
-        if len(routes) < target_count:
-            raise ScalingImpossible(
-                f"Cannot scale in deployment {deployment.id}: only {len(routes)} routes available, but {target_count} requested"
-            )
-        if len(routes) <= target_count:
-            return []
-        termination_route_candidates = sorted(
-            routes, key=lambda r: (r.status.termination_priority())
-        )
-        return termination_route_candidates[: len(routes) - target_count]
 
     async def calculate_desired_replicas(
         self, deployments: Sequence[DeploymentInfo]
