@@ -15,6 +15,6 @@ class MessageQueueClosedError(BackendAIError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MESSAGE_QUEUE,
-            operation=ErrorOperation.SETUP,
+            operation=ErrorOperation.READ,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
