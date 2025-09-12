@@ -192,6 +192,19 @@ class VFolderGrantAlreadyExists(BackendAIError, web.HTTPConflict):
         )
 
 
+class VFolderDeletionNotAllowed(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/vfolder-deletion-not-allowed"
+    error_title = "Virtual folder deletion is not allowed."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.SOFT_DELETE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
 class VFolderInvalidParameter(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-invalid-parameter"
     error_title = "Invalid parameter for virtual folder operation."
