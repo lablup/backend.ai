@@ -74,6 +74,35 @@ class ClientKey:
 
 class BaseClientPool(metaclass=abc.ABCMeta):
     _clients: MutableMapping[ClientKey, _Client]
+    _client_session_factory: ClientSessionFactory
+
+    def __init__(
+        self,
+        factory: ClientSessionFactory,
+        cleanup_interval_seconds: float = 600,
+    ) -> None:
+        frame = inspect.stack()[1]
+        self._creator_info = f"{frame.filename}:{frame.lineno}:{frame.function}()"
+
+        self._client_session_factory = factory
+        self._clients = {}
+
+    def __del__(self) -> None:
+        if self._clients:
+            warnings.warn(
+                f"{self!r} is garbage-collected but still has active client sessions.",
+                ResourceWarning,
+            )
+
+    def load_client_session(self, key: ClientKey) -> aiohttp.ClientSession:
+        session = self._clients.get(key, None)
+        now = time.perf_counter()
+        if session is not None:
+            session.last_used = now
+            return session.session
+        client_session = self._client_session_factory(key)
+        self._clients[key] = _Client(session=client_session, last_used=now)
+        return client_session
 
     async def close(self) -> None:
         for client in self._clients.values():
@@ -89,15 +118,11 @@ class ClientPool(BaseClientPool):
         factory: ClientSessionFactory,
         cleanup_interval_seconds: float = 600,
     ) -> None:
-        frame = inspect.stack()[1]
-        self._creator_info = f"{frame.filename}:{frame.lineno}:{frame.function}()"
+        super().__init__(factory, cleanup_interval_seconds)
         self._cleanup_task = asyncio.create_task(
             self._cleanup_loop(cleanup_interval_seconds),
             name=f"_cleanup_task from {self!r}",
         )
-
-        self._client_session_factory = factory
-        self._clients = {}
 
     async def close(self) -> None:
         if not (self._cleanup_task.cancelled() or self._cleanup_task.done()):
@@ -114,13 +139,6 @@ class ClientPool(BaseClientPool):
             f"<http_client.ClientPool object at {hex(id(self))} created from {self._creator_info}>"
         )
 
-    def __del__(self) -> None:
-        if self._clients:
-            warnings.warn(
-                f"{self!r} is garbage-collected but still has active client sessions.",
-                ResourceWarning,
-            )
-
     async def _cleanup_loop(self, cleanup_interval_seconds: float) -> None:
         while True:
             await asyncio.sleep(cleanup_interval_seconds)
@@ -133,16 +151,6 @@ class ClientPool(BaseClientPool):
                     except Exception as e:
                         log.exception("Error closing client session: {}", e)
 
-    def load_client_session(self, key: ClientKey) -> aiohttp.ClientSession:
-        session = self._clients.get(key, None)
-        now = time.perf_counter()
-        if session is not None:
-            session.last_used = now
-            return session.session
-        client_session = self._client_session_factory(key)
-        self._clients[key] = _Client(session=client_session, last_used=now)
-        return client_session
-
 
 AsyncClientPool = ClientPool
 
@@ -153,21 +161,10 @@ class SyncClientPool(BaseClientPool):
         factory: ClientSessionFactory,
         cleanup_interval_seconds: float = 600,
     ) -> None:
-        frame = inspect.stack()[1]
-        self._creator_info = f"{frame.filename}:{frame.lineno}:{frame.function}()"
+        super().__init__(factory, cleanup_interval_seconds)
         self._worker_thread = SyncWorkerThread()
         self._worker_thread.start()
         self._worker_thread.execute(self._cleanup_loop(cleanup_interval_seconds))
-
-        self._client_session_factory = factory
-        self._clients = {}
-
-    def __del__(self) -> None:
-        if self._clients:
-            warnings.warn(
-                f"{self!r} is garbage-collected but still has active client sessions.",
-                ResourceWarning,
-            )
 
     def __repr__(self) -> str:
         return f"<http_client.SyncClientPool object at {hex(id(self))} created from {self._creator_info}>"
@@ -183,16 +180,6 @@ class SyncClientPool(BaseClientPool):
                         await client.session.close()
                     except Exception as e:
                         log.exception("Error closing client session: {}", e)
-
-    def load_client_session(self, key: ClientKey) -> aiohttp.ClientSession:
-        session = self._clients.get(key, None)
-        now = time.perf_counter()
-        if session is not None:
-            session.last_used = now
-            return session.session
-        client_session = self._client_session_factory(key)
-        self._clients[key] = _Client(session=client_session, last_used=now)
-        return client_session
 
     async def close(self) -> None:
         if self._worker_thread.is_alive():
