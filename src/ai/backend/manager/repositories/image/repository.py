@@ -18,6 +18,7 @@ from ai.backend.manager.errors.image import (
     ForgetImageForbiddenError,
     ForgetImageNotFoundError,
     ImageAliasNotFound,
+    ImageNotFound,
     ModifyImageActionValueError,
 )
 from ai.backend.manager.models.image import (
@@ -114,13 +115,11 @@ class ImageRepository:
         return image_alias_row
 
     @repository_decorator()
-    async def get_image_by_id(
-        self, image_id: UUID, load_aliases: bool = False
-    ) -> Optional[ImageData]:
+    async def get_image_by_id(self, image_id: UUID, load_aliases: bool = False) -> ImageData:
         async with self._db.begin_session() as session:
             row = await self._get_image_by_id(session, image_id, load_aliases)
             if not row:
-                return None
+                raise ImageNotFound(f"Image with ID {image_id} not found.")
             data = row.to_dataclass()
         return data
 
