@@ -9,9 +9,12 @@ from ai.backend.manager.actions.types import ActionSpec, OperationStatus
 
 
 class BaseAction(ABC):
-    @abstractmethod
     def entity_id(self) -> Optional[str]:
-        raise NotImplementedError
+        """
+        Return the ID of the entity this action operates on.
+        This returns `None` by default because subclasses may not always need to specify an entity ID.
+        """
+        return None
 
     @classmethod
     @abstractmethod
@@ -37,31 +40,9 @@ class BaseActionTriggerMeta:
     started_at: datetime
 
 
-class BaseBatchAction(ABC):
-    @abstractmethod
-    def entity_ids(self) -> list[str]:
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def entity_type(cls) -> str:
-        raise NotImplementedError
-
-    @classmethod
-    @abstractmethod
-    def operation_type(cls) -> str:
-        raise NotImplementedError
-
-
 class BaseActionResult(ABC):
     @abstractmethod
     def entity_id(self) -> Optional[str]:
-        raise NotImplementedError
-
-
-class BaseBatchActionResult(ABC):
-    @abstractmethod
-    def entity_ids(self) -> list[str]:
         raise NotImplementedError
 
 
