@@ -384,6 +384,7 @@ async def add_circuit(
     allowed_client_ips: str | None = None,
     preferred_port: int | None = None,
     preferred_subdomain: str | None = None,
+    static_address_id: UUID | None = None,
     worker_id: UUID | None = None,
 ) -> tuple[Circuit, Worker]:
     if worker_id:
@@ -395,7 +396,33 @@ async def add_circuit(
 
     circuit_params: dict[str, Any] = {}
 
-    if worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
+    # Handle static address allocation if specified
+    if static_address_id:
+        from .static_address import StaticAddress  # Import here to avoid circular dependency
+
+        static_address = await StaticAddress.get(session, static_address_id)
+        if static_address.is_allocated:
+            raise ValueError(f"Static address {static_address_id} is already allocated")
+
+        # Verify worker compatibility with static address
+        if worker.frontend_mode != static_address.frontend_mode:
+            raise ValueError(
+                f"Worker frontend mode {worker.frontend_mode} incompatible with "
+                f"static address frontend mode {static_address.frontend_mode}"
+            )
+
+        # Allocate the static address to this circuit (we'll set the circuit_id later)
+        await static_address.allocate_to_circuit(
+            UUID("00000000-0000-0000-0000-000000000000")
+        )  # Temporary ID
+        circuit_params["static_address_id"] = static_address_id
+
+        # Set port/subdomain from static address
+        if static_address.frontend_mode == FrontendMode.PORT:
+            circuit_params["port"] = static_address.port
+        else:
+            circuit_params["subdomain"] = static_address.subdomain
+    elif worker.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
         acquired_subdomains = [c.subdomain for c in worker.circuits]
         if _requested_subdomain := preferred_subdomain:
             subdomain = _requested_subdomain
@@ -422,8 +449,9 @@ async def add_circuit(
             port = port_pool.pop()
         circuit_params["port"] = port
 
+    circuit_id = uuid.uuid4()
     circuit = Circuit.create(
-        uuid.uuid4(),
+        circuit_id,
         app,
         protocol,
         worker.id,
@@ -440,6 +468,13 @@ async def add_circuit(
         **circuit_params,
     )
     circuit.worker_row = worker
+
+    # Update static address allocation with actual circuit ID
+    if static_address_id:
+        from .static_address import StaticAddress
+
+        static_address = await StaticAddress.get(session, static_address_id)
+        static_address.allocated_to_circuit = circuit_id
 
     worker.occupied_slots += 1
     session.add(circuit)
