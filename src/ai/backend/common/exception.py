@@ -165,6 +165,7 @@ class ErrorDomain(enum.StrEnum):
     PERMISSION = "permission"
     METRIC = "metric"
     STORAGE_PROXY = "storage-proxy"
+    MESSAGE_QUEUE = "message-queue"
 
 
 class ErrorOperation(enum.StrEnum):
