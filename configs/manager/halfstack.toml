@@ -95,6 +95,7 @@ model-registry = "huggingface-hub"
 
 [reservoir]
 storage-name = "minio-storage"
+enable-approve-process = false
 
 [reservoir.config]
 type = "object_storage"

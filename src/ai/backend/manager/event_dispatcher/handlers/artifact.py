@@ -8,6 +8,8 @@ from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
@@ -22,16 +24,19 @@ class ArtifactEventHandler:
     _artifact_repository: ArtifactRepository
     _huggingface_repository: HuggingFaceRepository
     _reservoir_repository: ReservoirRegistryRepository
+    _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
         artifact_repository: ArtifactRepository,
         huggingface_repository: HuggingFaceRepository,
         reservoir_repository: ReservoirRegistryRepository,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._artifact_repository = artifact_repository
         self._huggingface_repository = huggingface_repository
         self._reservoir_repository = reservoir_repository
+        self._config_provider = config_provider
 
     async def handle_model_metadata_fetch_done(
         self,
@@ -84,6 +89,15 @@ class ArtifactEventHandler:
                 artifact.id,
                 model_info.size,
             )
+
+            if self._config_provider.config.reservoir.enable_approve_process:
+                await self._artifact_repository.update_artifact_revision_status(
+                    revision.id, ArtifactStatus.NEEDS_APPROVAL
+                )
+            else:
+                await self._artifact_repository.update_artifact_revision_status(
+                    revision.id, ArtifactStatus.AVAILABLE
+                )
         except Exception as model_error:
             log.error(
                 "Failed to process metadata update for model: {} - {}",
