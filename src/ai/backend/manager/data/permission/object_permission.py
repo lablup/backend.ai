@@ -1,8 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from typing import Any, Self, override
-
-from sqlalchemy.engine import Row
+from typing import Any, override
 
 from ai.backend.manager.types import Creator, OptionalState
 
@@ -48,12 +46,3 @@ class ObjectPermissionData:
     role_id: uuid.UUID
     object_id: ObjectId
     operation: OperationType
-
-    @classmethod
-    def from_sa_row(cls, row: Row) -> Self:
-        return cls(
-            id=row.id,
-            role_id=row.role_id,
-            object_id=ObjectId(entity_type=row.entity_type, entity_id=row.entity_id),
-            operation=row.operation,
-        )

@@ -172,7 +172,7 @@ class RoleManager:
             sa.insert(ObjectPermissionRow).returning(ObjectPermissionRow),
             [input.fields_to_store() for input in creators],
         )
-        result = [ObjectPermissionData.from_sa_row(row) for row in rows]
+        result = [ObjectPermissionRow.from_sa_row(row).to_data() for row in rows]
         return result
 
     async def delete_object_permission_of_user(
