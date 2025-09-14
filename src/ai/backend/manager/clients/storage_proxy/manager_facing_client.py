@@ -33,7 +33,10 @@ from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.clients.storage_proxy.base import StorageProxyHTTPClient
 from ai.backend.manager.decorators.client_decorator import create_layer_aware_client_decorator
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
-from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
+from ai.backend.manager.errors.storage import (
+    StorageProxyConnectionError,
+    UnexpectedStorageProxyResponseError,
+)
 
 client_decorator = create_layer_aware_client_decorator(LayerType.STORAGE_PROXY_CLIENT)
 
@@ -57,7 +60,10 @@ class StorageProxyManagerFacingClient:
 
         :return: Response containing volume information
         """
-        return await self._client.request_with_response("GET", "volumes")
+        try:
+            return await self._client.request_with_response("GET", "volumes")
+        except aiohttp.ClientConnectionError as e:
+            raise StorageProxyConnectionError from e
 
     @client_decorator()
     async def create_folder(
