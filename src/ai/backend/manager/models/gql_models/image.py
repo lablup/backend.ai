@@ -223,7 +223,7 @@ class Image(graphene.ObjectType):
                 )
                 for k, v in row.resources.items()
             ],
-            supported_accelerators=(row.accelerators or "").split(","),
+            supported_accelerators=row.accelerators.split(",") if row.accelerators else [],
             installed=len(installed_agents) > 0,
             installed_agents=installed_agents if not hide_agents else None,
             # legacy
@@ -560,7 +560,7 @@ class ImageNode(graphene.ObjectType):
                 )
                 for k, v in row.resources.items()
             ],
-            supported_accelerators=(row.accelerators or "").split(","),
+            supported_accelerators=row.accelerators.split(",") if row.accelerators else [],
             aliases=[alias_row.alias for alias_row in row.aliases],
             permissions=[] if permissions is None else permissions,
             status=row.status,
