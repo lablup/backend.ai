@@ -1,7 +1,6 @@
 import logging
 from typing import AsyncIterable, AsyncIterator, Optional
 
-from ai.backend.common.dto.storage.request import PresignedUploadObjectReq
 from ai.backend.common.dto.storage.response import (
     ObjectMetaResponse,
     PresignedDownloadObjectResponse,
@@ -90,9 +89,8 @@ class ObjectStorageService:
         except Exception as e:
             raise FileStreamDownloadError("Download failed") from e
 
-    # TODO: Replace `request` with proper options
     async def generate_presigned_upload_url(
-        self, storage_name: str, bucket_name: str, request: PresignedUploadObjectReq
+        self, storage_name: str, bucket_name: str, key: str
     ) -> PresignedUploadObjectResponse:
         """
         Generate presigned upload URL.
@@ -100,25 +98,27 @@ class ObjectStorageService:
         Args:
             storage_name: Name of the storage configuration
             bucket_name: Name of the S3 bucket
-            request: PresignedUploadReq containing key, content_type, expiration, min_size, max_size
+            key: Object key (path) within the bucket to upload the file to
 
         Returns:
             PresignedUploadObjectResponse with URL and fields
         """
         try:
+            storage_config = self._get_storage_config(storage_name)
+            presigned_upload_config = storage_config.presigned_upload
             s3_client = self._get_s3_client(storage_name, bucket_name)
 
             presigned_data = await s3_client.generate_presigned_upload_url(
-                request.key,
-                expiration=request.expiration or _DEFAULT_EXPIRATION,
-                content_type=request.content_type,
-                content_length_range=(request.min_size, request.max_size)
-                if request.min_size and request.max_size
+                key,
+                expiration=presigned_upload_config.expiration,
+                content_type=presigned_upload_config.content_type,
+                content_length_range=(
+                    presigned_upload_config.min_size,
+                    presigned_upload_config.max_size,
+                )
+                if presigned_upload_config.min_size and presigned_upload_config.max_size
                 else None,
             )
-
-            if presigned_data is None:
-                raise PresignedUploadURLGenerationError()
 
             # TODO: Separate PresignedUploadObjectResponse dto class
             return PresignedUploadObjectResponse(
@@ -133,7 +133,6 @@ class ObjectStorageService:
         storage_name: str,
         bucket_name: str,
         filepath: str,
-        expiration: int = _DEFAULT_EXPIRATION,
     ) -> PresignedDownloadObjectResponse:
         """
         Generate presigned download URL.
@@ -142,17 +141,18 @@ class ObjectStorageService:
             storage_name: Name of the storage configuration
             bucket_name: Name of the S3 bucket
             filepath: Path to the file to download
-            expiration: Expiration time in seconds (default: 1800)
 
         Returns:
             PresignedDownloadResponse with URL
         """
         try:
             s3_client = self._get_s3_client(storage_name, bucket_name)
+            storage_config = self._get_storage_config(storage_name)
+            presigned_download_config = storage_config.presigned_download
 
             presigned_url = await s3_client.generate_presigned_download_url(
                 filepath,
-                expiration=expiration,
+                expiration=presigned_download_config.expiration,
             )
 
             if presigned_url is None:
@@ -212,11 +212,7 @@ class ObjectStorageService:
             raise StorageBucketNotFoundError(f"Delete object failed: {str(e)}") from e
 
     def _get_s3_client(self, storage_name: str, bucket_name: str) -> S3Client:
-        storage_config = self._storage_configs.get(storage_name)
-        if not storage_config:
-            raise StorageNotFoundError(
-                f"No storage configuration found for storage: {storage_name}"
-            )
+        storage_config = self._get_storage_config(storage_name)
 
         if bucket_name not in storage_config.buckets:
             raise StorageBucketNotFoundError(
@@ -230,3 +226,11 @@ class ObjectStorageService:
             aws_access_key_id=storage_config.access_key,
             aws_secret_access_key=storage_config.secret_key,
         )
+
+    def _get_storage_config(self, storage_name: str) -> ObjectStorageConfig:
+        storage_config = self._storage_configs.get(storage_name)
+        if not storage_config:
+            raise StorageNotFoundError(
+                f"No storage configuration found for storage: {storage_name}"
+            )
+        return storage_config

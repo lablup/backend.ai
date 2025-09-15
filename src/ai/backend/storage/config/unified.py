@@ -569,6 +569,54 @@ class StorageProxyConfig(BaseModel):
     )
 
 
+class PresignedUploadConfig(BaseModel):
+    min_size: Optional[int] = Field(
+        default=None,
+        description="""
+        Minimum file size for multipart uploads.
+        """,
+        examples=[5 * 1024 * 1024, 10 * 1024 * 1024],
+        validation_alias=AliasChoices("min-size", "min_size"),
+        serialization_alias="min-size",
+    )
+    max_size: Optional[int] = Field(
+        default=None,
+        description="""
+        Maximum file size for uploads.
+        """,
+        examples=[5 * 1024 * 1024 * 1024, 10 * 1024 * 1024 * 1024],
+        validation_alias=AliasChoices("max-size", "max_size"),
+        serialization_alias="max-size",
+    )
+    expiration: int = Field(
+        default=60 * 60,
+        description="""
+        Expiration time (in seconds) for presigned URLs.
+        """,
+        examples=[3600, 7200],
+    )
+    content_type: Optional[str] = Field(
+        default=None,
+        description="""
+        Expected content type for uploads.
+        If set, presigned URLs will only accept uploads with this content type.
+        """,
+        examples=["application/octet-stream", "image/png"],
+        validation_alias=AliasChoices("content-type", "content_type"),
+        serialization_alias="content-type",
+    )
+
+
+class PresignedDownloadConfig(BaseModel):
+    expiration: int = Field(
+        default=1800,
+        description="""
+        Expiration time (in seconds) for presigned URLs.
+        """,
+        examples=[3600, 7200],
+    )
+
+
 # TODO: Remove this after migrating this to database
 class ObjectStorageConfig(BaseModel):
     name: str = Field(
@@ -614,6 +662,24 @@ class ObjectStorageConfig(BaseModel):
         Required for services that require region specification.
         """,
         examples=["us-west-1", "eu-central-1"],
+    )
+    presigned_upload: PresignedUploadConfig = Field(
+        default_factory=PresignedUploadConfig,
+        description="""
+        Configuration for presigned upload URLs.
+        Controls parameters like expiration time and size limits.
+        """,
+        validation_alias=AliasChoices("presigned-upload", "presigned_upload"),
+        serialization_alias="presigned-upload",
+    )
+    presigned_download: PresignedDownloadConfig = Field(
+        default_factory=PresignedDownloadConfig,
+        description="""
+        Configuration for presigned download URLs.
+        Controls parameters like expiration time.
+        """,
+        validation_alias=AliasChoices("presigned-download", "presigned_download"),
+        serialization_alias="presigned-download",
     )
     upload_chunk_size: int = Field(
         default=5 * 1024 * 1024,

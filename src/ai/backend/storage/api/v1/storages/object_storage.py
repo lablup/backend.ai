@@ -138,7 +138,7 @@ class ObjectStorageAPIHandler:
         await log_client_api_entry(log, "presigned_upload_url", req)
         storage_service = ObjectStorageService(self._storage_configs)
         response = await storage_service.generate_presigned_upload_url(
-            storage_name, bucket_name, req
+            storage_name, bucket_name, req.key
         )
 
         return APIResponse.build(

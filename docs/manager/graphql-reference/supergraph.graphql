@@ -2062,10 +2062,6 @@ input GetPresignedUploadURLInput
 {
   artifactRevisionId: ID!
   key: String!
-  contentType: String = null
-  expiration: Int = null
-  minSize: Int = null
-  maxSize: Int = null
 }
 
 """Added in 25.14.0"""

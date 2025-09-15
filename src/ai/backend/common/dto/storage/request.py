@@ -61,18 +61,6 @@ class PresignedUploadObjectReq(BaseRequestModel):
     """
 
     key: str = Field(description="The object key (path) within the bucket to upload the file to.")
-    content_type: Optional[str] = Field(
-        default=None, description="MIME type of the file being uploaded."
-    )
-    expiration: Optional[int] = Field(
-        default=None, gt=0, description="Token expiration time in seconds"
-    )
-    min_size: Optional[int] = Field(
-        default=None, ge=0, description="Minimum allowed size in bytes for upload operations"
-    )
-    max_size: Optional[int] = Field(
-        default=None, gt=0, description="Maximum allowed size in bytes for upload operations"
-    )
 
 
 class PresignedDownloadObjectReq(BaseRequestModel):

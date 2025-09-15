@@ -226,10 +226,6 @@ class GetPresignedDownloadURLInput:
 class GetPresignedUploadURLInput:
     artifact_revision_id: ID
     key: str
-    content_type: Optional[str] = None
-    expiration: Optional[int] = None
-    min_size: Optional[int] = None
-    max_size: Optional[int] = None
 
 
 @strawberry.type(description="Added in 25.14.0")
@@ -335,10 +331,6 @@ async def get_presigned_upload_url(
         GetUploadPresignedURLAction(
             artifact_revision_id=uuid.UUID(input.artifact_revision_id),
             key=input.key,
-            content_type=input.content_type,
-            expiration=input.expiration,
-            min_size=input.min_size,
-            max_size=input.max_size,
         )
     )
 
