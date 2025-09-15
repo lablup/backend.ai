@@ -1516,7 +1516,7 @@
       "SetPreopenPorts": "Урьдчилан нээх портууд (заавал биш)",
       "SetSessionOwner": "Session эзэмшигч",
       "SettingUpProxyForApp": "Апп-д прокси тохируулж байна ...",
-      "SharedMemory": "Хуваалцсан санах ой (SHMEM) {{утга}}}",
+      "SharedMemory": "Хуваалцсан санах ой (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Хуваалцсан санах ойн тохиргоог хуваарилагдсан санах ойн доогуур болгож багасгасан.",
       "SingleNode": "Нэг Node",
       "SkipToConfirmAndLaunch": "Шүүмж рүү алгасах",

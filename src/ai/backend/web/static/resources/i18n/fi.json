@@ -1517,7 +1517,7 @@
       "SetPreopenPorts": "Esiavattavat portit (valinnainen)",
       "SetSessionOwner": "Istunnon omistaja",
       "SettingUpProxyForApp": "Sovelluksen välityspalvelimen määrittäminen...",
-      "SharedMemory": "Jaettu muisti (SHMEM) {{arvo}}",
+      "SharedMemory": "Jaettu muisti (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Jaetun muistin asetusta pienennetään alle jaetun muistin.",
       "SingleNode": "Yksi solmu",
       "SkipToConfirmAndLaunch": "Siirry arvosteluun",
