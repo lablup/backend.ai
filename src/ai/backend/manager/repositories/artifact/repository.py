@@ -1,9 +1,12 @@
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, timezone
 from typing import Any, Optional, override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import selectinload, sessionmaker
 from sqlalchemy.sql import Select
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
@@ -737,7 +740,7 @@ class ArtifactRepository:
     async def update_artifact_revision_bytesize(
         self, artifact_revision_id: uuid.UUID, size: int
     ) -> uuid.UUID:
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(ArtifactRevisionRow)
                 .where(ArtifactRevisionRow.id == artifact_revision_id)
@@ -750,7 +753,7 @@ class ArtifactRepository:
     async def update_artifact_revision_readme(
         self, artifact_revision_id: uuid.UUID, readme: str
     ) -> uuid.UUID:
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(ArtifactRevisionRow)
                 .where(ArtifactRevisionRow.id == artifact_revision_id)
@@ -984,3 +987,22 @@ class ArtifactRepository:
                 rows, querybuild_result.pagination_order
             )
             return data_objects, total_count
+
+    @actxmgr
+    async def _begin_session_read_committed(self) -> AsyncIterator[SASession]:
+        """
+        Begin a read-write session with READ COMMITTED isolation level.
+        """
+        async with self._db.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
+            async with conn_with_isolation.begin():
+                # Configure session factory with the connection
+                sess_factory = sessionmaker(
+                    bind=conn_with_isolation,
+                    class_=SASession,
+                    expire_on_commit=False,
+                )
+                session = sess_factory()
+                yield session
+                await session.commit()
