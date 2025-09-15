@@ -1,14 +1,17 @@
 from collections.abc import AsyncIterable, AsyncIterator
 from typing import Optional, override
 
-from ai.backend.common.dto.storage.request import PresignedUploadObjectReq
 from ai.backend.common.dto.storage.response import (
     ObjectMetaResponse,
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
 )
 from ai.backend.storage.client.s3 import S3Client
-from ai.backend.storage.config.unified import ObjectStorageConfig
+from ai.backend.storage.config.unified import (
+    ObjectStorageConfig,
+    PresignedDownloadConfig,
+    PresignedUploadConfig,
+)
 from ai.backend.storage.exception import (
     FileStreamDownloadError,
     FileStreamUploadError,
@@ -19,8 +22,6 @@ from ai.backend.storage.exception import (
     StorageBucketNotFoundError,
 )
 from ai.backend.storage.storages.base import AbstractStorage
-
-_DEFAULT_EXPIRATION = 1800  # Default token expiration time in seconds
 
 
 class ObjectStorage(AbstractStorage):
@@ -33,6 +34,8 @@ class ObjectStorage(AbstractStorage):
     _upload_chunk_size: int
     _download_chunk_size: int
     _reservoir_download_chunk_size: int
+    _presigned_upload_config: PresignedUploadConfig
+    _presigned_download_config: PresignedDownloadConfig
 
     def __init__(self, cfg: ObjectStorageConfig) -> None:
         self._name = cfg.name
@@ -44,6 +47,8 @@ class ObjectStorage(AbstractStorage):
         self._upload_chunk_size = cfg.upload_chunk_size
         self._download_chunk_size = cfg.download_chunk_size
         self._reservoir_download_chunk_size = cfg.reservoir_download_chunk_size
+        self._presigned_upload_config = cfg.presigned_upload
+        self._presigned_download_config = cfg.presigned_download
 
     @override
     async def stream_upload(
@@ -92,28 +97,29 @@ class ObjectStorage(AbstractStorage):
         except Exception as e:
             raise FileStreamDownloadError("Download failed") from e
 
-    # TODO: Replace `request` with proper options
-    async def generate_presigned_upload_url(
-        self, request: PresignedUploadObjectReq
-    ) -> PresignedUploadObjectResponse:
+    async def generate_presigned_upload_url(self, key: str) -> PresignedUploadObjectResponse:
         """
         Generate presigned upload URL.
 
         Args:
-            request: PresignedUploadReq containing key, content_type, expiration, min_size, max_size
+            key: Path to the file to upload
 
         Returns:
             PresignedUploadObjectResponse with URL and fields
         """
         try:
             s3_client = self._get_s3_client()
+            presigned_upload_config = self._presigned_upload_config
 
             presigned_data = await s3_client.generate_presigned_upload_url(
-                request.key,
-                expiration=request.expiration or _DEFAULT_EXPIRATION,
-                content_type=request.content_type,
-                content_length_range=(request.min_size, request.max_size)
-                if request.min_size and request.max_size
+                key,
+                expiration=presigned_upload_config.expiration,
+                content_type=presigned_upload_config.content_type,
+                content_length_range=(
+                    presigned_upload_config.min_size,
+                    presigned_upload_config.max_size,
+                )
+                if presigned_upload_config.min_size and presigned_upload_config.max_size
                 else None,
             )
 
@@ -130,14 +136,12 @@ class ObjectStorage(AbstractStorage):
     async def generate_presigned_download_url(
         self,
         filepath: str,
-        expiration: int = _DEFAULT_EXPIRATION,
     ) -> PresignedDownloadObjectResponse:
         """
         Generate presigned download URL.
 
         Args:
             filepath: Path to the file to download
-            expiration: Expiration time in seconds (default: 1800)
 
         Returns:
             PresignedDownloadResponse with URL
@@ -147,7 +151,7 @@ class ObjectStorage(AbstractStorage):
 
             presigned_url = await s3_client.generate_presigned_download_url(
                 filepath,
-                expiration=expiration,
+                expiration=self._presigned_download_config.expiration,
             )
 
             if presigned_url is None:

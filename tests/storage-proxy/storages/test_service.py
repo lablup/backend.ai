@@ -1,8 +1,5 @@
 import pytest
 
-from ai.backend.common.dto.storage.response import (
-    PresignedUploadObjectResponse,
-)
 from ai.backend.storage.config.unified import ObjectStorageConfig, ReservoirConfig
 from ai.backend.storage.exception import (
     FileStreamDownloadError,
@@ -140,6 +137,7 @@ async def test_stream_download_nonexistent_file(s3_client, storages_service: Obj
             "test_storage", _BUCKET_FIXTURE_NAME, "nonexistent-key"
         ):
             pass
+
 
 @pytest.mark.asyncio
 async def test_get_object_info_success(s3_client, storages_service: ObjectStorageService):
