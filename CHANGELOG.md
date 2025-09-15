@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.14.2 (2025-09-15)
+
+### Features
+* Add GQL Viewer type ([#5728](https://github.com/lablup/backend.ai/issues/5728))
+
+
 ## 25.14.1 (2025-09-15)
 
 ### Fixes
