@@ -26,44 +26,44 @@ as a reference implementation of API clients.
 ### Directory Structure
 
 * `src/ai/backend/`: Source codes
-  - `manager/`: Manager as the cluster control-plane
-  - `manager/api`: Manager API handlers
-  - `account_manager/`: Unified user profile and SSO management
-  - `agent/`: Agent as per-node controller
-  - `agent/docker/`: Agent's Docker backend
-  - `agent/k8s/`: Agent's Kubernetes backend
-  - `agent/dummy/`: Agent's dummy backend
-  - `kernel/`: Agent's kernel runner counterpart
-  - `runner/`: Agent's in-kernel prebuilt binaries
-  - `helpers/`: Agent's in-kernel helper package
-  - `common/`: Shared utilities
-  - `client/`: Client SDK
-  - `cli/`: Unified CLI for all components
-  - `install/`: SCIE-based TUI installer
-  - `storage/`: Storage proxy for offloading storage operations
-  - `storage/api`: Storage proxy's manager-facing and client-facing APIs
-  - `appproxy/`: App proxy for accessing container apps from outside
-  - `appproxy/coordinator`: App proxy coordinator who provisions routing circuits
-  - `appproxy/worker`: App proxy worker who forwards the traffic
-  - `web/`: Web UI server
-    - `static/`: Backend.AI WebUI release artifacts
-  - `logging/`: Logging subsystem
-  - `plugin/`: Plugin subsystem
-  - `test/`: Integration test suite
-  - `testutils/`: Shared utilities used by unit tests
-  - `meta/`: Legacy meta package
-  - `accelerator/`: Intrinsic accelerator plugins
+- `manager/`: Manager as the cluster control-plane
+- `manager/api`: Manager API handlers
+- `account_manager/`: Unified user profile and SSO management
+- `agent/`: Agent as per-node controller
+- `agent/docker/`: Agent's Docker backend
+- `agent/k8s/`: Agent's Kubernetes backend
+- `agent/dummy/`: Agent's dummy backend
+- `kernel/`: Agent's kernel runner counterpart
+- `runner/`: Agent's in-kernel prebuilt binaries
+- `helpers/`: Agent's in-kernel helper package
+- `common/`: Shared utilities
+- `client/`: Client SDK
+- `cli/`: Unified CLI for all components
+- `install/`: SCIE-based TUI installer
+- `storage/`: Storage proxy for offloading storage operations
+- `storage/api`: Storage proxy's manager-facing and client-facing APIs
+- `appproxy/`: App proxy for accessing container apps from outside
+- `appproxy/coordinator`: App proxy coordinator who provisions routing circuits
+- `appproxy/worker`: App proxy worker who forwards the traffic
+- `web/`: Web UI server
+- `static/`: Backend.AI WebUI release artifacts
+- `logging/`: Logging subsystem
+- `plugin/`: Plugin subsystem
+- `test/`: Integration test suite
+- `testutils/`: Shared utilities used by unit tests
+- `meta/`: Legacy meta package
+- `accelerator/`: Intrinsic accelerator plugins
 * `docs/`: Unified documentation
 * `tests/`
-  - `manager/`, `agent/`, ...: Per-component unit tests
+- `manager/`, `agent/`, ...: Per-component unit tests
 * `configs/`
-  - `manager/`, `agent/`, ...: Per-component sample configurations
+- `manager/`, `agent/`, ...: Per-component sample configurations
 * `docker/`: Dockerfiles for auxiliary containers
 * `fixtures/`
-  - `manager/`, ...: Per-component fixtures for development setup and tests
+- `manager/`, ...: Per-component fixtures for development setup and tests
 * `plugins/`: A directory to place plugins such as accelerators, monitors, etc.
 * `scripts/`: Scripts to assist development workflows
-  - `install-dev.sh`: The single-node development setup script from the working copy
+- `install-dev.sh`: The single-node development setup script from the working copy
 * `stubs/`: Type annotation stub packages written by us
 * `tools/`: A directory to host Pants-related tooling
 * `dist/`: A directory to put build artifacts (.whl files) and Pants-exported virtualenvs
@@ -100,7 +100,7 @@ Getting Started
 Run `scripts/install-dev.sh` after cloning this repository.
 
 This script checks availability of all required dependencies such as Docker and bootstrap a development
-setup.  Note that it requires `sudo` and a modern Python installed in the host system based on Linux
+setup. Note that it requires `sudo` and a modern Python installed in the host system based on Linux
 (Debian/RHEL-likes) or macOS.
 
 ### Installation for Multi-node Tests &amp; Production
@@ -115,14 +115,14 @@ so that users can use their browsers and client CLI to access in-container appli
 in a secure way.
 
 * Jupyter: data scientists' favorite tool
-   * Most container images have intrinsic Jupyter and JupyterLab support.
+* Most container images have intrinsic Jupyter and JupyterLab support.
 * Web-based terminal
-   * All container sessions have intrinsic ttyd support.
+* All container sessions have intrinsic ttyd support.
 * SSH
-   * All container sessions have intrinsic SSH/SFTP/SCP support with auto-generated per-user SSH keypair.
-     PyCharm and other IDEs can use on-demand sessions using SSH remote interpreters.
+* All container sessions have intrinsic SSH/SFTP/SCP support with auto-generated per-user SSH keypair.
+PyCharm and other IDEs can use on-demand sessions using SSH remote interpreters.
 * VSCode
-   * Most container sessions have intrinsic web-based VSCode support.
+* Most container sessions have intrinsic web-based VSCode support.
 
 ### Working with Storage
 
@@ -141,15 +141,15 @@ It routes external API requests from front-end services to individual agents.
 It also monitors and scales the cluster of multiple agents (a few tens to hundreds).
 
 * `src/ai/backend/manager`
-  * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/README.md)
-  * Legacy per-pkg repo: https://github.com/lablup/backend.ai-manager
-  * Available plugin interfaces
-    - `backendai_scheduler_v10`
-    - `backendai_agentselector_v10`
-    - `backendai_hook_v20`
-    - `backendai_webapp_v20`
-    - `backendai_monitor_stats_v10`
-    - `backendai_monitor_error_v10`
+* [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/README.md)
+* Legacy per-pkg repo: https://github.com/lablup/backend.ai-manager
+* Available plugin interfaces
+- `backendai_scheduler_v10`
+- `backendai_agentselector_v10`
+- `backendai_hook_v20`
+- `backendai_webapp_v20`
+- `backendai_monitor_stats_v10`
+- `backendai_monitor_error_v10`
 
 ### Agent
 
@@ -159,12 +159,12 @@ Each agent on a new EC2 instance self-registers itself to the instance registry 
 heartbeats.
 
 * `src/ai/backend/agent`
-  * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/agent/README.md)
-  * Legacy per-pkg repo: https://github.com/lablup/backend.ai-agent
-  * Available plugin interfaces
-    - `backendai_accelerator_v21`
-    - `backendai_monitor_stats_v10`
-    - `backendai_monitor_error_v10`
+* [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/agent/README.md)
+* Legacy per-pkg repo: https://github.com/lablup/backend.ai-agent
+* Available plugin interfaces
+- `backendai_accelerator_v21`
+- `backendai_monitor_stats_v10`
+- `backendai_monitor_error_v10`
 
 ### Storage Proxy
 
@@ -173,8 +173,8 @@ vendor-specific enhancements such as real-time performance metrics and filesyste
 acceleration APIs.
 
 * `src/ai/backend/storage`
-  * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/storage/README.md)
-  * Legacy per-pkg repo: https://github.com/lablup/backend.ai-storage-proxy
+* [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/storage/README.md)
+* Legacy per-pkg repo: https://github.com/lablup/backend.ai-storage-proxy
 
 ### Webserver
 
@@ -182,8 +182,8 @@ It hosts the SPA (single-page application) packaged from our web UI codebase for
 and basic administration tasks.
 
 * `src/ai/backend/web`
-  * [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/web/README.md)
-  * Legacy per-pkg repo: https://github.com/lablup/backend.ai-webserver
+* [README](https://github.com/lablup/backend.ai/blob/main/src/ai/backend/web/README.md)
+* Legacy per-pkg repo: https://github.com/lablup/backend.ai-webserver
 
 **Synchronizing the static Backend.AI WebUI version:**
 ```console
@@ -217,17 +217,17 @@ These SDKs are freely available with MIT License to ease integration with both
 commercial and non-commercial software products and services.
 
 * Python (provides the command-line interface)
-   * `pip install backend.ai-client`
-   * https://github.com/lablup/backend.ai/tree/main/src/ai/backend/client
+* `pip install backend.ai-client`
+* https://github.com/lablup/backend.ai/tree/main/src/ai/backend/client
 * Java
-   * Currently only available via GitHub releases
-   * https://github.com/lablup/backend.ai-client-java
+* Currently only available via GitHub releases
+* https://github.com/lablup/backend.ai-client-java
 * Javascript
-   * `npm install backend.ai-client`
-   * https://github.com/lablup/backend.ai-client-js
+* `npm install backend.ai-client`
+* https://github.com/lablup/backend.ai-client-js
 * PHP (under preparation)
-   * `composer require lablup/backend.ai-client`
-   * https://github.com/lablup/backend.ai-client-php
+* `composer require lablup/backend.ai-client`
+* https://github.com/lablup/backend.ai-client-php
 
 
 Plugins
@@ -237,18 +237,18 @@ Plugins are detected and loaded via Python package entrypoints.
 The followings are the mainly used entrypoint names:
 
 * `backendai_accelerator_v21`
-  - [`ai.backend.accelerator.cuda`](https://github.com/lablup/backend.ai/tree/main/src/ai/backend/accelerator/cuda_open): CUDA accelerator plugin
-  - [`ai.backend.accelerator.cuda` (mock)](https://github.com/lablup/backend.ai/tree/main/src/ai/backend/accelerator/cuda_mock): CUDA mockup plugin
-    - This emulates the presence of CUDA devices without actual CUDA devices,
-      so that developers can work on CUDA integration without real GPUs.
-  - [`ai.backend.accelerator.rocm`](): ROCm accelerator plugin
-  - More available in the enterprise edition!
+- [`ai.backend.accelerator.cuda`](https://github.com/lablup/backend.ai/tree/main/src/ai/backend/accelerator/cuda_open): CUDA accelerator plugin
+- [`ai.backend.accelerator.cuda` (mock)](https://github.com/lablup/backend.ai/tree/main/src/ai/backend/accelerator/cuda_mock): CUDA mockup plugin
+- This emulates the presence of CUDA devices without actual CUDA devices,
+so that developers can work on CUDA integration without real GPUs.
+- [`ai.backend.accelerator.rocm`](): ROCm accelerator plugin
+- More available in the enterprise edition!
 * `backendai_monitor_stats_v10`
-  - [`ai.backend.monitor.stats`](https://github.com/lablup/backend.ai-monitor-datadog)
-    - Statistics collector based on the Datadog API
+- [`ai.backend.monitor.stats`](https://github.com/lablup/backend.ai-monitor-datadog)
+- Statistics collector based on the Datadog API
 * `backendai_monitor_error_v10`
-  - [`ai.backend.monitor.error`](https://github.com/lablup/backend.ai-monitor-sentry)
-    - Exception collector based on the Sentry API
+- [`ai.backend.monitor.error`](https://github.com/lablup/backend.ai-monitor-sentry)
+- Exception collector based on the Sentry API
 
 
 Legacy Components
@@ -263,18 +263,18 @@ animated vector graphics)
 
 * The Python package (`lablup`) is installed *inside* kernel containers.
 * To interpret and display media generated by the Python package, you need to load
-  the Javascript part in the front-end.
+the Javascript part in the front-end.
 * https://github.com/lablup/backend.ai-media
 
 
 ### IDE and Editor Extensions
 
 * Visual Studio Code Extension
-   * Search “Live Code Runner” among VSCode extensions.
-   * https://github.com/lablup/vscode-live-code-runner
+* Search “Live Code Runner” among VSCode extensions.
+* https://github.com/lablup/vscode-live-code-runner
 * Atom Editor plugin
-   * Search “Live Code Runner” among Atom plugins.
-   * https://github.com/lablup/atom-live-code-runner
+* Search “Live Code Runner” among Atom plugins.
+* https://github.com/lablup/atom-live-code-runner
 
 We now recommend using in-kernel applications such as Jupyter Lab, Visual Studio Code Server,
 or native SSH connection to kernels via our client SDK or desktop apps.
@@ -284,11 +284,11 @@ Python Version Compatibility
 
 | Backend.AI Core Version | Python Version | Pantsbuild version |
 |:-----------------------:|:--------------:|:------------------:|
-| 25.06.x ~               | 3.13.x         | 2.23.x             |
-| 24.03.x / 24.09.x ~ 25.05.x      | 3.12.x         | 2.21.x    |
-| 23.03.x / 23.09.x       | 3.11.x         | 2.19.x             |
-| 22.03.x / 22.09.x       | 3.10.x         |                    |
-| 21.03.x / 21.09.x       | 3.8.x          |                    |
+| 25.06.x ~ | 3.13.x | 2.23.x |
+| 24.03.x / 24.09.x ~ 25.05.x | 3.12.x | 2.21.x |
+| 23.03.x / 23.09.x | 3.11.x | 2.19.x |
+| 22.03.x / 22.09.x | 3.10.x | |
+| 21.03.x / 21.09.x | 3.8.x | |
 
 
 ### Building Packages
@@ -312,3 +312,7 @@ License
 -------
 
 Refer to [LICENSE file](https://github.com/lablup/backend.ai/blob/main/LICENSE).
+
+
+---
+*Documentation improved for better readability and formatting.*
