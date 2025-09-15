@@ -29,6 +29,39 @@ class ModelMetadataInfo:
 
 
 @dataclass
+class ModelImportDoneEvent(BaseArtifactEvent):
+    model_id: str
+    revision: str
+    registry_type: ArtifactRegistryType
+    registry_name: str
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "model_import_done"
+
+    def serialize(self) -> tuple:
+        return (self.model_id, self.revision, self.registry_type, self.registry_name)
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            model_id=value[0],
+            revision=value[1],
+            registry_type=value[2],
+            registry_name=value[3],
+        )
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+@dataclass
 class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
     model: ModelMetadataInfo
 

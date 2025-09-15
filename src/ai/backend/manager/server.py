@@ -796,6 +796,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             root_ctx.repositories,
             lambda: root_ctx.processors,
             root_ctx.storage_manager,
+            root_ctx.config_provider,
             use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )

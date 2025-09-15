@@ -1773,7 +1773,17 @@ class ReservoirObjectStorageConfig(BaseModel):
 StorageSpecificConfig = Union[ReservoirObjectStorageConfig]
 
 
-class ReservoirStorageConfig(BaseModel):
+class ReservoirConfig(BaseModel):
+    enable_approve_process: bool = Field(
+        default=False,
+        description="""
+        Whether to enable the approval process for artifact uploads.
+        When enabled, artifacts require approval before being available.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices("enable-approve-process", "enable_approve_process"),
+        serialization_alias="enable-approve-process",
+    )
     storage_name: str = Field(
         default="RESERVOIR_STORAGE_NAME",
         description="""
@@ -1988,11 +1998,10 @@ class ManagerUnifiedConfig(BaseModel):
         validation_alias=AliasChoices("artifact_registry", "artifact-registry"),
         serialization_alias="artifact-registry",
     )
-    reservoir: ReservoirStorageConfig = Field(
-        default_factory=ReservoirStorageConfig,
+    reservoir: ReservoirConfig = Field(
+        default_factory=ReservoirConfig,
         description="""
-        Reservoir storage configuration.
-        Controls which storage backend is used for the reservoir.
+        Reservoir configuration.
         """,
     )
 
