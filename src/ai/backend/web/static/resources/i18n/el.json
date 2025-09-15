@@ -210,17 +210,7 @@
     "UserStatus": "Κατάσταση χρήστη",
     "Users": "Χρήστες",
     "WarningLessRateLimit": "Εάν η τιμή Όριο ρυθμού είναι μικρή, ενδέχεται να μπλοκαριστούν λειτουργίες API, όπως η σύνδεση.",
-    "YouAreAboutToDeleteCredential": "Πρόκειται να διαγράψετε τα διαπιστευτήρια αυτού του χρήστη:",
-    "validation": {
-      "InvalidEmailAddress": "Μη έγκυρη διεύθυνση e-mail.",
-      "LetterNumber-_dot": "Επιτρέπει γράμματα, αριθμούς και -_.",
-      "NameAlreadyExists": "Το όνομα πολιτικής υπάρχει ήδη!",
-      "NumbersOnly": "Επιτρέπει μόνο αριθμούς",
-      "PleaseSelectOption": "Επιλέξτε μία από τις επιλογές",
-      "PleaseSelectOptions": "Παρακαλούμε επιλέξτε τουλάχιστον μία ή περισσότερες επιλογές.",
-      "PolicyName": "Απαιτείται όνομα πολιτικής.",
-      "ValidationFailed": "Η επικύρωση απέτυχε"
-    }
+    "YouAreAboutToDeleteCredential": "Πρόκειται να διαγράψετε τα διαπιστευτήρια αυτού του χρήστη:"
   },
   "data": {
     "Active": "Ενεργός",
@@ -309,7 +299,6 @@
       "InviteeEmail": "Πρόσκληση e-mail",
       "KeepFileExtension": "Διατήρηση",
       "LessThan10Sec": "Λιγότερο από 10 δευτερόλεπτα",
-      "ModifyPermissions": "Τροποποίηση δικαιωμάτων",
       "MoreThanADay": "Περισσότερο από μια μέρα",
       "Name": "Ονομα",
       "NewFileName": "Νέο όνομα αρχείου",
@@ -345,15 +334,20 @@
     },
     "folders": {
       "CannotDeleteFolder": "Δεν είναι δυνατή η διαγραφή του φακέλου που είναι τοποθετημένος σε μία ή περισσότερες περιόδους σύνδεσης. Κλείστε πρώτα τη συνεδρία.",
+      "CannotDeletePipelineFolder": "Δεν μπορείτε να διαγράψετε τους φακέλους αγωγών.",
+      "CannotRestorePipelineFolder": "Δεν μπορείτε να επαναφέρετε τους φακέλους αγωγών.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Οι φακέλοι έργων μοντέλων μπορούν να δημιουργηθούν μόνο σε αποκλειστικά έργα Model Store. \nΑλλάξτε το τρέχον έργο ή τον τύπο χρήστη.",
       "CloneAFolder": "Κλωνοποίηση φακέλου",
       "CloneFolder": "Φάκελος κλωνοποίησης",
       "Cloneable": "Κλωνοποιήσιμο",
       "Control": "Ελεγχος",
+      "CreateModelFolderOnlyInExclusiveProject": "Οι φακέλοι έργων μοντέλων μπορούν να δημιουργηθούν μόνο σε αποκλειστικά έργα Model Store.",
       "CreatedAt": "Δημιουργήθηκε στο",
       "Delete": "Διαγράφω",
       "DeleteAFolder": "Διαγραφή φακέλου",
       "DeleteForever": "Διαγραφή για πάντα",
       "DescYouAreFolderOwner": "Είστε ο κάτοχος αυτού του φακέλου.",
+      "DownloadingModel": "Μοντέλο λήψης ...",
       "Edit": "Επεξεργασία",
       "EditDelete": "Επεξεργασία + Διαγραφή",
       "FileDeleted": "Το αρχείο διαγράφηκε",
@@ -375,7 +369,7 @@
       "FolderUsage": "Χρήση φακέλου",
       "FolderUsing": "Χρήση του",
       "InviteUsers": "Προσκαλέστε χρήστης",
-      "KickOut": "",
+      "KickOut": "Διακοπή",
       "KickOutConfirm": "Σταματήστε να μοιράζεστε με {{email}};",
       "Leave": "Αδεια",
       "LeaveAFolder": "Αφήστε έναν φάκελο",
@@ -402,6 +396,7 @@
       "Path": "Διαδρομή αποθήκευσης",
       "Permission": "Αδεια",
       "ProjectFolderAlertDesc": "Αυτός ο φάκελος μοιράζεται με όλα τα μέλη του έργου",
+      "ProjectFolderCreationHelp": "Ένα φάκελο προσβάσιμο από το \"{{projectName}}\" Οι χρήστες του έργου θα δημιουργηθούν.",
       "Rename": "Μετονομάζω",
       "Restore": "Επαναφέρω",
       "RestoreDescription": "Θέλετε να επαναφέρετε \"{{ folderName }}\" \"Φάκελος;",
@@ -551,6 +546,7 @@
     "Digest": "Σύνοψη",
     "Disabled": "άτομα με ειδικές ανάγκες",
     "ErrorMinimumValue": "{{key}} πρέπει να είναι τουλάχιστον {{value}}",
+    "FailedToDeleteCustomizedImage": "Αποτυχία διαγραφής προσαρμοσμένης εικόνας.",
     "FullImagePath": "Πλήρης διαδρομή εικόνας",
     "ImageReinstallationRequired": "Απαιτείται επανεγκατάσταση εικόνας",
     "Images": "Εικόνες",
@@ -620,6 +616,7 @@
     "SmallerResourceThenImageRequires": "Το αίτημα πόρων είναι μικρότερο από το ελάχιστο απαιτούμενο από την εικόνα. Δοκιμάστε περισσότερους πόρους.",
     "TooManyLoginFailures": "Υπήρξαν πάρα πολλές αποτυχίες σύνδεσης σε σύντομο χρονικό διάστημα. Η είσοδος έχει μπλοκαριστεί για λίγο.",
     "UnauthorizedToken": "Μη εξουσιοδοτημένο token. Ελέγξτε το διακριτικό σας.",
+    "UnexpectedError": "Παρουσιάστηκε ένα απροσδόκητο σφάλμα. \nΔοκιμάστε ξανά αργότερα ή επικοινωνήστε με την υποστήριξη εάν το πρόβλημα παραμένει.",
     "UnknownError": "Εμφανίστηκε ένα άγνωστο σφάλμα. Προσπαθήστε ξανά.",
     "UpdateError": "Σφάλμα ενημέρωσης",
     "UserHasNoGroup": "Ο χρήστης δεν έχει ομάδα. Παρακαλούμε επικοινωνήστε με τον διαχειριστή για να το διορθώσετε.",
@@ -636,8 +633,10 @@
     "Title": "Εμφανίστηκε σφάλμα."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Ο φάκελος δεν βρέθηκε ή απορρίφθηκε η πρόσβαση",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Οι μη διαχειριζόμενοι φάκελοι δεν υποστηρίζουν τον εξερευνητή αρχείων.",
+    "NoPermissions": "Δεν υπάρχουν δικαιώματα πρόσβασης σε αυτόν τον φάκελο",
     "ValueRequired": "Απαιτούμενη τιμή"
   },
   "general": {
@@ -675,7 +674,17 @@
     "StorageProxies": "Αποθήκες",
     "TotalItems": "Σύνολο {{total}} στοιχείων",
     "Username": "Όνομα χρήστη",
-    "ValueRequired": "Παρακαλώ εισάγετε {{ όνομα }}"
+    "ValueRequired": "Παρακαλώ εισάγετε {{ όνομα }}",
+    "validation": {
+      "InvalidEmailAddress": "Μη έγκυρη διεύθυνση email.",
+      "LetterNumber-_dot": "Επιτρέπει γράμματα, αριθμούς και -_.",
+      "NameAlreadyExists": "Το όνομα πολιτικής υπάρχει ήδη!",
+      "NumbersOnly": "Επιτρέπει μόνο τους αριθμούς",
+      "PleaseSelectOption": "Επιλέξτε μία επιλογή",
+      "PleaseSelectOptions": "Επιλέξτε τουλάχιστον μία ή περισσότερες επιλογές.",
+      "PolicyName": "Απαιτείται όνομα πολιτικής.",
+      "ValidationFailed": "Η επικύρωση απέτυχε"
+    }
   },
   "import": {
     "CleanUpImportTask": "Εργασία εισαγωγής καθαρισμού ...",
@@ -762,6 +771,9 @@
   "kernel": {
     "AgentId": "Αναγνωριστικό πράκτορα",
     "ContainerId": "Αναγνωριστικό δοχείου",
+    "ContainerLogs": "Αρχεία καταγραφής εμπορευματοκιβωτίων",
+    "Hostname": "Όνομα κεντρικού υπολογιστή",
+    "Kernel": "Πυρήνας",
     "KernelId": "Αναγνωριστικό πυρήνα",
     "Kernels": "Πυρήνες",
     "Role": "Ρόλος",
@@ -769,8 +781,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -786,8 +796,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -903,6 +915,7 @@
     "EndpointName": "Όνομα τελικού σημείου",
     "Error": "Λάθος",
     "ExpiredDate": "Ημερομηνία λήξης",
+    "ExtraMountsWarning": "Κατά την επεξεργασία της υπηρεσίας, το όνομα (ψευδώνυμο) των πρόσθετων τοποθετημένων φακέλων μπορεί να μην διατηρηθεί. \nΠαρακαλώ ελέγξτε τα ονόματα φακέλων πριν από την αποθήκευση.",
     "FailedToStartService": "Απέτυχε η δημιουργία υπηρεσίας.",
     "FailedToTerminateService": "Η αίτηση τερματισμού της υπηρεσίας απέτυχε.",
     "FailedToUpdateService": "Η ενημέρωση της υπηρεσίας απέτυχε.",
@@ -912,6 +925,7 @@
     "GenerateNewToken": "Δημιουργία νέου token",
     "GenerateToken": "Δημιουργία Token",
     "GeneratedTokens": "Παραγόμενα Tokens",
+    "GoToServiceDetailPage": "Μεταβείτε στη σελίδα λεπτομερειών υπηρεσίας",
     "Image": "Εικόνα",
     "ModelDefinitionPath": "Διαδρομή αρχείου ορισμού μοντέλου",
     "ModelMountDestination": "Προσάρτηση προορισμού για φάκελο μοντέλου",
@@ -921,6 +935,7 @@
     "OnlyAllowsNonNegativeIntegers": "Επιτρέπει μόνο μη αρνητικούς ακέραιους αριθμούς",
     "OpenToPublic": "Ανοιχτό για το κοινό",
     "Owner": "Ιδιοκτήτης",
+    "PlayYourModelNow": "Παίξτε το μοντέλο σας τώρα!",
     "PleaseSelectTime": "Παρακαλώ επιλέξτε χρόνο!",
     "Processing": "Επεξεργασία...",
     "Public": "Δημόσιο",
@@ -932,17 +947,21 @@
     "RoutesInfo": "Πληροφορίες διαδρομών",
     "RoutingInfo": "Πληροφορίες δρομολόγησης",
     "RoutingsCount": "Αριθμός δρομολογίων",
+    "RunThisModel": "Εκτελέστε αυτό το μοντέλο",
     "RuntimeVariant": "Παραλλαγή χρόνου εκτέλεσης εξαγωγής συμπερασμάτων",
     "SeeContainerLogs": "Βλέπε αρχεία καταγραφής κοντέινερ",
+    "ServiceAlreadyExists": "Το όνομα της υπηρεσίας υπάρχει ήδη",
     "ServiceCreated": "Η υπηρεσία μοντέλου {{ όνομα }} δημιουργήθηκε με επιτυχία.",
     "ServiceDelegatedFrom": "Το μοντέλο υπηρεσίας δημιουργείται από τον {{ createdUser }}, αλλά η ιδιοκτησία της συνεδρίας θα ανατεθεί στον {{ sessionOwner }}",
     "ServiceEndpoint": "Τελικό σημείο υπηρεσίας",
     "ServiceInfo": "Πληροφορίες υπηρεσίας",
     "ServiceName": "Όνομα υπηρεσίας",
     "ServiceNameCannotStartWithHyphen": "Οι παύλες (-) δεν μπορούν να χρησιμοποιηθούν σε κανένα άκρο.",
+    "ServiceNameInvalidCharacter": "Στη μέση του ονόματος της υπηρεσίας, μόνο το αλφάβητο, ο αριθμός, το '_', '.', '-'-'μπορεί να συμπεριληφθεί μόνο.",
     "ServiceNameMaxLength": "Εισαγάγετε 24 χαρακτήρες ή λιγότερους.",
     "ServiceNameMinLength": "Εισαγάγετε τουλάχιστον 4 χαρακτήρες.",
-    "ServiceNameRule": "Επιτρέπονται μόνο αλφαριθμητικά, κάτω παύλα(_) και παύλα(-) και πρέπει να τελειώνει με αλφαριθμητικό χαρακτήρα.",
+    "ServiceNameShouldEndWith": "Το όνομα της περιόδου σύνδεσης πρέπει να τελειώνει με αλφάβητο, μεγάλους και μικρούς χαρακτήρες, αριθμούς και «_».",
+    "ServiceNameShouldStartWith": "Το όνομα της περιόδου σύνδεσης πρέπει να ξεκινά με αλφαβητικούς και μικρούς χαρακτήρες, αριθμούς ή '_'.",
     "ServiceTerminated": "Στάλθηκε ένα αίτημα τερματισμού λειτουργίας για την υπηρεσία μοντέλου \"{{ όνομα }}\".",
     "ServiceUpdated": "Η υπηρεσία μοντέλου {{ όνομα }} ενημερώθηκε με επιτυχία.",
     "Services": "Υπηρεσίες",
@@ -952,6 +971,7 @@
     "StartNewService": "Ξεκινήστε τη Νέα Υπηρεσία",
     "StartNewServing": "Έναρξη νέου σερβιρίσματος",
     "StartService": "Έναρξη υπηρεσίας",
+    "StartingModelService": "Εκκίνηση της υπηρεσίας μοντέλου ...",
     "Status": "Κατάσταση",
     "Success": "Επιτυχία",
     "SyncRoutes": "Διαδρομές συγχρονισμού",
@@ -1008,9 +1028,8 @@
     "SuccessfullyUpdated": "Ενημερώθηκε με επιτυχία",
     "Visit": "Επίσκεψη"
   },
-  "propertyFilter": {
-    "PlaceHolder": "Αναζήτηση",
-    "ResetFilter": "Επαναφορά φίλτρων"
+  "pagination": {
+    "Total": "{{start}} - {{end}} των στοιχείων {{Total}}"
   },
   "registry": {
     "AddRegistry": "Προσθήκη μητρώου",
@@ -1099,6 +1118,11 @@
     "TypeResourceGroupNameToDelete": "Πληκτρολογήστε όνομα ομάδας πόρων για διαγραφή",
     "WsproxyAddress": "Διεύθυνση διακομιστή WSProxy"
   },
+  "resourcePanel": {
+    "Limit": "Οριο",
+    "RemainingNumber": "Ριψοκίνδυνος",
+    "UsingNumber": "Χρήση"
+  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Πρόκειται να διαγράψετε αυτήν την πολιτική πόρων:",
     "AllowedHosts": "Επιτρεπόμενοι οικοδεσπότες",
@@ -1178,6 +1202,9 @@
     "SHMEMShouldBeSmallerThanMemory": "Η κοινόχρηστη μνήμη πρέπει να είναι μικρότερη από τη μνήμη",
     "SharedMemory": "Κοινόχρηστη μνήμη",
     "Updated": "Η προεπιλογή πόρων ενημερώθηκε"
+  },
+  "scheduler": {
+    "PendingSessions": "Εκκρεμείς συνεδρίες"
   },
   "session": {
     "Agent": "Μέσο",
@@ -1259,12 +1286,15 @@
     "OpenToPublic": "Ανοίξτε την εφαρμογή στο κοινό",
     "OpenToPublicDesc": "Η ενεργοποίηση αυτής της επιλογής επιτρέπει την πρόσβαση εφαρμογών για όλους τους χρήστες του δικτύου.<br /><br /> \nΓια τη διαχείριση πρόσβασης, εισαγάγετε συγκεκριμένες διευθύνσεις IP στο πεδίο «Επιτρεπόμενο IP».<br /><br /> \nΗ έξοδος από αυτό το πεδίο κενό θα επιτρέψει την πρόσβαση από όλες τις διευθύνσεις IP.<br /><br /> \nΕξετάστε τον καθορισμό περιορισμών IP όταν είναι απαραίτητο για τη διαχείριση της ασφάλειας.",
     "Others": "Οι υπολοιποι",
+    "PanelSettings": "Ρυθμίσεις πίνακα",
+    "PendingPosition": "Θέση ουράς",
     "PredicateChecks": "Έλεγχοι κατηγορίας",
     "Preparing": "Προετοιμασία ...",
     "PreparingSession": "Προετοιμασία συνεδρίας ...",
     "ReadLess": "Διαβάστε λιγότερα",
     "ReadMore": "Διαβάστε Περισσότερα...",
     "RecentlyCreatedSessions": "Πρόσφατα δημιουργήθηκαν συνεδρίες",
+    "RecentlyCreatedSessionsTooltip": "Εμφανίζει τις {{count}} πιο πρόσφατα δημιουργημένες εκτελούμενες συνεδρίες στο τρέχον έργο",
     "RequestContainerCommit": "Αίτηση δέσμευσης εμπορευματοκιβωτίου",
     "Reservation": "Κράτηση",
     "ResourceGroup": "Ομάδα πόρων",
@@ -1334,6 +1364,7 @@
       "AddingKernelToSocketQueue": "Προσθήκη πυρήνα στην ουρά υποδοχής ...",
       "AgentNode": "Μέσο",
       "AllocateNode": "Λειτουργία συμπλέγματος",
+      "ApplicationMemory": "Application MEM {{value}}",
       "Architecture": "Αρχιτεκτονική",
       "AutoSelect": "Αυτόματη επιλογή",
       "AutoSharedMemoryTooltip": "Μπορείτε να επιλέξετε αυτόματα ή να εισαγάγετε χειροκίνητα το μέγεθος της κοινόχρηστης μνήμης εντός της διατιθέμενης μνήμης.",
@@ -1401,6 +1432,7 @@
       "InsufficientAllocationOfResourcesWarning": "Οι κατανεμητέοι πόροι πέφτουν κάτω από τον ελάχιστο απαιτούμενο πόρο στην επιλεγμένη εικόνα.",
       "InteractiveMode": "Διαδραστικό",
       "InteractiveModeDesc": "σας επιτρέπει να δημιουργείτε, να δοκιμάζετε και να εκτελείτε κώδικα διαδραστικά μέσω του σημειωματάριου jupyter, του κώδικα του visual studio κ.λπ.",
+      "InvalidMountsSelectionWarning": "Οι πληροφορίες επιλογής φακέλων δεν είναι έγκυρες. Ελέγξτε τον επιλεγμένο φάκελο.",
       "InvalidPortFormat": "Η μορφή του αριθμού θύρας είναι λανθασμένη.",
       "Launch": "Εκτόξευση",
       "LaunchConfirmationDialog": "Για να διατηρήσετε τον κωδικό και τα δεδομένα σας ή να τα μοιραστείτε με άλλους συνεργάτες, απλώς δημιουργήστε ένα φάκελο αποθήκευσης στην πλαϊνή γραμμή δεδομένων και αποθήκευσης και, στη συνέχεια, τοποθετήστε αυτόν τον φάκελο όταν ξεκινάτε τον πόρο και διατηρείτε τον εκεί.",
@@ -1482,8 +1514,7 @@
       "SetPreopenPorts": "Προανοιχτές θύρες (προαιρετικά)",
       "SetSessionOwner": "Κάτοχος συνεδρίας",
       "SettingUpProxyForApp": "Ρύθμιση διακομιστή μεσολάβησης για την εφαρμογή ...",
-      "SharedMemory": "Κοινή μνήμη",
-      "SharedMemoryAbbr": "ΣΜΕΜ",
+      "SharedMemory": "Κοινή μνήμη (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Η ρύθμιση της κοινής μνήμης μειώνεται κάτω από την εκχωρημένη μνήμη.",
       "SingleNode": "Μονόκλινο",
       "SkipToConfirmAndLaunch": "Skip to review",
@@ -1519,6 +1550,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Atom Max Υποστήριξη",
     "ATOMPlusSupport": "Υποστήριξη ATOM+",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Να επιτρέπεται η εγγραφή από τον αντιπρόσωπο",
@@ -1526,6 +1558,7 @@
     "Config": "Διαμόρφωση",
     "ConfigPerJobSchduler": "Ρυθμίσεις προγραμματιστή",
     "ConfigPerJobSchdulerDescription": "Οι τιμές στη ρύθμιση χρονοπρογραμματισμού είναι οι προεπιλογές που θα χρησιμοποιηθούν όταν δεν υπάρχει ρύθμιση χρονοπρογραμματισμού σε κάθε ομάδα πόρων. Εάν υπάρχει μια ρύθμιση για συγκεκριμένη ομάδα πόρων, αυτή η τιμή θα αγνοηθεί.",
+    "DescATOMMaxSupport": "Χρησιμοποιήστε Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM+.",
     "DescATOMSupport": "Χρησιμοποιήστε τον επιταχυντή Rebellions ATOM",
     "DescAllowAgentSideRegistration": "Επιτρέψτε στον πράκτορα να εγγραφεί στον διαχειριστή. Χρησιμοποιήστε μόνο εάν το backend.ai cluster διαχειρίζεται σε ασφαλή τοποθεσία.",
@@ -1569,6 +1602,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "Υποστήριξη ROCm GPU",
     "RegisterNewImagesFromRepo": "Καταχωρήστε νέες εικόνες από το αποθετήριο",
+    "RequireATOMMaxPlugin": "Απαιτεί το Backend.AI ATOM Max Plugin.",
     "RequireATOMPlugin": "Απαιτεί Backend.AI ATOM Plugin.",
     "RequireATOMPlusPlugin": "Απαιτεί πρόσθετο Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Απαιτείται Backend.AI Virtual CUDA API Layer Plugin.",
@@ -1678,6 +1712,11 @@
     "SessionsDesc": "Ο αριθμός των συνόδων υπολογισμού που δημιουργήθηκαν.",
     "UsageHistory": "Ιστορικό χρήσης",
     "UsageHistoryNote": "Το ιστορικό χρήσης που παρουσιάζεται εδώ βασίζεται σε τερματισμένες συνεδρίες υπολογισμού.",
+    "description": {
+      "CPUUtilization": "Αντιπροσωπεύει το ποσό του χρόνου CPU που χρησιμοποιείται από τη συνεδρία κατά τη διάρκεια της επιλεγμένης περιόδου. \n\nΈνας μόνο πυρήνας CPU αντιστοιχεί σε μέγιστο 100%.\n\nΕάν διατεθούν πολλαπλοί πυρήνες, η συνολική χρήση μπορεί να υπερβεί το 100%, καθώς υπολογίζεται με τη συνοπτική συνοπτική χρήση της μέγιστης χρήσης (100%) κάθε πυρήνα.",
+      "NetworkRx": "Υποδεικνύει το ποσοστό μεταφοράς δικτύου. \n\nΑντιπροσωπεύει το ρυθμό με τον οποίο το δοχείο λαμβάνει δεδομένα δικτύου.",
+      "NetworkTx": "Υποδεικνύει το ποσοστό μεταφοράς δικτύου. \n\nΑντιπροσωπεύει το ρυθμό με τον οποίο το δοχείο στέλνει δεδομένα δικτύου."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Εάν η χρήση είναι χαμηλή, τα δεδομένα για ορισμένες ημερομηνίες ενδέχεται να μην είναι διαθέσιμα. \nΔοκιμάστε ξανά με μικρότερο εύρος ημερομηνιών.",
       "NoMetricsToDisplay": "Δεν υπάρχουν μετρήσεις για την παρακολούθηση"
@@ -1728,6 +1767,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Ενεργοποιημένη",
+    "ATOMMaxEnabled": "Atom Max NPU ενεργοποιημένη",
     "ATOMPlusEnabled": "Ενεργοποιημένο ATOM+ NPU",
     "Accept": "Αποδέχομαι",
     "AcceptSharedVFolder": "Τώρα μπορείτε να αποκτήσετε πρόσβαση σε φάκελο:",
@@ -1915,6 +1955,7 @@
       "ClickToDownload": "Κάντε κλικ για λήψη",
       "ComputationResources": "Πόροι υπολογισμού",
       "Configurations": "Διαμορφώσεις",
+      "Dashboard": "Ταμπλό",
       "Data&Model": "Δεδομένα",
       "Data&Storage": "Αποθήκευση δεδομένων",
       "DisMatchUserEmail": "Το email χρήστη δεν ταιριάζει",
@@ -1935,6 +1976,7 @@
       "InvalidBlankPassword": "Εισάγετε τον κωδικό σας",
       "InvalidPasswordMessage": "Απαιτείται τουλάχιστον 1 αλφάβητο, 1 αριθμός και 1 ειδικός χαρακτήρας με τουλάχιστον 8 χαρακτήρες.",
       "LeaveService": "Αφήστε την υπηρεσία",
+      "Limits": "Όρια",
       "LogOut": "Αποσύνδεση",
       "Logs": "Κούτσουρα",
       "LogsErrors": "Αρχεία καταγραφής / σφάλματα",
@@ -1942,6 +1984,11 @@
       "MyAccount": "Αλλαγή πληροφοριών χρήστη",
       "MyAccountInformation": "Αλλαγή πληροφοριών χρήστη",
       "MyEnvironments": "Τα περιβάλλοντα μου",
+      "MyResources": "Το όριο των συνολικών πόρων μου",
+      "MyResourcesDescription": "<p>Αυτός ο πίνακας εμφανίζει τη συνολική χρήση πόρων και όρια σε όλα τα έργα και ομάδες πόρων.</p><p>Όταν εφαρμόζονται πολλαπλά όρια (όπως τομέας, έργο ή ζεύγος κλειδιών), το πιο περιοριστικό όριο χρησιμοποιείται για τον υπολογισμό.</p>",
+      "MyResourcesIn": "Οι πόροι μου στο",
+      "MyResourcesInResourceGroup": "Οι πόροι μου στην ομάδα πόρων",
+      "MyResourcesInResourceGroupDescription": "Αυτός ο πίνακας δείχνει την τρέχουσα χρήση του πόρου μου και παραμένει στην επιλεγμένη ομάδα πόρων.",
       "NewPassword": "Νέος κωδικός πρόσβασης",
       "NewPasswordAgain": "Καινούριος κωδικός ξανά)",
       "NewPasswordCannotBeSame": "Παρακαλούμε εισάγετε έναν κωδικό πρόσβασης που είναι διαφορετικός από τον τρέχοντα κωδικό σας.",
@@ -1957,8 +2004,10 @@
       "Preferences": "Προτιμήσεις",
       "PrivacyPolicy": "Πολιτική απορρήτου",
       "Project": "Εργο",
+      "Remaining": "Παραμένων",
       "ResourcePolicy": "Πολιτική Πόρων",
       "Resources": "Πόροι",
+      "Scheduler": "Προγραμματιστής",
       "Serving": "Εξυπηρέτηση",
       "Sessions": "Συνεδρίες",
       "Settings": "Ρυθμίσεις",
@@ -1969,8 +2018,12 @@
       "Summary": "Περίληψη",
       "Tasks": "Εργασίες",
       "TermsOfService": "Όροι χρήσης",
+      "TotalResourcesIn": "Συνολικοί πόροι στο",
+      "TotalResourcesInResourceGroup": "Συνολικοί πόροι στην ομάδα πόρων",
+      "TotalResourcesInResourceGroupDescription": "Αυτός ο πίνακας δείχνει τους συνολικά χρησιμοποιούμενα και εναπομένοντα πόρους. \nΟι τιμές υπολογίζονται με την προσθήκη της χρήσης και των υπόλοιπων ποσών όλων των παραγόντων χρησιμοποιώντας την επιλεγμένη ομάδα πόρων.",
       "TotpActivated": "Ενεργοποίηση 2FA",
       "Update": "Εκσυγχρονίζω",
+      "Usage": "Χρήση",
       "UsageHistory": "Ιστορικό κατανομής",
       "UserCredentials&Policies": "Πιστοποιήσεις χρήστη και πολιτικές",
       "UserSessionHistory": "Ιστορικό περιόδου λειτουργίας χρήστη",

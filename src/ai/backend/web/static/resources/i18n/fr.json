@@ -210,17 +210,7 @@
     "UserStatus": "Statut de l'utilisateur",
     "Users": "Utilisateurs",
     "WarningLessRateLimit": "Si la valeur de la limite de débit est faible, les opérations API telles que la connexion peuvent être bloquées.",
-    "YouAreAboutToDeleteCredential": "Vous êtes sur le point de supprimer les identifiants de cet utilisateur :",
-    "validation": {
-      "InvalidEmailAddress": "Adresse e-mail invalide.",
-      "LetterNumber-_dot": "Autorise les lettres, les chiffres et -_.",
-      "NameAlreadyExists": "Le nom de la stratégie existe déjà !",
-      "NumbersOnly": "Autorise uniquement les chiffres",
-      "PleaseSelectOption": "Veuillez sélectionner une option",
-      "PleaseSelectOptions": "Veuillez sélectionner optios.",
-      "PolicyName": "Nom de la stratégie Obligatoire.",
-      "ValidationFailed": "Validation échouée"
-    }
+    "YouAreAboutToDeleteCredential": "Vous êtes sur le point de supprimer les identifiants de cet utilisateur :"
   },
   "data": {
     "Active": "Actif",
@@ -311,7 +301,6 @@
       "InviteeEmail": "Courriel de l'invité",
       "KeepFileExtension": "Garder",
       "LessThan10Sec": "Moins de 10 secondes",
-      "ModifyPermissions": "Modifier les autorisations",
       "MoreThanADay": "Plus d'un jour",
       "Name": "Nom",
       "NewFileName": "Nouveau nom de fichier",
@@ -348,15 +337,20 @@
     },
     "folders": {
       "CannotDeleteFolder": "Impossible de supprimer le dossier monté dans une ou plusieurs sessions. Veuillez d'abord terminer la session.",
+      "CannotDeletePipelineFolder": "Vous ne pouvez pas supprimer les dossiers du pipeline.",
+      "CannotRestorePipelineFolder": "Vous ne pouvez pas restaurer les dossiers du pipeline.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Les dossiers de projets modèles ne peuvent être créés que dans des projets exclusifs en magasin de modèles. \nModifiez le projet ou le type d'utilisateur actuel.",
       "CloneAFolder": "Cloner un dossier",
       "CloneFolder": "Cloner un dossier",
       "Cloneable": "Clonable",
       "Control": "Contrôler",
+      "CreateModelFolderOnlyInExclusiveProject": "Les dossiers de projets modèles ne peuvent être créés que dans des projets exclusifs en magasin de modèles.",
       "CreatedAt": "Créé à",
       "Delete": "Effacer",
       "DeleteAFolder": "Supprimer un dossier",
       "DeleteForever": "Supprimer pour toujours",
       "DescYouAreFolderOwner": "Vous êtes le propriétaire de ce dossier.",
+      "DownloadingModel": "Modèle de téléchargement ...",
       "Edit": "Éditer",
       "EditDelete": "Modifier+Supprimer",
       "FileDeleted": "Fichier supprimé",
@@ -378,7 +372,7 @@
       "FolderUsage": "Utilisation des dossiers",
       "FolderUsing": "Utilisation",
       "InviteUsers": "Inviter l'utilisateur",
-      "KickOut": "",
+      "KickOut": "Arrêter de partager",
       "KickOutConfirm": "Ne plus partager avec {{email}} ?",
       "Leave": "Quitter",
       "LeaveAFolder": "Laisser un dossier",
@@ -405,6 +399,7 @@
       "Path": "Chemin de stockage",
       "Permission": "Autorisation",
       "ProjectFolderAlertDesc": "Ce dossier est partagé avec tous les membres du projet",
+      "ProjectFolderCreationHelp": "Un dossier accessible par \"{{projectName}}\" Les utilisateurs du projet seront créés.",
       "Rename": "Renommer",
       "Restore": "Restaurer",
       "RestoreDescription": "Voulez-vous restaurer le dossier \"{{ folderName }}\"?",
@@ -555,6 +550,7 @@
     "Digest": "Digérer",
     "Disabled": "désactivée",
     "ErrorMinimumValue": "{{key}} doit être au moins {{value}}",
+    "FailedToDeleteCustomizedImage": "Échec de la suppression de l'image personnalisée.",
     "FullImagePath": "Chemin d'accès complet à l'image",
     "ImageReinstallationRequired": "Réinstallation d'image requise",
     "Images": "Images",
@@ -624,6 +620,7 @@
     "SmallerResourceThenImageRequires": "Votre demande de ressources est inférieure au minimum requis par l'image. Essayez d'autres ressources.",
     "TooManyLoginFailures": "Il y a eu trop d'échecs de connexion en peu de temps. La connexion est bloquée pendant un certain temps.",
     "UnauthorizedToken": "Jeton non autorisé. Veuillez vérifier votre jeton.",
+    "UnexpectedError": "Une erreur inattendue s'est produite. \nVeuillez réessayer plus tard ou contacter le support si le problème persiste.",
     "UnknownError": "Une erreur inconnue s'est produite. Veuillez réessayer.",
     "UpdateError": "Erreur de mise à jour",
     "UserHasNoGroup": "L'utilisateur n'a pas de groupe. Veuillez contacter l'administrateur pour résoudre ce problème.",
@@ -640,8 +637,10 @@
     "Title": "Une erreur s'est produite."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Dossier non trouvé ou accès refusé",
     "InputTooShort": "Entrée Trop Courte",
     "NoExplorerSupportForUnmanagedFolder": "Les dossiers non gérés ne prennent pas en charge l'explorateur de fichiers.",
+    "NoPermissions": "Aucune autorisation pour accéder à ce dossier",
     "ValueRequired": "ValeurRequis"
   },
   "general": {
@@ -679,7 +678,17 @@
     "StorageProxies": "Stockages",
     "TotalItems": "Total des éléments {{total}}",
     "Username": "Nom d'utilisateur",
-    "ValueRequired": "Veuillez saisir {{ nom }}"
+    "ValueRequired": "Veuillez saisir {{ nom }}",
+    "validation": {
+      "InvalidEmailAddress": "Adresse e-mail non valide.",
+      "LetterNumber-_dot": "Permet des lettres, des chiffres et -_.",
+      "NameAlreadyExists": "Le nom de politique existe déjà!",
+      "NumbersOnly": "Permet les nombres uniquement",
+      "PleaseSelectOption": "Veuillez sélectionner une option",
+      "PleaseSelectOptions": "Veuillez sélectionner au moins une option ou plus.",
+      "PolicyName": "Nom de la politique requis.",
+      "ValidationFailed": "La validation a échoué"
+    }
   },
   "import": {
     "CleanUpImportTask": "Nettoyage de la tâche d'importation...",
@@ -760,12 +769,15 @@
   "interactiveLogin": {
     "ConfirmLoginMessage": "Souhaitez-vous vous connecter avec le compte {{nom d'utilisateur}} ({{email}}) ?",
     "InteractiveLoginWithBackendAI": "Connectez-vous avec votre compte Backend.AI",
-    "ServiceName": "Nom du service",
+    "ServiceName": "Nom de service",
     "UseAnotherAccount": "Se connecter avec un autre compte"
   },
   "kernel": {
     "AgentId": "ID d'agent",
     "ContainerId": "ID de conteneur",
+    "ContainerLogs": "Journaux des conteneurs",
+    "Hostname": "Nom d'hôte",
+    "Kernel": "Noyau",
     "KernelId": "ID du noyau",
     "Kernels": "Graines",
     "Role": "Rôle",
@@ -773,8 +785,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +800,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -907,6 +919,7 @@
     "EndpointName": "Nom du point final",
     "Error": "Erreur",
     "ExpiredDate": "Date d'expiration",
+    "ExtraMountsWarning": "Lors de la modification du service, le nom (alias) des dossiers supplémentaires peut ne pas être conservé. \nVeuillez revérifier les noms de dossiers avant d'enregistrer.",
     "FailedToStartService": "Échec de la création du service.",
     "FailedToTerminateService": "La demande d'arrêt du service a échoué.",
     "FailedToUpdateService": "Échec de la mise à jour du service.",
@@ -916,6 +929,7 @@
     "GenerateNewToken": "Générer un nouveau jeton",
     "GenerateToken": "Générer un jeton",
     "GeneratedTokens": "Jetons générés",
+    "GoToServiceDetailPage": "Aller à la page de détail du service",
     "Image": "Image",
     "ModelDefinitionPath": "Chemin du fichier de définition du modèle",
     "ModelMountDestination": "Destination de montage pour le dossier modèle",
@@ -925,6 +939,7 @@
     "OnlyAllowsNonNegativeIntegers": "N'autorise que les nombres entiers non négatifs",
     "OpenToPublic": "Ouvert au public",
     "Owner": "Propriétaire",
+    "PlayYourModelNow": "Jouez votre modèle maintenant!",
     "PleaseSelectTime": "Veuillez choisir l'heure !",
     "Processing": "Traitement...",
     "Public": "Public",
@@ -936,17 +951,21 @@
     "RoutesInfo": "Informations sur les itinéraires",
     "RoutingInfo": "Informations sur le routage",
     "RoutingsCount": "Nombre d'itinéraires",
+    "RunThisModel": "Exécuter ce modèle",
     "RuntimeVariant": "Variante d'exécution de l'inférence",
     "SeeContainerLogs": "Voir les journaux de conteneur",
+    "ServiceAlreadyExists": "Le nom du service existe déjà",
     "ServiceCreated": "Le service modèle {{ name }} a été créé avec succès.",
     "ServiceDelegatedFrom": "Le service modèle est créé par {{ createdUser }} mais la propriété de la session sera déléguée à {{ sessionOwner }}.",
     "ServiceEndpoint": "Point final du service",
     "ServiceInfo": "Informations sur le service",
-    "ServiceName": "Nom du service",
+    "ServiceName": "Nom de service",
     "ServiceNameCannotStartWithHyphen": "Les tirets (-) ne peuvent pas être utilisés à chaque extrémité.",
+    "ServiceNameInvalidCharacter": "Au milieu du nom du service, seul l'alphabet, le numéro, le '_' ','. ',' - 'ne peut être inclus que.",
     "ServiceNameMaxLength": "Veuillez saisir 24 caractères ou moins.",
     "ServiceNameMinLength": "Veuillez saisir au moins 4 caractères.",
-    "ServiceNameRule": "Autorisez uniquement les caractères alphanumériques, les traits de soulignement (_) et les traits d'union (-) et ils doivent se terminer par un caractère alphanumérique.",
+    "ServiceNameShouldEndWith": "Il doit se terminer avec l'alphabet, les grands et petits caractères, les nombres et «_».",
+    "ServiceNameShouldStartWith": "It must start with alphabetic and small characters, numbers or '_'.",
     "ServiceTerminated": "Une demande d'arrêt a été envoyée pour le service modèle '{{ name }}'.",
     "ServiceUpdated": "Le service modèle {{ name }} a été mis à jour avec succès.",
     "Services": "Services",
@@ -956,6 +975,7 @@
     "StartNewService": "Démarrer un nouveau service",
     "StartNewServing": "Commencer une nouvelle distribution",
     "StartService": "Démarrer le service",
+    "StartingModelService": "Service de modèle de démarrage ...",
     "Status": "Statut",
     "Success": "Succès",
     "SyncRoutes": "Synchroniser les itinéraires",
@@ -1012,9 +1032,8 @@
     "SuccessfullyUpdated": "Mise à jour réussie",
     "Visit": "Visite"
   },
-  "propertyFilter": {
-    "PlaceHolder": "Recherche",
-    "ResetFilter": "Réinitialiser les filtres"
+  "pagination": {
+    "Total": "{{start}} - {{end}} des éléments {{total}}"
   },
   "registry": {
     "AddRegistry": "Ajouter un registre",
@@ -1103,6 +1122,11 @@
     "TypeResourceGroupNameToDelete": "Tapez le nom du groupe de ressources à supprimer",
     "WsproxyAddress": "Adresse du serveur WSProxy"
   },
+  "resourcePanel": {
+    "Limit": "Limite",
+    "RemainingNumber": "Rmanque",
+    "UsingNumber": "En utilisant"
+  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Vous êtes sur le point de supprimer cette stratégie de ressources :",
     "AllowedHosts": "Hôtes autorisés",
@@ -1182,6 +1206,9 @@
     "SHMEMShouldBeSmallerThanMemory": "La mémoire partagée doit être plus petite que la mémoire",
     "SharedMemory": "Mémoire partagée",
     "Updated": "Préréglage de ressource mis à jour"
+  },
+  "scheduler": {
+    "PendingSessions": "Séances en attente"
   },
   "session": {
     "Agent": "Agent",
@@ -1263,12 +1290,15 @@
     "OpenToPublic": "Ouvrir l'application au public",
     "OpenToPublicDesc": "L'activation de cette option permet un accès à l'application pour tous les utilisateurs du réseau.<br /><br /> \nPour la gestion de l'accès, entrez des adresses IP spécifiques dans le champ «IP autorisé».<br /><br /> \nLaisser ce champ vide permettra l'accès à partir de toutes les adresses IP.<br /><br /> \nEnvisagez de définir les restrictions IP lorsque cela est nécessaire pour la gestion de la sécurité.",
     "Others": "Autres",
+    "PanelSettings": "Paramètres du panneau",
+    "PendingPosition": "Position de file d'attente",
     "PredicateChecks": "Contrôles de prédicat",
     "Preparing": "En train de préparer...",
     "PreparingSession": "Séance de préparation...",
     "ReadLess": "Lire moins",
     "ReadMore": "Lire la suite...",
     "RecentlyCreatedSessions": "Sessions récemment créées",
+    "RecentlyCreatedSessionsTooltip": "Affiche les {{count}} sessions en cours d'exécution les plus récemment créées dans le projet actuel",
     "RequestContainerCommit": "Demande de conteneur Engagement",
     "Reservation": "Réservation",
     "ResourceGroup": "Groupe de ressources",
@@ -1338,6 +1368,7 @@
       "AddingKernelToSocketQueue": "Ajout du noyau à la file d'attente des sockets...",
       "AgentNode": "Agent",
       "AllocateNode": "Mode cluster",
+      "ApplicationMemory": "Application MEM {{value}}",
       "Architecture": "Architecture",
       "AutoSelect": "Sélection automatique",
       "AutoSharedMemoryTooltip": "Vous pouvez sélectionner automatiquement ou saisir manuellement la taille de la mémoire partagée dans la mémoire allouée.",
@@ -1405,6 +1436,7 @@
       "InsufficientAllocationOfResourcesWarning": "Les ressources allouables sont inférieures à la ressource minimale requise dans l'image sélectionnée.",
       "InteractiveMode": "Interactif",
       "InteractiveModeDesc": "vous permet de créer, de tester et d'exécuter du code de manière interactive via jupyter notebook, visual studio code, etc.",
+      "InvalidMountsSelectionWarning": "Les informations de sélection des dossiers ne sont pas valides. Découvrez le dossier sélectionné.",
       "InvalidPortFormat": "Le format du numéro de port est incorrect.",
       "Launch": "Lancer",
       "LaunchConfirmationDialog": "Pour conserver votre code et vos données, ou les partager avec d'autres collaborateurs, créez simplement un dossier de stockage dans la barre latérale Données et stockage, puis montez ce dossier lorsque vous démarrez la ressource et conservez-le.",
@@ -1486,8 +1518,7 @@
       "SetPreopenPorts": "Ports de préouverture (en option)",
       "SetSessionOwner": "Propriétaire de la session",
       "SettingUpProxyForApp": "Configuration du proxy pour l'application...",
-      "SharedMemory": "La memoire partagée",
-      "SharedMemoryAbbr": "SHMEM",
+      "SharedMemory": "Mémoire partagée (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Le paramètre de mémoire partagée est réduit en dessous de la mémoire allouée.",
       "SingleNode": "Seul",
       "SkipToConfirmAndLaunch": "Sauter à l'examen",
@@ -1523,6 +1554,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "ATOM MAX SOUTIEN",
     "ATOMPlusSupport": "Prise en charge ATOM+",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Autoriser l'enregistrement côté agent",
@@ -1530,6 +1562,7 @@
     "Config": "Configuration",
     "ConfigPerJobSchduler": "Paramètres du planificateur",
     "ConfigPerJobSchdulerDescription": "Les valeurs du paramètre du planificateur sont les valeurs par défaut à utiliser lorsqu'il n'y a pas de paramètre de planificateur dans chaque groupe de ressources. S'il existe un paramètre spécifique au groupe de ressources, cette valeur sera ignorée.",
+    "DescATOMMaxSupport": "Utilisez Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Utilisez l’accélérateur Rebellions ATOM+.",
     "DescATOMSupport": "Utiliser l'accélérateur ATOM de Rebellions",
     "DescAllowAgentSideRegistration": "Permettez à l'agent de s'inscrire au gestionnaire. Utilisez uniquement si Backend.ai Le cluster est géré sur l'emplacement sécurisé.",
@@ -1573,6 +1606,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "Prise en charge du GPU ROCm",
     "RegisterNewImagesFromRepo": "Enregistrer de nouvelles images à partir du référentiel",
+    "RequireATOMMaxPlugin": "Nécessite le plugin Backend.AI ATOM Max.",
     "RequireATOMPlugin": "Nécessite le plugin ATOM Backend.AI.",
     "RequireATOMPlusPlugin": "Nécessite le plugin Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Nécessite le plugin Backend.AI Virtual CUDA API Layer.",
@@ -1682,6 +1716,11 @@
     "SessionsDesc": "Le nombre de sessions de calcul créées.",
     "UsageHistory": "Usage Historique",
     "UsageHistoryNote": "L'historique d'utilisation montré ici est basé sur des séances de calcul terminées.",
+    "description": {
+      "CPUUtilization": "Représente la quantité de temps de CPU utilisé par la session pendant la période sélectionnée. \n\nUn seul noyau CPU correspond à un maximum de 100%.\n\nSi plusieurs noyaux sont alloués, l'utilisation totale peut dépasser 100%, car elle est calculée en résumant l'utilisation maximale (100%) de chaque noyau.",
+      "NetworkRx": "Indique le taux de transfert de réseau.\n\nReprésente la vitesse à laquelle le conteneur reçoit des données réseau.",
+      "NetworkTx": "Indique le taux de transfert de réseau. \n\nReprésente la vitesse à laquelle le conteneur envoie des données de réseau."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Si l'utilisation est faible, les données pour certaines dates peuvent ne pas être disponibles. \nVeuillez réessayer avec une plage de dates plus courte.",
       "NoMetricsToDisplay": "Aucune métrique avaliable pour le suivi"
@@ -1732,6 +1771,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Activé",
+    "ATOMMaxEnabled": "ATOM MAX NPU Activé",
     "ATOMPlusEnabled": "ATOM+ NPU activé",
     "Accept": "J'accepte",
     "AcceptSharedVFolder": "Vous pouvez maintenant accéder au dossier :",
@@ -1920,6 +1960,7 @@
       "ClickToDownload": "Cliquez pour télécharger",
       "ComputationResources": "Ressources de calcul",
       "Configurations": "Configurations",
+      "Dashboard": "Tableau de bord",
       "Data": "Données",
       "Data&Model": "Données",
       "Data&Storage": "Stockage de données",
@@ -1941,6 +1982,7 @@
       "InvalidBlankPassword": "Tapez votre mot de passe",
       "InvalidPasswordMessage": "Au moins 1 alphabet, 1 chiffre et 1 caractère spécial sont requis avec au moins 8 caractères.",
       "LeaveService": "Quitter le service",
+      "Limits": "Limites",
       "LogOut": "Se déconnecter",
       "Logs": "Journaux",
       "LogsErrors": "Journaux / Erreurs",
@@ -1948,6 +1990,11 @@
       "MyAccount": "Modifier les informations utilisateur",
       "MyAccountInformation": "Modifier les informations utilisateur",
       "MyEnvironments": "Mes environnements",
+      "MyResources": "Ma limite totale de ressources",
+      "MyResourcesDescription": "<p>Ce panneau affiche l'utilisation totale de vos ressources et les limites dans tous les projets et groupes de ressources.</p><p>Lorsque plusieurs limites sont appliquées (domaine, projet ou paire de clés), la limite la plus restrictive est utilisée pour le calcul.</p>",
+      "MyResourcesIn": "Mes ressources dans",
+      "MyResourcesInResourceGroup": "Mes ressources dans le groupe de ressources",
+      "MyResourcesInResourceGroupDescription": "Ce panneau montre votre utilisation actuelle de ressources et restant dans le groupe de ressources sélectionné.",
       "NewPassword": "Nouveau mot de passe",
       "NewPasswordAgain": "Retapez le nouveau mot de passe",
       "NewPasswordCannotBeSame": "Veuillez saisir un mot de passe différent de votre mot de passe actuel.",
@@ -1963,8 +2010,10 @@
       "Preferences": "Préférences",
       "PrivacyPolicy": "Politique de confidentialité",
       "Project": "Projet",
+      "Remaining": "Restant",
       "ResourcePolicy": "Politique des ressources",
       "Resources": "Ressources",
+      "Scheduler": "Planificateur",
       "Serving": "Servir",
       "Sessions": "Sessions",
       "Settings": "Paramètres",
@@ -1975,8 +2024,12 @@
       "Summary": "Résumé",
       "Tasks": "Tâches",
       "TermsOfService": "Conditions d'utilisation",
+      "TotalResourcesIn": "Ressources totales dans",
+      "TotalResourcesInResourceGroup": "Ressources totales dans le groupe de ressources",
+      "TotalResourcesInResourceGroupDescription": "Ce panneau montre le total des ressources utilisées et restantes. \nLes valeurs sont calculées en additionnant l'utilisation et les quantités restantes de tous les agents à l'aide du groupe de ressources sélectionné.",
       "TotpActivated": "2FA activé",
       "Update": "Mettre à jour",
+      "Usage": "Usage",
       "UsageHistory": "Historique d'allocation",
       "UserCredentials&Policies": "Identifiants et politiques",
       "UserSessionHistory": "Historique des sessions utilisateur",

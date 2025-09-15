@@ -209,17 +209,7 @@
     "UserStatus": "Status Pengguna",
     "Users": "Pengguna",
     "WarningLessRateLimit": "Jika nilai Had Kadar adalah kecil, operasi API seperti log masuk mungkin disekat.",
-    "YouAreAboutToDeleteCredential": "Anda akan memadamkan kelayakan pengguna ini:",
-    "validation": {
-      "InvalidEmailAddress": "Alamat email tidak sah.",
-      "LetterNumber-_dot": "Membolehkan huruf, nombor dan -_.",
-      "NameAlreadyExists": "Nama Polisi Sudah Ada!",
-      "NumbersOnly": "Membolehkan nombor sahaja",
-      "PleaseSelectOption": "Sila pilih satu pilihan",
-      "PleaseSelectOptions": "Sila pilih sekurang-kurangnya satu pilihan atau lebih.",
-      "PolicyName": "Nama polisi Diperlukan.",
-      "ValidationFailed": "Pengesahan gagal"
-    }
+    "YouAreAboutToDeleteCredential": "Anda akan memadamkan kelayakan pengguna ini:"
   },
   "data": {
     "Active": "Aktif",
@@ -310,7 +300,6 @@
       "InviteeEmail": "E-mel Jemputan",
       "KeepFileExtension": "Jaga",
       "LessThan10Sec": "Tidak sampai 10 saat",
-      "ModifyPermissions": "Ubahsuai Kebenaran",
       "MoreThanADay": "Lebih dari sehari",
       "Name": "Nama",
       "NewFileName": "Nama fail baru",
@@ -347,15 +336,20 @@
     },
     "folders": {
       "CannotDeleteFolder": "Tidak dapat menghapus folder yang dipasang dalam satu atau lebih sesi. Tamatkan sesi terlebih dahulu.",
+      "CannotDeletePipelineFolder": "Anda tidak boleh memadam folder saluran paip.",
+      "CannotRestorePipelineFolder": "Anda tidak boleh memulihkan folder saluran paip.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Folder projek model hanya boleh dibuat dalam projek eksklusif kedai model. \nTukar projek semasa atau jenis pengguna.",
       "CloneAFolder": "Klon folder",
       "CloneFolder": "Klon folder",
       "Cloneable": "Boleh diklon",
       "Control": "Kawal",
+      "CreateModelFolderOnlyInExclusiveProject": "Folder projek model hanya boleh dibuat dalam projek eksklusif kedai model.",
       "CreatedAt": "Dicipta di",
       "Delete": "Padam",
       "DeleteAFolder": "Padamkan folder",
       "DeleteForever": "Padam selama-lamanya",
       "DescYouAreFolderOwner": "Anda adalah pemilik folder ini.",
+      "DownloadingModel": "Muat turun Model ...",
       "Edit": "Edit",
       "EditDelete": "Edit + Padam",
       "FileDeleted": "Fail Dipadamkan",
@@ -377,7 +371,7 @@
       "FolderUsage": "Penggunaan folder",
       "FolderUsing": "menggunakan",
       "InviteUsers": "Jemput pengguna",
-      "KickOut": "",
+      "KickOut": "Berhenti berkongsi",
       "KickOutConfirm": "Berhenti berkongsi dengan {{email}}?",
       "Leave": "Tinggalkan",
       "LeaveAFolder": "Tinggalkan folder",
@@ -404,6 +398,7 @@
       "Path": "Laluan penyimpanan",
       "Permission": "Kebenaran",
       "ProjectFolderAlertDesc": "Folder ini dikongsi dengan semua ahli projek",
+      "ProjectFolderCreationHelp": "Folder yang boleh diakses oleh pengguna projek \"{{projectName}}\" akan dibuat.",
       "Rename": "Namakan semula",
       "Restore": "Pulihkan",
       "RestoreDescription": "Adakah anda mahu memulihkan folder \"{{ folderName }}\"?",
@@ -554,6 +549,7 @@
     "Digest": "Pencernaan",
     "Disabled": "kurang upaya",
     "ErrorMinimumValue": "{{key}} mestilah sekurang -kurangnya {{value}}",
+    "FailedToDeleteCustomizedImage": "Gagal memadam imej tersuai.",
     "FullImagePath": "Laluan imej penuh",
     "ImageReinstallationRequired": "Pemasaran imej diperlukan",
     "Images": "Gambar",
@@ -623,6 +619,7 @@
     "SmallerResourceThenImageRequires": "Permintaan sumber anda lebih kecil daripada minimum yang diperlukan oleh imej. \nCuba lebih banyak sumber.",
     "TooManyLoginFailures": "Terdapat terlalu banyak kegagalan log masuk dalam masa yang singkat. \nLog masuk disekat untuk seketika.",
     "UnauthorizedToken": "Token yang tidak dibenarkan. \nSila periksa token anda.",
+    "UnexpectedError": "Kesalahan yang tidak dijangka berlaku. \nCuba sebentar lagi atau hubungi sokongan jika masalah berterusan.",
     "UnknownError": "Kesalahan yang tidak diketahui berlaku. \nSila cuba lagi.",
     "UpdateError": "Ralat kemas kini",
     "UserHasNoGroup": "Pengguna tidak mempunyai kumpulan. \nSila hubungi pentadbir untuk membetulkannya.",
@@ -639,8 +636,10 @@
     "Title": "Ralat telah berlaku."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Folder tidak dijumpai atau akses ditolak",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Folder yang tidak dikendalikan tidak menyokong penjelajah fail.",
+    "NoPermissions": "Tiada kebenaran untuk mengakses folder ini",
     "ValueRequired": "Nilai Diperlukan"
   },
   "general": {
@@ -678,7 +677,17 @@
     "StorageProxies": "Stor",
     "TotalItems": "Jumlah {{total}} item",
     "Username": "Nama pengguna",
-    "ValueRequired": "Sila masukkan {{name}}"
+    "ValueRequired": "Sila masukkan {{name}}",
+    "validation": {
+      "InvalidEmailAddress": "Alamat e -mel tidak sah.",
+      "LetterNumber-_dot": "Membolehkan huruf, nombor dan -_.",
+      "NameAlreadyExists": "Nama dasar sudah ada!",
+      "NumbersOnly": "Membolehkan nombor sahaja",
+      "PleaseSelectOption": "Sila pilih satu pilihan",
+      "PleaseSelectOptions": "Sila pilih sekurang -kurangnya satu pilihan atau lebih.",
+      "PolicyName": "Nama dasar diperlukan.",
+      "ValidationFailed": "Pengesahan gagal"
+    }
   },
   "import": {
     "CleanUpImportTask": "Tugas import pembersihan ...",
@@ -765,6 +774,9 @@
   "kernel": {
     "AgentId": "Id ejen",
     "ContainerId": "ID kontena",
+    "ContainerLogs": "Log kontena",
+    "Hostname": "Nama Host",
+    "Kernel": "Kernel",
     "KernelId": "ID Kernel",
     "Kernels": "Biji",
     "Role": "Peranan",
@@ -772,8 +784,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -789,8 +799,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -906,6 +918,7 @@
     "EndpointName": "Nama Titik Akhir",
     "Error": "ralat",
     "ExpiredDate": "Tarikh luput",
+    "ExtraMountsWarning": "Apabila mengedit perkhidmatan, nama (alias) folder tambahan yang dipasang tidak boleh dikekalkan. \nSila semakan semula nama folder sebelum menyimpan.",
     "FailedToStartService": "Gagal membuat perkhidmatan.",
     "FailedToTerminateService": "Permintaan untuk menamatkan perkhidmatan gagal.",
     "FailedToUpdateService": "Gagal mengemas kini perkhidmatan.",
@@ -915,6 +928,7 @@
     "GenerateNewToken": "Hasilkan token baharu",
     "GenerateToken": "Hasilkan Token",
     "GeneratedTokens": "Token Dijana",
+    "GoToServiceDetailPage": "Pergi ke halaman perincian perkhidmatan",
     "Image": "Gambar",
     "ModelDefinitionPath": "Laluan Fail Definisi Model",
     "ModelMountDestination": "Lekapkan Destinasi Untuk Folder Model",
@@ -924,6 +938,7 @@
     "OnlyAllowsNonNegativeIntegers": "Hanya membenarkan integer bukan negatif",
     "OpenToPublic": "Terbuka Kepada Umum",
     "Owner": "Pemilik",
+    "PlayYourModelNow": "Mainkan model anda sekarang!",
     "PleaseSelectTime": "Sila pilih masa!",
     "Processing": "Memproses...",
     "Public": "Awam",
@@ -935,17 +950,21 @@
     "RoutesInfo": "Maklumat Laluan",
     "RoutingInfo": "Maklumat Laluan",
     "RoutingsCount": "Kiraan Laluan",
+    "RunThisModel": "Jalankan model ini",
     "RuntimeVariant": "Varian Masa Jalan Inferens",
     "SeeContainerLogs": "Lihat Log Bekas",
+    "ServiceAlreadyExists": "Nama perkhidmatan sudah ada",
     "ServiceCreated": "Perkhidmatan model {{ name }} telah berjaya dibuat.",
     "ServiceDelegatedFrom": "Perkhidmatan model dicipta oleh {{ createdUser }} tetapi pemilikan sesi akan diwakilkan kepada {{ sessionOwner }}",
     "ServiceEndpoint": "Titik Akhir Perkhidmatan",
     "ServiceInfo": "Maklumat Perkhidmatan",
-    "ServiceName": "Nama Perkhidmatan",
+    "ServiceName": "Nama perkhidmatan",
     "ServiceNameCannotStartWithHyphen": "Tanda sempang (-) tidak boleh digunakan pada kedua-dua hujung.",
+    "ServiceNameInvalidCharacter": "Di tengah-tengah nama perkhidmatan, hanya abjad, nombor, '_', '.', '-' hanya boleh dimasukkan.",
     "ServiceNameMaxLength": "Sila masukkan 24 aksara atau kurang.",
     "ServiceNameMinLength": "Sila masukkan sekurang-kurangnya 4 aksara.",
-    "ServiceNameRule": "Hanya benarkan abjad angka, garis bawah(_), dan sempang(-) dan ia mesti berakhir dengan aksara abjad angka.",
+    "ServiceNameShouldEndWith": "Nama sesi mesti berakhir dengan abjad, aksara besar dan kecil, nombor, dan '_'.",
+    "ServiceNameShouldStartWith": "Nama sesi hendaklah bermula dengan watak abjad dan kecil, nombor atau '_'.",
     "ServiceTerminated": "Permintaan penutupan telah dihantar untuk perkhidmatan model '{{ name }}'.",
     "ServiceUpdated": "Perkhidmatan model {{ name }} telah berjaya dikemas kini.",
     "Services": "Perkhidmatan",
@@ -955,6 +974,7 @@
     "StartNewService": "Mulakan Perkhidmatan Baharu",
     "StartNewServing": "Mulakan hidangan baharu",
     "StartService": "Mulakan Perkhidmatan",
+    "StartingModelService": "Perkhidmatan Model Memulakan ...",
     "Status": "Status",
     "Success": "Kejayaan",
     "SyncRoutes": "Segerakkan laluan",
@@ -1011,9 +1031,8 @@
     "SuccessfullyUpdated": "Berjaya Dikemas kini",
     "Visit": "Lawati"
   },
-  "propertyFilter": {
-    "PlaceHolder": "Cari",
-    "ResetFilter": "Tetapkan semula penapis"
+  "pagination": {
+    "Total": "{{start}} - {{end}} {{total}} item"
   },
   "registry": {
     "AddRegistry": "Tambah Pendaftaran",
@@ -1102,6 +1121,11 @@
     "TypeResourceGroupNameToDelete": "Taipkan nama kumpulan sumber untuk dipadamkan",
     "WsproxyAddress": "Alamat Pelayan WSProxy"
   },
+  "resourcePanel": {
+    "Limit": "Had",
+    "RemainingNumber": "Rmaining",
+    "UsingNumber": "Menggunakan"
+  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Anda akan memadamkan dasar sumber ini:",
     "AllowedHosts": "Tuan rumah yang dibenarkan",
@@ -1181,6 +1205,9 @@
     "SHMEMShouldBeSmallerThanMemory": "Memori yang dikongsi mestilah lebih kecil daripada memori",
     "SharedMemory": "Memori bersama",
     "Updated": "Pratetap sumber dikemas kini"
+  },
+  "scheduler": {
+    "PendingSessions": "Sesi yang belum selesai"
   },
   "session": {
     "Agent": "Ejen",
@@ -1262,12 +1289,15 @@
     "OpenToPublic": "Buka aplikasi untuk umum",
     "OpenToPublicDesc": "Membolehkan pilihan ini membolehkan akses aplikasi untuk semua pengguna dalam rangkaian.<br /><br /> \nUntuk pengurusan akses, masukkan alamat IP tertentu dalam medan 'IP yang dibenarkan'.<br /><br /> \nMeninggalkan medan ini kosong akan membenarkan akses dari semua alamat IP.<br /><br /> \nPertimbangkan menetapkan sekatan IP apabila perlu untuk pengurusan keselamatan.",
     "Others": "Yang lain",
+    "PanelSettings": "Tetapan panel",
+    "PendingPosition": "Kedudukan giliran",
     "PredicateChecks": "Pemeriksaan predikat",
     "Preparing": "Menyiapkan ...",
     "PreparingSession": "Menyiapkan sesi ...",
     "ReadLess": "Kurangkan membaca",
     "ReadMore": "Baca Lagi...",
     "RecentlyCreatedSessions": "Sesi yang baru dibuat",
+    "RecentlyCreatedSessionsTooltip": "Menunjukkan {{count}} sesi yang sedang berjalan yang dicipta baru-baru ini dalam projek semasa",
     "RequestContainerCommit": "Minta Komit Kontena",
     "Reservation": "Tempahan",
     "ResourceGroup": "Kumpulan Sumber",
@@ -1337,6 +1367,7 @@
       "AddingKernelToSocketQueue": "Menambah kernel ke soket barisan ...",
       "AgentNode": "ejen",
       "AllocateNode": "Mod kluster",
+      "ApplicationMemory": "Application MEM {{value}}",
       "Architecture": "Seni bina",
       "AutoSelect": "Pilih Auto",
       "AutoSharedMemoryTooltip": "Anda secara automatik boleh memilih atau secara manual memasukkan saiz memori bersama dalam memori yang diperuntukkan.",
@@ -1404,6 +1435,7 @@
       "InsufficientAllocationOfResourcesWarning": "Sumber yang boleh diperuntukkan berada di bawah sumber minimum yang diperlukan dalam imej yang dipilih.",
       "InteractiveMode": "Interaktif",
       "InteractiveModeDesc": "membolehkan anda membuat, menguji dan menjalankan kod secara interaktif melalui buku nota jupyter, kod studio visual, dsb.",
+      "InvalidMountsSelectionWarning": "Maklumat pemilihan folder tidak sah. Semak folder yang dipilih.",
       "InvalidPortFormat": "Format nombor port tidak betul.",
       "Launch": "Lancarkan",
       "LaunchConfirmationDialog": "Untuk menyimpan kod dan data anda, atau membaginya dengan kolaborator lain, cukup buat folder penyimpanan di bar sisi data & penyimpanan, kemudian pasang folder itu ketika anda memulakan sumber dan simpan di sana.",
@@ -1485,8 +1517,7 @@
       "SetPreopenPorts": "Pelabuhan Prabuka (pilihan)",
       "SetSessionOwner": "Pemilik sesi",
       "SettingUpProxyForApp": "Menyiapkan proksi untuk aplikasi ...",
-      "SharedMemory": "Ingatan Berkongsi",
-      "SharedMemoryAbbr": "SHMEM",
+      "SharedMemory": "Memori berkongsi (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Tetapan memori bersama dikurangkan menjadi di bawah memori yang diperuntukkan.",
       "SingleNode": "Bujang",
       "SkipToConfirmAndLaunch": "Langkau ke semakan",
@@ -1522,6 +1553,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Sokongan Atom Max",
     "ATOMPlusSupport": "Sokongan ATOM+",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Benarkan pendaftaran pihak ejen",
@@ -1529,6 +1561,7 @@
     "Config": "Konfigurasi",
     "ConfigPerJobSchduler": "Tetapan penjadual",
     "ConfigPerJobSchdulerDescription": "Nilai-nilai dalam pengaturan penjadual adalah default yang akan digunakan ketika tidak ada pengaturan penjadwal di setiap kelompok sumber. Sekiranya terdapat tetapan khusus kumpulan sumber, nilai ini akan diabaikan.",
+    "DescATOMMaxSupport": "Gunakan Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Gunakan pemecut ATOM+ Rebellions.",
     "DescATOMSupport": "Gunakan pemecut ATOM Rebellions",
     "DescAllowAgentSideRegistration": "Benarkan ejen mendaftar sendiri kepada pengurus. Gunakan hanya jika cluster backend.ai diuruskan di lokasi yang selamat.",
@@ -1572,6 +1605,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "Sokongan GPU ROCm",
     "RegisterNewImagesFromRepo": "Daftarkan gambar baru dari repositori",
+    "RequireATOMMaxPlugin": "Memerlukan Plugin Backend.AI ATOM Max.",
     "RequireATOMPlugin": "Memerlukan Pemalam ATOM Backend.AI.",
     "RequireATOMPlusPlugin": "Memerlukan Plugin Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Memerlukan Backend.AI Virtual CUDA API Layer Plugin.",
@@ -1680,6 +1714,11 @@
     "SessionsDesc": "Bilangan sesi pengiraan yang dibuat.",
     "UsageHistory": "Sejarah Penggunaan",
     "UsageHistoryNote": "Sejarah penggunaan yang ditunjukkan di sini adalah berdasarkan sesi pengiraan yang ditamatkan.",
+    "description": {
+      "CPUUtilization": "Mewakili jumlah masa CPU yang digunakan oleh sesi semasa tempoh yang dipilih. \n\nSatu teras CPU tunggal sepadan dengan maksimum 100%.\n\nJika pelbagai teras diperuntukkan, jumlah penggunaan boleh melebihi 100%, kerana ia dikira dengan menjumlahkan penggunaan maksimum (100%) bagi setiap teras.",
+      "NetworkRx": "Menunjukkan kadar pemindahan rangkaian. \n\nMewakili kadar di mana bekas menerima data rangkaian.",
+      "NetworkTx": "Menunjukkan kadar pemindahan rangkaian. \n\nMewakili kadar di mana bekas menghantar data rangkaian."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Jika penggunaan adalah rendah, data untuk beberapa tarikh mungkin tidak tersedia. \nSila cuba lagi dengan julat tarikh yang lebih pendek.",
       "NoMetricsToDisplay": "Tiada metrik yang boleh didapati untuk menjejaki"
@@ -1730,6 +1769,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Didayakan",
+    "ATOMMaxEnabled": "Atom Max NPU diaktifkan",
     "ATOMPlusEnabled": "ATOM+ NPU Didayakan",
     "Accept": "Terima",
     "AcceptSharedVFolder": "Anda kini boleh mengakses folder:",
@@ -1917,6 +1957,7 @@
       "ClickToDownload": "Klik untuk memuat turun",
       "ComputationResources": "Sumber Pengiraan",
       "Configurations": "Konfigurasi",
+      "Dashboard": "Papan pemuka",
       "Data": "Data",
       "Data&Model": "Data",
       "Data&Storage": "Simpanan data",
@@ -1938,6 +1979,7 @@
       "InvalidBlankPassword": "Masukkan kata laluan anda",
       "InvalidPasswordMessage": "Diperlukan sekurang-kurangnya 1 abjad, 1 nombor dan 1 watak khas dengan sekurang-kurangnya 8 huruf.",
       "LeaveService": "Tinggalkan perkhidmatan",
+      "Limits": "Had",
       "LogOut": "Log keluar",
       "Logs": "Log",
       "LogsErrors": "Log / Kesalahan",
@@ -1945,6 +1987,11 @@
       "MyAccount": "Tukar Maklumat Pengguna",
       "MyAccountInformation": "Tukar Maklumat Pengguna",
       "MyEnvironments": "Persekitaran Saya",
+      "MyResources": "Had jumlah sumber saya",
+      "MyResourcesDescription": "<p>Panel ini menunjukkan jumlah penggunaan sumber dan had di semua projek dan kumpulan sumber.</p><p>Apabila beberapa had digunakan (seperti domain, projek, atau pasangan kunci), had yang paling ketat digunakan untuk pengiraan.</p>",
+      "MyResourcesIn": "Sumber saya di",
+      "MyResourcesInResourceGroup": "Sumber saya dalam kumpulan sumber",
+      "MyResourcesInResourceGroupDescription": "Panel ini menunjukkan penggunaan sumber saya sekarang dan tinggal di kumpulan sumber yang dipilih.",
       "NewPassword": "Kata laluan baharu",
       "NewPasswordAgain": "Kata laluan baru (sekali lagi)",
       "NewPasswordCannotBeSame": "Sila masukkan kata laluan yang berbeza daripada kata laluan semasa anda.",
@@ -1960,8 +2007,10 @@
       "Preferences": "Keutamaan",
       "PrivacyPolicy": "Dasar Privasi",
       "Project": "Projek",
+      "Remaining": "Tinggal",
       "ResourcePolicy": "Dasar Sumber",
       "Resources": "Sumber",
+      "Scheduler": "Penjadual",
       "Serving": "Melayan",
       "Sessions": "Sesi",
       "Settings": "Tetapan",
@@ -1972,8 +2021,12 @@
       "Summary": "Ringkasan",
       "Tasks": "Tugasan",
       "TermsOfService": "Syarat Perkhidmatan",
+      "TotalResourcesIn": "Jumlah sumber dalam",
+      "TotalResourcesInResourceGroup": "Jumlah sumber dalam kumpulan sumber",
+      "TotalResourcesInResourceGroupDescription": "Panel ini menunjukkan jumlah sumber yang digunakan dan baki. \nNilai dikira dengan menambah penggunaan dan baki jumlah semua ejen menggunakan kumpulan sumber yang dipilih.",
       "TotpActivated": "2FA Didayakan",
       "Update": "Kemas kini",
+      "Usage": "Penggunaan",
       "UsageHistory": "Sejarah peruntukan",
       "UserCredentials&Policies": "Kepercayaan & Dasar Pengguna",
       "UserSessionHistory": "Sejarah Sesi Pengguna",

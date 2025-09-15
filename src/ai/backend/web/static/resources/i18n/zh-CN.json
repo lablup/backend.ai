@@ -210,17 +210,7 @@
     "UserStatus": "用户状态",
     "Users": "用户",
     "WarningLessRateLimit": "如果速率限制值较小，可能会阻止登录等 API 操作。",
-    "YouAreAboutToDeleteCredential": "您将要删除该用户的凭据：",
-    "validation": {
-      "InvalidEmailAddress": "无效的邮件地址。",
-      "LetterNumber-_dot": "允许字母、数字和 -_。",
-      "NameAlreadyExists": "策略名称已存在！",
-      "NumbersOnly": "只允许数字",
-      "PleaseSelectOption": "请选择一个选项",
-      "PleaseSelectOptions": "请至少选择一个或多个选项。",
-      "PolicyName": "策略名称 必填。",
-      "ValidationFailed": "验证失败"
-    }
+    "YouAreAboutToDeleteCredential": "您将要删除该用户的凭据："
   },
   "data": {
     "Active": "积极的",
@@ -311,7 +301,6 @@
       "InviteeEmail": "受邀者电子邮件",
       "KeepFileExtension": "保持",
       "LessThan10Sec": "不到 10 秒",
-      "ModifyPermissions": "修改权限",
       "MoreThanADay": "一天多",
       "Name": "名称",
       "NewFileName": "新文件名",
@@ -348,15 +337,20 @@
     },
     "folders": {
       "CannotDeleteFolder": "无法删除安装在一个或多个会话中的文件夹。请先终止会话。",
+      "CannotDeletePipelineFolder": "您无法删除管道文件夹。",
+      "CannotRestorePipelineFolder": "您无法还原管道文件夹。",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "模型项目文件夹只能在模型商店的独家项目中创建。\n更改当前项目或用户类型。",
       "CloneAFolder": "克隆文件夹",
       "CloneFolder": "克隆文件夹",
       "Cloneable": "可克隆",
       "Control": "控制",
+      "CreateModelFolderOnlyInExclusiveProject": "模型项目文件夹只能在模型商店的独家项目中创建。",
       "CreatedAt": "创建在",
       "Delete": "删除",
       "DeleteAFolder": "删除文件夹",
       "DeleteForever": "永久删除",
       "DescYouAreFolderOwner": "您是此文件夹的所有者。",
+      "DownloadingModel": "下载型号...",
       "Edit": "编辑",
       "EditDelete": "编辑+删除",
       "FileDeleted": "文件已删除",
@@ -378,7 +372,7 @@
       "FolderUsage": "文件夹的使用",
       "FolderUsing": "使用",
       "InviteUsers": "邀请用户",
-      "KickOut": "",
+      "KickOut": "停止共享",
       "KickOutConfirm": "停止与 {{email}} 共享？",
       "Leave": "离开",
       "LeaveAFolder": "留下文件夹",
@@ -405,6 +399,7 @@
       "Path": "存储路径",
       "Permission": "允许",
       "ProjectFolderAlertDesc": "该文件夹与项目的所有成员共享",
+      "ProjectFolderCreationHelp": "将创建一个可以通过“{{projectName}}”项目用户访问的文件夹。",
       "Rename": "改名",
       "Restore": "恢复",
       "RestoreDescription": "您要还原“{{ folderName }}”文件夹？",
@@ -555,6 +550,7 @@
     "Digest": "消化",
     "Disabled": "残疾",
     "ErrorMinimumValue": "{{key}}必须至少为{{value}}",
+    "FailedToDeleteCustomizedImage": "无法删除自定义图像。",
     "FullImagePath": "完整图像路径",
     "ImageReinstallationRequired": "需要恢复图像",
     "Images": "图片",
@@ -624,6 +620,7 @@
     "SmallerResourceThenImageRequires": "您的资源请求小于图像要求的最小值。尝试更多资源。",
     "TooManyLoginFailures": "短时间内登录失败次数过多。登录被暂时阻止。",
     "UnauthorizedToken": "未经授权的令牌。请检查您的令牌。",
+    "UnexpectedError": "发生意外错误。\n如果问题持续下去，请稍后再试或联系支持。",
     "UnknownError": "出现未知错误。请重试。",
     "UpdateError": "更新错误",
     "UserHasNoGroup": "用户没有组。请联系管理员修复。",
@@ -640,8 +637,10 @@
     "Title": "发生错误。"
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "未找到或拒绝访问的文件夹",
     "InputTooShort": "输入太短",
     "NoExplorerSupportForUnmanagedFolder": "未管理的文件夹不支持文件资源管理器。",
+    "NoPermissions": "无权访问此文件夹",
     "ValueRequired": "需要值"
   },
   "general": {
@@ -679,7 +678,17 @@
     "StorageProxies": "存储",
     "TotalItems": "{{总计}}项目总数",
     "Username": "用户名",
-    "ValueRequired": "请输入 {{ 姓名 }}"
+    "ValueRequired": "请输入 {{ 姓名 }}",
+    "validation": {
+      "InvalidEmailAddress": "无效的电子邮件地址。",
+      "LetterNumber-_dot": "允许字母，数字和-_。",
+      "NameAlreadyExists": "策略名称已经存在！",
+      "NumbersOnly": "仅允许数字",
+      "PleaseSelectOption": "请选择一个选项",
+      "PleaseSelectOptions": "请选择至少一个或更多选项。",
+      "PolicyName": "需要策略名称。",
+      "ValidationFailed": "验证失败"
+    }
   },
   "import": {
     "CleanUpImportTask": "清理导入任务...",
@@ -766,6 +775,9 @@
   "kernel": {
     "AgentId": "代理ID",
     "ContainerId": "容器ID",
+    "ContainerLogs": "容器日志",
+    "Hostname": "主机名",
+    "Kernel": "核心",
     "KernelId": "内核ID",
     "Kernels": "内核",
     "Role": "角色",
@@ -773,8 +785,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +800,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -907,6 +919,7 @@
     "EndpointName": "端点名称",
     "Error": "错误",
     "ExpiredDate": "过期日期",
+    "ExtraMountsWarning": "编辑服务时，可能不会保留其他安装文件夹的名称（别名）。\n保存之前，请仔细检查文件夹名称。",
     "FailedToStartService": "创建服务失败。",
     "FailedToTerminateService": "终止服务的请求失败。",
     "FailedToUpdateService": "更新服务失败。",
@@ -916,6 +929,7 @@
     "GenerateNewToken": "生成新令牌",
     "GenerateToken": "生成令牌",
     "GeneratedTokens": "生成令牌",
+    "GoToServiceDetailPage": "转到服务详细信息页面",
     "Image": "图片",
     "ModelDefinitionPath": "模型定义文件路径",
     "ModelMountDestination": "模型文件夹的安装目标",
@@ -925,6 +939,7 @@
     "OnlyAllowsNonNegativeIntegers": "只允许非负整数",
     "OpenToPublic": "向公众开放",
     "Owner": "所有者",
+    "PlayYourModelNow": "立即播放模型！",
     "PleaseSelectTime": "请选择时间！",
     "Processing": "加工...",
     "Public": "公众",
@@ -936,17 +951,21 @@
     "RoutesInfo": "路线信息",
     "RoutingInfo": "路由信息",
     "RoutingsCount": "路由计数",
+    "RunThisModel": "运行此模型",
     "RuntimeVariant": "推理运行时变量",
     "SeeContainerLogs": "查看容器日志",
+    "ServiceAlreadyExists": "服务名称已经存在",
     "ServiceCreated": "模型服务 {{ name }} 已成功创建。",
     "ServiceDelegatedFrom": "模型服务由 {{ createdUser }} 创建，但会话所有权将委托给 {{ sessionOwner }}",
     "ServiceEndpoint": "服务端点",
     "ServiceInfo": "服务信息",
     "ServiceName": "服务名称",
     "ServiceNameCannotStartWithHyphen": "两端不能使用连字符 (-)。",
+    "ServiceNameInvalidCharacter": "在服务名称的中间，只有字母，数字，'_'，'。'，' - '只能包括在内。",
     "ServiceNameMaxLength": "请输入 24 个或更少的字符。",
     "ServiceNameMinLength": "请输入至少 4 个字符。",
-    "ServiceNameRule": "仅允许使用字母数字、下划线 (_) 和连字符 (-)，并且必须以字母数字字符结尾。",
+    "ServiceNameShouldEndWith": "会话名称必须以字母，大字符，数字和“ _”结尾。",
+    "ServiceNameShouldStartWith": "会话名称应从字母和小字符，数字或“ _”开始。",
     "ServiceTerminated": "已为模型服务“{{ name }}”发送关闭请求。",
     "ServiceUpdated": "模型服务 {{ name }} 已成功更新。",
     "Services": "服务",
@@ -956,6 +975,7 @@
     "StartNewService": "开始新服务",
     "StartNewServing": "开始新服务",
     "StartService": "启动服务",
+    "StartingModelService": "启动型号服务...",
     "Status": "现状",
     "Success": "成功",
     "SyncRoutes": "同步路线",
@@ -1012,9 +1032,8 @@
     "SuccessfullyUpdated": "成功更新",
     "Visit": "访问"
   },
-  "propertyFilter": {
-    "PlaceHolder": "搜索",
-    "ResetFilter": "重置过滤器"
+  "pagination": {
+    "Total": "{{start}}  -  {{end}} {{total}}项目"
   },
   "registry": {
     "AddRegistry": "添加注册表",
@@ -1103,6 +1122,11 @@
     "TypeResourceGroupNameToDelete": "输入要删除的资源组名称",
     "WsproxyAddress": "WSProxy 服务器地址"
   },
+  "resourcePanel": {
+    "Limit": "限制",
+    "RemainingNumber": "rming",
+    "UsingNumber": "使用"
+  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "您即将删除此资源策略：",
     "AllowedHosts": "允许的主机",
@@ -1182,6 +1206,9 @@
     "SHMEMShouldBeSmallerThanMemory": "共享内存必须小于内存",
     "SharedMemory": "共享内存",
     "Updated": "资源预设已更新"
+  },
+  "scheduler": {
+    "PendingSessions": "等待会议"
   },
   "session": {
     "Agent": "代理人",
@@ -1263,12 +1290,15 @@
     "OpenToPublic": "向公众开放应用",
     "OpenToPublicDesc": "启用此选项允许网络中的所有用户访问应用程序。<br /><br />\n对于访问管理，请在“允许IP”字段中输入特定的IP地址。<br /><br />\n将此字段留为空，将允许从所有IP地址访问。<br /><br />\n考虑安全管理时，请考虑设置IP限制。",
     "Others": "其他",
+    "PanelSettings": "面板设置",
+    "PendingPosition": "队列位置",
     "PredicateChecks": "谓词检查",
     "Preparing": "正在准备...",
     "PreparingSession": "正在准备会议...",
     "ReadLess": "更多信息",
     "ReadMore": "阅读全文...",
     "RecentlyCreatedSessions": "最近创建了会议",
+    "RecentlyCreatedSessionsTooltip": "显示当前项目中最近创建的{{count}}个正在运行的会话",
     "RequestContainerCommit": "请求容器承诺",
     "Reservation": "预订",
     "ResourceGroup": "资源组",
@@ -1338,6 +1368,7 @@
       "AddingKernelToSocketQueue": "将内核添加到套接字队列...",
       "AgentNode": "代理人",
       "AllocateNode": "集群模式",
+      "ApplicationMemory": "Application MEM {{value}}",
       "Architecture": "建筑学",
       "AutoSelect": "自动选择",
       "AutoSharedMemoryTooltip": "您可以在分配的内存中自动选择或手动输入共享内存大小。",
@@ -1405,6 +1436,7 @@
       "InsufficientAllocationOfResourcesWarning": "可分配资源低于所选映像所需的最低资源。",
       "InteractiveMode": "交互式",
       "InteractiveModeDesc": "允许您通过 jupyter notebook、visual studio code 等交互式创建、测试和运行代码。",
+      "InvalidMountsSelectionWarning": "文件夹选择信息无效。查看选定的文件夹。",
       "InvalidPortFormat": "端口号格式不正确。",
       "Launch": "发射",
       "LaunchConfirmationDialog": "要保留您的代码和数据，或与其他协作者共享，只需在数据和存储侧栏中创建一个存储文件夹，然后在启动资源时挂载该文件夹并将其保留在那里。",
@@ -1486,8 +1518,7 @@
       "SetPreopenPorts": "预开放端口（可选）",
       "SetSessionOwner": "会话所有者",
       "SettingUpProxyForApp": "为应用程序设置代理...",
-      "SharedMemory": "共享内存",
-      "SharedMemoryAbbr": "机械制造商",
+      "SharedMemory": "共享内存（SHMEM）{{value}}",
       "SharedMemorySettingIsReduced": "共享内存设置减少到低于分配的内存。",
       "SingleNode": "单身的",
       "SkipToConfirmAndLaunch": "跳过评论",
@@ -1523,6 +1554,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "原子最大支持",
     "ATOMPlusSupport": "ATOM+支持",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "允许代理端注册",
@@ -1530,6 +1562,7 @@
     "Config": "配置",
     "ConfigPerJobSchduler": "调度程序设置",
     "ConfigPerJobSchdulerDescription": "调度程序设置中的值是每个资源组中没有调度程序设置时使用的默认值。如果存在特定于资源组的设置，则该值将被忽略。",
+    "DescATOMMaxSupport": "使用 Rebellions ATOM Max 加速器。",
     "DescATOMPlusSupport": "使用 Rebellions ATOM+ 加速器。",
     "DescATOMSupport": "使用 Rebellions ATOM 加速器",
     "DescAllowAgentSideRegistration": "允许代理商向经理注册。仅当后端群集在安全位置管理时才使用。",
@@ -1573,6 +1606,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "ROCm GPU 支持",
     "RegisterNewImagesFromRepo": "从存储库注册新图像",
+    "RequireATOMMaxPlugin": "需要 Backend.AI ATOM Max 插件。",
     "RequireATOMPlugin": "需要 Backend.AI ATOM 插件。",
     "RequireATOMPlusPlugin": "需要 Backend.AI ATOM+ 插件。",
     "RequireFGPUPlugin": "需要 Backend.AI 虚拟 CUDA API 层插件。",
@@ -1682,6 +1716,11 @@
     "SessionsDesc": "创建的计算会话数。",
     "UsageHistory": "使用历史",
     "UsageHistoryNote": "此处显示的用法历史记录基于终止的计算会议。",
+    "description": {
+      "CPUUtilization": "表示会话在选定期间使用的CPU时间量。 \n\n单个CPU核心对应于最大100％。\n\n如果分配了多个核心，则总使用情况可能超过100％，因为它是通过总结每个核心的最大使用（100％）来计算的。",
+      "NetworkRx": "指示网络传输速率。\n\n表示容器接收网络数据的速率。",
+      "NetworkTx": "指示网络传输速率。\n\n表示容器发送网络数据的速率。"
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "如果用法较低，则可能无法提供某些日期的数据。\n请在较短的日期范围内重试。",
       "NoMetricsToDisplay": "没有可用的指标来跟踪"
@@ -1732,6 +1771,7 @@
   },
   "summary": {
     "ATOMEnabled": "已启用 ATOM NPU",
+    "ATOMMaxEnabled": "Atom Max NPU启用",
     "ATOMPlusEnabled": "ATOM+ NPU 启用",
     "Accept": "接受",
     "AcceptSharedVFolder": "您现在可以访问文件夹：",
@@ -1920,6 +1960,7 @@
       "ClickToDownload": "点击下载",
       "ComputationResources": "计算资源",
       "Configurations": "配置",
+      "Dashboard": "仪表板",
       "Data": "数据",
       "Data&Model": "数据",
       "Data&Storage": "数据存储",
@@ -1941,6 +1982,7 @@
       "InvalidBlankPassword": "输入您的密码",
       "InvalidPasswordMessage": "至少需要 1 个字母、1 个数字和 1 个特殊字符，至少需要 8 个字符。",
       "LeaveService": "离开服务",
+      "Limits": "极限",
       "LogOut": "登出",
       "Logs": "日志",
       "LogsErrors": "日志/错误",
@@ -1948,6 +1990,11 @@
       "MyAccount": "更改用户信息",
       "MyAccountInformation": "更改用户信息",
       "MyEnvironments": "我的环境",
+      "MyResources": "我的总资源限制",
+      "MyResourcesDescription": "<p>此面板显示所有项目和资源组的总资源使用量和限制。</p><p>当应用多个限制（如域、项目或密钥对）时，将根据最严格的限制进行计算。</p>",
+      "MyResourcesIn": "我的资源",
+      "MyResourcesInResourceGroup": "我在资源组中的资源",
+      "MyResourcesInResourceGroupDescription": "该面板显示您当前的我的资源使用情况，并保留在选定的资源组中。",
       "NewPassword": "新密码",
       "NewPasswordAgain": "确认新密码）",
       "NewPasswordCannotBeSame": "请输入与当前密码不同的密码。",
@@ -1963,8 +2010,10 @@
       "Preferences": "首选项",
       "PrivacyPolicy": "隐私政策",
       "Project": "项目",
+      "Remaining": "其余的",
       "ResourcePolicy": "资源政策",
       "Resources": "资源",
+      "Scheduler": "调度程序",
       "Serving": "服务",
       "Sessions": "会话",
       "Settings": "设置",
@@ -1975,8 +2024,12 @@
       "Summary": "概括",
       "Tasks": "任务",
       "TermsOfService": "服务条款",
+      "TotalResourcesIn": "总资源中",
+      "TotalResourcesInResourceGroup": "资源组的总资源",
+      "TotalResourcesInResourceGroupDescription": "该面板显示了使用的总和剩余资源。\n这些值是通过使用所选资源组添加所有代理的使用量和剩余数量来计算的。",
       "TotpActivated": "已启用 2FA",
       "Update": "更新",
+      "Usage": "用法",
       "UsageHistory": "分配历史",
       "UserCredentials&Policies": "用户凭证和政策",
       "UserSessionHistory": "用户会话历史记录",

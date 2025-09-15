@@ -210,17 +210,7 @@
     "UserStatus": "Käyttäjän tila",
     "Users": "Käyttäjät",
     "WarningLessRateLimit": "Jos Rate Limit -arvo on pieni, API-toiminnot, kuten kirjautuminen, voivat estyä.",
-    "YouAreAboutToDeleteCredential": "Olet poistamassa tämän käyttäjän kirjautumistiedot:",
-    "validation": {
-      "InvalidEmailAddress": "Virheellinen sähköpostiosoite.",
-      "LetterNumber-_dot": "Sallii kirjaimet, numerot ja -_.",
-      "NameAlreadyExists": "Käytännön nimi on jo olemassa!",
-      "NumbersOnly": "Sallii vain numerot",
-      "PleaseSelectOption": "Valitse yksi vaihtoehto",
-      "PleaseSelectOptions": "Valitse vähintään yksi tai useampi vaihtoehto.",
-      "PolicyName": "Vakuutuksen nimi Pakollinen.",
-      "ValidationFailed": "Validointi epäonnistui"
-    }
+    "YouAreAboutToDeleteCredential": "Olet poistamassa tämän käyttäjän kirjautumistiedot:"
   },
   "data": {
     "Active": "Aktiivinen",
@@ -311,7 +301,6 @@
       "InviteeEmail": "Kutsutun sähköpostiosoite",
       "KeepFileExtension": "Pidä",
       "LessThan10Sec": "Alle 10 sekuntia",
-      "ModifyPermissions": "Muokkaa käyttöoikeuksia",
       "MoreThanADay": "Yli päivä",
       "Name": "Nimi",
       "NewFileName": "Uusi tiedostonimi",
@@ -348,15 +337,20 @@
     },
     "folders": {
       "CannotDeleteFolder": "Yhdessä tai useammassa istunnossa asennettua kansiota ei voi poistaa. Lopeta istunto ensin.",
+      "CannotDeletePipelineFolder": "Et voi poistaa putkilinjan kansioita.",
+      "CannotRestorePipelineFolder": "Putkilinjan kansiot eivät voi palauttaa.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Malliprojektin kansiot voidaan luoda vain Model Store - Exclusive -projekteihin. \nVaihda nykyinen projekti tai käyttäjätyyppi.",
       "CloneAFolder": "Kloonaa kansio",
       "CloneFolder": "Kloonattu kansio",
       "Cloneable": "Kloonattavissa",
       "Control": "Valvonta",
+      "CreateModelFolderOnlyInExclusiveProject": "Malliprojektin kansiot voidaan luoda vain Model Store - Exclusive -projekteihin.",
       "CreatedAt": "Luotu jhk",
       "Delete": "Poista",
       "DeleteAFolder": "Poista kansio",
       "DeleteForever": "Poista ikuisesti",
       "DescYouAreFolderOwner": "Olet tämän kansion omistaja.",
+      "DownloadingModel": "Latausmalli ...",
       "Edit": "Muokkaa",
       "EditDelete": "Muokkaa+Poista",
       "FileDeleted": "Tiedosto poistettu",
@@ -378,7 +372,7 @@
       "FolderUsage": "Kansion käyttö",
       "FolderUsing": "Käyttämällä",
       "InviteUsers": "Kutsua käyttäjää",
-      "KickOut": "",
+      "KickOut": "Lopeta jakaminen",
       "KickOutConfirm": "Lopeta jakaminen {{email}} kanssa?",
       "Leave": "Jätä",
       "LeaveAFolder": "Jätä kansio",
@@ -405,6 +399,7 @@
       "Path": "Säilytyspolku",
       "Permission": "Lupa",
       "ProjectFolderAlertDesc": "Tämä kansio on jaettu kaikkien projektin jäsenten kanssa",
+      "ProjectFolderCreationHelp": "Projektin käyttäjät luodaan kansioon, johon pääsee \"{{projectName}}\".",
       "Rename": "Nimeä uudelleen",
       "Restore": "Palauttaa",
       "RestoreDescription": "Haluatko palauttaa \"{{ folderName }}\" -kansio?",
@@ -555,6 +550,7 @@
     "Digest": "Digest",
     "Disabled": "disabled",
     "ErrorMinimumValue": "{{key}} on oltava vähintään {{value}}",
+    "FailedToDeleteCustomizedImage": "Mukautetun kuvan poistaminen epäonnistui.",
     "FullImagePath": "Koko kuvan polku",
     "ImageReinstallationRequired": "Kuvan uudelleenasentaminen vaaditaan",
     "Images": "Kuvat",
@@ -624,6 +620,7 @@
     "SmallerResourceThenImageRequires": "Resurssipyyntösi on pienempi kuin kuvan edellyttämä minimi. Kokeile lisää resursseja.",
     "TooManyLoginFailures": "Kirjautumishäiriöitä on ollut liian monta lyhyessä ajassa. Sisäänkirjautuminen on estetty jonkin aikaa.",
     "UnauthorizedToken": "Luvaton merkki. Tarkista tunnuksesi.",
+    "UnexpectedError": "Tapahtui odottamaton virhe. \nYritä myöhemmin uudelleen tai ota yhteyttä tukeen, jos ongelma jatkuu.",
     "UnknownError": "Tuntematon virhe tapahtui. Yritä uudelleen.",
     "UpdateError": "Päivitysvirhe",
     "UserHasNoGroup": "Käyttäjällä ei ole ryhmää. Ota yhteyttä ylläpitäjään sen korjaamiseksi.",
@@ -640,8 +637,10 @@
     "Title": "On tapahtunut virhe."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Kansiota ei löydy tai pääsy kielletty",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Hallitsemattomat kansiot eivät tue tiedostotutkijaa.",
+    "NoPermissions": "Ei oikeuksia käyttää tätä kansiota",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -679,7 +678,17 @@
     "StorageProxies": "Varastot",
     "TotalItems": "Yhteensä {{total}} kohteita",
     "Username": "Käyttäjätunnus",
-    "ValueRequired": "Kirjoita {{ nimi }}"
+    "ValueRequired": "Kirjoita {{ nimi }}",
+    "validation": {
+      "InvalidEmailAddress": "Virheellinen sähköpostiosoite.",
+      "LetterNumber-_dot": "Sallii kirjaimet, numerot ja -_.",
+      "NameAlreadyExists": "Politiikan nimi on jo olemassa!",
+      "NumbersOnly": "Sallii vain numerot",
+      "PleaseSelectOption": "Valitse yksi vaihtoehto",
+      "PleaseSelectOptions": "Valitse vähintään yksi vaihtoehto tai enemmän.",
+      "PolicyName": "Poliittisen nimi vaaditaan.",
+      "ValidationFailed": "Validointi epäonnistui"
+    }
   },
   "import": {
     "CleanUpImportTask": "Tuontitehtävän siivous...",
@@ -760,12 +769,15 @@
   "interactiveLogin": {
     "ConfirmLoginMessage": "Haluatko kirjautua sisään {{käyttäjätunnus}} ({{email}}) tilille?",
     "InteractiveLoginWithBackendAI": "Kirjaudu sisään Backend.AI-tililläsi",
-    "ServiceName": "Palvelun nimi",
+    "ServiceName": "Palvelunimi",
     "UseAnotherAccount": "Kirjaudu sisään eri tilillä"
   },
   "kernel": {
     "AgentId": "Agenttitunnus",
     "ContainerId": "Konttitunnus",
+    "ContainerLogs": "Säiliölokit",
+    "Hostname": "Isäntänimi",
+    "Kernel": "Ytimen",
     "KernelId": "Ytimen tunnus",
     "Kernels": "Ytimet",
     "Role": "Rooli",
@@ -773,8 +785,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +800,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -906,6 +918,7 @@
     "EndpointName": "Päätepisteen nimi",
     "Error": "Virhe",
     "ExpiredDate": "Vanhentunut päiväys",
+    "ExtraMountsWarning": "Palvelua muokattaessa ylimääräisten kansioiden nimeä (alias) ei välttämättä säily. \nTarkista kansioiden nimet ennen tallentamista.",
     "FailedToStartService": "Palvelun luominen epäonnistui.",
     "FailedToTerminateService": "Palvelun lopettamispyyntö epäonnistui.",
     "FailedToUpdateService": "Palvelun päivittäminen epäonnistui.",
@@ -915,6 +928,7 @@
     "GenerateNewToken": "Luo uusi merkki",
     "GenerateToken": "Luo tunniste",
     "GeneratedTokens": "Generoidut tunnukset",
+    "GoToServiceDetailPage": "Siirry Service Detail -sivulle",
     "Image": "Kuva",
     "ModelDefinitionPath": "Mallin määritelmän tiedostopolku",
     "ModelMountDestination": "Kiinnityskohde mallikansioon",
@@ -924,6 +938,7 @@
     "OnlyAllowsNonNegativeIntegers": "Sallii vain ei-negatiiviset kokonaisluvut",
     "OpenToPublic": "Avoinna yleisölle",
     "Owner": "Omistaja",
+    "PlayYourModelNow": "Pelaa malliasi nyt!",
     "PleaseSelectTime": "Valitse aika!",
     "Processing": "Käsitellään...",
     "Public": "Julkinen",
@@ -935,17 +950,21 @@
     "RoutesInfo": "Reittien tiedot",
     "RoutingInfo": "Reititystiedot",
     "RoutingsCount": "Reittien määrä",
+    "RunThisModel": "Suorita tämä malli",
     "RuntimeVariant": "Päättelyn suoritusaikamuunnos",
     "SeeContainerLogs": "Katso Säilön lokit",
+    "ServiceAlreadyExists": "Palvelun nimi on jo olemassa",
     "ServiceCreated": "Mallipalvelun {{ name }} luominen onnistui.",
     "ServiceDelegatedFrom": "Mallipalvelun luo {{ createdUser }}, mutta istunnon omistusoikeus siirretään {{ sessionOwner }}:lle.",
     "ServiceEndpoint": "Palvelun päätepiste",
     "ServiceInfo": "Palvelun tiedot",
-    "ServiceName": "Palvelun nimi",
+    "ServiceName": "Palvelunimi",
     "ServiceNameCannotStartWithHyphen": "Tavuviivoja (-) ei voi käyttää kummassakaan päässä.",
+    "ServiceNameInvalidCharacter": "Palvelun nimen keskellä vain aakkoset, numero '_', '.', '-' voidaan sisällyttää vain.",
     "ServiceNameMaxLength": "Anna enintään 24 merkkiä.",
     "ServiceNameMinLength": "Kirjoita vähintään 4 merkkiä.",
-    "ServiceNameRule": "Salli vain aakkosnumeeriset, alaviivat (_) ja yhdysviivat (-), ja sen tulee päättyä aakkosnumeeriseen merkkiin.",
+    "ServiceNameShouldEndWith": "Istunnon nimen on päätyttävä aakkosella, suurilla ja pienillä merkeillä, numeroilla ja '_'.",
+    "ServiceNameShouldStartWith": "Istunnon nimen tulisi alkaa aakkoset ja pienet merkit, numerot tai '_'.",
     "ServiceTerminated": "Mallipalvelun '{{ name }}' sammutuspyyntö lähetettiin.",
     "ServiceUpdated": "Mallipalvelun {{ name }} päivitys onnistui.",
     "Services": "Palvelut",
@@ -955,6 +974,7 @@
     "StartNewService": "Aloita uusi palvelu",
     "StartNewServing": "Aloita uusi annos",
     "StartService": "Käynnistä palvelu",
+    "StartingModelService": "Aloitusmallipalvelu ...",
     "Status": "Tila",
     "Success": "Menestys",
     "SyncRoutes": "Synkronoi reitit",
@@ -1011,9 +1031,8 @@
     "SuccessfullyUpdated": "Päivitetty onnistuneesti",
     "Visit": "Käy osoitteessa"
   },
-  "propertyFilter": {
-    "PlaceHolder": "Etsi",
-    "ResetFilter": "Nollaa suodattimet"
+  "pagination": {
+    "Total": "{{start}}–{{end}} yhteensä {{total}} kohteesta"
   },
   "registry": {
     "AddRegistry": "Lisää rekisteri",
@@ -1102,6 +1121,11 @@
     "TypeResourceGroupNameToDelete": "Kirjoita poistettavan resurssiryhmän nimi",
     "WsproxyAddress": "WSProxy-palvelimen osoite"
   },
+  "resourcePanel": {
+    "Limit": "Rajoittaa",
+    "RemainingNumber": "Rmmitys",
+    "UsingNumber": "Käyttäminen"
+  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Olet poistamassa tätä resurssikäytäntöä:",
     "AllowedHosts": "Sallitut isännät",
@@ -1181,6 +1205,9 @@
     "SHMEMShouldBeSmallerThanMemory": "Jaetun muistin on oltava pienempi kuin muistin",
     "SharedMemory": "Jaettu muisti",
     "Updated": "Resurssien esiasetus päivitetty"
+  },
+  "scheduler": {
+    "PendingSessions": "Vireillä olevat istunnot"
   },
   "session": {
     "Agent": "Agentti",
@@ -1262,12 +1289,15 @@
     "OpenToPublic": "Sovelluksen avaaminen yleisölle",
     "OpenToPublicDesc": "Tämän vaihtoehdon käyttöönotto mahdollistaa kaikille verkon käyttäjille sovellusten pääsyn.<br /><br /> \nSyötä pääsyn hallinta tietyt IP -osoitteet 'sallittu IP' -kenttään.<br /><br /> \nTämän kentän jättäminen tyhjiksi sallii pääsyn kaikista IP -osoitteista.<br /><br /> \nHarkitse IP -rajoitusten asettamista tarvittaessa turvallisuuden hallintaan.",
     "Others": "Muut",
+    "PanelSettings": "Paneelin asetukset",
+    "PendingPosition": "Jonopaikka",
     "PredicateChecks": "Predikaatin tarkistukset",
     "Preparing": "Valmistautuminen...",
     "PreparingSession": "Istunnon valmistelu...",
     "ReadLess": "Lue vähemmän",
     "ReadMore": "Lue lisää...",
     "RecentlyCreatedSessions": "Äskettäin loivat istunnot",
+    "RecentlyCreatedSessionsTooltip": "Näyttää {{count}} viimeisintä luotua käynnissä olevaa istuntoa nykyisessä projektissa",
     "RequestContainerCommit": "Pyyntö Container Commit",
     "Reservation": "Varaukset",
     "ResourceGroup": "Resurssiryhmä",
@@ -1337,6 +1367,7 @@
       "AddingKernelToSocketQueue": "Ytimen lisääminen socket-jonoon...",
       "AgentNode": "Agentti",
       "AllocateNode": "Cluster-tila",
+      "ApplicationMemory": "Application MEM {{value}}",
       "Architecture": "Arkkitehtuuri",
       "AutoSelect": "Automaattinen valinta",
       "AutoSharedMemoryTooltip": "Voit valita jaetun muistin koon automaattisesti tai syöttää sen manuaalisesti jaetun muistin sisällä.",
@@ -1404,6 +1435,7 @@
       "InsufficientAllocationOfResourcesWarning": "Allokoitavat resurssit jäävät alle valitussa kuvassa vaaditun vähimmäisresurssin.",
       "InteractiveMode": "Interaktiivinen",
       "InteractiveModeDesc": "voit luoda, testata ja ajaa koodia vuorovaikutteisesti jupyter notebookin, visual studio code -ohjelman jne. avulla.",
+      "InvalidMountsSelectionWarning": "Kansioiden valintatiedot eivät ole kelvollisia. Katso valittu kansio.",
       "InvalidPortFormat": "Porttinumeron muoto on virheellinen.",
       "Launch": "Laukaisu",
       "LaunchConfirmationDialog": "Jos haluat säilyttää koodisi ja tietosi tai jakaa ne muiden yhteistyökumppaneiden kanssa, luo tallennuskansio tietojen ja tallennuksen sivupalkissa ja kiinnitä kansio, kun käynnistät resurssin, ja pidä se siellä.",
@@ -1485,8 +1517,7 @@
       "SetPreopenPorts": "Esiavattavat portit (valinnainen)",
       "SetSessionOwner": "Istunnon omistaja",
       "SettingUpProxyForApp": "Sovelluksen välityspalvelimen määrittäminen...",
-      "SharedMemory": "Jaettu muisti",
-      "SharedMemoryAbbr": "SHMEM",
+      "SharedMemory": "Jaettu muisti (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Jaetun muistin asetusta pienennetään alle jaetun muistin.",
       "SingleNode": "Yksi solmu",
       "SkipToConfirmAndLaunch": "Siirry arvosteluun",
@@ -1522,6 +1553,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Atom Max -tuki",
     "ATOMPlusSupport": "ATOM+-tuki",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Salli agenttipuolen rekisteröinti",
@@ -1529,6 +1561,7 @@
     "Config": "Config",
     "ConfigPerJobSchduler": "Ajastimen asetukset",
     "ConfigPerJobSchdulerDescription": "Aikatauluttaja-asetuksen arvot ovat oletusarvoja, joita käytetään, kun kussakin resurssiryhmässä ei ole aikatauluttaja-asetusta. Jos resurssiryhmäkohtainen asetus on olemassa, tätä arvoa ei oteta huomioon.",
+    "DescATOMMaxSupport": "Käytä Rebellions ATOM Max -kiihdytin.",
     "DescATOMPlusSupport": "Käytä Rebellions ATOM+ -kiihdytintä.",
     "DescATOMSupport": "Käytä Rebellions ATOM-kiihdytintä",
     "DescAllowAgentSideRegistration": "Anna agentin rekisteröidä itsensä johtajalle. Käytä vain, jos backend.ai -klusteria hallitaan turvallisessa paikassa.",
@@ -1572,6 +1605,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "ROCm GPU-tuki",
     "RegisterNewImagesFromRepo": "Rekisteröi uudet kuvat arkistosta",
+    "RequireATOMMaxPlugin": "Vaatii Backend.AI ATOM Max -lisäosan.",
     "RequireATOMPlugin": "Vaatii Backend.AI ATOM Pluginin.",
     "RequireATOMPlusPlugin": "Vaatii Backend.AI ATOM+ laajennuksen.",
     "RequireFGPUPlugin": "Vaatii Backend.AI Virtual CUDA API Layer -lisäosan.",
@@ -1681,6 +1715,11 @@
     "SessionsDesc": "Luotujen laskenta-istuntojen määrä.",
     "UsageHistory": "Käyttöhistoria",
     "UsageHistoryNote": "Tässä esitetty käyttöhistoria perustuu lopetettuihin laskentaistuntoihin.",
+    "description": {
+      "CPUUtilization": "Edustaa istunnon käyttämän prosessorin määrää valitun ajanjakson aikana. \n\nYksi CPU -ydin vastaa enintään 100%.\n\nJos useita ytimiä allokoidaan, kokonaiskäyttö voi ylittää 100%, koska se lasketaan summaamalla enimmäiskäyttö (100%) jokaisesta ytimestä.",
+      "NetworkRx": "Osoittaa verkonsiirtonopeuden.\n\nEdustaa nopeutta, jolla säilö vastaanottaa verkkotietoja.",
+      "NetworkTx": "Osoittaa verkonsiirtonopeuden. \n\nEdustaa nopeutta, jolla säilö lähettää verkkotietoja."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Jos käyttö on alhainen, joihinkin päivämääriin tietoja ei välttämättä ole käytettävissä. \nYritä uudelleen lyhyemmällä ajanjaksolla.",
       "NoMetricsToDisplay": "Ei mittareita, joita on saatavana seurantaan"
@@ -1731,6 +1770,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU käytössä",
+    "ATOMMaxEnabled": "Atom Max NPU käytössä",
     "ATOMPlusEnabled": "ATOM+ NPU käytössä",
     "Accept": "Hyväksy",
     "AcceptSharedVFolder": "Voit nyt käyttää kansiota:",
@@ -1919,6 +1959,7 @@
       "ClickToDownload": "Napsauta ladataksesi",
       "ComputationResources": "Laskentaresurssit",
       "Configurations": "Kokoonpanot",
+      "Dashboard": "Kojelauta",
       "Data": "Tiedot",
       "Data&Model": "Data",
       "Data&Storage": "Data & varastointi",
@@ -1940,6 +1981,7 @@
       "InvalidBlankPassword": "Syötä salasanasi",
       "InvalidPasswordMessage": "Tarvitaan vähintään 1 aakkosmerkki, 1 numero ja 1 erikoismerkki, joissa on vähintään 8 merkkiä.",
       "LeaveService": "Jätä palvelu",
+      "Limits": "Rajat",
       "LogOut": "Kirjaudu ulos",
       "Logs": "Lokit",
       "LogsErrors": "Lokit / virheet",
@@ -1947,6 +1989,11 @@
       "MyAccount": "Oma tili",
       "MyAccountInformation": "Tilini tiedot",
       "MyEnvironments": "Omat ympäristöt",
+      "MyResources": "Kokonaisresurssini rajoittavat",
+      "MyResourcesDescription": "<p>Tämä paneeli näyttää resurssien kokonaiskäytön ja rajat kaikissa projekteissa ja resurssiryhmissä.</p><p>Kun useita rajoja on käytössä (verkkotunnus, projekti tai avainpari), tiukinta rajaa käytetään laskennassa.</p>",
+      "MyResourcesIn": "Resurssini",
+      "MyResourcesInResourceGroup": "Resurssini resurssiryhmässä",
+      "MyResourcesInResourceGroupDescription": "Tämä paneeli näyttää nykyisen resurssien käytön ja pysyvän valitussa resurssiryhmässä.",
       "NewPassword": "Uusi salasana",
       "NewPasswordAgain": "Uusi salasana (taas)",
       "NewPasswordCannotBeSame": "Kirjoita salasana, joka poikkeaa nykyisestä salasanastasi.",
@@ -1963,8 +2010,10 @@
       "Preferences": "Asetukset",
       "PrivacyPolicy": "Tietosuojakäytäntö",
       "Project": "Hanke",
+      "Remaining": "Jäljellä oleva",
       "ResourcePolicy": "Resurssipolitiikka",
       "Resources": "Resurssit",
+      "Scheduler": "Aikataulu",
       "Serving": "Palvelevat",
       "Sessions": "Istunnot",
       "Settings": "Asetukset",
@@ -1975,8 +2024,12 @@
       "Summary": "Yhteenveto",
       "Tasks": "Tehtävät",
       "TermsOfService": "Käyttöehdot",
+      "TotalResourcesIn": "Resurssien kokonaismäärä",
+      "TotalResourcesInResourceGroup": "Resurssien kokonaismäärä resurssiryhmässä",
+      "TotalResourcesInResourceGroupDescription": "Tämä paneeli näyttää käytetyt ja jäljellä olevat resurssit. \nArvot lasketaan lisäämällä kaikkien aineiden käyttö ja jäljellä olevat määrät valitun resurssiryhmän avulla.",
       "TotpActivated": "2FA käytössä",
       "Update": "Päivitys",
+      "Usage": "Käyttö",
       "UsageHistory": "Allokaatiohistoria",
       "UserCredentials&Policies": "Käyttäjien valtakirjat ja käytännöt",
       "UserSessionHistory": "Käyttäjäistunnon historia",

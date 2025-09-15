@@ -209,17 +209,7 @@
     "UserStatus": "Status Pengguna",
     "Users": "Pengguna",
     "WarningLessRateLimit": "Jika nilai Rate Limit kecil, operasi API seperti login dapat diblokir.",
-    "YouAreAboutToDeleteCredential": "Anda akan menghapus kredensial pengguna ini:",
-    "validation": {
-      "InvalidEmailAddress": "Alamat email salah.",
-      "LetterNumber-_dot": "Huruf, angka, dan -_. diizinkan",
-      "NameAlreadyExists": "Nama Kebijakan Sudah Ada!",
-      "NumbersOnly": "Hanya angka yang diizinkan",
-      "PleaseSelectOption": "Mohon pilih satu pilihan",
-      "PleaseSelectOptions": "Mohon pilih satu pilihan",
-      "PolicyName": "Nama kebijakan wajib diisi.",
-      "ValidationFailed": "Validasi gagal"
-    }
+    "YouAreAboutToDeleteCredential": "Anda akan menghapus kredensial pengguna ini:"
   },
   "data": {
     "Active": "Aktif",
@@ -310,7 +300,6 @@
       "InviteeEmail": "Email Undangan",
       "KeepFileExtension": "Jaga",
       "LessThan10Sec": "Kurang dari 10 detik",
-      "ModifyPermissions": "Ubah Perizinan",
       "MoreThanADay": "Lebih dari sehari",
       "Name": "Nama",
       "NewFileName": "Nama file baru",
@@ -347,15 +336,20 @@
     },
     "folders": {
       "CannotDeleteFolder": "Tidak dapat menghapus folder yang dipasang di satu atau beberapa sesi. Mohon hentikan sesi terlebih dahulu.",
+      "CannotDeletePipelineFolder": "Anda tidak dapat menghapus folder pipa.",
+      "CannotRestorePipelineFolder": "Anda tidak dapat mengembalikan folder pipa.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Folder Proyek Model hanya dapat dibuat di proyek Model Store -Eksklusif. \nUbah proyek atau jenis pengguna saat ini.",
       "CloneAFolder": "Klon folder",
       "CloneFolder": "Folder klon",
       "Cloneable": "Dapat diklon",
       "Control": "Kontrol",
+      "CreateModelFolderOnlyInExclusiveProject": "Folder Proyek Model hanya dapat dibuat di proyek Model Store -Eksklusif.",
       "CreatedAt": "Dibuat di",
       "Delete": "Hapus",
       "DeleteAFolder": "Hapus folder",
       "DeleteForever": "Hapus selamanya",
       "DescYouAreFolderOwner": "Anda adalah pemilik folder ini.",
+      "DownloadingModel": "Mengunduh model ...",
       "Edit": "Sunting",
       "EditDelete": "Sunting+Hapus",
       "FileDeleted": "File sudah dihapus",
@@ -377,7 +371,7 @@
       "FolderUsage": "Penggunaan folder",
       "FolderUsing": "Menggunakan",
       "InviteUsers": "Undang Pengguna",
-      "KickOut": "",
+      "KickOut": "Berhenti berbagi",
       "KickOutConfirm": "Berhenti berbagi dengan {{email}}?",
       "Leave": "Tinggalkan",
       "LeaveAFolder": "Tinggalkan folder",
@@ -404,6 +398,7 @@
       "Path": "Jalur penyimpanan",
       "Permission": "Izin",
       "ProjectFolderAlertDesc": "Folder ini dibagikan dengan semua anggota proyek",
+      "ProjectFolderCreationHelp": "Folder yang dapat diakses oleh \"{{projectName}}\" pengguna proyek akan dibuat.",
       "Rename": "Ganti nama",
       "Restore": "Memulihkan",
       "RestoreDescription": "Apakah Anda ingin mengembalikan \"{{ folderName }}\"?",
@@ -554,6 +549,7 @@
     "Digest": "Intisari",
     "Disabled": "di-nonaktifkan",
     "ErrorMinimumValue": "{{key}} harus setidaknya {{value}}",
+    "FailedToDeleteCustomizedImage": "Gagal menghapus gambar yang disesuaikan.",
     "FullImagePath": "Jalur gambar penuh",
     "ImageReinstallationRequired": "Diperlukan pemasangan ulang gambar",
     "Images": "Image",
@@ -623,6 +619,7 @@
     "SmallerResourceThenImageRequires": "Permintaan sumber daya Anda lebih kecil dari jumlah minimum yang dibutuhkan oleh gambar. Coba lebih banyak sumber daya.",
     "TooManyLoginFailures": "Terlalu banyak kegagalan login dalam waktu singkat. Login diblokir untuk sementara waktu.",
     "UnauthorizedToken": "Token tidak sah. Silakan periksa token Anda.",
+    "UnexpectedError": "Terjadi kesalahan yang tidak terduga. \nSilakan coba lagi nanti atau hubungi dukungan jika masalah tetap ada.",
     "UnknownError": "Terjadi kesalahan yang tidak diketahui. Silakan coba lagi.",
     "UpdateError": "Galat pembaruan",
     "UserHasNoGroup": "Pengguna tidak memiliki grup. Silakan hubungi administrator untuk memperbaikinya.",
@@ -639,8 +636,10 @@
     "Title": "Telah terjadi kesalahan."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Folder tidak ditemukan atau akses ditolak",
     "InputTooShort": "MasukanTerlaluPendek",
     "NoExplorerSupportForUnmanagedFolder": "Folder yang tidak dikelola tidak mendukung file explorer.",
+    "NoPermissions": "Tidak ada izin untuk mengakses folder ini",
     "ValueRequired": "NilaiDiperlukan"
   },
   "general": {
@@ -678,7 +677,17 @@
     "StorageProxies": "Penyimpanan",
     "TotalItems": "Total item {{total}}",
     "Username": "Nama pengguna",
-    "ValueRequired": "Silakan masukkan {{ nama }}"
+    "ValueRequired": "Silakan masukkan {{ nama }}",
+    "validation": {
+      "InvalidEmailAddress": "Alamat email yang tidak valid.",
+      "LetterNumber-_dot": "Memungkinkan huruf, angka, dan -_.",
+      "NameAlreadyExists": "Nama kebijakan sudah ada!",
+      "NumbersOnly": "Memungkinkan angka saja",
+      "PleaseSelectOption": "Pilih satu opsi",
+      "PleaseSelectOptions": "Pilih setidaknya satu opsi atau lebih.",
+      "PolicyName": "Nama kebijakan diperlukan.",
+      "ValidationFailed": "Validasi gagal"
+    }
   },
   "import": {
     "CleanUpImportTask": "Membersihkan tugas impor...",
@@ -759,12 +768,15 @@
   "interactiveLogin": {
     "ConfirmLoginMessage": "Apakah Anda ingin masuk dengan akun {{nama pengguna}} ({{email}})?",
     "InteractiveLoginWithBackendAI": "Login dengan akun Backend.AI Anda",
-    "ServiceName": "Nama layanan",
+    "ServiceName": "Nama Layanan",
     "UseAnotherAccount": "Masuk dengan akun yang berbeda"
   },
   "kernel": {
     "AgentId": "ID Agen",
     "ContainerId": "ID Kontainer",
+    "ContainerLogs": "Log Kontainer",
+    "Hostname": "Nama host",
+    "Kernel": "Inti",
     "KernelId": "ID kernel",
     "Kernels": "Kernel",
     "Role": "Peran",
@@ -772,8 +784,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -789,8 +799,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -905,6 +917,7 @@
     "EndpointName": "Nama Titik Akhir",
     "Error": "Kesalahan",
     "ExpiredDate": "Tanggal Kadaluarsa",
+    "ExtraMountsWarning": "Saat mengedit layanan, nama (alias) dari folder yang dipasang tambahan mungkin tidak dipertahankan. \nHarap periksa ulang nama folder sebelum disimpan.",
     "FailedToStartService": "Gagal membuat layanan.",
     "FailedToTerminateService": "Permintaan untuk menghentikan layanan gagal.",
     "FailedToUpdateService": "Gagal memperbarui layanan.",
@@ -914,6 +927,7 @@
     "GenerateNewToken": "Hasilkan token baru",
     "GenerateToken": "Hasilkan Token",
     "GeneratedTokens": "Token yang Dihasilkan",
+    "GoToServiceDetailPage": "Pergi ke Halaman Detail Layanan",
     "Image": "Gambar",
     "ModelDefinitionPath": "Jalur File Definisi Model",
     "ModelMountDestination": "Pasang Tujuan Untuk Folder Model",
@@ -923,6 +937,7 @@
     "OnlyAllowsNonNegativeIntegers": "Hanya mengizinkan bilangan bulat non-negatif",
     "OpenToPublic": "Terbuka Untuk Umum",
     "Owner": "Pemilik",
+    "PlayYourModelNow": "Mainkan model Anda sekarang!",
     "PleaseSelectTime": "Silakan pilih waktu!",
     "Processing": "Pengolahan...",
     "Public": "Publik",
@@ -934,17 +949,21 @@
     "RoutesInfo": "Info Rute",
     "RoutingInfo": "Info Perutean",
     "RoutingsCount": "Jumlah Rute",
+    "RunThisModel": "Jalankan model ini",
     "RuntimeVariant": "Varian Runtime Inferensi",
     "SeeContainerLogs": "Lihat Log Kontainer",
+    "ServiceAlreadyExists": "Nama layanan sudah ada",
     "ServiceCreated": "Layanan model {{ name }} telah berhasil dibuat.",
     "ServiceDelegatedFrom": "Layanan model dibuat oleh {{ createdUser }} namun kepemilikan sesi akan didelegasikan ke {{ sessionOwner }}",
     "ServiceEndpoint": "Titik Akhir Layanan",
     "ServiceInfo": "Info Layanan",
     "ServiceName": "Nama Layanan",
     "ServiceNameCannotStartWithHyphen": "Tanda hubung (-) tidak dapat digunakan pada kedua ujungnya.",
+    "ServiceNameInvalidCharacter": "Di tengah nama layanan, hanya alfabet, nomor, '_', '.', '-' hanya dapat dimasukkan.",
     "ServiceNameMaxLength": "Silakan masukkan 24 karakter atau kurang.",
     "ServiceNameMinLength": "Silakan masukkan setidaknya 4 karakter.",
-    "ServiceNameRule": "Hanya diperbolehkan alfanumerik, garis bawah(_), dan tanda hubung(-) dan harus diakhiri dengan karakter alfanumerik.",
+    "ServiceNameShouldEndWith": "Nama sesi harus diakhiri dengan alfabet, karakter besar dan kecil, angka, dan '_'.",
+    "ServiceNameShouldStartWith": "Nama sesi harus dimulai dengan karakter alfabet dan kecil, angka atau '_'.",
     "ServiceTerminated": "Permintaan penutupan dikirim untuk layanan model '{{ nama }}'.",
     "ServiceUpdated": "Layanan model {{ name }} telah berhasil diperbarui.",
     "Services": "Layanan",
@@ -954,6 +973,7 @@
     "StartNewService": "Mulai Layanan Baru",
     "StartNewServing": "Memulai sajian baru",
     "StartService": "Mulai Layanan",
+    "StartingModelService": "Mulai Layanan Model ...",
     "Status": "Status",
     "Success": "Kesuksesan",
     "SyncRoutes": "Menyinkronkan rute",
@@ -1010,9 +1030,8 @@
     "SuccessfullyUpdated": "Berhasil Diperbarui",
     "Visit": "Kunjungi"
   },
-  "propertyFilter": {
-    "PlaceHolder": "Pencarian",
-    "ResetFilter": "Setel ulang filter"
+  "pagination": {
+    "Total": "{{start}} - {{end}} dari {{total}} item"
   },
   "registry": {
     "AddRegistry": "Tambahkan Registri",
@@ -1101,6 +1120,11 @@
     "TypeResourceGroupNameToDelete": "Ketik nama grup sumber daya yang akan dihapus",
     "WsproxyAddress": "Alamat Server WSProxy"
   },
+  "resourcePanel": {
+    "Limit": "Membatasi",
+    "RemainingNumber": "Rmaining",
+    "UsingNumber": "Menggunakan"
+  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Anda akan menghapus kebijakan sumber daya ini:",
     "AllowedHosts": "Host yang diizinkan",
@@ -1180,6 +1204,9 @@
     "SHMEMShouldBeSmallerThanMemory": "Memori bersama harus lebih kecil dari memori",
     "SharedMemory": "Memori bersama",
     "Updated": "Preset sumber daya diperbarui"
+  },
+  "scheduler": {
+    "PendingSessions": "Sesi yang tertunda"
   },
   "session": {
     "Agent": "Agen",
@@ -1261,12 +1288,15 @@
     "OpenToPublic": "Buka aplikasi untuk publik",
     "OpenToPublicDesc": "Mengaktifkan opsi ini memungkinkan akses aplikasi untuk semua pengguna dalam jaringan.<br /><br /> \nUntuk manajemen akses, masukkan alamat IP tertentu di bidang 'IP yang diizinkan'.<br /><br /> \nMembiarkan bidang ini kosong akan memungkinkan akses dari semua alamat IP.<br /><br /> \nPertimbangkan untuk menetapkan pembatasan IP bila diperlukan untuk manajemen keamanan.",
     "Others": "Lainnya",
+    "PanelSettings": "Pengaturan Panel",
+    "PendingPosition": "Posisi antrian",
     "PredicateChecks": "Pemeriksaan Predikat",
     "Preparing": "Mempersiapkan...",
     "PreparingSession": "Mempersiapkan sesi...",
     "ReadLess": "Baca lebih sedikit",
     "ReadMore": "Baca Selengkapnya...",
     "RecentlyCreatedSessions": "Sesi yang baru dibuat",
+    "RecentlyCreatedSessionsTooltip": "Menampilkan {{count}} sesi yang sedang berjalan yang baru dibuat di proyek saat ini",
     "RequestContainerCommit": "Permintaan Komitmen Kontainer",
     "Reservation": "Reservasi",
     "ResourceGroup": "Grup Sumber Daya",
@@ -1336,6 +1366,7 @@
       "AddingKernelToSocketQueue": "Menambahkan kernel ke antrian soket...",
       "AgentNode": "Agen",
       "AllocateNode": "Modus klaster",
+      "ApplicationMemory": "Application MEM {{value}}",
       "Architecture": "Arsitektur",
       "AutoSelect": "Pilih Otomatis",
       "AutoSharedMemoryTooltip": "Anda dapat memilih secara otomatis atau secara manual memasukkan ukuran memori bersama dalam memori yang dialokasikan.",
@@ -1404,6 +1435,7 @@
       "InsufficientAllocationOfResourcesWarning": "Sumber daya yang dapat dialokasikan berada di bawah sumber daya minimum yang diperlukan pada gambar yang dipilih.",
       "InteractiveMode": "Interaktif",
       "InteractiveModeDesc": "memungkinkan Anda untuk membuat, menguji, dan menjalankan kode secara interaktif melalui jupyter notebook, kode visual studio, dll.",
+      "InvalidMountsSelectionWarning": "Informasi pemilihan folder tidak valid. Lihat folder yang dipilih.",
       "InvalidPortFormat": "Format nomor port salah.",
       "Launch": "Luncurkan",
       "LaunchConfirmationDialog": "Untuk menyimpan kode dan data Anda, atau membagikannya dengan kolaborator lain, cukup buat folder penyimpanan di bilah sisi Data & Penyimpanan, lalu pasang folder itu saat Anda memulai sumber daya dan simpan di sana.",
@@ -1485,8 +1517,7 @@
       "SetPreopenPorts": "Port yang sudah dibuka sebelumnya (opsional)",
       "SetSessionOwner": "Pemilik sesi",
       "SettingUpProxyForApp": "Menyiapkan proksi untuk aplikasi...",
-      "SharedMemory": "Memori Bersama",
-      "SharedMemoryAbbr": "SHMEM",
+      "SharedMemory": "Memori yang dibagikan (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Pengaturan memori bersama dikurangi hingga di bawah memori yang dialokasikan.",
       "SingleNode": "Tunggal",
       "SkipToConfirmAndLaunch": "Loncat ke ulasan",
@@ -1522,6 +1553,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Dukungan Atom Max",
     "ATOMPlusSupport": "Dukungan ATOM+",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Izinkan pendaftaran sisi agen",
@@ -1529,6 +1561,7 @@
     "Config": "Konfigurasi",
     "ConfigPerJobSchduler": "Pengaturan penjadwal",
     "ConfigPerJobSchdulerDescription": "Nilai dalam pengaturan penjadwal adalah default untuk digunakan ketika tidak ada pengaturan penjadwal di setiap grup sumber daya. Jika ada setelan khusus grup sumber daya, nilai ini akan diabaikan.",
+    "DescATOMMaxSupport": "Gunakan Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Gunakan akselerator ATOM+ Rebellions.",
     "DescATOMSupport": "Gunakan akselerator Rebellions ATOM",
     "DescAllowAgentSideRegistration": "Izinkan agen untuk mendaftarkan diri ke manajer. Gunakan hanya jika backend.ai cluster dikelola di lokasi yang aman.",
@@ -1572,6 +1605,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "Dukungan GPU ROCm",
     "RegisterNewImagesFromRepo": "Daftarkan image baru dari repositori",
+    "RequireATOMMaxPlugin": "Memerlukan Plugin Backend.AI ATOM Max.",
     "RequireATOMPlugin": "Membutuhkan Plugin Backend.AI ATOM.",
     "RequireATOMPlusPlugin": "Membutuhkan Plugin Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Memerlukan Plugin Lapisan API CUDA Virtual Backend.AI.",
@@ -1681,6 +1715,11 @@
     "SessionsDesc": "Jumlah sesi komputasi yang dibuat.",
     "UsageHistory": "Riwayat Penggunaan",
     "UsageHistoryNote": "Riwayat penggunaan yang ditampilkan di sini didasarkan pada sesi komputasi yang diakhiri.",
+    "description": {
+      "CPUUtilization": "Mewakili jumlah waktu CPU yang digunakan oleh sesi selama periode yang dipilih. \n\nInti CPU tunggal sesuai dengan maksimum 100%.\n\nJika beberapa core dialokasikan, total penggunaan dapat melebihi 100%, karena dihitung dengan meringkas penggunaan maksimum (100%) dari setiap inti.",
+      "NetworkRx": "Menunjukkan laju transfer jaringan.\n\nMewakili tingkat di mana wadah menerima data jaringan.",
+      "NetworkTx": "Menunjukkan laju transfer jaringan. \n\nMewakili tingkat di mana wadah mengirim data jaringan."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Jika penggunaan rendah, data untuk beberapa tanggal mungkin tidak tersedia. \nSilakan coba lagi dengan kisaran tanggal yang lebih pendek.",
       "NoMetricsToDisplay": "Tidak ada metrik yang tersedia untuk pelacakan"
@@ -1731,6 +1770,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Diaktifkan",
+    "ATOMMaxEnabled": "Atom max npu diaktifkan",
     "ATOMPlusEnabled": "ATOM+ NPU Diaktifkan",
     "Accept": "Terima",
     "AcceptSharedVFolder": "Anda sekarang dapat mengakses folder: ",
@@ -1919,6 +1959,7 @@
       "ClickToDownload": "Klik untuk mengunduh",
       "ComputationResources": "Sumber Daya Komputasi",
       "Configurations": "Konfigurasi",
+      "Dashboard": "Dasbor",
       "Data": "Data",
       "Data&Model": "Data",
       "Data&Storage": "Data & Penyimpanan",
@@ -1940,6 +1981,7 @@
       "InvalidBlankPassword": "Masukkan kata sandi Anda",
       "InvalidPasswordMessage": "Setidaknya 1 alfabet, 1 angka dan 1 karakter khusus diperlukan dengan setidaknya 8 karakter.",
       "LeaveService": "Tinggalkan layanan",
+      "Limits": "Batas",
       "LogOut": "Keluar",
       "Logs": "Log",
       "LogsErrors": "Log / Galat",
@@ -1947,6 +1989,11 @@
       "MyAccount": "Akun Saya",
       "MyAccountInformation": "Informasi Akun Saya",
       "MyEnvironments": "Lingkungan Saya",
+      "MyResources": "Batas Total Sumber Daya Saya",
+      "MyResourcesDescription": "<p>Panel ini menunjukkan total penggunaan sumber daya dan batas di semua proyek dan grup sumber daya.</p><p>Ketika beberapa batas diterapkan (seperti domain, proyek, atau pasangan kunci), batas yang paling ketat digunakan untuk perhitungan.</p>",
+      "MyResourcesIn": "Sumber daya saya di",
+      "MyResourcesInResourceGroup": "Sumber Daya Saya dalam Grup Sumber Daya",
+      "MyResourcesInResourceGroupDescription": "Panel ini menunjukkan penggunaan sumber daya saya saat ini dan tersisa di grup sumber daya yang dipilih.",
       "NewPassword": "Kata sandi baru",
       "NewPasswordAgain": "Kata sandi (konfirmasi)",
       "NewPasswordCannotBeSame": "Masukkan kata sandi yang berbeda dari kata sandi Anda saat ini.",
@@ -1962,8 +2009,10 @@
       "Preferences": "Preferensi",
       "PrivacyPolicy": "Kebijakan Privasi",
       "Project": "Proyek",
+      "Remaining": "Tersisa",
       "ResourcePolicy": "Kebijakan Sumber Daya",
       "Resources": "Sumber daya",
+      "Scheduler": "Penjadwal",
       "Serving": "Penyajian",
       "Sessions": "Sesi",
       "Settings": "Pengaturan",
@@ -1974,8 +2023,12 @@
       "Summary": "Ringkasan",
       "Tasks": "Tugas",
       "TermsOfService": "Persyaratan Layanan",
+      "TotalResourcesIn": "Total sumber daya di",
+      "TotalResourcesInResourceGroup": "Total Sumber Daya dalam Grup Sumber Daya",
+      "TotalResourcesInResourceGroupDescription": "Panel ini menunjukkan total sumber daya yang digunakan dan sisa. \nNilai dihitung dengan menambahkan penggunaan dan jumlah yang tersisa dari semua agen menggunakan grup sumber daya yang dipilih.",
       "TotpActivated": "2FA Diaktifkan",
       "Update": "Perbarui",
+      "Usage": "Penggunaan",
       "UsageHistory": "Riwayat alokasi",
       "UserCredentials&Policies": "Kredensial & Kebijakan Pengguna",
       "UserSessionHistory": "Riwayat sesi pengguna",

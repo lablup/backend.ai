@@ -812,6 +812,48 @@
           "color": "red"
         }
       ]
+    },
+    "vllm": {
+      "name": "vLLM",
+      "description": "vLLM is a high-performance inference engine for large language models (LLMs) that supports both autoregressive and non-autoregressive decoding.",
+      "group": "Inference",
+      "tags": [],
+      "icon": "vllm.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "vLLM",
+          "color": "blue"
+        }
+      ]
+    },
+    "mojo-max": {
+      "name": "MAX (Mojo)",
+      "description": "A high-performance inference engine to build, optimize, and deploy AI apps fast.",
+      "group": "Framework",
+      "tags": [],
+      "icon": "modular.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "Modular",
+          "color": "blue"
+        }
+      ]
+    },
+    "gromacs-runtime": {
+      "name": "GROMACS",
+      "description": "A free and open-source software suite for high-performance molecular dynamics and output analysis.",
+      "group": "Molecular Dynamics",
+      "tags": [],
+      "icon": "gromacs.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "GROMACS",
+          "color": "blue"
+        }
+      ]
     }
   },
   "tagAlias": {
@@ -924,7 +966,9 @@
     "alpine3.12": "Alpine Linux 3.12",
     "ngc": "NVIDIA GPU Cloud",
     "ff": "Research Env.",
-    "atom-orbit": "Orbit"
+    "atom-orbit": "Orbit",
+    "vllm": "vLLM",
+    "mojo-max": "MAX (Mojo)"
   },
   "tagReplace": {
     "^(tf)([0-9.]*)$": "TensorFlow $2",
@@ -939,6 +983,7 @@
     "^ji(\\d)\\.(\\d+)$": "Julia $1.$2",
     "^tpuv(\\d+)$": "TPU:TPUv$1",
     "^alpine(\\d+)$": "Alpine Linux $1",
+    "^gromacs*$": "GROMACS",
     "^(customized)_.*$": "Customized",
     "^(-_)$": " "
   }

@@ -209,17 +209,7 @@
     "UserStatus": "Хэрэглэгчийн статус",
     "Users": "Хэрэглэгчид",
     "WarningLessRateLimit": "Хэрэв ханшийн хязгаарын утга бага байвал нэвтрэх гэх мэт API үйлдлүүдийг хааж болно.",
-    "YouAreAboutToDeleteCredential": "Та энэ хэрэглэгчийн итгэмжлэлийг устгах гэж байна:",
-    "validation": {
-      "InvalidEmailAddress": "Хүчингүй мэйл хаяг.",
-      "LetterNumber-_dot": "Үсэг, тоо ба -_-г зөвшөөрдөг.",
-      "NameAlreadyExists": "Бодлогын нэр аль хэдийн байна!",
-      "NumbersOnly": "Зөвхөн дугаарыг зөвшөөрдөг",
-      "PleaseSelectOption": "Нэг сонголтыг сонгоно уу",
-      "PleaseSelectOptions": "сонголтуудыг сонгоно уу",
-      "PolicyName": "Бодлогын нэр шаардлагатай.",
-      "ValidationFailed": "Баталгаажуулалт амжилтгүй боллоо"
-    }
+    "YouAreAboutToDeleteCredential": "Та энэ хэрэглэгчийн итгэмжлэлийг устгах гэж байна:"
   },
   "data": {
     "Active": "Идэвхтэй",
@@ -310,7 +300,6 @@
       "InviteeEmail": "Уригдсан имэйл",
       "KeepFileExtension": "Хадгалах",
       "LessThan10Sec": "10 секундээс бага",
-      "ModifyPermissions": "Зөвшөөрлийг өөрчлөх",
       "MoreThanADay": "Өдөр гаруй",
       "Name": "Нэр",
       "NewFileName": "Шинэ файлын нэр",
@@ -347,15 +336,20 @@
     },
     "folders": {
       "CannotDeleteFolder": "Нэг буюу хэд хэдэн хэсэгт суулгасан фолдерыг устгах боломжгүй. Эхлээд хуралдааныг зогсооно уу.",
+      "CannotDeletePipelineFolder": "Та дамжуулах хоолойн хавтасыг устгах боломжгүй.",
+      "CannotRestorePipelineFolder": "Та дамжуулах хоолойн хавтасыг сэргээх боломжгүй.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Загвар төслийн фолдеруудыг зөвхөн загвар дэлгүүрийн онцгой төсөлд бий болгож болно. \nОдоогийн төсөл эсвэл хэрэглэгчийн төрлийг өөрчлөх.",
       "CloneAFolder": "Фолдерыг хуул",
       "CloneFolder": "Фолдерыг хувилах",
       "Cloneable": "Cloneable",
       "Control": "Хяналт",
+      "CreateModelFolderOnlyInExclusiveProject": "Загвар төслийн фолдеруудыг зөвхөн загвар дэлгүүрийн онцгой төсөлд бий болгож болно.",
       "CreatedAt": "Бүтэмж дээр бүтсэн",
       "Delete": "Устгах",
       "DeleteAFolder": "Фолдер устгах",
       "DeleteForever": "Бүрмөсөн устгах",
       "DescYouAreFolderOwner": "Та энэ фолдерын эзэн юм.",
+      "DownloadingModel": "Загварыг татаж байна ...",
       "Edit": "Засах",
       "EditDelete": "Засах + Устгах",
       "FileDeleted": "Файлыг устгасан",
@@ -377,7 +371,7 @@
       "FolderUsage": "Хавтас ашиглалт",
       "FolderUsing": "Ашиглаж байна",
       "InviteUsers": "Урих хэрэглэгч",
-      "KickOut": "",
+      "KickOut": "Хуваалцах гэж",
       "KickOutConfirm": "{{Имэйл}} -тай хуваалцахаа болих уу?",
       "Leave": "Орхи",
       "LeaveAFolder": "Фолдер үлдээнэ үү",
@@ -404,6 +398,7 @@
       "Path": "Агуулахын зам",
       "Permission": "Зөвшөөрөл",
       "ProjectFolderAlertDesc": "Энэ фолдерыг төслийн бүх гишүүдээр хуваалцаж байна",
+      "ProjectFolderCreationHelp": "\"{{projectName}} нь\" Төслийн хэрэглэгчид үүсгэгдэх болно.",
       "Rename": "Нэрийг нь өөрчлөх",
       "Restore": "Сэргээх",
       "RestoreDescription": "Та сэргээхийг хүсч байна уу \"{{ folderName }}\" хавтас?",
@@ -553,6 +548,7 @@
     "Digest": "Хоол боловсруулах",
     "Disabled": "Идэвхгүй",
     "ErrorMinimumValue": "{{ key }} нь дор хаяж {{ value }} байх ёстой",
+    "FailedToDeleteCustomizedImage": "Өөрчлөгдсөн зургийг устгах ажиллагаа амжилтгүй боллоо.",
     "FullImagePath": "Зургийн бүрэн зам",
     "ImageReinstallationRequired": "Зургийг дахин суулгах шаардлагатай",
     "Images": "Image",
@@ -622,6 +618,7 @@
     "SmallerResourceThenImageRequires": "Таны нөөцийн хүсэлт зурагт шаардагдах доод хэмжээнээс бага байна. \nИлүү их нөөцийг туршиж үзээрэй.",
     "TooManyLoginFailures": "Богино хугацаанд нэвтэрч ороход маш олон алдаа гарсан. \nНэвтрэхийг хэсэг хугацаанд хаасан.",
     "UnauthorizedToken": "Зөвшөөрөлгүй токен. \nТокенаа шалгана уу.",
+    "UnexpectedError": "Гэнэтийн алдаа гарлаа. \nХэрэв асуудал арилахгүй бол дараа дахин оролдоно уу.",
     "UnknownError": "Үл мэдэгдэх алдаа гарлаа. \nДахин оролдоно уу.",
     "UpdateError": "Шинэчлэлтийн алдаа",
     "UserHasNoGroup": "Хэрэглэгч бүлэггүй байна. \nҮүнийг засахын тулд админтай холбогдоно уу.",
@@ -638,8 +635,10 @@
     "Title": "Алдаа гарсан байна."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Фолдер олдсонгүй эсвэл хандалтыг үгүйсгэв",
     "InputTooShort": "Хэт богино байна",
     "NoExplorerSupportForUnmanagedFolder": "НҮБ-нээгүй хавтас нь файлын Explorer-ийг дэмждэггүй.",
+    "NoPermissions": "Энэ хавтсанд нэвтрэх зөвшөөрөл байхгүй байна",
     "ValueRequired": "Утга Шаардлагатай"
   },
   "general": {
@@ -677,7 +676,17 @@
     "StorageProxies": "Хадгалах сан",
     "TotalItems": "Нийт {{total}} зүйл",
     "Username": "Хэрэглэгчийн нэр",
-    "ValueRequired": "{{Нэр}}}}"
+    "ValueRequired": "{{Нэр}}}}",
+    "validation": {
+      "InvalidEmailAddress": "И-мэйл хаяг буруу байна.",
+      "LetterNumber-_dot": "Үсэг, тоо, -_-ийг зөвшөөрдөг.",
+      "NameAlreadyExists": "Бодлогын нэр аль хэдийн байна!",
+      "NumbersOnly": "Дугаарыг л зөвшөөрдөг",
+      "PleaseSelectOption": "Нэг сонголтыг сонгоно уу",
+      "PleaseSelectOptions": "Дор хаяж нэг сонголтыг сонгоно уу.",
+      "PolicyName": "Бодлогын нэр шаардлагатай.",
+      "ValidationFailed": "Баталгаажуулалт амжилтгүй боллоо"
+    }
   },
   "import": {
     "CleanUpImportTask": "Импортын ажлыг цэвэрлэх ...",
@@ -758,12 +767,15 @@
   "interactiveLogin": {
     "ConfirmLoginMessage": "Та {{username}} ({{email}}) бүртгэлээр нэвтрэхийг хүсэж байна уу?",
     "InteractiveLoginWithBackendAI": "Backend.AI бүртгэлээрээ нэвтэрнэ үү",
-    "ServiceName": "Үйлчилгээний нэр",
+    "ServiceName": "С УНKЦны нэр",
     "UseAnotherAccount": "Өөр бүртгэлээр нэвтэрнэ үү"
   },
   "kernel": {
     "AgentId": "Хийнний ID",
     "ContainerId": "Контейнер ID",
+    "ContainerLogs": "Савны бүртгэл",
+    "Hostname": "Хотийнгуу нэр",
+    "Kernel": "Цөм",
     "KernelId": "Kernel ID",
     "Kernels": "Кернел",
     "Role": "Дүрэм",
@@ -771,8 +783,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -788,8 +798,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -905,6 +917,7 @@
     "EndpointName": "Төгсгөлийн цэгийн нэр",
     "Error": "Алдаа",
     "ExpiredDate": "Хугацаа дууссан огноо",
+    "ExtraMountsWarning": "Үйлчилгээг засварлах үед нэмэлт суурилуулсан фолдерын нэр (нэр) нь хадгалагдахгүй байж болно. \nХадгалахаас өмнө хавтасны нэрийг дахин шалгана уу.",
     "FailedToStartService": "Үйлчилгээг үүсгэж чадсангүй.",
     "FailedToTerminateService": "Үйлчилгээг цуцлах хүсэлт амжилтгүй боллоо.",
     "FailedToUpdateService": "Үйлчилгээг шинэчилж чадсангүй.",
@@ -914,6 +927,7 @@
     "GenerateNewToken": "Шинэ токен үүсгэх",
     "GenerateToken": "Токен үүсгэх",
     "GeneratedTokens": "Үүсгэсэн токенууд",
+    "GoToServiceDetailPage": "Үйлчилгээний дэлгэрэнгүй хуудсанд очно уу",
     "Image": "Зураг",
     "ModelDefinitionPath": "Загварын тодорхойлолтын файлын зам",
     "ModelMountDestination": "Загварын хавтасыг холбох газар",
@@ -923,6 +937,7 @@
     "OnlyAllowsNonNegativeIntegers": "Зөвхөн сөрөг бус бүхэл тоог зөвшөөрдөг",
     "OpenToPublic": "Олон нийтэд нээлттэй",
     "Owner": "Эзэмшигч",
+    "PlayYourModelNow": "Одоо загвараа тоглоорой!",
     "PleaseSelectTime": "Цаг сонгоно уу!",
     "Processing": "Боловсруулж байна...",
     "Public": "Олон нийтийн",
@@ -934,17 +949,21 @@
     "RoutesInfo": "Маршрутын мэдээлэл",
     "RoutingInfo": "Чиглүүлэлтийн мэдээлэл",
     "RoutingsCount": "Чиглүүлэлтийн тоо",
+    "RunThisModel": "Энэ загварыг ажиллуул",
     "RuntimeVariant": "Дүгнэлт Runtime Variant",
     "SeeContainerLogs": "Контейнерийн бүртгэлийг үзнэ үү",
+    "ServiceAlreadyExists": "Үйлчилгээний нэр аль хэдийн байна",
     "ServiceCreated": "Загвар үйлчилгээ {{ name }} амжилттай үүсгэгдсэн.",
     "ServiceDelegatedFrom": "Загвар үйлчилгээг {{ createdUser }} үүсгэсэн боловч сессийн эрхийг {{ sessionOwner }}-д шилжүүлнэ.",
     "ServiceEndpoint": "Үйлчилгээний эцсийн цэг",
     "ServiceInfo": "Үйлчилгээний мэдээлэл",
-    "ServiceName": "Үйлчилгээний нэр",
+    "ServiceName": "С УНKЦны нэр",
     "ServiceNameCannotStartWithHyphen": "Хоёр төгсгөлд зураас (-) ашиглах боломжгүй.",
+    "ServiceNameInvalidCharacter": "Үйлчилгээний голд зөвхөн цагаан толгой, цагаан толгой, тоо, '_', '_'.",
     "ServiceNameMaxLength": "24 ба түүнээс бага тэмдэгт оруулна уу.",
     "ServiceNameMinLength": "Дор хаяж 4 тэмдэгт оруулна уу.",
-    "ServiceNameRule": "Зөвхөн үсэг тоо, доогуур зураас(_), зураас(-) оруулахыг зөвшөөрөх ба энэ нь үсэг, тоон тэмдэгтээр төгсөх ёстой.",
+    "ServiceNameShouldEndWith": "Сешн нэр нь цагаан толгой, том, жижиг тэмдэгтүүд, тоо, тоонууд, тоонууд, тоонууд, ба '_'.",
+    "ServiceNameShouldStartWith": "Хурлын нэр цагаан толгойн болон жижиг тэмдэгтүүдээс эхлэх ёстой.",
     "ServiceTerminated": "'{{ name }}' загварын үйлчилгээнд хаах хүсэлт илгээсэн.",
     "ServiceUpdated": "Загвар үйлчилгээ {{ name }} амжилттай шинэчлэгдсэн.",
     "Services": "Үйлчилгээ",
@@ -954,6 +973,7 @@
     "StartNewService": "Шинэ үйлчилгээг эхлүүлэх",
     "StartNewServing": "Шинээр үйлчилж эхлэх",
     "StartService": "Үйлчилгээг эхлүүлэх",
+    "StartingModelService": "Загварын үйлчилгээг эхлүүлэх ...",
     "Status": "Статус",
     "Success": "Амжилт",
     "SyncRoutes": "Замуудыг синк хийх",
@@ -1010,9 +1030,8 @@
     "SuccessfullyUpdated": "Амжилттай шинэчлэгдсэн",
     "Visit": "Айлчлах"
   },
-  "propertyFilter": {
-    "PlaceHolder": "Хайх",
-    "ResetFilter": "Шүүлтүүрийг дахин тохируулах"
+  "pagination": {
+    "Total": "{{start}} - {{{End}} {{нийт}}}} зүйл"
   },
   "registry": {
     "AddRegistry": "Бүртгэл нэмэх",
@@ -1101,6 +1120,11 @@
     "TypeResourceGroupNameToDelete": "Устгахын тулд нөөцийн бүлгийн нэрийг бичнэ үү",
     "WsproxyAddress": "WSProxy серверийн хаяг"
   },
+  "resourcePanel": {
+    "Limit": "Хязгаар",
+    "RemainingNumber": "Rmaining",
+    "UsingNumber": "Ашиглаж"
+  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Та энэ нөөцийн бодлогыг устгах гэж байна:",
     "AllowedHosts": "Зөвшөөрөгдсөн хостууд",
@@ -1179,6 +1203,9 @@
     "SHMEMShouldBeSmallerThanMemory": "Хуваалцсан санах ой санах ойноос бага байх ёстой",
     "SharedMemory": "Хуваалцсан санах ой",
     "Updated": "Нөөцийн урьдчилан тохируулалтыг шинэчилсэн"
+  },
+  "scheduler": {
+    "PendingSessions": "Хүлээгдэж буй хуралдаанууд"
   },
   "session": {
     "Agent": "Агент",
@@ -1260,12 +1287,15 @@
     "OpenToPublic": "Аппыг нийтэд нээлттэй болгох",
     "OpenToPublicDesc": "Энэ сонголтыг идэвхжүүлж байгаа энэ сонголтыг сүлжээнд байгаа бүх хэрэглэгчдэд ашиглах боломжтой.<br /><br /> \nХандалтын менежментийн хувьд 'Зөвшөөрөгдсөн IP' талбарт тодорхой IP хаягийг оруулна уу.<br /><br /> \nЭнэ талбарыг орхиж явах нь бүх IP хаягнаас нэвтрэх боломжийг олгоно.<br /><br /> \nАюулгүй байдлын менежментэд шаардлагатай үед IP хязгаарлалтыг тохируулах.",
     "Others": "Бусад",
+    "PanelSettings": "Пансын тохиргоо",
+    "PendingPosition": "Дарааллын байрлал",
     "PredicateChecks": "Урьдчилан шалгалт",
     "Preparing": "Бэлтгэж байна ...",
     "PreparingSession": "Session бэлтгэж байна ...",
     "ReadLess": "Бага унш",
     "ReadMore": "Цааш унших...",
     "RecentlyCreatedSessions": "Саяхан бүтээсэн хуралдаанууд",
+    "RecentlyCreatedSessionsTooltip": "Одоогийн төсөлд хамгийн сүүлд үүсгэсэн ажиллаж байгаа {{count}} сессийг харуулна",
     "RequestContainerCommit": "Контейнерын үүрэг хүлээнэ үү",
     "Reservation": "Захиалга",
     "ResourceGroup": "Нөөцийн бүлэг",
@@ -1335,6 +1365,7 @@
       "AddingKernelToSocketQueue": "Цөмийг сокет дараалалд нэмж оруулах ...",
       "AgentNode": "Агент",
       "AllocateNode": "Кластер горим",
+      "ApplicationMemory": "Application MEM {{value}}",
       "Architecture": "Архитектур",
       "AutoSelect": "Автоматаар сонгох",
       "AutoSharedMemoryTooltip": "Та автоматаар хуваалцсан санах ойн хэмжээг автоматаар сонгох эсвэл гараар сонгох боломжтой.",
@@ -1403,6 +1434,7 @@
       "InsufficientAllocationOfResourcesWarning": "Хуваарилах нөөц нь сонгосон зурагт шаардагдах хамгийн бага нөөцөөс доогуур байна.",
       "InteractiveMode": "Интерактив",
       "InteractiveModeDesc": "jupyter notebook, visual studio код гэх мэтээр интерактив код үүсгэх, турших, ажиллуулах боломжийг танд олгоно.",
+      "InvalidMountsSelectionWarning": "Фолдерын сонголтын мэдээлэл буруу байна. Сонгосон фолдерыг шалгана уу.",
       "InvalidPortFormat": "Портын дугаарын формат буруу байна.",
       "Launch": "Эхлэх",
       "LaunchConfirmationDialog": "Өөрийн код, өгөгдлийг хадгалах, эсвэл бусад хамтран ажиллагсадтайгаа хуваалцахын тулд өгөгдөл & хадгалах талын самбар дээр хадгалах хавтас үүсгээд нөөцөө эхлүүлэхдээ уг хавтасыг холбоод хадгална уу.",
@@ -1484,8 +1516,7 @@
       "SetPreopenPorts": "Урьдчилан нээх портууд (заавал биш)",
       "SetSessionOwner": "Session эзэмшигч",
       "SettingUpProxyForApp": "Апп-д прокси тохируулж байна ...",
-      "SharedMemory": "Хамтарсан санах ой",
-      "SharedMemoryAbbr": "SHMEM",
+      "SharedMemory": "Хуваалцсан санах ой (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Хуваалцсан санах ойн тохиргоог хуваарилагдсан санах ойн доогуур болгож багасгасан.",
       "SingleNode": "Нэг Node",
       "SkipToConfirmAndLaunch": "Шүүмж рүү алгасах",
@@ -1521,6 +1552,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Атомын хамгийн их дэмжлэг",
     "ATOMPlusSupport": "ATOM+ дэмжлэг",
     "ATOMSupport": "АТОМ",
     "AllowAgentSideRegistration": "Агент талын бүртгэлийг зөвшөөрөх",
@@ -1528,6 +1560,7 @@
     "Config": "Тохиргоо",
     "ConfigPerJobSchduler": "Хуваарилагчийн тохиргоо",
     "ConfigPerJobSchdulerDescription": "Төлөвлөгчийн тохиргооны утга нь нөөцийн бүлэг тус бүрт хуваарилагчийн тохиргоо хийгдээгүй үед хэрэглэгддэг анхдагч утга юм. Хэрэв нөөцийн бүлэгт зориулсан тохиргоо байгаа бол энэ утгыг үл тоомсорлох болно.",
+    "DescATOMMaxSupport": "Rebellions ATOM Max Accelerator ашиглана уу.",
     "DescATOMPlusSupport": "Rebellions ATOM+ хурдасгуурыг ашигла.",
     "DescATOMSupport": "Rebellions ATOM хурдасгуурыг ашигла",
     "DescAllowAgentSideRegistration": "Агентийг менежер рүүгээ бүртгүүлэхийг зөвшөөрөх. ACASEND.AL CLUSER-ийг АЖИЛЛАГААНЫ ХУДАЛДАН АВАХ БОЛОМЖТОЙ.",
@@ -1570,6 +1603,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "ROCm GPU дэмжлэг",
     "RegisterNewImagesFromRepo": "Агуулахаас шинэ зургуудыг бүртгүүлэх",
+    "RequireATOMMaxPlugin": "Backend.AI ATOM Max плагин шаардлагатай.",
     "RequireATOMPlugin": "Backend.AI ATOM Plugin шаардлагатай.",
     "RequireATOMPlusPlugin": "Backend.AI ATOM+ Plugin шаардлагатай.",
     "RequireFGPUPlugin": "Backend.AI виртуал CUDA API Layer Plugin шаарддаг.",
@@ -1679,6 +1713,11 @@
     "SessionsDesc": "Үүсгэсэн тооцооллын сешнүүдийн тоо.",
     "UsageHistory": "Хэрэглээ түүх",
     "UsageHistoryNote": "Ашиглалтын түүхийг энд харуулав.",
+    "description": {
+      "CPUUtilization": "Сонгосон хугацаанд ашигласан хуралдааны цагаар ашигладаг CPU-ийн хэмжээг илэрхийлнэ. \n\nНэг CPU цөм нь дээд тал нь хамгийн ихдээ 100% -тай тохирч байна.\n\nХэрэв олон цоорхойг хуваарилсан бол нийт хэрэглээний хамгийн их хэрэглээг (100%) тооцоолох замаар тооцоолох боломжтой.",
+      "NetworkRx": "Сүлжээний дамжуулах хурдыг заана. \n\nСавыг сүлжээний өгөгдлийг хүлээн авч байгаа хувь хэмжээг илэрхийлнэ.",
+      "NetworkTx": "Сүлжээний дамжуулах хурдыг заана.\n\nСавыг сүлжээний өгөгдлийг илгээж байгаа хувь хэмжээг илэрхийлнэ."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Хэрэв USERES бага бол зарим болзоонд өгөгдөл байхгүй байж магадгүй юм. \nБогино хугацаанд дахин оролдоно уу.",
       "NoMetricsToDisplay": "Хяналт хийх боломжтой хэмжигдэхүүн байхгүй"
@@ -1729,6 +1768,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU-г идэвхжүүлсэн",
+    "ATOMMaxEnabled": "Атомын Max NPU идэвхжсэн",
     "ATOMPlusEnabled": "ATOM+ NPU-г идэвхжүүлсэн",
     "Accept": "Хүлээн зөвшөөрөх",
     "AcceptSharedVFolder": "Та энэ фолдер рүү нэвтрэх боломжтой боллоо:",
@@ -1917,6 +1957,7 @@
       "ClickToDownload": "Татаж авахын тулд дарна уу",
       "ComputationResources": "Тооцооллын нөөц",
       "Configurations": "Тохиргоо",
+      "Dashboard": "Хотер самбар",
       "Data": "Мэдээ",
       "Data&Model": "Өгөгдөл",
       "Data&Storage": "Мэдээлэл ба хадгалах сан",
@@ -1938,6 +1979,7 @@
       "InvalidBlankPassword": "Нууц үгээ оруулна уу",
       "InvalidPasswordMessage": "Наад зах нь 1 цагаан толгой, 1 тоо, 1 тусгай тэмдэгт шаардагдах бөгөөд дор хаяж 8 тэмдэгттэй байх шаардлагатай.",
       "LeaveService": "Үйлчилгээг орхих",
+      "Limits": "Хязгаар",
       "LogOut": "Гарах",
       "Logs": "Бүртгэл",
       "LogsErrors": "Лог / Алдаа",
@@ -1945,6 +1987,11 @@
       "MyAccount": "Хэрэглэгчийн мэдээллийг өөрчлөх",
       "MyAccountInformation": "Хэрэглэгчийн мэдээллийг өөрчлөх",
       "MyEnvironments": "Миний орчин",
+      "MyResources": "Миний нийт нөөцийн хязгаар",
+      "MyResourcesDescription": "<p>Энэ самбар нь бүх төсөл болон нөөцийн бүлгүүдийн нийт нөөцийн хэрэглээ болон хязгаарыг харуулна.</p><p>Олон хязгаарлалт хэрэглэх үед (домэйн, төсөл эсвэл түлхүүр хос гэх мэт), тооцоололд хамгийн хатуу хязгаарлалтыг ашиглана.</p>",
+      "MyResourcesIn": "Миний нөөц",
+      "MyResourcesInResourceGroup": "Нөөцийн бүлгийн нөөц",
+      "MyResourcesInResourceGroupDescription": "Энэ самбар нь таны нөөцийн ашиглалтыг харуулж, сонгосон нөөцийн бүлэгт үлдсэн.",
       "NewPassword": "Шинэ нууц үг",
       "NewPasswordAgain": "Шинэ нууц үг (дахиад)",
       "NewPasswordCannotBeSame": "Таны одоогийн нууц үгээс өөр нууц үг оруулна уу.",
@@ -1960,8 +2007,10 @@
       "Preferences": "Тохиргоо",
       "PrivacyPolicy": "Нууцлалын бодлого",
       "Project": "Төсөл",
+      "Remaining": "Үлдсэн",
       "ResourcePolicy": "Нөөцийн бодлого",
       "Resources": "Нөөц",
+      "Scheduler": "Хуваарийн өгөх",
       "Serving": "Үйлчилж байна",
       "Sessions": "Session-үүд",
       "Settings": "Тохиргоо",
@@ -1972,8 +2021,12 @@
       "Summary": "Хураангуй",
       "Tasks": "Даалгаврууд",
       "TermsOfService": "Үйлчилгээний нөхцөл",
+      "TotalResourcesIn": "Нийт нөөц",
+      "TotalResourcesInResourceGroup": "Нөөцийн бүлгийн нийт нөөц",
+      "TotalResourcesInResourceGroupDescription": "Энэ самбар нь ашиглагдаж, үлдсэн нөөцийг нийтлүүлнэ. \nУтга нь сонгосон нөөцийн бүлгийг ашиглан бүх агентуудын болон үлдсэн агентуудын үлдэгдлийг нэмж, үлдсэн хэмжээгээр тооцдог.",
       "TotpActivated": "2FA идэвхжүүлсэн",
       "Update": "Шинэчлэх",
+      "Usage": "Угаалах",
       "UsageHistory": "Хуваарилах түүх",
       "UserCredentials&Policies": "Хэрэглэгчийн итгэмжлэл ба тохиргоо",
       "UserSessionHistory": "Хэрэглэгчийн хурлын түүх",

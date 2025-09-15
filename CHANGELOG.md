@@ -16,6 +16,39 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.13 (2025-09-15)
+
+### Features
+* Improve `logging.BraceStyleAdapter` to support user-defined kwargs and access to `extra` data including contextual fields. ([#5523](https://github.com/lablup/backend.ai/issues/5523))
+
+### Fixes
+* Fix incorrect filetype check of `PureStorage` VFolder ([#5018](https://github.com/lablup/backend.ai/issues/5018))
+* Allow any string value for volume name in config ([#5029](https://github.com/lablup/backend.ai/issues/5029))
+* Wrong `service ports` field name of Session creation response ([#5047](https://github.com/lablup/backend.ai/issues/5047))
+* Fix unbound `vfolder_id` when model-type folder is used in service `extra_mounts` ([#5059](https://github.com/lablup/backend.ai/issues/5059))
+* Manager correctly handles already-deleted VFolders ([#5080](https://github.com/lablup/backend.ai/issues/5080))
+* Enable continuous code execution tasks to work properly in Agent ([#5112](https://github.com/lablup/backend.ai/issues/5112))
+* Enable Agent starts if scratch already cleaned before destroy container ([#5118](https://github.com/lablup/backend.ai/issues/5118))
+* Handle empty consumer handlers in EventDispatcher to avoid retry ([#5137](https://github.com/lablup/backend.ai/issues/5137))
+* Add missing database transaction retry logic when setting network ID of new sessions ([#5329](https://github.com/lablup/backend.ai/issues/5329))
+* Apply memoization to the scheduler plugin loaders to reduce runtime overheads when running the scheduler loop ([#5342](https://github.com/lablup/backend.ai/issues/5342))
+* Add Docker image rescan exception handling logic when the image config is `None` ([#5394](https://github.com/lablup/backend.ai/issues/5394))
+* Fix NUMA-aware affinity allocation to find the larged connected component with the most remaining resource capacity when grouping devices per NUMA node ([#5454](https://github.com/lablup/backend.ai/issues/5454))
+* Prevent the Agent from producing error events in the heartbeat loop to avoid loop termination due to Redis connection failures ([#5469](https://github.com/lablup/backend.ai/issues/5469))
+* Fixed session being incorrectly set on failed login attempts and ensured `X-BackendAI-SessionID` header is always included when login succeeds ([#5473](https://github.com/lablup/backend.ai/issues/5473))
+* Respect the inherited ulimits when setting ulimits of new containers ([#5489](https://github.com/lablup/backend.ai/issues/5489))
+* Document the internal logic of affinity-aware device allocation and improve error messages ([#5521](https://github.com/lablup/backend.ai/issues/5521))
+* Fix NUMA node alignment of subsequent device allocation ([#5587](https://github.com/lablup/backend.ai/issues/5587))
+* Ensure id parameter of chown function is an int ([#5713](https://github.com/lablup/backend.ai/issues/5713))
+* Fixed JSON parsing error when querying wsproxy status endpoint occurred when wsproxy returned HTML error responses ([#5829](https://github.com/lablup/backend.ai/issues/5829))
+* Fix wrong `ResourceSlot` serialization error of `AgentNode` GQL resolver ([#5848](https://github.com/lablup/backend.ai/issues/5848))
+* Handle empty `supported_accelerators` list in `Image`, `ImageNode` ([#5869](https://github.com/lablup/backend.ai/issues/5869))
+* Ensured model service token expiration times are handled consistently in UTC ([#5872](https://github.com/lablup/backend.ai/issues/5872))
+
+### Miscellaneous
+* Add `[tool.pyright]` section to `pyproject.toml` so that IDEs using Pyright as the default LSP works out of the box by detecting Pants-specific configurations ([#5088](https://github.com/lablup/backend.ai/issues/5088))
+
+
 ## 25.6.12 (2025-07-07)
 
 ### Features
