@@ -589,7 +589,7 @@ class PresignedUploadConfig(BaseModel):
         serialization_alias="max-size",
     )
     expiration: int = Field(
-        default=60 * 60,
+        default=1800,
         description="""
         Expiration time (in seconds) for presigned URLs.
         """,

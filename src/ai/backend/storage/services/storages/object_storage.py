@@ -23,8 +23,6 @@ from ...exception import (
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_DEFAULT_EXPIRATION = 1800  # Default token expiration time in seconds
-
 
 class ObjectStorageService:
     """
