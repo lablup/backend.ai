@@ -64,6 +64,19 @@ class QuotaDirectoryNotEmptyError(BackendAIError, web.HTTPConflict):
         )
 
 
+class NetAppClientError(ExternalStorageServiceError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/storage/netapp/api-error"
+    error_title = "NetApp API Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class VFolderCreationError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/vfolder/creation-failed"
     error_title = "VFolder Creation Failed"

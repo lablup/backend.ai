@@ -10,6 +10,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressRepor
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
 from ai.backend.common.types import DispatchResult, ErrorResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.s3 import S3Client

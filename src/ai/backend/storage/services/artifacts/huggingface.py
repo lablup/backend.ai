@@ -17,6 +17,7 @@ from ai.backend.common.data.storage.registries.types import (
     ModelTarget,
 )
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
 from ai.backend.common.types import DispatchResult, ErrorResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.huggingface import (
