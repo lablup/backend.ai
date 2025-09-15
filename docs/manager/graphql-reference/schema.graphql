@@ -180,6 +180,9 @@ type Query {
     first: Int
     last: Int
   ): ImageConnection
+
+  """Added in 25.14.2. Returns information about the current user."""
+  viewer: Viewer
   user(domain_name: String, email: String): User
   user_from_uuid(domain_name: String, user_id: ID): User
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User]
@@ -1131,6 +1134,13 @@ type ImageEdge {
 
   """A cursor for use in pagination"""
   cursor: String!
+}
+
+"""Added in 25.14.2."""
+type Viewer {
+  user: UserNode
+  user_id: UUID
+  encoded_user_role: String
 }
 
 type User implements Item {
