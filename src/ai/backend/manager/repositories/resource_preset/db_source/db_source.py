@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
 from typing import Mapping, Optional
 from uuid import UUID
 
@@ -305,7 +304,9 @@ class ResourcePresetDBSource:
         :param known_slot_types: Known slot types for initialization
         :return: Dictionary of scaling group name to occupied resources
         """
-        per_sgroup_occupancy = {sgname: ResourceSlot() for sgname in sgroup_names}
+        per_sgroup_occupancy = {
+            sgname: ResourceSlot.from_known_slots(known_slot_types) for sgname in sgroup_names
+        }
 
         j = sa.join(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id)
         query = (
@@ -337,7 +338,9 @@ class ResourcePresetDBSource:
         :param known_slot_types: Known slot types for initialization
         :return: Tuple of (per_sgroup_remaining, agent_slots_list)
         """
-        per_sgroup_remaining = {sgname: ResourceSlot() for sgname in sgroup_names}
+        per_sgroup_remaining = {
+            sgname: ResourceSlot.from_known_slots(known_slot_types) for sgname in sgroup_names
+        }
         agent_slots = []
         query = (
             sa.select([
@@ -494,7 +497,7 @@ class ResourcePresetDBSource:
 
         # Build per scaling group data
         per_sgroup = {}
-        empty_slot = ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
+        empty_slot = ResourceSlot.from_known_slots(known_slot_types)
         for sgname in sgroup_names:
             per_sgroup[sgname] = PerScalingGroupResourceData(
                 using=per_sgroup_occupancy.get(sgname, empty_slot),
@@ -502,7 +505,7 @@ class ResourcePresetDBSource:
             )
 
         # Calculate total scaling group remaining
-        sgroup_remaining = ResourceSlot({k: Decimal(0) for k in known_slot_types.keys()})
+        sgroup_remaining = ResourceSlot.from_known_slots(known_slot_types)
         for remaining in per_sgroup_agent_remaining.values():
             sgroup_remaining += remaining
 
