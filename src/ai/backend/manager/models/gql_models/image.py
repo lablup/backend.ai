@@ -59,6 +59,7 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
 )
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
+from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
 from ai.backend.manager.services.image.actions.modify_image import (
     ImageModifier,
     ModifyImageAction,
@@ -726,6 +727,15 @@ class ImageNode(graphene.ObjectType):
                     for row in image_rows
                 ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    # TODO: Introduce access control logic considering scope and permission
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> "Image":
+        ctx: GraphQueryContext = info.context
+        _, image_id = AsyncNode.resolve_global_id(info, self.id)
+        action_result = await ctx.processors.image.get_image_by_id.wait_for_complete(
+            GetImageByIdAction(image_id=UUID(image_id))
+        )
+        return ImageNode.from_row(ctx, ImageRow.from_dataclass(action_result.image))
 
 
 class ImageConnection(Connection):
