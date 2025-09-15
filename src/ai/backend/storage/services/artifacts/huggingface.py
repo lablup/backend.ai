@@ -17,6 +17,7 @@ from ai.backend.common.data.storage.registries.types import (
     ModelTarget,
 )
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
 from ai.backend.common.types import DispatchResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.huggingface import (
@@ -373,6 +374,15 @@ class HuggingFaceService:
 
             if failed_uploads > 0:
                 log.warning(f"Some files failed to import: {model}, failed_count={failed_uploads}")
+
+            await self._event_producer.anycast_event(
+                ModelImportDoneEvent(
+                    model_id=model.model_id,
+                    revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
+                    registry_name=registry_name,
+                    registry_type=ArtifactRegistryType.HUGGINGFACE,
+                )
+            )
 
         except HuggingFaceModelNotFoundError:
             raise
