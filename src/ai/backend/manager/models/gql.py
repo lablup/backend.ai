@@ -741,7 +741,7 @@ class Query(graphene.ObjectType):
     )
 
     viewer = graphene.Field(
-        Viewer, description="Added in 25.14.0. Returns information about the current user."
+        Viewer, description="Added in 25.14.2. Returns information about the current user."
     )
 
     user = graphene.Field(

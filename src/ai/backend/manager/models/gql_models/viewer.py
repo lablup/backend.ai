@@ -22,7 +22,7 @@ __all__ = ("Viewer",)
 
 class Viewer(graphene.ObjectType):
     class Meta:
-        description = "Added in 25.14.0."
+        description = "Added in 25.14.2."
 
     user = graphene.Field(UserNode)
     user_id = graphene.UUID()
