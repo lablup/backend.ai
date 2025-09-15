@@ -1452,6 +1452,20 @@ type DealiasImage
   msg: String
 }
 
+"""Added in 25.15.0"""
+input DeleteArtifactsInput
+  @join__type(graph: STRAWBERRY)
+{
+  artifactIds: [ID!]!
+}
+
+"""Added in 25.14.0"""
+type DeleteArtifactsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  artifacts: [Artifact!]!
+}
+
 """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
 type DeleteContainerRegistry
   @join__type(graph: GRAPHENE)
@@ -3758,6 +3772,9 @@ type Mutation
 
   """Added in 25.14.0"""
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.14.0"""
+  deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
   cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload! @join__field(graph: STRAWBERRY)

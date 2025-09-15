@@ -302,6 +302,16 @@ type CreateReservoirRegistryPayload {
 """Date with time (isoformat)"""
 scalar DateTime
 
+"""Added in 25.15.0"""
+input DeleteArtifactsInput {
+  artifactIds: [ID!]!
+}
+
+"""Added in 25.14.0"""
+type DeleteArtifactsPayload {
+  artifacts: [Artifact!]!
+}
+
 """Added in 25.14.0"""
 input DeleteHuggingFaceRegistryInput {
   id: ID!
@@ -654,6 +664,9 @@ type Mutation {
 
   """Added in 25.14.0"""
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
+
+  """Added in 25.14.0"""
+  deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload!
 
   """Added in 25.14.0"""
   cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload!
