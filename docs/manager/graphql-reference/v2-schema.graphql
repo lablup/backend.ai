@@ -307,7 +307,7 @@ input DeleteArtifactsInput {
   artifactIds: [ID!]!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.15.0"""
 type DeleteArtifactsPayload {
   artifacts: [Artifact!]!
 }
@@ -665,7 +665,7 @@ type Mutation {
   """Added in 25.14.0"""
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
 
-  """Added in 25.14.0"""
+  """Added in 25.15.0"""
   deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload!
 
   """Added in 25.14.0"""

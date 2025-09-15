@@ -1459,7 +1459,7 @@ input DeleteArtifactsInput
   artifactIds: [ID!]!
 }
 
-"""Added in 25.14.0"""
+"""Added in 25.15.0"""
 type DeleteArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -3773,7 +3773,7 @@ type Mutation
   """Added in 25.14.0"""
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
+  """Added in 25.15.0"""
   deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""

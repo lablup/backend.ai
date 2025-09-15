@@ -428,7 +428,7 @@ class ScanArtifactModelsPayload:
     artifact_revision: ArtifactRevisionConnection
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(description="Added in 25.15.0")
 class DeleteArtifactsPayload:
     artifacts: list[Artifact]
 
@@ -896,7 +896,7 @@ async def cleanup_artifact_revisions(
     return CleanupArtifactRevisionsPayload(artifact_revisions=artifacts_connection)
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(description="Added in 25.15.0")
 async def delete_artifacts(
     input: DeleteArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DeleteArtifactsPayload:
