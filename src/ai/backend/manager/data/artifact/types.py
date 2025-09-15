@@ -28,6 +28,15 @@ class ArtifactStatus(enum.StrEnum):
     REJECTED = "REJECTED"
 
 
+class ArtifactAvailability(enum.StrEnum):
+    """
+    Artifact's availability.
+    """
+
+    ALIVE = "ALIVE"
+    DELETED = "DELETED"
+
+
 @dataclass
 class ArtifactData:
     id: uuid.UUID
@@ -38,6 +47,7 @@ class ArtifactData:
     source_registry_id: uuid.UUID
     registry_type: ArtifactRegistryType
     source_registry_type: ArtifactRegistryType
+    availability: ArtifactAvailability
     scanned_at: datetime
     updated_at: datetime
     readonly: bool
@@ -105,6 +115,7 @@ class ArtifactDataWithRevisions(ArtifactData):
             scanned_at=artifact_data.scanned_at,
             updated_at=artifact_data.updated_at,
             readonly=artifact_data.readonly,
+            availability=artifact_data.availability,
             revisions=revisions,
         )
 
@@ -131,6 +142,7 @@ class ArtifactDataWithRevisionsResponse(ArtifactData):
             scanned_at=artifact_data.scanned_at,
             updated_at=artifact_data.updated_at,
             readonly=artifact_data.readonly,
+            availability=artifact_data.availability,
             revisions=[ArtifactRevisionResponseData.from_revision_data(rev) for rev in revisions],
         )
 
@@ -150,6 +162,7 @@ class ArtifactDataWithRevisionsResponse(ArtifactData):
             scanned_at=artifact_with_revisions.scanned_at,
             updated_at=artifact_with_revisions.updated_at,
             readonly=artifact_with_revisions.readonly,
+            availability=artifact_with_revisions.availability,
             revisions=[
                 ArtifactRevisionResponseData.from_revision_data(rev)
                 for rev in artifact_with_revisions.revisions

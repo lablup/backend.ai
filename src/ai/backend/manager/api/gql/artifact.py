@@ -23,6 +23,7 @@ from ai.backend.manager.api.gql.base import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
+    ArtifactAvailability,
     ArtifactData,
     ArtifactOrderField,
     ArtifactRevisionData,
@@ -40,8 +41,10 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactStatusFilter,
     ArtifactStatusFilterType,
 )
+from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
+from ai.backend.manager.services.artifact.actions.restore_multi import RestoreArtifactsAction
 from ai.backend.manager.services.artifact.actions.retrieve_model_multi import RetrieveModelsAction
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.update import UpdateArtifactAction
@@ -71,6 +74,7 @@ class ArtifactFilter:
     name: Optional[StringFilter] = None
     registry: Optional[StringFilter] = None
     source: Optional[StringFilter] = None
+    availability: Optional[list[ArtifactAvailability]] = None
 
     AND: Optional[list["ArtifactFilter"]] = None
     OR: Optional[list["ArtifactFilter"]] = None
@@ -84,6 +88,7 @@ class ArtifactFilter:
         repo_filter.name_filter = self.name
         repo_filter.registry_filter = self.registry
         repo_filter.source_filter = self.source
+        repo_filter.availability = self.availability
 
         # Handle logical operations
         if self.AND:
@@ -191,6 +196,16 @@ class CleanupArtifactRevisionsInput:
     artifact_revision_ids: list[ID]
 
 
+@strawberry.input(description="Added in 25.15.0")
+class DeleteArtifactsInput:
+    artifact_ids: list[ID]
+
+
+@strawberry.input(description="Added in 25.15.0")
+class RestoreArtifactsInput:
+    artifact_ids: list[ID]
+
+
 @strawberry.input(description="Added in 25.14.0")
 class ApproveArtifactInput:
     artifact_revision_id: ID
@@ -239,6 +254,7 @@ class Artifact(Node):
     readonly: bool
     scanned_at: datetime
     updated_at: datetime
+    availability: ArtifactAvailability
 
     @classmethod
     def from_dataclass(cls, data: ArtifactData, registry_url: str, source_url: str) -> Self:
@@ -252,6 +268,7 @@ class Artifact(Node):
             readonly=data.readonly,
             scanned_at=data.scanned_at,
             updated_at=data.updated_at,
+            availability=data.availability,
         )
 
     @strawberry.field
@@ -415,6 +432,16 @@ class ArtifactStatusChangedPayload:
 @strawberry.type(description="Added in 25.14.0")
 class ScanArtifactModelsPayload:
     artifact_revision: ArtifactRevisionConnection
+
+
+@strawberry.type(description="Added in 25.15.0")
+class DeleteArtifactsPayload:
+    artifacts: list[Artifact]
+
+
+@strawberry.type(description="Added in 25.15.0")
+class RestoreArtifactsPayload:
+    artifacts: list[Artifact]
 
 
 async def resolve_artifacts(
@@ -668,7 +695,7 @@ async def resolve_artifact_revisions(
 @strawberry.field(description="Added in 25.14.0")
 async def artifacts(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactFilter] = None,
+    filter: Optional[ArtifactFilter] = ArtifactFilter(availability=[ArtifactAvailability.ALIVE]),
     order_by: Optional[list[ArtifactOrderBy]] = None,
     before: Optional[str] = None,
     after: Optional[str] = None,
@@ -878,6 +905,52 @@ async def cleanup_artifact_revisions(
     )
 
     return CleanupArtifactRevisionsPayload(artifact_revisions=artifacts_connection)
+
+
+@strawberry.mutation(description="Added in 25.15.0")
+async def delete_artifacts(
+    input: DeleteArtifactsInput, info: Info[StrawberryGQLContext]
+) -> DeleteArtifactsPayload:
+    action_result = await info.context.processors.artifact.delete_artifacts.wait_for_complete(
+        DeleteArtifactsAction(
+            artifact_ids=[uuid.UUID(id) for id in input.artifact_ids],
+        )
+    )
+
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
+    )
+
+    artifacts = []
+    for item in action_result.artifacts:
+        registry_data = await registry_meta_loader.load(item.registry_id)
+        source_registry_data = await registry_meta_loader.load(item.source_registry_id)
+        artifacts.append(Artifact.from_dataclass(item, registry_data.url, source_registry_data.url))
+
+    return DeleteArtifactsPayload(artifacts=artifacts)
+
+
+@strawberry.mutation(description="Added in 25.15.0")
+async def restore_artifacts(
+    input: RestoreArtifactsInput, info: Info[StrawberryGQLContext]
+) -> RestoreArtifactsPayload:
+    action_result = await info.context.processors.artifact.restore_artifacts.wait_for_complete(
+        RestoreArtifactsAction(
+            artifact_ids=[uuid.UUID(id) for id in input.artifact_ids],
+        )
+    )
+
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
+    )
+
+    artifacts = []
+    for item in action_result.artifacts:
+        registry_data = await registry_meta_loader.load(item.registry_id)
+        source_registry_data = await registry_meta_loader.load(item.source_registry_id)
+        artifacts.append(Artifact.from_dataclass(item, registry_data.url, source_registry_data.url))
+
+    return RestoreArtifactsPayload(artifacts=artifacts)
 
 
 @strawberry.mutation(description="Added in 25.14.0")
