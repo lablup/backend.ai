@@ -48,6 +48,16 @@ class ObjectPermissionRow(Base):
             operation=input.operation,
         )
 
+    @classmethod
+    def from_sa_row(cls, row: sa.engine.Row) -> Self:
+        return cls(
+            id=row.id,
+            role_id=row.role_id,
+            entity_type=row.entity_type,
+            entity_id=row.entity_id,
+            operation=row.operation,
+        )
+
     def to_data(self) -> ObjectPermissionData:
         return ObjectPermissionData(
             id=self.id,
