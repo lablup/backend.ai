@@ -16,7 +16,7 @@ import msgpack as _msgpack
 import temporenc
 
 from .typed_validators import AutoDirectoryPath
-from .types import BinarySize, ResourceSlot
+from .types import BinarySize, ErrorResult, ResourceSlot
 
 __all__ = ("packb", "unpackb")
 
@@ -31,6 +31,7 @@ class ExtTypes(enum.IntEnum):
     ENUM = 6
     IMAGE_REF = 7
     RESOURCE_SLOT = 8
+    ERROR_RESULT = 9
     BACKENDAI_BINARY_SIZE = 16
     AUTO_DIRECTORY_PATH = 17
 
@@ -61,6 +62,9 @@ def _default(obj: object) -> _msgpack.ExtType:
             return _msgpack.ExtType(ExtTypes.ENUM, pickle.dumps(obj, protocol=5))
         case ImageRef():
             return _msgpack.ExtType(ExtTypes.IMAGE_REF, pickle.dumps(obj, protocol=5))
+        case ErrorResult():
+            return _msgpack.ExtType(ExtTypes.ERROR_RESULT, pickle.dumps(obj, protocol=5))
+
     raise TypeError(f"Unknown type: {obj!r} ({type(obj)})")
 
 
@@ -80,6 +84,7 @@ _DEFAULT_EXT_HOOK: Mapping[ExtTypes, ExtFunc] = {
     ExtTypes.RESOURCE_SLOT: lambda data: pickle.loads(data),
     ExtTypes.BACKENDAI_BINARY_SIZE: lambda data: pickle.loads(data),
     ExtTypes.IMAGE_REF: lambda data: pickle.loads(data),
+    ExtTypes.ERROR_RESULT: lambda data: pickle.loads(data),
 }
 
 

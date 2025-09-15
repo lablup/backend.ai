@@ -606,7 +606,7 @@ class EventDispatcher(EventDispatcherGroup):
         metadata: Optional[MessageMetadata] = None,
     ) -> None:
         if self._log_events:
-            log.debug("DISPATCH_SUBSCRIBERS(ev:{}, ag:{})", event_name, source)
+            log.debug("DISPATCH_SUBSCRIBERS(ev:{}, source:{})", event_name, source)
         for subscriber in self._subscribers[event_name].copy():
             self._subscriber_taskgroup.create_task(
                 self._handle(subscriber, source, args, tuple(), metadata),
