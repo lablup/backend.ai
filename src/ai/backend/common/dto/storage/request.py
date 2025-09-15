@@ -41,9 +41,6 @@ class UploadObjectReq(BaseRequestModel):
     """
 
     key: str = Field(description="The object key (path) within the bucket to upload the file to.")
-    content_type: Optional[str] = Field(
-        default=None, description="MIME type of the file being uploaded."
-    )
 
 
 class DownloadObjectReq(BaseRequestModel):
