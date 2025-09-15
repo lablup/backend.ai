@@ -7,6 +7,7 @@ from dateutil.parser import isoparse
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact.types import (
+    ArtifactAvailability,
     ArtifactStatus,
     ArtifactType,
 )
@@ -122,6 +123,7 @@ ARTIFACT_ROW_FIXTURE = ArtifactRow(
     source_registry_type=ArtifactRegistryType.HUGGINGFACE.value,
     description="A conversational AI model by Microsoft",
     readonly=True,
+    availability=ArtifactAvailability.ALIVE.value,
 )
 ARTIFACT_ROW_FIXTURE.id = uuid.uuid4()
 ARTIFACT_ROW_FIXTURE.scanned_at = datetime.now(timezone.utc)
