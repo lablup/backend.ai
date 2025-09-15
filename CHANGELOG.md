@@ -16,6 +16,23 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.13 (2025-09-15)
+
+### Fixes
+* Do not check storage host permission in VFolder RBAC function ([#4045](https://github.com/lablup/backend.ai/issues/4045))
+* Fix incorrect filetype check of `PureStorage` VFolder ([#5018](https://github.com/lablup/backend.ai/issues/5018))
+* Wrong `service ports` field name of Session creation response ([#5047](https://github.com/lablup/backend.ai/issues/5047))
+* Enable continuous code execution tasks to work properly in Agent ([#5112](https://github.com/lablup/backend.ai/issues/5112))
+* Add Docker image rescan exception handling logic when the image config is `None` ([#5394](https://github.com/lablup/backend.ai/issues/5394))
+* Fix NUMA-aware affinity allocation to find the larged connected component with the most remaining resource capacity when grouping devices per NUMA node ([#5454](https://github.com/lablup/backend.ai/issues/5454))
+* Prevent the Agent from producing error events in the heartbeat loop to avoid loop termination due to Redis connection failures ([#5469](https://github.com/lablup/backend.ai/issues/5469))
+* Fixed session being incorrectly set on failed login attempts and ensured `X-BackendAI-SessionID` header is always included when login succeeds ([#5473](https://github.com/lablup/backend.ai/issues/5473))
+* Respect the inherited ulimits when setting ulimits of new containers ([#5489](https://github.com/lablup/backend.ai/issues/5489))
+* Fix NUMA node alignment of subsequent device allocation ([#5587](https://github.com/lablup/backend.ai/issues/5587))
+* Fixed JSON parsing error when querying wsproxy status endpoint occurred when wsproxy returned HTML error responses ([#5829](https://github.com/lablup/backend.ai/issues/5829))
+* GQL `KernelNode.status` field wrong format on 24.09 ([#5844](https://github.com/lablup/backend.ai/issues/5844))
+
+
 ## 24.09.12 (2025-07-07)
 
 ### Features

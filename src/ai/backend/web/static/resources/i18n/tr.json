@@ -210,17 +210,7 @@
     "UserStatus": "Kullanıcı Durumu",
     "Users": "Kullanıcılar",
     "WarningLessRateLimit": "Hız Sınırı değeri küçükse, oturum açma gibi API işlemleri engellenebilir.",
-    "YouAreAboutToDeleteCredential": "Bu kullanıcının kimlik bilgilerini silmek üzeresiniz:",
-    "validation": {
-      "InvalidEmailAddress": "Geçersiz e-posta adresi.",
-      "LetterNumber-_dot": "Harflere, sayılara ve -_'ye izin verir.",
-      "NameAlreadyExists": "Politika Adı Zaten Var!",
-      "NumbersOnly": "Yalnızca sayılara izin verir",
-      "PleaseSelectOption": "Lütfen bir seçeneği seçin",
-      "PleaseSelectOptions": "Lütfen en az bir veya daha fazla seçenek işaretleyiniz.",
-      "PolicyName": "İlke adı Gerekli.",
-      "ValidationFailed": "Doğrulama başarısız"
-    }
+    "YouAreAboutToDeleteCredential": "Bu kullanıcının kimlik bilgilerini silmek üzeresiniz:"
   },
   "data": {
     "Active": "Aktif",
@@ -311,7 +301,6 @@
       "InviteeEmail": "Davet E-postası",
       "KeepFileExtension": "Tut",
       "LessThan10Sec": "10 saniyeden az",
-      "ModifyPermissions": "İzinleri Değiştir",
       "MoreThanADay": "bir günden fazla",
       "Name": "isim",
       "NewFileName": "Yeni dosya adı",
@@ -348,15 +337,20 @@
     },
     "folders": {
       "CannotDeleteFolder": "Bir veya daha fazla oturuma bağlı klasör silinemez. Lütfen önce oturumu sonlandırın.",
+      "CannotDeletePipelineFolder": "Boru hattı klasörlerini silemezsiniz.",
+      "CannotRestorePipelineFolder": "Boru hattı klasörlerini geri yükleyemezsiniz.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Model proje klasörleri yalnızca model mağaza özel projelerinde oluşturulabilir. \nGeçerli projeyi veya kullanıcı türünü değiştirin.",
       "CloneAFolder": "Klasörü klonla",
       "CloneFolder": "Klasör klonlama",
       "Cloneable": "klonlanabilir",
       "Control": "Kontrol",
+      "CreateModelFolderOnlyInExclusiveProject": "Model proje klasörleri yalnızca model mağaza özel projelerinde oluşturulabilir.",
       "CreatedAt": "Yaratılmış",
       "Delete": "Sil",
       "DeleteAFolder": "Klasörü sil",
       "DeleteForever": "Tamamen sil",
       "DescYouAreFolderOwner": "Bu klasörün sahibi sizsiniz.",
+      "DownloadingModel": "İndirme Modeli ...",
       "Edit": "Düzenle",
       "EditDelete": "Düzenle+Sil",
       "FileDeleted": "Dosya Silindi",
@@ -378,7 +372,7 @@
       "FolderUsage": "Klasör kullanımı",
       "FolderUsing": "Kullanma",
       "InviteUsers": "Kullanıcıyı davet et",
-      "KickOut": "",
+      "KickOut": "Paylaşmayı Durdur",
       "KickOutConfirm": "{{email}} ile paylaşmayı keser misiniz?",
       "Leave": "Ayrılmak",
       "LeaveAFolder": "klasör bırak",
@@ -405,6 +399,7 @@
       "Path": "Depolama yolu",
       "Permission": "izin",
       "ProjectFolderAlertDesc": "Bu klasör projenin tüm üyeleriyle paylaşılıyor",
+      "ProjectFolderCreationHelp": "\"{{projectName}}\" proje kullanıcıları tarafından erişilebilen bir klasör oluşturulacaktır.",
       "Rename": "Adını değiştirmek",
       "Restore": "Eski haline getirmek",
       "RestoreDescription": "\"{{ folderName }}\" klasörünü geri yüklemek istiyor musunuz?",
@@ -555,6 +550,7 @@
     "Digest": "sindirmek",
     "Disabled": "engelli",
     "ErrorMinimumValue": "{{key}} en azından {{value}} olmalıdır.",
+    "FailedToDeleteCustomizedImage": "Özelleştirilmiş görüntüyü silemedi.",
     "FullImagePath": "Tam görüntü yolu",
     "ImageReinstallationRequired": "Resim Yeniden Yükleme Gerekli",
     "Images": "Görüntüler",
@@ -624,6 +620,7 @@
     "SmallerResourceThenImageRequires": "Kaynak isteğiniz görüntünün gerektirdiği minimum değerden daha küçük. Daha fazla kaynak deneyin.",
     "TooManyLoginFailures": "Kısa süre içinde çok fazla oturum açma hatası oldu. Giriş bir süreliğine engellendi.",
     "UnauthorizedToken": "Yetkisiz belirteç. Lütfen belirtecinizi kontrol edin.",
+    "UnexpectedError": "Beklenmedik bir hata oluştu. \nSorun devam ederse lütfen daha sonra tekrar deneyin veya destekle iletişime geçin.",
     "UnknownError": "Bilinmeyen bir hata oluştu. Lütfen tekrar deneyin.",
     "UpdateError": "Güncelleme hatası",
     "UserHasNoGroup": "Kullanıcının grubu yok. Düzeltmek için lütfen yöneticiyle iletişime geçin.",
@@ -640,8 +637,10 @@
     "Title": "Bir hata oluştu."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Klasör bulunamadı veya erişim reddedildi",
     "InputTooShort": "GirişÇok Kısa",
     "NoExplorerSupportForUnmanagedFolder": "Yönetilmeyen klasörler Dosya Gezgini'ni desteklemez.",
+    "NoPermissions": "Bu klasöre erişmek için izin yok",
     "ValueRequired": "DeğerGerekli"
   },
   "general": {
@@ -679,7 +678,17 @@
     "StorageProxies": "Depolar",
     "TotalItems": "Toplam {{toplam}} öğe",
     "Username": "Kullanıcı adı",
-    "ValueRequired": "Lütfen {{isim }} girin"
+    "ValueRequired": "Lütfen {{isim }} girin",
+    "validation": {
+      "InvalidEmailAddress": "Geçersiz e -posta adresi.",
+      "LetterNumber-_dot": "Harfler, sayılar ve -_ sağlar.",
+      "NameAlreadyExists": "Politika adı zaten var!",
+      "NumbersOnly": "Yalnızca numaralara izin verir",
+      "PleaseSelectOption": "Lütfen bir seçenek seçin",
+      "PleaseSelectOptions": "Lütfen en az bir veya daha fazla seçenek seçin.",
+      "PolicyName": "Politika adı gerekli.",
+      "ValidationFailed": "Doğrulama başarısız oldu"
+    }
   },
   "import": {
     "CleanUpImportTask": "İçe aktarma görevini temizle...",
@@ -766,6 +775,9 @@
   "kernel": {
     "AgentId": "Ajan kimliği",
     "ContainerId": "Konteyner kimliği",
+    "ContainerLogs": "Konteyner Günlükleri",
+    "Hostname": "Ana bilgisayar adı",
+    "Kernel": "Çekirdek",
     "KernelId": "Çekirdek kimliği",
     "Kernels": "Çekirdek",
     "Role": "Rol",
@@ -773,8 +785,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +800,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -907,6 +919,7 @@
     "EndpointName": "Uç Nokta Adı",
     "Error": "Hata",
     "ExpiredDate": "Son Kullanma Tarihi",
+    "ExtraMountsWarning": "Hizmeti düzenlerken, ek monte edilmiş klasörlerin adı (takma ad) korunmayabilir. \nKaydetmeden önce lütfen klasör adlarını çift kontrol edin.",
     "FailedToStartService": "Hizmet oluşturulamadı.",
     "FailedToTerminateService": "Hizmeti sonlandırma isteği başarısız oldu.",
     "FailedToUpdateService": "Hizmet güncellenemedi.",
@@ -916,6 +929,7 @@
     "GenerateNewToken": "Yeni belirteç oluşturun",
     "GenerateToken": "Belirteç Oluştur",
     "GeneratedTokens": "Oluşturulan Jetonlar",
+    "GoToServiceDetailPage": "Servis Ayrıntısı sayfasına gidin",
     "Image": "Resim",
     "ModelDefinitionPath": "Model Tanımı Dosya Yolu",
     "ModelMountDestination": "Model Klasörü İçin Montaj Hedefi",
@@ -925,6 +939,7 @@
     "OnlyAllowsNonNegativeIntegers": "Yalnızca negatif olmayan tam sayılara izin verir",
     "OpenToPublic": "Halka Açık",
     "Owner": "Mal sahibi",
+    "PlayYourModelNow": "Modelinizi şimdi oynayın!",
     "PleaseSelectTime": "Lütfen zaman seçin!",
     "Processing": "İşleme...",
     "Public": "Kamu",
@@ -936,17 +951,21 @@
     "RoutesInfo": "Güzergah Bilgileri",
     "RoutingInfo": "Yönlendirme Bilgisi",
     "RoutingsCount": "Güzergah Sayısı",
+    "RunThisModel": "Bu modeli çalıştır",
     "RuntimeVariant": "Çıkarım Çalışma Zamanı Varyantı",
     "SeeContainerLogs": "Konteyner Günlüklerini görün",
+    "ServiceAlreadyExists": "Hizmet Adı zaten var",
     "ServiceCreated": "Model hizmeti {{ name }} başarıyla oluşturuldu.",
     "ServiceDelegatedFrom": "Model hizmeti {{ createdUser }} tarafından oluşturulur ancak oturum sahipliği {{ sessionOwner }}'a devredilir.",
     "ServiceEndpoint": "Hizmet Uç Noktası",
     "ServiceInfo": "Servis Bilgileri",
-    "ServiceName": "Hizmet Adı",
+    "ServiceName": "Hizmet adı",
     "ServiceNameCannotStartWithHyphen": "Kısa çizgi (-) her iki uçta da kullanılamaz.",
+    "ServiceNameInvalidCharacter": "Servis adının ortasında, yalnızca alfabe, sayı, '_', '.', '-'-'sadece dahil edilebilir.",
     "ServiceNameMaxLength": "Lütfen 24 veya daha az karakter girin.",
     "ServiceNameMinLength": "Lütfen en az 4 karakter giriniz.",
-    "ServiceNameRule": "Yalnızca alfasayısal, alt çizgi(_) ve kısa çizgiye(-) izin verilir ve alfasayısal bir karakterle bitmelidir.",
+    "ServiceNameShouldEndWith": "Oturum adı alfabe, büyük ve küçük karakterler, sayılar ve '_' ile bitmelidir.",
+    "ServiceNameShouldStartWith": "Oturum adı alfabetik ve küçük karakterler, sayılar veya '_' ile başlamalıdır.",
     "ServiceTerminated": "'{{ name }}' model hizmeti için bir kapatma isteği gönderildi.",
     "ServiceUpdated": "Model hizmeti {{ name }} başarıyla güncellendi.",
     "Services": "Hizmetler",
@@ -956,6 +975,7 @@
     "StartNewService": "Yeni Hizmeti Başlat",
     "StartNewServing": "Yeni servis başlatın",
     "StartService": "Hizmeti Başlat",
+    "StartingModelService": "Başlangıç ​​Model Hizmeti ...",
     "Status": "Durum",
     "Success": "Başarı",
     "SyncRoutes": "Rotaları senkronize et",
@@ -1012,9 +1032,8 @@
     "SuccessfullyUpdated": "Başarıyla güncellendi",
     "Visit": "Ziyaret etmek"
   },
-  "propertyFilter": {
-    "PlaceHolder": "Arama",
-    "ResetFilter": "Filtreleri sıfırla"
+  "pagination": {
+    "Total": "{{start}} - {{total}} öğelerinin {{end}}"
   },
   "registry": {
     "AddRegistry": "Kayıt Ekle",
@@ -1103,6 +1122,11 @@
     "TypeResourceGroupNameToDelete": "Silmek için kaynak grubu adını yazın",
     "WsproxyAddress": "WSProxy Sunucu Adresi"
   },
+  "resourcePanel": {
+    "Limit": "Sınırlamak",
+    "RemainingNumber": "Zırhlı",
+    "UsingNumber": "Kullanma"
+  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Bu kaynak politikasını silmek üzeresiniz:",
     "AllowedHosts": "İzin verilen ana bilgisayarlar",
@@ -1182,6 +1206,9 @@
     "SHMEMShouldBeSmallerThanMemory": "Paylaşılan bellek, bellekten daha küçük olmalıdır",
     "SharedMemory": "Paylaşılan Bellek",
     "Updated": "Kaynak ön ayarı güncellendi"
+  },
+  "scheduler": {
+    "PendingSessions": "Bekleyen seanslar"
   },
   "session": {
     "Agent": "Temsilci",
@@ -1263,12 +1290,15 @@
     "OpenToPublic": "Uygulamayı herkese açık olarak aç",
     "OpenToPublicDesc": "Bu seçeneğin etkinleştirilmesi, ağ içindeki tüm kullanıcılar için uygulama erişimine izin verir.<br /><br /> \nErişim yönetimi için 'izin verilen IP' alanına belirli IP adreslerini girin.<br /><br /> \nBu alanı boş bırakmak tüm IP adreslerinden erişime izin verecektir.<br /><br /> \nGüvenlik yönetimi için gerektiğinde IP kısıtlamaları ayarlamayı düşünün.",
     "Others": "Diğerleri",
+    "PanelSettings": "Panel Ayarları",
+    "PendingPosition": "Kuyruk konumu",
     "PredicateChecks": "Yumurlamalı Çekler",
     "Preparing": "hazırlanıyor...",
     "PreparingSession": "Oturum hazırlanıyor...",
     "ReadLess": "Daha az oku",
     "ReadMore": "Daha Fazlasını Oku...",
     "RecentlyCreatedSessions": "Son zamanlarda oluşturulan oturumlar",
+    "RecentlyCreatedSessionsTooltip": "Geçerli projede en son oluşturulan {{count}} çalışan oturumu gösterir",
     "RequestContainerCommit": "Konteyner Taahhüdü İste",
     "Reservation": "Rezervasyon",
     "ResourceGroup": "Kaynak Grubu",
@@ -1338,6 +1368,7 @@
       "AddingKernelToSocketQueue": "Soket kuyruğuna çekirdek ekleniyor...",
       "AgentNode": "Ajan",
       "AllocateNode": "küme modu",
+      "ApplicationMemory": "Application MEM {{value}}",
       "Architecture": "Mimarlık",
       "AutoSelect": "Otomatik seçim",
       "AutoSharedMemoryTooltip": "Tahsis edilen bellek içinde paylaşılan bellek boyutunu otomatik olarak seçebilir veya manuel olarak girebilirsiniz.",
@@ -1405,6 +1436,7 @@
       "InsufficientAllocationOfResourcesWarning": "Tahsis edilebilir kaynaklar, seçilen görüntüde gereken minimum kaynağın altına düşüyor.",
       "InteractiveMode": "İnteraktif",
       "InteractiveModeDesc": "jupyter notebook, visual studio code vb. aracılığıyla etkileşimli olarak kod oluşturmanıza, test etmenize ve çalıştırmanıza olanak tanır.",
+      "InvalidMountsSelectionWarning": "Klasör seçim bilgileri geçerli değil. Seçilen klasöre göz atın.",
       "InvalidPortFormat": "Bağlantı noktası numarası biçimi yanlış.",
       "Launch": "Başlatmak",
       "LaunchConfirmationDialog": "Kodunuzu ve verilerinizi saklamak veya diğer ortak çalışanlarla paylaşmak için, veri ve depolama kenar çubuğunda bir depolama klasörü oluşturmanız, ardından kaynağı başlattığınızda bu klasörü bağlamanız ve orada tutmanız yeterlidir.",
@@ -1486,8 +1518,7 @@
       "SetPreopenPorts": "Ön Açık Bağlantı Noktaları (isteğe bağlı)",
       "SetSessionOwner": "Oturum sahibi",
       "SettingUpProxyForApp": "Uygulama için proxy ayarlanıyor...",
-      "SharedMemory": "Paylaşılan Bellek",
-      "SharedMemoryAbbr": "SHMEM",
+      "SharedMemory": "Paylaşılan Bellek (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Paylaşılan bellek ayarı, ayrılan belleğin altına düşürülür.",
       "SingleNode": "Tek",
       "SkipToConfirmAndLaunch": "İncelemeye geç",
@@ -1523,6 +1554,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Atom Max Desteği",
     "ATOMPlusSupport": "ATOM+ Desteği",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Aracı tarafı kaydına izin ver",
@@ -1530,6 +1562,7 @@
     "Config": "yapılandırma",
     "ConfigPerJobSchduler": "Zamanlayıcı ayarları",
     "ConfigPerJobSchdulerDescription": "Zamanlayıcı ayarındaki değerler, her kaynak grubunda zamanlayıcı ayarı olmadığında kullanılacak varsayılan değerlerdir. Kaynak grubuna özel bir ayar varsa bu değer yok sayılır.",
+    "DescATOMMaxSupport": "Rebellions ATOM Max Accelerator kullanın.",
     "DescATOMPlusSupport": "Rebellions ATOM+ hızlandırıcısını kullanın.",
     "DescATOMSupport": "Rebellions ATOM hızlandırıcısını kullanın",
     "DescAllowAgentSideRegistration": "Temsilcinin kendisini yöneticiye kaydetmesine izin verin. Yalnızca Backend.Ai kümesi güvenli konumda yönetilirse kullanın.",
@@ -1573,6 +1606,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "ROCm GPU desteği",
     "RegisterNewImagesFromRepo": "Depodan yeni görüntüler kaydet",
+    "RequireATOMMaxPlugin": "Backend.AI ATOM Max Eklentisi gereklidir.",
     "RequireATOMPlugin": "Backend.AI ATOM Eklentisi gerektirir.",
     "RequireATOMPlusPlugin": "Backend.AI ATOM+ Eklentisi gerektirir.",
     "RequireFGPUPlugin": "Backend.AI Sanal CUDA API Katmanı Eklentisi gerektirir.",
@@ -1682,6 +1716,11 @@
     "SessionsDesc": "Oluşturulan hesaplama oturumlarının sayısı.",
     "UsageHistory": "Kullanım Geçmişi",
     "UsageHistoryNote": "Burada gösterilen kullanım geçmişi, sonlandırılmış hesaplama oturumlarına dayanmaktadır.",
+    "description": {
+      "CPUUtilization": "Seçilen dönemde oturum tarafından kullanılan CPU süresinin miktarını temsil eder. \n\nTek bir CPU çekirdeği maksimum%100'e karşılık gelir.\n\nBirden fazla çekirdek tahsis edilirse, toplam kullanım%1000'i aşabilir, çünkü her bir çekirdeğin maksimum kullanımını (%100) özetleyerek hesaplanır.",
+      "NetworkRx": "Ağ aktarım hızını gösterir. \n\nKapsayıcının ağ verilerini alma oranını temsil eder.",
+      "NetworkTx": "Ağ aktarım hızını gösterir.\n\nKapsayıcının ağ verilerini gönderme oranını temsil eder."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Kullanım düşükse, bazı tarihler için veriler mevcut olmayabilir. \nLütfen daha kısa bir tarih aralığı ile tekrar deneyin.",
       "NoMetricsToDisplay": "İzleme için Avalifable Metrics yok"
@@ -1732,6 +1771,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Etkin",
+    "ATOMMaxEnabled": "Atom Max NPU etkin",
     "ATOMPlusEnabled": "ATOM+ NPU Etkin",
     "Accept": "Kabul etmek",
     "AcceptSharedVFolder": "Artık klasöre erişebilirsiniz:",
@@ -1920,6 +1960,7 @@
       "ClickToDownload": "İndirmek için tıklayın",
       "ComputationResources": "Hesaplama Kaynakları",
       "Configurations": "Yapılandırmalar",
+      "Dashboard": "Gösterge paneli",
       "Data": "Veri",
       "Data&Model": "Veri",
       "Data&Storage": "Veri depolama",
@@ -1941,6 +1982,7 @@
       "InvalidBlankPassword": "Şifrenizi girin",
       "InvalidPasswordMessage": "En az 8 karakter ile en az 1 alfabe, 1 rakam ve 1 özel karakter gereklidir.",
       "LeaveService": "hizmetten ayrıl",
+      "Limits": "Sınırlar",
       "LogOut": "Çıkış Yap",
       "Logs": "Kütükler",
       "LogsErrors": "Günlükler / Hatalar",
@@ -1948,6 +1990,11 @@
       "MyAccount": "Kullanıcı Bilgilerini Değiştir",
       "MyAccountInformation": "Kullanıcı Bilgilerini Değiştir",
       "MyEnvironments": "Ortamlarım",
+      "MyResources": "Toplam kaynak sınırım",
+      "MyResourcesDescription": "<p>Bu panel, tüm projeler ve kaynak gruplarındaki toplam kaynak kullanımınızı ve limitlerinizi gösterir.</p><p>Birden fazla limit uygulandığında (alan adı, proje veya anahtar çifti gibi), hesaplama için en kısıtlayıcı limit kullanılır.</p>",
+      "MyResourcesIn": "Kaynaklarım",
+      "MyResourcesInResourceGroup": "Kaynak Grubundaki Kaynaklarım",
+      "MyResourcesInResourceGroupDescription": "Bu panel, mevcut kaynak kullanımınızı ve seçilen kaynak grubunda kaldığınızı gösterir.",
       "NewPassword": "Yeni Şifre",
       "NewPasswordAgain": "Yeni Şifre Tekrar)",
       "NewPasswordCannotBeSame": "Lütfen mevcut şifrenizden farklı bir şifre girin.",
@@ -1963,8 +2010,10 @@
       "Preferences": "Tercihler",
       "PrivacyPolicy": "Gizlilik Politikası",
       "Project": "Proje",
+      "Remaining": "Geriye kalan",
       "ResourcePolicy": "Kaynak Politikası",
       "Resources": "Kaynaklar",
+      "Scheduler": "Zamanlayıcı",
       "Serving": "Servis",
       "Sessions": "Oturumlar",
       "Settings": "Ayarlar",
@@ -1975,8 +2024,12 @@
       "Summary": "Özet",
       "Tasks": "Görevler",
       "TermsOfService": "Kullanım Şartları",
+      "TotalResourcesIn": "Toplam Kaynaklar",
+      "TotalResourcesInResourceGroup": "Kaynak Grubundaki Toplam Kaynaklar",
+      "TotalResourcesInResourceGroupDescription": "Bu panel, kullanılan ve kalan toplam kaynakları gösterir. \nDeğerler, seçilen kaynak grubunu kullanan tüm ajanların kullanımını ve kalan miktarlarını ekleyerek hesaplanır.",
       "TotpActivated": "2FA Etkin",
       "Update": "Güncelleme",
+      "Usage": "Kullanım",
       "UsageHistory": "Tahsis geçmişi",
       "UserCredentials&Policies": "Kullanıcı Kimlik Bilgileri ve Politikaları",
       "UserSessionHistory": "Kullanıcı Oturumu Geçmişi",

@@ -210,17 +210,7 @@
     "UserStatus": "Tâm trạng người dùng",
     "Users": "Người dùng",
     "WarningLessRateLimit": "Nếu giá trị Giới hạn tốc độ nhỏ, các hoạt động API như đăng nhập có thể bị chặn.",
-    "YouAreAboutToDeleteCredential": "Bạn sắp xóa thông tin xác thực của người dùng này:",
-    "validation": {
-      "InvalidEmailAddress": "Địa chỉ email không hợp lệ.",
-      "LetterNumber-_dot": "Cho phép các chữ cái, số và -_.",
-      "NameAlreadyExists": "Tên chính sách đã tồn tại!",
-      "NumbersOnly": "Chỉ cho phép số",
-      "PleaseSelectOption": "Làm ơn chọn một giải pháp",
-      "PleaseSelectOptions": "Vui lòng chọn ít nhất một tùy chọn hoặc nhiều hơn.",
-      "PolicyName": "Tên chính sách Bắt buộc.",
-      "ValidationFailed": "Xác thực không thành công"
-    }
+    "YouAreAboutToDeleteCredential": "Bạn sắp xóa thông tin xác thực của người dùng này:"
   },
   "data": {
     "Active": "Tích cực",
@@ -311,7 +301,6 @@
       "InviteeEmail": "Thư điện tử của Người được mời",
       "KeepFileExtension": "Giữ",
       "LessThan10Sec": "Dưới 10 giây",
-      "ModifyPermissions": "Sửa đổi quyền",
       "MoreThanADay": "Hơn một ngày",
       "Name": "Tên",
       "NewFileName": "Tên tệp mới",
@@ -348,15 +337,20 @@
     },
     "folders": {
       "CannotDeleteFolder": "Không thể xóa thư mục được gắn trong một hoặc nhiều phiên. Vui lòng kết thúc phiên trước.",
+      "CannotDeletePipelineFolder": "Bạn không thể xóa các thư mục đường ống.",
+      "CannotRestorePipelineFolder": "Bạn không thể khôi phục các thư mục đường ống.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Các thư mục mô hình dự án chỉ có thể được tạo trong các dự án độc quyền của mô hình lưu trữ. \nThay đổi dự án hiện tại hoặc loại người dùng.",
       "CloneAFolder": "Sao chép một thư mục",
       "CloneFolder": "Sao chép thư mục",
       "Cloneable": "Có thể nhân bản",
       "Control": "Điều khiển",
+      "CreateModelFolderOnlyInExclusiveProject": "Các thư mục mô hình dự án chỉ có thể được tạo trong các dự án độc quyền của mô hình lưu trữ.",
       "CreatedAt": "Được tạo ra tại",
       "Delete": "Xóa bỏ",
       "DeleteAFolder": "Xóa một thư mục",
       "DeleteForever": "Xóa vĩnh viễn",
       "DescYouAreFolderOwner": "Bạn là chủ sở hữu của thư mục này.",
+      "DownloadingModel": "Mô hình tải xuống ...",
       "Edit": "Biên tập",
       "EditDelete": "Chỉnh sửa + Xóa",
       "FileDeleted": "Tệp đã Xóa",
@@ -378,7 +372,7 @@
       "FolderUsage": "Sử dụng thư mục",
       "FolderUsing": "sử dụng",
       "InviteUsers": "Mời người dùng",
-      "KickOut": "",
+      "KickOut": "Ngừng chia sẻ",
       "KickOutConfirm": "Dừng chia sẻ với {{email}}?",
       "Leave": "Rời khỏi",
       "LeaveAFolder": "Để lại một thư mục",
@@ -405,6 +399,7 @@
       "Path": "Đường dẫn lưu trữ",
       "Permission": "Sự cho phép",
       "ProjectFolderAlertDesc": "Thư mục này được chia sẻ với tất cả các thành viên của dự án",
+      "ProjectFolderCreationHelp": "Một thư mục có thể truy cập bằng \"{{projectName}}\" Người dùng dự án sẽ được tạo.",
       "Rename": "Đổi tên",
       "Restore": "Khôi phục",
       "RestoreDescription": "Bạn có muốn khôi phục thư mục \"{{ folderName }}\" không?",
@@ -555,6 +550,7 @@
     "Digest": "Tiêu",
     "Disabled": "tàn tật",
     "ErrorMinimumValue": "{{key}} phải ít nhất {{value}}",
+    "FailedToDeleteCustomizedImage": "Không thể xóa hình ảnh tùy chỉnh.",
     "FullImagePath": "Đường dẫn hình ảnh đầy đủ",
     "ImageReinstallationRequired": "Cài đặt lại hình ảnh cần thiết",
     "Images": "Hình ảnh",
@@ -624,6 +620,7 @@
     "SmallerResourceThenImageRequires": "Yêu cầu tài nguyên của bạn nhỏ hơn mức tối thiểu mà hình ảnh yêu cầu. \nHãy thử nhiều tài nguyên hơn.",
     "TooManyLoginFailures": "Đã có quá nhiều lần đăng nhập thất bại trong một thời gian ngắn. \nĐăng nhập bị chặn trong một thời gian.",
     "UnauthorizedToken": "Mã thông báo trái phép. \nVui lòng kiểm tra mã thông báo của bạn.",
+    "UnexpectedError": "Một lỗi không mong muốn đã xảy ra. \nVui lòng thử lại sau hoặc liên hệ với hỗ trợ nếu vấn đề vẫn còn.",
     "UnknownError": "Một lỗi không xác định xảy ra. \nHãy thử lại.",
     "UpdateError": "Cập nhật lỗi",
     "UserHasNoGroup": "Người dùng không có nhóm. \nHãy liên hệ với quản trị viên để sửa nó.",
@@ -640,8 +637,10 @@
     "Title": "Một lỗi đã xảy ra."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Thư mục không tìm thấy hoặc truy cập bị từ chối",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Các thư mục không được quản lý không hỗ trợ trình thám hiểm tệp.",
+    "NoPermissions": "Không có quyền truy cập thư mục này",
     "ValueRequired": "Giá trị bắt buộc"
   },
   "general": {
@@ -679,7 +678,17 @@
     "StorageProxies": "Kho lưu trữ",
     "TotalItems": "Tổng số {{total}} mặt hàng",
     "Username": "tên tài khoản",
-    "ValueRequired": "Vui lòng nhập {{name}}"
+    "ValueRequired": "Vui lòng nhập {{name}}",
+    "validation": {
+      "InvalidEmailAddress": "Địa chỉ email không hợp lệ.",
+      "LetterNumber-_dot": "Cho phép các chữ cái, số và -_.",
+      "NameAlreadyExists": "Tên chính sách đã tồn tại!",
+      "NumbersOnly": "Chỉ cho phép số",
+      "PleaseSelectOption": "Vui lòng chọn một tùy chọn",
+      "PleaseSelectOptions": "Vui lòng chọn ít nhất một tùy chọn trở lên.",
+      "PolicyName": "Tên chính sách cần thiết.",
+      "ValidationFailed": "Xác nhận không thành công"
+    }
   },
   "import": {
     "CleanUpImportTask": "Tác vụ nhập dọn dẹp ...",
@@ -766,6 +775,9 @@
   "kernel": {
     "AgentId": "Id đại lý",
     "ContainerId": "ID container",
+    "ContainerLogs": "Nhật ký container",
+    "Hostname": "Tên máy chủ",
+    "Kernel": "Kernel",
     "KernelId": "Kernel Id",
     "Kernels": "Hạt nhân",
     "Role": "Vai trò",
@@ -773,8 +785,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +800,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -907,6 +919,7 @@
     "EndpointName": "Tên điểm cuối",
     "Error": "Lỗi",
     "ExpiredDate": "Ngày hết hạn",
+    "ExtraMountsWarning": "Khi chỉnh sửa dịch vụ, tên (bí danh) của các thư mục được gắn bổ sung có thể không được giữ lại. \nVui lòng kiểm tra lại tên thư mục trước khi lưu.",
     "FailedToStartService": "Không thể tạo dịch vụ.",
     "FailedToTerminateService": "Yêu cầu chấm dứt dịch vụ không thành công.",
     "FailedToUpdateService": "Không thể cập nhật dịch vụ.",
@@ -916,6 +929,7 @@
     "GenerateNewToken": "Tạo mã thông báo mới",
     "GenerateToken": "Tạo mã thông báo",
     "GeneratedTokens": "Mã thông báo được tạo",
+    "GoToServiceDetailPage": "Đi đến trang chi tiết dịch vụ",
     "Image": "Hình ảnh",
     "ModelDefinitionPath": "Đường dẫn tệp định nghĩa mô hình",
     "ModelMountDestination": "Mount đích cho thư mục mẫu",
@@ -925,6 +939,7 @@
     "OnlyAllowsNonNegativeIntegers": "Chỉ cho phép số nguyên không âm",
     "OpenToPublic": "Mở cửa cho công chúng",
     "Owner": "Người sở hữu",
+    "PlayYourModelNow": "Chơi mô hình của bạn ngay bây giờ!",
     "PleaseSelectTime": "Hãy chọn thời gian!",
     "Processing": "Xử lý...",
     "Public": "Công cộng",
@@ -936,17 +951,21 @@
     "RoutesInfo": "Thông tin tuyến đường",
     "RoutingInfo": "Thông tin định tuyến",
     "RoutingsCount": "Số lượng định tuyến",
+    "RunThisModel": "Chạy mô hình này",
     "RuntimeVariant": "Biến thể thời gian chạy suy luận",
     "SeeContainerLogs": "Xem nhật ký vùng chứa",
+    "ServiceAlreadyExists": "Tên dịch vụ đã tồn tại",
     "ServiceCreated": "Dịch vụ mẫu {{ name }} đã được tạo thành công.",
     "ServiceDelegatedFrom": "Dịch vụ mô hình được tạo bởi {{ createUser }} nhưng quyền sở hữu phiên sẽ được ủy quyền cho {{ sessionOwner }}",
     "ServiceEndpoint": "Điểm cuối dịch vụ",
     "ServiceInfo": "Thông tin dịch vụ",
     "ServiceName": "Tên dịch vụ",
     "ServiceNameCannotStartWithHyphen": "Dấu gạch nối (-) không thể được sử dụng ở cả hai đầu.",
+    "ServiceNameInvalidCharacter": "Ở giữa tên dịch vụ, chỉ bảng chữ cái, số, '_', '.', '-' chỉ có thể được bao gồm.",
     "ServiceNameMaxLength": "Vui lòng nhập 24 ký tự trở xuống.",
     "ServiceNameMinLength": "Vui lòng nhập ít nhất 4 ký tự.",
-    "ServiceNameRule": "Chỉ cho phép chữ và số, dấu gạch dưới (_), dấu gạch nối (-) và phải kết thúc bằng ký tự chữ và số.",
+    "ServiceNameShouldEndWith": "Tên phiên phải kết thúc bằng bảng chữ cái, các ký tự lớn và nhỏ, số và '_'.",
+    "ServiceNameShouldStartWith": "Tên phiên sẽ bắt đầu với chữ cái và ký tự nhỏ, số hoặc '_'.",
     "ServiceTerminated": "Yêu cầu tắt máy đã được gửi cho dịch vụ mẫu '{{ name }}'.",
     "ServiceUpdated": "Dịch vụ mẫu {{ name }} đã được cập nhật thành công.",
     "Services": "Dịch vụ",
@@ -956,6 +975,7 @@
     "StartNewService": "Bắt đầu dịch vụ mới",
     "StartNewServing": "Bắt đầu phân phát mới",
     "StartService": "Bắt đầu dịch vụ",
+    "StartingModelService": "Bắt đầu dịch vụ mô hình ...",
     "Status": "Trạng thái",
     "Success": "Thành công",
     "SyncRoutes": "Đồng bộ hóa tuyến đường",
@@ -1012,9 +1032,8 @@
     "SuccessfullyUpdated": "Cập nhật thành công",
     "Visit": "Chuyến thăm"
   },
-  "propertyFilter": {
-    "PlaceHolder": "Tìm kiếm",
-    "ResetFilter": "Đặt lại bộ lọc"
+  "pagination": {
+    "Total": "{{start}} - {{end}} của {{Total}}"
   },
   "registry": {
     "AddRegistry": "Thêm sổ đăng ký",
@@ -1103,6 +1122,11 @@
     "TypeResourceGroupNameToDelete": "Nhập tên nhóm tài nguyên để xóa",
     "WsproxyAddress": "Địa chỉ máy chủ WSProxy"
   },
+  "resourcePanel": {
+    "Limit": "Giới hạn",
+    "RemainingNumber": "Rmaining",
+    "UsingNumber": "Sử dụng"
+  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Bạn sắp xóa chính sách tài nguyên này:",
     "AllowedHosts": "Máy chủ được phép",
@@ -1182,6 +1206,9 @@
     "SHMEMShouldBeSmallerThanMemory": "Bộ nhớ dùng chung phải nhỏ hơn bộ nhớ",
     "SharedMemory": "Bộ nhớ chia sẻ",
     "Updated": "Đã cập nhật cài đặt trước tài nguyên"
+  },
+  "scheduler": {
+    "PendingSessions": "Phiên đang chờ xử lý"
   },
   "session": {
     "Agent": "Đặc vụ",
@@ -1263,12 +1290,15 @@
     "OpenToPublic": "Mở ứng dụng công khai",
     "OpenToPublicDesc": "Kích hoạt tùy chọn này cho phép truy cập ứng dụng cho tất cả người dùng trong mạng.<br /><br /> \nĐể quản lý truy cập, hãy nhập các địa chỉ IP cụ thể trong trường 'IP được phép'.<br /><br /> \nĐể lại trường này trống sẽ cho phép truy cập từ tất cả các địa chỉ IP.<br /><br /> \nXem xét thiết lập các hạn chế IP khi cần thiết để quản lý bảo mật.",
     "Others": "Khác",
+    "PanelSettings": "Cài đặt bảng điều khiển",
+    "PendingPosition": "Vị trí hàng đợi",
     "PredicateChecks": "Kiểm tra vị ngữ",
     "Preparing": "Đang chuẩn bị ...",
     "PreparingSession": "Đang chuẩn bị phiên ...",
     "ReadLess": "Đọc ít hơn",
     "ReadMore": "Đọc thêm...",
     "RecentlyCreatedSessions": "Phiên được tạo gần đây",
+    "RecentlyCreatedSessionsTooltip": "Hiển thị {{count}} phiên đang chạy được tạo gần đây nhất trong dự án hiện tại",
     "RequestContainerCommit": "Yêu cầu cam kết vùng chứa",
     "Reservation": "Dự phòng",
     "ResourceGroup": "Nhóm tài nguyên",
@@ -1338,6 +1368,7 @@
       "AddingKernelToSocketQueue": "Thêm hạt nhân vào hàng đợi socket ...",
       "AgentNode": "Đại lý",
       "AllocateNode": "Chế độ cụm",
+      "ApplicationMemory": "Application MEM {{value}}",
       "Architecture": "Ngành kiến ​​​​trúc",
       "AutoSelect": "Tự động lựa chọn",
       "AutoSharedMemoryTooltip": "Bạn có thể tự động chọn hoặc nhập thủ công kích thước bộ nhớ được chia sẻ trong bộ nhớ được phân bổ.",
@@ -1405,6 +1436,7 @@
       "InsufficientAllocationOfResourcesWarning": "Tài nguyên có thể phân bổ giảm xuống dưới mức tài nguyên tối thiểu được yêu cầu trong hình ảnh đã chọn.",
       "InteractiveMode": "Tương tác",
       "InteractiveModeDesc": "cho phép bạn tạo, kiểm tra và chạy mã tương tác thông qua sổ ghi chép jupyter, mã studio trực quan, v.v.",
+      "InvalidMountsSelectionWarning": "Thông tin lựa chọn thư mục không hợp lệ. Kiểm tra thư mục đã chọn.",
       "InvalidPortFormat": "Định dạng số cổng không chính xác.",
       "Launch": "Phóng",
       "LaunchConfirmationDialog": "Để giữ mã và dữ liệu của bạn hoặc chia sẻ nó với các cộng tác viên khác, chỉ cần tạo một thư mục lưu trữ trong thanh bên dữ liệu & lưu trữ, sau đó gắn kết thư mục đó khi bạn khởi động tài nguyên và giữ nó ở đó.",
@@ -1486,8 +1518,7 @@
       "SetPreopenPorts": "Cổng mở trước (tùy chọn)",
       "SetSessionOwner": "Chủ sở hữu phiên",
       "SettingUpProxyForApp": "Thiết lập proxy cho ứng dụng ...",
-      "SharedMemory": "Bộ nhớ dùng chung",
-      "SharedMemoryAbbr": "SHMEM",
+      "SharedMemory": "Bộ nhớ chia sẻ (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Cài đặt bộ nhớ dùng chung được giảm xuống dưới bộ nhớ được cấp phát.",
       "SingleNode": "Độc thân",
       "SkipToConfirmAndLaunch": "Bỏ qua để xem xét",
@@ -1523,6 +1554,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Hỗ trợ Atom Max",
     "ATOMPlusSupport": "Hỗ trợ ATOM+",
     "ATOMSupport": "nguyên tử",
     "AllowAgentSideRegistration": "Cho phép đăng ký phía đại lý",
@@ -1530,6 +1562,7 @@
     "Config": "Cấu hình",
     "ConfigPerJobSchduler": "Cài đặt bộ lập lịch",
     "ConfigPerJobSchdulerDescription": "Các giá trị trong cài đặt bộ lập lịch là các giá trị mặc định được sử dụng khi không có cài đặt bộ lập lịch trong mỗi nhóm tài nguyên. Nếu có cài đặt dành riêng cho nhóm tài nguyên, giá trị này sẽ bị bỏ qua.",
+    "DescATOMMaxSupport": "Sử dụng Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Sử dụng máy gia tốc ATOM+ của Rebellions.",
     "DescATOMSupport": "Sử dụng máy gia tốc ATOM của Rebellions",
     "DescAllowAgentSideRegistration": "Cho phép đại lý đăng ký vào người quản lý. Chỉ sử dụng nếu cụm phụ trợ.ai được quản lý trên vị trí an toàn.",
@@ -1573,6 +1606,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "Hỗ trợ GPU ROCm",
     "RegisterNewImagesFromRepo": "Đăng ký hình ảnh mới từ kho",
+    "RequireATOMMaxPlugin": "Yêu cầu Plugin Backend.AI ATOM Max.",
     "RequireATOMPlugin": "Yêu cầu Plugin Backend.AI ATOM.",
     "RequireATOMPlusPlugin": "Yêu cầu Plugin Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Yêu cầu Plugin lớp API CUDA ảo Backend.AI.",
@@ -1682,6 +1716,11 @@
     "SessionsDesc": "Số lượng phiên điện toán được tạo.",
     "UsageHistory": "Lịch sử sử dụng",
     "UsageHistoryNote": "Lịch sử sử dụng được hiển thị ở đây dựa trên các phiên tính toán chấm dứt.",
+    "description": {
+      "CPUUtilization": "Đại diện cho lượng thời gian CPU được sử dụng bởi phiên trong khoảng thời gian đã chọn. \n\nMột lõi CPU duy nhất tương ứng với tối đa 100%.\n\nNếu nhiều lõi được phân bổ, tổng lượng sử dụng có thể vượt quá 100%, vì nó được tính bằng cách tổng hợp mức sử dụng tối đa (100%) của mỗi lõi.",
+      "NetworkRx": "Cho biết tốc độ truyền mạng. \n\nĐại diện cho tốc độ mà container đang nhận dữ liệu mạng.",
+      "NetworkTx": "Cho biết tốc độ truyền mạng. \n\nĐại diện cho tốc độ mà container đang gửi dữ liệu mạng."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Nếu việc sử dụng thấp, dữ liệu cho một số ngày có thể không có sẵn. \nVui lòng thử lại với phạm vi ngày ngắn hơn.",
       "NoMetricsToDisplay": "Không có số liệu có giá trị để theo dõi"
@@ -1732,6 +1771,7 @@
   },
   "summary": {
     "ATOMEnabled": "Đã bật NPU ATOM",
+    "ATOMMaxEnabled": "Atom Max NPU được bật",
     "ATOMPlusEnabled": "Đã bật NPU ATOM+",
     "Accept": "Chấp nhận",
     "AcceptSharedVFolder": "Bây giờ bạn có thể truy cập thư mục:",
@@ -1920,6 +1960,7 @@
       "ClickToDownload": "Bấm để tải xuống",
       "ComputationResources": "Tài nguyên tính toán",
       "Configurations": "Cấu hình",
+      "Dashboard": "Bảng điều khiển",
       "Data": "Dữ liệu",
       "Data&Model": "Dữ liệu",
       "Data&Storage": "Dữ liệu & Lưu trữ",
@@ -1941,6 +1982,7 @@
       "InvalidBlankPassword": "Nhập mật khẩu của bạn",
       "InvalidPasswordMessage": "Cần có ít nhất 1 bảng chữ cái, 1 số và 1 ký tự đặc biệt với ít nhất 8 ký tự.",
       "LeaveService": "Rời khỏi dịch vụ",
+      "Limits": "Giới hạn",
       "LogOut": "Đăng xuất",
       "Logs": "Nhật ký",
       "LogsErrors": "Nhật ký / Lỗi",
@@ -1948,6 +1990,11 @@
       "MyAccount": "Thay đổi thông tin người dùng",
       "MyAccountInformation": "Thay đổi thông tin người dùng",
       "MyEnvironments": "Môi trường của tôi",
+      "MyResources": "Tổng giới hạn tài nguyên của tôi",
+      "MyResourcesDescription": "<p>Bảng điều khiển này hiển thị tổng mức sử dụng tài nguyên và giới hạn trong tất cả các dự án và nhóm tài nguyên.</p><p>Khi áp dụng nhiều giới hạn (như domain, dự án hoặc cặp khóa), giới hạn nghiêm ngặt nhất được sử dụng để tính toán.</p>",
+      "MyResourcesIn": "Tài nguyên của tôi trong",
+      "MyResourcesInResourceGroup": "Tài nguyên của tôi trong nhóm tài nguyên",
+      "MyResourcesInResourceGroupDescription": "Bảng điều khiển này hiển thị việc sử dụng tài nguyên hiện tại của bạn và còn lại trong nhóm tài nguyên đã chọn.",
       "NewPassword": "Mật khẩu mới",
       "NewPasswordAgain": "Mật khẩu mới (một lần nữa)",
       "NewPasswordCannotBeSame": "Vui lòng nhập mật khẩu khác với mật khẩu hiện tại của bạn.",
@@ -1963,8 +2010,10 @@
       "Preferences": "Sở thích",
       "PrivacyPolicy": "Chính sách bảo mật",
       "Project": "Dự án",
+      "Remaining": "Còn lại",
       "ResourcePolicy": "Chính sách tài nguyên",
       "Resources": "Tài nguyên",
+      "Scheduler": "Người lập lịch",
       "Serving": "Phục vụ",
       "Sessions": "Phiên",
       "Settings": "Cài đặt",
@@ -1975,8 +2024,12 @@
       "Summary": "Tóm lược",
       "Tasks": "Nhiệm vụ",
       "TermsOfService": "Điều khoản dịch vụ",
+      "TotalResourcesIn": "Tổng tài nguyên trong",
+      "TotalResourcesInResourceGroup": "Tổng tài nguyên trong nhóm tài nguyên",
+      "TotalResourcesInResourceGroupDescription": "Bảng điều khiển này cho thấy tổng tài nguyên được sử dụng và còn lại. \nCác giá trị được tính bằng cách thêm sử dụng và số lượng còn lại của tất cả các tác nhân bằng nhóm tài nguyên đã chọn.",
       "TotpActivated": "Đã bật 2FA",
       "Update": "Cập nhật",
+      "Usage": "Cách sử dụng",
       "UsageHistory": "Lịch sử phân bổ",
       "UserCredentials&Policies": "Chính sách & Thông tin đăng nhập Người dùng",
       "UserSessionHistory": "Lịch sử phiên người dùng",

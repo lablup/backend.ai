@@ -210,17 +210,7 @@
     "UserStatus": "Статус пользователя",
     "Users": "Пользователи",
     "WarningLessRateLimit": "Если значение Rate Limit мало, то такие операции API, как вход в систему, могут быть заблокированы.",
-    "YouAreAboutToDeleteCredential": "Вы собираетесь удалить учетные данные этого пользователя:",
-    "validation": {
-      "InvalidEmailAddress": "Неверный адрес электронной почты.",
-      "LetterNumber-_dot": "Допускает буквы, цифры и -_.",
-      "NameAlreadyExists": "Название политики уже существует!",
-      "NumbersOnly": "Допускает только числа",
-      "PleaseSelectOption": "Пожалуйста, выберите один вариант",
-      "PleaseSelectOptions": "Пожалуйста, выберите варианты",
-      "PolicyName": "Название политики Обязательно.",
-      "ValidationFailed": "Проверка не удалась"
-    }
+    "YouAreAboutToDeleteCredential": "Вы собираетесь удалить учетные данные этого пользователя:"
   },
   "data": {
     "Active": "Активный",
@@ -311,7 +301,6 @@
       "InviteeEmail": "Электронная почта приглашенного",
       "KeepFileExtension": "Хранить",
       "LessThan10Sec": "Менее 10 секунд",
-      "ModifyPermissions": "Изменить разрешения",
       "MoreThanADay": "Больше суток",
       "Name": "Имя",
       "NewFileName": "Новое имя файла",
@@ -348,15 +337,20 @@
     },
     "folders": {
       "CannotDeleteFolder": "Невозможно удалить папку, установленную в одном или нескольких сеансах. Пожалуйста, сначала завершите сеанс.",
+      "CannotDeletePipelineFolder": "Вы не можете удалить папки трубопровода.",
+      "CannotRestorePipelineFolder": "Вы не можете восстановить папки трубопровода.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Папки моделей проектов могут быть созданы только в эксклюзивных проектах Model Store. \nИзмените текущий проект или тип пользователя.",
       "CloneAFolder": "Клонировать папку",
       "CloneFolder": "Клонировать папку",
       "Cloneable": "Клонируемый",
       "Control": "Контроль",
+      "CreateModelFolderOnlyInExclusiveProject": "Папки моделей проектов могут быть созданы только в эксклюзивных проектах Model Store.",
       "CreatedAt": "Создан в",
       "Delete": "Удалить",
       "DeleteAFolder": "Удалить папку",
       "DeleteForever": "Удалить навсегда",
       "DescYouAreFolderOwner": "Вы являетесь владельцем этой папки.",
+      "DownloadingModel": "Модель загрузки ...",
       "Edit": "Редактировать",
       "EditDelete": "Изменить + Удалить",
       "FileDeleted": "Файл удален",
@@ -378,7 +372,7 @@
       "FolderUsage": "Использование папок",
       "FolderUsing": "Использование сайта",
       "InviteUsers": "Пригласить пользователя",
-      "KickOut": "",
+      "KickOut": "Перестань делиться",
       "KickOutConfirm": "Перестать делиться с {{email}}?",
       "Leave": "Покинуть",
       "LeaveAFolder": "Обновить настройки папки",
@@ -405,6 +399,7 @@
       "Path": "Путь хранения",
       "Permission": "Разрешение",
       "ProjectFolderAlertDesc": "Эта папка передается всем членам проекта",
+      "ProjectFolderCreationHelp": "Папка, доступная по \"{{projectName}}\" Пользователи проекта будут созданы.",
       "Rename": "Переименовать",
       "Restore": "Восстановить",
       "RestoreDescription": "Вы хотите восстановить \"{{ folderName }}\" папка?",
@@ -555,6 +550,7 @@
     "Digest": "Дайджест",
     "Disabled": "отключен",
     "ErrorMinimumValue": "{{key}} должен быть как минимум {{value}}",
+    "FailedToDeleteCustomizedImage": "Не удалось удалить индивидуальное изображение.",
     "FullImagePath": "Полный путь к изображению",
     "ImageReinstallationRequired": "Требуется переустановка изображения",
     "Images": "Изображений",
@@ -624,6 +620,7 @@
     "SmallerResourceThenImageRequires": "Ваш запрос ресурсов меньше, чем минимально требуется для изображения. Попробуйте использовать больше ресурсов.",
     "TooManyLoginFailures": "За короткое время произошло слишком много сбоев при входе в систему. Вход в систему на некоторое время заблокирован.",
     "UnauthorizedToken": "Неавторизованный токен. Пожалуйста, проверьте ваш токен.",
+    "UnexpectedError": "Произошла неожиданная ошибка. \nПожалуйста, попробуйте еще раз позже или свяжитесь с поддержкой, если проблема сохранится.",
     "UnknownError": "Произошла неизвестная ошибка. Пожалуйста, попробуйте еще раз.",
     "UpdateError": "Ошибка обновления",
     "UserHasNoGroup": "У пользователя нет группы. Обратитесь к администратору для устранения проблемы.",
@@ -640,6 +637,7 @@
     "Title": "Произошла ошибка."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Папка не найдена или доступа отказана",
     "InputTooShort": "ВводОченьКороток",
     "NoExplorerSupportForUnmanagedFolder": "Неуправляемые папки не поддерживают исследователь файлов.",
     "ValueRequired": "НужноЗначение"
@@ -679,7 +677,17 @@
     "StorageProxies": "Хранилища данных",
     "TotalItems": "Всего {{total}} предметов",
     "Username": "Имя пользователя",
-    "ValueRequired": "Пожалуйста, введите {{ имя }}"
+    "ValueRequired": "Пожалуйста, введите {{ имя }}",
+    "validation": {
+      "InvalidEmailAddress": "Неверный адрес электронной почты.",
+      "LetterNumber-_dot": "Позволяет письма, цифры и -_.",
+      "NameAlreadyExists": "Название политики уже существует!",
+      "NumbersOnly": "Позволяет только числа",
+      "PleaseSelectOption": "Пожалуйста, выберите один вариант",
+      "PleaseSelectOptions": "Пожалуйста, выберите хотя бы один вариант или несколько.",
+      "PolicyName": "Требуется имя политики.",
+      "ValidationFailed": "Проверка не удалась"
+    }
   },
   "import": {
     "CleanUpImportTask": "Очистить задачу импорта ...",
@@ -760,12 +768,15 @@
   "interactiveLogin": {
     "ConfirmLoginMessage": "Вы хотите войти в систему под {{имя пользователя}} ({{email}}) учетной записи?",
     "InteractiveLoginWithBackendAI": "Войдите в систему под своей учетной записью Backend.AI",
-    "ServiceName": "Название услуги",
+    "ServiceName": "Название службы",
     "UseAnotherAccount": "Войдите в систему под другой учетной записью"
   },
   "kernel": {
     "AgentId": "Идентификатор агента",
     "ContainerId": "Идентификатор контейнера",
+    "ContainerLogs": "Журналы контейнеров",
+    "Hostname": "Имя хоста",
+    "Kernel": "Ядро",
     "KernelId": "Ядро идентификатор",
     "Kernels": "Ядра",
     "Role": "Роль",
@@ -773,8 +784,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -790,8 +799,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -907,6 +918,7 @@
     "EndpointName": "Имя конечной точки",
     "Error": "Ошибка",
     "ExpiredDate": "Дата истечения срока действия",
+    "ExtraMountsWarning": "При редактировании службы имя (псевдоним) дополнительных монтированных папок не может быть сохранено. \nПожалуйста, проверьте имена папок перед сохранением.",
     "FailedToStartService": "Не удалось создать службу.",
     "FailedToTerminateService": "Запрос на завершение службы завершился неудачно.",
     "FailedToUpdateService": "Не удалось обновить службу.",
@@ -916,6 +928,7 @@
     "GenerateNewToken": "Генерация нового токена",
     "GenerateToken": "Сгенерировать токен",
     "GeneratedTokens": "Сгенерированные токены",
+    "GoToServiceDetailPage": "Перейти на страницу сведений об обслуживании",
     "Image": "Изображение",
     "ModelDefinitionPath": "Путь к файлу определения модели",
     "ModelMountDestination": "Место установки папки модели",
@@ -925,6 +938,7 @@
     "OnlyAllowsNonNegativeIntegers": "Допускаются только неотрицательные целые числа",
     "OpenToPublic": "Открыт для посещения",
     "Owner": "Владелец",
+    "PlayYourModelNow": "Играйте в свою модель сейчас!",
     "PleaseSelectTime": "Пожалуйста, выберите время!",
     "Processing": "Обработка...",
     "Public": "Публичный",
@@ -936,17 +950,21 @@
     "RoutesInfo": "Информация о маршрутах",
     "RoutingInfo": "Маршрутная информация",
     "RoutingsCount": "Количество маршрутов",
+    "RunThisModel": "Запустите эту модель",
     "RuntimeVariant": "Вариант времени выполнения вывода",
     "SeeContainerLogs": "См. журналы контейнеров",
+    "ServiceAlreadyExists": "Название услуги уже существует",
     "ServiceCreated": "Сервис модели {{ name }} успешно создан.",
     "ServiceDelegatedFrom": "Сервис модели создается {{ createdUser }}, но право владения сессией будет передано {{ sessionOwner }}.",
     "ServiceEndpoint": "Конечная точка обслуживания",
     "ServiceInfo": "Служебная информация",
-    "ServiceName": "Название услуги",
+    "ServiceName": "Название службы",
     "ServiceNameCannotStartWithHyphen": "Дефисы (-) нельзя использовать ни на одном конце.",
+    "ServiceNameInvalidCharacter": "В середине имени службы, только алфавит, номер,« _ »,». ','-'может быть включен только.",
     "ServiceNameMaxLength": "Введите не более 24 символов.",
     "ServiceNameMinLength": "Пожалуйста, введите не менее 4 символов.",
-    "ServiceNameRule": "Разрешены только буквы, цифры, подчеркивание (_) и дефис (-), и они должны заканчиваться буквенно-цифровым символом.",
+    "ServiceNameShouldEndWith": "Имя сеанса должно заканчиваться алфавитом, большими и маленькими символами, номерами и «_».",
+    "ServiceNameShouldStartWith": "Имя сеанса должно начинаться с алфавитных и маленьких символов, чисел или «_».",
     "ServiceTerminated": "Для службы модели «{{ name }}» отправлен запрос на завершение работы.",
     "ServiceUpdated": "Сервис модели {{ name }} успешно обновлен.",
     "Services": "Услуги",
@@ -956,6 +974,7 @@
     "StartNewService": "Запустить новую услугу",
     "StartNewServing": "Запуск новой порции",
     "StartService": "Начало обслуживания",
+    "StartingModelService": "Служба начала модели ...",
     "Status": "Статус",
     "Success": "Успех",
     "SyncRoutes": "Синхронизация маршрутов",
@@ -1012,9 +1031,8 @@
     "SuccessfullyUpdated": "Успешно обновлено",
     "Visit": "Посещение"
   },
-  "propertyFilter": {
-    "PlaceHolder": "Поиск",
-    "ResetFilter": "Сбросить фильтры"
+  "pagination": {
+    "Total": "{{start}} - {{end}} of {{total}} элементы"
   },
   "registry": {
     "AddRegistry": "Добавить реестр",
@@ -1103,6 +1121,11 @@
     "TypeResourceGroupNameToDelete": "Введите имя группы ресурсов для удаления",
     "WsproxyAddress": "Адрес WSProxy-сервера"
   },
+  "resourcePanel": {
+    "Limit": "Предел",
+    "RemainingNumber": "Rmaing",
+    "UsingNumber": "С использованием"
+  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Вы собираетесь удалить эту политику ресурсов:",
     "AllowedHosts": "Разрешенные хосты",
@@ -1182,6 +1205,9 @@
     "SHMEMShouldBeSmallerThanMemory": "Общая память должна быть меньше памяти",
     "SharedMemory": "Общая память",
     "Updated": "Предустановка ресурса обновлена"
+  },
+  "scheduler": {
+    "PendingSessions": "В ожидании сессий"
   },
   "session": {
     "Agent": "Агент",
@@ -1263,12 +1289,15 @@
     "OpenToPublic": "Открыть приложение для всех",
     "OpenToPublicDesc": "Включение этой опции позволяет получить доступ к приложениям для всех пользователей в сети.<br /><br /> \nДля управления доступом введите конкретные IP -адреса в поле «Разрешено IP».<br /><br /> \nОставляя это поле пустым, разрешит доступ от всех IP -адресов.<br /><br /> \nРассмотрите возможность установления ограничений IP, когда это необходимо для управления безопасности.",
     "Others": "Другие",
+    "PanelSettings": "Панель настройки",
+    "PendingPosition": "Позиция очереди",
     "PredicateChecks": "ПРЕДИСКИЕ ПРОВЕРКИ",
     "Preparing": "Подготовка ...",
     "PreparingSession": "Подготовка сеанса ...",
     "ReadLess": "Читать далее",
     "ReadMore": "Читать далее...",
     "RecentlyCreatedSessions": "Недавно создал сессии",
+    "RecentlyCreatedSessionsTooltip": "Показывает {{count}} недавно созданных активных сессий в текущем проекте",
     "RequestContainerCommit": "Запрос контейнера Commit",
     "Reservation": "Бронирование",
     "ResourceGroup": "Группа ресурсов",
@@ -1338,6 +1367,7 @@
       "AddingKernelToSocketQueue": "Добавление ядра в очередь сокетов ...",
       "AgentNode": "Агент",
       "AllocateNode": "Кластерный режим",
+      "ApplicationMemory": "Application MEM {{value}}",
       "Architecture": "Архитектура",
       "AutoSelect": "Авто Выбор",
       "AutoSharedMemoryTooltip": "Вы можете автоматически выбрать или вручную ввести размер общей памяти в пределах выделенной памяти.",
@@ -1405,6 +1435,7 @@
       "InsufficientAllocationOfResourcesWarning": "Выделяемые ресурсы ниже минимального ресурса, необходимого для выбранного изображения.",
       "InteractiveMode": "Интерактивный",
       "InteractiveModeDesc": "позволяет создавать, тестировать и запускать код в интерактивном режиме через jupyter notebook, visual studio code и т.д.",
+      "InvalidMountsSelectionWarning": "Информация о выборе папок не действительна. Проверьте выбранную папку.",
       "InvalidPortFormat": "Неверный формат номера порта.",
       "Launch": "Запуск",
       "LaunchConfirmationDialog": "Чтобы сохранить свой код и данные или поделиться ими с другими соавторами, просто создайте папку хранения на боковой панели данных и хранилища, затем подключите эту папку при запуске ресурса и сохраните ее там.",
@@ -1486,8 +1517,7 @@
       "SetPreopenPorts": "Предварительно открытые порты (опция)",
       "SetSessionOwner": "Владелец сеанса",
       "SettingUpProxyForApp": "Настройка прокси для приложения ...",
-      "SharedMemory": "Общая память",
-      "SharedMemoryAbbr": "Обш. Пам.",
+      "SharedMemory": "Shared Memory (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Параметр общей памяти уменьшен до уровня ниже выделенной памяти.",
       "SingleNode": "Один",
       "SkipToConfirmAndLaunch": "Перейти к обзору",
@@ -1523,6 +1553,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "Atom Max поддержка",
     "ATOMPlusSupport": "Поддержка АТОМ+",
     "ATOMSupport": "АТОМ",
     "AllowAgentSideRegistration": "Разрешить регистрацию на стороне агента",
@@ -1530,6 +1561,7 @@
     "Config": "Конфиг",
     "ConfigPerJobSchduler": "Настройки планировщика",
     "ConfigPerJobSchdulerDescription": "Значения в настройке планировщика - это значения по умолчанию, которые используются, когда в каждой группе ресурсов нет настройки планировщика. Если есть параметр, относящийся к группе ресурсов, это значение будет проигнорировано.",
+    "DescATOMMaxSupport": "Используйте Rebellions ATOM Max Accelerator.",
     "DescATOMPlusSupport": "Используйте ускоритель Rebellions ATOM+.",
     "DescATOMSupport": "Использование ускорителя Rebellions ATOM",
     "DescAllowAgentSideRegistration": "Позвольте агенту зарегистрироваться в менеджере. Используйте только в том случае, если кластер Backend.ai управляется в безопасном месте.",
@@ -1573,6 +1605,7 @@
     "RNGDSupport": "РНГД",
     "ROCMGPUSupport": "Поддержка графического процессора ROCm",
     "RegisterNewImagesFromRepo": "Зарегистрируйте новые образы из репозитория",
+    "RequireATOMMaxPlugin": "Требует плагин Backend.AI ATOM Max.",
     "RequireATOMPlugin": "Требуется наличие плагина Backend.AI ATOM Plugin.",
     "RequireATOMPlusPlugin": "Требуется плагин Backend.AI ATOM+.",
     "RequireFGPUPlugin": "Требуется подключаемый модуль уровня виртуального CUDA API Backend.AI.",
@@ -1682,6 +1715,11 @@
     "SessionsDesc": "Количество созданных вычислительных сессий.",
     "UsageHistory": "История использования",
     "UsageHistoryNote": "История использования, показанная здесь, основана на прекращенных вычислительных сеансах.",
+    "description": {
+      "CPUUtilization": "Представляет количество времени процессора, используемого сеансом в течение выбранного периода. \n\nОдно ядро ​​процессора соответствует максимум 100%.\n\nЕсли выделяются несколько ядер, общее использование может превышать 100%, так как оно рассчитывается путем суммирования максимального использования (100%) каждого ядра.",
+      "NetworkRx": "Указывает скорость передачи сети. \n\nПредставляет скорость, с которой контейнер получает сетевые данные.",
+      "NetworkTx": "Указывает скорость передачи сети. \n\nПредставляет скорость, с которой контейнер отправляет сетевые данные."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "Если использование низкое, данные для некоторых дат могут быть недоступны. \nПожалуйста, попробуйте еще раз с более коротким диапазоном дат.",
       "NoMetricsToDisplay": "Нет метрик доступных для отслеживания"
@@ -1732,6 +1770,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Включено",
+    "ATOMMaxEnabled": "Atom Max NPU включен",
     "ATOMPlusEnabled": "NPU ATOM+ включен",
     "Accept": "Принимать",
     "AcceptSharedVFolder": "Теперь вы можете получить доступ к папке:",
@@ -1920,6 +1959,7 @@
       "ClickToDownload": "Нажмите, чтобы скачать",
       "ComputationResources": "Вычислительные ресурсы",
       "Configurations": "Конфигурации",
+      "Dashboard": "Приборная панель",
       "Data": "Данные",
       "Data&Model": "Данные",
       "Data&Storage": "Хранилище данных",
@@ -1941,6 +1981,7 @@
       "InvalidBlankPassword": "Введите ваш пароль",
       "InvalidPasswordMessage": "Требуется минимум 1 буква, 1 цифра и 1 специальный символ, состоящий не менее чем из 8 символов.",
       "LeaveService": "Оставить службу",
+      "Limits": "Ограничения",
       "LogOut": "Выйти",
       "Logs": "Журналы",
       "LogsErrors": "Журналы / ошибки",
@@ -1948,6 +1989,11 @@
       "MyAccount": "Изменить информацию о пользователе",
       "MyAccountInformation": "Изменить информацию о пользователе",
       "MyEnvironments": "Моя среда",
+      "MyResources": "Мой общий предел ресурсов",
+      "MyResourcesDescription": "<p>Эта панель показывает общее использование ресурсов и лимиты по всем проектам и группам ресурсов.</p><p>При применении нескольких ограничений (домен, проект или ключевая пара), для расчета используется наиболее строгое ограничение.</p>",
+      "MyResourcesIn": "Мои ресурсы в",
+      "MyResourcesInResourceGroup": "Мои ресурсы в ресурсной группе",
+      "MyResourcesInResourceGroupDescription": "Эта панель показывает ваше текущее использование моего ресурса и оставшееся в выбранной группе ресурсов.",
       "NewPassword": "Новый пароль",
       "NewPasswordAgain": "Новый пароль (ещё раз)",
       "NewPasswordCannotBeSame": "Пожалуйста, введите пароль, отличный от Вашего текущего пароля.",
@@ -1963,8 +2009,10 @@
       "Preferences": "Настройки",
       "PrivacyPolicy": "Политика конфиденциальности",
       "Project": "Проект",
+      "Remaining": "Оставшийся",
       "ResourcePolicy": "Ресурсная политика",
       "Resources": "Ресурсы",
+      "Scheduler": "Планировщик",
       "Serving": "Обслуживание",
       "Sessions": "Сессии",
       "Settings": "Настройки",
@@ -1975,8 +2023,12 @@
       "Summary": "Обзор",
       "Tasks": "Задачи",
       "TermsOfService": "Условия использования",
+      "TotalResourcesIn": "Общие ресурсы в",
+      "TotalResourcesInResourceGroup": "Общие ресурсы в ресурсной группе",
+      "TotalResourcesInResourceGroupDescription": "На этой панели показаны общие и оставшиеся ресурсы. \nЗначения рассчитываются путем добавления использования и оставшихся сумм всех агентов, использующих выбранную группу ресурсов.",
       "TotpActivated": "2FA Enabled",
       "Update": "Обновить",
+      "Usage": "Использование",
       "UsageHistory": "История распределения",
       "UserCredentials&Policies": "Учетные данные и политики пользователя",
       "UserSessionHistory": "История сеанса пользователя",

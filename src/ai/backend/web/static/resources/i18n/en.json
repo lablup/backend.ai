@@ -212,17 +212,7 @@
     "UserStatus": "User Status",
     "Users": "Users",
     "WarningLessRateLimit": "If the Rate Limit value is small, API operations such as login may be blocked.",
-    "YouAreAboutToDeleteCredential": "You are about to delete this user's credential:",
-    "validation": {
-      "InvalidEmailAddress": "Invalid Email Address.",
-      "LetterNumber-_dot": "Allows letters, numbers and -_.",
-      "NameAlreadyExists": "Policy Name Already Exists!",
-      "NumbersOnly": "Allows numbers only",
-      "PleaseSelectOption": "Please select one option",
-      "PleaseSelectOptions": "Please select at least one option or more.",
-      "PolicyName": "Policy name Required.",
-      "ValidationFailed": "Validation failed"
-    }
+    "YouAreAboutToDeleteCredential": "You are about to delete this user's credential:"
   },
   "data": {
     "Active": "Active",
@@ -313,7 +303,6 @@
       "InviteeEmail": "Invitee email",
       "KeepFileExtension": "Keep ",
       "LessThan10Sec": "Less than 10 seconds",
-      "ModifyPermissions": "Modify Permissions",
       "MoreThanADay": "More than a day",
       "Name": "Name",
       "NewFileName": "New file name",
@@ -350,15 +339,20 @@
     },
     "folders": {
       "CannotDeleteFolder": "Cannot delete folder mounted in one or more sessions. Please terminate the session first.",
+      "CannotDeletePipelineFolder": "You can't delete pipeline folders.",
+      "CannotRestorePipelineFolder": "You can't restore pipeline folders.",
+      "ChangeTheCurrentProjectToModelStoreOrSelectUserType": "Model project folders can only be created in model store–exclusive projects. Change the current project or user type.",
       "CloneAFolder": "Clone folder",
       "CloneFolder": "Clone folder",
       "Cloneable": "Cloneable",
       "Control": "Controls",
+      "CreateModelFolderOnlyInExclusiveProject": "Model project folders can only be created in model store–exclusive projects.",
       "CreatedAt": "Created At",
       "Delete": "Delete",
       "DeleteAFolder": "Delete folder",
       "DeleteForever": "Delete forever",
       "DescYouAreFolderOwner": "You are the owner of this folder.",
+      "DownloadingModel": "Downloading Model...",
       "Edit": "Edit",
       "EditDelete": "Edit+Delete",
       "FileDeleted": "File deleted",
@@ -407,6 +401,7 @@
       "Path": "Path",
       "Permission": "Permission",
       "ProjectFolderAlertDesc": "This folder is shared with all members of the project",
+      "ProjectFolderCreationHelp": "A folder accessible by \"{{projectName}}\" project users will be created.",
       "Rename": "Rename",
       "Restore": "Restore",
       "RestoreDescription": "Do you want to restore \"{{ folderName }}\" folder?",
@@ -557,6 +552,7 @@
     "Digest": "Digest",
     "Disabled": "disabled",
     "ErrorMinimumValue": "{{ key }} must be at least {{ value }}",
+    "FailedToDeleteCustomizedImage": "Failed to delete customized image.",
     "FullImagePath": "Full image path",
     "ImageReinstallationRequired": "Image reinstallation required",
     "Images": "Images",
@@ -628,6 +624,7 @@
     "SmallerResourceThenImageRequires": "Your resource request is smaller than the minimum required by the image. Try more resources.",
     "TooManyLoginFailures": "There have been too many login failures in a short time. Login is blocked for a while.",
     "UnauthorizedToken": "Unauthorized token. Please check your token.",
+    "UnexpectedError": "An unexpected error occurred. Please try again later or contact support if the problem persists.",
     "UnknownError": "An unknown error occurred. Please try again.",
     "UpdateError": "Update error",
     "UserHasNoGroup": "User has no group. Please contact administrator to fix it.",
@@ -644,8 +641,10 @@
     "Title": "An error has occurred."
   },
   "explorer": {
+    "FolderNotFoundOrNoAccess": "Folder not found or access denied",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Unmanaged folders do not support the file explorer.",
+    "NoPermissions": "No permissions to access this folder",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -683,7 +682,17 @@
     "StorageProxies": "Storages",
     "TotalItems": "Total {{total}} items",
     "Username": "Username",
-    "ValueRequired": "Please enter {{ name }}"
+    "ValueRequired": "Please enter {{ name }}",
+    "validation": {
+      "InvalidEmailAddress": "Invalid Email Address.",
+      "LetterNumber-_dot": "Allows letters, numbers and -_.",
+      "NameAlreadyExists": "Policy Name Already Exists!",
+      "NumbersOnly": "Allows numbers only",
+      "PleaseSelectOption": "Please select one option",
+      "PleaseSelectOptions": "Please select at least one option or more.",
+      "PolicyName": "Policy name Required.",
+      "ValidationFailed": "Validation failed"
+    }
   },
   "import": {
     "CleanUpImportTask": "Cleanup import task...",
@@ -764,12 +773,15 @@
   "interactiveLogin": {
     "ConfirmLoginMessage": "Would you like to sign in with {{username}} ({{email}}) account?",
     "InteractiveLoginWithBackendAI": "Login with your Backend.AI account",
-    "ServiceName": "Service name",
+    "ServiceName": "Service Name",
     "UseAnotherAccount": "Sign in with a different account"
   },
   "kernel": {
     "AgentId": "Agent ID",
     "ContainerId": "Container ID",
+    "ContainerLogs": "Container Logs",
+    "Hostname": "Hostname",
+    "Kernel": "Kernel",
     "KernelId": "Kernel ID",
     "Kernels": "Kernels",
     "Role": "Role",
@@ -777,8 +789,6 @@
   },
   "language": {
     "Brazilian": "brasileiro",
-    "Chinese": "中文",
-    "Chinese (Simplified)": "简体中文",
     "English": "English",
     "Finnish": "Suomalainen",
     "French": "Français",
@@ -794,8 +804,10 @@
     "Polish": "Polski",
     "Portuguese": "Português",
     "Russian": "русский",
+    "SimplifiedChinese": "简体中文",
     "Spanish": "Español",
     "Thai": "ภาษาไทย",
+    "TraditionalChinese": "繁體中文",
     "Turkish": "Türkçe",
     "Vietnamese": "Tiếng Việt"
   },
@@ -911,6 +923,7 @@
     "EndpointName": "Endpoint Name",
     "Error": "Error",
     "ExpiredDate": "Expired Date",
+    "ExtraMountsWarning": "When editing the service, the name (alias) of additional mounted folders may not be retained. Please double-check folder names before saving.",
     "FailedToStartService": "Failed to create service.",
     "FailedToTerminateService": "The request to terminate the service failed.",
     "FailedToUpdateService": "Failed to update service.",
@@ -920,15 +933,18 @@
     "GenerateNewToken": "Generate new token",
     "GenerateToken": "Generate Token",
     "GeneratedTokens": "Generated Tokens",
+    "GoToServiceDetailPage": "Go to service detail page",
     "Image": "Image",
     "ModelDefinitionPath": "Model Definition File Path",
     "ModelMountDestination": "Mount Destination For Model Folder",
+    "ModelServiceFailedToStart": "Failed to start model service.",
     "NoExtraMounts": "No extra mounts",
     "NoServiceEndpoint": "No Service Endpoint",
     "NumberOfReplicas": "Number of replicas",
     "OnlyAllowsNonNegativeIntegers": "Only allows non-negative integers",
     "OpenToPublic": "Open To Public",
     "Owner": "Owner",
+    "PlayYourModelNow": "Play your model now!",
     "PleaseSelectTime": "Please select time!",
     "Processing": "Processing...",
     "Public": "Public",
@@ -940,17 +956,21 @@
     "RoutesInfo": "Routes Info",
     "RoutingInfo": "Routing Info",
     "RoutingsCount": "Routings Count",
+    "RunThisModel": "Run this model",
     "RuntimeVariant": "Inference Runtime Variant",
     "SeeContainerLogs": "See Container Logs",
+    "ServiceAlreadyExists": "Service name already exists",
     "ServiceCreated": "Model service {{ name }} has been created successfully.",
     "ServiceDelegatedFrom": "Model service is created by {{ createdUser }} but the session ownership will be delegated to {{ sessionOwner }}",
     "ServiceEndpoint": "Service Endpoint",
     "ServiceInfo": "Service Info",
     "ServiceName": "Service Name",
     "ServiceNameCannotStartWithHyphen": "Hyphens (-) cannot be used at either end.",
+    "ServiceNameInvalidCharacter": "In the middle of the service name, only the alphabet, the number, the '_', '.', '-' can only be included.",
     "ServiceNameMaxLength": "Please enter 24 characters or less.",
     "ServiceNameMinLength": "Please enter at least 4 characters.",
-    "ServiceNameRule": "Only allow alphanumeric, underscore(_), and hyphen(-) and it must end with an alphanumeric character.",
+    "ServiceNameShouldEndWith": "It must end with alphabet, large and small characters, numbers, and '_'.",
+    "ServiceNameShouldStartWith": "It must start with alphabetic and small characters, numbers or '_'.",
     "ServiceTerminated": "A shutdown request was sent for model service '{{ name }}'.",
     "ServiceUpdated": "Model service {{ name }} has been updated successfully.",
     "Services": "Services",
@@ -960,6 +980,7 @@
     "StartNewService": "Start New Service",
     "StartNewServing": "Start new serving",
     "StartService": "Start Service",
+    "StartingModelService": "Starting model service...",
     "Status": "Status",
     "Success": "Success",
     "SyncRoutes": "Sync routes",
@@ -1016,9 +1037,8 @@
     "SuccessfullyUpdated": "Successfully Updated",
     "Visit": "Visit"
   },
-  "propertyFilter": {
-    "PlaceHolder": "Search",
-    "ResetFilter": "Reset filters"
+  "pagination": {
+    "Total": "{{start}} - {{end}} of {{total}} items"
   },
   "registry": {
     "AddRegistry": "Add Registry",
@@ -1107,6 +1127,11 @@
     "TypeResourceGroupNameToDelete": "Type resource group name to delete",
     "WsproxyAddress": "WSProxy Server Address"
   },
+  "resourcePanel": {
+    "Limit": "Limit",
+    "RemainingNumber": "Remaining",
+    "UsingNumber": "Using"
+  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "You are about to delete this resource policy: ",
     "AllowedHosts": "Allowed hosts",
@@ -1184,8 +1209,11 @@
     "ResourcePresets": "Resource Presets",
     "Resources": "Resources",
     "SHMEMShouldBeSmallerThanMemory": "Shared memory must be smaller than memory",
-    "SharedMemory": "Shared memory",
+    "SharedMemory": "Shared Memory",
     "Updated": "Resource preset updated"
+  },
+  "scheduler": {
+    "PendingSessions": "Pending Sessions"
   },
   "session": {
     "Agent": "Agent",
@@ -1267,12 +1295,15 @@
     "OpenToPublic": "Open app to public",
     "OpenToPublicDesc": "Enabling this option allows application access for all users within the network.<br /><br />   For access management, enter specific IP addresses in the 'Allowed IP' field. <br /><br />  Leaving this field empty will permit access from all IP addresses.<br /> <br /> Consider setting IP restrictions when necessary for security management.",
     "Others": "Others",
+    "PanelSettings": "Panel Settings",
+    "PendingPosition": "Queue Position",
     "PredicateChecks": "Predicate Checks",
     "Preparing": "Preparing...",
     "PreparingSession": "Preparing session...",
     "ReadLess": "Read less",
     "ReadMore": "Read More...",
     "RecentlyCreatedSessions": "Recently Created Sessions",
+    "RecentlyCreatedSessionsTooltip": "Shows the {{count}} most recently created running sessions in the current project",
     "RequestContainerCommit": "Request Container Commit",
     "Reservation": "Reservation",
     "ResourceGroup": "Resource Group",
@@ -1342,6 +1373,7 @@
       "AddingKernelToSocketQueue": "Adding kernel to socket queue...",
       "AgentNode": "Agent ",
       "AllocateNode": "Cluster mode",
+      "ApplicationMemory": "Application MEM {{value}}",
       "Architecture": "Architecture",
       "AutoSelect": "Auto Select",
       "AutoSharedMemoryTooltip": "You can automatically select or manually enter the shared memory size within the allocated memory.",
@@ -1409,6 +1441,7 @@
       "InsufficientAllocationOfResourcesWarning": "Allocatable resources falls below the minimum resource required in the selected image.",
       "InteractiveMode": "Interactive",
       "InteractiveModeDesc": "allows you to create, test and run code interactively via jupyter notebook, visual studio code, etc.",
+      "InvalidMountsSelectionWarning": "Folder selection information is not valid. \nCheck out the selected folder.",
       "InvalidPortFormat": "The port number format is incorrect.",
       "Launch": "Launch",
       "LaunchConfirmationDialog": "To keep your code and data, or share it with other collaborators, simply create a storage folder in the data & storage sidebar, then mount that folder when you start the resource and keep it there.",
@@ -1491,8 +1524,7 @@
       "SetPreopenPorts": "Preopen Ports (optional)",
       "SetSessionOwner": "Session owner",
       "SettingUpProxyForApp": "Setting up proxy for the app...",
-      "SharedMemory": "Shared Memory",
-      "SharedMemoryAbbr": "SHMEM",
+      "SharedMemory": "Shared Memory (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Shared memory setting is reduced to below the allocated memory.",
       "SingleNode": "Single Node",
       "SkipToConfirmAndLaunch": "Skip to review",
@@ -1528,6 +1560,7 @@
     }
   },
   "settings": {
+    "ATOMMaxSupport": "ATOM Max Support",
     "ATOMPlusSupport": "ATOM+ Support",
     "ATOMSupport": "ATOM",
     "AllowAgentSideRegistration": "Allow agent-side registration",
@@ -1535,6 +1568,7 @@
     "Config": "Config",
     "ConfigPerJobSchduler": "Scheduler settings",
     "ConfigPerJobSchdulerDescription": "The values in the scheduler setting is the defaults to use when there is no scheduler setting in each resource group. If there is a resource group-specific setting, this value will be ignored.",
+    "DescATOMMaxSupport": "Use Rebellions ATOM Max accelerator.",
     "DescATOMPlusSupport": "Use Rebellions ATOM+ accelerator.",
     "DescATOMSupport": "Use Rebellions ATOM accelerator",
     "DescAllowAgentSideRegistration": "Allow agent to register itself to manager. Use only if Backend.AI cluster is managed on secure location.",
@@ -1578,6 +1612,7 @@
     "RNGDSupport": "RNGD",
     "ROCMGPUSupport": "ROCm GPU support",
     "RegisterNewImagesFromRepo": "Register new images from repository",
+    "RequireATOMMaxPlugin": "Requires Backend.AI ATOM Max Plugin.",
     "RequireATOMPlugin": "Requires Backend.AI ATOM Plugin.",
     "RequireATOMPlusPlugin": "Requires Backend.AI ATOM+ Plugin.",
     "RequireFGPUPlugin": "Requires Backend.AI Virtual CUDA API Layer Plugin.",
@@ -1687,6 +1722,11 @@
     "SessionsDesc": "The number of compute sessions created.",
     "UsageHistory": "Usage History",
     "UsageHistoryNote": "The usage history shown here are based on terminated compute sessions.",
+    "description": {
+      "CPUUtilization": "Represents the amount of CPU time used by the session during the selected period. \n\nA single CPU core corresponds to a maximum of 100%.\nIf multiple cores are allocated, the total usage can exceed 100%, as it is calculated by summing up the maximum usage (100%) of each core.",
+      "NetworkRx": "Indicates the network transfer rate.  \n\nRepresents the rate at which the container is receiving network data.",
+      "NetworkTx": "Indicates the network transfer rate. \n\n Represents the rate at which the container is sending network data."
+    },
     "prometheus": {
       "DataMissingInLowUsageDesc": "If usage is low, data for some dates may not be available. Please try again with a shorter date range.",
       "NoMetricsToDisplay": "No metrics avaliable for tracking"
@@ -1737,6 +1777,7 @@
   },
   "summary": {
     "ATOMEnabled": "ATOM NPU Enabled",
+    "ATOMMaxEnabled": "ATOM Max NPU Enabled",
     "ATOMPlusEnabled": "ATOM+ NPU Enabled",
     "Accept": "Accept",
     "AcceptSharedVFolder": "You can now access folder: ",
@@ -1948,6 +1989,7 @@
       "InvalidBlankPassword": "Enter your password",
       "InvalidPasswordMessage": "At least 1 alphabet, 1 number and 1 special character is required with at least 8 chars.",
       "LeaveService": "Leave service",
+      "Limits": "Limits",
       "LogOut": "Log Out",
       "Logs": "Logs",
       "LogsErrors": "Logs / Errors",
@@ -1955,6 +1997,11 @@
       "MyAccount": "My Account",
       "MyAccountInformation": "My Account Information",
       "MyEnvironments": "My Environments",
+      "MyResources": "My Total Resources Limit",
+      "MyResourcesDescription": "<p>This panel shows your total resource usage and limits across all projects and resource groups.</p><p>When multiple limits are applied (such as domain, project, or keypair), the most restrictive limit is used for calculation.</p>",
+      "MyResourcesIn": "My Resources in",
+      "MyResourcesInResourceGroup": "My Resources in Resource Group",
+      "MyResourcesInResourceGroupDescription": "This panel shows your current my resource usage and remaining in the selected resource group.",
       "NewPassword": "New password",
       "NewPasswordAgain": "New password (again)",
       "NewPasswordCannotBeSame": "Please enter a password that is different from your current password.",
@@ -1969,8 +2016,10 @@
       "Preferences": "Preferences",
       "PrivacyPolicy": "Privacy Policy",
       "Project": "Project",
+      "Remaining": "Remaining",
       "ResourcePolicy": "Resource Policy",
       "Resources": "Resources",
+      "Scheduler": "Scheduler",
       "Serving": "Serving",
       "Sessions": "Sessions",
       "Settings": "Settings",
@@ -1981,8 +2030,12 @@
       "Summary": "Summary",
       "Tasks": "Tasks",
       "TermsOfService": "Terms of Service",
+      "TotalResourcesIn": "Total Resources in",
+      "TotalResourcesInResourceGroup": "Total Resources in Resource Group",
+      "TotalResourcesInResourceGroupDescription": "This panel shows the total used and remaining resources. The values are calculated by adding up the usage and remaining amounts of all agents using the selected resource group.",
       "TotpActivated": "2FA Enabled",
       "Update": "Update",
+      "Usage": "Usage",
       "UsageHistory": "Allocation History",
       "UserCredentials&Policies": "User Credentials & Policies",
       "UserSessionHistory": "User Session History",
