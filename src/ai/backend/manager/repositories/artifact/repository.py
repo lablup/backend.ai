@@ -267,13 +267,27 @@ class ArtifactRepository:
             if not data:
                 raise InvalidArtifactModifierTypeError("No valid fields to update")
 
-            await db_sess.execute(
-                sa.update(ArtifactRow).where(ArtifactRow.id == artifact_id).values(**data)
+            result = await db_sess.execute(
+                sa.update(ArtifactRow)
+                .where(
+                    sa.and_(
+                        ArtifactRow.id == artifact_id,
+                        ArtifactRow.availability != ArtifactAvailability.DELETED,
+                    )
+                )
+                .values(**data)
             )
+            if result.rowcount == 0:
+                raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             await db_sess.commit()
 
             result = await db_sess.execute(
-                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
+                sa.select(ArtifactRow).where(
+                    sa.and_(
+                        ArtifactRow.id == artifact_id,
+                        ArtifactRow.availability != ArtifactAvailability.DELETED,
+                    )
+                )
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
@@ -700,10 +714,15 @@ class ArtifactRepository:
     @repository_decorator()
     async def delete_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
         async with self._db.begin_session() as db_sess:
-            # Update availability to DELETED for the given artifact IDs
+            # Update availability to DELETED for the given artifact IDs (only for ALIVE artifacts)
             await db_sess.execute(
                 sa.update(ArtifactRow)
-                .where(ArtifactRow.id.in_(artifact_ids))
+                .where(
+                    sa.and_(
+                        ArtifactRow.id.in_(artifact_ids),
+                        ArtifactRow.availability != ArtifactAvailability.DELETED,
+                    )
+                )
                 .values(availability=ArtifactAvailability.DELETED.value)
             )
 
