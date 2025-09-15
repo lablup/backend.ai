@@ -25,9 +25,9 @@ class StorageProxyError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class ExecutionError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/storage/execution-failed"
-    error_title = "Storage Execution Error"
+class ProcessExecutionError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/storage/execution/failed"
+    error_title = "Storage Operation Execution Failed"
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -38,20 +38,20 @@ class ExecutionError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class ExternalError(BackendAIError, web.HTTPServiceUnavailable):
+class ExternalStorageServiceError(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/storage/external-error"
-    error_title = "Storage External Error"
+    error_title = "External Operation Failed"
 
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
-            operation=ErrorOperation.ACCESS,
+            operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
-class NotEmptyError(BackendAIError, web.HTTPConflict):
+class QuotaDirectoryNotEmptyError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/storage/not-empty"
     error_title = "Storage Not Empty"
 
