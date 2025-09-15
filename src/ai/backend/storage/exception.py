@@ -393,16 +393,14 @@ class ArtifactImportError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class NotImplementedAPI(web.HTTPBadRequest):
-    def __init__(self, msg: Optional[str] = None) -> None:
-        payload = {
-            "type": "https://api.backend.ai/probs/not-implemented",
-            "title": "This API is not implemented.",
-        }
-        if msg is not None:
-            payload["title"] = f"This API is not implemented. ({msg})"
-            payload["data"] = msg
-        super().__init__(
-            text=dump_json_str(payload),
-            content_type="application/problem+json",
+class NotImplementedAPI(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage/api/not-implemented"
+    error_title = "API Not Implemented"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
         )

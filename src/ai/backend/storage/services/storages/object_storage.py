@@ -3,6 +3,8 @@ from typing import AsyncIterable, AsyncIterator, Optional
 
 from ai.backend.common.dto.storage.response import (
     ObjectMetaResponse,
+    PresignedDownloadObjectResponse,
+    PresignedUploadObjectResponse,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import StorageBucketNotFoundError, StorageNotFoundError
@@ -89,6 +91,43 @@ class ObjectStorageService:
         """
         storage = self._resolve_storage(storage_name, bucket_name)
         await storage.delete_object(prefix)
+
+    async def generate_presigned_upload_url(
+        self, storage_name: str, bucket_name: str, key: str
+    ) -> PresignedUploadObjectResponse:
+        """
+        Generate presigned upload URL.
+
+        Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
+            key: Path to the file to upload
+
+        Returns:
+            PresignedUploadObjectResponse with URL and fields
+        """
+        storage = self._resolve_storage(storage_name, bucket_name)
+        return await storage.generate_presigned_upload_url(key)
+
+    async def generate_presigned_download_url(
+        self,
+        storage_name: str,
+        bucket_name: str,
+        filepath: str,
+    ) -> PresignedDownloadObjectResponse:
+        """
+        Generate presigned download URL.
+
+        Args:
+            storage_name: Name of the storage configuration
+            bucket_name: Name of the S3 bucket
+            filepath: Path to the file to download
+
+        Returns:
+            PresignedDownloadResponse with URL
+        """
+        storage = self._resolve_storage(storage_name, bucket_name)
+        return await storage.generate_presigned_download_url(filepath)
 
     def _resolve_storage(self, storage_name: str, bucket_name: str) -> ObjectStorage:
         try:
