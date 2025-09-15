@@ -684,7 +684,7 @@ async def resolve_artifact_revisions(
 @strawberry.field(description="Added in 25.14.0")
 async def artifacts(
     info: Info[StrawberryGQLContext],
-    filter: Optional[ArtifactFilter] = None,
+    filter: Optional[ArtifactFilter] = ArtifactFilter(availability=[ArtifactAvailability.ALIVE]),
     order_by: Optional[list[ArtifactOrderBy]] = None,
     before: Optional[str] = None,
     after: Optional[str] = None,
