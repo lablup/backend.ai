@@ -68,11 +68,8 @@ class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
         conditions = []
 
         # Handle basic filters
-        if filters.artifact_type and len(filters.artifact_type) > 0:
-            if len(filters.artifact_type) == 1:
-                conditions.append(ArtifactRow.type == filters.artifact_type[0])
-            else:
-                conditions.append(ArtifactRow.type.in_(filters.artifact_type))
+        if filters.artifact_type:
+            conditions.append(ArtifactRow.type.in_(filters.artifact_type))
 
         # Handle StringFilter-based filters
         if filters.name_filter is not None:
@@ -118,12 +115,8 @@ class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
             conditions.append(ArtifactRow.source_registry_type == filters.source_registry_type)
 
         # Handle availability filter
-        if filters.availability and len(filters.availability) > 0:
-            availability_values = [availability.value for availability in filters.availability]
-            if len(availability_values) == 1:
-                conditions.append(ArtifactRow.availability == availability_values[0])
-            else:
-                conditions.append(ArtifactRow.availability.in_(availability_values))
+        if filters.availability:
+            conditions.append(ArtifactRow.availability.in_(filters.availability))
 
         return conditions, stmt
 
