@@ -1517,7 +1517,7 @@
       "SetPreopenPorts": "Wstępnie otwarte porty (opcjonalnie)",
       "SetSessionOwner": "Właściciel sesji",
       "SettingUpProxyForApp": "Konfiguruję serwer proxy dla aplikacji...",
-      "SharedMemory": "Udostępniona pamięć (SHMEM) {{wartość}}",
+      "SharedMemory": "Udostępniona pamięć (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Ustawienie pamięci współdzielonej jest ograniczone do wartości poniżej przydzielonej pamięci.",
       "SingleNode": "Pojedynczy",
       "SkipToConfirmAndLaunch": "Przejdź do recenzji",
