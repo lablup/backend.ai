@@ -11,6 +11,7 @@ import graphene_federation
 import jwt
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
+from dateutil.tz import tzutc
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined, UndefinedType
 from sqlalchemy.orm import joinedload, selectinload
@@ -1310,7 +1311,7 @@ class EndpointToken(graphene.ObjectType):
             return None
         if "exp" not in decoded:
             return None
-        return datetime.datetime.fromtimestamp(decoded["exp"])
+        return datetime.datetime.fromtimestamp(decoded["exp"], tz=tzutc())
 
 
 class EndpointTokenList(graphene.ObjectType):
