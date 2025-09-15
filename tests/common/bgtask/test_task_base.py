@@ -175,4 +175,4 @@ class TestBaseBackgroundTaskHandler:
 
         assert result.has_error()
         assert len(result.errors) == 1
-        assert result.errors[0] == "Something went wrong"
+        assert result.errors[0].message == "Something went wrong"

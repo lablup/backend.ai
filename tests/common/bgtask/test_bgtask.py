@@ -295,7 +295,7 @@ class TestBackgroundTaskManager:
 
         event = background_task_manager._convert_bgtask_to_event(task_id, result_with_error)
         assert isinstance(event, BgtaskPartialSuccessEvent)
-        assert event.errors == ["test error"]
+        assert event.errors == result_with_error.errors
 
     @pytest.mark.asyncio
     async def test_heartbeat_loop(
