@@ -3776,6 +3776,9 @@ type Mutation
   """Added in 25.15.0"""
   deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload! @join__field(graph: STRAWBERRY)
 
+  """Added in 25.15.0"""
+  restoreArtifacts(input: RestoreArtifactsInput!): RestoreArtifactsPayload! @join__field(graph: STRAWBERRY)
+
   """Added in 25.14.0"""
   cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload! @join__field(graph: STRAWBERRY)
 
@@ -4755,6 +4758,20 @@ type ResourcePreset
   Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
   """
   scaling_group_name: String
+}
+
+"""Added in 25.15.0"""
+input RestoreArtifactsInput
+  @join__type(graph: STRAWBERRY)
+{
+  artifactIds: [ID!]!
+}
+
+"""Added in 25.15.0"""
+type RestoreArtifactsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  artifacts: [Artifact!]!
 }
 
 type Routing implements Item

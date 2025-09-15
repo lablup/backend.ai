@@ -668,6 +668,9 @@ type Mutation {
   """Added in 25.15.0"""
   deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload!
 
+  """Added in 25.15.0"""
+  restoreArtifacts(input: RestoreArtifactsInput!): RestoreArtifactsPayload!
+
   """Added in 25.14.0"""
   cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload!
 
@@ -966,6 +969,16 @@ input ResourceConfigInput {
 
 input ResourceGroupInput {
   name: String!
+}
+
+"""Added in 25.15.0"""
+input RestoreArtifactsInput {
+  artifactIds: [ID!]!
+}
+
+"""Added in 25.15.0"""
+type RestoreArtifactsPayload {
+  artifacts: [Artifact!]!
 }
 
 type RoutingNode implements Node {

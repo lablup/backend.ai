@@ -730,6 +730,28 @@ class ArtifactRepository:
             return [row.to_dataclass() for row in rows]
 
     @repository_decorator()
+    async def restore_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
+        async with self._db.begin_session() as db_sess:
+            # Update availability to ALIVE for the given artifact IDs (only for DELETED artifacts)
+            await db_sess.execute(
+                sa.update(ArtifactRow)
+                .where(
+                    sa.and_(
+                        ArtifactRow.id.in_(artifact_ids),
+                        ArtifactRow.availability == ArtifactAvailability.DELETED,
+                    )
+                )
+                .values(availability=ArtifactAvailability.ALIVE.value)
+            )
+
+            # Fetch and return the updated artifacts
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(ArtifactRow.id.in_(artifact_ids))
+            )
+            rows: list[ArtifactRow] = result.scalars().all()
+            return [row.to_dataclass() for row in rows]
+
+    @repository_decorator()
     async def update_artifact_revision_bytesize(
         self, artifact_revision_id: uuid.UUID, size: int
     ) -> uuid.UUID:

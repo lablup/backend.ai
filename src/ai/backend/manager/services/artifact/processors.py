@@ -23,6 +23,10 @@ from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
     ListArtifactsWithRevisionsActionResult,
 )
+from ai.backend.manager.services.artifact.actions.restore_multi import (
+    RestoreArtifactsAction,
+    RestoreArtifactsActionResult,
+)
 from ai.backend.manager.services.artifact.actions.retrieve_model import (
     RetrieveModelAction,
     RetrieveModelActionResult,
@@ -62,6 +66,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
     retrieve_models: ActionProcessor[RetrieveModelsAction, RetrieveModelsActionResult]
     retrieve_single_model: ActionProcessor[RetrieveModelAction, RetrieveModelActionResult]
     delete_artifacts: ActionProcessor[DeleteArtifactsAction, DeleteArtifactsActionResult]
+    restore_artifacts: ActionProcessor[RestoreArtifactsAction, RestoreArtifactsActionResult]
 
     def __init__(self, service: ArtifactService, action_monitors: list[ActionMonitor]) -> None:
         # TODO: Move scan action to ArtifactRegistryService
@@ -79,6 +84,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
         self.retrieve_models = ActionProcessor(service.retrieve_models, action_monitors)
         self.retrieve_single_model = ActionProcessor(service.retrieve_single_model, action_monitors)
         self.delete_artifacts = ActionProcessor(service.delete_artifacts, action_monitors)
+        self.restore_artifacts = ActionProcessor(service.restore_artifacts, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -92,4 +98,5 @@ class ArtifactProcessors(AbstractProcessorPackage):
             UpsertArtifactsAction.spec(),
             RetrieveModelAction.spec(),
             RetrieveModelsAction.spec(),
+            RestoreArtifactsAction.spec(),
         ]
