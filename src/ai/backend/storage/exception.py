@@ -38,8 +38,8 @@ class ProcessExecutionError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class ExternalStorageServiceError(BackendAIError, web.HTTPServiceUnavailable):
-    error_type = "https://api.backend.ai/probs/storage/external-error"
+class ExternalStorageServiceError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/storage/external/failed"
     error_title = "External Operation Failed"
 
     @classmethod
@@ -208,19 +208,6 @@ class InvalidVolumeError(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
-        )
-
-
-class WatcherClientError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/storage/watcher/client-error"
-    error_title = "Watcher Client Error"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.STORAGE_PROXY,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 
