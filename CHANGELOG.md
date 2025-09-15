@@ -16,6 +16,27 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.14.0 (2025-09-15)
+
+### Features
+* Introduce error code to storage-proxy exceptions ([#5813](https://github.com/lablup/backend.ai/issues/5813))
+* Add config for disable artifact approve process ([#5830](https://github.com/lablup/backend.ai/issues/5830))
+
+### Fixes
+* Added an explicit call to await sess.refresh(worker) after flushing the session in update_worker. This ensures the worker object is up-to-date with the database state before proceeding ([#5674](https://github.com/lablup/backend.ai/issues/5674))
+* Fix import paths for `ai.backend.errors.*` in `migrate-health-check-configuration.py` to resolve `ModuleNotFoundError` during script execution ([#5828](https://github.com/lablup/backend.ai/issues/5828))
+* Fixed JSON parsing error when querying wsproxy status endpoint occurred when wsproxy returned HTML error responses ([#5829](https://github.com/lablup/backend.ai/issues/5829))
+* Update kernel host references to current kernel host in proxy and health check logic ([#5834](https://github.com/lablup/backend.ai/issues/5834))
+* Mark hint for immediate model-service update ([#5845](https://github.com/lablup/backend.ai/issues/5845))
+* Fix wrong syntax in object permission record adder function ([#5849](https://github.com/lablup/backend.ai/issues/5849))
+* `modify_user` GQL mutation's `project` update not working due to incorrect condition ([#5850](https://github.com/lablup/backend.ai/issues/5850))
+* Check if vfolder is mounted to any session before deleting ([#5855](https://github.com/lablup/backend.ai/issues/5855))
+* Initialize ResourceSlot with known_slots in resource occupancy calculation ([#5860](https://github.com/lablup/backend.ai/issues/5860))
+* Reset the pending queue when there are no sessions with scheduling failures to prevent querying sessions with non-pending status from the pending queue API ([#5865](https://github.com/lablup/backend.ai/issues/5865))
+* Handle empty `supported_accelerators` list in `Image`, `ImageNode` ([#5869](https://github.com/lablup/backend.ai/issues/5869))
+* Ensured model service token expiration times are handled consistently in UTC ([#5872](https://github.com/lablup/backend.ai/issues/5872))
+
+
 ## 25.14.0rc1 (2025-09-11)
 
 ### Breaking Changes
