@@ -1188,10 +1188,10 @@ class Scheduler:
                     # Create image ref for this kernel
                     kernel_image_refs[KernelId(k.kernel_id)] = ImageRef.from_image_str(
                         image_str,
-                        project=None,
-                        registry="",  # Would need proper registry in production
+                        project=kernel_image_config["project"],
+                        registry=kernel_image_config["registry"]["name"],
                         architecture=k.architecture,
-                        is_local=False,
+                        is_local=kernel_image_config["is_local"],
                     )
 
                 # Create cluster info with network and SSH configuration
