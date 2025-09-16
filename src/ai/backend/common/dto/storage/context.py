@@ -1,4 +1,4 @@
-from typing import Self, override
+from typing import Optional, Self, override
 
 from aiohttp import MultipartReader, web
 from pydantic import ConfigDict, Field
@@ -10,6 +10,9 @@ class MultipartUploadCtx(MiddlewareParam):
     file_reader: MultipartReader = Field(
         ..., description="Multipart file reader for handling file uploads"
     )
+    content_type: Optional[str] = Field(
+        default=None, description="Content type from request headers"
+    )
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -20,4 +23,6 @@ class MultipartUploadCtx(MiddlewareParam):
         if not ctype_header.startswith("multipart/form-data"):
             raise web.HTTPUnsupportedMediaType(reason="multipart/form-data required")
 
-        return cls(file_reader=await request.multipart())
+        # Extract content type from request headers if present
+        content_type = request.headers.get("X-Content-Type")
+        return cls(file_reader=await request.multipart(), content_type=content_type)

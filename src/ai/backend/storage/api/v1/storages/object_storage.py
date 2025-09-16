@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import mimetypes
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
@@ -85,9 +86,13 @@ class ObjectStorageAPIHandler:
                     break
                 yield chunk
 
-        # TODO: Support content type configuration
+        # Determine content type: use header if available, otherwise guess from filename
+        content_type = multipart_ctx.content_type
+        if not content_type:
+            content_type, _ = mimetypes.guess_type(filepath)
+
         await storage_service.stream_upload(
-            storage_name, bucket_name, filepath, None, data_stream()
+            storage_name, bucket_name, filepath, content_type, data_stream()
         )
 
         return APIResponse.no_content(
