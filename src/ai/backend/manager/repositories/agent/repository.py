@@ -1,8 +1,7 @@
 import asyncio
 import logging
 import zlib
-from collections.abc import Mapping
-from typing import Any, Optional
+from typing import Optional
 
 from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
@@ -63,15 +62,12 @@ class AgentRepository:
 
     @repository_decorator()
     async def sync_agent_heartbeat(
-        self, agent_id: AgentId, agent_info: Mapping[Any, Any], state_sync_data: AgentStateSyncData
+        self,
+        agent_id: AgentId,
+        upsert_data: AgentHeartbeatUpsert,
+        state_sync_data: AgentStateSyncData,
     ) -> UpsertResult:
         await self._cache_source.update_agent_last_seen(agent_id, state_sync_data.now)
-
-        upsert_data = AgentHeartbeatUpsert.from_agent_info(
-            agent_id=agent_id,
-            agent_info=agent_info,
-            heartbeat_received=state_sync_data.now,
-        )
 
         upsert_result = await self._db_source.upsert_agent_with_state(upsert_data)
         if upsert_result.need_agent_cache_update:
