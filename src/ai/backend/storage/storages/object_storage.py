@@ -114,7 +114,6 @@ class ObjectStorage(AbstractStorage):
             presigned_data = await s3_client.generate_presigned_upload_url(
                 key,
                 expiration=presigned_upload_config.expiration,
-                content_type=presigned_upload_config.content_type,
                 content_length_range=(
                     presigned_upload_config.min_size,
                     presigned_upload_config.max_size,
