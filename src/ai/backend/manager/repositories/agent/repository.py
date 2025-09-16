@@ -75,3 +75,9 @@ class AgentRepository:
             )
 
         return upsert_result
+
+    @repository_decorator()
+    async def remove_agent_from_images(
+        self, agent_id: AgentId, image_canonicals: list[str]
+    ) -> None:
+        await self._cache_source.remove_agent_from_images(agent_id, image_canonicals)

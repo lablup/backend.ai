@@ -37,3 +37,16 @@ class AgentCacheSource:
             await self._valkey_live.update_agent_last_seen(agent_id, time.timestamp())
         except Exception as e:
             log.debug("Failed to update last seen for agent: {}, error: {}", agent_id, e)
+
+    async def remove_agent_from_images(
+        self, agent_id: AgentId, image_canonicals: list[str]
+    ) -> None:
+        try:
+            await self._valkey_image.remove_agent_from_images(agent_id, image_canonicals)
+        except Exception as e:
+            log.debug(
+                "Failed to remove agent: {} from images: {}, error: {}",
+                agent_id,
+                image_canonicals,
+                e,
+            )
