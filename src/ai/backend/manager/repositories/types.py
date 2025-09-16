@@ -12,7 +12,6 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidCursorTypeError
-from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.base import DEFAULT_PAGE_SIZE, validate_connection_args
@@ -31,7 +30,6 @@ class RepositoryArgs:
     valkey_schedule_client: "ValkeyScheduleClient"
     valkey_image_client: "ValkeyImageClient"
     valkey_live_client: "ValkeyLiveClient"
-    agent_cache: AgentRPCCache
 
 
 # Generic types for pagination
