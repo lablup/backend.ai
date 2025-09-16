@@ -205,7 +205,7 @@ def show_warning(message, category, filename, lineno, file=None, line=None):
     )
 
 
-class PorgressBarWithSpinner(tqdm):
+class ProgressBarWithSpinner(tqdm):
     """
     A simple extension to tqdm adding a spinner.
 

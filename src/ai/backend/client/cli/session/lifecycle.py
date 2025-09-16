@@ -36,7 +36,7 @@ from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
 from ..events import SubscribableEvents
 from ..pretty import (
-    PorgressBarWithSpinner,
+    ProgressBarWithSpinner,
     print_done,
     print_error,
     print_fail,
@@ -1038,7 +1038,7 @@ def convert_to_image(session_id: str, image_name: str) -> None:
                 bgtask = session.BackgroundTask(bgtask_id)
                 async with (
                     bgtask.listen_events() as response,
-                    PorgressBarWithSpinner("Starting the session...") as pbar,
+                    ProgressBarWithSpinner("Starting the session...") as pbar,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)

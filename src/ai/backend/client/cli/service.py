@@ -22,7 +22,7 @@ from ..exceptions import BackendError
 from ..output.fields import routing_fields, service_fields
 from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
-from .pretty import PorgressBarWithSpinner, print_done, print_fail, print_warn
+from .pretty import ProgressBarWithSpinner, print_done, print_fail, print_warn
 from .types import CLIContext
 
 _default_detail_fields: Sequence[FieldSpec] = (
@@ -555,7 +555,7 @@ def try_start(
                 bgtask = session.BackgroundTask(bgtask_id)
                 async with (
                     bgtask.listen_events() as response,
-                    PorgressBarWithSpinner("Starting the session...") as pbar,
+                    ProgressBarWithSpinner("Starting the session...") as pbar,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)

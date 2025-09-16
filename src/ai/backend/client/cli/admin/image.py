@@ -12,7 +12,7 @@ from ai.backend.common.bgtask.types import BgtaskStatus
 from ...compat import asyncio_run
 from ...session import AsyncSession
 from ..extensions import pass_ctx_obj
-from ..pretty import PorgressBarWithSpinner, print_done, print_error, print_fail, print_warn
+from ..pretty import ProgressBarWithSpinner, print_done, print_error, print_fail, print_warn
 from ..types import CLIContext
 from . import admin
 
@@ -77,7 +77,7 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
             try:
                 async with (
                     bgtask.listen_events() as response,
-                    PorgressBarWithSpinner("Scanning the registry...", unit="images") as pbar,
+                    ProgressBarWithSpinner("Scanning the registry...", unit="images") as pbar,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
