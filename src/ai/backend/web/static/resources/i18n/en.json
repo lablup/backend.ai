@@ -303,7 +303,6 @@
       "InviteeEmail": "Invitee email",
       "KeepFileExtension": "Keep ",
       "LessThan10Sec": "Less than 10 seconds",
-      "ModifyPermissions": "Modify Permissions",
       "MoreThanADay": "More than a day",
       "Name": "Name",
       "NewFileName": "New file name",
@@ -1128,6 +1127,11 @@
     "TypeResourceGroupNameToDelete": "Type resource group name to delete",
     "WsproxyAddress": "WSProxy Server Address"
   },
+  "resourcePanel": {
+    "Limit": "Limit",
+    "RemainingNumber": "Remaining",
+    "UsingNumber": "Using"
+  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "You are about to delete this resource policy: ",
     "AllowedHosts": "Allowed hosts",
@@ -1205,7 +1209,6 @@
     "ResourcePresets": "Resource Presets",
     "Resources": "Resources",
     "SHMEMShouldBeSmallerThanMemory": "Shared memory must be smaller than memory",
-    "SharedMemory": "Shared memory",
     "Updated": "Resource preset updated"
   },
   "scheduler": {
@@ -1369,6 +1372,7 @@
       "AddingKernelToSocketQueue": "Adding kernel to socket queue...",
       "AgentNode": "Agent ",
       "AllocateNode": "Cluster mode",
+      "ApplicationMemory": "Application MEM {{value}}",
       "Architecture": "Architecture",
       "AutoSelect": "Auto Select",
       "AutoSharedMemoryTooltip": "You can automatically select or manually enter the shared memory size within the allocated memory.",
@@ -1519,8 +1523,7 @@
       "SetPreopenPorts": "Preopen Ports (optional)",
       "SetSessionOwner": "Session owner",
       "SettingUpProxyForApp": "Setting up proxy for the app...",
-      "SharedMemory": "Shared Memory",
-      "SharedMemoryAbbr": "SHMEM",
+      "SharedMemory": "Shared Memory (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Shared memory setting is reduced to below the allocated memory.",
       "SingleNode": "Single Node",
       "SkipToConfirmAndLaunch": "Skip to review",
@@ -1985,6 +1988,7 @@
       "InvalidBlankPassword": "Enter your password",
       "InvalidPasswordMessage": "At least 1 alphabet, 1 number and 1 special character is required with at least 8 chars.",
       "LeaveService": "Leave service",
+      "Limits": "Limits",
       "LogOut": "Log Out",
       "Logs": "Logs",
       "LogsErrors": "Logs / Errors",
@@ -1992,11 +1996,11 @@
       "MyAccount": "My Account",
       "MyAccountInformation": "My Account Information",
       "MyEnvironments": "My Environments",
-      "MyResources": "My Resources",
-      "MyResourcesDescription": "<p>This panel shows your total resource usage and remaining across all projects and resource groups.</p><p>When there are multiple limits (such as domain, project, or keypair), the most restrictive limit is applied to show your usage and remaining capacity.</p>\n",
+      "MyResources": "My Total Resources Limit",
+      "MyResourcesDescription": "<p>This panel shows your total resource usage and limits across all projects and resource groups.</p><p>When multiple limits are applied (such as domain, project, or keypair), the most restrictive limit is used for calculation.</p>",
       "MyResourcesIn": "My Resources in",
       "MyResourcesInResourceGroup": "My Resources in Resource Group",
-      "MyResourcesInResourceGroupDescription": "This panel shows your current resource usage and available capacity in the selected resource group.",
+      "MyResourcesInResourceGroupDescription": "This panel shows your current my resource usage and remaining in the selected resource group.",
       "NewPassword": "New password",
       "NewPasswordAgain": "New password (again)",
       "NewPasswordCannotBeSame": "Please enter a password that is different from your current password.",

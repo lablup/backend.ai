@@ -24,7 +24,7 @@ from ai.backend.common.clients.valkey_client.client import (
     create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
-from ai.backend.common.data.config.types import HealthCheckConfig
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -89,10 +89,40 @@ class ValkeyLiveClient:
         self._closed = True
         await self._client.disconnect()
 
+    def _create_batch(self, is_atomic: bool = False) -> Batch:
+        """
+        Create a batch for pipeline operations (internal use only).
+
+        :param is_atomic: Whether the batch should be atomic (transaction).
+        :return: A Batch instance.
+        """
+        return Batch(is_atomic=is_atomic)
+
+    async def _execute_batch(self, batch: Batch) -> Any:
+        """
+        Execute a batch of commands (internal use only).
+
+        :param batch: The batch to execute.
+        :return: List of command results.
+        """
+        return await self._client.client.exec(batch, raise_on_error=True)
+
     @valkey_decorator()
     async def get_live_data(self, key: str) -> Optional[bytes]:
         """Get live data value by key."""
         return await self._client.client.get(key)
+
+    @valkey_decorator()
+    async def get_multiple_live_data(self, keys: list[str]) -> list[Optional[bytes]]:
+        """
+        Get multiple live data keys in a single batch operation.
+
+        :param keys: List of keys to get.
+        :return: List of values corresponding to the keys.
+        """
+        if not keys:
+            return []
+        return await self._client.client.mget(cast(list[str | bytes], keys))
 
     @valkey_decorator()
     async def store_live_data(
@@ -104,19 +134,48 @@ class ValkeyLiveClient:
         xx: Optional[bool] = None,
     ) -> None:
         """Store live data value for key with optional expiration."""
-        expiry = None
-        if ex is not None:
-            expiry = ExpirySet(ExpiryType.SEC, ex)
-        elif ex is None:
-            expiry = ExpirySet(ExpiryType.SEC, _DEFAULT_EXPIRATION)
-
+        expiry = ExpirySet(ExpiryType.SEC, _DEFAULT_EXPIRATION if ex is None else ex)
         conditional_set = ConditionalChange.ONLY_IF_EXISTS if xx else None
         await self._client.client.set(key, value, conditional_set=conditional_set, expiry=expiry)
+
+    @valkey_decorator()
+    async def store_multiple_live_data(
+        self,
+        data: Mapping[str, str | bytes],
+        *,
+        ex: Optional[int] = None,
+        xx: Optional[bool] = None,
+    ) -> None:
+        """Store multiple live data values for key with optional expiration."""
+        if not data:
+            return
+        batch = self._create_batch()
+        expiry = ExpirySet(ExpiryType.SEC, _DEFAULT_EXPIRATION if ex is None else ex)
+        conditional_set = ConditionalChange.ONLY_IF_EXISTS if xx else None
+        # To set the conditional_set and expiry, we issue multiple SET commands instead of a single MSET.
+        for key, value in data.items():
+            batch.set(key, value, conditional_set=conditional_set, expiry=expiry)
+        await self._execute_batch(batch)
 
     @valkey_decorator()
     async def delete_live_data(self, key: str) -> int:
         """Delete live data keys."""
         return await self._client.client.delete([key])
+
+    @valkey_decorator()
+    async def incr_live_data(
+        self,
+        key: str,
+        *,
+        ex: Optional[int] = None,
+    ) -> int:
+        """Increment a key in the live data."""
+        expiration_sec = _DEFAULT_EXPIRATION if ex is None else ex
+        batch = self._create_batch()
+        batch.incr(key)
+        batch.expire(key, expiration_sec)
+        results = await self._execute_batch(batch)
+        return results[0]
 
     @valkey_decorator()
     async def replace_schedule_data(self, key: str, values: Mapping[str, str]) -> None:
@@ -187,36 +246,6 @@ class ValkeyLiveClient:
             metadata[str_key] = str_value
 
         return metadata
-
-    def _create_batch(self, is_atomic: bool = False) -> Batch:
-        """
-        Create a batch for pipeline operations (internal use only).
-
-        :param is_atomic: Whether the batch should be atomic (transaction).
-        :return: A Batch instance.
-        """
-        return Batch(is_atomic=is_atomic)
-
-    async def _execute_batch(self, batch: Batch) -> Any:
-        """
-        Execute a batch of commands (internal use only).
-
-        :param batch: The batch to execute.
-        :return: List of command results.
-        """
-        return await self._client.client.exec(batch, raise_on_error=True)
-
-    @valkey_decorator()
-    async def get_multiple_live_data(self, keys: list[str]) -> list[Optional[bytes]]:
-        """
-        Get multiple live data keys in a single batch operation.
-
-        :param keys: List of keys to get.
-        :return: List of values corresponding to the keys.
-        """
-        if not keys:
-            return []
-        return await self._client.client.mget(cast(list[str | bytes], keys))
 
     @valkey_decorator()
     async def update_connection_tracker(
@@ -481,7 +510,7 @@ class ValkeyLiveClient:
         self,
         endpoint_id: UUID,
         connection_info: dict[str, Any],
-        health_check_config: HealthCheckConfig | None,
+        health_check_config: Optional[ModelHealthCheck],
     ) -> None:
         pipe = self._create_batch()
         pipe.set(
@@ -494,13 +523,14 @@ class ValkeyLiveClient:
             "true" if health_check_config is not None else "false",
             expiry=ExpirySet(ExpiryType.SEC, 3600),
         )
+        # TODO: Don't update health_check_config when route is updated.
         if health_check_config:
             pipe.set(
                 f"endpoint.{endpoint_id}.health_check_config",
                 health_check_config.model_dump_json(),
                 expiry=ExpirySet(ExpiryType.SEC, 3600),
             )
-        await self._client.client.exec(pipe, True)
+        await self._client.client.exec(pipe, raise_on_error=True)
 
     @valkey_decorator()
     async def delete_key(self, key: str) -> int:

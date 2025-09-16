@@ -23,7 +23,7 @@ from ai.backend.manager.decorators.repository_decorator import (
 )
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import GroupNotFound
-from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed, VFolderNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -32,6 +32,7 @@ from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
 from ai.backend.manager.models.vfolder import (
     VFolderCloneInfo,
+    VFolderDeletionInfo,
     VFolderInvitationRow,
     VFolderInvitationState,
     VFolderOperationStatus,
@@ -41,6 +42,7 @@ from ai.backend.manager.models.vfolder import (
     VFolderRow,
     delete_vfolder_relation_rows,
     ensure_host_permission_allowed,
+    get_sessions_by_mounted_folder,
     is_unmanaged,
     query_accessible_vfolders,
     vfolders,
@@ -308,9 +310,6 @@ class VfolderRepository:
         """
         Move VFolders to trash.
         """
-        from ai.backend.manager.models.vfolder import (
-            VFolderDeletionInfo,
-        )
 
         async with self._db.begin_session() as session:
             vfolder_rows = []
@@ -322,8 +321,6 @@ class VfolderRepository:
             # Create deletion info for each vfolder
             deletion_infos = []
             for vfolder_row in vfolder_rows:
-                from ai.backend.common.types import VFolderID
-
                 vfolder_id_obj = VFolderID(
                     quota_scope_id=vfolder_row.quota_scope_id,
                     folder_id=vfolder_row.id,
@@ -339,6 +336,15 @@ class VfolderRepository:
             # This would need to be passed to the repository method or handled differently
             # For now, we'll update the status directly instead of using the full deletion process
             for vfolder_row in vfolder_rows:
+                mount_sessions = await get_sessions_by_mounted_folder(
+                    session, VFolderID.from_row(vfolder_row)
+                )
+                if mount_sessions:
+                    session_ids = [str(session_id) for session_id in mount_sessions]
+                    raise VFolderDeletionNotAllowed(
+                        "Cannot delete the vfolder. "
+                        f"The vfolder(id: {vfolder_row.id}) is mounted on sessions(ids: {session_ids})."
+                    )
                 vfolder_row.status = VFolderOperationStatus.DELETE_PENDING
 
             await session.flush()
@@ -466,6 +472,19 @@ class VfolderRepository:
                 & (VFolderPermissionRow.user == user_id)
             )
             await session.execute(query)
+            await self._role_manager.unmap_entity_from_scope(
+                session,
+                entity_id=ObjectId(
+                    entity_type=EntityType.VFOLDER,
+                    entity_id=str(vfolder_id),
+                ),
+                scope_id=ScopeId(ScopeType.USER, str(user_id)),
+            )
+            await self._role_manager.delete_object_permission_of_user(
+                session,
+                user_id,
+                vfolder_id,
+            )
 
     @repository_decorator()
     async def get_vfolder_invitations_by_vfolder(

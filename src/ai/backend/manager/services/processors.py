@@ -104,7 +104,7 @@ class ServiceArgs:
     event_dispatcher: EventDispatcher
     hook_plugin_ctx: HookPluginContext
     scheduling_controller: "SchedulingController"
-    deployment_controller: Optional["DeploymentController"]
+    deployment_controller: "DeploymentController"
 
 
 @dataclass
@@ -131,7 +131,7 @@ class Services:
     artifact: ArtifactService
     artifact_revision: ArtifactRevisionService
     artifact_registry: ArtifactRegistryService
-    deployment: Optional[DeploymentService]
+    deployment: DeploymentService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -207,9 +207,6 @@ class Services:
             repositories.project_resource_policy.repository
         )
         resource_preset_service = ResourcePresetService(
-            args.db,
-            args.agent_registry,
-            args.config_provider,
             repositories.resource_preset.repository,
         )
         utilization_metric_service = UtilizationMetricService(
@@ -226,6 +223,7 @@ class Services:
             valkey_live=args.valkey_live,
             repository=repositories.model_serving.repository,
             admin_repository=repositories.model_serving.admin_repository,
+            deployment_controller=args.deployment_controller,
         )
 
         model_serving_auto_scaling = AutoScalingService(
@@ -265,11 +263,7 @@ class Services:
             repositories.reservoir_registry.repository,
             repositories.artifact_registry.repository,
         )
-
-        # Initialize deployment service if controller is available
-        deployment_service = None
-        if args.deployment_controller is not None:
-            deployment_service = DeploymentService(args.deployment_controller)
+        deployment_service = DeploymentService(args.deployment_controller)
 
         return cls(
             agent=agent_service,

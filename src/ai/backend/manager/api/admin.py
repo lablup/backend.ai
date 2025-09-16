@@ -23,6 +23,7 @@ from ai.backend.common.dto.manager.request import GraphQLReq
 from ai.backend.common.dto.manager.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dto.context import ProcessorsCtx
 
 from ..api.gql.schema import schema as strawberry_schema
@@ -179,27 +180,42 @@ class GQLInspectionConfigCtx(MiddlewareParam):
         )
 
 
+class ConfigProviderCtx(MiddlewareParam):
+    config_provider: ManagerConfigProvider
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        root_ctx: RootContext = request.app["_root.context"]
+
+        return cls(
+            config_provider=root_ctx.config_provider,
+        )
+
+
 class GQLAPIHandler:
     @auth_required_for_method
     @api_handler
     async def handle_gql_strawberry(
         self,
         body: BodyParam[GraphQLReq],
-        config_ctx: GQLInspectionConfigCtx,
+        gql_config_ctx: GQLInspectionConfigCtx,
+        config_provider_ctx: ConfigProviderCtx,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         rules = []
 
-        if not config_ctx.allow_graphql_schema_introspection:
+        if not gql_config_ctx.allow_graphql_schema_introspection:
             rules.append(CustomIntrospectionRule)
-        max_depth = cast(int | None, config_ctx.max_gql_query_depth)
+        max_depth = cast(int | None, gql_config_ctx.max_gql_query_depth)
         if max_depth is not None:
             rules.append(depth_limit_validator(max_depth=max_depth))
 
         if rules:
             validate_errors = validate(
                 # TODO: Instead of accessing private field, use another approach
-                schema=config_ctx.gql_v2_schema._schema,
+                schema=gql_config_ctx.gql_v2_schema._schema,
                 document_ast=parse(body.parsed.query),
                 rules=rules,
             )
@@ -214,6 +230,7 @@ class GQLAPIHandler:
 
         strawberry_ctx = StrawberryGQLContext(
             processors=processors_ctx.processors,
+            config_provider=config_provider_ctx.config_provider,
         )
 
         query, variables, operation_name = (
@@ -222,7 +239,7 @@ class GQLAPIHandler:
             body.parsed.operation_name,
         )
 
-        result = await config_ctx.gql_v2_schema.execute(
+        result = await gql_config_ctx.gql_v2_schema.execute(
             query,
             root_value=None,
             variable_values=variables,

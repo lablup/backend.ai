@@ -276,6 +276,24 @@ enum ArtifactOrderField
 }
 
 """Added in 25.14.0"""
+type ArtifactRegistry
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the default artifact registry."""
+  name: String!
+
+  """Type of the default artifact registry."""
+  type: ArtifactRegistryType!
+}
+
+enum ArtifactRegistryType
+  @join__type(graph: STRAWBERRY)
+{
+  HUGGINGFACE @join__enumValue(graph: STRAWBERRY)
+  RESERVOIR @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 25.14.0"""
 type ArtifactRevision implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -2005,6 +2023,7 @@ input GetPresignedDownloadURLInput
 {
   artifactRevisionId: ID!
   key: String!
+  expiration: Int = null
 }
 
 """Added in 25.14.0"""
@@ -4522,6 +4541,9 @@ type Query
 
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.14.0"""
+  defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
 }
 
 type QuotaDetails
@@ -4683,7 +4705,7 @@ type ResourceLimit
 {
   key: String
   min: String
-  max: String
+  max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete.")
 }
 
 input ResourceLimitInput
@@ -4691,7 +4713,7 @@ input ResourceLimitInput
 {
   key: String
   min: String
-  max: String
+  max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete.")
 }
 
 type ResourcePreset
@@ -4878,6 +4900,8 @@ input ScanArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
   registryId: ID = null
+
+  """Maximum number of artifacts to scan (max: 500)"""
   limit: Int!
   artifactType: ArtifactType = null
   search: String = null

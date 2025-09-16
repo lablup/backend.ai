@@ -16,6 +16,48 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.14.0rc1 (2025-09-11)
+
+### Breaking Changes
+* Implement password hashing system with multiple algorithms ([#5753](https://github.com/lablup/backend.ai/issues/5753))
+
+### Features
+* Add data migration script from VFolder to RBAC tables ([#5340](https://github.com/lablup/backend.ai/issues/5340))
+* Migrate existing user/project records to RBAC data ([#5417](https://github.com/lablup/backend.ai/issues/5417))
+* Expand RBAC tables by adding `permission_groups` table to group permissions with the same target ([#5465](https://github.com/lablup/backend.ai/issues/5465))
+* Add `reservoir_registries` DB table, service, and CRUD GQL mutations ([#5644](https://github.com/lablup/backend.ai/issues/5644))
+* Add `artifact_registries` DB table to store common information of the various artifact registries ([#5656](https://github.com/lablup/backend.ai/issues/5656))
+* Implement Reservoir registry, and Sync APIs between Managers ([#5660](https://github.com/lablup/backend.ai/issues/5660))
+* Add config to set GPFS fileset name prefix ([#5684](https://github.com/lablup/backend.ai/issues/5684))
+* Add RBAC repositoy functions to manage scopes and entity DB records ([#5699](https://github.com/lablup/backend.ai/issues/5699))
+* Allow `__typename` type query for advanced GraphQL features(GQL Federation, `@connection` directive) by introducing custom introspection rule ([#5705](https://github.com/lablup/backend.ai/issues/5705))
+* Align the reported agent memory size so that the reserved memory absorbs tiny memory size deviation originating from various firmware/kernel settings and make the memory size of same-hardware agents consistent, preventing inadvertent resource allocation failures in large clusters ([#5729](https://github.com/lablup/backend.ai/issues/5729))
+* Set expiry to set records of Bgtask metadata ids ([#5736](https://github.com/lablup/backend.ai/issues/5736))
+* Add `defaultArtifactRegistry` GQL resolver to fetch the default artifact registry information ([#5739](https://github.com/lablup/backend.ai/issues/5739))
+* Add `Artifact`, `ArtifactRegistry` REST API ([#5747](https://github.com/lablup/backend.ai/issues/5747))
+* Add session mode(Client, Proxy) based error handling in FetchContextManager ([#5774](https://github.com/lablup/backend.ai/issues/5774))
+* Add VFolder delete Background Task ([#5778](https://github.com/lablup/backend.ai/issues/5778))
+* Apply cache layer for resource presets ([#5781](https://github.com/lablup/backend.ai/issues/5781))
+* Add PBKDF2-SHA3-256 password hashing implementation and update supported algorithms ([#5785](https://github.com/lablup/backend.ai/issues/5785))
+* Remove obsolete max slot limit validation during session creation ([#5807](https://github.com/lablup/backend.ai/issues/5807))
+* Implement health check functionality for route management ([#5811](https://github.com/lablup/backend.ai/issues/5811))
+
+### Improvements
+* Migrate legacy redis clients to valkey clients in App Proxy ([#5741](https://github.com/lablup/backend.ai/issues/5741))
+
+### Fixes
+* Add missing `restart: unless-stopped` policy to all services in docker compose file ([#5694](https://github.com/lablup/backend.ai/issues/5694))
+* Add missing session live stat update ([#5762](https://github.com/lablup/backend.ai/issues/5762))
+* Make overlay network creation idempotent so that retries due to errors after this step does not make infinite retry loop ([#5765](https://github.com/lablup/backend.ai/issues/5765))
+* Clean up dangling docker networks ([#5770](https://github.com/lablup/backend.ai/issues/5770))
+* Add missing update when app proxy registered endpoint ([#5783](https://github.com/lablup/backend.ai/issues/5783))
+* Restrict `limit` to `scan_artifacts` API ([#5801](https://github.com/lablup/backend.ai/issues/5801))
+* Update client SDK to reflect UUID-only restriction in session dependencies ([#5809](https://github.com/lablup/backend.ai/issues/5809))
+
+### Miscellaneous
+* Refactor scheduler handlers: Split into individual files and create a base handler class ([#5766](https://github.com/lablup/backend.ai/issues/5766))
+
+
 ## 25.13.4 (2025-09-03)
 
 ### Fixes

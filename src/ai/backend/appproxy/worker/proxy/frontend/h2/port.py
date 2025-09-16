@@ -90,7 +90,7 @@ class PortFrontend(H2Frontend[int]):
         return await self.update_backend(backend, routes)
 
     async def update_backend(self, backend: H2Backend, routes: list[RouteInfo]) -> H2Backend:
-        backend_configs = [BackendConfig(r.kernel_host, r.kernel_port) for r in routes]
+        backend_configs = [BackendConfig(r.current_kernel_host, r.kernel_port) for r in routes]
         await backend.update_config(backend_configs)
         return backend
 

@@ -480,6 +480,26 @@
   # Format is a duration string like "90d" for 90 days.
   # Set to None to disable password expiration.
   # max_password_age =
+  # The password hashing algorithm to use for new passwords.
+  # Supported algorithms: bcrypt, sha256, sha3_256, pbkdf2_sha256,
+  # pbkdf2_sha3_256.
+  # Existing passwords with different algorithms will be gradually migrated.
+  password-hash-algorithm = "pbkdf2_sha256"
+  # The number of rounds (iterations) for the password hashing algorithm.
+  # Higher values are more secure but slower.
+  # - bcrypt: valid range is 4-31 (will be automatically capped at 31)
+  # - pbkdf2_sha256: recommended 100,000+ (default 100,000)
+  # - sha256/sha3_256: any positive integer (100,000 may be too high for these)
+  # The value will be automatically adjusted to fit the algorithm's constraints.
+  password-hash-rounds = 600000
+  # The size of the salt in bytes for password hashing.
+  # Larger salts provide better protection against rainbow table attacks.
+  # - Minimum: 16 bytes (128 bits)
+  # - Default: 32 bytes (256 bits) - recommended for most use cases
+  # - Maximum: 256 bytes (2048 bits)
+  # Note: bcrypt manages its own salt internally, so this setting doesn't apply to
+  # bcrypt.
+  password-hash-salt-size = 32
 
 [session]
   [session.hang_tolerance]
@@ -542,3 +562,15 @@
 [service_discovery]
   # Type of service discovery to use.
   type = "redis"
+
+[artifact_registry]
+  # Name of the Model registry configuration.
+  # Used to identify this registry in the system.
+  model-registry = "MODEL_REGISTRY_NAME"
+
+[reservoir]
+  # Name of the reservoir storage configuration.
+  # Used to identify this storage in the system.
+  storage-name = "RESERVOIR_STORAGE_NAME"
+  # Configuration for the storage.
+  config = "..."

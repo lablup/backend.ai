@@ -19,7 +19,10 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
-from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
+from ai.backend.common.events.event_types.artifact.anycast import (
+    ModelImportDoneEvent,
+    ModelMetadataFetchDoneEvent,
+)
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
     DoScanReservoirRegistryEvent,
 )
@@ -93,6 +96,7 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.event_dispatcher.handlers.artifact import ArtifactEventHandler
 from ai.backend.manager.event_dispatcher.handlers.artifact_registry import (
     ArtifactRegistryEventHandler,
@@ -140,6 +144,7 @@ class DispatcherArgs:
     repositories: Repositories
     processors_factory: Callable[[], Processors]
     storage_manager: StorageSessionManager
+    config_provider: ManagerConfigProvider
     use_sokovan: bool = True
 
 
@@ -204,6 +209,7 @@ class Dispatchers:
             args.repositories.artifact.repository,
             args.repositories.huggingface_registry.repository,
             args.repositories.reservoir_registry.repository,
+            args.config_provider,
         )
         self._artifact_registry_event_handler = ArtifactRegistryEventHandler(
             args.processors_factory,
@@ -566,9 +572,14 @@ class Dispatchers:
     def _dispatch_artifact_events(self, event_dispatcher: EventDispatcher) -> None:
         evd = event_dispatcher.with_reporters([EventLogger(self._db)])
         evd.consume(
+            ModelMetadataFetchDoneEvent,
+            None,
+            self._artifact_event_handler.handle_model_metadata_fetch_done,
+        )
+        evd.consume(
             ModelImportDoneEvent,
             None,
-            self._artifact_event_handler.handle_artifact_import_done,
+            self._artifact_event_handler.handle_model_import_done,
         )
 
     def _dispatch_artifact_registry_events(self, event_dispatcher: EventDispatcher) -> None:

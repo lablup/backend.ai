@@ -58,8 +58,8 @@ Alias keys are also URL-quoted in the same way.
        - app-streaming-packet-timeout: "5m"  # in seconds; idleness of app-streaming TCP connections
          # NOTE: idle checkers get activated AFTER the app-streaming packet timeout has passed.
        - checkers
-         + "timeout"
-           - threshold: "10m"
+         + "network_timeout"
+           - threshold: "10m"  # time duration to stay under the thresholds
          + "utilization"
            + resource-thresholds
              + "cpu_util"
@@ -420,7 +420,7 @@ class AuthConfig(BaseModel):
         default=PasswordHashAlgorithm.PBKDF2_SHA256,
         description="""
         The password hashing algorithm to use for new passwords.
-        Supported algorithms: bcrypt, sha256, sha3_256, pbkdf2_sha256.
+        Supported algorithms: bcrypt, sha256, sha3_256, pbkdf2_sha256, pbkdf2_sha3_256.
         Existing passwords with different algorithms will be gradually migrated.
         """,
         examples=[
@@ -428,6 +428,7 @@ class AuthConfig(BaseModel):
             PasswordHashAlgorithm.SHA256,
             PasswordHashAlgorithm.SHA3_256,
             PasswordHashAlgorithm.PBKDF2_SHA256,
+            PasswordHashAlgorithm.PBKDF2_SHA3_256,
         ],
         validation_alias=AliasChoices("password-hash-algorithm", "password_hash_algorithm"),
         serialization_alias="password-hash-algorithm",
@@ -1555,7 +1556,7 @@ class IdleCheckerConfig(BaseModel):
         """,
         examples=[
             {
-                "timeout": {
+                "network_timeout": {
                     "threshold": "10m",
                 },
                 "utilization": {
@@ -1772,7 +1773,17 @@ class ReservoirObjectStorageConfig(BaseModel):
 StorageSpecificConfig = Union[ReservoirObjectStorageConfig]
 
 
-class ReservoirStorageConfig(BaseModel):
+class ReservoirConfig(BaseModel):
+    enable_approve_process: bool = Field(
+        default=False,
+        description="""
+        Whether to enable the approval process for artifact uploads.
+        When enabled, artifacts require approval before being available.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices("enable-approve-process", "enable_approve_process"),
+        serialization_alias="enable-approve-process",
+    )
     storage_name: str = Field(
         default="RESERVOIR_STORAGE_NAME",
         description="""
@@ -1987,11 +1998,10 @@ class ManagerUnifiedConfig(BaseModel):
         validation_alias=AliasChoices("artifact_registry", "artifact-registry"),
         serialization_alias="artifact-registry",
     )
-    reservoir: ReservoirStorageConfig = Field(
-        default_factory=ReservoirStorageConfig,
+    reservoir: ReservoirConfig = Field(
+        default_factory=ReservoirConfig,
         description="""
-        Reservoir storage configuration.
-        Controls which storage backend is used for the reservoir.
+        Reservoir configuration.
         """,
     )
 

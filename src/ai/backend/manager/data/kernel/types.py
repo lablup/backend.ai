@@ -58,8 +58,6 @@ class KernelStatus(CIStrEnum):
         """
         return frozenset((
             cls.RUNNING,
-            cls.RESTARTING,
-            cls.RESIZING,
             cls.TERMINATING,
         ))
 

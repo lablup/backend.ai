@@ -27,6 +27,11 @@ from ai.backend.common.data.storage.registries.types import (
     ModelSortKey,
     ModelTarget,
 )
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.artifact.anycast import (
+    ModelMetadataFetchDoneEvent,
+    ModelMetadataInfo,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import HuggingFaceAPIError
 
@@ -242,6 +247,7 @@ class HuggingFaceScanner:
                             created_at=model.created_at,
                             modified_at=model.last_modified,
                             readme=None,
+                            size=None,
                         )
                         model_data_list.append(model_data)
 
@@ -280,6 +286,7 @@ class HuggingFaceScanner:
         try:
             log.info(f"Scanning specific HuggingFace model: {model}")
             model_info = await self._client.scan_model(model)
+            total_size = await self._calculate_model_size(model)
             readme_content = await self._download_readme(model)
 
             model_id = model.model_id
@@ -292,10 +299,45 @@ class HuggingFaceScanner:
                 created_at=model_info.created_at,
                 modified_at=model_info.last_modified,
                 readme=readme_content,
+                size=total_size,
             )
 
             log.info(
                 f"Successfully scanned HuggingFace model: {model}",
+            )
+            return result
+
+        except Exception as e:
+            raise HuggingFaceAPIError(f"Failed to scan model {model}: {str(e)}") from e
+
+    async def scan_model_without_metadata(self, model: ModelTarget) -> ModelData:
+        """Scan a specific model by ID without README and size metadata.
+
+        Args:
+            model: HuggingFace model to scan
+
+        Returns:
+            ModelData object with basic metadata only (without README and size)
+        """
+        try:
+            log.info(f"Scanning HuggingFace model without metadata: {model}")
+            model_info = await self._client.scan_model(model)
+
+            model_id = model.model_id
+            result = ModelData(
+                id=model_id,
+                name=model_id.split("/")[-1],
+                author=model_info.author,
+                revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
+                tags=model_info.tags or [],
+                created_at=model_info.created_at,
+                modified_at=model_info.last_modified,
+                readme=None,
+                size=None,
+            )
+
+            log.info(
+                f"Successfully scanned HuggingFace model without metadata: {model}",
             )
             return result
 
@@ -362,6 +404,54 @@ class HuggingFaceScanner:
         except Exception as e:
             raise HuggingFaceAPIError(f"Failed to list files for model {model}: {str(e)}") from e
 
+    async def download_metadata_batch(
+        self,
+        models: list[ModelData],
+        registry_name: str,
+        event_producer: EventProducer,
+        max_concurrent: int = 8,
+    ) -> None:
+        """Download metadata (README and file size) for all models and fire event when complete.
+
+        Args:
+            models: List of ModelData objects to download metadata for
+            registry_name: Name of the registry (e.g., HuggingFace registry name)
+            event_producer: Event producer to fire the completion event
+            max_concurrent: Maximum number of concurrent metadata downloads (default: 8)
+        """
+        log.info(
+            f"Starting batch metadata processing for {len(models)} models (max_concurrent={max_concurrent})"
+        )
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def download_metadata(model_data: ModelData) -> None:
+            """Download metadata (README and file size) for a single model."""
+            async with semaphore:
+                try:
+                    model_target = ModelTarget(model_id=model_data.id, revision=model_data.revision)
+                    total_size = await self._calculate_model_size(model_target)
+                    readme_content = await self._download_readme(model_target)
+
+                    # Only add to results if we have README content
+                    if readme_content:
+                        metadata_info = ModelMetadataInfo(
+                            model_id=model_data.id,
+                            revision=model_data.revision,
+                            readme_content=readme_content,
+                            registry_type=ArtifactRegistryType.HUGGINGFACE,
+                            registry_name=registry_name,
+                            size=total_size,
+                        )
+                        await event_producer.anycast_event(
+                            ModelMetadataFetchDoneEvent(model=metadata_info)
+                        )
+                except Exception as e:
+                    log.warning(f"Failed to download metadata for {model_data.id}: {str(e)}")
+
+        # Download metadata concurrently with semaphore limit
+        tasks = [download_metadata(model) for model in models]
+        await asyncio.gather(*tasks, return_exceptions=True)
+
     async def _download_readme(self, model: ModelTarget) -> Optional[str]:
         """Download README content for a model.
 
@@ -388,3 +478,11 @@ class HuggingFaceScanner:
         except Exception as e:
             log.warning(f"Failed to download README for {model}: {str(e)}")
             return None
+
+    async def _calculate_model_size(self, model: ModelTarget) -> int:
+        try:
+            file_infos = await self.list_model_files_info(model)
+            return sum(file.size for file in file_infos)
+        except Exception as size_error:
+            log.warning(f"Failed to calculate size for {model}: {str(size_error)}")
+            return 0

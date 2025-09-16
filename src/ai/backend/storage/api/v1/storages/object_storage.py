@@ -91,7 +91,7 @@ class ObjectStorageAPIHandler:
         )
 
         return APIResponse.no_content(
-            status_code=HTTPStatus.OK,
+            status_code=HTTPStatus.NO_CONTENT,
         )
 
     @stream_api_handler
@@ -218,7 +218,7 @@ class ObjectStorageAPIHandler:
         await storage_service.delete_object(storage_name, bucket_name, prefix)
 
         return APIResponse.no_content(
-            status_code=HTTPStatus.OK,
+            status_code=HTTPStatus.NO_CONTENT,
         )
 
 

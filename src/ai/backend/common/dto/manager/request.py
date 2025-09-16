@@ -64,8 +64,10 @@ class UpdateArtifactPathParam(BaseRequestModel):
 
 
 class UpdateArtifactReq(BaseRequestModel):
-    # Add fields as needed for artifact updates
     description: Optional[str] = Field(default=None, description="Updated description")
+    readonly: Optional[bool] = Field(
+        default=None, description="Whether the artifact should be readonly."
+    )
 
 
 class DeleteArtifactPathParam(BaseRequestModel):
@@ -117,6 +119,7 @@ class GetPresignedDownloadURLReq(BaseRequestModel):
         description="The unique identifier of the artifact revision"
     )
     key: str = Field(description="Object key")
+    expiration: Optional[int] = Field(default=None, description="URL expiration time in seconds")
 
 
 class GetPresignedUploadURLReq(BaseRequestModel):

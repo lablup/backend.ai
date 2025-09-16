@@ -10,7 +10,10 @@ from dateutil.tz import tzutc
 from ai.backend.common.auth.utils import generate_signature
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.dto.request import SearchArtifactsReq
-from ai.backend.manager.dto.response import SearchArtifactsResponse
+from ai.backend.manager.dto.response import (
+    GetArtifactRevisionReadmeResponse,
+    SearchArtifactsResponse,
+)
 
 _HASH_TYPE = "sha256"
 
@@ -70,3 +73,8 @@ class ReservoirRegistryClient:
         return await self._request(
             "POST", "/artifact-registries/search", json=req.model_dump(mode="json")
         )
+
+    async def get_readme(
+        self, artifact_revision_id: uuid.UUID
+    ) -> GetArtifactRevisionReadmeResponse:
+        return await self._request("GET", f"/artifacts/revisions/{artifact_revision_id}/readme")

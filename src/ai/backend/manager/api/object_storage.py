@@ -59,6 +59,7 @@ class APIHandler:
                 GetDownloadPresignedURLAction(
                     artifact_revision_id=body.parsed.artifact_revision_id,
                     key=body.parsed.key,
+                    expiration=body.parsed.expiration,
                 )
             )
         )

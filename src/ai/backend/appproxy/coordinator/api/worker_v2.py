@@ -31,7 +31,6 @@ from ai.backend.appproxy.common.utils import (
     pydantic_api_response_handler,
 )
 from ai.backend.appproxy.coordinator.defs import LockID
-from ai.backend.common import redis_helper
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.types import AgentId
@@ -44,8 +43,7 @@ from .types import CircuitListResponseModel, SlotModel, StubResponseModel
 from .utils import auth_required
 
 if TYPE_CHECKING:
-    from redis.asyncio import Redis
-    from redis.asyncio.client import Pipeline
+    pass
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
@@ -238,6 +236,7 @@ async def update_worker(
             )
             sess.add(worker)
             await sess.flush()
+            await sess.refresh(worker)
 
         for filter in params.app_filters:
             try:
@@ -300,16 +299,11 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
         ]
 
         # Update "last seen" timestamp for liveness tracking
-        def _hset_with_expiration(r: Redis) -> Pipeline:
-            pipe = r.pipeline(transaction=False)
-            pipe.hset("proxy-worker.last_seen", worker.authority, now.timestamp())
-            ttl = get_default_redis_key_ttl()
-            pipe.expire("proxy-worker.last_seen", ttl)
-            return pipe
-
-        await redis_helper.execute(
-            root_ctx.redis_live,
-            _hset_with_expiration,
+        ttl = get_default_redis_key_ttl()
+        await root_ctx.valkey_live.hset_with_expiry(
+            "proxy-worker.last_seen",
+            {worker.authority: str(now.timestamp())},
+            ttl,
         )
         return result
 
@@ -344,17 +338,14 @@ async def check_worker_lost(
             seconds=root_ctx.local_config.proxy_coordinator.worker_heartbeat_timeout
         )
 
-        _, msg_data = await redis_helper.execute(
-            root_ctx.redis_live, lambda r: r.hscan("proxy-worker.last_seen")
-        )
+        msg_data = await root_ctx.valkey_live.hgetall_str("proxy-worker.last_seen")
 
         async with root_ctx.db.begin_readonly_session() as sess:
             workers = await Worker.list_workers(sess)
             worker_map = {w.authority: w for w in workers}
 
-        for worker_id, prev in msg_data.items():
+        for worker_id_str, prev in msg_data.items():
             prev = datetime.fromtimestamp(float(prev), tzutc())
-            worker_id_str = worker_id.decode()
             if (
                 (now - prev) > timeout
                 and worker_id_str in worker_map

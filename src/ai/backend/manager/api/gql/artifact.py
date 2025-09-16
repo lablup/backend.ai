@@ -30,6 +30,8 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactStatus,
     ArtifactType,
 )
+from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
+from ai.backend.manager.errors.artifact import ArtifactScanLimitExceededError
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
     ArtifactOrderingOptions,
@@ -161,7 +163,9 @@ class ArtifactRevisionOrderBy:
 @strawberry.input(description="Added in 25.14.0")
 class ScanArtifactsInput:
     registry_id: Optional[ID] = None
-    limit: int
+    limit: int = strawberry.field(
+        description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})"
+    )
     artifact_type: Optional[ArtifactType] = None
     search: Optional[str] = None
 
@@ -748,6 +752,9 @@ async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Optiona
 async def scan_artifacts(
     input: ScanArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ScanArtifactsPayload:
+    if input.limit > ARTIFACT_MAX_SCAN_LIMIT:
+        raise ArtifactScanLimitExceededError(f"Limit cannot exceed {ARTIFACT_MAX_SCAN_LIMIT}")
+
     action_result = await info.context.processors.artifact.scan.wait_for_complete(
         ScanArtifactsAction(
             artifact_type=input.artifact_type,
@@ -765,11 +772,9 @@ async def scan_artifacts(
 
     artifacts = []
     for item in action_result.result:
-        registry_data = await registry_meta_loader.load(item.artifact.registry_id)
-        source_registry_data = await registry_meta_loader.load(item.artifact.source_registry_id)
-        artifacts.append(
-            Artifact.from_dataclass(item.artifact, registry_data.url, source_registry_data.url)
-        )
+        registry_data = await registry_meta_loader.load(item.registry_id)
+        source_registry_data = await registry_meta_loader.load(item.source_registry_id)
+        artifacts.append(Artifact.from_dataclass(item, registry_data.url, source_registry_data.url))
     return ScanArtifactsPayload(artifacts=artifacts)
 
 

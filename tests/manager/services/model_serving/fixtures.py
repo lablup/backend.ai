@@ -100,6 +100,7 @@ def mock_service(
     mock_config_provider,
     mock_valkey_live,
     mock_repositories,
+    mock_deployment_controller,
 ) -> ModelServingService:
     return ModelServingService(
         agent_registry=mock_agent_registry,
@@ -110,6 +111,7 @@ def mock_service(
         valkey_live=mock_valkey_live,
         repository=mock_repositories.repository,
         admin_repository=mock_repositories.admin_repository,
+        deployment_controller=mock_deployment_controller,
     )
 
 

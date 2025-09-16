@@ -61,6 +61,8 @@ def processors(database_fixture, database_engine) -> DomainProcessors:
         storage_manager=MagicMock(),  # Not used by DomainRepositories
         config_provider=MagicMock(),  # Not used by DomainRepositories
         valkey_stat_client=MagicMock(),  # Not used by DomainRepositories
+        valkey_live_client=MagicMock(),  # Not used by DomainRepositories
+        valkey_schedule_client=MagicMock(),  # Not used by DomainRepositories
     )
     domain_repositories = DomainRepositories.create(repository_args)
 

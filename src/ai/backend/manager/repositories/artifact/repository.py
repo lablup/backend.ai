@@ -226,7 +226,9 @@ class ArtifactRepository:
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
-                raise ArtifactNotFoundError(f"Artifact with model ID {model_id} not found")
+                raise ArtifactNotFoundError(
+                    f"Artifact with model ID {model_id} not found under registry {registry_id}"
+                )
             return row.to_dataclass()
 
     @repository_decorator()
@@ -507,7 +509,9 @@ class ArtifactRepository:
                 artifact_data = artifact_row.to_dataclass()
                 revision_data_list = [revision.to_dataclass() for revision in revision_rows]
                 result.append(
-                    ArtifactDataWithRevisions(artifact=artifact_data, revisions=revision_data_list)
+                    ArtifactDataWithRevisions.from_dataclasses(
+                        artifact_data=artifact_data, revisions=revision_data_list
+                    )
                 )
 
         return result
@@ -698,6 +702,34 @@ class ArtifactRepository:
             return artifact_revision_id
 
     @repository_decorator()
+    async def update_artifact_revision_readme(
+        self, artifact_revision_id: uuid.UUID, readme: str
+    ) -> uuid.UUID:
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(readme=readme)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    @repository_decorator()
+    async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> str:
+        async with self._db.begin_session() as db_sess:
+            result = await db_sess.execute(
+                sa.select(ArtifactRevisionRow.readme).where(
+                    ArtifactRevisionRow.id == artifact_revision_id
+                )
+            )
+            readme = result.scalar_one_or_none()
+            if readme is None:
+                raise ArtifactRevisionNotFoundError(
+                    f"Artifact revision with ID {artifact_revision_id} not found"
+                )
+            return readme
+
+    @repository_decorator()
     async def list_artifacts_paginated(
         self,
         *,
@@ -819,7 +851,9 @@ class ArtifactRepository:
                 artifact_data = row.to_dataclass()
                 revisions_data = [revision.to_dataclass() for revision in row.revision_rows]
                 data_objects.append(
-                    ArtifactDataWithRevisions(artifact=artifact_data, revisions=revisions_data)
+                    ArtifactDataWithRevisions.from_dataclasses(
+                        artifact_data=artifact_data, revisions=revisions_data
+                    )
                 )
 
             return data_objects, total_count

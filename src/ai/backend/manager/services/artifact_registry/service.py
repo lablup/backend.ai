@@ -1,5 +1,6 @@
 import logging
 
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
@@ -219,9 +220,18 @@ class ArtifactRegistryService:
         self, action: GetArtifactRegistryMetaAction
     ) -> GetArtifactRegistryMetaActionResult:
         log.info("Getting artifact registry meta with id: {}", action.registry_id)
-        registry_meta = await self._artifact_registry_repository.get_artifact_registry_data(
-            action.registry_id
-        )
+        if action.registry_id:
+            registry_meta = await self._artifact_registry_repository.get_artifact_registry_data(
+                action.registry_id
+            )
+        elif action.registry_name:
+            registry_meta = (
+                await self._artifact_registry_repository.get_artifact_registry_data_by_name(
+                    action.registry_name
+                )
+            )
+        else:
+            raise InvalidAPIParameters("Either registry_id or registry_name must be provided.")
         return GetArtifactRegistryMetaActionResult(result=registry_meta)
 
     async def get_registry_metas(

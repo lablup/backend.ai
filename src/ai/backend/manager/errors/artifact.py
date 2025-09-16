@@ -163,3 +163,16 @@ class ArtifactRevisionNotFoundError(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class ArtifactScanLimitExceededError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/artifact-scan-limit-exceeded"
+    error_title = "Artifact Scan Limit Exceeded"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )

@@ -1092,6 +1092,7 @@ configure_backendai() {
   ./backend.ai mgr fixture populate fixtures/manager/example-keypairs.json
   ./backend.ai mgr fixture populate fixtures/manager/example-set-user-main-access-keys.json
   ./backend.ai mgr fixture populate fixtures/manager/example-resource-presets.json
+  ./backend.ai mgr fixture populate fixtures/manager/example-roles.json
 
   # Populate artifact registries with substituted MinIO credentials
   TMP_ARTIFACT_REGISTRIES_JSON="/tmp/example-artifact-registries.json"

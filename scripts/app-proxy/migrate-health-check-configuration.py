@@ -4,6 +4,9 @@ Place it under `manager` directory and then run it with manager's python interpr
 """
 
 import asyncio
+from collections.abc import Coroutine
+from http import HTTPStatus
+from typing import Optional
 from urllib.parse import quote_plus as urlquote
 from uuid import UUID
 
@@ -18,7 +21,8 @@ from ai.backend.logging.types import LogLevel
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.unified import VolumesConfig
-from ai.backend.manager.errors.exceptions import InvalidAPIParameters, VFolderOperationFailed
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.storage import VFolderOperationFailed
 from ai.backend.manager.models import (
     EndpointLifecycle,
     EndpointRow,
@@ -32,7 +36,7 @@ from ai.backend.manager.models.utils import create_async_engine
 
 async def get_health_check_info(
     storage_manager: StorageSessionManager, endpoint: EndpointRow, model: VFolderRow
-) -> HealthCheckConfig | None:
+) -> Optional[HealthCheckConfig]:
     if _path := MODEL_SERVICE_RUNTIME_PROFILES[endpoint.runtime_variant].health_check_endpoint:
         return HealthCheckConfig(path=_path)
     elif endpoint.runtime_variant == RuntimeVariant.CUSTOM:
@@ -82,11 +86,12 @@ async def update_appproxy_endpoint_entity(
             try:
                 resp.raise_for_status()
             except aiohttp.ClientResponseError as e:
-                if e.status == 404:
+                if e.status == HTTPStatus.NOT_FOUND:
                     pass
 
 
-async def main(config: BootstrapConfig):
+async def main(get_bootstrap_config_coro: Coroutine[None, None, BootstrapConfig]) -> None:
+    config: BootstrapConfig = await get_bootstrap_config_coro
     etcd = AsyncEtcd.initialize(config.etcd.to_dataclass())
     raw_volumes_config = await etcd.get_prefix("volumes")
     storage_manager = StorageSessionManager(VolumesConfig(**raw_volumes_config))

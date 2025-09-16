@@ -7,7 +7,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import weakref
 from contextlib import contextmanager as ctxmgr
 from datetime import datetime
 from http import HTTPStatus
@@ -26,7 +25,6 @@ from typing import (
 )
 
 import attr
-import attrs
 import jwt
 import trafaret as t
 from aiohttp import hdrs, web
@@ -34,11 +32,7 @@ from aiohttp import hdrs, web
 from ai.backend.common import validators as tx
 from ai.backend.common.bgtask.types import TaskName
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
-from ai.backend.common.dto.storage.response import VFolderCloneResponse
-from ai.backend.common.events.event_types.vfolder.anycast import (
-    VFolderDeletionFailureEvent,
-    VFolderDeletionSuccessEvent,
-)
+from ai.backend.common.dto.storage.response import VFolderCloneResponse, VFolderDeleteResponse
 from ai.backend.common.events.event_types.volume.broadcast import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
@@ -63,12 +57,14 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
+from ..bgtask.tags import ROOT_PRIVILEGED_TAG
 from ..bgtask.tasks.clone import VFolderCloneTaskArgs
+from ..bgtask.tasks.delete import VFolderDeleteTaskArgs
 from ..exception import (
-    ExecutionError,
-    ExternalError,
+    ExternalStorageServiceError,
     InvalidQuotaConfig,
     InvalidSubpathError,
+    ProcessExecutionError,
     QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
     StorageProxyError,
@@ -162,7 +158,7 @@ def handle_fs_errors(
 def handle_external_errors() -> Iterator[None]:
     try:
         yield
-    except ExternalError as e:
+    except ExternalStorageServiceError as e:
         raise web.HTTPInternalServerError(
             text=dump_json_str({
                 "msg": str(e),
@@ -397,7 +393,9 @@ async def create_vfolder(request: web.Request) -> web.Response:
                 try:
                     await volume.create_vfolder(params["vfid"], mode=perm_mode)
                 except QuotaScopeNotFoundError:
-                    raise ExternalError("Failed to create vfolder due to quota scope not found.")
+                    raise ExternalStorageServiceError(
+                        "Failed to create vfolder due to quota scope not found."
+                    )
             return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
@@ -420,57 +418,18 @@ async def delete_vfolder(request: web.Request) -> web.Response:
     ) as params:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: RootContext = request.app["ctx"]
-        app_ctx: PrivateContext = request.app["app_ctx"]
         vfid: VFolderID = params["vfid"]
-
-        async def _delete_vfolder(
-            task_map: weakref.WeakValueDictionary[VFolderID, asyncio.Task],
-        ) -> None:
-            current_task = asyncio.current_task()
-            assert current_task is not None
-            task_map[vfid] = current_task
-
-            try:
-                async with ctx.get_volume(params["volume"]) as volume:
-                    await volume.delete_vfolder(vfid)
-            except OSError as e:
-                msg = str(e) if e.strerror is None else e.strerror
-                msg = f"{msg} (errno:{e.errno})"
-                log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{msg})")
-                await ctx.event_producer.anycast_event(
-                    VFolderDeletionFailureEvent(
-                        vfid,
-                        msg,
-                    )
-                )
-            except Exception as e:
-                log.exception(f"VFolder deletion task failed. (vfid:{vfid}, e:{str(e)})")
-                await ctx.event_producer.anycast_event(
-                    VFolderDeletionFailureEvent(
-                        vfid,
-                        str(e),
-                    )
-                )
-            except asyncio.CancelledError:
-                log.warning(f"VFolder deletion task cancelled. (vfid:{vfid})")
-            else:
-                log.info(f"VFolder deletion task successed. (vfid:{vfid})")
-                await ctx.event_producer.anycast_event(VFolderDeletionSuccessEvent(vfid))
-
-        try:
-            async with ctx.get_volume(params["volume"]) as volume:
-                await volume.get_vfolder_mount(vfid, ".")
-        except VFolderNotFoundError:
-            ongoing_task = app_ctx.deletion_tasks.get(vfid)
-            if ongoing_task is not None:
-                ongoing_task.cancel()
-            return web.Response(status=HTTPStatus.GONE)
-        else:
-            ongoing_task = app_ctx.deletion_tasks.get(vfid)
-            if ongoing_task is None or ongoing_task.done():
-                asyncio.create_task(_delete_vfolder(app_ctx.deletion_tasks))
-
-    return web.Response(status=HTTPStatus.ACCEPTED)
+        delete_args = VFolderDeleteTaskArgs(
+            volume=params["volume"],
+            vfolder_id=vfid,
+        )
+        task_id = await ctx.background_task_manager.start_retriable(
+            TaskName.DELETE_VFOLDER,
+            delete_args,
+            tags=[ROOT_PRIVILEGED_TAG],
+        )
+        data = VFolderDeleteResponse(bgtask_id=task_id).model_dump(mode="json")
+        return web.json_response(data, status=HTTPStatus.ACCEPTED)
 
 
 async def clone_vfolder(request: web.Request) -> web.Response:
@@ -751,7 +710,7 @@ async def get_vfolder_usage(request: web.Request) -> web.Response:
                         "used_bytes": usage.used_bytes,
                     },
                 )
-        except ExecutionError:
+        except ProcessExecutionError:
             return web.Response(
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 reason="Storage server is busy. Please try again",
@@ -785,7 +744,7 @@ async def get_vfolder_used_bytes(request: web.Request) -> web.Response:
                         "used_bytes": usage,
                     },
                 )
-        except ExecutionError:
+        except ProcessExecutionError:
             return web.Response(
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
                 reason="Storage server is busy. Please try again",
@@ -1161,18 +1120,8 @@ async def delete_files(request: web.Request) -> web.Response:
         )
 
 
-@attrs.define(slots=True)
-class PrivateContext:
-    deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task]
-
-
 async def _shutdown(app: web.Application) -> None:
-    app_ctx: PrivateContext = app["app_ctx"]
-    for task in app_ctx.deletion_tasks.values():
-        task.cancel()
-        await asyncio.sleep(0)
-        if not task.done():
-            await task
+    pass
 
 
 def init_v2_volume_app(service_ctx: ServiceContext) -> web.Application:
@@ -1233,8 +1182,6 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
         ],
     )
     app["ctx"] = ctx
-    app_ctx = PrivateContext(deletion_tasks=weakref.WeakValueDictionary())
-    app["app_ctx"] = app_ctx
     app.on_shutdown.append(_shutdown)
     app.router.add_route("GET", "/", check_status)
     app.router.add_route("GET", "/status", check_status)

@@ -255,7 +255,7 @@ class ReservoirService:
         reservoir_config = self._reservoir_registry_configs[0]
         prefix_key = f"{model.model_id}/{model.revision}"
 
-        copied_bytesize = await self._stream_bucket_to_bucket(
+        await self._stream_bucket_to_bucket(
             source_cfg=reservoir_config,
             storage_name=storage_name,
             bucket_name=bucket_name,
@@ -270,10 +270,9 @@ class ReservoirService:
         await self._event_producer.anycast_event(
             ModelImportDoneEvent(
                 model_id=model.model_id,
-                revision=model.revision,
+                revision=model.resolve_revision(ArtifactRegistryType.RESERVOIR),
                 registry_name=registry_name,
                 registry_type=ArtifactRegistryType.RESERVOIR,
-                total_size=copied_bytesize,
             )
         )
 

@@ -10,6 +10,7 @@ from ai.backend.manager.services.object_storage.actions.base import ObjectStorag
 class GetDownloadPresignedURLAction(ObjectStorageAction):
     artifact_revision_id: uuid.UUID
     key: str
+    expiration: Optional[int] = None
 
     @override
     def entity_id(self) -> Optional[str]:

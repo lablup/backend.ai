@@ -60,6 +60,10 @@ class VFolderCloneResponse(BaseResponseModel):
     bgtask_id: TaskID
 
 
+class VFolderDeleteResponse(BaseResponseModel):
+    bgtask_id: TaskID
+
+
 class HuggingFaceScanModelsResponse(BaseResponseModel):
     """Response for HuggingFace scan operation."""
 
@@ -80,6 +84,17 @@ class HuggingFaceRetrieveModelsResponse(BaseResponseModel):
         description="""
         List of HuggingFace models scanned and retrieved.
         Each model includes comprehensive metadata and file information.
+        """,
+    )
+
+
+class HuggingFaceRetrieveModelResponse(BaseResponseModel):
+    """Response for HuggingFace retrieve operation."""
+
+    model: ModelData = Field(
+        description="""
+        HuggingFace model scanned and retrieved.
+        The model includes comprehensive metadata and file information.
         """,
     )
 

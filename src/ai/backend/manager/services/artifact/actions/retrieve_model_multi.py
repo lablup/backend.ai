@@ -20,7 +20,7 @@ class RetrieveModelsAction(ArtifactAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "upsert_model_multi"
+        return "retrieve_model_multi"
 
 
 @dataclass

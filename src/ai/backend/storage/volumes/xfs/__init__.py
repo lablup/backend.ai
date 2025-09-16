@@ -18,7 +18,7 @@ from ai.backend.common.lock import FileLock
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 
-from ...exception import InvalidQuotaScopeError, NotEmptyError
+from ...exception import InvalidQuotaScopeError, QuotaDirectoryNotEmptyError
 from ...subproc import run
 from ...types import (
     QuotaConfig,
@@ -257,7 +257,9 @@ class XFSProjectQuotaModel(BaseQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
-            raise NotEmptyError(quota_scope_id)
+            raise QuotaDirectoryNotEmptyError(
+                f"Cannot delete quota scope '{quota_scope_id}': directory not empty"
+            )
         async with FileLock(LOCK_FILE):
             await self.project_registry.read_project_info()
             await self.project_registry.remove_project_entry(quota_scope_id)

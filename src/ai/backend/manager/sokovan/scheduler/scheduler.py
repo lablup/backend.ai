@@ -15,6 +15,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import (
     AgentId,
     AgentSelectionStrategy,
@@ -109,7 +110,7 @@ class SchedulerArgs:
     lock_factory: DistributedLockFactory
     agent_pool: AgentPool
     network_plugin_ctx: NetworkPluginContext
-
+    event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
 
 
@@ -151,6 +152,7 @@ class Scheduler:
                 agent_pool=args.agent_pool,
                 network_plugin_ctx=args.network_plugin_ctx,
                 config_provider=args.config_provider,
+                event_producer=args.event_producer,
             )
         )
         self._valkey_schedule = args.valkey_schedule
@@ -621,20 +623,6 @@ class Scheduler:
 
             session_results.append(session_result)
 
-        # Batch update database with termination results
-        await self._repository.batch_update_terminated_status(session_results)
-
-        # Count successfully terminated sessions
-        terminated_session_count = sum(
-            1 for result in session_results if result.should_terminate_session
-        )
-
-        log.info(
-            "Terminated {} sessions (partial: {})",
-            terminated_session_count,
-            len(session_results) - terminated_session_count,
-        )
-
         # Convert only successfully terminated sessions to ScheduledSessionData format
         scheduled_data = [
             ScheduledSessionData(
@@ -850,6 +838,7 @@ class Scheduler:
             return ScheduleResult()
 
         sessions_to_update: list[SessionId] = []
+        log.info("session types to terminate: {}", [s.session_type for s in sessions_data])
 
         hook_coroutines = [
             self._hook_registry.get_hook(session_data.session_type).on_transition_to_terminated(

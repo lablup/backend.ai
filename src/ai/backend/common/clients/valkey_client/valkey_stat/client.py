@@ -594,6 +594,166 @@ class ValkeyStatClient:
         """
         return await self._client.client.get(key)
 
+    # Resource preset cache methods
+    def _get_resource_preset_id_key(self, preset_id: str) -> str:
+        """Generate resource preset key by ID."""
+        return f"resource_preset:id:{preset_id}"
+
+    def _get_resource_preset_name_key(self, name: str) -> str:
+        """Generate resource preset key by name."""
+        return f"resource_preset:name:{name}"
+
+    def _get_resource_preset_list_key(self, scaling_group: Optional[str] = None) -> str:
+        """Generate resource preset list key."""
+        return f"resource_preset:list:{scaling_group or '_global_'}"
+
+    def _get_resource_preset_check_key(
+        self, access_key: str, group: str, domain: str, scaling_group: Optional[str] = None
+    ) -> str:
+        """Generate resource preset check key."""
+        return f"resource_preset:check:{access_key}:{group}:{domain}:{scaling_group or '_any_'}"
+
+    @valkey_decorator()
+    async def get_resource_preset_by_id(self, preset_id: str) -> Optional[bytes]:
+        """
+        Get cached resource preset data by ID.
+
+        :param preset_id: The preset ID.
+        :return: The cached data, or None if not found.
+        """
+        key = self._get_resource_preset_id_key(preset_id)
+        return await self._client.client.get(key)
+
+    @valkey_decorator()
+    async def get_resource_preset_by_name(self, name: str) -> Optional[bytes]:
+        """
+        Get cached resource preset data by name.
+
+        :param name: The preset name.
+        :return: The cached data, or None if not found.
+        """
+        key = self._get_resource_preset_name_key(name)
+        return await self._client.client.get(key)
+
+    @valkey_decorator()
+    async def get_resource_preset_list(
+        self, scaling_group: Optional[str] = None
+    ) -> Optional[bytes]:
+        """
+        Get cached resource preset list.
+
+        :param scaling_group: The scaling group name.
+        :return: The cached data, or None if not found.
+        """
+        key = self._get_resource_preset_list_key(scaling_group)
+        return await self._client.client.get(key)
+
+    @valkey_decorator()
+    async def get_resource_preset_check_data(
+        self, access_key: str, group: str, domain: str, scaling_group: Optional[str] = None
+    ) -> Optional[bytes]:
+        """
+        Get cached resource preset check data.
+
+        :param access_key: The access key.
+        :param group: The group name.
+        :param domain: The domain name.
+        :param scaling_group: The scaling group name.
+        :return: The cached data, or None if not found.
+        """
+        key = self._get_resource_preset_check_key(access_key, group, domain, scaling_group)
+        return await self._client.client.get(key)
+
+    @valkey_decorator()
+    async def set_resource_preset_by_id_and_name(
+        self, preset_id: str, name: str, value: bytes, expire_sec: int = 60
+    ) -> None:
+        """
+        Cache resource preset data by both ID and name.
+
+        :param preset_id: The preset ID.
+        :param name: The preset name.
+        :param value: The data to cache.
+        :param expire_sec: Expiration time in seconds (default 60).
+        """
+        batch = self._create_batch()
+
+        # Set by ID
+        id_key = self._get_resource_preset_id_key(preset_id)
+        batch.set(id_key, value, expiry=ExpirySet(ExpiryType.SEC, expire_sec))
+
+        # Set by name
+        name_key = self._get_resource_preset_name_key(name)
+        batch.set(name_key, value, expiry=ExpirySet(ExpiryType.SEC, expire_sec))
+
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_decorator()
+    async def set_resource_preset_list(
+        self, scaling_group: Optional[str], value: bytes, expire_sec: int = 60
+    ) -> None:
+        """
+        Cache resource preset list.
+
+        :param scaling_group: The scaling group name.
+        :param value: The data to cache.
+        :param expire_sec: Expiration time in seconds (default 60).
+        """
+        key = self._get_resource_preset_list_key(scaling_group)
+        await self._client.client.set(
+            key=key,
+            value=value,
+            expiry=ExpirySet(ExpiryType.SEC, expire_sec),
+        )
+
+    @valkey_decorator()
+    async def set_resource_preset_check_data(
+        self,
+        access_key: str,
+        group: str,
+        domain: str,
+        scaling_group: Optional[str],
+        value: bytes,
+        expire_sec: int = 60,
+    ) -> None:
+        """
+        Cache resource preset check data.
+
+        :param access_key: The access key.
+        :param group: The group name.
+        :param domain: The domain name.
+        :param value: The data to cache.
+        :param scaling_group: The scaling group name.
+        :param expire_sec: Expiration time in seconds (default 60).
+        """
+        key = self._get_resource_preset_check_key(access_key, group, domain, scaling_group)
+        await self._client.client.set(
+            key=key,
+            value=value,
+            expiry=ExpirySet(ExpiryType.SEC, expire_sec),
+        )
+
+    @valkey_decorator()
+    async def delete_resource_preset(
+        self, preset_id: Optional[str] = None, name: Optional[str] = None
+    ) -> int:
+        """
+        Delete resource preset cache by ID and/or name.
+
+        :param preset_id: The preset ID.
+        :param name: The preset name.
+        :return: Number of keys that were deleted.
+        """
+        keys_to_delete: list[str | bytes] = []
+        if preset_id:
+            keys_to_delete.append(self._get_resource_preset_id_key(preset_id))
+        if name:
+            keys_to_delete.append(self._get_resource_preset_name_key(name))
+
+        if not keys_to_delete:
+            return 0
+        return await self._client.client.delete(keys_to_delete)
+
     # TODO: Remove this too generalized methods
     @valkey_decorator()
     async def set(
@@ -1177,3 +1337,36 @@ class ValkeyStatClient:
 
         if updates:
             await self.set_multiple_keys(updates)
+
+    @valkey_decorator()
+    async def store_inference_metrics(
+        self,
+        app_metrics_updates: dict[Any, dict[str, Any]],
+        replica_metrics_updates: dict[tuple[Any, Any], dict[str, Any]],
+        cache_lifespan: int = 120,
+    ) -> None:
+        """
+        Store inference metrics for apps and replicas with proper serialization and expiration.
+
+        :param app_metrics_updates: Dictionary mapping endpoint_id to app metrics
+        :param replica_metrics_updates: Dictionary mapping (endpoint_id, replica_id) to replica metrics
+        :param cache_lifespan: TTL in seconds for the stored metrics
+        """
+        if not app_metrics_updates and not replica_metrics_updates:
+            return
+
+        batch = self._create_batch()
+
+        # Store app metrics
+        for endpoint_id, app_measures in app_metrics_updates.items():
+            key = f"inference.{endpoint_id}.app"
+            value = msgpack.packb(app_measures)
+            batch.set(key, value, expiry=ExpirySet(ExpiryType.SEC, cache_lifespan))
+
+        # Store replica metrics
+        for (endpoint_id, replica_id), replica_measures in replica_metrics_updates.items():
+            key = f"inference.{endpoint_id}.replica.{replica_id}"
+            value = msgpack.packb(replica_measures)
+            batch.set(key, value, expiry=ExpirySet(ExpiryType.SEC, cache_lifespan))
+
+        await self._client.client.exec(batch, raise_on_error=True)
