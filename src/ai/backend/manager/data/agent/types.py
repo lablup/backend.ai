@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
@@ -108,7 +110,7 @@ class UpsertResult:
 
     @classmethod
     def from_state_comparison(
-        cls, existing_row: Optional[Row], upsert_data: "AgentHeartbeatUpsert"
+        cls, existing_row: Optional["Row"], upsert_data: "AgentHeartbeatUpsert"
     ) -> "UpsertResult":
         if existing_row is None:
             return cls(
