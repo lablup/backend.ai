@@ -25,7 +25,7 @@ from ...models.rbac_models.user_role import UserRoleRow
 from ...models.utils import ExtendedAsyncSAEngine
 
 
-class PermissionControllerDBSource:
+class PermissionDBSource:
     _db: ExtendedAsyncSAEngine
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
@@ -56,10 +56,13 @@ class PermissionControllerDBSource:
             await db_session.refresh(role_row)
             return role_row
 
-    async def _get_role(self, role_id: uuid.UUID, db_session: SASession) -> Optional[RoleRow]:
+    async def _get_role(self, role_id: uuid.UUID, db_session: SASession) -> RoleRow:
         stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
         role_row = await db_session.scalar(stmt)
-        return cast(Optional[RoleRow], role_row)
+        result = cast(Optional[RoleRow], role_row)
+        if result is None:
+            raise ObjectNotFound(f"Role with ID {role_id} does not exist.")
+        return result
 
     async def update_role(self, data: RoleUpdateInput) -> RoleRow:
         to_update = data.fields_to_update()
@@ -67,15 +70,11 @@ class PermissionControllerDBSource:
             stmt = sa.update(RoleRow).where(RoleRow.id == data.id).values(**to_update)
             await db_session.execute(stmt)
             role_row = await self._get_role(data.id, db_session)
-            if role_row is None:
-                raise ObjectNotFound(f"Role with ID {data.id} does not exist.")
             return role_row
 
     async def delete_role(self, data: RoleDeleteInput) -> RoleRow:
         async with self._db.begin_session() as db_session:
             role_row = await self._get_role(data.id, db_session)
-            if role_row is None:
-                raise ObjectNotFound(f"Role with ID {data.id} does not exist.")
             role_row.status = RoleStatus.DELETED
             await db_session.flush()
             await db_session.refresh(role_row)
@@ -91,8 +90,9 @@ class PermissionControllerDBSource:
 
     async def get_role(self, role_id: uuid.UUID) -> Optional[RoleRow]:
         async with self._db.begin_readonly_session() as db_session:
-            result = await self._get_role(role_id, db_session)
-            if result is None:
+            try:
+                result = await self._get_role(role_id, db_session)
+            except ObjectNotFound:
                 return None
             return result
 

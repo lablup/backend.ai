@@ -16,17 +16,17 @@ from ...decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ...models.utils import ExtendedAsyncSAEngine
-from .db_source import PermissionControllerDBSource
+from .db_source import PermissionDBSource
 
 # Layer-specific decorator for user repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.PERMISSION_CONTROL)
 
 
 class PermissionControllerRepository:
-    _db_source: PermissionControllerDBSource
+    _db_source: PermissionDBSource
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._db_source = PermissionControllerDBSource(db)
+        self._db_source = PermissionDBSource(db)
 
     @repository_decorator()
     async def create_role(self, data: RoleCreateInput) -> RoleData:
