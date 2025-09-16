@@ -11,7 +11,13 @@ class AgentRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = AgentRepository(args.db)
+        repository = AgentRepository(
+            args.db,
+            args.valkey_image_client,
+            args.valkey_live_client,
+            args.config_provider,
+            args.agent_cache,
+        )
 
         return cls(
             repository=repository,
