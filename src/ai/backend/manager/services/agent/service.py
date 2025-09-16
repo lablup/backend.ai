@@ -20,7 +20,11 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.agent.types import AgentStateSyncData, UpsertResult
+from ai.backend.manager.data.agent.types import (
+    AgentHeartbeatUpsert,
+    AgentStateSyncData,
+    UpsertResult,
+)
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -198,9 +202,14 @@ class AgentService:
         )
 
         async with self._heartbeat_lock:
+            upsert_data = AgentHeartbeatUpsert.from_agent_info(
+                agent_id=action.agent_id,
+                agent_info=action.agent_info,
+                heartbeat_received=now,
+            )
             result: UpsertResult = await self._agent_repository.sync_agent_heartbeat(
                 action.agent_id,
-                action.agent_info,
+                upsert_data,
                 reported_agent_state_sync_data,
             )
             if result.was_revived:
