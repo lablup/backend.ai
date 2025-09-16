@@ -14,7 +14,7 @@ from ai.backend.manager.repositories.permission_controller.repository import (
 from ...validator.scope import ScopeActionValidator
 
 
-class SingleEntityActionRBACValidator(ScopeActionValidator):
+class ScopeActionRBACValidator(ScopeActionValidator):
     def __init__(
         self,
         repository: PermissionControllerRepository,
