@@ -11,7 +11,7 @@ from aiohttp import web
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.common import (
+from ai.backend.manager.api.exceptions import (
     InternalServerError,
     ObjectNotFound,
     ServerMisconfiguredError,
