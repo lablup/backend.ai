@@ -212,12 +212,33 @@ class ProgressBarWithSpinner(tqdm):
     .. code-block::
 
        async with ProgressBarWithSpinner("Waiting...") as pbar:
-           await init_work()  # here the spinner already indicates something is going on.
+           # The spinner starts here but no tqdm progress bar is displayed yet.
+           await init_work()
+           # When the user sets the 'total' attribute, the progress bar gets displayed.
            pbar.total = 10
            for i in range(10):
                await piece_of_work()
                pbar.update(1)
     """
+
+    @staticmethod
+    def alt_format_meter(
+        n,
+        total,
+        elapsed,
+        ncols=None,
+        prefix="",
+        ascii=False,
+        unit="it",
+        unit_scale=False,
+        rate=None,
+        bar_format=None,
+        postfix=None,
+        *args,
+        **kwargs,
+    ) -> str:
+        # Return the prefix string only.
+        return str(prefix) + str(postfix)
 
     def __init__(
         self,
@@ -227,30 +248,45 @@ class ProgressBarWithSpinner(tqdm):
     ) -> None:
         self.spinner_msg = spinner_msg
         self.spinner_delay = spinner_delay
+        self.prefix = style("", fg="bright_yellow", reset=False)
         if spinner_msg:
-            initial_desc = "  {spinner_msg} "
+            initial_desc = f"{self.prefix}  {spinner_msg} "
         else:
-            initial_desc = "  "
+            initial_desc = f"{self.prefix}  "
+        self._orig_format_meter = self.format_meter
         super().__init__(
-            total=0,
+            total=float("inf"),
             unit=unit,
-            desc=initial_desc,
         )
+        # Deactivate the progress bar display by default
+        self.format_meter = self.alt_format_meter  # type: ignore
+        self.set_description_str(initial_desc)
+        self.set_postfix_str(style("", reset=True))
 
     async def spin(self) -> None:
         try:
             while True:
                 for char in "|/-\\":
                     if self.spinner_msg:
-                        self.set_description_str(f"{char} {self.spinner_msg} ")
+                        self.set_description_str(f"{self.prefix}{char} {self.spinner_msg} ")
                     else:
-                        self.set_description_str(f"{char} ")
+                        self.set_description_str(f"{self.prefix}{char} ")
                     await asyncio.sleep(self.spinner_delay)
         except asyncio.CancelledError:
             pass
 
+    @property
+    def total(self) -> int | float | None:
+        return self._total
+
+    @total.setter
+    def total(self, value: int | float) -> None:
+        self._total = value
+        # Reactivate the progress bar display when total is first set
+        self.format_meter = self._orig_format_meter  # type: ignore
+
     async def __aenter__(self) -> Self:
-        self.task = asyncio.create_task(self.spin())
+        self.spinner_task = asyncio.create_task(self.spin())
         return self
 
     async def __aexit__(
@@ -259,12 +295,12 @@ class ProgressBarWithSpinner(tqdm):
         exc_val: Optional[BaseException],
         exc_tb: Optional[TracebackType],
     ) -> Optional[bool]:
-        if self.task is not None and not self.task.done():
-            self.task.cancel()
-            await self.task
+        if self.spinner_task is not None and not self.spinner_task.done():
+            self.spinner_task.cancel()
+            await self.spinner_task
         if self.spinner_msg:
-            self.set_description_str(f"✓ {self.spinner_msg}")
+            self.set_description_str(f"{self.prefix}✓ {self.spinner_msg}")
         else:
-            self.set_description_str("✓ ")
+            self.set_description_str(f"{self.prefix}✓ ")
         self.close()
         return None
