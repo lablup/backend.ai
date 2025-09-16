@@ -1,6 +1,5 @@
 import pytest
 
-from ai.backend.common.dto.storage.request import PresignedUploadObjectReq
 from ai.backend.common.dto.storage.response import (
     PresignedUploadObjectResponse,
 )
@@ -149,18 +148,9 @@ async def test_generate_presigned_upload_url_success(
     """Test successful presigned upload URL generation and actual upload"""
     import aiohttp
 
-    # Create presigned upload request
-    presigned_request = PresignedUploadObjectReq(
-        key=_PRESIGNED_TEST_KEY,
-        expiration=3600,
-        content_type="text/plain",
-        min_size=1,
-        max_size=1024 * 1024,  # 1MB
-    )
-
     # Generate presigned upload URL
     result = await storages_service.generate_presigned_upload_url(
-        "test_storage", _BUCKET_FIXTURE_NAME, presigned_request
+        "test_storage", _BUCKET_FIXTURE_NAME, _PRESIGNED_TEST_KEY
     )
 
     assert isinstance(result, PresignedUploadObjectResponse)
@@ -200,32 +190,18 @@ async def test_generate_presigned_upload_url_invalid_storage(
     storages_service: ObjectStorageService,
 ):
     """Test presigned upload URL generation with invalid storage"""
-    presigned_request = PresignedUploadObjectReq(
-        key=_PRESIGNED_TEST_KEY,
-        expiration=3600,
-        content_type="text/plain",
-        min_size=1,
-        max_size=1024 * 1024,  # 1MB
-    )
     with pytest.raises(PresignedUploadURLGenerationError):
         await storages_service.generate_presigned_upload_url(
-            "invalid_storage", _BUCKET_FIXTURE_NAME, presigned_request
+            "invalid_storage", _BUCKET_FIXTURE_NAME, _PRESIGNED_TEST_KEY
         )
 
 
 @pytest.mark.asyncio
 async def test_generate_presigned_upload_url_invalid_bucket(storages_service: ObjectStorageService):
     """Test presigned upload URL generation with invalid bucket"""
-    presigned_request = PresignedUploadObjectReq(
-        key=_PRESIGNED_TEST_KEY,
-        expiration=3600,
-        content_type="text/plain",
-        min_size=1,
-        max_size=1024 * 1024,  # 1MB
-    )
     with pytest.raises(PresignedUploadURLGenerationError):
         await storages_service.generate_presigned_upload_url(
-            "test_storage", "invalid-bucket", presigned_request
+            "test_storage", "invalid-bucket", _PRESIGNED_TEST_KEY
         )
 
 
@@ -253,7 +229,7 @@ async def test_generate_presigned_download_url_success(
 
     # Generate presigned download URL
     result = await storages_service.generate_presigned_download_url(
-        "test_storage", _BUCKET_FIXTURE_NAME, _PRESIGNED_TEST_KEY, 3600
+        "test_storage", _BUCKET_FIXTURE_NAME, _PRESIGNED_TEST_KEY
     )
 
     assert result.url is not None
@@ -276,7 +252,7 @@ async def test_generate_presigned_download_url_invalid_storage(
     """Test presigned download URL generation with invalid storage"""
     with pytest.raises(PresignedDownloadURLGenerationError):
         await storages_service.generate_presigned_download_url(
-            "invalid_storage", _BUCKET_FIXTURE_NAME, _PRESIGNED_TEST_KEY, 3600
+            "invalid_storage", _BUCKET_FIXTURE_NAME, _PRESIGNED_TEST_KEY
         )
 
 
@@ -287,7 +263,7 @@ async def test_generate_presigned_download_url_invalid_bucket(
     """Test presigned download URL generation with invalid bucket"""
     with pytest.raises(PresignedDownloadURLGenerationError):
         await storages_service.generate_presigned_download_url(
-            "test_storage", "invalid-bucket", _PRESIGNED_TEST_KEY, 3600
+            "test_storage", "invalid-bucket", _PRESIGNED_TEST_KEY
         )
 
 

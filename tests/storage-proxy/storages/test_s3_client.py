@@ -74,7 +74,6 @@ async def test_generate_presigned_upload_url_success(s3_client: S3Client):
     result = await s3_client.generate_presigned_upload_url(
         "test/presigned_upload.txt",
         expiration=3600,
-        content_type="text/plain",
         content_length_range=(10, 1000),
     )
 

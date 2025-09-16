@@ -184,7 +184,6 @@ class S3Client:
         self,
         s3_key: str,
         expiration: int,
-        content_type: Optional[str] = None,
         content_length_range: Optional[tuple[int, int]] = None,
     ) -> PresignedUploadObjectResponse:
         """
@@ -193,7 +192,6 @@ class S3Client:
         Args:
             s3_key: The S3 object key for upload
             expiration: URL expiration time in seconds
-            content_type: Required content type for the upload (optional)
             content_length_range: Tuple of (min, max) content length in bytes (optional)
 
         Returns:
@@ -207,11 +205,6 @@ class S3Client:
             aws_secret_access_key=self.aws_secret_access_key,
         ) as s3_client:
             conditions: list = []
-            fields = {}
-
-            if content_type:
-                conditions.append({"Content-Type": content_type})
-                fields["Content-Type"] = content_type
 
             if content_length_range:
                 conditions.append([
@@ -223,7 +216,7 @@ class S3Client:
             response = await s3_client.generate_presigned_post(
                 Bucket=self.bucket_name,
                 Key=s3_key,
-                Fields=fields,
+                Fields={},
                 Conditions=conditions,
                 ExpiresIn=expiration,
             )

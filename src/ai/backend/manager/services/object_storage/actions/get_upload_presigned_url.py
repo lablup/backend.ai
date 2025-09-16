@@ -10,10 +10,6 @@ from ai.backend.manager.services.object_storage.actions.base import ObjectStorag
 class GetUploadPresignedURLAction(ObjectStorageAction):
     artifact_revision_id: uuid.UUID
     key: str
-    content_type: Optional[str] = None
-    expiration: Optional[int] = None
-    min_size: Optional[int] = None
-    max_size: Optional[int] = None
 
     @override
     def entity_id(self) -> Optional[str]:

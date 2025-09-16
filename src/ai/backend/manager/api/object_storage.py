@@ -80,10 +80,6 @@ class APIHandler:
             GetUploadPresignedURLAction(
                 artifact_revision_id=body.parsed.artifact_revision_id,
                 key=body.parsed.key,
-                content_type=body.parsed.content_type,
-                expiration=body.parsed.expiration,
-                min_size=body.parsed.min_size,
-                max_size=body.parsed.max_size,
             )
         )
 

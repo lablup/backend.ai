@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import mimetypes
 import ssl
 import time
 import uuid
@@ -679,13 +680,14 @@ class HuggingFaceService:
                 file_info.download_url, download_chunk_size
             )
 
+            ctype = mimetypes.guess_type(file_info.path)[0] or "application/octet-stream"
             # Upload to storage using existing service
             await self._storages_service.stream_upload(
                 storage_name=storage_name,
                 bucket_name=bucket_name,
                 filepath=storage_key,
                 data_stream=download_stream,
-                content_type=None,
+                content_type=ctype,
             )
 
             log.info(
