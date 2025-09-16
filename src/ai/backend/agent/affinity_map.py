@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from collections import defaultdict
+from collections.abc import Iterable
 from typing import TYPE_CHECKING, Optional, Sequence
 
 import attr
@@ -60,9 +61,9 @@ class AffinityMap(nx.Graph):
         # sort by: low distance first, large component first
         device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
         largest_components: list[list[AbstractComputeDevice]] = []
-        for distance, device_set in device_cluster_list:
+        for distance, subgraph in device_cluster_list:
             largest_component: list[AbstractComputeDevice] = []
-            for device in device_set:
+            for device in subgraph:
                 if device == src_device:
                     continue
                 largest_component.append(device)
@@ -80,19 +81,19 @@ class AffinityMap(nx.Graph):
         In most cases, it will be accelerators as defined in the device allocation order
         (see :attr:`ai.backend.agent.config.unified.ResourceConfig.allocation_order`)
         """
-        device_cluster_list = []
+        device_cluster_list: list[tuple[int, set[AbstractComputeDevice]]] = []
         for weight in [self.min_weight]:
             subgraph = nx.subgraph_view(
                 self,
                 filter_node=lambda u: u.device_name == device_name,
                 filter_edge=lambda u, v: self.edges[u, v]["weight"] == weight,
             )
-            components = nx.connected_components(subgraph)
+            components: Iterable[set[AbstractComputeDevice]] = nx.connected_components(subgraph)
             for component in components:
                 device_cluster_list.append((weight, component))
         # sort by: low distance first, large component first
         device_cluster_list.sort(key=lambda item: (item[0], -len(item[1])))
-        return [device_set for distance, device_set in device_cluster_list]
+        return [[*device_set] for distance, device_set in device_cluster_list]
 
     def get_distance_ordered_neighbors(
         self,

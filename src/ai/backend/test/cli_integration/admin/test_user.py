@@ -2,7 +2,7 @@ import json
 from contextlib import closing
 from typing import Callable, Tuple
 
-from ...utils.cli import EOF, ClientRunnerFunc
+from ...utils.cli import EOF, ClientRunnerFunc, decode
 from ..conftest import User
 
 
@@ -35,13 +35,13 @@ def test_add_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
             add_arguments.append("--need-password-change")
         with closing(run_admin(add_arguments)) as p:
             p.expect(EOF)
-            response = json.loads(p.before.decode())
+            response = json.loads(decode(p.before))
             assert response.get("ok") is True, f"Account creation failed: Account#{i + 1}"
 
     # Check if user is added
     with closing(run_admin(["--output=json", "admin", "user", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         user_list = loaded.get("items")
 
@@ -114,7 +114,7 @@ def test_update_user(
     # Check if user is updated correctly
     with closing(run_admin(["--output=json", "admin", "user", "list"])) as p:
         p.expect(EOF)
-        after_update_decoded = p.before.decode()
+        after_update_decoded = decode(p.before)
         after_update_loaded = json.loads(after_update_decoded)
         updated_user_list = after_update_loaded.get("items")
         assert isinstance(updated_user_list, list), "Expected user list"
@@ -148,7 +148,7 @@ def test_delete_user(run_admin: ClientRunnerFunc, users: Tuple[User, ...]):
         with closing(run_admin(["--output=json", "admin", "user", "purge", fake_user.email])) as p:
             p.sendline("y")
             p.expect(EOF)
-            before = p.before.decode()
+            before = decode(p.before)
             response = json.loads(before[before.index("{") :])
             assert response.get("ok") is True, f"Account deletion failed: Account#{i + 1}"
 
@@ -159,7 +159,7 @@ def test_list_user(run_admin: ClientRunnerFunc):
     """
     with closing(run_admin(["--output=json", "admin", "user", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         user_list = loaded.get("items")
         assert isinstance(user_list, list)
