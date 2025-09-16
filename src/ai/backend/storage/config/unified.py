@@ -609,6 +609,64 @@ class PresignedDownloadConfig(BaseModel):
     )
 
 
+class VFSStorageConfig(BaseModel):
+    name: str = Field(
+        description="""
+        Name of the VFS storage configuration.
+        Used to identify this storage in the system.
+        """,
+        examples=["local-models", "shared-datasets"],
+    )
+    type: Literal["vfs"] = Field(
+        description="""
+        Storage type identifier for VFS storage.
+        Must be 'vfs' for VFS storage configurations.
+        """,
+        default="vfs",
+    )
+    base_path: Path = Field(
+        description="""
+        Base filesystem path for VFS storage.
+        This directory will serve as the root for all VFS operations.
+        """,
+        examples=["/data/ai-models", "/shared/datasets"],
+        validation_alias=AliasChoices("base-path", "base_path"),
+        serialization_alias="base-path",
+    )
+    upload_chunk_size: int = Field(
+        default=65536,  # 64KB
+        ge=1024,  # Minimum 1KB
+        description="""
+        Chunk size (in bytes) for streaming file upload operations.
+        Controls how data is buffered during file uploads.
+        """,
+        examples=[8192, 65536, 1048576],
+        validation_alias=AliasChoices("upload-chunk-size", "upload_chunk_size"),
+        serialization_alias="upload-chunk-size",
+    )
+    download_chunk_size: int = Field(
+        default=65536,  # 64KB
+        ge=1024,  # Minimum 1KB
+        description="""
+        Chunk size (in bytes) for streaming file download operations.
+        Controls how data is buffered during file downloads.
+        """,
+        examples=[8192, 65536, 1048576],
+        validation_alias=AliasChoices("download-chunk-size", "download_chunk_size"),
+        serialization_alias="download-chunk-size",
+    )
+    max_file_size: Optional[int] = Field(
+        default=None,
+        description="""
+        Maximum file size (in bytes) allowed for uploads.
+        If None, no size limit is enforced.
+        """,
+        examples=[1073741824, 10737418240],  # 1GB, 10GB
+        validation_alias=AliasChoices("max-file-size", "max_file_size"),
+        serialization_alias="max-file-size",
+    )
+
+
 # TODO: Remove this after migrating this to database
 class ObjectStorageConfig(BaseModel):
     name: str = Field(
@@ -879,6 +937,15 @@ class StorageProxyUnifiedConfig(BaseModel):
         List of artifact registry configurations.
         Each configuration defines how to connect to and use an artifact registry service.
         """,
+    )
+    vfs_storages: list[VFSStorageConfig] = Field(
+        default_factory=list,
+        description="""
+        List of VFS storage configurations.
+        Each configuration defines a filesystem-based storage backend.
+        """,
+        validation_alias=AliasChoices("vfs-storages", "vfs_storages"),
+        serialization_alias="vfs-storages",
     )
 
     # TODO: Remove me after changing config injection logic

@@ -34,7 +34,6 @@ from ai.backend.storage.exception import (
     RegistryNotFoundError,
 )
 from ai.backend.storage.storages.base import StoragePool
-from ai.backend.storage.storages.object_storage import ObjectStorage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -330,14 +329,6 @@ class HuggingFaceService:
         if not self._storage_pool:
             raise ObjectStorageConfigInvalidError(
                 "Storage pool not configured for import operations"
-            )
-
-        # Get storage from pool and verify it's ObjectStorage type
-        storage = self._storage_pool.get_storage(storage_name)
-        if not isinstance(storage, ObjectStorage):
-            raise ObjectStorageConfigInvalidError(
-                f"Storage '{storage_name}' is not an ObjectStorage type. "
-                f"HuggingFace import requires ObjectStorage for bucket operations."
             )
 
         registry_config = self._registry_configs.get(registry_name)
@@ -670,13 +661,7 @@ class HuggingFaceService:
                 "Storage pool not configured for import operations"
             )
 
-        # Get storage from pool and verify it's ObjectStorage type
         storage = self._storage_pool.get_storage(storage_name)
-        if not isinstance(storage, ObjectStorage):
-            raise ObjectStorageConfigInvalidError(
-                f"Storage '{storage_name}' is not an ObjectStorage type. "
-                f"HuggingFace import requires ObjectStorage for bucket operations."
-            )
 
         try:
             # Create storage key path
