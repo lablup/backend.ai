@@ -186,10 +186,6 @@ class AgentService:
     async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
         now = datetime.now(tzutc())
         reported_agent_info = action.agent_info
-        reported_agent_available_slots = ResourceSlot({
-            SlotName(k): Decimal(v[1]) for k, v in reported_agent_info["resource_slots"].items()
-        })
-        reported_agent_sgroup = reported_agent_info.get("scaling_group", "default")
 
         reported_agent_state_sync_data = AgentStateSyncData(
             now=now,
@@ -222,6 +218,13 @@ class AgentService:
 
         await self._hook_plugin_ctx.notify(
             "POST_AGENT_HEARTBEAT",
-            (action.agent_id, reported_agent_sgroup, reported_agent_available_slots),
+            (
+                action.agent_id,
+                reported_agent_info.get("scaling_group", "default"),
+                ResourceSlot({
+                    SlotName(k): Decimal(v[1])
+                    for k, v in reported_agent_info["resource_slots"].items()
+                }),
+            ),
         )
         return HandleHeartbeatActionResult(agent_id=action.agent_id)
