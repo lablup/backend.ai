@@ -98,5 +98,6 @@ class ArtifactProcessors(AbstractProcessorPackage):
             UpsertArtifactsAction.spec(),
             RetrieveModelAction.spec(),
             RetrieveModelsAction.spec(),
+            DeleteArtifactsAction.spec(),
             RestoreArtifactsAction.spec(),
         ]
