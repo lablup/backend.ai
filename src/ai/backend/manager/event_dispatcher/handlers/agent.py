@@ -1,6 +1,7 @@
+import asyncio
 import logging
 from collections.abc import Collection, Iterable
-from typing import Callable
+from typing import Callable, Optional
 
 import sqlalchemy as sa
 
@@ -42,7 +43,8 @@ class AgentEventHandler:
     _registry: AgentRegistry
     _db: ExtendedAsyncSAEngine
     _event_dispatcher_plugin_ctx: EventDispatcherPluginContext
-    _processors: Processors
+    _processor_factory: Callable[[], Processors]
+    _processors: Optional[Processors]
 
     def __init__(
         self,
@@ -54,7 +56,20 @@ class AgentEventHandler:
         self._registry = registry
         self._db = db
         self._event_dispatcher_plugin_ctx = event_dispatcher_plugin_ctx
-        self._processors = processors_factory()
+        self._processors = None
+        self._processor_factory = processors_factory
+
+    # Lazy initialization of processors as AgentEventHandler is created earlier than Processors
+    async def get_processors(self) -> Processors:
+        if self._processors is None:
+            for _ in range(5):
+                try:
+                    self._processors = self._processor_factory()
+                    return self._processors
+                except Exception:
+                    await asyncio.sleep(0.1)
+        assert self._processors is not None
+        return self._processors
 
     async def handle_agent_started(
         self,
@@ -99,7 +114,8 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentHeartbeatEvent,
     ) -> None:
-        await self._processors.agent.handle_heartbeat.wait_for_complete(
+        processor = await self.get_processors()
+        await processor.agent.handle_heartbeat.wait_for_complete(
             action=HandleHeartbeatAction(agent_id=source, agent_info=event.agent_info)
         )
 
