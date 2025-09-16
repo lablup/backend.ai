@@ -212,7 +212,7 @@ class AgentService:
                 await self._event_producer.anycast_event(
                     AgentStartedEvent("revived"), source_override=action.agent_id
                 )
-            self._agent_repository.add_agent_to_images(
+            await self._agent_repository.add_agent_to_images(
                 agent_id=action.agent_id, images=action.agent_info["images"]
             )
 
