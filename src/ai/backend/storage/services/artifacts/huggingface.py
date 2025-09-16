@@ -327,6 +327,18 @@ class HuggingFaceService:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
+        if not self._storage_pool:
+            raise ObjectStorageConfigInvalidError(
+                "Storage pool not configured for import operations"
+            )
+
+        # Get storage from pool and verify it's ObjectStorage type
+        storage = self._storage_pool.get_storage(storage_name)
+        if not isinstance(storage, ObjectStorage):
+            raise ObjectStorageConfigInvalidError(
+                f"Storage '{storage_name}' is not an ObjectStorage type. "
+                f"HuggingFace import requires ObjectStorage for bucket operations."
+            )
 
         registry_config = self._registry_configs.get(registry_name)
         if not registry_config:
@@ -357,8 +369,6 @@ class HuggingFaceService:
                         model=model,
                         storage_name=storage_name,
                         download_chunk_size=chunk_size,
-                        storage_name=storage_name,
-                        bucket_name="",
                     )
 
                     successful_uploads += 1
@@ -646,7 +656,6 @@ class HuggingFaceService:
         model: ModelTarget,
         download_chunk_size: int,
         storage_name: str,
-        bucket_name: str,
     ) -> None:
         """Upload a single file to storage.
 
