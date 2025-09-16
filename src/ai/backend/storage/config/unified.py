@@ -574,6 +574,7 @@ class PresignedUploadConfig(BaseModel):
         default=None,
         description="""
         Minimum file size for multipart uploads.
+        If None, no minimum size limit is enforced.
         """,
         examples=[5 * 1024 * 1024, 10 * 1024 * 1024],
         validation_alias=AliasChoices("min-size", "min_size"),
@@ -583,6 +584,7 @@ class PresignedUploadConfig(BaseModel):
         default=None,
         description="""
         Maximum file size for uploads.
+        If None, no maximum size limit is enforced.
         """,
         examples=[5 * 1024 * 1024 * 1024, 10 * 1024 * 1024 * 1024],
         validation_alias=AliasChoices("max-size", "max_size"),
@@ -594,16 +596,6 @@ class PresignedUploadConfig(BaseModel):
         Expiration time (in seconds) for presigned URLs.
         """,
         examples=[3600, 7200],
-    )
-    content_type: Optional[str] = Field(
-        default=None,
-        description="""
-        Expected content type for uploads.
-        If set, presigned URLs will only accept uploads with this content type.
-        """,
-        examples=["application/octet-stream", "image/png"],
-        validation_alias=AliasChoices("content-type", "content_type"),
-        serialization_alias="content-type",
     )
 
 
