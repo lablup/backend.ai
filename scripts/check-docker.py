@@ -1,3 +1,9 @@
+# /// script
+# dependencies = [
+#   "aiohttp~=3.12.15",
+# ]
+# ///
+
 import argparse
 import asyncio
 import base64
