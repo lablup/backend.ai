@@ -248,11 +248,11 @@ class ProgressBarWithSpinner(tqdm):
     ) -> None:
         self.spinner_msg = spinner_msg
         self.spinner_delay = spinner_delay
-        self.prefix = style("", fg="bright_yellow", reset=False)
+        prefix = style("", fg="bright_yellow", reset=False)
         if spinner_msg:
-            initial_desc = f"{self.prefix}  {spinner_msg} "
+            initial_desc = f"{prefix}  {spinner_msg} "
         else:
-            initial_desc = f"{self.prefix}  "
+            initial_desc = f"{prefix}  "
         self._orig_format_meter = self.format_meter
         super().__init__(
             total=float("inf"),
@@ -264,13 +264,14 @@ class ProgressBarWithSpinner(tqdm):
         self.set_postfix_str(style("", reset=True))
 
     async def spin(self) -> None:
+        prefix = style("", fg="bright_yellow", reset=False)
         try:
             while True:
                 for char in "|/-\\":
                     if self.spinner_msg:
-                        self.set_description_str(f"{self.prefix}{char} {self.spinner_msg} ")
+                        self.set_description_str(f"{prefix}{char} {self.spinner_msg} ")
                     else:
-                        self.set_description_str(f"{self.prefix}{char} ")
+                        self.set_description_str(f"{prefix}{char} ")
                     await asyncio.sleep(self.spinner_delay)
         except asyncio.CancelledError:
             pass
@@ -298,9 +299,10 @@ class ProgressBarWithSpinner(tqdm):
         if self.spinner_task is not None and not self.spinner_task.done():
             self.spinner_task.cancel()
             await self.spinner_task
+        prefix = style("", fg="bright_green", reset=False)
         if self.spinner_msg:
-            self.set_description_str(f"{self.prefix}✓ {self.spinner_msg}")
+            self.set_description_str(f"{prefix}✓ {self.spinner_msg}")
         else:
-            self.set_description_str(f"{self.prefix}✓ ")
+            self.set_description_str(f"{prefix}✓ ")
         self.close()
         return None
