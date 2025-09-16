@@ -609,3 +609,19 @@ class InvalidConfigError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class ScalingGroupNotFoundError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/scaling-group-not-found"
+    error_title = "Scaling Group Not Found"
+
+    def __init__(self, scaling_group_name: str) -> None:
+        super().__init__(extra_msg=f"Scaling group '{scaling_group_name}' not found.")
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )

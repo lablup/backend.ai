@@ -1,15 +1,26 @@
+import asyncio
 import logging
+from datetime import datetime
+from decimal import Decimal
 
 import aiohttp
 import yarl
 from async_timeout import timeout as _timeout
+from dateutil.tz import tzutc
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
+from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AgentId,
+    ResourceSlot,
+    SlotName,
+    SlotTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.agent.types import AgentStateSyncData, UpsertResult
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -20,6 +31,10 @@ from ai.backend.manager.services.agent.actions.get_total_resources import (
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
     GetWatcherStatusActionResult,
+)
+from ai.backend.manager.services.agent.actions.handle_heartbeat import (
+    HandleHeartbeatAction,
+    HandleHeartbeatActionResult,
 )
 from ai.backend.manager.services.agent.actions.recalculate_usage import (
     RecalculateUsageAction,
@@ -51,6 +66,9 @@ class AgentService:
     _agent_registry: AgentRegistry
     _agent_repository: AgentRepository
     _scheduler_repository: SchedulerRepository
+    _hook_plugin_ctx: HookPluginContext
+    _event_producer: EventProducer
+    _heartbeat_lock: asyncio.Lock
 
     def __init__(
         self,
@@ -59,12 +77,17 @@ class AgentService:
         config_provider: ManagerConfigProvider,
         agent_repository: AgentRepository,
         scheduler_repository: SchedulerRepository,
+        hook_plugin_ctx: HookPluginContext,
+        event_producer: EventProducer,
     ) -> None:
         self._etcd = etcd
         self._agent_registry = agent_registry
         self._config_provider = config_provider
         self._agent_repository = agent_repository
         self._scheduler_repository = scheduler_repository
+        self._hook_plugin_ctx = hook_plugin_ctx
+        self._event_producer = event_producer
+        self._heartbeat_lock = asyncio.Lock()
 
     async def _get_watcher_info(self, agent_id: AgentId) -> dict:
         """
@@ -155,3 +178,41 @@ class AgentService:
     ) -> GetTotalResourcesActionResult:
         total_resources = await self._scheduler_repository.get_total_resource_slots()
         return GetTotalResourcesActionResult(total_resources=total_resources)
+
+    async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
+        now = datetime.now(tzutc())
+        reported_agent_info = action.agent_info
+        reported_agent_available_slots = ResourceSlot({
+            SlotName(k): Decimal(v[1]) for k, v in reported_agent_info["resource_slots"].items()
+        })
+        reported_agent_sgroup = reported_agent_info.get("scaling_group", "default")
+
+        reported_agent_state_sync_data = AgentStateSyncData(
+            now=now,
+            slot_key_and_units={
+                SlotName(k): SlotTypes(v[0])
+                for k, v in reported_agent_info["resource_slots"].items()
+            },
+            current_addr=reported_agent_info["addr"],
+            public_key=reported_agent_info["public_key"],
+        )
+
+        async with self._heartbeat_lock:
+            result: UpsertResult = await self._agent_repository.sync_agent_heartbeat(
+                action.agent_id,
+                action.agent_info,
+                reported_agent_state_sync_data,
+            )
+            if result.was_revived:
+                await self._event_producer.anycast_event(
+                    AgentStartedEvent("revived"), source_override=action.agent_id
+                )
+            self._agent_repository.add_agent_to_images(
+                agent_id=action.agent_id, images=action.agent_info["images"]
+            )
+
+        await self._hook_plugin_ctx.notify(
+            "POST_AGENT_HEARTBEAT",
+            (action.agent_id, reported_agent_sgroup, reported_agent_available_slots),
+        )
+        return HandleHeartbeatActionResult(agent_id=action.agent_id)

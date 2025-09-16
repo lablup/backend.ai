@@ -5,7 +5,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -104,6 +104,7 @@ class ServiceArgs:
     hook_plugin_ctx: HookPluginContext
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
+    event_producer: EventProducer
 
 
 @dataclass
@@ -142,6 +143,8 @@ class Services:
             args.config_provider,
             repositories.agent.repository,
             repositories.scheduler.repository,
+            args.hook_plugin_ctx,
+            args.event_producer,
         )
         domain_service = DomainService(
             repositories.domain.repository, repositories.domain.admin_repository

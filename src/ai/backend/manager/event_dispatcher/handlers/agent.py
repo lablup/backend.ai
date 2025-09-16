@@ -1,5 +1,6 @@
 import logging
 from collections.abc import Collection, Iterable
+from typing import Callable
 
 import sqlalchemy as sa
 
@@ -22,6 +23,8 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.resource import InstanceNotFound
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.services.agent.actions.handle_heartbeat import HandleHeartbeatAction
+from ai.backend.manager.services.processors import Processors
 
 from ...models.agent import AgentStatus, agents
 from ...models.kernel import (
@@ -36,15 +39,22 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AgentEventHandler:
+    _registry: AgentRegistry
+    _db: ExtendedAsyncSAEngine
+    _event_dispatcher_plugin_ctx: EventDispatcherPluginContext
+    _processors: Processors
+
     def __init__(
         self,
         registry: AgentRegistry,
         db: ExtendedAsyncSAEngine,
         event_dispatcher_plugin_ctx: EventDispatcherPluginContext,
+        processors_factory: Callable[[], Processors],
     ) -> None:
         self._registry = registry
         self._db = db
         self._event_dispatcher_plugin_ctx = event_dispatcher_plugin_ctx
+        self._processors = processors_factory()
 
     async def handle_agent_started(
         self,
@@ -89,7 +99,9 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentHeartbeatEvent,
     ) -> None:
-        await self._registry.handle_heartbeat(source, event.agent_info)
+        await self._processors.agent.handle_heartbeat.wait_for_complete(
+            action=HandleHeartbeatAction(agent_id=source, agent_info=event.agent_info)
+        )
 
     async def handle_agent_images_remove(
         self,
