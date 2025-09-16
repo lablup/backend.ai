@@ -96,8 +96,8 @@ class PresetAllocatabilityData:
                 id=UUID(data["preset"]["id"]),
                 name=data["preset"]["name"],
                 resource_slots=ResourceSlot.from_json(data["preset"]["resource_slots"]),
-                shared_memory=BinarySize.from_str(data["preset"]["shared_memory"])
-                if data["preset"]["shared_memory"]
+                shared_memory=int(BinarySize.from_str(data["preset"]["shared_memory"]))
+                if data["preset"]["shared_memory"] is not None
                 else None,
                 scaling_group_name=data["preset"]["scaling_group_name"],
             ),
