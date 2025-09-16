@@ -53,8 +53,8 @@ class PerScalingGroupResourceData:
     def to_cache(self) -> dict[str, Any]:
         """Serialize to cache-friendly format."""
         return {
-            ResourceSlotState.OCCUPIED: self.using.to_json(),
-            ResourceSlotState.AVAILABLE: self.remaining.to_json(),
+            str(ResourceSlotState.OCCUPIED): self.using.to_json(),
+            str(ResourceSlotState.AVAILABLE): self.remaining.to_json(),
         }
 
     @classmethod
@@ -81,7 +81,7 @@ class PresetAllocatabilityData:
                 "name": self.preset.name,
                 "resource_slots": self.preset.resource_slots.to_json(),
                 "shared_memory": str(self.preset.shared_memory)
-                if self.preset.shared_memory
+                if self.preset.shared_memory is not None
                 else None,
                 "scaling_group_name": self.preset.scaling_group_name,
             },
