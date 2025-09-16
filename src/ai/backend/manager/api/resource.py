@@ -23,6 +23,7 @@ import yarl
 from aiohttp import web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.services.agent.actions.get_watcher_status import GetWatcherStatusAction
 from ai.backend.manager.services.agent.actions.recalculate_usage import RecalculateUsageAction
@@ -124,8 +125,8 @@ async def check_presets(request: web.Request, params: Any) -> web.Response:
     scaling_groups_json = {}
     for sgname, sg_data in result.scaling_groups.items():
         scaling_groups_json[sgname] = {
-            "using": sg_data["using"].to_json(),
-            "remaining": sg_data["remaining"].to_json(),
+            ResourceSlotState.OCCUPIED: sg_data[ResourceSlotState.OCCUPIED].to_json(),
+            ResourceSlotState.AVAILABLE: sg_data[ResourceSlotState.AVAILABLE].to_json(),
         }
 
     resp = {

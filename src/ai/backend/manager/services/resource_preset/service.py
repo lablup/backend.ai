@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.resource_preset import ResourcePresetRepository
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
@@ -134,8 +135,8 @@ class ResourcePresetService:
         per_sgroup_dict = {}
         for sgname, sg_data in result.scaling_groups.items():
             per_sgroup_dict[sgname] = {
-                "using": sg_data.using,
-                "remaining": sg_data.remaining,
+                ResourceSlotState.OCCUPIED: sg_data.using,
+                ResourceSlotState.AVAILABLE: sg_data.remaining,
             }
 
         return CheckResourcePresetsActionResult(

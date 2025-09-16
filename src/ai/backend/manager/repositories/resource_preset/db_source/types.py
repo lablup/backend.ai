@@ -7,7 +7,16 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 from uuid import UUID
 
-from ai.backend.common.types import AccessKey, BinarySize, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.types import (
+    AccessKey,
+    BinarySize,
+    ResourceSlot,
+    SlotName,
+    SlotTypes,
+)
+from ai.backend.common.types import (
+    LegacyResourceSlotState as ResourceSlotState,
+)
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models import KernelRow
 
@@ -44,16 +53,16 @@ class PerScalingGroupResourceData:
     def to_cache(self) -> dict[str, Any]:
         """Serialize to cache-friendly format."""
         return {
-            "using": self.using.to_json(),
-            "remaining": self.remaining.to_json(),
+            ResourceSlotState.OCCUPIED: self.using.to_json(),
+            ResourceSlotState.AVAILABLE: self.remaining.to_json(),
         }
 
     @classmethod
     def from_cache(cls, data: dict[str, Any]) -> PerScalingGroupResourceData:
         """Deserialize from cache format."""
         return cls(
-            using=ResourceSlot.from_json(data["using"]),
-            remaining=ResourceSlot.from_json(data["remaining"]),
+            using=ResourceSlot.from_json(data[ResourceSlotState.OCCUPIED]),
+            remaining=ResourceSlot.from_json(data[ResourceSlotState.AVAILABLE]),
         )
 
 
