@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 24.09.14 (2025-09-16)
+
+### Fixes
+* Handle empty `supported_accelerators` list correctly in Image, ImageNode ([#5878](https://github.com/lablup/backend.ai/issues/5878))
+
+
 ## 24.09.13 (2025-09-15)
 
 ### Fixes
