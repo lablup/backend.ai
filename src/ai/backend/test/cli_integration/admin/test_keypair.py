@@ -2,7 +2,7 @@ import json
 from contextlib import closing
 from typing import Tuple
 
-from ...utils.cli import EOF, ClientRunnerFunc
+from ...utils.cli import EOF, ClientRunnerFunc, decode
 from ..conftest import KeypairOption, User
 
 
@@ -35,7 +35,7 @@ def test_add_keypair(
         ]
         with closing(run_admin(arguments)) as p:
             p.expect(EOF)
-            response = json.loads(p.before.decode())
+            response = json.loads(decode(p.before))
             assert response.get("ok") is True, f"Account#{i + 1} add error"
             user_ids.append(response["user"]["uuid"])
 
@@ -48,7 +48,7 @@ def test_add_keypair(
     ]
     with closing(run_admin(arguments)) as p:
         p.expect(EOF)
-        response = json.loads(p.before.decode())
+        response = json.loads(decode(p.before))
         group_id = response.get("items")[0]["id"]
 
     # FIXME: Delete the following code
@@ -65,7 +65,7 @@ def test_add_keypair(
     ]
     with closing(run_admin(arguments)) as p:
         p.expect(EOF)
-        response = json.loads(p.before.decode())
+        response = json.loads(decode(p.before))
         assert response.get("ok") is True, "cannot add users to group"
 
     # Create keypair
@@ -86,12 +86,12 @@ def test_add_keypair(
             keypair_add_arguments.extend(["--rate-limit", rate_limit])
         with closing(run_admin(keypair_add_arguments)) as p:
             p.expect(EOF)
-            response = json.loads(p.before.decode())
+            response = json.loads(decode(p.before))
             assert response.get("ok") is True, f"Keypair#{i + 1} add error"
     # Check if keypair is added
     with closing(run_admin(["--output=json", "admin", "keypair", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         keypair_list = loaded.get("items")
         assert isinstance(keypair_list, list), "List not printed properly!"
@@ -124,7 +124,7 @@ def test_update_keypair(
     # Get access key
     with closing(run_admin(["--output=json", "admin", "keypair", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         keypair_list = loaded.get("items")
         assert isinstance(keypair_list, list), "List not printed properly!"
@@ -149,13 +149,13 @@ def test_update_keypair(
         # Update keypair
         with closing(run_admin(keypair_update_arguments)) as p:
             p.expect(EOF)
-            response = json.loads(p.before.decode())
+            response = json.loads(decode(p.before))
             assert response.get("ok") is True, f"Keypair#{i + 1} update error"
 
     # Check if keypair is updated
     with closing(run_admin(["--output=json", "admin", "keypair", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         updated_keypair_list = loaded.get("items")
         assert isinstance(updated_keypair_list, list), "List not printed properly!"
@@ -187,7 +187,7 @@ def test_delete_keypair(run_admin: ClientRunnerFunc, users: Tuple[User]):
     # Get access key
     with closing(run_admin(["--output=json", "admin", "keypair", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         keypair_list = loaded.get("items")
         assert isinstance(keypair_list, list), "List not printed properly!"
@@ -204,7 +204,7 @@ def test_delete_keypair(run_admin: ClientRunnerFunc, users: Tuple[User]):
         with closing(run_admin(["--output=json", "admin", "user", "purge", user.email])) as p:
             p.sendline("y")
             p.expect(EOF)
-            before = p.before.decode()
+            before = decode(p.before)
             response = json.loads(before[before.index("{") :])
             assert response.get("ok") is True, f"Account deletion failed: {user.username}"
 
@@ -215,7 +215,7 @@ def test_list_keypair(run_admin: ClientRunnerFunc):
     """
     with closing(run_admin(["--output=json", "admin", "keypair", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         keypair_list = loaded.get("items")
         assert isinstance(keypair_list, list), "List not printed properly!"
@@ -232,7 +232,7 @@ def test_delete_keypair_on_running_session(run_admin: ClientRunnerFunc):
     ]
     with closing(run_admin(admin_find_command)) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         item = loaded.get("items")
         assert len(item) == 1, "admin user not found"
@@ -252,7 +252,7 @@ def test_delete_keypair_on_running_session(run_admin: ClientRunnerFunc):
     ]
     with closing(run_admin(keypair_add_arguments)) as p:
         p.expect(EOF)
-        response = json.loads(p.before.decode())
+        response = json.loads(decode(p.before))
         access_key = response.get("access_key")
         assert access_key
         assert response.get("ok") is True, "Admin keypair add error"
@@ -260,7 +260,7 @@ def test_delete_keypair_on_running_session(run_admin: ClientRunnerFunc):
     # find image
     with closing(run_admin(["--output=json", "admin", "image", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         image_list = loaded.get("items")
         assert isinstance(image_list, list), "Image list not printed properly"
@@ -293,12 +293,12 @@ def test_delete_keypair_on_running_session(run_admin: ClientRunnerFunc):
 
     with closing(run_admin(create_session_command)) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         assert "is enqueued for scheduling." in decoded, "Session creation failed"
 
     with closing(run_admin(["--output=json", "admin", "session", "list"])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         session_list = loaded.get("items")
         assert isinstance(session_list, list), "Session list not printed properly"
@@ -309,7 +309,7 @@ def test_delete_keypair_on_running_session(run_admin: ClientRunnerFunc):
     # delete keypair
     with closing(run_admin(["--output=json", "admin", "keypair", "delete", access_key])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         print("delete keypair response", loaded)
         assert loaded.get("ok") is False, "Keypair should not be deleted"
@@ -319,13 +319,13 @@ def test_delete_keypair_on_running_session(run_admin: ClientRunnerFunc):
         run_admin(["--output=json", "session", "rm", session_name, "-o", access_key])
     ) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         assert "Done" in decoded, "Session deletion failed"
 
     # delete keypair
     with closing(run_admin(["--output=json", "admin", "keypair", "delete", access_key])) as p:
         p.expect(EOF)
-        decoded = p.before.decode()
+        decoded = decode(p.before)
         loaded = json.loads(decoded)
         assert loaded.get("ok") is True, "Keypair deletion failed"
 

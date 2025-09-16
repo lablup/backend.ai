@@ -36,7 +36,7 @@ from ...output.types import FieldSpec
 from ...session import AsyncSession, Session
 from ..events import SubscribableEvents
 from ..pretty import (
-    ProgressViewer,
+    PorgressBarWithSpinner,
     print_done,
     print_error,
     print_fail,
@@ -1033,21 +1033,17 @@ def convert_to_image(session_id: str, image_name: str) -> None:
 
     async def export_tracker(bgtask_id):
         async with AsyncSession() as session:
+            completion_msg_func = lambda: print_done("Session export process completed.")
             try:
                 bgtask = session.BackgroundTask(bgtask_id)
-                completion_msg_func = lambda: print_done("Session export process completed.")
                 async with (
                     bgtask.listen_events() as response,
-                    ProgressViewer("Starting the session...") as viewer,
+                    PorgressBarWithSpinner("Starting the session...") as pbar,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
                         match ev.event:
                             case BgtaskStatus.UPDATED:
-                                if viewer.tqdm is None:
-                                    pbar = await viewer.to_tqdm()
-
-                                pbar = viewer.tqdm
                                 pbar.total = data["total_progress"]
                                 pbar.update(data["current_progress"] - pbar.n)
                                 pbar.display(data["message"])

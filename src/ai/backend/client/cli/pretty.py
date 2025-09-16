@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import enum
 import functools
@@ -5,7 +7,9 @@ import json
 import sys
 import textwrap
 import traceback
-from typing import Sequence
+from collections.abc import Sequence
+from types import TracebackType
+from typing import Optional, Self
 
 from click import echo, style
 from tqdm import tqdm
@@ -201,71 +205,66 @@ def show_warning(message, category, filename, lineno, file=None, line=None):
     )
 
 
-class Spinner:
-    def __init__(self, msg: str, delay: float = 0.3):
-        self.msg = msg
-        self.task = None
-        self.delay = delay
+class PorgressBarWithSpinner(tqdm):
+    """
+    A simple extension to tqdm adding a spinner.
 
-    async def __aenter__(self):
-        self.run()
-        return self
+    .. code-block::
 
-    async def __aexit__(self, exc_type, exc_value, traceback):
-        await self.stop()
+       async with ProgressBarWithSpinner("Waiting...") as pbar:
+           await init_work()  # here the spinner already indicates something is going on.
+           pbar.total = 10
+           for i in range(10):
+               await piece_of_work()
+               pbar.update(1)
+    """
 
-    def run(self):
-        self.task = asyncio.create_task(self.spin())
+    def __init__(
+        self,
+        spinner_msg: str = "",
+        spinner_delay: float = 0.14,
+        unit: str = "it",
+    ) -> None:
+        self.spinner_msg = spinner_msg
+        self.spinner_delay = spinner_delay
+        if spinner_msg:
+            initial_desc = "  {spinner_msg} "
+        else:
+            initial_desc = "  "
+        super().__init__(
+            total=0,
+            unit=unit,
+            desc=initial_desc,
+        )
 
-    async def spin(self):
+    async def spin(self) -> None:
         try:
             while True:
                 for char in "|/-\\":
-                    print_wait("{} {}".format(self.msg, char))
-                    await asyncio.sleep(self.delay)
+                    if self.spinner_msg:
+                        self.set_description_str(f"{char} {self.spinner_msg} ")
+                    else:
+                        self.set_description_str(f"{char} ")
+                    await asyncio.sleep(self.spinner_delay)
         except asyncio.CancelledError:
             pass
 
-    async def stop(self):
-        self.task.cancel()
-        await self.task
-
-
-class ProgressViewer:
-    """
-
-    A context manager that displays a spinner and a tqdm progress bar.
-
-    It shows the spinner until it is switched explicitly to the tqdm progress bar.
-
-    Usage:
-
-    ```
-    async with ProgressViewer("Waiting...") as viewer:
-        for i in range(10):
-            await asyncio.sleep(0.2)
-        tqdm = await viewer.to_tqdm()
-        tqdm.total = 10
-        for i in range(10):
-            await asyncio.sleep(0.2)
-            tqdm.update(1)
-    ```
-    """
-
-    def __init__(self, spinner_msg: str = "", delay: float = 0.3) -> None:
-        self.spinner = Spinner(spinner_msg, delay)
-        self.tqdm = None
-
-    async def __aenter__(self):
-        self.spinner.run()
+    async def __aenter__(self) -> Self:
+        self.task = asyncio.create_task(self.spin())
         return self
 
-    async def __aexit__(self, exc_type, exc_value, traceback) -> None:
-        await self.spinner.stop()
-        if self.tqdm:
-            self.tqdm.close()
-
-    async def to_tqdm(self, unit: str = "it") -> tqdm:
-        await self.spinner.stop()
-        self.tqdm = tqdm(total=0, unit=unit)
-        return self.tqdm
+    async def __aexit__(
+        self,
+        exc_type: Optional[type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
+        if self.task is not None and not self.task.done():
+            self.task.cancel()
+            await self.task
+        if self.spinner_msg:
+            self.set_description_str(f"✓ {self.spinner_msg}")
+        else:
+            self.set_description_str("✓ ")
+        self.close()
+        return None
