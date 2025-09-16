@@ -569,6 +569,9 @@
   model-registry = "MODEL_REGISTRY_NAME"
 
 [reservoir]
+  # Whether to enable the approval process for artifact uploads.
+  # When enabled, artifacts require approval before being available.
+  enable-approve-process = false
   # Name of the reservoir storage configuration.
   # Used to identify this storage in the system.
   storage-name = "RESERVOIR_STORAGE_NAME"

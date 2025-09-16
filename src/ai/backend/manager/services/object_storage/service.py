@@ -201,10 +201,6 @@ class ObjectStorageService:
             storage_namespace.bucket,
             PresignedUploadObjectReq(
                 key=str(object_path),
-                content_type=action.content_type,
-                expiration=action.expiration,
-                min_size=action.min_size,
-                max_size=action.max_size,
             ),
         )
 

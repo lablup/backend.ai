@@ -26,7 +26,13 @@ type Artifact implements Node {
   readonly: Boolean!
   scannedAt: DateTime!
   updatedAt: DateTime!
+  availability: ArtifactAvailability!
   revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
+}
+
+enum ArtifactAvailability {
+  ALIVE
+  DELETED
 }
 
 """Added in 25.14.0"""
@@ -54,6 +60,7 @@ input ArtifactFilter {
   name: StringFilter = null
   registry: StringFilter = null
   source: StringFilter = null
+  availability: [ArtifactAvailability!] = null
   AND: [ArtifactFilter!] = null
   OR: [ArtifactFilter!] = null
   NOT: [ArtifactFilter!] = null
@@ -295,6 +302,16 @@ type CreateReservoirRegistryPayload {
 """Date with time (isoformat)"""
 scalar DateTime
 
+"""Added in 25.15.0"""
+input DeleteArtifactsInput {
+  artifactIds: [ID!]!
+}
+
+"""Added in 25.15.0"""
+type DeleteArtifactsPayload {
+  artifacts: [Artifact!]!
+}
+
 """Added in 25.14.0"""
 input DeleteHuggingFaceRegistryInput {
   id: ID!
@@ -401,10 +418,6 @@ type GetPresignedDownloadURLPayload {
 input GetPresignedUploadURLInput {
   artifactRevisionId: ID!
   key: String!
-  contentType: String = null
-  expiration: Int = null
-  minSize: Int = null
-  maxSize: Int = null
 }
 
 """Added in 25.14.0"""
@@ -648,6 +661,12 @@ type Mutation {
   """Added in 25.14.0"""
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
 
+  """Added in 25.15.0"""
+  deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload!
+
+  """Added in 25.15.0"""
+  restoreArtifacts(input: RestoreArtifactsInput!): RestoreArtifactsPayload!
+
   """Added in 25.14.0"""
   cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload!
 
@@ -797,7 +816,7 @@ type Query {
   artifact(id: ID!): Artifact
 
   """Added in 25.14.0"""
-  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
+  artifacts(filter: ArtifactFilter = {type: null, name: null, registry: null, source: null, availability: [ALIVE], AND: null, OR: null, NOT: null}, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection!
 
   """Added in 25.14.0"""
   artifactRevision(id: ID!): ArtifactRevision
@@ -946,6 +965,16 @@ input ResourceConfigInput {
 
 input ResourceGroupInput {
   name: String!
+}
+
+"""Added in 25.15.0"""
+input RestoreArtifactsInput {
+  artifactIds: [ID!]!
+}
+
+"""Added in 25.15.0"""
+type RestoreArtifactsPayload {
+  artifacts: [Artifact!]!
 }
 
 type RoutingNode implements Node {

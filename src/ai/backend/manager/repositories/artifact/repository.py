@@ -1,9 +1,12 @@
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime, timezone
 from typing import Any, Optional, override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import selectinload, sessionmaker
 from sqlalchemy.sql import Select
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
@@ -12,6 +15,7 @@ from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
+    ArtifactAvailability,
     ArtifactData,
     ArtifactDataWithRevisions,
     ArtifactRevisionData,
@@ -64,11 +68,8 @@ class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
         conditions = []
 
         # Handle basic filters
-        if filters.artifact_type and len(filters.artifact_type) > 0:
-            if len(filters.artifact_type) == 1:
-                conditions.append(ArtifactRow.type == filters.artifact_type[0])
-            else:
-                conditions.append(ArtifactRow.type.in_(filters.artifact_type))
+        if filters.artifact_type:
+            conditions.append(ArtifactRow.type.in_(filters.artifact_type))
 
         # Handle StringFilter-based filters
         if filters.name_filter is not None:
@@ -112,6 +113,10 @@ class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
             conditions.append(ArtifactRow.source_registry_id == filters.source_registry_id)
         if filters.source_registry_type is not None:
             conditions.append(ArtifactRow.source_registry_type == filters.source_registry_type)
+
+        # Handle availability filter
+        if filters.availability:
+            conditions.append(ArtifactRow.availability.in_(filters.availability))
 
         return conditions, stmt
 
@@ -258,13 +263,27 @@ class ArtifactRepository:
             if not data:
                 raise InvalidArtifactModifierTypeError("No valid fields to update")
 
-            await db_sess.execute(
-                sa.update(ArtifactRow).where(ArtifactRow.id == artifact_id).values(**data)
+            result = await db_sess.execute(
+                sa.update(ArtifactRow)
+                .where(
+                    sa.and_(
+                        ArtifactRow.id == artifact_id,
+                        ArtifactRow.availability != ArtifactAvailability.DELETED,
+                    )
+                )
+                .values(**data)
             )
+            if result.rowcount == 0:
+                raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             await db_sess.commit()
 
             result = await db_sess.execute(
-                sa.select(ArtifactRow).where(ArtifactRow.id == artifact_id)
+                sa.select(ArtifactRow).where(
+                    sa.and_(
+                        ArtifactRow.id == artifact_id,
+                        ArtifactRow.availability != ArtifactAvailability.DELETED,
+                    )
+                )
             )
             row: ArtifactRow = result.scalar_one_or_none()
             if row is None:
@@ -689,10 +708,54 @@ class ArtifactRepository:
             return artifact_revision_id
 
     @repository_decorator()
+    async def delete_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
+        async with self._db.begin_session() as db_sess:
+            # Update availability to DELETED for the given artifact IDs (only for ALIVE artifacts)
+            await db_sess.execute(
+                sa.update(ArtifactRow)
+                .where(
+                    sa.and_(
+                        ArtifactRow.id.in_(artifact_ids),
+                        ArtifactRow.availability != ArtifactAvailability.DELETED,
+                    )
+                )
+                .values(availability=ArtifactAvailability.DELETED.value)
+            )
+
+            # Fetch and return the updated artifacts
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(ArtifactRow.id.in_(artifact_ids))
+            )
+            rows: list[ArtifactRow] = result.scalars().all()
+            return [row.to_dataclass() for row in rows]
+
+    @repository_decorator()
+    async def restore_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
+        async with self._db.begin_session() as db_sess:
+            # Update availability to ALIVE for the given artifact IDs (only for DELETED artifacts)
+            await db_sess.execute(
+                sa.update(ArtifactRow)
+                .where(
+                    sa.and_(
+                        ArtifactRow.id.in_(artifact_ids),
+                        ArtifactRow.availability == ArtifactAvailability.DELETED,
+                    )
+                )
+                .values(availability=ArtifactAvailability.ALIVE.value)
+            )
+
+            # Fetch and return the updated artifacts
+            result = await db_sess.execute(
+                sa.select(ArtifactRow).where(ArtifactRow.id.in_(artifact_ids))
+            )
+            rows: list[ArtifactRow] = result.scalars().all()
+            return [row.to_dataclass() for row in rows]
+
+    @repository_decorator()
     async def update_artifact_revision_bytesize(
         self, artifact_revision_id: uuid.UUID, size: int
     ) -> uuid.UUID:
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(ArtifactRevisionRow)
                 .where(ArtifactRevisionRow.id == artifact_revision_id)
@@ -705,7 +768,7 @@ class ArtifactRepository:
     async def update_artifact_revision_readme(
         self, artifact_revision_id: uuid.UUID, readme: str
     ) -> uuid.UUID:
-        async with self._db.begin_session() as db_sess:
+        async with self._begin_session_read_committed() as db_sess:
             stmt = (
                 sa.update(ArtifactRevisionRow)
                 .where(ArtifactRevisionRow.id == artifact_revision_id)
@@ -939,3 +1002,22 @@ class ArtifactRepository:
                 rows, querybuild_result.pagination_order
             )
             return data_objects, total_count
+
+    @actxmgr
+    async def _begin_session_read_committed(self) -> AsyncIterator[SASession]:
+        """
+        Begin a read-write session with READ COMMITTED isolation level.
+        """
+        async with self._db.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
+            async with conn_with_isolation.begin():
+                # Configure session factory with the connection
+                sess_factory = sessionmaker(
+                    bind=conn_with_isolation,
+                    class_=SASession,
+                    expire_on_commit=False,
+                )
+                session = sess_factory()
+                yield session
+                await session.commit()

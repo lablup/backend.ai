@@ -16,42 +16,87 @@ Changes
 
 <!-- towncrier release notes start -->
 
-## 25.14.0rc1 (2025-09-11)
-
-### Breaking Changes
-* Implement password hashing system with multiple algorithms ([#5753](https://github.com/lablup/backend.ai/issues/5753))
+## 25.14.2 (2025-09-15)
 
 ### Features
-* Add data migration script from VFolder to RBAC tables ([#5340](https://github.com/lablup/backend.ai/issues/5340))
+* Add GQL Viewer type ([#5728](https://github.com/lablup/backend.ai/issues/5728))
+
+
+## 25.14.1 (2025-09-15)
+
+### Fixes
+* Handle empty `supported_accelerators` list correctly in Image, ImageNode ([#5878](https://github.com/lablup/backend.ai/issues/5878))
+
+
+## 25.14.0 (2025-09-15)
+
+### Breaking Changes
+* Implement password hashing system with multiple algorithms including PBKDF2-SHA3-256 ([#5753](https://github.com/lablup/backend.ai/issues/5753), [#5785](https://github.com/lablup/backend.ai/issues/5785))
+
+### Features
+
+#### RBAC Enhancements
+* Add data migration scripts from VFolder to RBAC tables ([#5340](https://github.com/lablup/backend.ai/issues/5340))
 * Migrate existing user/project records to RBAC data ([#5417](https://github.com/lablup/backend.ai/issues/5417))
-* Expand RBAC tables by adding `permission_groups` table to group permissions with the same target ([#5465](https://github.com/lablup/backend.ai/issues/5465))
+* Expand RBAC tables with `permission_groups` table to group permissions with the same target ([#5465](https://github.com/lablup/backend.ai/issues/5465))
+* Add RBAC repository functions to manage scopes and entity DB records ([#5699](https://github.com/lablup/backend.ai/issues/5699))
+
+#### Artifact Management
 * Add `reservoir_registries` DB table, service, and CRUD GQL mutations ([#5644](https://github.com/lablup/backend.ai/issues/5644))
-* Add `artifact_registries` DB table to store common information of the various artifact registries ([#5656](https://github.com/lablup/backend.ai/issues/5656))
-* Implement Reservoir registry, and Sync APIs between Managers ([#5660](https://github.com/lablup/backend.ai/issues/5660))
-* Add config to set GPFS fileset name prefix ([#5684](https://github.com/lablup/backend.ai/issues/5684))
-* Add RBAC repositoy functions to manage scopes and entity DB records ([#5699](https://github.com/lablup/backend.ai/issues/5699))
-* Allow `__typename` type query for advanced GraphQL features(GQL Federation, `@connection` directive) by introducing custom introspection rule ([#5705](https://github.com/lablup/backend.ai/issues/5705))
-* Align the reported agent memory size so that the reserved memory absorbs tiny memory size deviation originating from various firmware/kernel settings and make the memory size of same-hardware agents consistent, preventing inadvertent resource allocation failures in large clusters ([#5729](https://github.com/lablup/backend.ai/issues/5729))
-* Set expiry to set records of Bgtask metadata ids ([#5736](https://github.com/lablup/backend.ai/issues/5736))
-* Add `defaultArtifactRegistry` GQL resolver to fetch the default artifact registry information ([#5739](https://github.com/lablup/backend.ai/issues/5739))
+* Add `artifact_registries` DB table to store common information of various artifact registries ([#5656](https://github.com/lablup/backend.ai/issues/5656))
+* Implement Reservoir registry and Sync APIs between Managers ([#5660](https://github.com/lablup/backend.ai/issues/5660))
+* Add `defaultArtifactRegistry` GQL resolver to fetch default artifact registry information ([#5739](https://github.com/lablup/backend.ai/issues/5739))
 * Add `Artifact`, `ArtifactRegistry` REST API ([#5747](https://github.com/lablup/backend.ai/issues/5747))
-* Add session mode(Client, Proxy) based error handling in FetchContextManager ([#5774](https://github.com/lablup/backend.ai/issues/5774))
-* Add VFolder delete Background Task ([#5778](https://github.com/lablup/backend.ai/issues/5778))
+
+#### Background Tasks
+* Add VFolder delete background task ([#5778](https://github.com/lablup/backend.ai/issues/5778))
+* Set expiry to set records of Bgtask metadata IDs ([#5736](https://github.com/lablup/backend.ai/issues/5736))
+
+#### Performance and Resource Management
 * Apply cache layer for resource presets ([#5781](https://github.com/lablup/backend.ai/issues/5781))
-* Add PBKDF2-SHA3-256 password hashing implementation and update supported algorithms ([#5785](https://github.com/lablup/backend.ai/issues/5785))
+* Align reported agent memory size for consistency in large clusters, preventing inadvertent resource allocation failures ([#5729](https://github.com/lablup/backend.ai/issues/5729))
+
+#### Other Features
+* Allow `__typename` type query for advanced GraphQL features (GQL Federation, `@connection` directive) by introducing custom introspection rule ([#5705](https://github.com/lablup/backend.ai/issues/5705))
+* Add config for GPFS fileset name prefix ([#5684](https://github.com/lablup/backend.ai/issues/5684))
+* Add session mode (Client, Proxy) based error handling in FetchContextManager ([#5774](https://github.com/lablup/backend.ai/issues/5774))
 * Remove obsolete max slot limit validation during session creation ([#5807](https://github.com/lablup/backend.ai/issues/5807))
 * Implement health check functionality for route management ([#5811](https://github.com/lablup/backend.ai/issues/5811))
+* Introduce error code to storage-proxy exceptions ([#5813](https://github.com/lablup/backend.ai/issues/5813))
+* Add config to disable artifact approval process ([#5830](https://github.com/lablup/backend.ai/issues/5830))
 
 ### Improvements
 * Migrate legacy redis clients to valkey clients in App Proxy ([#5741](https://github.com/lablup/backend.ai/issues/5741))
 
 ### Fixes
-* Add missing `restart: unless-stopped` policy to all services in docker compose file ([#5694](https://github.com/lablup/backend.ai/issues/5694))
+
+#### Session Management
 * Add missing session live stat update ([#5762](https://github.com/lablup/backend.ai/issues/5762))
-* Make overlay network creation idempotent so that retries due to errors after this step does not make infinite retry loop ([#5765](https://github.com/lablup/backend.ai/issues/5765))
+* Ensure worker object refresh after DB flush in update_worker ([#5674](https://github.com/lablup/backend.ai/issues/5674))
+* Handle empty `supported_accelerators` list in `Image`, `ImageNode` ([#5869](https://github.com/lablup/backend.ai/issues/5869))
+* Reset pending queue when there are no sessions with scheduling failures ([#5865](https://github.com/lablup/backend.ai/issues/5865))
+
+#### Network and Docker
+* Make overlay network creation idempotent to prevent infinite retry loops ([#5765](https://github.com/lablup/backend.ai/issues/5765))
 * Clean up dangling docker networks ([#5770](https://github.com/lablup/backend.ai/issues/5770))
-* Add missing update when app proxy registered endpoint ([#5783](https://github.com/lablup/backend.ai/issues/5783))
-* Restrict `limit` to `scan_artifacts` API ([#5801](https://github.com/lablup/backend.ai/issues/5801))
+* Add missing `restart: unless-stopped` policy to docker compose services ([#5694](https://github.com/lablup/backend.ai/issues/5694))
+
+#### API and Permissions
+* Fix `modify_user` GQL mutation's `project` update due to incorrect condition ([#5850](https://github.com/lablup/backend.ai/issues/5850))
+* Fix wrong syntax in object permission record adder function ([#5849](https://github.com/lablup/backend.ai/issues/5849))
+* Check if vfolder is mounted to any session before deleting ([#5855](https://github.com/lablup/backend.ai/issues/5855))
+* Restrict `limit` parameter in `scan_artifacts` API ([#5801](https://github.com/lablup/backend.ai/issues/5801))
+
+#### Proxy and Health Check
+* Fix JSON parsing error when wsproxy returns HTML error responses ([#5829](https://github.com/lablup/backend.ai/issues/5829))
+* Update kernel host references to current kernel host in proxy and health check logic ([#5834](https://github.com/lablup/backend.ai/issues/5834))
+* Add missing update when app proxy registers endpoint ([#5783](https://github.com/lablup/backend.ai/issues/5783))
+
+#### Other Fixes
+* Fix import paths for `ai.backend.errors.*` in migration script ([#5828](https://github.com/lablup/backend.ai/issues/5828))
+* Mark hint for immediate model-service update ([#5845](https://github.com/lablup/backend.ai/issues/5845))
+* Initialize ResourceSlot with known_slots in resource occupancy calculation ([#5860](https://github.com/lablup/backend.ai/issues/5860))
+* Ensure model service token expiration times are handled consistently in UTC ([#5872](https://github.com/lablup/backend.ai/issues/5872))
 * Update client SDK to reflect UUID-only restriction in session dependencies ([#5809](https://github.com/lablup/backend.ai/issues/5809))
 
 ### Miscellaneous

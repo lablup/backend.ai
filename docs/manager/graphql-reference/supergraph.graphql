@@ -209,7 +209,15 @@ type Artifact implements Node
   readonly: Boolean!
   scannedAt: DateTime!
   updatedAt: DateTime!
+  availability: ArtifactAvailability!
   revisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
+}
+
+enum ArtifactAvailability
+  @join__type(graph: STRAWBERRY)
+{
+  ALIVE @join__enumValue(graph: STRAWBERRY)
+  DELETED @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.14.0"""
@@ -243,6 +251,7 @@ input ArtifactFilter
   name: StringFilter = null
   registry: StringFilter = null
   source: StringFilter = null
+  availability: [ArtifactAvailability!] = null
   AND: [ArtifactFilter!] = null
   OR: [ArtifactFilter!] = null
   NOT: [ArtifactFilter!] = null
@@ -1443,6 +1452,20 @@ type DealiasImage
   msg: String
 }
 
+"""Added in 25.15.0"""
+input DeleteArtifactsInput
+  @join__type(graph: STRAWBERRY)
+{
+  artifactIds: [ID!]!
+}
+
+"""Added in 25.15.0"""
+type DeleteArtifactsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  artifacts: [Artifact!]!
+}
+
 """Deprecated since 24.09.0. use `DeleteContainerRegistryNode` instead"""
 type DeleteContainerRegistry
   @join__type(graph: GRAPHENE)
@@ -2039,10 +2062,6 @@ input GetPresignedUploadURLInput
 {
   artifactRevisionId: ID!
   key: String!
-  contentType: String = null
-  expiration: Int = null
-  minSize: Int = null
-  maxSize: Int = null
 }
 
 """Added in 25.14.0"""
@@ -3750,6 +3769,12 @@ type Mutation
   """Added in 25.14.0"""
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload! @join__field(graph: STRAWBERRY)
 
+  """Added in 25.15.0"""
+  deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload! @join__field(graph: STRAWBERRY)
+
+  """Added in 25.15.0"""
+  restoreArtifacts(input: RestoreArtifactsInput!): RestoreArtifactsPayload! @join__field(graph: STRAWBERRY)
+
   """Added in 25.14.0"""
   cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload! @join__field(graph: STRAWBERRY)
 
@@ -4275,6 +4300,9 @@ type Query
     first: Int
     last: Int
   ): ImageConnection @join__field(graph: GRAPHENE)
+
+  """Added in 25.14.2. Returns information about the current user."""
+  viewer: Viewer @join__field(graph: GRAPHENE)
   user(domain_name: String, email: String): User @join__field(graph: GRAPHENE)
   user_from_uuid(domain_name: String, user_id: ID): User @join__field(graph: GRAPHENE)
   users(domain_name: String, group_id: UUID, is_active: Boolean, status: String): [User] @join__field(graph: GRAPHENE)
@@ -4481,7 +4509,7 @@ type Query
   artifact(id: ID!): Artifact @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
-  artifacts(filter: ArtifactFilter = null, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection! @join__field(graph: STRAWBERRY)
+  artifacts(filter: ArtifactFilter = {type: null, name: null, registry: null, source: null, availability: [ALIVE], AND: null, OR: null, NOT: null}, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
   artifactRevision(id: ID!): ArtifactRevision @join__field(graph: STRAWBERRY)
@@ -4729,6 +4757,20 @@ type ResourcePreset
   Added in 25.4.0. A name of scaling group(=resource group) of the resource preset associated with.
   """
   scaling_group_name: String
+}
+
+"""Added in 25.15.0"""
+input RestoreArtifactsInput
+  @join__type(graph: STRAWBERRY)
+{
+  artifactIds: [ID!]!
+}
+
+"""Added in 25.15.0"""
+type RestoreArtifactsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  artifacts: [Artifact!]!
 }
 
 type Routing implements Item
@@ -5484,6 +5526,15 @@ Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribut
 """
 scalar VFolderPermissionValueField
   @join__type(graph: GRAPHENE)
+
+"""Added in 25.14.2."""
+type Viewer
+  @join__type(graph: GRAPHENE)
+{
+  user: UserNode
+  user_id: UUID
+  encoded_user_role: String
+}
 
 type VirtualFolder implements Item
   @join__implements(graph: GRAPHENE, interface: "Item")

@@ -1518,7 +1518,7 @@
       "SetPreopenPorts": "Ön Açık Bağlantı Noktaları (isteğe bağlı)",
       "SetSessionOwner": "Oturum sahibi",
       "SettingUpProxyForApp": "Uygulama için proxy ayarlanıyor...",
-      "SharedMemory": "Paylaşılan Bellek (SHMEM) {{değer}}",
+      "SharedMemory": "Paylaşılan Bellek (SHMEM) {{value}}",
       "SharedMemorySettingIsReduced": "Paylaşılan bellek ayarı, ayrılan belleğin altına düşürülür.",
       "SingleNode": "Tek",
       "SkipToConfirmAndLaunch": "İncelemeye geç",

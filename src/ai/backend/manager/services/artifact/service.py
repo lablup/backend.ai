@@ -36,6 +36,10 @@ from ai.backend.manager.repositories.object_storage.repository import ObjectStor
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
+from ai.backend.manager.services.artifact.actions.delete_multi import (
+    DeleteArtifactsAction,
+    DeleteArtifactsActionResult,
+)
 from ai.backend.manager.services.artifact.actions.get import (
     GetArtifactAction,
     GetArtifactActionResult,
@@ -51,6 +55,10 @@ from ai.backend.manager.services.artifact.actions.list import (
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
     ListArtifactsWithRevisionsActionResult,
+)
+from ai.backend.manager.services.artifact.actions.restore_multi import (
+    RestoreArtifactsAction,
+    RestoreArtifactsActionResult,
 )
 from ai.backend.manager.services.artifact.actions.retrieve_model import (
     RetrieveModelAction,
@@ -242,6 +250,7 @@ class ArtifactService:
                             scanned_at=response_artifact.scanned_at,
                             updated_at=response_artifact.updated_at,
                             readonly=response_artifact.readonly,
+                            availability=response_artifact.availability,
                             revisions=full_revisions,
                         )
                         all_artifacts.append(full_artifact)
@@ -394,6 +403,16 @@ class ArtifactService:
         )
 
         return RetrieveModelActionResult(result=scanned_models[0])
+
+    async def delete_artifacts(self, action: DeleteArtifactsAction) -> DeleteArtifactsActionResult:
+        deleted_artifacts = await self._artifact_repository.delete_artifacts(action.artifact_ids)
+        return DeleteArtifactsActionResult(artifacts=deleted_artifacts)
+
+    async def restore_artifacts(
+        self, action: RestoreArtifactsAction
+    ) -> RestoreArtifactsActionResult:
+        restored_artifacts = await self._artifact_repository.restore_artifacts(action.artifact_ids)
+        return RestoreArtifactsActionResult(artifacts=restored_artifacts)
 
     async def _resolve_artifact_registry_meta(
         self, artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]

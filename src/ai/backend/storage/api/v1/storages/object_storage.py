@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import mimetypes
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
@@ -61,7 +62,6 @@ class ObjectStorageAPIHandler:
         Reads multipart file data in chunks to minimize memory usage.
         """
         req = body.parsed
-        content_type = req.content_type
         filepath = req.key
         file_reader = multipart_ctx.file_reader
         storage_name = path.parsed.storage_name
@@ -85,6 +85,11 @@ class ObjectStorageAPIHandler:
                 if not chunk:
                     break
                 yield chunk
+
+        # Determine content type: use header if available, otherwise guess from filename
+        content_type = multipart_ctx.content_type
+        if not content_type:
+            content_type, _ = mimetypes.guess_type(filepath)
 
         await storage_service.stream_upload(
             storage_name, bucket_name, filepath, content_type, data_stream()
@@ -138,7 +143,7 @@ class ObjectStorageAPIHandler:
         await log_client_api_entry(log, "presigned_upload_url", req)
         storage_service = ObjectStorageService(self._storage_configs)
         response = await storage_service.generate_presigned_upload_url(
-            storage_name, bucket_name, req
+            storage_name, bucket_name, req.key
         )
 
         return APIResponse.build(

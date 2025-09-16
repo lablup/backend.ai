@@ -1209,6 +1209,7 @@
     "ResourcePresets": "Resource Presets",
     "Resources": "Resources",
     "SHMEMShouldBeSmallerThanMemory": "Shared memory must be smaller than memory",
+    "SharedMemory": "Shared Memory",
     "Updated": "Resource preset updated"
   },
   "scheduler": {
