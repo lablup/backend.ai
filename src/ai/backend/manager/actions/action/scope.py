@@ -1,6 +1,8 @@
 from abc import abstractmethod
 from typing import Optional, TypeVar, override
 
+from ai.backend.manager.data.permission.types import OperationType
+
 from .base import BaseAction, BaseActionResult
 
 
@@ -15,6 +17,11 @@ class BaseScopeAction(BaseAction):
 
     @abstractmethod
     def scope_id(self) -> str:
+        raise NotImplementedError
+
+    @classmethod
+    @abstractmethod
+    def permission_operation_type(cls) -> OperationType:
         raise NotImplementedError
 
 

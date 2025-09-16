@@ -12,7 +12,7 @@ from .object_permission import (
 )
 from .permission_group import PermissionGroupCreatorBeforeRoleCreation
 from .status import RoleStatus
-from .types import EntityType, RoleSource
+from .types import EntityType, OperationType, RoleSource
 
 
 @dataclass
@@ -84,14 +84,14 @@ class ScopePermissionCheckInput:
     user_id: uuid.UUID
     target_entity_type: EntityType
     target_scope_id: ScopeId
-    operation: str
+    operation: OperationType
 
 
 @dataclass
 class SingleEntityPermissionCheckInput:
     user_id: uuid.UUID
     target_object_id: ObjectId
-    operation: str
+    operation: OperationType
 
 
 @dataclass
