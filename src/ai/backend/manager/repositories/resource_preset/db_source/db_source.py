@@ -351,6 +351,7 @@ class ResourcePresetDBSource:
             .select_from(AgentRow)
             .where(
                 sa.and_(
+                    AgentRow.scaling_group.in_(sgroup_names),
                     AgentRow.available_slots.isnot(None),
                     AgentRow.occupied_slots.isnot(None),
                     AgentRow.schedulable == sa.true(),
