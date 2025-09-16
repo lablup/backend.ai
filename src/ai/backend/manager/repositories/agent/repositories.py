@@ -16,7 +16,6 @@ class AgentRepositories:
             args.valkey_image_client,
             args.valkey_live_client,
             args.config_provider,
-            args.agent_cache,
         )
 
         return cls(

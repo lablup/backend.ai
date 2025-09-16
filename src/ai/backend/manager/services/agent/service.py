@@ -19,6 +19,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
@@ -67,6 +68,7 @@ class AgentService:
     _hook_plugin_ctx: HookPluginContext
     _event_producer: EventProducer
     _heartbeat_lock: asyncio.Lock
+    _agent_cache: AgentRPCCache
 
     def __init__(
         self,
@@ -76,6 +78,7 @@ class AgentService:
         agent_repository: AgentRepository,
         hook_plugin_ctx: HookPluginContext,
         event_producer: EventProducer,
+        agent_cache: AgentRPCCache,
     ) -> None:
         self._etcd = etcd
         self._agent_registry = agent_registry
@@ -84,6 +87,7 @@ class AgentService:
         self._hook_plugin_ctx = hook_plugin_ctx
         self._event_producer = event_producer
         self._heartbeat_lock = asyncio.Lock()
+        self._agent_cache = agent_cache
 
     async def _get_watcher_info(self, agent_id: AgentId) -> dict:
         """
@@ -194,6 +198,12 @@ class AgentService:
                 upsert_data,
                 reported_agent_state_sync_data,
             )
+            if result.need_agent_cache_update:
+                self._agent_cache.update(
+                    action.agent_id,
+                    reported_agent_info["addr"],
+                    reported_agent_info["public_key"],
+                )
             if result.was_revived:
                 await self._event_producer.anycast_event(
                     AgentStartedEvent("revived"), source_override=action.agent_id

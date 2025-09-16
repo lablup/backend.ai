@@ -35,6 +35,7 @@ class AgentRepository:
     _cache_source: AgentCacheSource
     _config_provider: ManagerConfigProvider
     _heartbeat_lock: asyncio.Lock
+    _agent_cache: AgentRPCCache
 
     def __init__(
         self,
@@ -42,13 +43,11 @@ class AgentRepository:
         valkey_image: ValkeyImageClient,
         valkey_live: ValkeyLiveClient,
         config_provider: ManagerConfigProvider,
-        agent_cache: AgentRPCCache,
     ) -> None:
         self._db_source = AgentDBSource(db)
         self._cache_source = AgentCacheSource(valkey_image, valkey_live)
         self._config_provider = config_provider
         self._heartbeat_lock = asyncio.Lock()
-        self._agent_cache = agent_cache
 
     @repository_decorator()
     async def get_by_id(self, agent_id: AgentId) -> Optional[AgentData]:
@@ -70,10 +69,6 @@ class AgentRepository:
         await self._cache_source.update_agent_last_seen(agent_id, state_sync_data.now)
 
         upsert_result = await self._db_source.upsert_agent_with_state(upsert_data)
-        if upsert_result.need_agent_cache_update:
-            self._agent_cache.update(
-                agent_id, state_sync_data.current_addr, state_sync_data.public_key
-            )
         if upsert_result.need_resource_slot_update:
             await self._config_provider.legacy_etcd_config_loader.update_resource_slots(
                 state_sync_data.slot_key_and_units
