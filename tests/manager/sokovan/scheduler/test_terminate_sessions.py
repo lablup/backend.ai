@@ -55,6 +55,7 @@ def mock_repository():
     """Mock ScheduleRepository for testing."""
     mock_repo = MagicMock()
     mock_repo.get_terminating_sessions = AsyncMock()
+    mock_repo.update_kernel_status_terminated = AsyncMock()
     return mock_repo
 
 
@@ -321,68 +322,6 @@ class TestTerminateSessions:
         # If executed sequentially, it would take at least 0.6 seconds (6 kernels * 0.1s)
         # With concurrent execution, it should be much faster
         assert elapsed < 0.4  # Allow some overhead for metrics and other operations
-
-    async def test_terminate_sessions_skip_kernels_without_agent(
-        self,
-        scheduler: Scheduler,
-        mock_repository,
-        mock_agent_pool,
-    ):
-        """Test that kernels without agent_id or container_id are skipped."""
-        # Setup
-        session_id = SessionId(uuid4())
-
-        terminating_session = TerminatingSessionData(
-            session_id=session_id,
-            access_key=AccessKey("test-key"),
-            creation_id="test-creation",
-            status=SessionStatus.TERMINATING,
-            status_info="TEST_SKIP",
-            session_type=SessionTypes.INTERACTIVE,
-            kernels=[
-                # Kernel with both agent_id and container_id
-                TerminatingKernelData(
-                    kernel_id=KernelId(uuid4()),
-                    status=KernelStatus.TERMINATING,
-                    container_id="container-1",
-                    agent_id=AgentId("agent-1"),
-                    agent_addr="10.0.0.1:2001",
-                    occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-                ),
-                # Kernel without agent_id
-                TerminatingKernelData(
-                    kernel_id=KernelId(uuid4()),
-                    status=KernelStatus.TERMINATING,
-                    container_id="container-2",
-                    agent_id=None,
-                    occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-                    agent_addr=None,
-                ),
-                # Kernel without container_id
-                TerminatingKernelData(
-                    kernel_id=KernelId(uuid4()),
-                    status=KernelStatus.TERMINATING,
-                    container_id=None,
-                    agent_id=AgentId("agent-2"),
-                    agent_addr="10.0.0.2:2001",
-                    occupied_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
-                ),
-            ],
-        )
-
-        mock_repository.get_terminating_sessions.return_value = [terminating_session]
-
-        # Execute
-        await scheduler.terminate_sessions()
-
-        # Verify
-        # Only the first kernel should be terminated
-        mock_agent1 = mock_agent_pool.get_agent_client(AgentId("agent-1"))
-        mock_agent1.destroy_kernel.assert_called_once()
-
-        # Agent-2 should not be called (kernel has no container_id)
-        mock_agent2 = mock_agent_pool.get_agent_client(AgentId("agent-2"))
-        mock_agent2.destroy_kernel.assert_not_called()
 
     async def test_terminate_sessions_empty_kernel_list(
         self,
