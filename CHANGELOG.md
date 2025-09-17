@@ -16,6 +16,31 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.14.3 (2025-09-17)
+
+### Features
+* Introduce soft-deletion to `Artifact` model ([#5808](https://github.com/lablup/backend.ai/issues/5808))
+* Add artifact presigned download, upload configs in the `storage-proxy.toml` ([#5870](https://github.com/lablup/backend.ai/issues/5870))
+
+### Improvements
+* Refactor Message queue architecture by decoupling dispatcher components ([#5805](https://github.com/lablup/backend.ai/issues/5805))
+
+### Fixes
+* Fixed missing scaling group filter condition in AgentRow queries that was causing agents to not be properly filtered by scaling group names ([#5894](https://github.com/lablup/backend.ai/issues/5894))
+* Fixed missing kernel_image_config references in ImageRef creation where registry name and is_local parameters were using hardcoded values instead of proper config settings. ([#5895](https://github.com/lablup/backend.ai/issues/5895))
+* Revert format of Resource preset shared-memory value ([#5896](https://github.com/lablup/backend.ai/issues/5896))
+* Fix serialization of Resource preset cache ([#5899](https://github.com/lablup/backend.ai/issues/5899))
+* Modify pending session resource limit validation logic ([#5901](https://github.com/lablup/backend.ai/issues/5901))
+* Set kernel status to terminated when the kernel is missing ([#5903](https://github.com/lablup/backend.ai/issues/5903))
+* Fix Endpoint mutation by querying endpoint records with image objects ([#5905](https://github.com/lablup/backend.ai/issues/5905))
+
+### External Dependency Updates
+* Update aiohttp and its dependencies including multidict ([#5786](https://github.com/lablup/backend.ai/issues/5786))
+
+### Miscellaneous
+* Replace hardcoded resource slot states with `ResourceSlotState` enum ([#5665](https://github.com/lablup/backend.ai/issues/5665))
+
+
 ## 25.14.2 (2025-09-15)
 
 ### Features
