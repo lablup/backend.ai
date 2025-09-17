@@ -85,7 +85,7 @@ class DeploymentController:
                 variant_def = ModelServiceDefinition.model_validate(
                     definition_files.service_definition
                 )
-                model_revision = variant_def.ovrride_model_revision(model_revision)
+                model_revision = variant_def.override_model_revision(model_revision)
             ModelDefinition.model_validate(definition_files.model_definition)
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision(model_revision=model_revision)
