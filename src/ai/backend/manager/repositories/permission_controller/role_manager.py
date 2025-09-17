@@ -168,12 +168,12 @@ class RoleManager:
             for operation in operations
         ]
 
-        rows = await db_session.execute(
-            sa.insert(ObjectPermissionRow).returning(ObjectPermissionRow),
-            [input.fields_to_store() for input in creators],
-        )
-        rows = rows.fetchall()
-        result = [ObjectPermissionRow.from_sa_row(row).to_data() for row in rows]
+        rows = [ObjectPermissionRow.from_input(creator) for creator in creators]
+        db_session.add_all(rows)
+        await db_session.flush()
+        for row in rows:
+            await db_session.refresh(row)
+        result = [row.to_data() for row in rows]
         return result
 
     async def delete_object_permission_of_user(
