@@ -208,12 +208,11 @@ class AgentService:
             upsert_data,
             reported_agent_state_sync_data,
         )
-        if result.need_agent_cache_update:
-            self._agent_cache.update(
-                action.agent_id,
-                reported_agent_info["addr"],
-                reported_agent_info["public_key"],
-            )
+        self._agent_cache.update(
+            action.agent_id,
+            reported_agent_info["addr"],
+            reported_agent_info["public_key"],
+        )
         if result.was_revived:
             await self._event_producer.anycast_event(
                 AgentStartedEvent("revived"), source_override=action.agent_id
