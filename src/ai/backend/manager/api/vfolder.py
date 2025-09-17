@@ -134,7 +134,9 @@ from ..services.vfolder.actions.invite import (
     LeaveInvitedVFolderAction,
     ListInvitationAction,
     RejectInvitationAction,
+    RevokeInvitedVFolderAction,
     UpdateInvitationAction,
+    UpdateInvitedVFolderMountPermissionAction,
 )
 from ..services.vfolder.exceptions import (
     ModelServiceDependencyNotCleared as VFolderMountedOnModelService,
@@ -2100,21 +2102,18 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
         user_uuid,
         perm,
     )
-    async with root_ctx.db.begin() as conn:
-        if perm is not None:
-            query = (
-                sa.update(vfolder_permissions)
-                .values(permission=perm)
-                .where(vfolder_permissions.c.vfolder == vfolder_id)
-                .where(vfolder_permissions.c.user == user_uuid)
+    if perm is not None:
+        await root_ctx.processors.vfolder_invite.update_invited_vfolder_mount_permission.wait_for_complete(
+            UpdateInvitedVFolderMountPermissionAction(
+                vfolder_id=vfolder_id,
+                user_id=user_uuid,
+                permission=perm,
             )
-        else:
-            query = (
-                sa.delete(vfolder_permissions)
-                .where(vfolder_permissions.c.vfolder == vfolder_id)
-                .where(vfolder_permissions.c.user == user_uuid)
-            )
-        await conn.execute(query)
+        )
+    else:
+        await root_ctx.processors.vfolder_invite.revoke_invited_vfolder.wait_for_complete(
+            RevokeInvitedVFolderAction(vfolder_id=vfolder_id, shared_user_id=user_uuid)
+        )
     resp = {"msg": "shared vfolder permission updated"}
     return web.json_response(resp, status=HTTPStatus.OK)
 

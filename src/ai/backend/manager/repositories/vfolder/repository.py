@@ -948,6 +948,26 @@ class VfolderRepository:
             await session.execute(query)
 
     @repository_decorator()
+    async def update_invited_vfolder_mount_permission(
+        self, vfolder_id: uuid.UUID, user_id: uuid.UUID, permission: VFolderPermission
+    ) -> None:
+        """
+        Update the permission of an invited user for a specific vfolder.
+        """
+        async with self._db.begin_session() as session:
+            query = (
+                sa.update(VFolderPermissionRow)
+                .where(
+                    sa.and_(
+                        VFolderPermissionRow.vfolder == vfolder_id,
+                        VFolderPermissionRow.user == user_id,
+                    )
+                )
+                .values(permission=permission)
+            )
+            await session.execute(query)
+
+    @repository_decorator()
     async def get_pending_invitations_for_user(
         self, user_email: str
     ) -> list[tuple[VFolderInvitationData, VFolderData]]:
