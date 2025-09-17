@@ -763,6 +763,7 @@ class ModelServingRepository:
                         load_session_owner=True,
                         load_model=True,
                         load_routes=True,
+                        load_image=True,
                     )
                     match action.requester_ctx.user_role:
                         case UserRole.SUPERADMIN:
