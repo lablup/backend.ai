@@ -1,4 +1,3 @@
-import asyncio
 import logging
 from datetime import datetime
 from decimal import Decimal
@@ -67,7 +66,6 @@ class AgentService:
     _agent_repository: AgentRepository
     _hook_plugin_ctx: HookPluginContext
     _event_producer: EventProducer
-    _heartbeat_lock: asyncio.Lock
     _agent_cache: AgentRPCCache
 
     def __init__(
@@ -86,7 +84,6 @@ class AgentService:
         self._agent_repository = agent_repository
         self._hook_plugin_ctx = hook_plugin_ctx
         self._event_producer = event_producer
-        self._heartbeat_lock = asyncio.Lock()
         self._agent_cache = agent_cache
 
     async def _get_watcher_info(self, agent_id: AgentId) -> dict:
@@ -187,30 +184,29 @@ class AgentService:
             public_key=reported_agent_info["public_key"],
         )
 
-        async with self._heartbeat_lock:
-            upsert_data = AgentHeartbeatUpsert.from_agent_info(
-                agent_id=action.agent_id,
-                agent_info=action.agent_info,
-                heartbeat_received=now,
-            )
-            result: UpsertResult = await self._agent_repository.sync_agent_heartbeat(
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=action.agent_id,
+            agent_info=action.agent_info,
+            heartbeat_received=now,
+        )
+        result: UpsertResult = await self._agent_repository.sync_agent_heartbeat(
+            action.agent_id,
+            upsert_data,
+            reported_agent_state_sync_data,
+        )
+        if result.need_agent_cache_update:
+            self._agent_cache.update(
                 action.agent_id,
-                upsert_data,
-                reported_agent_state_sync_data,
+                reported_agent_info["addr"],
+                reported_agent_info["public_key"],
             )
-            if result.need_agent_cache_update:
-                self._agent_cache.update(
-                    action.agent_id,
-                    reported_agent_info["addr"],
-                    reported_agent_info["public_key"],
-                )
-            if result.was_revived:
-                await self._event_producer.anycast_event(
-                    AgentStartedEvent("revived"), source_override=action.agent_id
-                )
-            await self._agent_repository.add_agent_to_images(
-                agent_id=action.agent_id, images=action.agent_info["images"]
+        if result.was_revived:
+            await self._event_producer.anycast_event(
+                AgentStartedEvent("revived"), source_override=action.agent_id
             )
+        await self._agent_repository.add_agent_to_images(
+            agent_id=action.agent_id, images=action.agent_info["images"]
+        )
 
         await self._hook_plugin_ctx.notify(
             "POST_AGENT_HEARTBEAT",
