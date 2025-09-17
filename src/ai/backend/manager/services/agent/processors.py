@@ -11,6 +11,14 @@ from ai.backend.manager.services.agent.actions.handle_heartbeat import (
     HandleHeartbeatAction,
     HandleHeartbeatActionResult,
 )
+from ai.backend.manager.services.agent.actions.mark_agent_exit import (
+    MarkAgentExitAction,
+    MarkAgentExitActionResult,
+)
+from ai.backend.manager.services.agent.actions.mark_agent_running import (
+    MarkAgentRunningAction,
+    MarkAgentRunningActionResult,
+)
 from ai.backend.manager.services.agent.actions.recalculate_usage import (
     RecalculateUsageAction,
     RecalculateUsageActionResult,
@@ -44,6 +52,8 @@ class AgentProcessors(AbstractProcessorPackage):
     watcher_agent_stop: ActionProcessor[WatcherAgentStopAction, WatcherAgentStopActionResult]
     recalculate_usage: ActionProcessor[RecalculateUsageAction, RecalculateUsageActionResult]
     handle_heartbeat: ActionProcessor[HandleHeartbeatAction, HandleHeartbeatActionResult]
+    mark_agent_exit: ActionProcessor[MarkAgentExitAction, MarkAgentExitActionResult]
+    mark_agent_running: ActionProcessor[MarkAgentRunningAction, MarkAgentRunningActionResult]
 
     def __init__(self, service: AgentService, action_monitors: list[ActionMonitor]) -> None:
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
@@ -53,6 +63,8 @@ class AgentProcessors(AbstractProcessorPackage):
         self.watcher_agent_stop = ActionProcessor(service.watcher_agent_stop, action_monitors)
         self.recalculate_usage = ActionProcessor(service.recalculate_usage, action_monitors)
         self.handle_heartbeat = ActionProcessor(service.handle_heartbeat, action_monitors)
+        self.mark_agent_exit = ActionProcessor(service.mark_agent_exit, action_monitors)
+        self.mark_agent_running = ActionProcessor(service.mark_agent_running, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -64,4 +76,6 @@ class AgentProcessors(AbstractProcessorPackage):
             WatcherAgentStopAction.spec(),
             RecalculateUsageAction.spec(),
             HandleHeartbeatAction.spec(),
+            MarkAgentExitAction.spec(),
+            MarkAgentRunningAction.spec(),
         ]
