@@ -953,6 +953,7 @@ class ModifyEndpoint(graphene.Mutation):
                         load_session_owner=True,
                         load_model=True,
                         load_routes=True,
+                        load_image=True,
                     )
                     match graph_ctx.user["role"]:
                         case UserRole.SUPERADMIN:
