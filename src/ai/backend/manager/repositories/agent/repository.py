@@ -11,6 +11,7 @@ from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     AgentStateSyncData,
@@ -75,3 +76,13 @@ class AgentRepository:
             )
 
         return upsert_result
+
+    @repository_decorator()
+    async def cleanup_agent_on_exit(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
+        await self._cache_source.remove_agent_last_seen(agent_id)
+        await self._db_source.update_agent_status_exit(agent_id, modifier)
+        await self._cache_source.remove_agent_from_all_images(agent_id)
+
+    @repository_decorator()
+    async def update_agent_status(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
+        await self._db_source.update_agent_status(agent_id, modifier)
