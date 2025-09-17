@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Optional, Self
 
 from ai.backend.common.auth import PublicKey
-from ai.backend.common.types import AgentId, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.models.agent import AgentStatus
 
 if TYPE_CHECKING:
@@ -33,7 +33,7 @@ class AgentHeartbeatUpsert:
     public_host: str
     public_key: str
     version: str
-    compute_plugins: dict[Any, Any]
+    compute_plugins: Mapping[DeviceName, Mapping[str, str]]
     architecture: str
     auto_terminate_abusing_kernel: bool
     lost_at: Optional[datetime]
