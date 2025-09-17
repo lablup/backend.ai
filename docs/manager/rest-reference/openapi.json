@@ -5005,6 +5005,44 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "//gql/strawberry/ws": {
+      "head": {
+        "operationId": "root.handle_gql_ws",
+        "tags": [
+          "root"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "get": {
+        "operationId": "root.handle_gql_ws.2",
+        "tags": [
+          "root"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/spec/graphiql": {
       "get": {
         "operationId": "spec.render_graphiql_graphene_html",
