@@ -4,13 +4,13 @@ from typing import Optional
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from ai.backend.common.exception import ScalingGroupNotFoundError
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
+from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models import agents
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -49,6 +49,6 @@ class AgentDBSource:
                 await conn.execute(final_query)
             except sa.exc.IntegrityError:
                 log.error("Scaling group named [{}] does not exist.", upsert_data.scaling_group)
-                raise ScalingGroupNotFoundError(upsert_data.scaling_group)
+                raise ScalingGroupNotFound(upsert_data.scaling_group)
 
             return upsert_result
