@@ -173,6 +173,31 @@ class LeaveInvitedVFolderActionResult(BaseActionResult):
 
 
 @dataclass
+class RevokeInvitedVFolderAction(VFolderInvitationAction):
+    vfolder_id: uuid.UUID
+    shared_user_id: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_id)
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "revoke"
+
+
+@dataclass
+class RevokeInvitedVFolderActionResult(BaseActionResult):
+    vfolder_id: uuid.UUID
+    shared_user_id: uuid.UUID
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return str(self.vfolder_id)
+
+
+@dataclass
 class UpdateInvitedVFolderMountPermissionAction(VFolderInvitationAction):
     vfolder_id: uuid.UUID
     user_id: uuid.UUID

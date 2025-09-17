@@ -15,6 +15,8 @@ from ..actions.invite import (
     ListInvitationActionResult,
     RejectInvitationAction,
     RejectInvitationActionResult,
+    RevokeInvitedVFolderAction,
+    RevokeInvitedVFolderActionResult,
     UpdateInvitationAction,
     UpdateInvitationActionResult,
     UpdateInvitedVFolderMountPermissionAction,
@@ -32,6 +34,9 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
     leave_invited_vfolder: ActionProcessor[
         LeaveInvitedVFolderAction, LeaveInvitedVFolderActionResult
     ]
+    revoke_invited_vfolder: ActionProcessor[
+        RevokeInvitedVFolderAction, RevokeInvitedVFolderActionResult
+    ]
     update_invited_vfolder_mount_permission: ActionProcessor[
         UpdateInvitedVFolderMountPermissionAction, UpdateInvitedVFolderMountPermissionActionResult
     ]
@@ -43,6 +48,9 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
         self.update_invitation = ActionProcessor(service.update_invitation, action_monitors)
         self.list_invitation = ActionProcessor(service.list_invitation, action_monitors)
         self.leave_invited_vfolder = ActionProcessor(service.leave_invited_vfolder, action_monitors)
+        self.revoke_invited_vfolder = ActionProcessor(
+            service.revoke_invited_vfolder, action_monitors
+        )
         self.update_invited_vfolder_mount_permission = ActionProcessor(
             service.update_invited_vfolder_mount_permission, action_monitors
         )
@@ -56,5 +64,6 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
             UpdateInvitationAction.spec(),
             ListInvitationAction.spec(),
             LeaveInvitedVFolderAction.spec(),
+            RevokeInvitedVFolderAction.spec(),
             UpdateInvitedVFolderMountPermissionAction.spec(),
         ]

@@ -134,6 +134,7 @@ from ..services.vfolder.actions.invite import (
     LeaveInvitedVFolderAction,
     ListInvitationAction,
     RejectInvitationAction,
+    RevokeInvitedVFolderAction,
     UpdateInvitationAction,
     UpdateInvitedVFolderMountPermissionAction,
 )
@@ -2110,12 +2111,8 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
             )
         )
     else:
-        await root_ctx.processors.vfolder_invite.leave_invited_vfolder.wait_for_complete(
-            LeaveInvitedVFolderAction(
-                vfolder_uuid=vfolder_id,
-                requester_user_uuid=user_uuid,
-                shared_user_uuid=user_uuid,
-            )
+        await root_ctx.processors.vfolder_invite.revoke_invited_vfolder.wait_for_complete(
+            RevokeInvitedVFolderAction(vfolder_id=vfolder_id, shared_user_id=user_uuid)
         )
     resp = {"msg": "shared vfolder permission updated"}
     return web.json_response(resp, status=HTTPStatus.OK)
