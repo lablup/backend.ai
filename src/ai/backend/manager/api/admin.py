@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import traceback
 from http import HTTPStatus
@@ -17,6 +18,7 @@ from graphql.error import GraphQLError  # pants: no-infer-dep
 from graphql.execution import ExecutionResult  # pants: no-infer-dep
 from pydantic import ConfigDict, Field
 
+# Import Strawberry aiohttp views
 from ai.backend.common import validators as tx
 from ai.backend.common.api_handlers import APIResponse, BodyParam, MiddlewareParam, api_handler
 from ai.backend.common.dto.manager.request import GraphQLReq
@@ -232,6 +234,9 @@ class GQLAPIHandler:
         strawberry_ctx = StrawberryGQLContext(
             processors=processors_ctx.processors,
             config_provider=config_provider_ctx.config_provider,
+            event_hub=processors_ctx.event_hub,
+            event_fetcher=processors_ctx.event_fetcher,
+            valkey_bgtask=processors_ctx.valkey_bgtask,
         )
 
         query, variables, operation_name = (
@@ -302,6 +307,9 @@ async def init(app: web.Application) -> None:
         auto_camelcase=False,
     )
     app_ctx.gql_v2_schema = strawberry_schema
+
+    log.info("Simple Strawberry WebSocket handler ready")
+
     root_ctx: RootContext = app["_root.context"]
     if root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
         log.warning(
@@ -312,6 +320,123 @@ async def init(app: web.Application) -> None:
 
 async def shutdown(app: web.Application) -> None:
     pass
+
+
+@auth_required
+async def handle_gql_ws(request: web.Request) -> web.WebSocketResponse:
+    ws = web.WebSocketResponse(protocols=["graphql-transport-ws", "graphql-ws"])
+    await ws.prepare(request)
+
+    # Create context once
+    root_ctx: RootContext = request.app["_root.context"]
+    processors_ctx = await ProcessorsCtx.from_request(request)
+    context = StrawberryGQLContext(
+        processors=processors_ctx.processors,
+        config_provider=root_ctx.config_provider,
+        event_hub=processors_ctx.event_hub,
+        event_fetcher=processors_ctx.event_fetcher,
+        valkey_bgtask=processors_ctx.valkey_bgtask,
+    )
+
+    schema = request.app["admin.context"].gql_v2_schema
+
+    async for msg in ws:
+        if msg.type == web.WSMsgType.TEXT:
+            data = msg.json()
+
+            if data.get("type") == "connection_init":
+                await ws.send_str('{"type":"connection_ack"}')
+
+            elif data.get("type") == "subscribe":
+                subscription_id = data.get("id")
+                payload = data.get("payload", {})
+                query = payload.get("query", "")
+                variables = payload.get("variables", {})
+
+                log.info(
+                    "Processing subscription: {}, query: {}, variables: {}",
+                    subscription_id,
+                    query[:30],
+                    variables,
+                )
+
+                try:
+                    # Execute subscription using Strawberry's subscribe method for proper AsyncGenerator handling
+                    async_result = await schema.subscribe(
+                        query,
+                        variable_values=variables,
+                        context_value=context,
+                    )
+
+                    log.info("Subscription subscribe result: {}", type(async_result))
+
+                    if hasattr(async_result, "__aiter__"):
+                        log.info("Processing subscription async generator")
+
+                        async for result in async_result:
+                            log.info(
+                                "Subscription result: errors={}, data={}",
+                                result.errors,
+                                result.data,
+                            )
+
+                            if result.errors:
+                                log.error("Subscription errors: {}", result.errors)
+                                await ws.send_str(
+                                    json.dumps({
+                                        "id": subscription_id,
+                                        "type": "error",
+                                        "payload": [{"message": str(e)} for e in result.errors],
+                                    })
+                                )
+                                break
+                            elif result.data:
+                                log.info("Sending subscription data: {}", result.data)
+                                await ws.send_str(
+                                    json.dumps({
+                                        "id": subscription_id,
+                                        "type": "next",
+                                        "payload": {"data": result.data},
+                                    })
+                                )
+
+                        # Send completion
+                        log.info("Subscription completed, sending complete message")
+                        await ws.send_str(json.dumps({"id": subscription_id, "type": "complete"}))
+                    else:
+                        # Fallback to regular execute for queries
+                        log.info("Not a subscription, using regular execute")
+                        result = async_result
+
+                        if result.errors:
+                            await ws.send_str(
+                                json.dumps({
+                                    "id": subscription_id,
+                                    "type": "error",
+                                    "payload": [{"message": str(e)} for e in result.errors],
+                                })
+                            )
+                        elif result.data:
+                            await ws.send_str(
+                                json.dumps({
+                                    "id": subscription_id,
+                                    "type": "next",
+                                    "payload": {"data": result.data},
+                                })
+                            )
+
+                except Exception as e:
+                    log.error("Subscription execution error: {}", e)
+                    log.exception("Full traceback:")
+                    await ws.send_str(
+                        json.dumps({
+                            "id": subscription_id,
+                            "type": "error",
+                            "payload": [{"message": str(e)}],
+                        })
+                    )
+
+    return ws
 
 
 def create_app(
@@ -329,4 +454,7 @@ def create_app(
     cors.add(
         app.router.add_route("POST", r"/gql/strawberry", gql_api_handler.handle_gql_strawberry)
     )
+
+    cors.add(app.router.add_get(r"/gql/strawberry/ws", handle_gql_ws))
+
     return app, []

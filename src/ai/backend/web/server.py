@@ -789,6 +789,16 @@ async def server_main(
     cors.add(app.router.add_route("POST", "/func/{path:auth/signout}", web_handler))
     cors.add(app.router.add_route("GET", "/func/{path:stream/kernel/_/events}", web_handler))
     cors.add(app.router.add_route("GET", "/func/{path:stream/session/[^/]+/apps$}", web_handler))
+    # GraphQL WebSocket subscription endpoint (must be before generic stream handler)
+    cors.add(
+        app.router.add_route("GET", "/func/{path:admin/gql/strawberry/ws$}", websocket_handler)
+    )
+
+    # TODO: Use this endpoint
+    # cors.add(
+    #     app.router.add_route("GET", "/func/{path:stream/gql$}", websocket_handler)
+    # )
+
     cors.add(app.router.add_route("GET", "/func/{path:stream/.*$}", websocket_handler))
     cors.add(app.router.add_route("GET", "/func/", anon_web_handler))
 
