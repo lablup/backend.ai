@@ -105,7 +105,6 @@ class AgentHeartbeatUpsert:
 class UpsertResult:
     was_insert: bool
     was_revived: bool
-    need_agent_cache_update: bool
     need_resource_slot_update: bool
 
     @classmethod
@@ -116,15 +115,10 @@ class UpsertResult:
             return cls(
                 was_insert=True,
                 was_revived=False,
-                need_agent_cache_update=True,
                 need_resource_slot_update=True,
             )
 
         was_revived = existing_row.status in (AgentStatus.LOST, AgentStatus.TERMINATED)
-        need_agent_cache_update = (
-            existing_row.addr != upsert_data.addr
-            or existing_row.public_key != upsert_data.public_key
-        )
         need_resource_slot_update = (
             existing_row.available_slots != upsert_data.available_slots
             or existing_row.scaling_group != upsert_data.scaling_group
@@ -140,6 +134,5 @@ class UpsertResult:
         return cls(
             was_insert=False,
             was_revived=was_revived,
-            need_agent_cache_update=need_agent_cache_update,
             need_resource_slot_update=need_resource_slot_update,
         )
