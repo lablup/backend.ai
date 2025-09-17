@@ -48,7 +48,7 @@ class ContainerRegistryService:
 
             scanner_cls = get_container_registry_cls(registry_row)
             scanner = scanner_cls(self._db, registry_name, registry_row)
-            result = await scanner.rescan_single_registry(None)
+            result = await scanner.rescan_single_registry(action.progress_reporter)
 
         return RescanImagesActionResult(
             images=result.images, errors=result.errors, registry=registry_row.to_dataclass()
