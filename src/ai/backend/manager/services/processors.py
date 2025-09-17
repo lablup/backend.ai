@@ -106,7 +106,7 @@ class ServiceArgs:
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
     event_producer: EventProducer
-    agent_cache: "AgentRPCCache"
+    agent_cache: AgentRPCCache
 
 
 @dataclass

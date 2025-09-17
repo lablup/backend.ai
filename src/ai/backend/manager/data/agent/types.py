@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, Self
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.types import AgentId, ResourceSlot, SlotName, SlotTypes
@@ -80,7 +80,7 @@ class AgentHeartbeatUpsert:
     @classmethod
     def from_agent_info(
         cls, agent_id: AgentId, agent_info: Mapping[Any, Any], heartbeat_received: datetime
-    ) -> "AgentHeartbeatUpsert":
+    ) -> Self:
         return cls(
             id=agent_id,
             status=AgentStatus.ALIVE,
@@ -111,7 +111,7 @@ class UpsertResult:
     @classmethod
     def from_state_comparison(
         cls, existing_row: Optional["Row"], upsert_data: "AgentHeartbeatUpsert"
-    ) -> "UpsertResult":
+    ) -> Self:
         if existing_row is None:
             return cls(
                 was_insert=True,
