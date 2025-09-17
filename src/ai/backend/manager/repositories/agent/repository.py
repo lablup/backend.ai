@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import zlib
 from typing import Optional
@@ -9,7 +8,6 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
@@ -34,8 +32,6 @@ class AgentRepository:
     _db_source: AgentDBSource
     _cache_source: AgentCacheSource
     _config_provider: ManagerConfigProvider
-    _heartbeat_lock: asyncio.Lock
-    _agent_cache: AgentRPCCache
 
     def __init__(
         self,
@@ -47,7 +43,6 @@ class AgentRepository:
         self._db_source = AgentDBSource(db)
         self._cache_source = AgentCacheSource(valkey_image, valkey_live)
         self._config_provider = config_provider
-        self._heartbeat_lock = asyncio.Lock()
 
     @repository_decorator()
     async def get_by_id(self, agent_id: AgentId) -> Optional[AgentData]:
