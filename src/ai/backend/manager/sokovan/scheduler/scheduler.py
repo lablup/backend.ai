@@ -6,6 +6,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import groupby
 from typing import Any, Awaitable, Coroutine, Optional
+from uuid import UUID
 
 import aiotools
 import async_timeout
@@ -606,6 +607,10 @@ class Scheduler:
                     # If no agent/container, just mark as successful termination
                     # This is a fallback for kernels that might not have been scheduled properly
                     # or were already terminated
+                    await self._repository.update_kernel_status_terminated(
+                        UUID(kernel.kernel_id),
+                        session_result.reason,
+                    )
                     session_result.kernel_results.append(
                         KernelTerminationResult(
                             kernel_id=str(kernel.kernel_id),
