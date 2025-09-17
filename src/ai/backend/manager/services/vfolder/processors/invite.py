@@ -17,6 +17,8 @@ from ..actions.invite import (
     RejectInvitationActionResult,
     UpdateInvitationAction,
     UpdateInvitationActionResult,
+    UpdateInvitedVFolderMountPermissionAction,
+    UpdateInvitedVFolderMountPermissionActionResult,
 )
 from ..services.invite import VFolderInviteService
 
@@ -30,6 +32,9 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
     leave_invited_vfolder: ActionProcessor[
         LeaveInvitedVFolderAction, LeaveInvitedVFolderActionResult
     ]
+    update_invited_vfolder_mount_permission: ActionProcessor[
+        UpdateInvitedVFolderMountPermissionAction, UpdateInvitedVFolderMountPermissionActionResult
+    ]
 
     def __init__(self, service: VFolderInviteService, action_monitors: list[ActionMonitor]):
         self.invite_vfolder = ActionProcessor(service.invite, action_monitors)
@@ -38,6 +43,9 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
         self.update_invitation = ActionProcessor(service.update_invitation, action_monitors)
         self.list_invitation = ActionProcessor(service.list_invitation, action_monitors)
         self.leave_invited_vfolder = ActionProcessor(service.leave_invited_vfolder, action_monitors)
+        self.update_invited_vfolder_mount_permission = ActionProcessor(
+            service.update_invited_vfolder_mount_permission, action_monitors
+        )
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -48,4 +56,5 @@ class VFolderInviteProcessors(AbstractProcessorPackage):
             UpdateInvitationAction.spec(),
             ListInvitationAction.spec(),
             LeaveInvitedVFolderAction.spec(),
+            UpdateInvitedVFolderMountPermissionAction.spec(),
         ]

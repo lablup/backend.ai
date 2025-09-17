@@ -32,6 +32,8 @@ from ..actions.invite import (
     RejectInvitationActionResult,
     UpdateInvitationAction,
     UpdateInvitationActionResult,
+    UpdateInvitedVFolderMountPermissionAction,
+    UpdateInvitedVFolderMountPermissionActionResult,
 )
 from ..types import VFolderInvitationInfo
 
@@ -271,3 +273,13 @@ class VFolderInviteService:
         await self._vfolder_repository.delete_vfolder_permission(action.vfolder_uuid, user_uuid)
 
         return LeaveInvitedVFolderActionResult(vfolder_data.id)
+
+    async def update_invited_vfolder_mount_permission(
+        self, action: UpdateInvitedVFolderMountPermissionAction
+    ) -> UpdateInvitedVFolderMountPermissionActionResult:
+        await self._vfolder_repository.update_invited_vfolder_mount_permission(
+            action.vfolder_id, action.user_id, action.permission
+        )
+        return UpdateInvitedVFolderMountPermissionActionResult(
+            action.vfolder_id, action.user_id, action.permission
+        )
