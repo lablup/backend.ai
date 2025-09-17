@@ -20,7 +20,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AgentDBSource:
-    """ "Database source for agent-related operations."""
+    """Database source for agent-related operations."""
 
     _db: ExtendedAsyncSAEngine
 
