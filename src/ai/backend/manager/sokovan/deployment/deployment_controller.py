@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.types import RuntimeVariant
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreator
@@ -75,14 +76,17 @@ class DeploymentController:
 
     async def _validate_model_revision(self, model_revision: ModelRevisionSpec) -> None:
         """Validate the model revision specification."""
-        definition_files = await self._deployment_repository.fetch_definition_files(
-            vfolder_id=model_revision.mounts.model_vfolder_id,
-            model_definition_path=model_revision.mounts.model_definition_path,
-        )
-        if definition_files.service_definition:
-            variant_def = ModelServiceDefinition.model_validate(definition_files.service_definition)
-            model_revision = variant_def.ovrride_model_revision(model_revision)
-        ModelDefinition.model_validate(definition_files.model_definition)
+        if model_revision.execution.runtime_variant == RuntimeVariant.CUSTOM:
+            definition_files = await self._deployment_repository.fetch_definition_files(
+                vfolder_id=model_revision.mounts.model_vfolder_id,
+                model_definition_path=model_revision.mounts.model_definition_path,
+            )
+            if definition_files.service_definition:
+                variant_def = ModelServiceDefinition.model_validate(
+                    definition_files.service_definition
+                )
+                model_revision = variant_def.ovrride_model_revision(model_revision)
+            ModelDefinition.model_validate(definition_files.model_definition)
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision(model_revision=model_revision)
         )
