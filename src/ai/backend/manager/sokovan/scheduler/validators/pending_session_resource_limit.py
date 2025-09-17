@@ -30,7 +30,7 @@ class PendingSessionResourceLimitValidator(ValidatorRule):
 
         # Check if there's a pending session resource limit
         pending_resource_limit = policy.max_pending_session_resource_slots
-        if pending_resource_limit is None:
+        if not pending_resource_limit:
             # No limit set, allow
             return
 
@@ -41,7 +41,7 @@ class PendingSessionResourceLimitValidator(ValidatorRule):
             current_pending_slots += session.requested_slots
 
         # Check if adding this workload would exceed the limit
-        total_after = current_pending_slots + workload.requested_slots
+        total_after = current_pending_slots
         if total_after > pending_resource_limit:
             # Format the current usage for human-readable output
             usage_str = " ".join(f"{k}={v}" for k, v in current_pending_slots.items() if v)
