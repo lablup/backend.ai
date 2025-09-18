@@ -103,8 +103,8 @@ class ServiceArgs:
     idle_checker_host: IdleCheckerHost
     event_dispatcher: EventDispatcher
     hook_plugin_ctx: HookPluginContext
-    scheduling_controller: SchedulingController
-    deployment_controller: DeploymentController
+    scheduling_controller: "SchedulingController"
+    deployment_controller: "DeploymentController"
     event_producer: EventProducer
     agent_cache: AgentRPCCache
 
