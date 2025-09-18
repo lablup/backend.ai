@@ -2826,6 +2826,7 @@ class ScheduleDBSource:
                 SessionRow.access_key,
                 SessionRow.session_type,
                 SessionRow.name,
+                SessionRow.environ,
                 SessionRow.cluster_mode,
                 SessionRow.user_uuid,
                 KernelRow.id.label("kernel_id"),
@@ -2879,6 +2880,7 @@ class ScheduleDBSource:
                     "access_key": row.access_key,
                     "session_type": row.session_type,
                     "name": row.name,
+                    "environ": row.environ,
                     "cluster_mode": row.cluster_mode,
                     "user_uuid": row.user_uuid,
                 }
@@ -2961,6 +2963,7 @@ class ScheduleDBSource:
                 )
                 for k in data["kernels"]
             ]
+            log.info(f"kernel preopen ports: {[k.preopen_ports for k in kernel_bindings]}")
 
             sessions_for_start.append(
                 SessionDataForStart(
@@ -2971,6 +2974,7 @@ class ScheduleDBSource:
                     name=session_info["name"],
                     cluster_mode=session_info["cluster_mode"],
                     kernels=kernel_bindings,
+                    environ=session_info.get("environ", {}),
                     user_uuid=session_info["user_uuid"],
                     user_email=user_info.email,
                     user_name=user_info.username,

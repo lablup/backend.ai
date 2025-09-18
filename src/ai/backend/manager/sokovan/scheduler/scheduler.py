@@ -1068,8 +1068,8 @@ class Scheduler:
                     key=keyfunc,
                 )
             }
-
             environ: dict[str, str] = {
+                **session.environ,
                 "BACKENDAI_USER_UUID": str(session.user_uuid),
                 "BACKENDAI_USER_EMAIL": session.user_email,
                 "BACKENDAI_USER_NAME": session.user_name,

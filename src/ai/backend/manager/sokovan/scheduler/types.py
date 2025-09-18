@@ -546,6 +546,7 @@ class SessionDataForStart:
     user_uuid: UUID
     user_email: str
     user_name: str
+    environ: dict[str, str]
     network_type: Optional[NetworkType] = None
     network_id: Optional[str] = None
 
