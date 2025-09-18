@@ -197,28 +197,6 @@ enum ArtifactType {
   IMAGE
 }
 
-type BackgroundTaskEvent implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-  taskId: ID!
-  eventName: String!
-  data: JSON!
-  timestamp: DateTime!
-  retryCount: Int
-}
-
-type BackgroundTaskProgress implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-  taskId: ID!
-  currentProgress: Float
-  totalProgress: Float
-  message: String
-  isCompleted: Boolean!
-  isFailed: Boolean!
-  isCancelled: Boolean!
-}
-
 scalar ByteSize
 
 """Added in 25.14.0"""
@@ -504,11 +482,6 @@ input IntFilter {
   lessThan: Int = null
   lessThanOrEqual: Int = null
 }
-
-"""
-The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
-"""
-scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
 """A custom scalar for JSON strings using orjson"""
 scalar JSONString
@@ -906,9 +879,6 @@ type Query {
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
-
-  """Get current background task progress"""
-  backgroundTaskProgress(taskId: ID!): BackgroundTaskProgress
 }
 
 type RawServiceConfig {
@@ -1083,9 +1053,6 @@ type Subscription {
   artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
-
-  """Subscribe to background task events"""
-  backgroundTaskEvents(taskId: ID!): BackgroundTaskEvent
 }
 
 scalar UUID

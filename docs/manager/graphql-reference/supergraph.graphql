@@ -614,34 +614,6 @@ type AvailableServiceNode implements Node
   service_variants: [String]!
 }
 
-type BackgroundTaskEvent implements Node
-  @join__implements(graph: STRAWBERRY, interface: "Node")
-  @join__type(graph: STRAWBERRY)
-{
-  """The Globally Unique ID of this object"""
-  id: ID!
-  taskId: ID!
-  eventName: String!
-  data: JSON!
-  timestamp: DateTime!
-  retryCount: Int
-}
-
-type BackgroundTaskProgress implements Node
-  @join__implements(graph: STRAWBERRY, interface: "Node")
-  @join__type(graph: STRAWBERRY)
-{
-  """The Globally Unique ID of this object"""
-  id: ID!
-  taskId: ID!
-  currentProgress: Float
-  totalProgress: Float
-  message: String
-  isCompleted: Boolean!
-  isFailed: Boolean!
-  isCancelled: Boolean!
-}
-
 """
 BigInt is an extension of the regular graphene.Int scalar type
 to support integers outside the range of a signed 32-bit integer.
@@ -2456,13 +2428,6 @@ enum join__Graph {
   GRAPHENE @join__graph(name: "graphene", url: "http://host.docker.internal:8091/admin/gql")
   STRAWBERRY @join__graph(name: "strawberry", url: "http://host.docker.internal:8091/admin/gql/strawberry")
 }
-
-"""
-The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
-"""
-scalar JSON
-  @join__type(graph: STRAWBERRY)
-  @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
 """
 Allows use of a JSON String for input / output from the GraphQL schema.
@@ -4607,9 +4572,6 @@ type Query
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
-
-  """Get current background task progress"""
-  backgroundTaskProgress(taskId: ID!): BackgroundTaskProgress @join__field(graph: STRAWBERRY)
 }
 
 type QuotaDetails
@@ -5153,9 +5115,6 @@ type Subscription
   artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
-
-  """Subscribe to background task events"""
-  backgroundTaskEvents(taskId: ID!): BackgroundTaskEvent
 }
 
 """Added in 25.5.0."""
