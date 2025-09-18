@@ -5007,7 +5007,7 @@
     },
     "//gql/strawberry/ws": {
       "head": {
-        "operationId": "root.handle_gql_ws",
+        "operationId": "root.handle_gql_strawberry_ws",
         "tags": [
           "root"
         ],
@@ -5025,7 +5025,7 @@
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       },
       "get": {
-        "operationId": "root.handle_gql_ws.2",
+        "operationId": "root.handle_gql_strawberry_ws.2",
         "tags": [
           "root"
         ],
