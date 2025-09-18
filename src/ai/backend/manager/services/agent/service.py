@@ -39,6 +39,10 @@ from ai.backend.manager.services.agent.actions.recalculate_usage import (
     RecalculateUsageAction,
     RecalculateUsageActionResult,
 )
+from ai.backend.manager.services.agent.actions.remove_agent_from_images import (
+    RemoveAgentFromImagesAction,
+    RemoveAgentFromImagesActionResult,
+)
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
@@ -219,3 +223,12 @@ class AgentService:
             ),
         )
         return HandleHeartbeatActionResult(agent_id=action.agent_id)
+
+    async def remove_agent_from_images(
+        self, action: RemoveAgentFromImagesAction
+    ) -> RemoveAgentFromImagesActionResult:
+        await self._agent_repository.remove_agent_from_images(
+            action.agent_id, action.image_canonicals
+        )
+
+        return RemoveAgentFromImagesActionResult(agent_id=action.agent_id)
