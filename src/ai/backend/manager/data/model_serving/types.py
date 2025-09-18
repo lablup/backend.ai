@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Mapping, Optional, Self, Sequence
+from typing import Any, Mapping, Optional, Sequence
 
 import yarl
 from pydantic import BaseModel, Field, HttpUrl
@@ -27,9 +27,6 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.image.types import ImageData, ImageIdentifier
 from ai.backend.manager.data.user.types import UserRole
-
-if TYPE_CHECKING:
-    from ai.backend.manager.models.user import UserRow
 
 # Re-export for backward compatibility
 __all__ = [
@@ -120,13 +117,6 @@ class EndpointAutoScalingRuleData:
 class UserData:
     uuid: uuid.UUID
     email: str
-
-    @classmethod
-    def from_row(cls, row: UserRow) -> Self:
-        return cls(
-            uuid=row.uuid,
-            email=row.email,
-        )
 
 
 @dataclass
