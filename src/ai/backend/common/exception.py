@@ -159,6 +159,7 @@ class ErrorDomain(enum.StrEnum):
     VFOLDER = "vfolder"
     VFOLDER_INVITATION = "vfolder-invitation"
     MODEL_SERVICE = "model-service"
+    MODEL_DEPLOYMENT = "model-deployment"
     RESOURCE_PRESET = "resource-preset"
     STORAGE = "storage"
     AGENT = "agent"
@@ -565,4 +566,36 @@ class ArtifactDefaultRevisionResolveError(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class RuntimeVariantNotSupportedError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/runtime-variant-not-supported"
+    error_title = "Runtime Variant Not Supported"
+
+    def __init__(self, runtime_variant: str) -> None:
+        super().__init__(extra_msg=f"Runtime variant '{runtime_variant}' is not supported.")
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class ServiceDefinitionNotLoadedError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/service-definition-not-loaded"
+    error_title = "Service Definition Not Loaded"
+
+    def __init__(self) -> None:
+        super().__init__(extra_msg="Service definition is not loaded yet.")
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
