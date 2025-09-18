@@ -24,6 +24,7 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
     EndpointData,
     EndpointTokenData,
+    MutationResult,
     RoutingData,
     ScalingGroupData,
     UserData,
@@ -56,7 +57,6 @@ from ai.backend.manager.models.vfolder import VFolderRow
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
 from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParameters
-from ai.backend.manager.services.model_serving.types import MutationResult
 from ai.backend.manager.types import MountOptionModel, UserScope
 
 # Layer-specific decorator for model_serving repository

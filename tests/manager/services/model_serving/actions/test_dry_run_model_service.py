@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.types import AccessKey, ClusterMode, RuntimeVariant
+from ai.backend.manager.data.model_serving.types import ModelServicePrepareCtx, ServiceConfig
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.dry_run_model_service import (
     DryRunModelServiceAction,
@@ -12,10 +13,6 @@ from ai.backend.manager.services.model_serving.actions.dry_run_model_service imp
 )
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
-)
-from ai.backend.manager.services.model_serving.types import (
-    ModelServicePrepareCtx,
-    ServiceConfig,
 )
 
 from ...utils import ScenarioBase

@@ -7,7 +7,7 @@ import pytest
 from aioresponses import aioresponses
 
 from ai.backend.common.data.endpoint.types import EndpointStatus
-from ai.backend.manager.data.model_serving.types import EndpointTokenData
+from ai.backend.manager.data.model_serving.types import EndpointTokenData, RequesterCtx
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.generate_token import (
     GenerateTokenAction,
@@ -16,7 +16,6 @@ from ai.backend.manager.services.model_serving.actions.generate_token import (
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-from ai.backend.manager.services.model_serving.types import RequesterCtx
 
 from ...utils import ScenarioBase
 
