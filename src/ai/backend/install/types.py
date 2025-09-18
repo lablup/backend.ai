@@ -4,7 +4,7 @@ import dataclasses
 import enum
 from datetime import datetime
 from pathlib import Path
-from typing import cast
+from typing import cast, Literal
 
 from pydantic import BaseModel, Field
 from rich.console import ConsoleRenderable, RichCast
@@ -127,7 +127,7 @@ class HalfstackConfig:
     postgres_addr: ServerAddr
     postgres_user: str
     postgres_password: str
-    redis_addr: ServerAddr | None
+    redis_addr: ServerAddr
     redis_sentinel_addrs: list[HostPortPair] | None
     redis_password: str | None
     etcd_addr: list[ServerAddr]  # multiple if HA
@@ -161,11 +161,18 @@ class ServiceConfig:
     storage_agent_var_base_path: str
     storage_watcher_addr: ServerAddr
     vfolder_relpath: str
+    proxy_mode: Literal["auto", "appproxy", "wsproxy"]
     wsproxy_hash_key: str
     wsproxy_jwt_key: str
     wsproxy_api_token: str
+    appproxy_api_secret: str
+    appproxy_jwt_secret: str
+    appproxy_permit_hash_secret: str
+    appproxy_coordinator_addr: ServerAddr = ServerAddr(HostPortPair("127.0.0.1", 10200))
+    appproxy_worker_addr: ServerAddr  = ServerAddr(HostPortPair("127.0.0.1", 10200))
 
 
 @dataclasses.dataclass
 class InstallVariable:
     public_facing_address: str = "127.0.0.1"
+    proxy_mode: Literal["auto", "appproxy", "wsproxy"] = "auto"

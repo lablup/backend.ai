@@ -17,6 +17,7 @@ from contextvars import ContextVar
 from datetime import datetime
 from functools import partial
 from pathlib import Path
+from packaging.version import Version
 from typing import Any, AsyncIterator, Final, Iterator, Sequence
 
 import aiofiles
@@ -612,6 +613,55 @@ class Context(metaclass=ABCMeta):
         ]
         dotenv_path.write_text("\n".join(envs))
 
+    async def configure_appproxy(self) -> None:
+        service = self.install_info.service_config
+        halfstack = self.install_info.halfstack_config
+
+        # Coordinator
+        coord_path = self.copy_config("app-proxy-coordinator.toml")
+        self.sed_in_place_multi(
+            coord_path,
+            [
+                ("port = 8100", f"port = {halfstack.postgres_addr.face.port}"),
+                ("port = 8110", f"port = {halfstack.redis_addr.face.port}"),
+                ("port = 10200", f"port = {service.appproxy_coordinator_addr.bind.port}"),
+                (
+                    'api_secret = "some_api_secret"',
+                    f'api_secret = "{service.appproxy_api_secret}"',
+                ),
+                (
+                    'jwt_secret = "some_jwt_secret"',
+                    f'jwt_secret = "{service.appproxy_jwt_secret}"',
+                ),
+                (
+                    'secret = "some_permit_hash_secret"',
+                    f'secret = "{service.appproxy_permit_hash_secret}"',
+                ),
+            ],
+        )
+
+        # Worker
+        worker_path = self.copy_config("app-proxy-worker.toml")
+        self.sed_in_place_multi(
+            worker_path,
+            [
+                ("port = 8110", f"port = {halfstack.redis_addr.face.port}"),
+                ("port = 10201", f"port = {service.appproxy_worker_addr.bind.port}"),
+                (
+                    'api_secret = "some_api_secret"',
+                    f'api_secret = "{service.appproxy_api_secret}"',
+                ),
+                (
+                    'jwt_secret = "some_jwt_secret"',
+                    f'jwt_secret = "{service.appproxy_jwt_secret}"',
+                ),
+                (
+                    'secret = "some_permit_hash_secret"',
+                    f'secret = "{service.appproxy_permit_hash_secret}"',
+                ),
+            ],
+        )
+
     async def configure_client(self) -> None:
         # TODO: add an option to generate keypairs
         base_path = self.install_info.base_path
@@ -825,10 +875,22 @@ class DevContext(Context):
             etcd_password=None,
         )
         service_config = ServiceConfig(
+            proxy_mode=self.install_variable.proxy_mode,
             webserver_addr=ServerAddr(
                 bind=HostPortPair(public_component_bind_address, 8090),
                 face=HostPortPair(public_facing_address, 8090),
             ),
+                appproxy_coordinator_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 10200),
+                face=HostPortPair(public_facing_address, 10200),
+            ),
+            appproxy_worker_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 10201),
+                face=HostPortPair(public_facing_address, 10201),
+            ),
+            appproxy_api_secret=secrets.token_hex(32),
+            appproxy_jwt_secret=secrets.token_hex(32),
+            appproxy_permit_hash_secret=secrets.token_hex(32),
             webserver_ipc_base_path="ipc/webserver",
             webserver_var_base_path="var/webserver",
             webui_menu_blocklist=["pipeline"],
@@ -862,6 +924,16 @@ class DevContext(Context):
             wsproxy_jwt_key=self.generate_passphrase(),
             wsproxy_api_token=self.generate_passphrase(),
         )
+        if service_config.proxy_mode == "auto":
+            version_file = self.dist_info.target_path / "VERSION"
+            if version_file.exists():
+                version = version_file.read_text().strip()
+                if Version(version) >= Version("25.4.2"):
+                    service_config.proxy_mode = "appproxy"
+                else:
+                    service_config.proxy_mode = "wsproxy"
+            else:
+                service_config.proxy_mode = "appproxy"
         return InstallInfo(
             version=self.dist_info.version,
             base_path=self.dist_info.target_path,
@@ -899,6 +971,7 @@ class DevContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
+        
         self.log_header("Configuring wsproxy...")
         await self.configure_wsproxy()
         self.log_header("Generating client environ configs...")
@@ -931,6 +1004,7 @@ class PackageContext(Context):
             etcd_password=None,
         )
         service_config = ServiceConfig(
+            proxy_mode=self.install_variable.proxy_mode,
             webserver_addr=ServerAddr(
                 bind=HostPortPair(public_component_bind_address, 8090),
                 face=HostPortPair(public_facing_address, 8090),
@@ -967,7 +1041,28 @@ class PackageContext(Context):
             wsproxy_hash_key=self.generate_passphrase(),
             wsproxy_jwt_key=self.generate_passphrase(),
             wsproxy_api_token=self.generate_passphrase(),
+            appproxy_coordinator_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 10200),
+                face=HostPortPair(public_facing_address, 10200),
+            ),
+            appproxy_worker_addr=ServerAddr(
+                bind=HostPortPair(public_component_bind_address, 10201),
+                face=HostPortPair(public_facing_address, 10201),
+            ),
+            appproxy_api_secret=secrets.token_hex(32),
+            appproxy_jwt_secret=secrets.token_hex(32),
+            appproxy_permit_hash_secret=secrets.token_hex(32),
         )
+        if service_config.proxy_mode == "auto":
+            version_file = self.dist_info.target_path / "VERSION"
+            if version_file.exists():
+                version = version_file.read_text().strip()
+                if Version(version) >= Version("25.4.2"):
+                    service_config.proxy_mode = "appproxy"
+                else:
+                    service_config.proxy_mode = "wsproxy"
+            else:
+                service_config.proxy_mode = "appproxy"
         return InstallInfo(
             version=self.dist_info.version,
             base_path=self.dist_info.target_path,
@@ -1137,8 +1232,14 @@ class PackageContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
-        self.log_header("Configuring wsproxy...")
-        await self.configure_wsproxy()
+
+        if self.install_info.service_config.proxy_mode == "appproxy":
+            self.log_header("Configuring app-proxy...")
+            await self.configure_appproxy()
+        elif self.install_info.service_config.proxy_mode == "wsproxy":
+            self.log_header("Configuring wsproxy...")
+            await self.configure_wsproxy()
+
         self.log_header("Generating client environ configs...")
         await self.configure_client()
         self.log_header("Loading fixtures...")
