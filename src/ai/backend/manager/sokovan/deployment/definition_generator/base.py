@@ -1,12 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import TypeVar
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpec,
 )
-
-TDefinition = TypeVar("TDefinition")
 
 
 class ModelDefinitionGenerator(ABC):
