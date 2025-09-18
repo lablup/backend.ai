@@ -394,11 +394,11 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session() as session:
             query = sa.select(UserRow).where(UserRow.uuid == user_id)
             result = await session.execute(query)
-            user_row = result.scalar()
+            user_row: Optional[UserRow] = result.scalar()
             if not user_row:
                 return None
 
-            return UserData.from_row(user_row)
+            return user_row.to_model_serving_user_data()
 
     async def _get_endpoint_by_id(
         self,

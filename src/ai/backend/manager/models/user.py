@@ -21,6 +21,7 @@ from sqlalchemy.types import VARCHAR, TypeDecorator
 
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.model_serving.types import UserData as ModelServingUserData
 from ai.backend.manager.data.user.types import UserCreator, UserData, UserRole, UserStatus
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordInfo
 
@@ -352,6 +353,12 @@ class UserRow(Base):
         else:
             keypair_candidate = main_keypair_row
         return keypair_candidate
+
+    def to_model_serving_user_data(self) -> ModelServingUserData:
+        return ModelServingUserData(
+            uuid=self.uuid,
+            email=self.email,
+        )
 
     def to_data(self) -> UserData:
         return UserData(
