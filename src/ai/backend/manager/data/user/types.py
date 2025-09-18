@@ -4,7 +4,7 @@ import enum
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self, override
+from typing import TYPE_CHECKING, Any, Optional, Self, override
 from uuid import UUID
 
 from sqlalchemy.engine import Row
@@ -16,8 +16,10 @@ from ai.backend.manager.data.permission.types import (
     OperationType,
     ScopeType,
 )
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.types import Creator
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.hasher.types import PasswordInfo
 
 
 class UserStatus(enum.StrEnum):

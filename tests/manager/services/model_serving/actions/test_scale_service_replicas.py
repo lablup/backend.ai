@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.scale_service_replicas import (
     ScaleServiceReplicasAction,
@@ -14,9 +15,6 @@ from ai.backend.manager.services.model_serving.exceptions import (
 )
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
-)
-from ai.backend.manager.services.model_serving.types import (
-    RequesterCtx,
 )
 
 from ...utils import ScenarioBase

@@ -9,6 +9,8 @@ from ai.backend.common.types import (
     AutoScalingMetricSource,
     EndpointId,
 )
+from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
+from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.create_auto_scaling_rule import (
     CreateEndpointAutoScalingRuleAction,
@@ -19,10 +21,6 @@ from ai.backend.manager.services.model_serving.exceptions import (
 )
 from ai.backend.manager.services.model_serving.processors.auto_scaling import (
     ModelServingAutoScalingProcessors,
-)
-from ai.backend.manager.services.model_serving.types import (
-    EndpointAutoScalingRuleCreator,
-    RequesterCtx,
 )
 
 from ...utils import ScenarioBase
