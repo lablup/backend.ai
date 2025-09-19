@@ -7,6 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.sql import Select
 from sqlalchemy.sql.elements import BooleanClauseList
 
+from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -26,8 +27,9 @@ class RepositoryArgs:
     storage_manager: "StorageSessionManager"
     config_provider: "ManagerConfigProvider"
     valkey_stat_client: "ValkeyStatClient"
-    valkey_live_client: "ValkeyLiveClient"
     valkey_schedule_client: "ValkeyScheduleClient"
+    valkey_image_client: "ValkeyImageClient"
+    valkey_live_client: "ValkeyLiveClient"
 
 
 # Generic types for pagination

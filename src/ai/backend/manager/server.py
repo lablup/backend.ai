@@ -684,6 +684,8 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 hook_plugin_ctx=root_ctx.hook_plugin_ctx,
                 scheduling_controller=root_ctx.scheduling_controller,
                 deployment_controller=root_ctx.deployment_controller,
+                event_producer=root_ctx.event_producer,
+                agent_cache=root_ctx.agent_cache,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -873,6 +875,7 @@ async def repositories_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             valkey_stat_client=root_ctx.valkey_stat,
             valkey_live_client=root_ctx.valkey_live,
             valkey_schedule_client=root_ctx.valkey_schedule,
+            valkey_image_client=root_ctx.valkey_image,
         )
     )
     root_ctx.repositories = repositories

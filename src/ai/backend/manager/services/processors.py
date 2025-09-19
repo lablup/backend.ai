@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional, Self, override
 
+from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
@@ -18,7 +19,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -105,6 +106,8 @@ class ServiceArgs:
     hook_plugin_ctx: HookPluginContext
     scheduling_controller: "SchedulingController"
     deployment_controller: "DeploymentController"
+    event_producer: EventProducer
+    agent_cache: AgentRPCCache
 
 
 @dataclass
@@ -141,6 +144,9 @@ class Services:
             args.agent_registry,
             args.config_provider,
             repositories.agent.repository,
+            args.hook_plugin_ctx,
+            args.event_producer,
+            args.agent_cache,
         )
         domain_service = DomainService(
             repositories.domain.repository, repositories.domain.admin_repository
