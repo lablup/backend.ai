@@ -17,7 +17,7 @@ from ai.backend.common.bgtask.bgtask import (
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.bgtask.task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskHandler
 from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
-from ai.backend.common.bgtask.types import BackgroundTaskMetadata, BgtaskStatus, TaskID
+from ai.backend.common.bgtask.types import BackgroundTaskDetailMetadata, BgtaskStatus, TaskID
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.bgtask.broadcast import (
@@ -47,10 +47,7 @@ class MockBackgroundTaskArgs(BaseBackgroundTaskArgs):
 
 
 class MockBackgroundTaskHandler(BaseBackgroundTaskHandler[MockBackgroundTaskArgs]):
-    async def execute(
-        self, reporter: ProgressReporter, args: MockBackgroundTaskArgs
-    ) -> DispatchResult:
-        await reporter.update(1, "Starting mock task")
+    async def execute(self, args: MockBackgroundTaskArgs) -> DispatchResult:
         return DispatchResult(result={"result": "success"})
 
     @classmethod
@@ -253,6 +250,7 @@ class TestBackgroundTaskManager:
     async def test_start_retriable(self, background_task_manager: BackgroundTaskManager) -> None:
         args = MockBackgroundTaskArgs("test_value")
         task_id = await background_task_manager.start_retriable(
+            "mock_task_name",
             MOCK_TASK,  # type: ignore[arg-type]
             args,
             tags=["test-tag"],
@@ -314,7 +312,8 @@ class TestBackgroundTaskManager:
         mock_valkey_client: AsyncMock,
         mock_task_registry: BackgroundTaskHandlerRegistry,
     ) -> None:
-        metadata = BackgroundTaskMetadata.create(
+        metadata = BackgroundTaskDetailMetadata.create(
+            task_key="mock_task_key",
             task_id=TaskID(uuid.uuid4()),
             task_name=MOCK_TASK,  # type: ignore[arg-type]
             body={"test_value": "retry"},
@@ -331,7 +330,8 @@ class TestBackgroundTaskManager:
     async def test_retry_loop_tagged_tasks(
         self, background_task_manager: BackgroundTaskManager, mock_valkey_client: AsyncMock
     ) -> None:
-        metadata = BackgroundTaskMetadata.create(
+        metadata = BackgroundTaskDetailMetadata.create(
+            task_key="mock_task_key",
             task_id=TaskID(uuid.uuid4()),
             task_name=MOCK_TASK,  # type: ignore[arg-type]
             body={"test_value": "retry"},
@@ -348,7 +348,8 @@ class TestBackgroundTaskManager:
     async def test_retry_task_not_registered(
         self, background_task_manager: BackgroundTaskManager, mock_valkey_client: AsyncMock
     ) -> None:
-        metadata = BackgroundTaskMetadata.create(
+        metadata = BackgroundTaskDetailMetadata.create(
+            task_key="mock_task_key",
             task_id=TaskID(uuid.uuid4()),
             task_name=MOCK_TASK_TWO,  # type: ignore[arg-type]
             body={"test": "data"},
@@ -398,9 +399,7 @@ class TestBackgroundTaskManager:
         self, background_task_manager: BackgroundTaskManager, mock_observer: Mock
     ) -> None:
         class FailingHandler(BaseBackgroundTaskHandler[MockBackgroundTaskArgs]):
-            async def execute(
-                self, reporter: ProgressReporter, args: MockBackgroundTaskArgs
-            ) -> DispatchResult:
+            async def execute(self, args: MockBackgroundTaskArgs) -> DispatchResult:
                 raise ValueError("Test error")
 
             @classmethod
@@ -413,7 +412,8 @@ class TestBackgroundTaskManager:
 
         handler = FailingHandler()
         args = MockBackgroundTaskArgs()
-        metadata = BackgroundTaskMetadata.create(
+        metadata = BackgroundTaskDetailMetadata.create(
+            task_key="mock_task_key",
             task_id=TaskID(uuid.uuid4()),
             task_name=MOCK_TASK,  # type: ignore[arg-type]
             body=args.to_metadata_body(),

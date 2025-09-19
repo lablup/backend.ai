@@ -4,7 +4,6 @@ from typing import Any, Generic, Self, TypeVar
 
 from ai.backend.common.types import DispatchResult
 
-from ..reporter import ProgressReporter
 from ..types import TaskName
 
 
@@ -34,7 +33,38 @@ TFunctionArgs = TypeVar("TFunctionArgs", bound=BaseBackgroundTaskArgs)
 
 class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
     @abstractmethod
-    async def execute(self, reporter: ProgressReporter, args: TFunctionArgs) -> DispatchResult:
+    async def execute(self, args: TFunctionArgs) -> DispatchResult:
+        """
+        Execute the background task with the provided reporter and arguments.
+        This method should be implemented by subclasses to provide
+        the specific execution logic.
+        """
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @classmethod
+    @abstractmethod
+    def name(cls) -> TaskName:
+        """
+        Return the name of the background task.
+        This method should be implemented by subclasses to provide
+        the specific task name.
+        """
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @classmethod
+    @abstractmethod
+    def args_type(cls) -> type[TFunctionArgs]:
+        """
+        Return the type of arguments that this task expects.
+        This method should be implemented by subclasses to provide
+        the specific argument type.
+        """
+        raise NotImplementedError("Subclasses must implement this method")
+
+
+class BaseBatchBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
+    @abstractmethod
+    async def execute(self, args: list[TFunctionArgs]) -> list[DispatchResult]:
         """
         Execute the background task with the provided reporter and arguments.
         This method should be implemented by subclasses to provide

@@ -1,6 +1,7 @@
 import enum
 import uuid
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from typing import Any, NewType, Optional, Self
 
 from pydantic import BaseModel, Field
@@ -31,7 +32,48 @@ class TaskName(enum.StrEnum):
 TaskID = NewType("TaskID", uuid.UUID)
 
 
-class BackgroundTaskMetadata(BaseModel):
+@dataclass
+class TaskDetailIdentifier(BaseModel):
+    task_id: TaskID
+    task_key: str
+
+    def to_storage_key(self) -> str:
+        """Convert to storage key format for Redis sets."""
+        return f"{self.task_id.hex}:{self.task_key}"
+
+    @classmethod
+    def from_storage_key(cls, storage_key: str) -> Self:
+        """Create TaskDetailIdentifier from storage key format."""
+        if ":" in storage_key:
+            task_id_hex, task_key = storage_key.split(":", 1)
+            task_id = TaskID(uuid.UUID(hex=task_id_hex))
+            return cls(task_id=task_id, task_key=task_key)
+        else:
+            # Fallback for old format (task_id only)
+            task_id = TaskID(uuid.UUID(hex=storage_key))
+            return cls(task_id=task_id, task_key="")
+
+
+class BackgroundTaskStatusMetadata(BaseModel):
+    success_count: int = Field(0, description="Number of successfully completed tasks")
+    failure_count: int = Field(0, description="Number of failed tasks")
+    pending_count: int = Field(0, description="Number of pending tasks")
+
+    keys: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of keys to identify tasks within the batch",
+    )
+    created_at: str = Field(
+        description="Timestamp when the batch task was created",
+    )
+
+    def to_json(self) -> str:
+        data = self.model_dump_json()
+        return data
+
+
+class BackgroundTaskDetailMetadata(BaseModel):
+    task_key: str
     task_id: TaskID
     task_name: TaskName
     body: Mapping[str, Any]
@@ -41,6 +83,7 @@ class BackgroundTaskMetadata(BaseModel):
     @classmethod
     def create(
         cls,
+        task_key: str,
         task_id: TaskID,
         task_name: TaskName,
         body: Mapping[str, Any],
@@ -48,6 +91,7 @@ class BackgroundTaskMetadata(BaseModel):
         tags: Optional[Iterable[str]] = None,
     ) -> Self:
         return cls(
+            task_key=task_key,
             task_id=task_id,
             task_name=task_name,
             body=body,
@@ -66,3 +110,7 @@ class BackgroundTaskMetadata(BaseModel):
             return cls.model_validate_json(data)
         except ValidationError as e:
             raise InvalidTaskMetadataError from e
+
+    @property
+    def task_detail_identifier(self) -> TaskDetailIdentifier:
+        return TaskDetailIdentifier(task_id=self.task_id, task_key=self.task_key)

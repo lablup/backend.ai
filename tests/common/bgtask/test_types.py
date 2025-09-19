@@ -4,7 +4,7 @@ import json
 import uuid
 
 from ai.backend.common.bgtask.types import (
-    BackgroundTaskMetadata,
+    BackgroundTaskDetailMetadata,
     BgtaskStatus,
     TaskID,
     TaskName,
@@ -66,10 +66,11 @@ class TestTaskID:
         assert task_id in task_ids
 
 
-class TestBackgroundTaskMetadata:
+class TestBackgroundTaskDetailMetadata:
     def test_create(self) -> None:
         task_id = TaskID(uuid.uuid4())
-        metadata = BackgroundTaskMetadata.create(
+        metadata = BackgroundTaskDetailMetadata.create(
+            task_key="mock_task_key",
             task_id=task_id,
             task_name=TaskName.CLONE_VFOLDER,
             body={"key": "value"},
@@ -85,7 +86,8 @@ class TestBackgroundTaskMetadata:
     def test_create_with_tags(self) -> None:
         task_id = TaskID(uuid.uuid4())
         tags = ["tag1", "tag2", "tag3"]
-        metadata = BackgroundTaskMetadata.create(
+        metadata = BackgroundTaskDetailMetadata.create(
+            task_key="mock_task_key",
             task_id=task_id,
             task_name=TaskName.PUSH_IMAGE,
             body={"data": "test"},
@@ -97,7 +99,8 @@ class TestBackgroundTaskMetadata:
 
     def test_create_with_none_tags(self) -> None:
         task_id = TaskID(uuid.uuid4())
-        metadata = BackgroundTaskMetadata.create(
+        metadata = BackgroundTaskDetailMetadata.create(
+            task_key="mock_task_key",
             task_id=task_id,
             task_name=TaskName.CLONE_VFOLDER,
             body={},
@@ -110,7 +113,8 @@ class TestBackgroundTaskMetadata:
     def test_json_serialization_deserialization(self) -> None:
         # Test to_json and from_json together since they are a pair for DB storage
         task_id = TaskID(uuid.uuid4())
-        original_metadata = BackgroundTaskMetadata.create(
+        original_metadata = BackgroundTaskDetailMetadata.create(
+            task_key="mock_task_key",
             task_id=task_id,
             task_name=TaskName.CLONE_VFOLDER,
             body={"test": "data", "number": 42, "nested": {"key": "value"}},
@@ -131,7 +135,7 @@ class TestBackgroundTaskMetadata:
         assert set(data["tags"]) == {"tag1", "tag2"}
 
         # Deserialize from JSON
-        restored_metadata = BackgroundTaskMetadata.from_json(json_str)
+        restored_metadata = BackgroundTaskDetailMetadata.from_json(json_str)
 
         # Verify the restored object matches the original
         assert str(restored_metadata.task_id) == str(original_metadata.task_id)
@@ -151,7 +155,7 @@ class TestBackgroundTaskMetadata:
             "tags": [],
         }).encode("utf-8")
 
-        metadata = BackgroundTaskMetadata.from_json(json_data)
+        metadata = BackgroundTaskDetailMetadata.from_json(json_data)
 
         assert str(metadata.task_id) == str(task_id)
         assert metadata.task_name == TaskName.CLONE_VFOLDER
@@ -170,7 +174,8 @@ class TestBackgroundTaskMetadata:
             "null": None,
         }
 
-        original = BackgroundTaskMetadata.create(
+        original = BackgroundTaskDetailMetadata.create(
+            task_key="mock_task_key",
             task_id=task_id,
             task_name=TaskName.PUSH_IMAGE,
             body=complex_body,
@@ -180,7 +185,7 @@ class TestBackgroundTaskMetadata:
 
         # Round-trip serialization
         json_str = original.to_json()
-        restored = BackgroundTaskMetadata.from_json(json_str)
+        restored = BackgroundTaskDetailMetadata.from_json(json_str)
 
         assert str(restored.task_id) == str(original.task_id)
         assert restored.task_name == original.task_name

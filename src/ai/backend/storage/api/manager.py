@@ -424,6 +424,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
             vfolder_id=vfid,
         )
         task_id = await ctx.background_task_manager.start_retriable(
+            str(vfid),
             TaskName.DELETE_VFOLDER,
             delete_args,
             tags=[ROOT_PRIVILEGED_TAG],
@@ -465,6 +466,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
             dst_vfolder=params["dst_vfid"],
         )
         task_id = await ctx.background_task_manager.start_retriable(
+            str(params["dst_vfid"]),
             TaskName.CLONE_VFOLDER,
             clone_args,
         )

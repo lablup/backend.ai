@@ -3,8 +3,8 @@ from __future__ import annotations
 import enum
 import logging
 import textwrap
-import uuid
 from collections.abc import Collection
+from datetime import datetime, timezone
 from typing import Optional, Self, cast
 
 from glide import (
@@ -16,7 +16,9 @@ from glide import (
 
 from ai.backend.common.bgtask.exception import InvalidTaskMetadataError
 from ai.backend.common.bgtask.types import (
-    BackgroundTaskMetadata,
+    BackgroundTaskDetailMetadata,
+    BackgroundTaskStatusMetadata,
+    TaskDetailIdentifier,
     TaskID,
 )
 from ai.backend.common.clients.valkey_client.client import (
@@ -101,48 +103,90 @@ class ValkeyBgtaskClient:
     def _get_server_key(self, server_id: str) -> str:
         return f"{_SERVER_KEY_PREFIX}:{server_id}"
 
-    def _get_task_key(self, task_id: TaskID) -> str:
+    def _get_task_status_key(self, task_id: TaskID) -> str:
+        return f"{_TASK_KEY_PREFIX}:{task_id}:status"
+
+    def _get_task_detail_key(self, task_id: TaskID, key: str) -> str:
+        return f"{_TASK_KEY_PREFIX}:{task_id}:key:{key}"
+
+    # legacy, kept for backward compatibility
+    def _get_legacy_task_key(self, task_id: TaskID) -> str:
         return f"{_TASK_KEY_PREFIX}:{task_id}"
+
+    @valkey_decorator()
+    async def increase_partial_progress(self, task_id: TaskID) -> None:
+        batch = self._create_batch()
+        key = self._get_task_status_key(task_id)
+        batch.hincrby(key, "success", 1)
+        await self._client.client.exec(batch, raise_on_error=True)
+
+    @valkey_decorator()
+    async def increase_error_progress(self, task_id: TaskID) -> None:
+        batch = self._create_batch()
+        key = self._get_task_status_key(task_id)
+        batch.hincrby(key, "error", 1)
+        await self._client.client.exec(batch, raise_on_error=True)
 
     # Task metadata operations
     @valkey_decorator()
-    async def register_task(self, metadata: BackgroundTaskMetadata) -> None:
+    async def register_task(self, metadata: BackgroundTaskDetailMetadata) -> None:
         """
         Register a background task with 24-hour TTL and index it by tags and server ID.
         """
         batch = self._create_batch()
-        key = self._get_task_key(metadata.task_id)
+        key = self._get_task_detail_key(metadata.task_id, metadata.task_key)
         value = metadata.to_json()
         batch.set(key, value, expiry=ExpirySet(ExpiryType.SEC, TASK_METADATA_TTL))
 
+        # Store task identifier using TaskDetailIdentifier.to_storage_key()
+        task_detail_id = TaskDetailIdentifier(task_id=metadata.task_id, task_key=metadata.task_key)
+        task_identifier = task_detail_id.to_storage_key()
+
         for tag in metadata.tags:
             tag_key = self._get_tag_key(tag)
-            batch.sadd(tag_key, [metadata.task_id.hex])
+            batch.sadd(tag_key, [task_identifier])
             batch.expire(tag_key, TASK_METADATA_TTL)
 
         server_key = self._get_server_key(metadata.server_id)
-        batch.sadd(server_key, [metadata.task_id.hex])
+        batch.sadd(server_key, [task_identifier])
         batch.expire(server_key, TASK_METADATA_TTL)
+
+        # Process status metadata
+        key = self._get_task_status_key(metadata.task_id)
+        status_meta = BackgroundTaskStatusMetadata(
+            success_count=0,
+            failure_count=0,
+            pending_count=0,
+            keys={},
+            created_at=datetime.now(timezone.utc).isoformat(),
+        )
+        value = status_meta.to_json()
+        batch.set(key, value, expiry=ExpirySet(ExpiryType.SEC, TASK_METADATA_TTL))
+
         await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_decorator()
-    async def unregister_task(self, metadata: BackgroundTaskMetadata) -> None:
+    async def unregister_task(self, metadata: BackgroundTaskDetailMetadata) -> None:
         """
         Remove task and all its index references. Idempotent operation.
         """
         batch = self._create_batch()
-        key = self._get_task_key(metadata.task_id)
+        key = self._get_task_detail_key(metadata.task_id, metadata.task_key)
         batch.delete([key])
+
+        # Remove task identifier using TaskDetailIdentifier.to_storage_key()
+        task_detail_id = TaskDetailIdentifier(task_id=metadata.task_id, task_key=metadata.task_key)
+        task_identifier = task_detail_id.to_storage_key()
 
         for tag in metadata.tags:
             tag_key = self._get_tag_key(tag)
-            batch.srem(tag_key, [metadata.task_id.hex])
+            batch.srem(tag_key, [task_identifier])
 
         server_key = self._get_server_key(metadata.server_id)
-        batch.srem(server_key, [metadata.task_id.hex])
+        batch.srem(server_key, [task_identifier])
         await self._client.client.exec(batch, raise_on_error=True)
 
-    async def _get_registered_task_ids(self, keys: Collection[str]) -> set[TaskID]:
+    async def _get_registered_task_ids(self, keys: Collection[str]) -> set[TaskDetailIdentifier]:
         if not keys:
             return set()
         batch = self._create_batch()
@@ -152,16 +196,19 @@ class ValkeyBgtaskClient:
         if raw_results is None:
             raise RuntimeError("Failed to retrieve members from keys")
         results = cast(list[Optional[set[bytes]]], raw_results)
-        task_ids: set[TaskID] = set()
+        task_identifiers: set[TaskDetailIdentifier] = set()
         for raw_result in results:
             if raw_result is not None:
-                task_ids |= {TaskID(uuid.UUID(hex=hex_id.decode())) for hex_id in raw_result}
-        return task_ids
+                for hex_id in raw_result:
+                    stored_value = hex_id.decode()
+                    task_detail_id = TaskDetailIdentifier.from_storage_key(stored_value)
+                    task_identifiers.add(task_detail_id)
+        return task_identifiers
 
     @valkey_decorator()
     async def list_timeout_tasks_by_tags(
         self, tags: Collection[str]
-    ) -> list[BackgroundTaskMetadata]:
+    ) -> list[BackgroundTaskDetailMetadata]:
         """
         List tasks with insufficient TTL filtered by tags.
         """
@@ -173,7 +220,9 @@ class ValkeyBgtaskClient:
         return results
 
     @valkey_decorator()
-    async def list_timeout_tasks_by_server_id(self, server_id: str) -> list[BackgroundTaskMetadata]:
+    async def list_timeout_tasks_by_server_id(
+        self, server_id: str
+    ) -> list[BackgroundTaskDetailMetadata]:
         """
         List tasks with insufficient TTL owned by a specific server.
         """
@@ -183,14 +232,19 @@ class ValkeyBgtaskClient:
         return results
 
     async def _list_timeout_tasks(
-        self, task_ids: Collection[TaskID]
-    ) -> list[BackgroundTaskMetadata]:
-        if not task_ids:
+        self, ids: Collection[TaskDetailIdentifier]
+    ) -> list[BackgroundTaskDetailMetadata]:
+        if not ids:
             return []
         script = self._task_getter_script()
-        results: list[BackgroundTaskMetadata] = []
-        for task_id in task_ids:
-            key = self._get_task_key(task_id)
+        results: list[BackgroundTaskDetailMetadata] = []
+        for id_obj in ids:
+            # legacy support
+            if id_obj.task_key == "":
+                key = self._get_legacy_task_key(id_obj.task_id)
+            else:
+                key = self._get_task_detail_key(id_obj.task_id, id_obj.task_key)
+
             raw_result = await self._client.client.invoke_script(
                 script,
                 keys=[key],
@@ -204,21 +258,24 @@ class ValkeyBgtaskClient:
             match result_type:
                 case _ScriptResult.TTL_SUFFICIENT:
                     log.debug(
-                        "Task TTL sufficient, skipping (id: {})",
-                        task_id,
+                        "Task TTL sufficient, skipping (id: {}, key: {})",
+                        id_obj.task_id,
+                        id_obj.task_key,
                     )
                     continue
                 case _ScriptResult.KEY_NOT_EXIST | _ScriptResult.NO_EXPIRY:
                     log.warning(
-                        "Task key not exist or no expiry, skipping (id: {}, result: {})",
-                        task_id,
+                        "Task key not exist or no expiry, skipping (id: {}, key: {} result: {})",
+                        id_obj.task_id,
+                        id_obj.task_key,
                         result_type,
                     )
                     continue
                 case _ScriptResult.TTL_INSUFFICIENT:
                     log.info(
-                        "Task TTL insufficient, fetching metadata (id: {}, metadata: {})",
-                        task_id,
+                        "Task TTL insufficient, fetching metadata (id: {}, key: {}, metadata: {})",
+                        id_obj.task_id,
+                        id_obj.task_key,
                         metadata,
                     )
                     if metadata is None:
@@ -230,13 +287,13 @@ class ValkeyBgtaskClient:
 
     def _resolve_script_result(
         self, raw_result: list[bytes]
-    ) -> tuple[_ScriptResult, Optional[BackgroundTaskMetadata]]:
+    ) -> tuple[_ScriptResult, Optional[BackgroundTaskDetailMetadata]]:
         result_type = _ScriptResult.from_bytes(raw_result[0])
-        metadata: Optional[BackgroundTaskMetadata] = None
+        metadata: Optional[BackgroundTaskDetailMetadata] = None
         if len(raw_result) == 2:
             raw_metadata = raw_result[1]
             try:
-                metadata = BackgroundTaskMetadata.from_json(raw_metadata)
+                metadata = BackgroundTaskDetailMetadata.from_json(raw_metadata)
             except InvalidTaskMetadataError:
                 log.exception("Invalid bgtask metadata (data: {})", raw_metadata)
         return result_type, metadata
@@ -244,7 +301,7 @@ class ValkeyBgtaskClient:
     @valkey_decorator()
     async def heartbeat(
         self,
-        task_ids: Collection[TaskID],
+        task_identifiers: Collection[TaskDetailIdentifier | TaskID],
         server_id: Optional[str],
         tags: Collection[str],
     ) -> None:
@@ -253,7 +310,13 @@ class ValkeyBgtaskClient:
         """
         keys: list[str] = []
 
-        task_keys = [self._get_task_key(task_id) for task_id in task_ids]
+        task_keys = []
+        for tid in task_identifiers:
+            if isinstance(tid, TaskDetailIdentifier):
+                task_keys.append(self._get_task_detail_key(tid.task_id, tid.task_key))
+            else:
+                task_keys.append(self._get_legacy_task_key(tid))
+
         keys.extend(task_keys)
         if server_id is not None:
             server_key = self._get_server_key(server_id)

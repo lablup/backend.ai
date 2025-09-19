@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.bgtask.task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskHandler
 from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
 from ai.backend.common.exception import BgtaskNotRegisteredError
@@ -30,7 +28,7 @@ class MockTaskArgs(BaseBackgroundTaskArgs):
 
 
 class MockTaskOneHandler(BaseBackgroundTaskHandler[MockTaskArgs]):
-    async def execute(self, reporter: ProgressReporter, args: MockTaskArgs) -> DispatchResult:
+    async def execute(self, args: MockTaskArgs) -> DispatchResult:
         return DispatchResult(result={"result": f"processed_one: {args.data}"})
 
     @classmethod
@@ -43,7 +41,7 @@ class MockTaskOneHandler(BaseBackgroundTaskHandler[MockTaskArgs]):
 
 
 class MockTaskTwoHandler(BaseBackgroundTaskHandler[MockTaskArgs]):
-    async def execute(self, reporter: ProgressReporter, args: MockTaskArgs) -> DispatchResult:
+    async def execute(self, args: MockTaskArgs) -> DispatchResult:
         return DispatchResult(result={"result": f"processed_two: {args.data}"})
 
     @classmethod
@@ -102,9 +100,7 @@ class TestBackgroundTaskHandlerRegistry:
         registry = BackgroundTaskHandlerRegistry()
 
         class CustomTaskOneHandler(BaseBackgroundTaskHandler[MockTaskArgs]):
-            async def execute(
-                self, reporter: ProgressReporter, args: MockTaskArgs
-            ) -> DispatchResult:
+            async def execute(self, args: MockTaskArgs) -> DispatchResult:
                 return DispatchResult(result={"result": "custom task one"})
 
             @classmethod
@@ -163,9 +159,7 @@ class TestBackgroundTaskHandlerRegistry:
 
         retrieved_handler = registry.get_task(MOCK_TASK_ONE)  # type: ignore[arg-type]
         args = MockTaskArgs(data="test-data")
-        reporter = AsyncMock(spec=ProgressReporter)
-
-        result = await retrieved_handler.execute(reporter, args)
+        result = await retrieved_handler.execute(args)
 
         assert result.result is not None
         assert result.result["result"] == "processed_one: test-data"
