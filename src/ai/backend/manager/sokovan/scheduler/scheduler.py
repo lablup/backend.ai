@@ -600,7 +600,7 @@ class Scheduler:
                     termination_tasks.append(task)
                 else:
                     log.warning(
-                        "Kernel {} in session {} has not assigned to agent, skipping termination",
+                        "Kernel {} in session {} Kernel {} in session {} has not been assigned to agent, skipping termination",
                         kernel.kernel_id,
                         session.session_id,
                     )
