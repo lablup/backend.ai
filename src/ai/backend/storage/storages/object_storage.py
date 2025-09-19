@@ -1,4 +1,5 @@
-from typing import Optional, override
+import mimetypes
+from typing import override
 
 from ai.backend.common.dto.storage.response import (
     ObjectMetaResponse,
@@ -55,7 +56,6 @@ class ObjectStorage(AbstractStorage):
         self,
         filepath: str,
         data_stream: StreamReader,
-        content_type: Optional[str] = None,
     ) -> None:
         """
         Upload a file to S3 using streaming.
@@ -71,7 +71,6 @@ class ObjectStorage(AbstractStorage):
             await s3_client.upload_stream(
                 data_stream,
                 filepath,
-                content_type=content_type,
                 part_size=part_size,
             )
         except Exception as e:
@@ -90,8 +89,14 @@ class ObjectStorage(AbstractStorage):
         """
         try:
             s3_client = self._get_s3_client()
+            object_meta = await s3_client.get_object_meta(filepath)
+            ctype = (
+                (object_meta.content_type if object_meta else None)
+                or mimetypes.guess_type(filepath)[0]
+                or "application/octet-stream"
+            )
             chunk_size = self._download_chunk_size
-            return s3_client.download_stream(filepath, chunk_size=chunk_size)
+            return s3_client.download_stream(filepath, chunk_size=chunk_size, content_type=ctype)
 
         except Exception as e:
             raise FileStreamDownloadError("Download failed") from e

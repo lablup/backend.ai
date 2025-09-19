@@ -22,6 +22,7 @@ class S3DownloadStreamReader(StreamReader):
         region_name: Optional[str],
         aws_access_key_id: Optional[str],
         aws_secret_access_key: Optional[str],
+        content_type: Optional[str],
     ):
         self._session = aioboto3.Session()
         self._key = s3_key
@@ -31,6 +32,7 @@ class S3DownloadStreamReader(StreamReader):
         self._region_name = region_name
         self._aws_access_key_id = aws_access_key_id
         self._aws_secret_access_key = aws_secret_access_key
+        self._content_type = content_type
 
     @override
     async def read(self) -> AsyncIterator[bytes]:
@@ -55,6 +57,10 @@ class S3DownloadStreamReader(StreamReader):
                     yield chunk
             finally:
                 body.close()
+
+    @override
+    def content_type(self) -> Optional[str]:
+        return self._content_type
 
 
 class S3Client:
@@ -114,8 +120,6 @@ class S3Client:
         data_stream: StreamReader,
         s3_key: str,
         part_size: int,
-        *,
-        content_type: Optional[str] = None,
     ) -> None:
         """
         Upload data stream to S3 using streaming.
@@ -124,7 +128,6 @@ class S3Client:
             data_stream: StreamReader to upload
             s3_key: The S3 object key (destination path in bucket)
             part_size: Size of each part in bytes
-            content_type: MIME type of the file (optional)
         """
         async with self.session.client(
             "s3",
@@ -134,7 +137,7 @@ class S3Client:
             aws_secret_access_key=self.aws_secret_access_key,
         ) as s3_client:
             create_args = {"Bucket": self.bucket_name, "Key": s3_key}
-            if content_type:
+            if content_type := data_stream.content_type():
                 create_args["ContentType"] = content_type
 
             resp = await s3_client.create_multipart_upload(**create_args)
@@ -194,6 +197,7 @@ class S3Client:
         self,
         s3_key: str,
         chunk_size: int,
+        content_type: Optional[str] = None,
     ) -> StreamReader:
         """
         Download and stream S3 object content as bytes chunks.
@@ -214,6 +218,7 @@ class S3Client:
             region_name=self.region_name,
             aws_access_key_id=self.aws_access_key_id,
             aws_secret_access_key=self.aws_secret_access_key,
+            content_type=content_type,
         )
 
     async def generate_presigned_upload_url(

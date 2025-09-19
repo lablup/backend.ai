@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 from ai.backend.common.dto.storage.response import (
     ObjectMetaResponse,
@@ -30,7 +29,6 @@ class ObjectStorageService:
         storage_name: str,
         bucket_name: str,
         filepath: str,
-        content_type: Optional[str],
         data_stream: StreamReader,
     ) -> None:
         """
@@ -44,7 +42,7 @@ class ObjectStorageService:
             data_stream: Async iterator of file data chunks
         """
         storage = self._resolve_storage(storage_name, bucket_name)
-        await storage.stream_upload(filepath, data_stream, content_type)
+        await storage.stream_upload(filepath, data_stream)
 
     async def stream_download(
         self, storage_name: str, bucket_name: str, filepath: str

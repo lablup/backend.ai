@@ -18,7 +18,6 @@ class AbstractStorage(ABC):
         self,
         filepath: str,
         data_stream: StreamReader,
-        content_type: Optional[str] = None,
     ) -> None:
         raise NotImplementedAPI
 

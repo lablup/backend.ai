@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import AsyncIterator, Tuple
+from typing import Tuple
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
 import pytest
@@ -456,7 +456,10 @@ class TestHuggingFaceService:
 
         chunks = []
         download_stream = HuggingFaceFileDownloadStreamReader(
-            "http://test.com/file", _DEFAULT_CHUNK_SIZE
+            "http://test.com/file",
+            _DEFAULT_CHUNK_SIZE,
+            max_retries=8,
+            content_type="application/octet-stream",
         )
         async for chunk in download_stream.read():
             chunks.append(chunk)
@@ -485,7 +488,10 @@ class TestHuggingFaceService:
 
         with pytest.raises(RuntimeError):
             download_stream = HuggingFaceFileDownloadStreamReader(
-                "http://test.com/file", _DEFAULT_CHUNK_SIZE
+                "http://test.com/file",
+                _DEFAULT_CHUNK_SIZE,
+                max_retries=8,
+                content_type="application/octet-stream",
             )
             async for chunk in download_stream.read():
                 pass
@@ -500,7 +506,10 @@ class TestHuggingFaceService:
 
         with pytest.raises(ClientError):
             download_stream = HuggingFaceFileDownloadStreamReader(
-                "http://test.com/file", _DEFAULT_CHUNK_SIZE
+                "http://test.com/file",
+                _DEFAULT_CHUNK_SIZE,
+                max_retries=8,
+                content_type="application/octet-stream",
             )
             async for chunk in download_stream.read():
                 pass
@@ -513,15 +522,26 @@ class TestHuggingFaceService:
         mock_storage_pool: MagicMock,
     ) -> None:
         """Test successful model file upload."""
-        # Mock the download stream
-        with patch.object(hf_service, "_make_download_file_stream") as mock_download_stream:
-            mock_download_stream.return_value = AsyncIterator[bytes]
+        # Mock the HuggingFaceFileDownloadStreamReader class
+        with patch(
+            "ai.backend.storage.services.artifacts.huggingface.HuggingFaceFileDownloadStreamReader"
+        ) as mock_stream_class:
+            mock_stream_instance = AsyncMock()
+            mock_stream_class.return_value = mock_stream_instance
 
             await hf_service._pipe_single_file_to_storage(
                 file_info=mock_file_info,
                 model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
                 storage_name="test_storage",
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
+            )
+
+            # Verify the stream reader was created with correct parameters
+            mock_stream_class.assert_called_once_with(
+                url=mock_file_info.download_url,
+                chunk_size=_DEFAULT_CHUNK_SIZE,
+                max_retries=8,
+                content_type="application/json",  # mimetypes.guess_type('config.json')[0]
             )
 
             # Get the mock storage from the pool and check it was called
@@ -540,9 +560,12 @@ class TestHuggingFaceService:
         mock_storage = mock_storage_pool.get_storage.return_value
         mock_storage.stream_upload.side_effect = Exception("Upload failed")
 
-        # Mock the download stream
-        with patch.object(hf_service, "_make_download_file_stream") as mock_download_stream:
-            mock_download_stream.return_value = AsyncIterator[bytes]
+        # Mock the HuggingFaceFileDownloadStreamReader class
+        with patch(
+            "ai.backend.storage.services.artifacts.huggingface.HuggingFaceFileDownloadStreamReader"
+        ) as mock_stream_class:
+            mock_stream_instance = AsyncMock()
+            mock_stream_class.return_value = mock_stream_instance
 
             with pytest.raises(HuggingFaceAPIError):
                 await hf_service._pipe_single_file_to_storage(
@@ -589,17 +612,20 @@ class TestHuggingFaceService:
         mock_storage = mock_storage_pool.get_storage.return_value
         mock_storage.stream_upload.side_effect = Exception("Upload error")
 
-        # Mock the download stream
-        with patch.object(hf_service, "_make_download_file_stream") as mock_download_stream:
-            mock_download_stream.return_value = AsyncIterator[bytes]
+        # Mock the HuggingFaceFileDownloadStreamReader class
+        with patch(
+            "ai.backend.storage.services.artifacts.huggingface.HuggingFaceFileDownloadStreamReader"
+        ) as mock_stream_class:
+            mock_stream_instance = AsyncMock()
+            mock_stream_class.return_value = mock_stream_instance
 
-        with pytest.raises(HuggingFaceAPIError):
-            await hf_service._pipe_single_file_to_storage(
-                file_info=mock_file_info,
-                model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
-                storage_name="test_storage",
-                download_chunk_size=_DEFAULT_CHUNK_SIZE,
-            )
+            with pytest.raises(HuggingFaceAPIError):
+                await hf_service._pipe_single_file_to_storage(
+                    file_info=mock_file_info,
+                    model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
+                    storage_name="test_storage",
+                    download_chunk_size=_DEFAULT_CHUNK_SIZE,
+                )
 
 
 class TestReservoirService:

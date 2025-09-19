@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 from ai.backend.common.dto.storage.response import (
     VFSFileMetaResponse,
@@ -29,7 +28,6 @@ class VFSStorageService:
         storage_name: str,
         filepath: str,
         data_stream: StreamReader,
-        content_type: Optional[str] = None,
     ) -> None:
         """
         Upload a file to VFS using streaming.
@@ -38,10 +36,9 @@ class VFSStorageService:
             storage_name: Name of the VFS storage configuration
             filepath: Path to the file to upload
             data_stream: Async iterator of file data chunks
-            content_type: Content type of the file (ignored for VFS)
         """
         storage = self._resolve_storage(storage_name)
-        await storage.stream_upload(filepath, data_stream, content_type)
+        await storage.stream_upload(filepath, data_stream)
 
     async def stream_download(self, storage_name: str, filepath: str) -> StreamReader:
         """

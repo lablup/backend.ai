@@ -1,5 +1,8 @@
+from collections.abc import AsyncIterator
+
 import pytest
 
+from ai.backend.common.types import StreamReader
 from ai.backend.storage.config.unified import ObjectStorageConfig, ReservoirConfig
 from ai.backend.storage.exception import (
     FileStreamDownloadError,
@@ -12,6 +15,18 @@ from ai.backend.storage.storages.base import AbstractStorage, StoragePool
 from ai.backend.storage.storages.object_storage import ObjectStorage
 
 _BUCKET_FIXTURE_NAME = "test-bucket"
+
+
+class TestStreamReader(StreamReader):
+    def __init__(self, data_chunks: list[bytes]):
+        self._data_chunks = data_chunks
+
+    async def read(self) -> AsyncIterator[bytes]:
+        for chunk in self._data_chunks:
+            yield chunk
+
+    def content_type(self) -> str | None:
+        return None
 
 
 @pytest.fixture
@@ -48,7 +63,6 @@ def reservoir_config(minio_container) -> ReservoirConfig:
 
 # Test configuration constants
 _TEST_KEY = "test-key"
-_TEST_CONTENT_TYPE = "application/octet-stream"
 _PRESIGNED_TEST_KEY = "presigned-test-key"
 
 
@@ -56,16 +70,13 @@ _PRESIGNED_TEST_KEY = "presigned-test-key"
 async def test_stream_upload_success(s3_client, storages_service: ObjectStorageService):
     """Test successful stream upload"""
 
-    async def mock_data_stream():
-        yield b"chunk 1"
-        yield b"chunk 2"
+    test_stream = TestStreamReader([b"chunk 1", b"chunk 2"])
 
     await storages_service.stream_upload(
         "test_storage",
         _BUCKET_FIXTURE_NAME,
         _TEST_KEY,
-        _TEST_CONTENT_TYPE,
-        mock_data_stream(),
+        test_stream,
     )
 
 
@@ -73,16 +84,12 @@ async def test_stream_upload_success(s3_client, storages_service: ObjectStorageS
 async def test_stream_upload_invalid_storage(storages_service: ObjectStorageService):
     """Test stream upload with invalid storage name"""
 
-    async def mock_data_stream():
-        yield b"test data"
-
     with pytest.raises(StorageNotFoundError):
         await storages_service.stream_upload(
             "invalid_storage",
             _BUCKET_FIXTURE_NAME,
             _TEST_KEY,
-            _TEST_CONTENT_TYPE,
-            mock_data_stream(),
+            TestStreamReader([b"test data"]),
         )
 
 
@@ -90,16 +97,14 @@ async def test_stream_upload_invalid_storage(storages_service: ObjectStorageServ
 async def test_stream_upload_invalid_bucket(storages_service: ObjectStorageService):
     """Test stream upload with invalid bucket name"""
 
-    async def mock_data_stream():
-        yield b"test data"
+    test_stream = TestStreamReader([b"test data"])
 
     with pytest.raises(StorageBucketNotFoundError):
         await storages_service.stream_upload(
             "test_storage",
             "invalid-bucket",
             _TEST_KEY,
-            _TEST_CONTENT_TYPE,
-            mock_data_stream(),
+            test_stream,
         )
 
 
@@ -108,12 +113,10 @@ async def test_stream_download_success(s3_client, storages_service: ObjectStorag
     """Test successful stream download after upload"""
 
     # First upload a test file
-    async def upload_stream():
-        yield b"test chunk 1"
-        yield b"test chunk 2"
+    upload_stream = TestStreamReader([b"test chunk 1", b"test chunk 2"])
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, upload_stream
     )
 
     # Now download it
@@ -146,11 +149,10 @@ async def test_get_object_info_success(s3_client, storages_service: ObjectStorag
     """Test successful object info retrieval"""
 
     # First upload a test file
-    async def upload_stream():
-        yield b"test data for object info"
+    upload_stream = TestStreamReader([b"test data for object info"])
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, upload_stream
     )
 
     # Get object info
@@ -191,11 +193,10 @@ async def test_delete_object_success(s3_client, storages_service: ObjectStorageS
     """Test successful object deletion"""
 
     # First upload a test file
-    async def upload_stream():
-        yield b"test data for deletion"
+    upload_stream = TestStreamReader([b"test data for deletion"])
 
     await storages_service.stream_upload(
-        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, _TEST_CONTENT_TYPE, upload_stream()
+        "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY, upload_stream
     )
 
     # Delete the object

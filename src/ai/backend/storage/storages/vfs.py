@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import mimetypes
 import shutil
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -28,9 +29,10 @@ from ai.backend.storage.utils import normalize_filepath
 
 
 class VFSDownloadStreamReader(StreamReader):
-    def __init__(self, file_path: Path, chunk_size: int):
+    def __init__(self, file_path: Path, chunk_size: int, content_type: Optional[str]) -> None:
         self._file_path = file_path
         self._chunk_size = chunk_size
+        self._content_type = content_type
 
     @override
     async def read(self) -> AsyncIterator[bytes]:
@@ -40,6 +42,10 @@ class VFSDownloadStreamReader(StreamReader):
                 if not chunk:
                     break
                 yield chunk
+
+    @override
+    def content_type(self) -> Optional[str]:
+        return self._content_type
 
 
 class VFSStorage(AbstractStorage):
@@ -87,6 +93,7 @@ class VFSStorage(AbstractStorage):
         try:
             full_path.relative_to(self._base_path)
         except ValueError:
+            # TODO: Make exception class
             raise ValueError(f"Path traversal not allowed: {filepath}")
 
         return full_path
@@ -104,7 +111,6 @@ class VFSStorage(AbstractStorage):
         self,
         filepath: str,
         data_stream: StreamReader,
-        content_type: Optional[str] = None,
     ) -> None:
         """
         Upload a file to VFS using streaming.
@@ -142,8 +148,6 @@ class VFSStorage(AbstractStorage):
                             )
 
         except Exception as e:
-            if isinstance(e, FileStreamUploadError):
-                raise
             raise FileStreamUploadError(f"Upload failed: {str(e)}") from e
 
     @override
@@ -166,11 +170,12 @@ class VFSStorage(AbstractStorage):
             if not target_path.is_file():
                 raise FileStreamDownloadError(f"Path is not a file: {filepath}")
 
-            return VFSDownloadStreamReader(target_path, self._download_chunk_size)
+            ctype = mimetypes.guess_type(str(target_path))[0] or "application/octet-stream"
+            return VFSDownloadStreamReader(
+                target_path, self._download_chunk_size, content_type=ctype
+            )
 
         except Exception as e:
-            if isinstance(e, (StorageBucketFileNotFoundError, FileStreamDownloadError)):
-                raise
             raise FileStreamDownloadError(f"Download failed: {str(e)}") from e
 
     async def get_object_info(self, filepath: str) -> VFSFileMetaResponse:
@@ -215,8 +220,6 @@ class VFSStorage(AbstractStorage):
             )
 
         except Exception as e:
-            if isinstance(e, StorageBucketFileNotFoundError):
-                raise
             raise ObjectInfoFetchError(f"Get file info failed: {str(e)}") from e
 
     async def delete_object(self, filepath: str) -> None:
@@ -244,8 +247,6 @@ class VFSStorage(AbstractStorage):
                 raise FileStreamUploadError(f"Cannot delete: {filepath}")
 
         except Exception as e:
-            if isinstance(e, FileStreamUploadError):
-                raise
             raise FileStreamUploadError(f"Delete failed: {str(e)}") from e
 
     async def list_directory(self, directory: str) -> list[dict]:
@@ -282,8 +283,6 @@ class VFSStorage(AbstractStorage):
             return entries
 
         except Exception as e:
-            if isinstance(e, (StorageBucketFileNotFoundError, FileStreamDownloadError)):
-                raise
             raise FileStreamDownloadError(f"List directory failed: {str(e)}") from e
 
     async def create_directory(self, directory: str) -> None:

@@ -498,8 +498,8 @@ def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
         status = result.status
         resp = web.StreamResponse(status=status, headers=result.headers)
 
-        # StreamReader.read()가 AsyncGenerator를 반환함
         body_iter = body_stream.read()
+
         # Send first chunk, and check if it raises an exception
         try:
             first_chunk = await body_iter.__anext__()

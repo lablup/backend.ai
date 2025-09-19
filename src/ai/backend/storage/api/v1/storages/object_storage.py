@@ -37,11 +37,10 @@ if TYPE_CHECKING:
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-_DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
-
 
 class ObjectStorageAPIHandler:
     _storage_pool: StoragePool
+    # _object_storage_service: ObjectStorageService
 
     def __init__(
         self,
@@ -69,16 +68,15 @@ class ObjectStorageAPIHandler:
         await log_client_api_entry(log, "upload_object", req)
 
         storage_service = ObjectStorageService(self._storage_pool)
-        upload_stream = MultipartFileUploadStreamReader(file_reader)
 
         # Determine content type: use header if available, otherwise guess from filename
         content_type = multipart_ctx.content_type
         if not content_type:
             content_type, _ = mimetypes.guess_type(filepath)
 
-        await storage_service.stream_upload(
-            storage_name, bucket_name, filepath, content_type, upload_stream
-        )
+        upload_stream = MultipartFileUploadStreamReader(file_reader, content_type)
+
+        await storage_service.stream_upload(storage_name, bucket_name, filepath, upload_stream)
 
         return APIResponse.no_content(
             status_code=HTTPStatus.NO_CONTENT,

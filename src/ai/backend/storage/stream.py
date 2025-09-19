@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator
-from typing import override
+from typing import Optional, override
 
 from aiohttp import BodyPartReader, MultipartReader, web
 
@@ -17,8 +17,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-d
 class MultipartFileUploadStreamReader(StreamReader):
     _file_reader: MultipartReader
 
-    def __init__(self, file_reader: MultipartReader) -> None:
+    def __init__(self, file_reader: MultipartReader, content_type: Optional[str]) -> None:
         self._file_reader = file_reader
+        self._content_type = content_type
 
     @override
     async def read(self) -> AsyncIterator[bytes]:
@@ -38,3 +39,7 @@ class MultipartFileUploadStreamReader(StreamReader):
             if not chunk:
                 break
             yield chunk
+
+    @override
+    def content_type(self) -> Optional[str]:
+        return self._content_type

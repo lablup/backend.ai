@@ -1,5 +1,4 @@
 from collections.abc import AsyncIterator
-from typing import override
 
 import pytest
 from botocore.exceptions import ClientError
@@ -12,10 +11,12 @@ class TestStreamReader(StreamReader):
     def __init__(self, data_chunks: list[bytes]):
         self._data_chunks = data_chunks
 
-    @override
     async def read(self) -> AsyncIterator[bytes]:
         for chunk in self._data_chunks:
             yield chunk
+
+    def content_type(self) -> str | None:
+        return None
 
 
 _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE = 5 * 1024 * 1024  # 5 MiB
@@ -32,7 +33,6 @@ async def test_upload_stream_success(s3_client: S3Client):
         test_stream,
         "test/key.txt",
         part_size=_DEFAULT_UPLOAD_STREAM_CHUNK_SIZE,
-        content_type="text/plain",
     )
 
     # Verify the file was uploaded by downloading it
@@ -129,16 +129,14 @@ async def test_get_object_info_success(s3_client: S3Client):
     # Upload test file
     test_stream = TestStreamReader([test_data])
 
-    await s3_client.upload_stream(
-        test_stream, "test/info.txt", _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE, content_type="text/plain"
-    )
+    await s3_client.upload_stream(test_stream, "test/info.txt", _DEFAULT_UPLOAD_STREAM_CHUNK_SIZE)
 
     # Get object info
     result = await s3_client.get_object_meta("test/info.txt")
 
     assert result is not None
     assert result.content_length == len(test_data)
-    assert result.content_type == "text/plain"
+    assert result.content_type == "binary/octet-stream"
     assert result.etag is not None
     assert result.last_modified is not None
 

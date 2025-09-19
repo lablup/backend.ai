@@ -45,6 +45,7 @@ class ReservoirFileDownloadStreamReader(StreamReader):
     _size: int
     _options: BucketCopyOptions
     _download_chunk_size: int
+    _content_type: Optional[str]
 
     def __init__(
         self,
@@ -53,12 +54,14 @@ class ReservoirFileDownloadStreamReader(StreamReader):
         size: int,
         options: BucketCopyOptions,
         download_chunk_size: int,
+        content_type: Optional[str],
     ):
         self._src_s3_client = src_s3_client
         self._key = key
         self._size = size
         self._options = options
         self._download_chunk_size = download_chunk_size
+        self._content_type = content_type
 
     @override
     async def read(self) -> AsyncIterator[bytes]:
@@ -78,6 +81,10 @@ class ReservoirFileDownloadStreamReader(StreamReader):
                 )
                 next_mark += self._options.progress_log_interval_bytes
             yield chunk
+
+    @override
+    def content_type(self) -> Optional[str]:
+        return self._content_type
 
 
 class ReservoirService:
@@ -244,13 +251,6 @@ class ReservoirService:
                 log.trace("[stream_bucket_to_bucket] begin key={} size={}", key, size)
 
                 download_chunk_size = storage._reservoir_download_chunk_size
-                data_stream = ReservoirFileDownloadStreamReader(
-                    src_s3_client=src_s3_client,
-                    key=key,
-                    size=size,
-                    options=options,
-                    download_chunk_size=download_chunk_size,
-                )
 
                 # Content-Type
                 object_meta = await src_s3_client.get_object_meta(key)
@@ -260,11 +260,19 @@ class ReservoirService:
                     or "application/octet-stream"
                 )
 
+                data_stream = ReservoirFileDownloadStreamReader(
+                    src_s3_client=src_s3_client,
+                    key=key,
+                    size=size,
+                    options=options,
+                    download_chunk_size=download_chunk_size,
+                    content_type=ctype,
+                )
+
                 part_size = storage._upload_chunk_size
                 await dst_client.upload_stream(
                     data_stream,
                     key,
-                    content_type=ctype,
                     part_size=part_size,
                 )
 

@@ -75,8 +75,8 @@ class VFSStorageAPIHandler:
         await log_client_api_entry(log, "upload_file", req)
 
         vfs_service = VFSStorageService(self._storage_pool)
-        upload_stream = MultipartFileUploadStreamReader(file_reader)
-        await vfs_service.stream_upload(storage_name, filepath, upload_stream, content_type)
+        upload_stream = MultipartFileUploadStreamReader(file_reader, content_type)
+        await vfs_service.stream_upload(storage_name, filepath, upload_stream)
 
         return APIResponse.build(
             status_code=HTTPStatus.CREATED,

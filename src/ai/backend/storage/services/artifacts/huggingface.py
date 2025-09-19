@@ -132,11 +132,15 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
     _url: str
     _chunk_size: int
     _max_retries: int
+    _content_type: Optional[str]
 
-    def __init__(self, url: str, chunk_size: int, max_retries: int = 8) -> None:
+    def __init__(
+        self, url: str, chunk_size: int, max_retries: int, content_type: Optional[str]
+    ) -> None:
         self._url = url
         self._chunk_size = chunk_size
         self._max_retries = max_retries
+        self._content_type = content_type
 
     async def _probe_head(self) -> _ProbeHeadInfo:
         """
@@ -280,6 +284,10 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
                     continue
         finally:
             await self._session.close()
+
+    @override
+    def content_type(self) -> Optional[str]:
+        return self._content_type
 
 
 @dataclass
@@ -704,17 +712,19 @@ class HuggingFaceService:
                 f"storage_key={storage_key}, file_size={file_info.size}"
             )
 
+            ctype = mimetypes.guess_type(file_info.path)[0] or "application/octet-stream"
+
             data_stream = HuggingFaceFileDownloadStreamReader(
                 url=file_info.download_url,
                 chunk_size=download_chunk_size,
+                max_retries=8,  # TODO: Add config
+                content_type=ctype,
             )
 
-            ctype = mimetypes.guess_type(file_info.path)[0] or "application/octet-stream"
             # Upload to storage using existing service
             await storage.stream_upload(
                 filepath=storage_key,
                 data_stream=data_stream,
-                content_type=ctype,
             )
 
             log.info(
