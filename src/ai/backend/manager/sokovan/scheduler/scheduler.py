@@ -588,7 +588,7 @@ class Scheduler:
             # Create termination tasks for all kernels in this session
             termination_tasks: list[Awaitable[KernelTerminationResult]] = []
             for kernel in session.kernels:
-                if kernel.agent_id and kernel.container_id:
+                if kernel.agent_id:
                     # Create task to terminate this kernel
                     task = self._terminate_kernel(
                         kernel.agent_id,
@@ -600,11 +600,11 @@ class Scheduler:
                     termination_tasks.append(task)
                 else:
                     log.warning(
-                        "Kernel {} in session {} has no agent or container ID, skipping termination",
+                        "Kernel {} in session {} has not been assigned to agent, skipping termination",
                         kernel.kernel_id,
                         session.session_id,
                     )
-                    # If no agent/container, just mark as successful termination
+                    # If no agent, just mark as successful termination
                     # This is a fallback for kernels that might not have been scheduled properly
                     # or were already terminated
                     await self._repository.update_kernel_status_terminated(
@@ -662,7 +662,7 @@ class Scheduler:
             agent_client = self._agent_pool.get_agent_client(agent_id)
 
             # Call agent's destroy_kernel RPC method with correct parameters
-            await agent_client.destroy_kernel(kernel_id, session_id, reason)
+            await agent_client.destroy_kernel(kernel_id, session_id, reason, suppress_events=False)
             return KernelTerminationResult(
                 kernel_id=kernel_id,
                 agent_id=agent_id,

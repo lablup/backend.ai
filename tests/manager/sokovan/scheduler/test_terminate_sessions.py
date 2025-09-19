@@ -149,6 +149,7 @@ class TestTerminateSessions:
             str(kernel_id),
             str(session_id),
             "USER_REQUESTED",
+            suppress_events=False,
         )
 
     async def test_terminate_sessions_multiple_kernels(
@@ -201,6 +202,7 @@ class TestTerminateSessions:
                 str(kernel_ids[i]),
                 str(session_id),
                 "FORCED_TERMINATION",
+                suppress_events=False,
             )
 
     async def test_terminate_sessions_partial_failure(
@@ -297,7 +299,7 @@ class TestTerminateSessions:
         mock_repository.get_terminating_sessions.return_value = sessions
 
         # Add delay to agent calls to verify concurrency
-        async def delayed_destroy(*args):
+        async def delayed_destroy(*args, **kwargs):
             await asyncio.sleep(0.1)
             return None
 
