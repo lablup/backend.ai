@@ -1,8 +1,8 @@
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterable, AsyncIterator
 from typing import Optional, Self
 
+from ai.backend.common.types import StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.config.unified import (
     StorageProxyUnifiedConfig,
@@ -17,15 +17,14 @@ class AbstractStorage(ABC):
     async def stream_upload(
         self,
         filepath: str,
-        data_stream: AsyncIterable[bytes],
+        data_stream: StreamReader,
         content_type: Optional[str] = None,
     ) -> None:
         raise NotImplementedAPI
 
     @abstractmethod
-    async def stream_download(self, filepath: str) -> AsyncIterator[bytes]:
+    async def stream_download(self, filepath: str) -> StreamReader:
         raise NotImplementedAPI
-        yield b""  # Mark as generator
 
 
 class StoragePool:

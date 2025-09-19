@@ -32,6 +32,7 @@ from ai.backend.storage.exception import (
     StorageNotFoundError,
 )
 from ai.backend.storage.services.artifacts.huggingface import (
+    HuggingFaceFileDownloadStreamReader,
     HuggingFaceService,
     HuggingFaceServiceArgs,
 )
@@ -454,9 +455,10 @@ class TestHuggingFaceService:
         mock_response.headers.get.side_effect = mock_headers_get
 
         chunks = []
-        async for chunk in hf_service._make_download_file_stream(
+        download_stream = HuggingFaceFileDownloadStreamReader(
             "http://test.com/file", _DEFAULT_CHUNK_SIZE
-        ):
+        )
+        async for chunk in download_stream.read():
             chunks.append(chunk)
 
         assert chunks == [b"chunk1", b"chunk2"]
@@ -482,9 +484,10 @@ class TestHuggingFaceService:
         mock_response.headers.get.return_value = None
 
         with pytest.raises(RuntimeError):
-            async for chunk in hf_service._make_download_file_stream(
+            download_stream = HuggingFaceFileDownloadStreamReader(
                 "http://test.com/file", _DEFAULT_CHUNK_SIZE
-            ):
+            )
+            async for chunk in download_stream.read():
                 pass
 
     @pytest.mark.asyncio
@@ -496,9 +499,10 @@ class TestHuggingFaceService:
         mock_client_session.side_effect = ClientError("Connection error")
 
         with pytest.raises(ClientError):
-            async for chunk in hf_service._make_download_file_stream(
+            download_stream = HuggingFaceFileDownloadStreamReader(
                 "http://test.com/file", _DEFAULT_CHUNK_SIZE
-            ):
+            )
+            async for chunk in download_stream.read():
                 pass
 
     @pytest.mark.asyncio

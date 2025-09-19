@@ -11,7 +11,7 @@ import textwrap
 import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
-from collections.abc import Iterable
+from collections.abc import AsyncIterator, Iterable
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -31,6 +31,7 @@ from typing import (
     NewType,
     NotRequired,
     Optional,
+    Protocol,
     Self,
     Sequence,
     Tuple,
@@ -1894,3 +1895,7 @@ class SessionExecutionStatus(enum.StrEnum):
     FINISHED = "finished"
     CANCELED = "canceled"
     TIMEOUT = "timeout"
+
+
+class StreamReader(Protocol):
+    def read(self) -> AsyncIterator[bytes]: ...

@@ -27,6 +27,7 @@ from ai.backend.common.dto.storage.response import (
     VFSUploadResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.stream import MultipartFileUploadStreamReader
 
 from ....services.storages.vfs import VFSStorageService
 from ....storages.base import StoragePool
@@ -36,8 +37,6 @@ if TYPE_CHECKING:
     from ....context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-_DEFAULT_UPLOAD_FILE_CHUNKS = 8192  # Default chunk size for streaming uploads
 
 
 class VFSStorageAPIHandler:
@@ -69,7 +68,6 @@ class VFSStorageAPIHandler:
         """
         req = body.parsed
         filepath = req.filepath
-        overwrite = req.overwrite
         content_type = req.content_type
         file_reader = multipart_ctx.file_reader
         storage_name = path.parsed.storage_name
@@ -77,29 +75,8 @@ class VFSStorageAPIHandler:
         await log_client_api_entry(log, "upload_file", req)
 
         vfs_service = VFSStorageService(self._storage_pool)
-
-        file_part = await file_reader.next()
-        while file_part and not getattr(file_part, "filename", None):
-            await file_part.release()
-            file_part = await file_reader.next()
-
-        if file_part is None:
-            raise web.HTTPBadRequest(reason='No file part found (expected field "file")')
-
-        # Check if file exists and overwrite is not allowed
-        if not overwrite:
-            try:
-                await vfs_service.get_file_meta(storage_name, filepath)
-                raise web.HTTPConflict(reason=f"File already exists: {filepath}")
-            except Exception:
-                pass  # File doesn't exist, which is fine
-
-        async def file_data_stream():
-            async for chunk in file_part.iter_chunked(_DEFAULT_UPLOAD_FILE_CHUNKS):
-                yield chunk
-            await file_part.release()
-
-        await vfs_service.stream_upload(storage_name, filepath, file_data_stream(), content_type)
+        upload_stream = MultipartFileUploadStreamReader(file_reader)
+        await vfs_service.stream_upload(storage_name, filepath, upload_stream, content_type)
 
         return APIResponse.build(
             status_code=HTTPStatus.CREATED,
@@ -124,7 +101,7 @@ class VFSStorageAPIHandler:
 
         await log_client_api_entry(log, "download_file", req)
         vfs_service = VFSStorageService(self._storage_pool)
-        download_stream = vfs_service.stream_download(storage_name, filepath)
+        file_stream = await vfs_service.stream_download(storage_name, filepath)
 
         # Get file metadata for content type
         try:
@@ -134,7 +111,7 @@ class VFSStorageAPIHandler:
             content_type = "application/octet-stream"
 
         return APIStreamResponse(
-            body=download_stream,
+            body=file_stream,
             status=HTTPStatus.OK,
             headers={
                 "Content-Type": content_type,

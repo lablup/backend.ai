@@ -1,11 +1,12 @@
 import logging
-from typing import AsyncIterable, AsyncIterator, Optional
+from typing import Optional
 
 from ai.backend.common.dto.storage.response import (
     ObjectMetaResponse,
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
 )
+from ai.backend.common.types import StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import StorageBucketNotFoundError, StorageNotFoundError
 from ai.backend.storage.storages.base import StoragePool
@@ -30,7 +31,7 @@ class ObjectStorageService:
         bucket_name: str,
         filepath: str,
         content_type: Optional[str],
-        data_stream: AsyncIterable[bytes],
+        data_stream: StreamReader,
     ) -> None:
         """
         Upload a file to S3 using streaming.
@@ -47,7 +48,7 @@ class ObjectStorageService:
 
     async def stream_download(
         self, storage_name: str, bucket_name: str, filepath: str
-    ) -> AsyncIterator[bytes]:
+    ) -> StreamReader:
         """
         Download a file from S3 using streaming.
 
@@ -56,12 +57,11 @@ class ObjectStorageService:
             bucket_name: Name of the S3 bucket
             filepath: Path to the file to download
 
-        Yields:
-            bytes: Chunks of file data
+        Returns:
+            FileStream: Stream for reading file data
         """
         storage = self._resolve_storage(storage_name, bucket_name)
-        async for chunk in storage.stream_download(filepath):
-            yield chunk
+        return await storage.stream_download(filepath)
 
     async def get_object_info(
         self, storage_name: str, bucket_name: str, filepath: str

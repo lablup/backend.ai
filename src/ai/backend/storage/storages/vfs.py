@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import shutil
-from collections.abc import AsyncIterable, AsyncIterator
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Optional, override
 
@@ -14,6 +14,7 @@ from ai.backend.common.dto.storage.response import (
     PresignedUploadObjectResponse,
     VFSFileMetaResponse,
 )
+from ai.backend.common.types import StreamReader
 from ai.backend.storage.config.unified import VFSStorageConfig
 from ai.backend.storage.exception import (
     FileStreamDownloadError,
@@ -24,6 +25,21 @@ from ai.backend.storage.exception import (
 )
 from ai.backend.storage.storages.base import AbstractStorage
 from ai.backend.storage.utils import normalize_filepath
+
+
+class VFSDownloadStreamReader(StreamReader):
+    def __init__(self, file_path: Path, chunk_size: int):
+        self._file_path = file_path
+        self._chunk_size = chunk_size
+
+    @override
+    async def read(self) -> AsyncIterator[bytes]:
+        async with aiofiles.open(self._file_path, "rb") as f:
+            while True:
+                chunk = await f.read(self._chunk_size)
+                if not chunk:
+                    break
+                yield chunk
 
 
 class VFSStorage(AbstractStorage):
@@ -87,7 +103,7 @@ class VFSStorage(AbstractStorage):
     async def stream_upload(
         self,
         filepath: str,
-        data_stream: AsyncIterable[bytes],
+        data_stream: StreamReader,
         content_type: Optional[str] = None,
     ) -> None:
         """
@@ -98,7 +114,6 @@ class VFSStorage(AbstractStorage):
             data_stream: Async iterator of file data chunks
             content_type: Content type of the file (ignored for VFS)
         """
-        print("vfs stream_upload")
         try:
             # Validate constraints first
             self._validate_upload_constraints(filepath)
@@ -112,7 +127,7 @@ class VFSStorage(AbstractStorage):
             # Stream write to file
             total_size = 0
             async with aiofiles.open(target_path, "wb") as f:
-                async for chunk in data_stream:
+                async for chunk in data_stream.read():
                     if chunk:  # Skip empty chunks
                         await f.write(chunk)
                         total_size += len(chunk)
@@ -132,15 +147,15 @@ class VFSStorage(AbstractStorage):
             raise FileStreamUploadError(f"Upload failed: {str(e)}") from e
 
     @override
-    async def stream_download(self, filepath: str) -> AsyncIterator[bytes]:
+    async def stream_download(self, filepath: str) -> StreamReader:
         """
         Download a file from VFS using streaming.
 
         Args:
             filepath: Path to the file to download (relative to base_path)
 
-        Yields:
-            bytes: Chunks of file data
+        Returns:
+            FileStream: Stream for reading file data
         """
         try:
             target_path = self._resolve_path(filepath)
@@ -151,12 +166,7 @@ class VFSStorage(AbstractStorage):
             if not target_path.is_file():
                 raise FileStreamDownloadError(f"Path is not a file: {filepath}")
 
-            async with aiofiles.open(target_path, "rb") as f:
-                while True:
-                    chunk = await f.read(self._download_chunk_size)
-                    if not chunk:
-                        break
-                    yield chunk
+            return VFSDownloadStreamReader(target_path, self._download_chunk_size)
 
         except Exception as e:
             if isinstance(e, (StorageBucketFileNotFoundError, FileStreamDownloadError)):

@@ -26,6 +26,7 @@ from ai.backend.common.dto.storage.request import (
     UploadObjectReq,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.stream import MultipartFileUploadStreamReader
 
 from ....services.storages.object_storage import ObjectStorageService
 from ....storages.base import StoragePool
@@ -68,21 +69,7 @@ class ObjectStorageAPIHandler:
         await log_client_api_entry(log, "upload_object", req)
 
         storage_service = ObjectStorageService(self._storage_pool)
-
-        file_part = await file_reader.next()
-        while file_part and not getattr(file_part, "filename", None):
-            await file_part.release()
-            file_part = await file_reader.next()
-
-        if file_part is None:
-            raise web.HTTPBadRequest(reason='No file part found (expected field "file")')
-
-        async def data_stream():
-            while True:
-                chunk = await file_part.read_chunk(_DEFAULT_UPLOAD_FILE_CHUNKS)
-                if not chunk:
-                    break
-                yield chunk
+        upload_stream = MultipartFileUploadStreamReader(file_reader)
 
         # Determine content type: use header if available, otherwise guess from filename
         content_type = multipart_ctx.content_type
@@ -90,7 +77,7 @@ class ObjectStorageAPIHandler:
             content_type, _ = mimetypes.guess_type(filepath)
 
         await storage_service.stream_upload(
-            storage_name, bucket_name, filepath, content_type, data_stream()
+            storage_name, bucket_name, filepath, content_type, upload_stream
         )
 
         return APIResponse.no_content(
@@ -114,10 +101,10 @@ class ObjectStorageAPIHandler:
 
         await log_client_api_entry(log, "download_file", req)
         storage_service = ObjectStorageService(self._storage_pool)
-        download_stream = storage_service.stream_download(storage_name, bucket_name, filepath)
+        file_stream = await storage_service.stream_download(storage_name, bucket_name, filepath)
 
         return APIStreamResponse(
-            body=download_stream,
+            body=file_stream,
             status=HTTPStatus.OK,
             headers={
                 "Content-Type": "application/octet-stream",

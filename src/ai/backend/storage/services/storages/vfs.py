@@ -1,10 +1,10 @@
 import logging
-from collections.abc import AsyncIterable, AsyncIterator
 from typing import Optional
 
 from ai.backend.common.dto.storage.response import (
     VFSFileMetaResponse,
 )
+from ai.backend.common.types import StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import StorageNotFoundError
 from ai.backend.storage.storages.base import StoragePool
@@ -28,7 +28,7 @@ class VFSStorageService:
         self,
         storage_name: str,
         filepath: str,
-        data_stream: AsyncIterable[bytes],
+        data_stream: StreamReader,
         content_type: Optional[str] = None,
     ) -> None:
         """
@@ -43,7 +43,7 @@ class VFSStorageService:
         storage = self._resolve_storage(storage_name)
         await storage.stream_upload(filepath, data_stream, content_type)
 
-    async def stream_download(self, storage_name: str, filepath: str) -> AsyncIterator[bytes]:
+    async def stream_download(self, storage_name: str, filepath: str) -> StreamReader:
         """
         Download a file from VFS using streaming.
 
@@ -51,12 +51,11 @@ class VFSStorageService:
             storage_name: Name of the VFS storage configuration
             filepath: Path to the file to download
 
-        Yields:
-            bytes: Chunks of file data
+        Returns:
+            FileStream: Stream for reading file data
         """
         storage = self._resolve_storage(storage_name)
-        async for chunk in storage.stream_download(filepath):
-            yield chunk
+        return await storage.stream_download(filepath)
 
     async def get_file_meta(self, storage_name: str, filepath: str) -> VFSFileMetaResponse:
         """

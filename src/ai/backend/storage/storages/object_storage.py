@@ -1,4 +1,3 @@
-from collections.abc import AsyncIterable, AsyncIterator
 from typing import Optional, override
 
 from ai.backend.common.dto.storage.response import (
@@ -6,6 +5,7 @@ from ai.backend.common.dto.storage.response import (
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
 )
+from ai.backend.common.types import StreamReader
 from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.unified import (
     ObjectStorageConfig,
@@ -54,7 +54,7 @@ class ObjectStorage(AbstractStorage):
     async def stream_upload(
         self,
         filepath: str,
-        data_stream: AsyncIterable[bytes],
+        data_stream: StreamReader,
         content_type: Optional[str] = None,
     ) -> None:
         """
@@ -78,21 +78,20 @@ class ObjectStorage(AbstractStorage):
             raise FileStreamUploadError("Upload failed") from e
 
     @override
-    async def stream_download(self, filepath: str) -> AsyncIterator[bytes]:
+    async def stream_download(self, filepath: str) -> StreamReader:
         """
         Download a file from S3 using streaming.
 
         Args:
             filepath: Path to the file to download
 
-        Yields:
-            bytes: Chunks of file data
+        Returns:
+            FileStream: Stream for reading file data
         """
         try:
             s3_client = self._get_s3_client()
             chunk_size = self._download_chunk_size
-            async for chunk in s3_client.download_stream(filepath, chunk_size=chunk_size):
-                yield chunk
+            return s3_client.download_stream(filepath, chunk_size=chunk_size)
 
         except Exception as e:
             raise FileStreamDownloadError("Download failed") from e

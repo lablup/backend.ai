@@ -118,9 +118,10 @@ async def test_stream_download_success(s3_client, storages_service: ObjectStorag
 
     # Now download it
     chunks = []
-    async for chunk in storages_service.stream_download(
+    file_stream = await storages_service.stream_download(
         "test_storage", _BUCKET_FIXTURE_NAME, _TEST_KEY
-    ):
+    )
+    async for chunk in file_stream.read():
         chunks.append(chunk)
 
     assert len(chunks) >= 1
@@ -133,9 +134,10 @@ async def test_stream_download_success(s3_client, storages_service: ObjectStorag
 async def test_stream_download_nonexistent_file(s3_client, storages_service: ObjectStorageService):
     """Test stream download of nonexistent file"""
     with pytest.raises(FileStreamDownloadError):
-        async for chunk in storages_service.stream_download(
+        file_stream = await storages_service.stream_download(
             "test_storage", _BUCKET_FIXTURE_NAME, "nonexistent-key"
-        ):
+        )
+        async for chunk in file_stream.read():
             pass
 
 
