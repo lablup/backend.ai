@@ -26,8 +26,12 @@ if [ $USER_ID -eq 0 ]; then
   echo "WARNING: Running the user codes as root is not recommended."
   if [ -f /bin/ash ]; then  # for alpine
     export SHELL=/bin/ash
+    addgroup -g 1002 grpread
+    usermod -aG grpread $USER_NAME
   else  # for other distros (ubuntu, centos, etc.)
     export SHELL=/bin/bash
+    addgroup -g 1002 grpread
+    usermod -aG grpread $USER_NAME
     echo "$LD_PRELOAD" | tr ':' '\n' > /etc/ld.so.preload
     unset LD_PRELOAD
   fi
@@ -79,6 +83,8 @@ else
       USER_NAME=work
       adduser -s /bin/ash -h "/home/$USER_NAME" -H -D -u $USER_ID -G $GROUP_NAME -g "User" $USER_NAME
       usermod -aG shadow $USER_NAME
+      addgroup --gid 1002 grpread
+      usermod -aG grpread $USER_NAME
     fi
     export SHELL=/bin/ash
   else  # for other distros (ubuntu, centos, etc.)
@@ -92,6 +98,8 @@ else
       USER_NAME=work
       useradd -s /bin/bash -d "/home/$USER_NAME" -M -r -u $USER_ID -g $GROUP_NAME -o -c "User" $USER_NAME
       usermod -aG shadow $USER_NAME
+      addgroup --gid 1002 grpread
+      usermod -aG 1002 $USER_NAME
     else
       # The image has an existing user name for the given uid.
       # Merge the image's existing home directory into the bind-mounted "/home/work" from the scratch space.
@@ -141,6 +149,32 @@ else
     export ALPHA_NUMERIC_VAL=$(cat $HOME/.password)
     chmod 0644 "$HOME/.password"
     echo "$USER_NAME:$ALPHA_NUMERIC_VAL" | chpasswd -c SHA512
+  fi
+
+  # Create groups for ADDITIONAL_GIDS if they don't exist
+  if [ ! -z "${ADDITIONAL_GIDS}" ]; then
+    echo "Processing additional GIDs: ${ADDITIONAL_GIDS}"
+
+    # Convert comma-separated list to individual lines and process
+    echo "${ADDITIONAL_GIDS}" | tr ',' '\n' | while read -r gid; do
+      if [ ! -z "$gid" ]; then
+        # Clean whitespace
+        gid=$(echo "$gid" | tr -d ' \t')
+
+        # Check if group exists, create if not
+        if ! getent group "$gid" > /dev/null 2>&1; then
+          echo "Creating group with GID $gid"
+          addgroup --gid "$gid" "group$gid"
+          if usermod -aG "$gid" $USER_NAME 2>/dev/null; then
+            echo "Added $USER_NAME to group$gid"
+          else
+            echo "Failed to add $USER_NAME to group$gid"
+          fi
+        else
+          echo "Group with GID $gid already exists"
+        fi
+      fi
+    done
   fi
 
   # The gid 42 is a reserved gid for "shadow" to allow passwrd-based SSH login. (lablup/backend.ai#751)
