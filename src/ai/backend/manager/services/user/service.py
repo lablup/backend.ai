@@ -79,14 +79,13 @@ class UserService:
     async def modify_user(self, action: ModifyUserAction) -> ModifyUserActionResult:
         email = action.email
         data = action.modifier.fields_to_update()
-        group_ids = action.group_ids
-        if not data and group_ids is None:
+
+        if not data and action.modifier.group_ids_value is None:
             raise NoUserUpdateError("No fields to update for user {email}.")
 
         user_data_result = await self._user_repository.update_user_validated(
             email=email,
             modifier=action.modifier,
-            group_ids=group_ids,
             requester_uuid=None,  # No user context available in ModifyUserAction
         )
         return ModifyUserActionResult(

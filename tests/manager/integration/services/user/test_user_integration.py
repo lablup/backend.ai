@@ -396,8 +396,8 @@ class TestModifyUserIntegration:
             email=user_email,
             modifier=UserModifier(
                 domain_name=OptionalState.update("test-domain"),
+                group_ids=OptionalState.update([str(new_team_id), str(research_team_id)]),
             ),
-            group_ids=[str(new_team_id), str(research_team_id)],
         )
 
         result = await processors.modify_user.wait_for_complete(action)

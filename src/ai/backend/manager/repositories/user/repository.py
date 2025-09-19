@@ -155,7 +155,6 @@ class UserRepository:
         self,
         email: str,
         modifier: UserModifier,
-        group_ids: Optional[list[str]],
         requester_uuid: Optional[UUID],
     ) -> UserData:
         """
@@ -192,6 +191,7 @@ class UserRepository:
                 await self._sync_keypair_roles(conn, updated_user.uuid, role)
 
             # Handle group updates
+            group_ids = modifier.group_ids_value
             if prev_role != updated_user.role and group_ids is None:
                 await self._clear_user_groups(conn, updated_user.uuid)
 

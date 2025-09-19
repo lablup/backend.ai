@@ -28,6 +28,7 @@ class UserModifier(PartialModifier):
     container_uid: TriState[int] = field(default_factory=TriState.nop)
     container_main_gid: TriState[int] = field(default_factory=TriState.nop)
     container_gids: TriState[list[int]] = field(default_factory=TriState.nop)
+    group_ids: OptionalState[list[str]] = field(default_factory=OptionalState.nop)
 
     def fields_to_update(self) -> dict[str, Any]:
         to_update: dict[str, Any] = {}
@@ -59,12 +60,15 @@ class UserModifier(PartialModifier):
             to_update["status"] = status
         return to_update
 
+    @property
+    def group_ids_value(self) -> Optional[list[str]]:
+        return self.group_ids.optional_value()
+
 
 @dataclass
 class ModifyUserAction(UserAction):
     email: str
     modifier: UserModifier
-    group_ids: Optional[list[str]] = None
 
     @override
     def entity_id(self) -> Optional[str]:
