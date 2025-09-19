@@ -159,7 +159,8 @@ class AgentNode(graphene.ObjectType):
         ctx: GraphQueryContext,
         row: AgentRow,
     ) -> Self:
-        occupied_slots = await row.get_occupied_slots(ctx.db)
+        known_slot_types = await ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
+        occupied_slots = await row.get_occupied_slots(ctx.db, known_slot_types)
         return cls(
             id=row.id,
             row_id=row.id,

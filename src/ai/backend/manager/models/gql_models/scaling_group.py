@@ -288,7 +288,10 @@ class ScalingGroup(graphene.ObjectType):
             total_available_slots = ResourceSlot()
 
             for agent_row in agent_rows:
-                occupied_slots = await agent_row.get_occupied_slots(graph_ctx.db)
+                known_slot_types = (
+                    await graph_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
+                )
+                occupied_slots = await agent_row.get_occupied_slots(graph_ctx.db, known_slot_types)
                 total_occupied_slots += occupied_slots
                 total_available_slots += agent_row.available_slots
 

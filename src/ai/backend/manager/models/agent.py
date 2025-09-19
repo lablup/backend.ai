@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import enum
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Optional, Self, TypeAlias, cast, override
 
@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, relationship, selectinload, with_loader_criteria
 from sqlalchemy.sql.expression import false, true
 
-from ai.backend.common.types import AccessKey, AgentId, ResourceSlot
+from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
+from ai.backend.manager.data.kernel.types import KernelStatus
 
 from .base import (
     Base,
@@ -142,16 +143,18 @@ class AgentRow(Base):
             db=db,
         )
 
-    async def get_occupied_slots(self, db: ExtendedAsyncSAEngine) -> ResourceSlot:
+    async def get_occupied_slots(
+        self, db: ExtendedAsyncSAEngine, known_slot_types: Mapping[SlotName, SlotTypes]
+    ) -> ResourceSlot:
         async with db.begin_readonly_session() as db_session:
             query = sa.select(KernelRow.occupied_slots).where(
                 sa.and_(
                     KernelRow.agent == self.id,
-                    KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                    KernelRow.status == KernelStatus.RUNNING,
                 )
             )
             kernel_slots = (await db_session.scalars(query)).all()
-            occupied_slots = ResourceSlot()
+            occupied_slots = ResourceSlot.from_known_slots(known_slot_types)
             for slots in kernel_slots:
                 occupied_slots += slots
             return occupied_slots
