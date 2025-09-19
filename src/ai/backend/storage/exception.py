@@ -391,3 +391,16 @@ class ArtifactImportError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class NotImplementedAPI(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage/api/not-implemented"
+    error_title = "API Not Implemented"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )

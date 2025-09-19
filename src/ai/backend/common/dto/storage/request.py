@@ -190,13 +190,6 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         """,
         examples=["default-minio", "s3-storage", "local-storage"],
     )
-    bucket_name: str = Field(
-        description="""
-        Target bucket name within the storage for all models.
-        The bucket must exist and be writable by the service.
-        """,
-        examples=["models", "huggingface-models", "ai-models"],
-    )
 
 
 class ReservoirImportModelsReq(BaseRequestModel):
@@ -227,13 +220,6 @@ class ReservoirImportModelsReq(BaseRequestModel):
         Must be a configured and accessible storage backend.
         """,
         examples=["default-minio", "s3-storage", "local-storage"],
-    )
-    bucket_name: str = Field(
-        description="""
-        Target bucket name within the storage for all models.
-        The bucket must exist and be writable by the service.
-        """,
-        examples=["models", "huggingface-models", "ai-models"],
     )
 
 

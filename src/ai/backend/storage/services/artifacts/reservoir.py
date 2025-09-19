@@ -15,7 +15,6 @@ from ai.backend.common.types import DispatchResult
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.unified import (
-    ObjectStorageConfig,
     ReservoirConfig,
 )
 from ai.backend.storage.exception import (
@@ -25,6 +24,8 @@ from ai.backend.storage.exception import (
     StorageBucketNotFoundError,
     StorageNotFoundError,
 )
+from ai.backend.storage.storages.base import StoragePool
+from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.types import BucketCopyOptions
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -34,7 +35,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class ReservoirServiceArgs:
     background_task_manager: BackgroundTaskManager
     event_producer: EventProducer
-    storage_configs: list[ObjectStorageConfig]
+    storage_pool: StoragePool
     reservoir_registry_configs: list[ReservoirConfig]
 
 
@@ -44,33 +45,44 @@ class ReservoirService:
     _background_task_manager: BackgroundTaskManager
     _event_producer: EventProducer
     _reservoir_registry_configs: list[ReservoirConfig]
-    _storage_configs: dict[str, ObjectStorageConfig]
+    _storage_pool: StoragePool
 
     def __init__(self, args: ReservoirServiceArgs):
         self._background_task_manager = args.background_task_manager
         self._event_producer = args.event_producer
         self._reservoir_registry_configs = args.reservoir_registry_configs
-        self._storage_configs = {cfg.name: cfg for cfg in args.storage_configs}
+        self._storage_pool = args.storage_pool
 
-    def _get_s3_client(self, storage_name: str, bucket_name: str) -> S3Client:
-        storage_config = self._storage_configs.get(storage_name)
-        if not storage_config:
+    def _get_s3_client(self, storage_name: str) -> tuple[S3Client, str]:
+        if not self._storage_pool:
+            raise StorageNotFoundError("Storage pool not configured")
+
+        # Get storage from pool and verify it's ObjectStorage type
+        try:
+            storage = self._storage_pool.get_storage(storage_name)
+        except KeyError:
+            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool")
+
+        if not isinstance(storage, ObjectStorage):
             raise StorageNotFoundError(
-                f"No storage configuration found for storage: {storage_name}"
+                f"Storage '{storage_name}' is not an ObjectStorage type. "
+                f"Reservoir import requires ObjectStorage for S3 operations."
             )
 
-        if bucket_name not in storage_config.buckets:
-            raise StorageBucketNotFoundError(
-                f"Bucket '{bucket_name}' not found in storage '{storage_name}'"
-            )
+        # Use the configured bucket from ObjectStorage
+        bucket_name = storage._bucket
+        if not bucket_name:
+            raise StorageBucketNotFoundError(f"No bucket configured for storage '{storage_name}'")
 
-        return S3Client(
+        # Create S3Client from ObjectStorage configuration
+        s3_client = S3Client(
             bucket_name=bucket_name,
-            endpoint_url=storage_config.endpoint,
-            region_name=storage_config.region,
-            aws_access_key_id=storage_config.access_key,
-            aws_secret_access_key=storage_config.secret_key,
+            endpoint_url=storage._endpoint,
+            region_name=storage._region,
+            aws_access_key_id=storage._access_key,
+            aws_secret_access_key=storage._secret_key,
         )
+        return s3_client, bucket_name
 
     async def _list_all_keys_and_sizes(
         self,
@@ -126,7 +138,6 @@ class ReservoirService:
         self,
         source_cfg: ReservoirConfig,
         storage_name: str,
-        bucket_name: str,
         options: BucketCopyOptions,
         progress_reporter: ProgressReporter,
         key_prefix: Optional[str] = None,
@@ -138,8 +149,17 @@ class ReservoirService:
         Returns:
             the total number of bytes copied.
         """
-        dst_client = self._get_s3_client(storage_name, bucket_name)
-        download_chunk_size = self._storage_configs[storage_name].reservoir_download_chunk_size
+        dst_client, bucket_name = self._get_s3_client(storage_name)
+
+        # Get storage from pool to access configuration
+        try:
+            storage = self._storage_pool.get_storage(storage_name)
+        except KeyError:
+            raise StorageNotFoundError(f"Storage '{storage_name}' not found in pool")
+
+        if not isinstance(storage, ObjectStorage):
+            raise StorageNotFoundError(f"Storage '{storage_name}' is not an ObjectStorage type")
+        download_chunk_size = storage._reservoir_download_chunk_size
 
         # List all objects under prefix
         src_s3_client = S3Client(
@@ -208,7 +228,7 @@ class ReservoirService:
                     or "application/octet-stream"
                 )
 
-                part_size = self._storage_configs[storage_name].upload_chunk_size
+                part_size = storage._upload_chunk_size
                 await dst_client.upload_stream(
                     _data_stream(),
                     key,
@@ -233,7 +253,6 @@ class ReservoirService:
         registry_name: str,
         model: ModelTarget,
         storage_name: str,
-        bucket_name: str,
         reporter: ProgressReporter,
     ) -> None:
         """
@@ -243,7 +262,6 @@ class ReservoirService:
             registry_name: Name of the Reservoir registry
             model: Reservoir model to import
             storage_name: Target storage name
-            bucket_name: Target bucket name
             reporter: ProgressReporter for tracking progress
         """
         if model.revision is None:
@@ -258,7 +276,6 @@ class ReservoirService:
         await self._stream_bucket_to_bucket(
             source_cfg=reservoir_config,
             storage_name=storage_name,
-            bucket_name=bucket_name,
             options=BucketCopyOptions(
                 concurrency=16,
                 progress_log_interval_bytes=0,  # disabled
@@ -281,7 +298,6 @@ class ReservoirService:
         registry_name: str,
         models: list[ModelTarget],
         storage_name: str,
-        bucket_name: str,
     ) -> uuid.UUID:
         async def _import_models_batch(reporter: ProgressReporter) -> DispatchResult:
             model_count = len(models)
@@ -293,7 +309,7 @@ class ReservoirService:
 
             log.info(
                 f"Starting batch model import: model_count={model_count}, "
-                f"(storage_name={storage_name}, bucket_name={bucket_name})"
+                f"storage_name={storage_name}"
             )
 
             try:
@@ -316,7 +332,6 @@ class ReservoirService:
                             registry_name,
                             model=model,
                             storage_name=storage_name,
-                            bucket_name=bucket_name,
                             reporter=reporter,
                         )
 
