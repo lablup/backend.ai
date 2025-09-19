@@ -373,7 +373,6 @@ class TestUserRepository:
                     result = await user_repository.update_user_validated(
                         email="test@example.com",
                         modifier=modifier,
-                        group_ids=["new_group"],
                         requester_uuid=None,
                     )
 
@@ -404,7 +403,6 @@ class TestUserRepository:
                 await user_repository.update_user_validated(
                     email="nonexistent@example.com",
                     modifier=modifier,
-                    group_ids=None,
                     requester_uuid=None,
                 )
 

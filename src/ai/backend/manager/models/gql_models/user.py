@@ -889,8 +889,10 @@ class ModifyUserInput(graphene.InputObjectType):
                 container_gids=TriState[list[int]].from_graphql(
                     self.container_gids,
                 ),
+                group_ids=OptionalState[list[str]].from_graphql(
+                    self.group_ids,
+                ),
             ),
-            group_ids=self.group_ids,
         )
 
 
