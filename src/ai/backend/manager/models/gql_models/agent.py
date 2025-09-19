@@ -154,11 +154,12 @@ class AgentNode(graphene.ObjectType):
     )
 
     @classmethod
-    def from_row(
+    async def from_row(
         cls,
         ctx: GraphQueryContext,
         row: AgentRow,
     ) -> Self:
+        occupied_slots = await row.get_occupied_slots(ctx.db)
         return cls(
             id=row.id,
             row_id=row.id,
@@ -168,7 +169,7 @@ class AgentNode(graphene.ObjectType):
             scaling_group=row.scaling_group,
             schedulable=row.schedulable,
             available_slots=row.available_slots.to_json(),
-            occupied_slots=row.occupied_slots.to_json(),
+            occupied_slots=occupied_slots.to_json(),
             addr=row.addr,
             architecture=row.architecture,
             first_contact=row.first_contact,
@@ -179,13 +180,13 @@ class AgentNode(graphene.ObjectType):
         )
 
     @classmethod
-    def parse(
+    async def parse(
         cls,
         info: graphene.ResolveInfo,
         row: AgentRow,
         permissions: Iterable[AgentPermission],
     ) -> Self:
-        result = cls.from_row(info.context, row)
+        result = await cls.from_row(info.context, row)
         result.permissions = list(permissions)
         return result
 
@@ -252,6 +253,7 @@ class AgentNode(graphene.ObjectType):
         before: Optional[str] = None,
         last: Optional[int] = None,
     ) -> ConnectionResolverResult:
+        print("get_connection!")
         graph_ctx: GraphQueryContext = info.context
         _filter_arg = (
             FilterExprArg(filter_expr, QueryFilterParser(_queryfilter_fieldspec))
@@ -304,8 +306,10 @@ class AgentNode(graphene.ObjectType):
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 agent_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
+
+        print("parse available_slots!!")
         result: list[AgentNode] = [
-            cls.parse(info, row, await permission_getter(row)) for row in agent_rows
+            await cls.parse(info, row, await permission_getter(row)) for row in agent_rows
         ]
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)

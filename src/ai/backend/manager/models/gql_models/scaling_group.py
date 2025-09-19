@@ -279,7 +279,7 @@ class ScalingGroup(graphene.ObjectType):
                 .where(
                     (AgentRow.scaling_group == self.name) & (AgentRow.status == AgentStatus[status])
                 )
-                .options(load_only(AgentRow.occupied_slots, AgentRow.available_slots))
+                .options(load_only(AgentRow.available_slots))
             )
             result = (await db_session.scalars(query_stmt)).all()
             agent_rows = cast(list[AgentRow], result)
@@ -288,7 +288,8 @@ class ScalingGroup(graphene.ObjectType):
             total_available_slots = ResourceSlot()
 
             for agent_row in agent_rows:
-                total_occupied_slots += agent_row.occupied_slots
+                occupied_slots = await agent_row.get_occupied_slots(graph_ctx.db)
+                total_occupied_slots += occupied_slots
                 total_available_slots += agent_row.available_slots
 
             return {

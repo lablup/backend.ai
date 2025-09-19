@@ -142,6 +142,18 @@ class AgentRow(Base):
             db=db,
         )
 
+    async def get_occupied_slots(self, db: ExtendedAsyncSAEngine) -> ResourceSlot:
+        async with db.begin_readonly_session() as db_session:
+            query = sa.select(KernelRow.occupied_slots).where(
+                (KernelRow.agent == self.id)
+                & (KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            )
+            kernel_slots = (await db_session.scalars(query)).all()
+            occupied_slots = ResourceSlot()
+            for slots in kernel_slots:
+                occupied_slots += slots
+            return occupied_slots
+
 
 def by_scaling_group(
     scaling_group: str,
