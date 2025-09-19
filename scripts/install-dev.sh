@@ -778,6 +778,24 @@ append_to_profiles() {
   done
 }
 
+install_rover_cli() {
+  if command -v rover >/dev/null 2>&1; then
+    echo "✓ Rover CLI is already installed: $(rover --version)"
+    return 0
+  fi
+
+  curl -sSL https://rover.apollo.dev/nix/latest | sh
+  
+  rover_settings='# Apollo Rover Settings
+export PATH="$HOME/.rover/bin:$PATH"
+export APOLLO_ELV2_LICENSE=accept'
+  
+  append_to_profiles "$rover_settings"
+  
+  export PATH="$HOME/.rover/bin:$PATH"
+  export APOLLO_ELV2_LICENSE=accept
+}
+
 setup_environment() {
   wait_for_docker
   # Install pyenv
@@ -807,6 +825,9 @@ setup_environment() {
 
   show_info "Configuring the standard git hooks..."
   install_git_hooks
+
+  show_info "Installing Rover CLI..."
+  install_rover_cli
 
   show_info "Installing Python..."
   install_python
@@ -920,6 +941,9 @@ configure_backendai() {
   show_info "Creating docker compose \"halfstack\"..."
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" up -d --wait
   $docker_sudo docker compose -f "docker-compose.halfstack.current.yml" ps   # You should see containers here.
+
+  # Install rover cli for Supergraph generation
+  install_rover_cli
 
   # Configure MinIO using separate configuration script
   source "$(dirname "$0")/configure-minio.sh"
