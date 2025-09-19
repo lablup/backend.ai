@@ -296,7 +296,7 @@ class ModelServiceDefinition(BaseModel):
         ],
     )
 
-    def ovrride_model_revision(self, model_revision: ModelRevisionSpec) -> ModelRevisionSpec:
+    def override_model_revision(self, model_revision: ModelRevisionSpec) -> ModelRevisionSpec:
         """Override model revision configuration with model service definition values."""
         if self.resource_slots:
             model_revision.resource_spec.resource_slots = self.resource_slots

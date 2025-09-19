@@ -11,7 +11,7 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
 )
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.config import ModelDefinition, ModelHealthCheck
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.types import (
     RuntimeVariant,
 )
@@ -32,6 +32,10 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.errors.service import ModelDefinitionNotFound
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
+    ModelDefinitionGeneratorRegistry,
+    RegistryArgs,
+)
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 from .types import (
@@ -67,6 +71,9 @@ class DeploymentExecutor:
         self._config_provider = config_provider
         self._client_pool = client_pool
         self._valkey_stat = valkey_stat
+        self._model_definition_generator_registry = ModelDefinitionGeneratorRegistry(
+            RegistryArgs(deployment_repository=self._deployment_repo)
+        )
 
     async def check_pending_deployments(
         self, deployments: Sequence[DeploymentInfo]
@@ -317,11 +324,10 @@ class DeploymentExecutor:
         target_revision = deployment.target_revision()
         if not target_revision:
             raise ModelDefinitionNotFound(f"No target revision for deployment {deployment.id}")
-        model_definition_content = await self._deployment_repo.fetch_model_definition(
-            vfolder_id=target_revision.mounts.model_vfolder_id,
-            model_definition_path=target_revision.mounts.model_definition_path,
+        generator = self._model_definition_generator_registry.get(
+            target_revision.execution.runtime_variant
         )
-        model_definition = ModelDefinition.model_validate(model_definition_content)
+        model_definition = await generator.generate_model_definition(target_revision)
         health_check_config = model_definition.health_check_config()
         if not health_check_config:
             log.debug(
