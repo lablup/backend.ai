@@ -16,6 +16,24 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.14.4 (2025-09-19)
+
+### Features
+* Add model definition generators for VLLM, TGI, NIM, and CMD runtime variants to support model service deployments ([#5958](https://github.com/lablup/backend.ai/issues/5958))
+
+### Improvements
+* Introduce ModelDefinitionGenerator pattern to support multiple runtime variant in model service ([#5924](https://github.com/lablup/backend.ai/issues/5924))
+
+### Fixes
+* Change object permission bulk insert to use ORM functions ([#5893](https://github.com/lablup/backend.ai/issues/5893))
+* Add missing RBAC function call in update-shared-vfolder action handler ([#5919](https://github.com/lablup/backend.ai/issues/5919))
+* Read creation configs using correct key ([#5954](https://github.com/lablup/backend.ai/issues/5954))
+* Handle Undefined group IDs when modifying user ([#5955](https://github.com/lablup/backend.ai/issues/5955))
+* Aggregate kernel resources instead of using `AgentNode.occupied_slots` in GQL API ([#5957](https://github.com/lablup/backend.ai/issues/5957))
+* Scheduler tries destroying kernels that have no container ([#5962](https://github.com/lablup/backend.ai/issues/5962))
+* `entrypoint.sh` explicitly runs addgroup to prevent the container's gid setting from being ignored ([#5963](https://github.com/lablup/backend.ai/issues/5963))
+
+
 ## 25.14.3 (2025-09-17)
 
 ### Features

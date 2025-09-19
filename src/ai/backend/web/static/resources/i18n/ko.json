@@ -1215,9 +1215,9 @@
     "PendingSessions": "대기 세션"
   },
   "session": {
-    "Agent": "실행노드",
+    "Agent": "실행 노드",
     "AgentId": "에이전트 ID",
-    "Agents": "실행노드",
+    "Agents": "실행 노드",
     "AllowedClientIps": "허용된 클라이언트 IP",
     "AlreadyTerminatingSession": "이미 종료 중인 세션입니다",
     "AnotherUserSession": "이 세션은 다른 사용자에 의해 생성되었습니다.",
@@ -1304,7 +1304,7 @@
     "RecentlyCreatedSessions": "최근 생성 세션",
     "RecentlyCreatedSessionsTooltip": "현재 프로젝트에서 가장 최근에 생성된 실행 중인 세션 {{count}}개를 표시합니다",
     "RequestContainerCommit": "컨테이너 커밋하기",
-    "Reservation": "예약시간",
+    "Reservation": "예약 시간",
     "ResourceGroup": "자원 그룹",
     "ResourceUsage": "자원 사용량",
     "Running": "실행중",
