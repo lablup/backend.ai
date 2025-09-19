@@ -11,7 +11,7 @@ import textwrap
 import uuid
 from abc import ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -23,17 +23,12 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
-    Dict,
     Generic,
-    List,
     Literal,
-    Mapping,
     NewType,
     NotRequired,
     Optional,
     Self,
-    Sequence,
-    Tuple,
     Type,
     TypeAlias,
     TypedDict,
@@ -200,7 +195,15 @@ class aobject(object):
 
 
 class Sentinel(enum.Enum):
+    """
+    A special type to represent a special value to indicate closing/shutdown of queues.
+    """
+
     TOKEN = 0
+
+    def __bool__(self) -> bool:
+        # It should be evaluated as False when used as a boolean expr.
+        return False
 
 
 class QueueSentinel(enum.Enum):
@@ -260,33 +263,33 @@ T4 = TypeVar("T4")
 
 @overload
 def check_typed_tuple(
-    value: Tuple[Any],
-    types: Tuple[Type[T1]],
-) -> Tuple[T1]: ...
+    value: tuple[Any],
+    types: tuple[Type[T1]],
+) -> tuple[T1]: ...
 
 
 @overload
 def check_typed_tuple(
-    value: Tuple[Any, Any],
-    types: Tuple[Type[T1], Type[T2]],
-) -> Tuple[T1, T2]: ...
+    value: tuple[Any, Any],
+    types: tuple[Type[T1], Type[T2]],
+) -> tuple[T1, T2]: ...
 
 
 @overload
 def check_typed_tuple(
-    value: Tuple[Any, Any, Any],
-    types: Tuple[Type[T1], Type[T2], Type[T3]],
-) -> Tuple[T1, T2, T3]: ...
+    value: tuple[Any, Any, Any],
+    types: tuple[Type[T1], Type[T2], Type[T3]],
+) -> tuple[T1, T2, T3]: ...
 
 
 @overload
 def check_typed_tuple(
-    value: Tuple[Any, Any, Any, Any],
-    types: Tuple[Type[T1], Type[T2], Type[T3], Type[T4]],
-) -> Tuple[T1, T2, T3, T4]: ...
+    value: tuple[Any, Any, Any, Any],
+    types: tuple[Type[T1], Type[T2], Type[T3], Type[T4]],
+) -> tuple[T1, T2, T3, T4]: ...
 
 
-def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
+def check_typed_tuple(value: tuple[Any, ...], types: tuple[Type, ...]) -> tuple:
     for val, typ in itertools.zip_longest(value, types):
         if typ is not None:
             typeguard.check_type(val, typ)
@@ -400,7 +403,7 @@ class SlotTypes(enum.StrEnum):
 class HardwareMetadata(TypedDict):
     status: Literal["healthy", "degraded", "offline", "unavailable"]
     status_info: Optional[str]
-    metadata: Dict[str, str]
+    metadata: dict[str, str]
 
 
 class AutoPullBehavior(enum.StrEnum):
@@ -596,7 +599,7 @@ class MountExpression:
 
 
 class HostPortPair(namedtuple("HostPortPair", "host port")):
-    def as_sockaddr(self) -> Tuple[str, int]:
+    def as_sockaddr(self) -> tuple[str, int]:
         return str(self.host), self.port
 
     def __str__(self) -> str:
@@ -1215,7 +1218,7 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
             return self
         if not isinstance(other, dict):
             raise ValueError(f"Invalid type. expected `dict` type, got {type(other)} type")
-        union_map: Dict[str, set] = defaultdict(set)
+        union_map: dict[str, set] = defaultdict(set)
         for host, perms in [*self.items(), *other.items()]:
             try:
                 perm_list = [VFolderHostPermission(perm) for perm in perms]
@@ -1289,7 +1292,7 @@ class ServicePort(TypedDict):
     is_inference: bool
 
 
-ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, Tuple[str, int]])
+ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, tuple[str, int]])
 
 
 class ClusterInfo(TypedDict):
@@ -1444,8 +1447,8 @@ class KernelCreationConfig(TypedDict):
     bootstrap_script: Optional[str]
     startup_command: Optional[str]
     internal_data: Optional[Mapping[str, Any]]
-    preopen_ports: List[int]
-    allocated_host_ports: List[int]
+    preopen_ports: list[int]
+    allocated_host_ports: list[int]
     scaling_group: str
     agent_addr: str
     endpoint_id: Optional[str]
@@ -1453,7 +1456,7 @@ class KernelCreationConfig(TypedDict):
 
 class SessionEnqueueingConfig(TypedDict):
     creation_config: dict
-    kernel_configs: List[KernelEnqueueingConfig]
+    kernel_configs: list[KernelEnqueueingConfig]
 
 
 class KernelEnqueueingConfig(TypedDict):
@@ -1516,7 +1519,7 @@ class ValkeyTarget:
 @dataclass
 class RedisTarget:
     addr: Optional[HostPortPair] = None
-    sentinel: Optional[Union[str, List[HostPortPair]]] = None
+    sentinel: Optional[Union[str, list[HostPortPair]]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
     redis_helper_config: Optional[RedisHelperConfig] = None
@@ -1610,7 +1613,7 @@ class RedisProfileTarget:
         self,
         *,
         addr: Optional[HostPortPair] = None,
-        sentinel: Optional[Union[str, List[HostPortPair]]] = None,
+        sentinel: Optional[Union[str, list[HostPortPair]]] = None,
         service_name: Optional[str] = None,
         password: Optional[str] = None,
         redis_helper_config: Optional[RedisHelperConfig] = None,
