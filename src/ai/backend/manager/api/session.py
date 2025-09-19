@@ -592,12 +592,6 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
                     " agents must be same to the cluster size. Note that you may specify"
                     " duplicate agents in the list.",
                 )
-        else:
-            if agent_count != 1:
-                raise InvalidAPIParameters(
-                    "For non-cluster sessions and single-node cluster sessions, "
-                    "you may specify only one manually assigned agent.",
-                )
 
     if params["domain"] is None:
         domain_name = request["user"]["domain_name"]
