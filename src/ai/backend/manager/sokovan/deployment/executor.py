@@ -327,7 +327,7 @@ class DeploymentExecutor:
         generator = self._model_definition_generator_registry.get(
             target_revision.execution.runtime_variant
         )
-        model_definition = await generator.generate_definition(target_revision)
+        model_definition = await generator.generate_model_definition(target_revision)
         health_check_config = model_definition.health_check_config()
         if not health_check_config:
             log.debug(

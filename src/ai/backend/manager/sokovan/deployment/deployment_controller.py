@@ -88,10 +88,9 @@ class DeploymentController:
         generator = self._model_definition_generator_registry.get(
             model_revision.execution.runtime_variant
         )
-        _ = await generator.generate_definition(model_revision)
-        overrided_revision = await generator.override_service_definition(model_revision)
+        model_revision = await generator.generate_model_revision(model_revision)
         await self._scheduling_controller.validate_session_spec(
-            SessionValidationSpec.from_revision(model_revision=overrided_revision)
+            SessionValidationSpec.from_revision(model_revision=model_revision)
         )
 
     async def update_deployment(

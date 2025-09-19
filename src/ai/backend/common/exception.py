@@ -583,19 +583,3 @@ class RuntimeVariantNotSupportedError(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
-
-
-class ServiceDefinitionNotLoadedError(BackendAIError, web.HTTPInternalServerError):
-    error_type = "https://api.backend.ai/probs/service-definition-not-loaded"
-    error_title = "Service Definition Not Loaded"
-
-    def __init__(self) -> None:
-        super().__init__(extra_msg="Service definition is not loaded yet.")
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_DEPLOYMENT,
-            operation=ErrorOperation.GENERIC,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )

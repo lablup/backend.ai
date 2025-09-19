@@ -10,7 +10,7 @@ class ModelDefinitionGenerator(ABC):
     """Abstract base class for generating model definitions."""
 
     @abstractmethod
-    async def generate_definition(self, model_revision: ModelRevisionSpec) -> ModelDefinition:
+    async def generate_model_definition(self, model_revision: ModelRevisionSpec) -> ModelDefinition:
         """Generate a model definition based on the provided revision (RuntimeVariant)."""
         raise NotImplementedError
 
@@ -20,8 +20,5 @@ class ModelDefinitionGenerator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def override_service_definition(
-        self, model_revision: ModelRevisionSpec
-    ) -> ModelRevisionSpec:
-        """Apply overrides to the model revision based on the service definition."""
+    async def generate_model_revision(self, model_revision: ModelRevisionSpec) -> ModelRevisionSpec:
         raise NotImplementedError
