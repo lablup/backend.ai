@@ -33,7 +33,7 @@ class ProcessExecutionError(BackendAIError, web.HTTPInternalServerError):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
-            operation=ErrorOperation.GENERIC,
+            operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
@@ -51,6 +51,19 @@ class ExternalStorageServiceError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class QuotaDirectoryNotEmptyError(BackendAIError, web.HTTPConflict):
+    error_type = "https://api.backend.ai/probs/storage/not-empty"
+    error_title = "Storage Not Empty"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.SOFT_DELETE,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class NetAppClientError(ExternalStorageServiceError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/storage/netapp/api-error"
     error_title = "NetApp API Error"
@@ -60,6 +73,45 @@ class NetAppClientError(ExternalStorageServiceError, web.HTTPServiceUnavailable)
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class VFolderCreationError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/storage/vfolder/creation-failed"
+    error_title = "VFolder Creation Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class VFolderDeletionError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/storage/vfolder/deletion-failed"
+    error_title = "VFolder Creation Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.SOFT_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class VFolderCloneError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/storage/vfolder/clone-failed"
+    error_title = "VFolder Clone Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.UPDATE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
@@ -74,19 +126,6 @@ class VFolderNotFoundError(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
-class QuotaDirectoryNotEmptyError(BackendAIError, web.HTTPConflict):
-    error_type = "https://api.backend.ai/probs/storage/quota-directory-not-empty"
-    error_title = "Quota Directory Not Empty"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.STORAGE_PROXY,
-            operation=ErrorOperation.SOFT_DELETE,
-            error_detail=ErrorDetail.CONFLICT,
         )
 
 
@@ -185,7 +224,7 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class FileStreamUploadError(ProcessExecutionError):
+class FileStreamUploadError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/file-stream-upload-failed"
     error_title = "Failed to upload file stream"
 
@@ -198,7 +237,7 @@ class FileStreamUploadError(ProcessExecutionError):
         )
 
 
-class FileStreamDownloadError(ProcessExecutionError):
+class FileStreamDownloadError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/file-stream-download-failed"
     error_title = "Failed to download file stream"
 
@@ -211,7 +250,7 @@ class FileStreamDownloadError(ProcessExecutionError):
         )
 
 
-class PresignedUploadURLGenerationError(ProcessExecutionError):
+class PresignedUploadURLGenerationError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/presigned-upload-url-generation-failed"
     error_title = "Failed to generate presigned upload URL"
 
@@ -224,7 +263,7 @@ class PresignedUploadURLGenerationError(ProcessExecutionError):
         )
 
 
-class PresignedDownloadURLGenerationError(ProcessExecutionError):
+class PresignedDownloadURLGenerationError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/presigned-download-url-generation-failed"
     error_title = "Failed to generate presigned download URL"
 
@@ -237,7 +276,7 @@ class PresignedDownloadURLGenerationError(ProcessExecutionError):
         )
 
 
-class ObjectInfoFetchError(ProcessExecutionError):
+class ObjectInfoFetchError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/object-info-fetch-failed"
     error_title = "Failed to fetch object info"
 

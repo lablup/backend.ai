@@ -8,7 +8,8 @@ import pytest
 
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.bgtask.task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskHandler
-from ai.backend.common.types import DispatchResult
+from ai.backend.common.exception import ErrorCode
+from ai.backend.common.types import DispatchResult, ErrorResult
 
 
 # Mock task name enum for testing - using actual TaskName values
@@ -150,7 +151,12 @@ class TestBaseBackgroundTaskHandler:
             ) -> DispatchResult:
                 return DispatchResult(
                     result={"status": "partial"},
-                    errors=["Something went wrong"],
+                    errors=[
+                        ErrorResult(
+                            code=ErrorCode.default(),
+                            message="Something went wrong",
+                        )
+                    ],
                 )
 
             @classmethod
@@ -169,4 +175,4 @@ class TestBaseBackgroundTaskHandler:
 
         assert result.has_error()
         assert len(result.errors) == 1
-        assert result.errors[0] == "Something went wrong"
+        assert result.errors[0].message == "Something went wrong"

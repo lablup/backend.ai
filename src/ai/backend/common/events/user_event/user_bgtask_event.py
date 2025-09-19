@@ -1,6 +1,8 @@
 from dataclasses import asdict, dataclass
 from typing import Any, Mapping, Optional, override
 
+from ai.backend.common.types import ErrorResult
+
 from .user_event import UserEvent
 
 
@@ -54,11 +56,11 @@ class UserBgtaskDoneEvent(UserEvent):
 class UserBgtaskPartialSuccessEvent(UserEvent):
     task_id: str
     message: str
-    errors: list[str]
+    errors: list[ErrorResult]
 
     @override
     def event_name(self) -> Optional[str]:
-        return "bgtask_done"
+        return "bgtask_partial_done"
 
     @override
     def retry_count(self) -> Optional[int]:

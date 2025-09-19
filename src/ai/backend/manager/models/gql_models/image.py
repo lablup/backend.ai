@@ -30,10 +30,12 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AgentId,
     DispatchResult,
+    ErrorResult,
     ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.errors.image import ImagePurgeError, ImageRescanError
 from ai.backend.manager.models.minilang import EnumFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
@@ -1021,7 +1023,14 @@ class RescanImages(graphene.Mutation):
 
             rescanned_image_ids = [image.id for image in rescanned_images]
             if errors:
-                return DispatchResult.partial_success(rescanned_image_ids, errors)
+                error_results = [
+                    ErrorResult(
+                        code=ImageRescanError.error_code(),
+                        message=str(error),
+                    )
+                    for error in errors
+                ]
+                return DispatchResult.partial_success(rescanned_image_ids, error_results)
             return DispatchResult.success(rescanned_image_ids)
 
         task_id = await ctx.background_task_manager.start(_bg_task)
@@ -1306,9 +1315,14 @@ class PurgeImages(graphene.Mutation):
                         total_result.errors.append(result.error)
 
             if total_result.errors:
-                return DispatchResult.partial_success(
-                    total_result.purged_images, total_result.errors
-                )
+                error_results = [
+                    ErrorResult(
+                        code=ImagePurgeError.error_code(),
+                        message=str(error),
+                    )
+                    for error in total_result.errors
+                ]
+                return DispatchResult.partial_success(total_result.purged_images, error_results)
             return DispatchResult.success(total_result.purged_images)
 
         task_id = await ctx.background_task_manager.start(_bg_task)

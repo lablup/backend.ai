@@ -137,6 +137,7 @@ class HuggingFaceRegistryAPIHandler:
         """
         Import multiple HuggingFace models to storage in batch.
         """
+
         await log_client_api_entry(log, "import_models", body.parsed)
 
         task_id = await self._huggingface_service.import_models_batch(
