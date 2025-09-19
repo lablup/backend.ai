@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time
 import uuid
+from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import (
@@ -14,6 +15,7 @@ from typing import (
     Optional,
     Protocol,
     Self,
+    Sequence,
     TypeAlias,
 )
 
@@ -134,9 +136,88 @@ class NopBackgroundTaskObserver:
         pass
 
 
+@dataclass
+class BgtaskKey:
+    task_id: TaskID
+    sub_key: Optional[str] = None
+
+
+class BackgroundTaskMeta(ABC):
+    @abstractmethod
+    def task_keys(self) -> Sequence[BgtaskKey]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def retriable(self) -> bool:
+        # TODO: Remove the retriable property once all migrations are complete
+        raise NotImplementedError
+
+    @abstractmethod
+    def async_tasks(self) -> Sequence[asyncio.Task]:
+        raise NotImplementedError
+
+
+class LocalBgtask(BackgroundTaskMeta):
+    _task_id: TaskID
+    _task: asyncio.Task
+
+    def __init__(self, task_id: TaskID, task: asyncio.Task) -> None:
+        self._task_id = task_id
+        self._task = task
+
+    def task_keys(self) -> Sequence[BgtaskKey]:
+        return [BgtaskKey(self._task_id)]
+
+    def retriable(self) -> bool:
+        return False
+
+    def async_tasks(self) -> Sequence[asyncio.Task]:
+        return [self._task]
+
+
+class SingleBgtask(BackgroundTaskMeta):
+    _task_id: TaskID
+    _task: asyncio.Task
+
+    def __init__(self, task_id: TaskID, task: asyncio.Task) -> None:
+        self._task_id = task_id
+        self._task = task
+
+    def task_keys(self) -> Sequence[BgtaskKey]:
+        return [BgtaskKey(self._task_id)]
+
+    def retriable(self) -> bool:
+        return True
+
+    def async_tasks(self) -> Sequence[asyncio.Task]:
+        return [self._task]
+
+
+class MultipleBgtask(BackgroundTaskMeta):
+    _task_id: TaskID
+    _sub_keys: list[str]
+    _tasks: Sequence[asyncio.Task]
+
+    def __init__(
+        self, task_id: TaskID, sub_keys: Iterable[str], tasks: Sequence[asyncio.Task]
+    ) -> None:
+        self._task_id = task_id
+        self._sub_keys = list(sub_keys)
+        self._tasks = list(tasks)
+
+    def task_keys(self) -> Sequence[BgtaskKey]:
+        return [BgtaskKey(self._task_id, sub_key) for sub_key in self._sub_keys]
+
+    def retriable(self) -> bool:
+        return True
+
+    def async_tasks(self) -> Sequence[asyncio.Task]:
+        return self._tasks
+
+
 class BackgroundTaskManager:
     _event_producer: EventProducer
-    _ongoing_tasks: dict[TaskID, asyncio.Task]
+    _ongoing_tasks: dict[TaskID, BackgroundTaskMeta]
     _metric_observer: BackgroundTaskObserver
     _dict_lock: asyncio.Lock
 
@@ -185,19 +266,21 @@ class BackgroundTaskManager:
             ),
         )
         task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
-        self._ongoing_tasks[TaskID(task_id)] = task
+        self._ongoing_tasks[TaskID(task_id)] = LocalBgtask(task_id=TaskID(task_id), task=task)
         return task_id
 
     async def shutdown(self) -> None:
         log.info("Cancelling remaining background tasks...")
         for task in self._ongoing_tasks.values():
-            if task.done():
-                continue
-            try:
-                task.cancel()
-                await task
-            except asyncio.CancelledError:
-                pass
+            async_tasks = task.async_tasks()
+            for async_task in async_tasks:
+                if async_task.done():
+                    continue
+                try:
+                    async_task.cancel()
+                    await async_task
+                except asyncio.CancelledError:
+                    pass
         try:
             self._heartbeat_loop_task.cancel()
             await self._heartbeat_loop_task
@@ -333,7 +416,7 @@ class BackgroundTaskManager:
             tags=tags,
         )
         task = asyncio.create_task(self._process_retriable_task(func, args, metadata))
-        self._ongoing_tasks[task_id] = task
+        self._ongoing_tasks[task_id] = SingleBgtask(task_id=task_id, task=task)
         return task_id
 
     async def _process_retriable_task(
@@ -458,7 +541,7 @@ class BackgroundTaskManager:
                 # Update heartbeat for all ongoing background tasks
                 alive_task_ids: list[TaskID] = []
                 for task_id, bg_task in self._ongoing_tasks.items():
-                    if not bg_task.done():
+                    if bg_task.retriable():
                         alive_task_ids.append(task_id)
                 await self._valkey_client.heartbeat(
                     alive_task_ids,
@@ -513,4 +596,4 @@ class BackgroundTaskManager:
         args = args_type.from_metadata_body(metadata.body)
         retry_task = self._process_retriable_task(func, args, metadata=metadata)
         task = asyncio.create_task(retry_task)
-        self._ongoing_tasks[metadata.task_id] = task
+        self._ongoing_tasks[metadata.task_id] = SingleBgtask(task_id=metadata.task_id, task=task)
