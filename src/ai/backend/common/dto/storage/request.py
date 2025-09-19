@@ -229,3 +229,52 @@ class DeleteObjectReq(BaseRequestModel):
     """
 
     key: str = Field(description="The object key (path) within the bucket to delete the file from.")
+
+
+# VFS Storage Request DTOs
+class VFSStorageAPIPathParams(BaseRequestModel):
+    """Path parameters for VFS storage API endpoints."""
+
+    storage_name: str = Field(
+        description="The name of the VFS storage configuration to use for the operation."
+    )
+
+
+class VFSUploadFileReq(BaseRequestModel):
+    """
+    Data model for file upload requests to VFS storage.
+    This is used to specify the target filepath and options for the file upload.
+    """
+
+    filepath: str = Field(description="The file path within VFS storage to upload the file to.")
+    overwrite: bool = Field(
+        default=False, description="Whether to overwrite the file if it already exists."
+    )
+    content_type: Optional[str] = Field(
+        default=None, description="MIME type of the file being uploaded (optional for VFS)."
+    )
+
+
+class VFSDownloadFileReq(BaseRequestModel):
+    """
+    Data model for file download requests from VFS storage.
+    """
+
+    filepath: str = Field(description="The file path within VFS storage to download the file from.")
+
+
+class VFSGetFileMetaReq(BaseRequestModel):
+    """
+    Data model for retrieving metadata of a file in VFS storage.
+    """
+
+    filepath: str = Field(description="The file path within VFS storage to retrieve metadata for.")
+
+
+class VFSDeleteFileReq(BaseRequestModel):
+    """
+    Data model for deleting files from VFS storage.
+    """
+
+    filepath: str = Field(description="The file path within VFS storage to delete.")
+    recursive: bool = Field(default=False, description="Whether to delete directories recursively.")

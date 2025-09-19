@@ -1,12 +1,66 @@
+from __future__ import annotations
+
 import logging
-from collections.abc import AsyncIterable
-from typing import Any, AsyncIterator, Iterable, Optional
+from collections.abc import AsyncIterator
+from typing import Any, Iterable, Optional, override
 
 import aioboto3
 
 from ai.backend.common.dto.storage.response import ObjectMetaResponse, PresignedUploadObjectResponse
+from ai.backend.common.types import StreamReader
 
 logger = logging.getLogger(__name__)
+
+
+class S3DownloadStreamReader(StreamReader):
+    def __init__(
+        self,
+        s3_key: str,
+        bucket_name: str,
+        chunk_size: int,
+        endpoint_url: str,
+        region_name: Optional[str],
+        aws_access_key_id: Optional[str],
+        aws_secret_access_key: Optional[str],
+        content_type: Optional[str],
+    ):
+        self._session = aioboto3.Session()
+        self._key = s3_key
+        self._chunk_size = chunk_size
+        self._bucket_name = bucket_name
+        self._endpoint_url = endpoint_url
+        self._region_name = region_name
+        self._aws_access_key_id = aws_access_key_id
+        self._aws_secret_access_key = aws_secret_access_key
+        self._content_type = content_type
+
+    @override
+    async def read(self) -> AsyncIterator[bytes]:
+        async with self._session.client(
+            "s3",
+            endpoint_url=self._endpoint_url,
+            region_name=self._region_name,
+            aws_access_key_id=self._aws_access_key_id,
+            aws_secret_access_key=self._aws_secret_access_key,
+        ) as s3_client:
+            response = await s3_client.get_object(
+                Bucket=self._bucket_name,
+                Key=self._key,
+            )
+
+            body = response["Body"]
+            try:
+                while True:
+                    chunk = await body.read(self._chunk_size)
+                    if not chunk:
+                        break
+                    yield chunk
+            finally:
+                body.close()
+
+    @override
+    def content_type(self) -> Optional[str]:
+        return self._content_type
 
 
 class S3Client:
@@ -63,20 +117,17 @@ class S3Client:
 
     async def upload_stream(
         self,
-        data_stream: AsyncIterable[bytes],
+        data_stream: StreamReader,
         s3_key: str,
         part_size: int,
-        *,
-        content_type: Optional[str] = None,
     ) -> None:
         """
         Upload data stream to S3 using streaming.
 
         Args:
-            data_stream: Async iterator of bytes to upload
+            data_stream: StreamReader to upload
             s3_key: The S3 object key (destination path in bucket)
             part_size: Size of each part in bytes
-            content_type: MIME type of the file (optional)
         """
         async with self.session.client(
             "s3",
@@ -86,7 +137,7 @@ class S3Client:
             aws_secret_access_key=self.aws_secret_access_key,
         ) as s3_client:
             create_args = {"Bucket": self.bucket_name, "Key": s3_key}
-            if content_type:
+            if content_type := data_stream.content_type():
                 create_args["ContentType"] = content_type
 
             resp = await s3_client.create_multipart_upload(**create_args)
@@ -97,7 +148,7 @@ class S3Client:
             buf = bytearray()
 
             try:
-                async for downloaded_chunk in data_stream:
+                async for downloaded_chunk in data_stream.read():
                     if not downloaded_chunk:
                         continue
                     buf.extend(downloaded_chunk)
@@ -142,11 +193,12 @@ class S3Client:
                     # Reraise original exception, not abort exception
                     raise
 
-    async def download_stream(
+    def download_stream(
         self,
         s3_key: str,
         chunk_size: int,
-    ) -> AsyncIterator[bytes]:
+        content_type: Optional[str] = None,
+    ) -> StreamReader:
         """
         Download and stream S3 object content as bytes chunks.
         This method streams the file content without downloading the entire file to memory.
@@ -155,30 +207,19 @@ class S3Client:
             s3_key: The S3 object key to download
             chunk_size: Size of each chunk in bytes
 
-        Yields:
-            bytes: Chunks of file content
+        Returns:
+            FileStream: Stream for reading file data chunks
         """
-        async with self.session.client(
-            "s3",
+        return S3DownloadStreamReader(
+            s3_key=s3_key,
+            bucket_name=self.bucket_name,
+            chunk_size=chunk_size,
             endpoint_url=self.endpoint_url,
             region_name=self.region_name,
             aws_access_key_id=self.aws_access_key_id,
             aws_secret_access_key=self.aws_secret_access_key,
-        ) as s3_client:
-            response = await s3_client.get_object(
-                Bucket=self.bucket_name,
-                Key=s3_key,
-            )
-
-            body = response["Body"]
-            try:
-                while True:
-                    chunk = await body.read(chunk_size)
-                    if not chunk:
-                        break
-                    yield chunk
-            finally:
-                body.close()
+            content_type=content_type,
+        )
 
     async def generate_presigned_upload_url(
         self,

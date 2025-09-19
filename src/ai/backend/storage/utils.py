@@ -3,6 +3,7 @@ import logging
 from contextlib import asynccontextmanager as actxmgr
 from datetime import datetime
 from datetime import timezone as tz
+from pathlib import PurePath
 from typing import Any, AsyncIterator, Optional, Union
 
 import trafaret as t
@@ -177,3 +178,39 @@ async def log_client_api_entry(
             name.upper(),
             str(params),
         )
+
+
+def normalize_filepath(filepath: str) -> str:
+    """
+    Normalize a filepath by removing path traversal components and extra slashes.
+
+    Args:
+        filepath: The filepath to normalize
+
+    Returns:
+        Normalized filepath string
+
+    Raises:
+        ValueError: If the filepath contains invalid characters or path traversal
+    """
+    if not filepath:
+        raise ValueError("Filepath cannot be empty")
+
+    # Convert to PurePath to handle cross-platform path normalization
+    path = PurePath(filepath)
+
+    # Check for path traversal attempts
+    for part in path.parts:
+        if part in (".", ".."):
+            raise ValueError(f"Path traversal not allowed: {filepath}")
+        if "\x00" in part:  # Null byte
+            raise ValueError(f"Invalid character in filepath: {filepath}")
+
+    # Convert back to string with forward slashes (POSIX style)
+    normalized = str(path).replace("\\", "/")
+
+    # Remove leading slash if present (we want relative paths)
+    if normalized.startswith("/"):
+        normalized = normalized[1:]
+
+    return normalized
