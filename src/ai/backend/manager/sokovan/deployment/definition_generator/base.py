@@ -15,10 +15,5 @@ class ModelDefinitionGenerator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def validate_configuration(self, config: dict) -> None:
-        """Validate the provided model configuration."""
-        raise NotImplementedError
-
-    @abstractmethod
     async def generate_model_revision(self, model_revision: ModelRevisionSpec) -> ModelRevisionSpec:
         raise NotImplementedError

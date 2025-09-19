@@ -84,7 +84,6 @@ class DeploymentController:
 
     async def _validate_model_revision(self, model_revision: ModelRevisionSpec) -> None:
         """Validate the model revision specification."""
-
         generator = self._model_definition_generator_registry.get(
             model_revision.execution.runtime_variant
         )
