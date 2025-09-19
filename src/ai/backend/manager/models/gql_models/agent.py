@@ -307,7 +307,6 @@ class AgentNode(graphene.ObjectType):
                 agent_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
 
-        print("parse available_slots!!")
         result: list[AgentNode] = [
             await cls.parse(info, row, await permission_getter(row)) for row in agent_rows
         ]
