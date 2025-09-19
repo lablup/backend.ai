@@ -2963,7 +2963,6 @@ class ScheduleDBSource:
                 )
                 for k in data["kernels"]
             ]
-            log.info(f"kernel preopen ports: {[k.preopen_ports for k in kernel_bindings]}")
 
             sessions_for_start.append(
                 SessionDataForStart(

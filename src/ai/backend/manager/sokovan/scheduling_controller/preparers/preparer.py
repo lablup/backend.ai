@@ -202,7 +202,7 @@ class SessionPreparer:
 
             # Get preopen_ports from kernel config or fall back to creation_spec
             # This follows the same pattern as in the original registry.py
-            preopen_ports = kernel_config.get("preopen_ports")
+            preopen_ports = kernel_config.get("creation_config", {}).get("preopen_ports")
             if preopen_ports is None:
                 # Fall back to creation_spec preopen_ports (applies to all kernels)
                 preopen_ports = spec.creation_spec.get("preopen_ports")
