@@ -3,6 +3,7 @@ import logging
 from typing import Any
 
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.model_serving.admin_repository import (
     AdminModelServingRepository,
@@ -30,9 +31,6 @@ from ai.backend.manager.services.model_serving.exceptions import (
     GenericForbidden,
     InvalidAPIParameters,
     ModelServiceNotFound,
-)
-from ai.backend.manager.services.model_serving.types import (
-    RequesterCtx,
 )
 
 log = BraceStyleAdapter(logging.getLogger(__name__))

@@ -13,9 +13,9 @@ from ai.backend.manager.data.deployment.creator import DeploymentCreator
 from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.types import DeploymentInfo, ModelRevisionSpec
+from ai.backend.manager.data.model_serving.types import ModelServiceDefinition
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.services.model_serving.types import ModelServiceDefinition
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
 
