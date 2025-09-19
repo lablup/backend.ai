@@ -88,6 +88,10 @@ class SessionPreparer:
         # Prepare environment variables
         environ = dict(spec.creation_spec.get("environ") or {})
 
+        # Add SUDO_SESSION_ENABLED to environ if sudo session is enabled
+        if spec.sudo_session_enabled:
+            environ["SUDO_SESSION_ENABLED"] = "1"
+
         # Determine network configuration
         network_type, network_id = self._determine_network_config(spec, context)
 
@@ -196,12 +200,22 @@ class SessionPreparer:
                 # Fallback for string image references
                 image_info = None
 
+            # Get preopen_ports from kernel config or fall back to creation_spec
+            # This follows the same pattern as in the original registry.py
+            preopen_ports = kernel_config.get("preopen_ports")
+            if preopen_ports is None:
+                # Fall back to creation_spec preopen_ports (applies to all kernels)
+                preopen_ports = spec.creation_spec.get("preopen_ports")
+            if not preopen_ports:
+                preopen_ports = []
+            if not isinstance(preopen_ports, list):
+                preopen_ports = []
+
             # Use pre-calculated resources for this kernel
             if idx < len(calculated_resources.kernel_resources):
                 kernel_resource = calculated_resources.kernel_resources[idx]
                 requested_slots = kernel_resource.requested_slots
                 resource_opts = kernel_resource.resource_opts
-                preopen_ports = kernel_config.get("preopen_ports") or []
                 log.debug(
                     "Kernel {} (idx={}, role={}) using calculated resources: {}",
                     kernel_id,
@@ -222,7 +236,6 @@ class SessionPreparer:
                 )
                 requested_slots = ResourceSlot()
                 resource_opts = {}
-                preopen_ports = []
 
             # Build kernel data
             kernel_data = KernelEnqueueData(
