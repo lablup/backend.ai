@@ -113,7 +113,9 @@ types-aiofiles
 types-cachetools
 types-colorama
 types-Jinja2
-types-networkx
+# Removed types-networkx because it depends on numpy, which we do not want to install by default
+# https://github.com/python/typeshed/issues/14760
+# types-networkx
 types-pexpect
 types-psutil
 types-PyYAML
