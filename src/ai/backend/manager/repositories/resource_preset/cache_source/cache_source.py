@@ -31,7 +31,7 @@ class ResourcePresetCacheSource:
 
     async def get_preset_by_id(self, preset_id: UUID) -> Optional[ResourcePresetData]:
         """
-        Try to get a preset from cache by ID.
+        Get a preset from cache by ID.
         Returns None if not in cache.
         """
         data = await self._valkey_stat.get_resource_preset_by_id(str(preset_id))
@@ -41,7 +41,7 @@ class ResourcePresetCacheSource:
 
     async def get_preset_by_name(self, name: str) -> Optional[ResourcePresetData]:
         """
-        Try to get a preset from cache by name.
+        Get a preset from cache by name.
         Returns None if not in cache.
         """
         data = await self._valkey_stat.get_resource_preset_by_name(name)
