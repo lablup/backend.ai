@@ -62,6 +62,10 @@ from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_deplo
     BatchLoadReplicasByDeploymentIdsAction,
     BatchLoadReplicasByDeploymentIdsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_revision_ids import (
+    BatchLoadReplicasByRevisionIdsAction,
+    BatchLoadReplicasByRevisionIdsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
@@ -73,10 +77,6 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
-)
-from ai.backend.manager.services.deployment.actions.get_replicas_by_revision_id import (
-    GetReplicasByRevisionIdAction,
-    GetReplicasByRevisionIdActionResult,
 )
 from ai.backend.manager.services.deployment.actions.list_replicas import (
     ListReplicasAction,
@@ -436,11 +436,11 @@ class DeploymentService:
             data=[mock_revision_data_1, mock_revision_data_2]
         )
 
-    async def get_replicas_by_revision_id(
-        self, action: GetReplicasByRevisionIdAction
-    ) -> GetReplicasByRevisionIdActionResult:
+    async def batch_load_replicas_by_revision_ids(
+        self, action: BatchLoadReplicasByRevisionIdsAction
+    ) -> BatchLoadReplicasByRevisionIdsActionResult:
         # For now, return empty replica list
-        return GetReplicasByRevisionIdActionResult(data=[])
+        return BatchLoadReplicasByRevisionIdsActionResult(data={})
 
     async def create_model_revision(
         self, action: CreateModelRevisionAction
