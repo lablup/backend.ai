@@ -35,17 +35,18 @@ class AgentDBSource:
                 return None
             return AgentData.from_row(agent_row)
 
+    async def _check_scaling_group_exists(self, scaling_group_name: str) -> None:
+        async with self._db.begin_readonly_session() as db_session:
+            scaling_group_row = await db_session.scalar(
+                sa.select(ScalingGroupRow).where(ScalingGroupRow.name == scaling_group_name)
+            )
+            if not scaling_group_row:
+                log.error("Scaling group named [{}] does not exist.", scaling_group_name)
+                raise ScalingGroupNotFound(scaling_group_name)
+
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin() as conn:
-            scaling_group_query = sa.select(ScalingGroupRow).where(
-                ScalingGroupRow.name == upsert_data.metadata.scaling_group
-            )
-            scaling_group_result = (await conn.execute(scaling_group_query)).scalar()
-            if scaling_group_result is None:
-                log.error(
-                    "Scaling group named [{}] does not exist.", upsert_data.metadata.scaling_group
-                )
-                raise ScalingGroupNotFound(upsert_data.metadata.scaling_group)
+            await self._check_scaling_group_exists(upsert_data.metadata.scaling_group)
 
             query = (
                 sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
