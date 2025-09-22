@@ -216,8 +216,8 @@ class ModelReplica(Node):
     @classmethod
     async def batch_load_by_deployment_ids(
         cls, ctx: StrawberryGQLContext, deployment_ids: Sequence[UUID]
-    ) -> list["ModelReplica"]:
-        """Batch load replicas by their IDs."""
+    ) -> list[list["ModelReplica"]]:
+        """Batch load replicas by their deployment IDs."""
         processor = ctx.processors.deployment
         if processor is None:
             raise ModelDeploymentUnavailable(
@@ -229,16 +229,19 @@ class ModelReplica(Node):
         )
 
         replicas_map = action_result.data
-        replicas = []
+        result = []
         for deployment_id in deployment_ids:
-            if deployment_id in replicas_map:
-                replicas.extend(replicas_map[deployment_id])
-        return [cls.from_dataclass(data) for data in replicas]
+            replica_data_list = replicas_map.get(deployment_id, [])
+            replica_objects = []
+            for replica_data in replica_data_list:
+                replica_objects.append(cls.from_dataclass(replica_data))
+            result.append(replica_objects)
+        return result
 
     @classmethod
     async def batch_load_by_revision_ids(
         cls, ctx: StrawberryGQLContext, revision_ids: Sequence[UUID]
-    ) -> list["ModelReplica"]:
+    ) -> list[list["ModelReplica"]]:
         """Batch load replicas by their revision IDs."""
         processor = ctx.processors.deployment
         if processor is None:
@@ -246,16 +249,19 @@ class ModelReplica(Node):
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
-        replicas = []
-        action_results = await processor.batch_load_replicas_by_revision_ids.wait_for_complete(
+        action_result = await processor.batch_load_replicas_by_revision_ids.wait_for_complete(
             BatchLoadReplicasByRevisionIdsAction(revision_ids=list(revision_ids))
         )
-        replicas_map = action_results.data
-        for revision_id in revision_ids:
-            if revision_id in replicas_map:
-                replicas.extend(replicas_map[revision_id])
+        replicas_map = action_result.data
 
-        return [cls.from_dataclass(data) for data in replicas]
+        result = []
+        for revision_id in revision_ids:
+            replica_data_list = replicas_map.get(revision_id, [])
+            replica_objects = [
+                cls.from_dataclass(replica_data) for replica_data in replica_data_list
+            ]
+            result.append(replica_objects)
+        return result
 
 
 ModelReplicaEdge = Edge[ModelReplica]
