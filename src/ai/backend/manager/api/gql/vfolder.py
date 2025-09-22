@@ -1,5 +1,5 @@
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
@@ -65,16 +65,3 @@ class ExtraVFolderMountConnection(Connection[ExtraVFolderMount]):
         )
 
         return cls(count=len(nodes), edges=edges, page_info=page_info)
-
-
-mock_extra_mount_1 = ExtraVFolderMount(
-    id=str(uuid4()),
-    _vfolder_id=uuid4(),
-    mount_destination="/extra_models/model1",
-)
-
-mock_extra_mount_2 = ExtraVFolderMount(
-    id=str(uuid4()),
-    _vfolder_id=uuid4(),
-    mount_destination="/extra_models/model2",
-)

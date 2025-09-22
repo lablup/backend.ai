@@ -9,6 +9,3 @@ class User:
     @classmethod
     def resolve_reference(cls, id: ID, info: Info) -> "User":
         return cls(id=id)
-
-
-mock_user_id = ID("VXNlck5vZGU6ZjM4ZGVhMjMtNTBmYS00MmEwLWI1YWUtMzM4ZjVmNDY5M2Y0")
