@@ -10,7 +10,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.data.object_storage_namespace.creator import ObjectStorageNamespaceCreator
-from ai.backend.manager.data.object_storage_namespace.types import ObjectStorageNamespaceData
+from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.services.object_storage.actions.get_buckets import (
     GetBucketsAction,
 )
@@ -44,11 +44,11 @@ class ObjectStorageNamespace(Node):
     bucket: str
 
     @classmethod
-    def from_dataclass(cls, data: ObjectStorageNamespaceData) -> Self:
+    def from_dataclass(cls, data: StorageNamespaceData) -> Self:
         return cls(
             id=ID(str(data.id)),
             storage_id=ID(str(data.storage_id)),
-            bucket=data.bucket,
+            bucket=data.namespace,
         )
 
 

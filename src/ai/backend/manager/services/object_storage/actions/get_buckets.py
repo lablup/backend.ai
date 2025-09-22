@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.object_storage_namespace.types import ObjectStorageNamespaceData
+from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
 
 
@@ -23,7 +23,7 @@ class GetBucketsAction(ObjectStorageAction):
 
 @dataclass
 class GetBucketsActionResult(BaseActionResult):
-    result: list[ObjectStorageNamespaceData]
+    result: list[StorageNamespaceData]
 
     @override
     def entity_id(self) -> Optional[str]:
