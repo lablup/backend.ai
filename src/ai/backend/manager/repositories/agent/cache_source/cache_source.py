@@ -25,15 +25,7 @@ class AgentCacheSource:
         self._valkey_live = valkey_live
 
     async def set_agent_to_images(self, agent_id: AgentId, image_canonicals: list[str]) -> None:
-        try:
-            await self._valkey_image.add_agent_to_images(agent_id, image_canonicals)
-        except Exception as e:
-            log.debug(
-                "Failed to cache agent: {} to images: {}, error: {}", agent_id, image_canonicals, e
-            )
+        await self._valkey_image.add_agent_to_images(agent_id, image_canonicals)
 
     async def update_agent_last_seen(self, agent_id: AgentId, time: datetime) -> None:
-        try:
-            await self._valkey_live.update_agent_last_seen(agent_id, time.timestamp())
-        except Exception as e:
-            log.debug("Failed to update last seen for agent: {}, error: {}", agent_id, e)
+        await self._valkey_live.update_agent_last_seen(agent_id, time.timestamp())

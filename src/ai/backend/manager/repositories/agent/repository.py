@@ -20,6 +20,7 @@ from ai.backend.manager.decorators.repository_decorator import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
+from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 from ai.backend.manager.services.agent.types import AgentData
 
 # Layer-specific decorator for agent repository
@@ -52,7 +53,10 @@ class AgentRepository:
     async def add_agent_to_images(self, agent_id: AgentId, images) -> None:
         images = msgpack.unpackb(zlib.decompress(images))
         image_canonicals = set(img_info[0] for img_info in images)
-        await self._cache_source.set_agent_to_images(agent_id, list(image_canonicals))
+        with suppress_with_log(
+            [Exception], message=f"Failed to cache agent: {agent_id} to images: {image_canonicals}"
+        ):
+            await self._cache_source.set_agent_to_images(agent_id, list(image_canonicals))
 
     @repository_decorator()
     async def sync_agent_heartbeat(
@@ -61,7 +65,10 @@ class AgentRepository:
         upsert_data: AgentHeartbeatUpsert,
         state_sync_data: AgentStateSyncData,
     ) -> UpsertResult:
-        await self._cache_source.update_agent_last_seen(agent_id, state_sync_data.now)
+        with suppress_with_log(
+            [Exception], message=f"Failed to update last seen for agent: {agent_id}"
+        ):
+            await self._cache_source.update_agent_last_seen(agent_id, state_sync_data.now)
 
         upsert_result = await self._db_source.upsert_agent_with_state(upsert_data)
         if upsert_result.need_resource_slot_update:
