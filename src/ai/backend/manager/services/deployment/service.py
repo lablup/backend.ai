@@ -86,6 +86,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
     AddModelRevisionAction,
     AddModelRevisionActionResult,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.batch_load_revisions import (
+    BatchLoadRevisionsAction,
+    BatchLoadRevisionsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
     CreateModelRevisionAction,
     CreateModelRevisionActionResult,
@@ -357,6 +361,11 @@ class DeploymentService:
             data=[],
             total_count=0,
         )
+
+    async def batch_load_revisions(
+        self, action: BatchLoadRevisionsAction
+    ) -> BatchLoadRevisionsActionResult:
+        return BatchLoadRevisionsActionResult(data=[mock_revision_data_1, mock_revision_data_2])
 
     async def list_revisions(self, action: ListRevisionsAction) -> ListRevisionsActionResult:
         return ListRevisionsActionResult(data=[], total_count=0)
