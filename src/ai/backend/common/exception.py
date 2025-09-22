@@ -476,7 +476,7 @@ class BgtaskNotRegisteredError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class BgtaskNotFoundError(BackendAIError, web.HTTPNotFound):
+class BgtaskNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/bgtask-not-found"
     error_title = "Background Task Not Found"
 
@@ -700,7 +700,7 @@ class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class VFolderNotFoundError(BackendAIError, web.HTTPNotFound):
+class VFolderNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/vfolder-not-found"
     error_title = "Virtual Folder Not Found"
 
@@ -713,7 +713,7 @@ class VFolderNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class UserNotFoundError(BackendAIError, web.HTTPNotFound):
+class UserNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/user-not-found"
     error_title = "User Not Found"
 
@@ -726,7 +726,7 @@ class UserNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class GroupNotFoundError(BackendAIError, web.HTTPNotFound):
+class GroupNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/group-not-found"
     error_title = "Project Not Found"
 
@@ -739,7 +739,7 @@ class GroupNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class DomainNotFoundError(BackendAIError, web.HTTPNotFound):
+class DomainNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/domain-not-found"
     error_title = "Domain Not Found"
 
@@ -752,7 +752,7 @@ class DomainNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ModelDeploymentUnavailableError(BackendAIError, web.HTTPServiceUnavailable):
+class ModelDeploymentUnavailable(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/model-deployment-unavailable"
     error_title = "Model Deployment Unavailable"
 
