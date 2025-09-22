@@ -566,3 +566,16 @@ class ArtifactDefaultRevisionResolveError(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
+
+
+class GenericNotImplementedError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/not-implemented"
+    error_title = "Not Implemented"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
