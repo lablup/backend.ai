@@ -14,5 +14,5 @@ class ObjectStorageNamespaceCreator(Creator):
     def fields_to_store(self) -> dict[str, Any]:
         return {
             "storage_id": self.storage_id,
-            "bucket": self.bucket,
+            "namespace": self.bucket,
         }

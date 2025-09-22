@@ -9,9 +9,11 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.data.object_storage_namespace.creator import ObjectStorageNamespaceCreator
 from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
-from ai.backend.manager.services.object_storage.actions.register_bucket import RegisterBucketAction
-from ai.backend.manager.services.object_storage.actions.unregister_bucket import (
-    UnregisterBucketAction,
+from ai.backend.manager.services.storage_namespace.actions.register_namespace import (
+    RegisterNamespaceAction,
+)
+from ai.backend.manager.services.storage_namespace.actions.unregister_namespace import (
+    UnregisterNamespaceAction,
 )
 
 from .types import StrawberryGQLContext
@@ -76,8 +78,8 @@ async def register_storage_namespace(
 ) -> RegisterStorageNamespacePayload:
     processors = info.context.processors
 
-    action_result = await processors.object_storage.register_bucket.wait_for_complete(
-        RegisterBucketAction(
+    action_result = await processors.storage_namespace.register_namespace.wait_for_complete(
+        RegisterNamespaceAction(
             creator=input.to_creator(),
         )
     )
@@ -91,10 +93,10 @@ async def unregister_storage_namespace(
 ) -> UnregisterStorageNamespacePayload:
     processors = info.context.processors
 
-    action_result = await processors.object_storage.unregister_bucket.wait_for_complete(
-        UnregisterBucketAction(
+    action_result = await processors.storage_namespace.unregister_namespace.wait_for_complete(
+        UnregisterNamespaceAction(
             storage_id=input.storage_id,
-            bucket_name=input.namespace_name,
+            namespace_name=input.namespace_name,
         )
     )
 

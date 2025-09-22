@@ -9,14 +9,14 @@ from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.base import to_global_id
-from ai.backend.manager.services.object_storage.actions.get_buckets import (
-    GetBucketsAction,
-)
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
 from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
     GetUploadPresignedURLAction,
+)
+from ai.backend.manager.services.storage_namespace.actions.get_namespaces import (
+    GetNamespacesAction,
 )
 
 from ...data.object_storage.creator import ObjectStorageCreator
@@ -66,8 +66,10 @@ class ObjectStorage(Node):
         offset: Optional[int],
     ) -> StorageNamespaceConnection:
         # TODO: Support pagination
-        action_result = await info.context.processors.object_storage.get_buckets.wait_for_complete(
-            GetBucketsAction(uuid.UUID(self.id))
+        action_result = (
+            await info.context.processors.storage_namespace.get_namespaces.wait_for_complete(
+                GetNamespacesAction(uuid.UUID(self.id))
+            )
         )
 
         nodes = [StorageNamespace.from_dataclass(bucket) for bucket in action_result.result]
