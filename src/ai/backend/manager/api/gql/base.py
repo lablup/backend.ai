@@ -138,7 +138,7 @@ class Ordering(StrEnum):
     DESC_NULLS_LAST = "DESC_NULLS_LAST"
 
 
-@strawberry.scalar(description="Added in 25.13.0")
+@strawberry.scalar(description="Added in 25.15.0")
 class JSONString:
     @staticmethod
     def parse_value(value: str | bytes) -> Mapping[str, Any]:

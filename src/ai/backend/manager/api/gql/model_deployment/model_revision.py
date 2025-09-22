@@ -78,17 +78,17 @@ from ai.backend.manager.services.deployment.actions.model_revision.list_revision
 MountPermission = strawberry.enum(
     CommonMountPermission,
     name="MountPermission",
-    description="Added in 25.13.0. This enum represents the permission level for a mounted volume. It can be ro, rw, wd",
+    description="Added in 25.15.0. This enum represents the permission level for a mounted volume. It can be ro, rw, wd",
 )
 
 
-@strawberry.enum(description="Added in 25.13.0")
+@strawberry.enum(description="Added in 25.15.0")
 class ClusterMode(StrEnum):
     SINGLE_NODE = "SINGLE_NODE"
     MULTI_NODE = "MULTI_NODE"
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.15.0")
 class ModelMountConfig:
     _vfolder_id: strawberry.Private[UUID]
     mount_destination: str
@@ -110,7 +110,7 @@ class ModelMountConfig:
         )
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.15.0")
 class ModelRuntimeConfig:
     runtime_variant: str
     inference_runtime_config: Optional[JSON] = None
@@ -128,7 +128,7 @@ class ModelRuntimeConfig:
         )
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.15.0")
 class ResourceConfig:
     _resource_group_name: strawberry.Private[str]
     resource_slots: JSONString = strawberry.field(
@@ -156,7 +156,7 @@ class ResourceConfig:
         )
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.15.0")
 class ClusterConfig:
     mode: ClusterMode
     size: int
@@ -169,7 +169,7 @@ class ClusterConfig:
         )
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.15.0")
 class ModelRevision(Node):
     _image_id: strawberry.Private[UUID]
     id: NodeID
@@ -226,7 +226,7 @@ class ModelRevision(Node):
 
 
 # Filter and Order Types
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.15.0")
 class ModelRevisionFilter:
     name: Optional[StringFilter] = None
     deployment_id: Optional[ID] = None
@@ -257,36 +257,36 @@ class ModelRevisionFilter:
         return repo_filter
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.15.0")
 class ModelRevisionOrderBy:
     field: ModelRevisionOrderField
     direction: OrderDirection = OrderDirection.DESC
 
 
 # Payload Types
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.15.0")
 class CreateModelRevisionPayload:
     revision: ModelRevision
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.15.0")
 class AddModelRevisionPayload:
     revision: ModelRevision
 
 
 # Input Types
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.15.0")
 class ClusterConfigInput:
     mode: ClusterMode
     size: int
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.15.0")
 class ResourceGroupInput:
     name: str
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.15.0")
 class ResourceConfigInput:
     resource_group: ResourceGroupInput
     resource_slots: JSONString = strawberry.field(
@@ -298,13 +298,13 @@ class ResourceConfigInput:
     )
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.15.0")
 class ImageInput:
     name: str
     architecture: str
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.15.0")
 class ModelRuntimeConfigInput:
     runtime_variant: str
     inference_runtime_config: Optional[JSON] = None
@@ -314,20 +314,20 @@ class ModelRuntimeConfigInput:
     )
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.15.0")
 class ModelMountConfigInput:
     vfolder_id: ID
     mount_destination: str
     definition_path: str
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.15.0")
 class ExtraVFolderMountInput:
     vfolder_id: ID
     mount_destination: Optional[str]
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.15.0")
 class CreateModelRevisionInput:
     name: Optional[str] = None
     cluster_config: ClusterConfigInput
@@ -387,7 +387,7 @@ class CreateModelRevisionInput:
         )
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.15.0")
 class AddModelRevisionInput:
     name: Optional[str] = None
     deployment_id: ID
@@ -451,7 +451,7 @@ class AddModelRevisionInput:
 ModelRevisionEdge = Edge[ModelRevision]
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.15.0")
 class ModelRevisionConnection(Connection[ModelRevision]):
     count: int
 
@@ -475,7 +475,7 @@ class ModelRevisionConnection(Connection[ModelRevision]):
 
 
 @strawberry.field(
-    description="Added in 25.13.0. Get JSON Schema for inference runtime configuration"
+    description="Added in 25.15.0. Get JSON Schema for inference runtime configuration"
 )
 async def inference_runtime_config(name: str) -> JSON:
     match name.lower():
@@ -494,7 +494,7 @@ async def inference_runtime_config(name: str) -> JSON:
 
 
 @strawberry.field(
-    description="Added in 25.13.0 Get configuration JSON Schemas for all inference runtimes"
+    description="Added in 25.15.0 Get configuration JSON Schemas for all inference runtimes"
 )
 async def inference_runtime_configs(info: Info[StrawberryGQLContext]) -> JSON:
     all_configs = {
@@ -581,7 +581,7 @@ async def resolve_revisions(
     return connection
 
 
-@strawberry.field(description="Added in 25.13.0")
+@strawberry.field(description="Added in 25.15.0")
 async def revisions(
     info: Info[StrawberryGQLContext],
     filter: Optional[ModelRevisionFilter] = None,
@@ -607,7 +607,7 @@ async def revisions(
     )
 
 
-@strawberry.field(description="Added in 25.13.0")
+@strawberry.field(description="Added in 25.15.0")
 async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision:
     """Get a specific revision by ID."""
     _, revision_id = resolve_global_id(id)
@@ -616,7 +616,7 @@ async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision:
     return revision[0]
 
 
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.15.0")
 async def add_model_revision(
     input: AddModelRevisionInput, info: Info[StrawberryGQLContext]
 ) -> AddModelRevisionPayload:
@@ -638,7 +638,7 @@ async def add_model_revision(
 
 
 @strawberry.mutation(
-    description="Added in 25.13.0. Create model revision which is not attached to any deployment."
+    description="Added in 25.15.0. Create model revision which is not attached to any deployment."
 )
 async def create_model_revision(
     input: CreateModelRevisionInput, info: Info[StrawberryGQLContext]
