@@ -16,6 +16,15 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.14.5 (2025-09-22)
+
+### Features
+* Remove agent count validation for single-node multi-designated sessions ([#5961](https://github.com/lablup/backend.ai/issues/5961))
+
+### External Dependency Updates
+* Revert addition of types-networkx dependency because it depends on numpy ([#5978](https://github.com/lablup/backend.ai/issues/5978))
+
+
 ## 25.14.4 (2025-09-19)
 
 ### Features
