@@ -16,7 +16,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus as CommonDeploymentStatus,
 )
-from ai.backend.common.exception import ModelDeploymentUnavailableError
+from ai.backend.common.exception import ModelDeploymentUnavailable
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -151,7 +151,7 @@ class ScalingRule:
     ) -> list[AutoScalingRule]:
         processor = info.context.processors.deployment
         if processor is None:
-            raise ModelDeploymentUnavailableError(
+            raise ModelDeploymentUnavailable(
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
@@ -324,7 +324,7 @@ class ModelDeployment(Node):
         """Batch load deployments by their IDs."""
         processor = ctx.processors.deployment
         if processor is None:
-            raise ModelDeploymentUnavailableError(
+            raise ModelDeploymentUnavailable(
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
@@ -593,7 +593,7 @@ async def resolve_deployments(
 
     processor = info.context.processors.deployment
     if processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
     action_result = await processor.list_deployments.wait_for_complete(
@@ -668,7 +668,7 @@ async def create_model_deployment(
 
     processor = info.context.processors.deployment
     if processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
 
@@ -687,7 +687,7 @@ async def update_model_deployment(
     _, deployment_id = resolve_global_id(input.id)
     deployment_processor = info.context.processors.deployment
     if deployment_processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
     action_result = await deployment_processor.update_deployment.wait_for_complete(
@@ -706,7 +706,7 @@ async def delete_model_deployment(
     _, deployment_id = resolve_global_id(input.id)
     deployment_processor = info.context.processors.deployment
     if deployment_processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
     _ = await deployment_processor.destroy_deployment.wait_for_complete(
@@ -745,7 +745,7 @@ async def sync_replicas(
     _, deployment_id = resolve_global_id(input.model_deployment_id)
     deployment_processor = info.context.processors.deployment
     if deployment_processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
     await deployment_processor.sync_replicas.wait_for_complete(

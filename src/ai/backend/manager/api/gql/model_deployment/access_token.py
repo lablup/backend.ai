@@ -7,7 +7,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.exception import ModelDeploymentUnavailableError
+from ai.backend.common.exception import ModelDeploymentUnavailable
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
@@ -46,7 +46,7 @@ class AccessToken(Node):
         """Batch load access tokens by deployment IDs."""
         processor = ctx.processors.deployment
         if processor is None:
-            raise ModelDeploymentUnavailableError(
+            raise ModelDeploymentUnavailable(
                 "Model Deployment feature is unavailable. Please contact support."
             )
 

@@ -12,7 +12,7 @@ from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 from strawberry.scalars import JSON
 
-from ai.backend.common.exception import ModelDeploymentUnavailableError, ModelRevisionNotFound
+from ai.backend.common.exception import ModelDeploymentUnavailable, ModelRevisionNotFound
 from ai.backend.common.types import ClusterMode as CommonClusterMode
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.common.types import RuntimeVariant
@@ -207,7 +207,7 @@ class ModelRevision(Node):
         """Batch load revisions by their IDs."""
         processor = ctx.processors.deployment
         if processor is None:
-            raise ModelDeploymentUnavailableError(
+            raise ModelDeploymentUnavailable(
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
@@ -549,7 +549,7 @@ async def resolve_revisions(
 
     processor = info.context.processors.deployment
     if processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
     action_result = await processor.list_revisions.wait_for_complete(
@@ -624,7 +624,7 @@ async def add_model_revision(
 
     processor = info.context.processors.deployment
     if processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
 
@@ -646,7 +646,7 @@ async def create_model_revision(
     """Create a new model revision without attaching it to any deployment."""
     processor = info.context.processors.deployment
     if processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
 

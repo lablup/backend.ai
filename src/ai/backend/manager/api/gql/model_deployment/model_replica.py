@@ -12,7 +12,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 from ai.backend.common.data.model_deployment.types import ActivenessStatus as CommonActivenessStatus
 from ai.backend.common.data.model_deployment.types import LivenessStatus as CommonLivenessStatus
 from ai.backend.common.data.model_deployment.types import ReadinessStatus as CommonReadinessStatus
-from ai.backend.common.exception import ModelDeploymentUnavailableError
+from ai.backend.common.exception import ModelDeploymentUnavailable
 from ai.backend.manager.api.gql.base import (
     JSONString,
     OrderDirection,
@@ -220,7 +220,7 @@ class ModelReplica(Node):
         """Batch load replicas by their IDs."""
         processor = ctx.processors.deployment
         if processor is None:
-            raise ModelDeploymentUnavailableError(
+            raise ModelDeploymentUnavailable(
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
@@ -241,7 +241,7 @@ class ModelReplica(Node):
         """Batch load replicas by their revision IDs."""
         processor = ctx.processors.deployment
         if processor is None:
-            raise ModelDeploymentUnavailableError(
+            raise ModelDeploymentUnavailable(
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
@@ -338,7 +338,7 @@ async def resolve_replicas(
 
     processor = info.context.processors.deployment
     if processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
 
