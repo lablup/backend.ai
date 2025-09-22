@@ -71,9 +71,6 @@ from ai.backend.manager.services.deployment.actions.model_revision.create_model_
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
     GetRevisionByIdAction,
 )
-from ai.backend.manager.services.deployment.actions.model_revision.get_revisions_by_deployment_id import (
-    GetRevisionsByDeploymentIdAction,
-)
 from ai.backend.manager.services.deployment.actions.model_revision.list_revisions import (
     ListRevisionsAction,
 )
@@ -221,26 +218,6 @@ class ModelRevision(Node):
                 GetRevisionByIdAction(revision_id=revision_id)
             )
             revisions.append(action_result.data)
-
-        return [cls.from_dataclass(revision) for revision in revisions if revision]
-
-    @classmethod
-    async def batch_load_by_deployment_ids(
-        cls, ctx: StrawberryGQLContext, deployment_ids: Sequence[UUID]
-    ) -> list["ModelRevision"]:
-        processor = ctx.processors.deployment
-        if processor is None:
-            raise ModelDeploymentUnavailableError(
-                "Model Deployment feature is unavailable. Please contact support."
-            )
-
-        revisions = []
-
-        for deployment_id in deployment_ids:
-            action_result = await processor.get_revisions_by_deployment_id.wait_for_complete(
-                GetRevisionsByDeploymentIdAction(deployment_id=deployment_id)
-            )
-            revisions.extend(action_result.data)
 
         return [cls.from_dataclass(revision) for revision in revisions if revision]
 
