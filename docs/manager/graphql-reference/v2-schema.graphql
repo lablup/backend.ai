@@ -686,11 +686,11 @@ type Mutation {
   """Added in 25.14.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
 
-  """Added in 25.14.0"""
-  registerObjectStorageBucket(input: RegisterObjectStorageBucketInput!): RegisterObjectStorageBucketPayload!
+  """Added in 25.15.0"""
+  registerStorageNamespace(input: RegisterStorageNamespaceInput!): RegisterStorageNamespacePayload!
 
-  """Added in 25.14.0"""
-  unregisterObjectStorageBucket(input: UnregisterObjectStorageBucketInput!): UnregisterObjectStorageBucketPayload!
+  """Added in 25.15.0"""
+  unregisterStorageNamespace(input: UnregisterStorageNamespaceInput!): UnregisterStorageNamespacePayload!
 
   """Added in 25.14.0"""
   createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload!
@@ -739,7 +739,7 @@ type ObjectStorage implements Node {
   secretKey: String!
   endpoint: String!
   region: String!
-  namespaces(before: String, after: String, first: Int, last: Int, limit: Int, offset: Int): ObjectStorageNamespaceConnection!
+  namespaces(before: String, after: String, first: Int, last: Int, limit: Int, offset: Int): StorageNamespaceConnection!
 }
 
 """Added in 25.14.0"""
@@ -759,33 +759,6 @@ type ObjectStorageEdge {
 
   """The item at the end of the edge"""
   node: ObjectStorage!
-}
-
-"""Added in 25.14.0"""
-type ObjectStorageNamespace implements Node {
-  """The Globally Unique ID of this object"""
-  id: ID!
-  storageId: ID!
-  bucket: String!
-}
-
-"""Added in 25.14.0"""
-type ObjectStorageNamespaceConnection {
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ObjectStorageNamespaceEdge!]!
-  count: Int!
-}
-
-"""An edge in a connection."""
-type ObjectStorageNamespaceEdge {
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: ObjectStorageNamespace!
 }
 
 enum OrderDirection {
@@ -886,14 +859,14 @@ type RawServiceConfig {
   extraCliParameters: String
 }
 
-"""Added in 25.14.0"""
-input RegisterObjectStorageBucketInput {
+"""Added in 25.15.0"""
+input RegisterStorageNamespaceInput {
   storageId: UUID!
-  bucketName: String!
+  namespaceName: String!
 }
 
-"""Added in 25.14.0"""
-type RegisterObjectStorageBucketPayload {
+"""Added in 25.15.0"""
+type RegisterStorageNamespacePayload {
   id: UUID!
 }
 
@@ -1032,6 +1005,33 @@ type SourceInfo {
   url: String
 }
 
+"""Added in 25.15.0"""
+type StorageNamespace implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  storageId: ID!
+  namespace: String!
+}
+
+"""Added in 25.15.0"""
+type StorageNamespaceConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [StorageNamespaceEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type StorageNamespaceEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: StorageNamespace!
+}
+
 input StringFilter {
   contains: String = null
   startsWith: String = null
@@ -1057,14 +1057,14 @@ type Subscription {
 
 scalar UUID
 
-"""Added in 25.14.0"""
-input UnregisterObjectStorageBucketInput {
+"""Added in 25.15.0"""
+input UnregisterStorageNamespaceInput {
   storageId: UUID!
-  bucketName: String!
+  namespaceName: String!
 }
 
-"""Added in 25.14.0"""
-type UnregisterObjectStorageBucketPayload {
+"""Added in 25.15.0"""
+type UnregisterStorageNamespacePayload {
   id: UUID!
 }
 

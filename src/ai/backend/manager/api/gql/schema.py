@@ -50,8 +50,6 @@ from .object_storage import (
     get_presigned_upload_url,
     object_storage,
     object_storages,
-    register_object_storage_bucket,
-    unregister_object_storage_bucket,
     update_object_storage,
 )
 from .reservoir_registry import (
@@ -60,6 +58,10 @@ from .reservoir_registry import (
     reservoir_registries,
     reservoir_registry,
     update_reservoir_registry,
+)
+from .storage_namespace import (
+    register_storage_namespace,
+    unregister_storage_namespace,
 )
 
 
@@ -100,8 +102,8 @@ class Mutation:
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     delete_object_storage = delete_object_storage
-    register_object_storage_bucket = register_object_storage_bucket
-    unregister_object_storage_bucket = unregister_object_storage_bucket
+    register_storage_namespace = register_storage_namespace
+    unregister_storage_namespace = unregister_storage_namespace
     create_huggingface_registry = create_huggingface_registry
     update_huggingface_registry = update_huggingface_registry
     delete_huggingface_registry = delete_huggingface_registry

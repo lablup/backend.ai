@@ -3794,11 +3794,11 @@ type Mutation
   """Added in 25.14.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
-  registerObjectStorageBucket(input: RegisterObjectStorageBucketInput!): RegisterObjectStorageBucketPayload! @join__field(graph: STRAWBERRY)
+  """Added in 25.15.0"""
+  registerStorageNamespace(input: RegisterStorageNamespaceInput!): RegisterStorageNamespacePayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
-  unregisterObjectStorageBucket(input: UnregisterObjectStorageBucketInput!): UnregisterObjectStorageBucketPayload! @join__field(graph: STRAWBERRY)
+  """Added in 25.15.0"""
+  unregisterStorageNamespace(input: UnregisterStorageNamespaceInput!): UnregisterStorageNamespacePayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
   createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload! @join__field(graph: STRAWBERRY)
@@ -3899,7 +3899,7 @@ type ObjectStorage implements Node
   secretKey: String!
   endpoint: String!
   region: String!
-  namespaces(before: String, after: String, first: Int, last: Int, limit: Int, offset: Int): ObjectStorageNamespaceConnection!
+  namespaces(before: String, after: String, first: Int, last: Int, limit: Int, offset: Int): StorageNamespaceConnection!
 }
 
 """Added in 25.14.0"""
@@ -3923,40 +3923,6 @@ type ObjectStorageEdge
 
   """The item at the end of the edge"""
   node: ObjectStorage!
-}
-
-"""Added in 25.14.0"""
-type ObjectStorageNamespace implements Node
-  @join__implements(graph: STRAWBERRY, interface: "Node")
-  @join__type(graph: STRAWBERRY)
-{
-  """The Globally Unique ID of this object"""
-  id: ID!
-  storageId: ID!
-  bucket: String!
-}
-
-"""Added in 25.14.0"""
-type ObjectStorageNamespaceConnection
-  @join__type(graph: STRAWBERRY)
-{
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ObjectStorageNamespaceEdge!]!
-  count: Int!
-}
-
-"""An edge in a connection."""
-type ObjectStorageNamespaceEdge
-  @join__type(graph: STRAWBERRY)
-{
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: ObjectStorageNamespace!
 }
 
 enum OrderDirection
@@ -4605,16 +4571,16 @@ type RawServiceConfig
   extraCliParameters: String
 }
 
-"""Added in 25.14.0"""
-input RegisterObjectStorageBucketInput
+"""Added in 25.15.0"""
+input RegisterStorageNamespaceInput
   @join__type(graph: STRAWBERRY)
 {
   storageId: UUID!
-  bucketName: String!
+  namespaceName: String!
 }
 
-"""Added in 25.14.0"""
-type RegisterObjectStorageBucketPayload
+"""Added in 25.15.0"""
+type RegisterStorageNamespacePayload
   @join__type(graph: STRAWBERRY)
 {
   id: UUID!
@@ -5062,6 +5028,40 @@ type SourceInfo
   url: String
 }
 
+"""Added in 25.15.0"""
+type StorageNamespace implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  storageId: ID!
+  namespace: String!
+}
+
+"""Added in 25.15.0"""
+type StorageNamespaceConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [StorageNamespaceEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type StorageNamespaceEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: StorageNamespace!
+}
+
 type StorageVolume implements Item
   @join__implements(graph: GRAPHENE, interface: "Item")
   @join__type(graph: GRAPHENE)
@@ -5135,16 +5135,16 @@ type UnloadImage
   task_id: String
 }
 
-"""Added in 25.14.0"""
-input UnregisterObjectStorageBucketInput
+"""Added in 25.15.0"""
+input UnregisterStorageNamespaceInput
   @join__type(graph: STRAWBERRY)
 {
   storageId: UUID!
-  bucketName: String!
+  namespaceName: String!
 }
 
-"""Added in 25.14.0"""
-type UnregisterObjectStorageBucketPayload
+"""Added in 25.15.0"""
+type UnregisterStorageNamespacePayload
   @join__type(graph: STRAWBERRY)
 {
   id: UUID!
