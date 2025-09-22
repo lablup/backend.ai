@@ -1,7 +1,7 @@
 import enum
 import uuid
-from collections.abc import Iterable, Mapping
-from typing import Any, NewType, Optional, Self
+from collections.abc import Mapping
+from typing import Any, NewType, Self
 
 from pydantic import BaseModel, Field
 from pydantic_core import ValidationError
@@ -37,23 +37,6 @@ class BackgroundTaskMetadata(BaseModel):
     body: Mapping[str, Any]
     server_id: str = Field(description="Server ID where the task is running")
     tags: set[str] = Field(default_factory=set, description="Optional tags to group tasks")
-
-    @classmethod
-    def create(
-        cls,
-        task_id: TaskID,
-        task_name: TaskName,
-        body: Mapping[str, Any],
-        server_id: str,
-        tags: Optional[Iterable[str]] = None,
-    ) -> Self:
-        return cls(
-            task_id=task_id,
-            task_name=task_name,
-            body=body,
-            server_id=server_id,
-            tags=set(tags) if tags is not None else set(),
-        )
 
     def to_json(self) -> str:
         data = self.model_dump_json()

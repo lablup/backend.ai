@@ -69,7 +69,7 @@ class TestTaskID:
 class TestBackgroundTaskMetadata:
     def test_create(self) -> None:
         task_id = TaskID(uuid.uuid4())
-        metadata = BackgroundTaskMetadata.create(
+        metadata = BackgroundTaskMetadata(
             task_id=task_id,
             task_name=TaskName.CLONE_VFOLDER,
             body={"key": "value"},
@@ -84,8 +84,8 @@ class TestBackgroundTaskMetadata:
 
     def test_create_with_tags(self) -> None:
         task_id = TaskID(uuid.uuid4())
-        tags = ["tag1", "tag2", "tag3"]
-        metadata = BackgroundTaskMetadata.create(
+        tags = {"tag1", "tag2", "tag3"}
+        metadata = BackgroundTaskMetadata(
             task_id=task_id,
             task_name=TaskName.PUSH_IMAGE,
             body={"data": "test"},
@@ -97,12 +97,11 @@ class TestBackgroundTaskMetadata:
 
     def test_create_with_none_tags(self) -> None:
         task_id = TaskID(uuid.uuid4())
-        metadata = BackgroundTaskMetadata.create(
+        metadata = BackgroundTaskMetadata(
             task_id=task_id,
             task_name=TaskName.CLONE_VFOLDER,
             body={},
             server_id="server-3",
-            tags=None,
         )
 
         assert metadata.tags == set()
@@ -110,12 +109,12 @@ class TestBackgroundTaskMetadata:
     def test_json_serialization_deserialization(self) -> None:
         # Test to_json and from_json together since they are a pair for DB storage
         task_id = TaskID(uuid.uuid4())
-        original_metadata = BackgroundTaskMetadata.create(
+        original_metadata = BackgroundTaskMetadata(
             task_id=task_id,
             task_name=TaskName.CLONE_VFOLDER,
             body={"test": "data", "number": 42, "nested": {"key": "value"}},
             server_id="server-1",
-            tags=["tag1", "tag2"],
+            tags={"tag1", "tag2"},
         )
 
         # Serialize to JSON
@@ -170,12 +169,12 @@ class TestBackgroundTaskMetadata:
             "null": None,
         }
 
-        original = BackgroundTaskMetadata.create(
+        original = BackgroundTaskMetadata(
             task_id=task_id,
             task_name=TaskName.PUSH_IMAGE,
             body=complex_body,
             server_id="server-complex",
-            tags=["tag1", "tag2", "tag3"],
+            tags={"tag1", "tag2", "tag3"},
         )
 
         # Round-trip serialization

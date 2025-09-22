@@ -156,6 +156,19 @@ class BackgroundTaskMeta(ABC):
     def async_tasks(self) -> Sequence[asyncio.Task]:
         raise NotImplementedError
 
+    def cancel(self) -> None:
+        """Cancel all tasks."""
+        for task in self.async_tasks():
+            task.cancel()
+
+    def done(self) -> bool:
+        """Check if all tasks are done."""
+        return all(task.done() for task in self.async_tasks())
+
+    def cancelled(self) -> bool:
+        """Check if any task was cancelled."""
+        return any(task.cancelled() for task in self.async_tasks())
+
 
 class LocalBgtask(BackgroundTaskMeta):
     _task_id: TaskID
@@ -408,13 +421,14 @@ class BackgroundTaskManager:
             ),
         )
         func = self._get_task_func_by_name(task_name)
-        metadata = BackgroundTaskMetadata.create(
+        metadata = BackgroundTaskMetadata(
             task_id=task_id,
             task_name=task_name,
             body=args.to_metadata_body(),
             server_id=self._server_id,
-            tags=tags,
+            tags=set(tags) if tags is not None else set(),
         )
+        await self._valkey_client.register_task(metadata)
         task = asyncio.create_task(self._process_retriable_task(func, args, metadata))
         self._ongoing_tasks[task_id] = SingleBgtask(task_id=task_id, task=task)
         return task_id
@@ -425,7 +439,6 @@ class BackgroundTaskManager:
         args: BaseBackgroundTaskArgs,
         metadata: BackgroundTaskMetadata,
     ) -> None:
-        await self._valkey_client.register_task(metadata)
         try:
             await self._wrapper_broadcast_result(
                 func,
@@ -595,5 +608,6 @@ class BackgroundTaskManager:
         args_type = func.args_type()
         args = args_type.from_metadata_body(metadata.body)
         retry_task = self._process_retriable_task(func, args, metadata=metadata)
+        await self._valkey_client.register_task(metadata)
         task = asyncio.create_task(retry_task)
         self._ongoing_tasks[metadata.task_id] = SingleBgtask(task_id=metadata.task_id, task=task)
