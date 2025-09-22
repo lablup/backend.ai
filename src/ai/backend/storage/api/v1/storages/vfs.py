@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final
 
 from aiohttp import web
 
@@ -34,6 +34,8 @@ from ....utils import log_client_api_entry
 
 if TYPE_CHECKING:
     from ....context import RootContext
+
+_DEFAULT_CONTENT_TYPE: Final[str] = "application/octet-stream"
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -103,9 +105,9 @@ class VFSStorageAPIHandler:
         # Get file metadata for content type
         try:
             meta = await self._vfs_service.get_file_meta(storage_name, filepath)
-            content_type = meta.content_type or "application/octet-stream"
+            content_type = meta.content_type or _DEFAULT_CONTENT_TYPE
         except Exception:
-            content_type = "application/octet-stream"
+            content_type = _DEFAULT_CONTENT_TYPE
 
         return APIStreamResponse(
             body=file_stream,
