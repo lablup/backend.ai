@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from typing import Any, Iterable, Optional, override
 
 import aioboto3
@@ -12,46 +13,56 @@ from ai.backend.common.types import StreamReader
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class _S3Credentials:
+    aws_access_key_id: Optional[str]
+    aws_secret_access_key: Optional[str]
+
+
+@dataclass(frozen=True)
+class _S3Target:
+    bucket_name: str
+    key: str
+    endpoint_url: str
+    region_name: Optional[str]
+
+
+@dataclass(frozen=True)
+class _S3DownloadConfig:
+    chunk_size: int
+    content_type: Optional[str]
+
+
 class S3DownloadStreamReader(StreamReader):
     def __init__(
         self,
-        s3_key: str,
-        bucket_name: str,
-        chunk_size: int,
-        endpoint_url: str,
-        region_name: Optional[str],
-        aws_access_key_id: Optional[str],
-        aws_secret_access_key: Optional[str],
-        content_type: Optional[str],
+        target: _S3Target,
+        credentials: _S3Credentials,
+        config: _S3DownloadConfig,
     ):
         self._session = aioboto3.Session()
-        self._key = s3_key
-        self._chunk_size = chunk_size
-        self._bucket_name = bucket_name
-        self._endpoint_url = endpoint_url
-        self._region_name = region_name
-        self._aws_access_key_id = aws_access_key_id
-        self._aws_secret_access_key = aws_secret_access_key
-        self._content_type = content_type
+        self._target = target
+        self._credentials = credentials
+        self._config = config
 
     @override
     async def read(self) -> AsyncIterator[bytes]:
         async with self._session.client(
             "s3",
-            endpoint_url=self._endpoint_url,
-            region_name=self._region_name,
-            aws_access_key_id=self._aws_access_key_id,
-            aws_secret_access_key=self._aws_secret_access_key,
+            endpoint_url=self._target.endpoint_url,
+            region_name=self._target.region_name,
+            aws_access_key_id=self._credentials.aws_access_key_id,
+            aws_secret_access_key=self._credentials.aws_secret_access_key,
         ) as s3_client:
             response = await s3_client.get_object(
-                Bucket=self._bucket_name,
-                Key=self._key,
+                Bucket=self._target.bucket_name,
+                Key=self._target.key,
             )
 
             body = response["Body"]
             try:
                 while True:
-                    chunk = await body.read(self._chunk_size)
+                    chunk = await body.read(self._config.chunk_size)
                     if not chunk:
                         break
                     yield chunk
@@ -60,7 +71,7 @@ class S3DownloadStreamReader(StreamReader):
 
     @override
     def content_type(self) -> Optional[str]:
-        return self._content_type
+        return self._config.content_type
 
 
 class S3Client:
@@ -210,15 +221,25 @@ class S3Client:
         Returns:
             FileStream: Stream for reading file data chunks
         """
-        return S3DownloadStreamReader(
-            s3_key=s3_key,
+        target = _S3Target(
             bucket_name=self.bucket_name,
-            chunk_size=chunk_size,
+            key=s3_key,
             endpoint_url=self.endpoint_url,
             region_name=self.region_name,
+        )
+        credentials = _S3Credentials(
             aws_access_key_id=self.aws_access_key_id,
             aws_secret_access_key=self.aws_secret_access_key,
+        )
+        config = _S3DownloadConfig(
+            chunk_size=chunk_size,
             content_type=content_type,
+        )
+
+        return S3DownloadStreamReader(
+            target=target,
+            credentials=credentials,
+            config=config,
         )
 
     async def generate_presigned_upload_url(
