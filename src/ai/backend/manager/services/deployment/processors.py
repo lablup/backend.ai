@@ -29,6 +29,10 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_aut
     UpdateAutoScalingRuleAction,
     UpdateAutoScalingRuleActionResult,
 )
+from ai.backend.manager.services.deployment.actions.batch_load_deployments import (
+    BatchLoadDeploymentsAction,
+    BatchLoadDeploymentsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
@@ -40,10 +44,6 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
-)
-from ai.backend.manager.services.deployment.actions.get_deployment import (
-    GetDeploymentAction,
-    GetDeploymentActionResult,
 )
 from ai.backend.manager.services.deployment.actions.get_replicas_by_deployment_id import (
     GetReplicasByDeploymentIdAction,
@@ -120,6 +120,10 @@ class DeploymentServiceProtocol(Protocol):
         self, action: DestroyDeploymentAction
     ) -> DestroyDeploymentActionResult: ...
 
+    async def batch_load_deployments(
+        self, action: BatchLoadDeploymentsAction
+    ) -> BatchLoadDeploymentsActionResult: ...
+
     async def create_auto_scaling_rule(
         self, action: CreateAutoScalingRuleAction
     ) -> CreateAutoScalingRuleActionResult: ...
@@ -165,8 +169,6 @@ class DeploymentServiceProtocol(Protocol):
     async def get_revision_by_id(
         self, action: GetRevisionByIdAction
     ) -> GetRevisionByIdActionResult: ...
-
-    async def get_deployment(self, action: GetDeploymentAction) -> GetDeploymentActionResult: ...
 
     async def get_revisions_by_deployment_id(
         self, action: GetRevisionsByDeploymentIdAction
@@ -226,8 +228,10 @@ class DeploymentProcessors(AbstractProcessorPackage):
     get_revision_by_replica_id: ActionProcessor[
         GetRevisionByReplicaIdAction, GetRevisionByReplicaIdActionResult
     ]
-    get_deployment: ActionProcessor[GetDeploymentAction, GetDeploymentActionResult]
     list_deployments: ActionProcessor[ListDeploymentsAction, ListDeploymentsActionResult]
+    batch_load_deployments: ActionProcessor[
+        BatchLoadDeploymentsAction, BatchLoadDeploymentsActionResult
+    ]
     get_revisions_by_deployment_id: ActionProcessor[
         GetRevisionsByDeploymentIdAction, GetRevisionsByDeploymentIdActionResult
     ]
@@ -252,6 +256,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.delete_auto_scaling_rule = ActionProcessor(
             service.delete_auto_scaling_rule, action_monitors
         )
+        self.batch_load_deployments = ActionProcessor(
+            service.batch_load_deployments, action_monitors
+        )
         self.create_deployment = ActionProcessor(service.create_deployment, action_monitors)
         self.destroy_deployment = ActionProcessor(service.destroy_deployment, action_monitors)
         self.update_deployment = ActionProcessor(service.update_deployment, action_monitors)
@@ -274,7 +281,6 @@ class DeploymentProcessors(AbstractProcessorPackage):
             service.get_revision_by_replica_id, action_monitors
         )
         self.get_revision_by_id = ActionProcessor(service.get_revision_by_id, action_monitors)
-        self.get_deployment = ActionProcessor(service.get_deployment, action_monitors)
         self.get_revisions_by_deployment_id = ActionProcessor(
             service.get_revisions_by_deployment_id, action_monitors
         )
@@ -303,7 +309,6 @@ class DeploymentProcessors(AbstractProcessorPackage):
             GetRevisionByDeploymentIdAction.spec(),
             GetRevisionByReplicaIdAction.spec(),
             GetRevisionByIdAction.spec(),
-            GetDeploymentAction.spec(),
             GetRevisionsByDeploymentIdAction.spec(),
             GetReplicasByRevisionIdAction.spec(),
             ListRevisionsAction.spec(),
@@ -311,4 +316,5 @@ class DeploymentProcessors(AbstractProcessorPackage):
             CreateLegacyDeploymentAction.spec(),
             CreateModelRevisionAction.spec(),
             BatchLoadRevisionsAction.spec(),
+            BatchLoadDeploymentsAction.spec(),
         ]

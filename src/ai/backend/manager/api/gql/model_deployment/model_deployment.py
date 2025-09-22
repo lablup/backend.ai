@@ -16,7 +16,7 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus as CommonDeploymentStatus,
 )
-from ai.backend.common.exception import ModelDeploymentUnavailable
+from ai.backend.common.exception import ModelDeploymentNotFound, ModelDeploymentUnavailable
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
@@ -69,13 +69,15 @@ from ai.backend.manager.repositories.deployment.types.types import (
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule_by_deployment_id import (
     GetAutoScalingRulesByDeploymentIdAction,
 )
+from ai.backend.manager.services.deployment.actions.batch_load_deployments import (
+    BatchLoadDeploymentsAction,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
 )
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
 )
-from ai.backend.manager.services.deployment.actions.get_deployment import GetDeploymentAction
 from ai.backend.manager.services.deployment.actions.list_deployments import ListDeploymentsAction
 from ai.backend.manager.services.deployment.actions.sync_replicas import SyncReplicaAction
 from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
@@ -328,15 +330,19 @@ class ModelDeployment(Node):
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
+        result = await processor.batch_load_deployments.wait_for_complete(
+            BatchLoadDeploymentsAction(deployment_ids=list(deployment_ids))
+        )
+
+        deployment_map = {deployment.id: deployment for deployment in result.data}
         model_deployments = []
 
         for deployment_id in deployment_ids:
-            action_result = await processor.get_deployment.wait_for_complete(
-                GetDeploymentAction(deployment_id=deployment_id)
-            )
-            model_deployments.append(action_result.data)
+            if deployment_id not in deployment_map:
+                raise ModelDeploymentNotFound(f"Deployment with ID {deployment_id} not found")
+            model_deployments.append(cls.from_dataclass(deployment_map[deployment_id]))
 
-        return [cls.from_dataclass(deployment) for deployment in model_deployments if deployment]
+        return model_deployments
 
     @classmethod
     def from_dataclass(

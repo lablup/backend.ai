@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Optional, override
 from uuid import UUID
@@ -10,23 +8,23 @@ from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAc
 
 
 @dataclass
-class GetDeploymentAction(DeploymentBaseAction):
-    deployment_id: UUID
+class BatchLoadDeploymentsAction(DeploymentBaseAction):
+    deployment_ids: list[UUID]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.deployment_id)
+        return None
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "get_deployment"
+        return "batch_load_deployments"
 
 
 @dataclass
-class GetDeploymentActionResult(BaseActionResult):
-    data: ModelDeploymentData
+class BatchLoadDeploymentsActionResult(BaseActionResult):
+    data: list[ModelDeploymentData]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.data.id)
+        return None
