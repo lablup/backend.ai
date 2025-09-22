@@ -33,6 +33,10 @@ from ai.backend.manager.services.deployment.actions.batch_load_deployments impor
     BatchLoadDeploymentsAction,
     BatchLoadDeploymentsActionResult,
 )
+from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_deployment_ids import (
+    BatchLoadReplicasByDeploymentIdsAction,
+    BatchLoadReplicasByDeploymentIdsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
@@ -44,10 +48,6 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
-)
-from ai.backend.manager.services.deployment.actions.get_replicas_by_deployment_id import (
-    GetReplicasByDeploymentIdAction,
-    GetReplicasByDeploymentIdActionResult,
 )
 from ai.backend.manager.services.deployment.actions.get_replicas_by_revision_id import (
     GetReplicasByRevisionIdAction,
@@ -154,9 +154,9 @@ class DeploymentServiceProtocol(Protocol):
         self, action: GetAutoScalingRulesByDeploymentIdAction
     ) -> GetAutoScalingRulesByDeploymentIdActionResult: ...
 
-    async def get_replicas_by_deployment_id(
-        self, action: GetReplicasByDeploymentIdAction
-    ) -> GetReplicasByDeploymentIdActionResult: ...
+    async def batch_load_replicas_by_deployment_ids(
+        self, action: BatchLoadReplicasByDeploymentIdsAction
+    ) -> BatchLoadReplicasByDeploymentIdsActionResult: ...
 
     async def get_revision_by_deployment_id(
         self, action: GetRevisionByDeploymentIdAction
@@ -219,8 +219,8 @@ class DeploymentProcessors(AbstractProcessorPackage):
     ]
     get_revision_by_id: ActionProcessor[GetRevisionByIdAction, GetRevisionByIdActionResult]
     batch_load_revisions: ActionProcessor[BatchLoadRevisionsAction, BatchLoadRevisionsActionResult]
-    get_replicas_by_deployment_id: ActionProcessor[
-        GetReplicasByDeploymentIdAction, GetReplicasByDeploymentIdActionResult
+    batch_load_replicas_by_deployment_ids: ActionProcessor[
+        BatchLoadReplicasByDeploymentIdsAction, BatchLoadReplicasByDeploymentIdsActionResult
     ]
     get_revision_by_deployment_id: ActionProcessor[
         GetRevisionByDeploymentIdAction, GetRevisionByDeploymentIdActionResult
@@ -274,8 +274,8 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.get_auto_scaling_rules_by_deployment_id = ActionProcessor(
             service.get_auto_scaling_rules_by_deployment_id, action_monitors
         )
-        self.get_replicas_by_deployment_id = ActionProcessor(
-            service.get_replicas_by_deployment_id, action_monitors
+        self.batch_load_replicas_by_deployment_ids = ActionProcessor(
+            service.batch_load_replicas_by_deployment_ids, action_monitors
         )
         self.get_revision_by_replica_id = ActionProcessor(
             service.get_revision_by_replica_id, action_monitors
@@ -305,7 +305,6 @@ class DeploymentProcessors(AbstractProcessorPackage):
             SyncReplicaAction.spec(),
             AddModelRevisionAction.spec(),
             GetAutoScalingRulesByDeploymentIdAction.spec(),
-            GetReplicasByDeploymentIdAction.spec(),
             GetRevisionByDeploymentIdAction.spec(),
             GetRevisionByReplicaIdAction.spec(),
             GetRevisionByIdAction.spec(),
