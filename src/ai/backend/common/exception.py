@@ -763,3 +763,16 @@ class ModelDeploymentUnavailableError(BackendAIError, web.HTTPServiceUnavailable
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+
+class ModelRevisionNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/model-revision-not-found"
+    error_title = "Model Revision Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
