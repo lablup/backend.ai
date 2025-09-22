@@ -42,7 +42,7 @@ class AccessToken(Node):
     @classmethod
     async def batch_load_by_deployment_ids(
         cls, ctx: StrawberryGQLContext, deployment_ids: Sequence[UUID]
-    ) -> list[list[ModelDeploymentAccessTokenData]]:
+    ) -> list[list["AccessToken"]]:
         """Batch load access tokens by deployment IDs."""
         processor = ctx.processors.deployment
         if processor is None:
@@ -55,7 +55,9 @@ class AccessToken(Node):
         )
         access_tokens = []
         for deployment_id in deployment_ids:
-            access_tokens.append(result.data.get(deployment_id, []))
+            tokens = result.data.get(deployment_id, [])
+            access_tokens.append([AccessToken.from_dataclass(token) for token in tokens])
+
         return access_tokens
 
 
