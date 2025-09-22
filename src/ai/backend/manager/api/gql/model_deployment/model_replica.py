@@ -41,8 +41,8 @@ from ai.backend.manager.repositories.deployment.types.types import (
 from ai.backend.manager.repositories.deployment.types.types import (
     ReadinessStatusFilter as RepoReadinessStatusFilter,
 )
-from ai.backend.manager.services.deployment.actions.get_replicas_by_deployment_id import (
-    GetReplicasByDeploymentIdAction,
+from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_deployment_ids import (
+    BatchLoadReplicasByDeploymentIdsAction,
 )
 from ai.backend.manager.services.deployment.actions.get_replicas_by_revision_id import (
     GetReplicasByRevisionIdAction,
@@ -224,14 +224,15 @@ class ModelReplica(Node):
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
+        action_result = await processor.batch_load_replicas_by_deployment_ids.wait_for_complete(
+            BatchLoadReplicasByDeploymentIdsAction(deployment_ids=list(deployment_ids))
+        )
+
+        replicas_map = action_result.data
         replicas = []
-
         for deployment_id in deployment_ids:
-            action_result = await processor.get_replicas_by_deployment_id.wait_for_complete(
-                GetReplicasByDeploymentIdAction(deployment_id=deployment_id)
-            )
-            replicas.extend(action_result.data)
-
+            if deployment_id in replicas_map:
+                replicas.extend(replicas_map[deployment_id])
         return [cls.from_dataclass(data) for data in replicas]
 
     @classmethod
