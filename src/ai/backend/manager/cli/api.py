@@ -8,13 +8,12 @@ from typing import TYPE_CHECKING
 
 import aiofiles
 import click
-import graphene_federation
 
 from ai.backend.common.json import pretty_json_str
 from ai.backend.manager.openapi import generate
 
 from ..api.gql.schema import schema as strawberry_schema
-from ..models.gql import Mutation, Query
+from ..models.gql import graphene_schema
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -28,18 +27,12 @@ def cli(args) -> None:
 
 
 async def generate_graphene_gql_schema(output_path: Path) -> None:
-    schema = graphene_federation.build_schema(
-        query=Query,
-        mutation=Mutation,
-        auto_camelcase=False,
-        federation_version=graphene_federation.LATEST_VERSION,
-    )
     if output_path == "-":
         log.info("======== Graphene GraphQL API Schema ========")
-        print(str(schema))
+        print(str(graphene_schema))
     else:
         async with aiofiles.open(output_path, "w") as fw:
-            await fw.write(str(schema))
+            await fw.write(str(graphene_schema))
 
 
 async def generate_strawberry_gql_schema(output_path: Path) -> None:

@@ -40,6 +40,7 @@ from aiotools import apartial
 from dateutil.parser import isoparse
 from graphene.types import Scalar
 from graphene.types.scalars import MAX_INT, MIN_INT
+from graphene_federation import shareable
 from graphql import Undefined
 from graphql.language.ast import IntValueNode
 from sqlalchemy.dialects.postgresql import ARRAY, CIDR, ENUM, JSONB, UUID
@@ -797,6 +798,7 @@ class DataLoaderManager(Generic[TContext, TLoaderKey, TLoaderResult]):
         return loader
 
 
+@shareable
 class ResourceLimit(graphene.ObjectType):
     key = graphene.String()
     min = graphene.String()
@@ -805,6 +807,7 @@ class ResourceLimit(graphene.ObjectType):
     )
 
 
+@shareable
 class KVPair(graphene.ObjectType):
     key = graphene.String()
     value = graphene.String()
