@@ -60,8 +60,8 @@ class VFSStorage(AbstractStorage):
     _download_chunk_size: int
     _max_file_size: Optional[int]
 
-    def __init__(self, cfg: VFSStorageConfig) -> None:
-        self._name = cfg.name
+    def __init__(self, name: str, cfg: VFSStorageConfig) -> None:
+        self._name = name
         self._base_path = cfg.base_path.resolve()
         self._upload_chunk_size = cfg.upload_chunk_size
         self._download_chunk_size = cfg.download_chunk_size

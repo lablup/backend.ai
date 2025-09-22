@@ -107,14 +107,18 @@ enabled = true
 log-level = "INFO"
 endpoint = "http://127.0.0.1:4317"
 
-[[registries]]
+[[artifact-registries]]
 name = "huggingface-hub"
-[registries.config]
 type = "huggingface"
+
+[artifact-registries.huggingface]
 endpoint = "https://huggingface.co"
 
-[[storages]]
+[[artifact-storages]]
 name = "minio-storage"
+type = "object_storage"
+
+[[artifact-storages.object_storage]]
 buckets = ["enter_bucket_name"]
 endpoint = "http://minio.example.com:9000"
 region = "us-east-1"

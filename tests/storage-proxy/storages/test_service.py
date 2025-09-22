@@ -33,7 +33,6 @@ class TestStreamReader(StreamReader):
 def storage_config(minio_container) -> ObjectStorageConfig:
     container_id, host_port = minio_container
     return ObjectStorageConfig(
-        name="test_storage",
         buckets=[_BUCKET_FIXTURE_NAME],
         endpoint=f"http://{host_port.host}:{host_port.port}",
         region="us-east-1",
@@ -44,7 +43,10 @@ def storage_config(minio_container) -> ObjectStorageConfig:
 
 @pytest.fixture
 def storages_service(storage_config) -> ObjectStorageService:
-    storages: dict[str, AbstractStorage] = {storage_config.name: ObjectStorage(storage_config)}
+    storage_name = "test_storage"
+    storages: dict[str, AbstractStorage] = {
+        storage_name: ObjectStorage(storage_name, storage_config)
+    }
     storage_pool = StoragePool(storages)
     return ObjectStorageService(storage_pool)
 
@@ -53,7 +55,6 @@ def storages_service(storage_config) -> ObjectStorageService:
 def reservoir_config(minio_container) -> ReservoirConfig:
     container_id, host_port = minio_container
     return ReservoirConfig(
-        type="reservoir",
         endpoint=f"http://{host_port.host}:{host_port.port}",
         object_storage_access_key="minioadmin",
         object_storage_secret_key="minioadmin",

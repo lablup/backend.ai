@@ -2,6 +2,8 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Optional, Self
 
+from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
 from ai.backend.common.types import StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.config.unified import (
@@ -50,19 +52,48 @@ class StoragePool:
         """
         storages: dict[str, AbstractStorage] = {}
 
-        # Add Object Storage instances
+        # Add Legacy Object Storage instances
         from ai.backend.storage.storages.object_storage import ObjectStorage
 
-        for storage_config in config.storages:
-            log.info(f"Adding object storage: {storage_config.name} ({storage_config.endpoint})")
-            storages[storage_config.name] = ObjectStorage(storage_config)
+        for legacy_storage_config in config.storages:
+            log.info(
+                f"Adding object storage: {legacy_storage_config.name} ({legacy_storage_config.endpoint})"
+            )
+            storages[legacy_storage_config.name] = ObjectStorage(
+                legacy_storage_config.name, legacy_storage_config
+            )
 
-        # Add VFS Storage instances
+        # Add Storage instances
         from ai.backend.storage.storages.vfs import VFSStorage
 
-        for vfs_config in config.vfs_storages:
-            log.info(f"Adding VFS storage: {vfs_config.name} ({vfs_config.base_path})")
-            storages[vfs_config.name] = VFSStorage(vfs_config)
+        for artifact_storage_config in config.artifact_storages:
+            match artifact_storage_config.storage_type:
+                case ArtifactStorageType.VFS:
+                    if artifact_storage_config.vfs is None:
+                        raise InvalidConfigError(
+                            "vfs config is required when storage_type is 'vfs'"
+                        )
+                    log.info(
+                        f"Adding VFS storage: {artifact_storage_config.name} ({artifact_storage_config.vfs.base_path})"
+                    )
+                    storages[artifact_storage_config.name] = VFSStorage(
+                        artifact_storage_config.name, artifact_storage_config.vfs
+                    )
+
+                case ArtifactStorageType.OBJECT_STORAGE:
+                    if artifact_storage_config.object_storage is None:
+                        raise InvalidConfigError(
+                            "object_storage config is required when storage_type is 'object_storage'"
+                        )
+                    log.info(
+                        f"Adding object storage: {artifact_storage_config.name} ({artifact_storage_config.object_storage.endpoint})"
+                    )
+                    storages[artifact_storage_config.name] = ObjectStorage(
+                        artifact_storage_config.name, artifact_storage_config.object_storage
+                    )
+
+                case ArtifactStorageType.GIT_LFS:
+                    raise GenericNotImplementedError("Git LFS storage is not supported yet")
 
         return cls(storages)
 

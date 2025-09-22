@@ -38,8 +38,8 @@ class ObjectStorage(AbstractStorage):
     _presigned_upload_config: PresignedUploadConfig
     _presigned_download_config: PresignedDownloadConfig
 
-    def __init__(self, cfg: ObjectStorageConfig) -> None:
-        self._name = cfg.name
+    def __init__(self, name: str, cfg: ObjectStorageConfig) -> None:
+        self._name = name
         self._endpoint = cfg.endpoint
         self._access_key = cfg.access_key
         self._secret_key = cfg.secret_key
