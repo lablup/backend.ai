@@ -788,7 +788,7 @@ input ClearImageCustomResourceLimitKey
   @join__type(graph: GRAPHENE)
 {
   image_canonical: String!
-  architecture: String! = "x86_64"
+  architecture: String! = "aarch64"
 }
 
 """Added in 25.6.0."""
@@ -1615,7 +1615,6 @@ type DealiasImage
 scalar Decimal
   @join__type(graph: STRAWBERRY)
 
-<<<<<<< HEAD
 """Added in 25.15.0"""
 input DeleteArtifactsInput
   @join__type(graph: STRAWBERRY)
@@ -1630,8 +1629,6 @@ type DeleteArtifactsPayload
   artifacts: [Artifact!]!
 }
 
-=======
->>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
 input DeleteAutoScalingRuleInput
   @join__type(graph: STRAWBERRY)
 {
@@ -3868,7 +3865,7 @@ type Mutation
   ): RescanImages @join__field(graph: GRAPHENE)
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage @join__field(graph: GRAPHENE)
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage @join__field(graph: GRAPHENE)
-  modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage @join__field(graph: GRAPHENE)
+  modify_image(architecture: String = "aarch64", props: ModifyImageInput!, target: String!): ModifyImage @join__field(graph: GRAPHENE)
 
   """Added in 25.6.0"""
   clear_image_custom_resource_limit(key: ClearImageCustomResourceLimitKey!): ClearImageCustomResourceLimitPayload @join__field(graph: GRAPHENE)
@@ -3877,7 +3874,7 @@ type Mutation
   forget_image_by_id(image_id: String!): ForgetImageById @join__field(graph: GRAPHENE)
 
   """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
-  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
+  forget_image(architecture: String = "aarch64", reference: String!): ForgetImage @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
 
   """Added in 25.4.0"""
   purge_image_by_id(
@@ -3889,7 +3886,7 @@ type Mutation
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry @join__field(graph: GRAPHENE)
-  alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage @join__field(graph: GRAPHENE)
+  alias_image(alias: String!, architecture: String = "aarch64", target: String!): AliasImage @join__field(graph: GRAPHENE)
   dealias_image(alias: String!): DealiasImage @join__field(graph: GRAPHENE)
   clear_images(registry: String): ClearImages @join__field(graph: GRAPHENE)
 
@@ -4610,7 +4607,7 @@ type Query
     """Added in 24.03.1"""
     id: String
     reference: String
-    architecture: String = "x86_64"
+    architecture: String = "aarch64"
   ): Image @join__field(graph: GRAPHENE)
   images(
     """
@@ -4914,26 +4911,10 @@ type Query
 
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection! @join__field(graph: STRAWBERRY)
-<<<<<<< HEAD
-<<<<<<< HEAD
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
 
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> d3b85aadf (docs: Update gql schema docs)
-
-  """Added in 25.14.0"""
-  defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
-
-<<<<<<< HEAD
->>>>>>> 37dfcaedc (feat: Add compute session node ref in model replica node)
->>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
-=======
->>>>>>> d3b85aadf (docs: Update gql schema docs)
   """
   Added in 25.13.0 Get configuration JSON Schemas for all inference runtimes
   """
@@ -4941,17 +4922,6 @@ type Query
 
   """Added in 25.13.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON! @join__field(graph: STRAWBERRY)
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> Stashed changes
->>>>>>> 59a2a2f4d (feat: Modify gql schemas)
-=======
->>>>>>> 37dfcaedc (feat: Add compute session node ref in model replica node)
->>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
-=======
->>>>>>> d3b85aadf (docs: Update gql schema docs)
 }
 
 type QuotaDetails
