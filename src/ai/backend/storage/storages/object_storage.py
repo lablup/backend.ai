@@ -193,16 +193,16 @@ class ObjectStorage(AbstractStorage):
         except Exception as e:
             raise ObjectInfoFetchError(f"Get object info failed: {str(e)}") from e
 
-    async def delete_object(self, prefix: str) -> None:
+    async def delete_object(self, filepath: str) -> None:
         """
         Delete an object and all its contents.
 
         Args:
-            prefix: Prefix of the object to delete
+            filepath: Prefix of the object to delete
         """
         try:
             s3_client = self._get_s3_client()
-            await s3_client.delete_object(prefix)
+            await s3_client.delete_object(filepath)
         except Exception as e:
             raise StorageBucketNotFoundError(f"Delete object failed: {str(e)}") from e
 

@@ -609,6 +609,37 @@ class PresignedDownloadConfig(BaseModel):
     )
 
 
+class CompositeStorageConfig(BaseModel):
+    name: str = Field(
+        description="""
+        Name of the composite storage configuration.
+        Used to identify this composite storage in the system.
+        """,
+        examples=["multi-tier-storage", "backup-storage"],
+    )
+    type: Literal["sequence"] = Field(
+        default="sequence",
+        description="""
+        Type of composite storage.
+        Currently only 'sequence' type is supported.
+        """,
+    )
+    primary: str = Field(
+        description="""
+        Name of the primary storage to use.
+        Must reference a storage name from either 'storages' or 'vfs_storages'.
+        """,
+        examples=["local-vfs", "primary-s3"],
+    )
+    secondary: list[str] = Field(
+        description="""
+        List of secondary storage names to cascade to.
+        Must reference storage names from either 'storages' or 'vfs_storages'.
+        """,
+        examples=[["backup-s3", "remote-vfs"]],
+    )
+
+
 class VFSStorageConfig(BaseModel):
     name: str = Field(
         description="""
@@ -946,6 +977,15 @@ class StorageProxyUnifiedConfig(BaseModel):
         """,
         validation_alias=AliasChoices("vfs-storages", "vfs_storages"),
         serialization_alias="vfs-storages",
+    )
+    composite_storages: list[CompositeStorageConfig] = Field(
+        default_factory=list,
+        description="""
+        List of composite storage configurations.
+        Each configuration defines how to combine multiple storages in a cascade pattern.
+        """,
+        validation_alias=AliasChoices("composite-storages", "composite_storages"),
+        serialization_alias="composite-storages",
     )
 
     # TODO: Remove me after changing config injection logic
