@@ -10,7 +10,7 @@ from strawberry.types import Info
 from ai.backend.manager.api.gql.base import JSONString
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.15.0")
 class RoutingNode(Node):
     id: NodeID
     routing_id: UUID
@@ -24,7 +24,7 @@ class RoutingNode(Node):
     )
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.15.0")
 class RoutingNodeConnection(Connection[RoutingNode]):
     @classmethod
     def resolve_connection(
