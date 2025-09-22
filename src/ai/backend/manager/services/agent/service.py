@@ -187,15 +187,15 @@ class AgentService:
     async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
         now = datetime.now(tzutc())
         reported_agent_info = action.agent_info
+        print("Heartbeat received:", action.agent_id, reported_agent_info)
 
         reported_agent_state_sync_data = AgentStateSyncData(
             now=now,
             slot_key_and_units={
-                SlotName(k): SlotTypes(v[0])
-                for k, v in reported_agent_info["resource_slots"].items()
+                SlotName(k): SlotTypes(v[0]) for k, v in reported_agent_info.resource_slots.items()
             },
-            current_addr=reported_agent_info["addr"],
-            public_key=reported_agent_info["public_key"],
+            current_addr=reported_agent_info.addr,
+            public_key=reported_agent_info.public_key,
         )
 
         upsert_data = AgentHeartbeatUpsert.from_agent_info(
@@ -210,25 +210,25 @@ class AgentService:
         )
         self._agent_cache.update(
             action.agent_id,
-            reported_agent_info["addr"],
-            reported_agent_info["public_key"],
+            reported_agent_info.addr,
+            reported_agent_info.public_key,
         )
         if result.was_revived:
             await self._event_producer.anycast_event(
                 AgentStartedEvent("revived"), source_override=action.agent_id
             )
         await self._agent_repository.add_agent_to_images(
-            agent_id=action.agent_id, images=action.agent_info["images"]
+            agent_id=action.agent_id, images=action.agent_info.images
         )
 
         await self._hook_plugin_ctx.notify(
             "POST_AGENT_HEARTBEAT",
             (
                 action.agent_id,
-                reported_agent_info.get("scaling_group", "default"),
+                reported_agent_info.scaling_group,
                 ResourceSlot({
                     SlotName(k): Decimal(v[1])
-                    for k, v in reported_agent_info["resource_slots"].items()
+                    for k, v in reported_agent_info.resource_slots.items()
                 }),
             ),
         )

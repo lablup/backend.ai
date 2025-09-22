@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Optional, Self
 
 from ai.backend.common.auth import PublicKey
+from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.models.agent import AgentStatus
 
@@ -19,14 +20,14 @@ class AgentStateSyncData:
     now: datetime
     slot_key_and_units: dict[SlotName, SlotTypes]
     current_addr: str
-    public_key: PublicKey
+    public_key: Optional[PublicKey]
 
 
 @dataclass
 class AgentMetadata:
     id: AgentId
     status: AgentStatus
-    region: str
+    region: Optional[str]
     scaling_group: str
     architecture: str
     version: str
@@ -37,7 +38,7 @@ class AgentMetadata:
 class AgentNetworkInfo:
     addr: str
     public_host: str
-    public_key: PublicKey
+    public_key: Optional[PublicKey]
 
 
 @dataclass
@@ -94,30 +95,28 @@ class AgentHeartbeatUpsert:
 
     @classmethod
     def from_agent_info(
-        cls, agent_id: AgentId, agent_info: Mapping[Any, Any], heartbeat_received: datetime
+        cls, agent_id: AgentId, agent_info: AgentInfo, heartbeat_received: datetime
     ) -> Self:
         return cls(
             metadata=AgentMetadata(
                 id=agent_id,
                 status=AgentStatus.ALIVE,
-                region=agent_info["region"],
-                scaling_group=agent_info.get("scaling_group", "default"),
-                architecture=agent_info.get("architecture", "x86_64"),
-                auto_terminate_abusing_kernel=agent_info.get(
-                    "auto_terminate_abusing_kernel", False
-                ),
-                version=agent_info["version"],
+                region=agent_info.region,
+                scaling_group=agent_info.scaling_group,
+                architecture=agent_info.architecture,
+                auto_terminate_abusing_kernel=agent_info.auto_terminate_abusing_kernel,
+                version=agent_info.version,
             ),
             network_info=AgentNetworkInfo(
-                addr=agent_info["addr"],
-                public_host=agent_info["public_host"],
-                public_key=agent_info["public_key"],
+                addr=agent_info.addr,
+                public_host=agent_info.public_host,
+                public_key=agent_info.public_key,
             ),
             resource_info=AgentResourceInfo(
                 available_slots=ResourceSlot({
-                    SlotName(k): Decimal(v[1]) for k, v in agent_info["resource_slots"].items()
+                    SlotName(k): Decimal(v[1]) for k, v in agent_info.resource_slots.items()
                 }),
-                compute_plugins=agent_info["compute_plugins"],
+                compute_plugins=agent_info.compute_plugins,
             ),
             lost_at=None,
             first_contact=heartbeat_received,
