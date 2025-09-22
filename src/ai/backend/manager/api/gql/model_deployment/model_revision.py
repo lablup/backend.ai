@@ -12,7 +12,7 @@ from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 from strawberry.scalars import JSON
 
-from ai.backend.common.exception import ModelDeploymentUnavailableError
+from ai.backend.common.exception import ModelDeploymentUnavailableError, ModelRevisionNotFound
 from ai.backend.common.types import ClusterMode as CommonClusterMode
 from ai.backend.common.types import MountPermission as CommonMountPermission
 from ai.backend.common.types import RuntimeVariant
@@ -65,11 +65,11 @@ from ai.backend.manager.repositories.deployment.types.types import (
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.batch_load_revisions import (
+    BatchLoadRevisionsAction,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
     CreateModelRevisionAction,
-)
-from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_id import (
-    GetRevisionByIdAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.list_revisions import (
     ListRevisionsAction,
@@ -211,15 +211,18 @@ class ModelRevision(Node):
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
+        result = await processor.batch_load_revisions.wait_for_complete(
+            BatchLoadRevisionsAction(revision_ids=list(revision_ids))
+        )
+
+        revision_map = {revision.id: revision for revision in result.data}
         revisions = []
-
         for revision_id in revision_ids:
-            action_result = await processor.get_revision_by_id.wait_for_complete(
-                GetRevisionByIdAction(revision_id=revision_id)
-            )
-            revisions.append(action_result.data)
+            if revision_id not in revision_map:
+                raise ModelRevisionNotFound(f"Revision {revision_id} not found")
+            revisions.append(cls.from_dataclass(revision_map[revision_id]))
 
-        return [cls.from_dataclass(revision) for revision in revisions if revision]
+        return revisions
 
 
 # Filter and Order Types

@@ -65,6 +65,10 @@ from ai.backend.manager.services.deployment.actions.model_revision.add_model_rev
     AddModelRevisionAction,
     AddModelRevisionActionResult,
 )
+from ai.backend.manager.services.deployment.actions.model_revision.batch_load_revisions import (
+    BatchLoadRevisionsAction,
+    BatchLoadRevisionsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
     CreateModelRevisionAction,
     CreateModelRevisionActionResult,
@@ -172,6 +176,10 @@ class DeploymentServiceProtocol(Protocol):
         self, action: GetReplicasByRevisionIdAction
     ) -> GetReplicasByRevisionIdActionResult: ...
 
+    async def batch_load_revisions(
+        self, action: BatchLoadRevisionsAction
+    ) -> BatchLoadRevisionsActionResult: ...
+
     async def list_replicas(self, action: ListReplicasAction) -> ListReplicasActionResult: ...
     async def list_revisions(self, action: ListRevisionsAction) -> ListRevisionsActionResult: ...
 
@@ -208,6 +216,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         GetAutoScalingRulesByDeploymentIdAction, GetAutoScalingRulesByDeploymentIdActionResult
     ]
     get_revision_by_id: ActionProcessor[GetRevisionByIdAction, GetRevisionByIdActionResult]
+    batch_load_revisions: ActionProcessor[BatchLoadRevisionsAction, BatchLoadRevisionsActionResult]
     get_replicas_by_deployment_id: ActionProcessor[
         GetReplicasByDeploymentIdAction, GetReplicasByDeploymentIdActionResult
     ]
@@ -275,6 +284,7 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.list_replicas = ActionProcessor(service.list_replicas, action_monitors)
         self.list_revisions = ActionProcessor(service.list_revisions, action_monitors)
         self.create_model_revision = ActionProcessor(service.create_model_revision, action_monitors)
+        self.batch_load_revisions = ActionProcessor(service.batch_load_revisions, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -301,4 +311,5 @@ class DeploymentProcessors(AbstractProcessorPackage):
             ListReplicasAction.spec(),
             CreateLegacyDeploymentAction.spec(),
             CreateModelRevisionAction.spec(),
+            BatchLoadRevisionsAction.spec(),
         ]
