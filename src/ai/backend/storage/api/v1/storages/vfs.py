@@ -30,7 +30,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.stream import MultipartFileUploadStreamReader
 
 from ....services.storages.vfs import VFSStorageService
-from ....storages.base import StoragePool
 from ....utils import log_client_api_entry
 
 if TYPE_CHECKING:
@@ -45,13 +44,13 @@ class VFSStorageAPIHandler:
     Provides endpoints similar to object storage but for filesystem-based storage.
     """
 
-    _storage_pool: StoragePool
+    _vfs_service: VFSStorageService
 
     def __init__(
         self,
-        storage_pool: StoragePool,
+        vfs_service: VFSStorageService,
     ) -> None:
-        self._storage_pool = storage_pool
+        self._vfs_service = vfs_service
 
     @api_handler
     async def upload_file(
@@ -74,9 +73,8 @@ class VFSStorageAPIHandler:
 
         await log_client_api_entry(log, "upload_file", req)
 
-        vfs_service = VFSStorageService(self._storage_pool)
         upload_stream = MultipartFileUploadStreamReader(file_reader, content_type)
-        await vfs_service.stream_upload(storage_name, filepath, upload_stream)
+        await self._vfs_service.stream_upload(storage_name, filepath, upload_stream)
 
         return APIResponse.build(
             status_code=HTTPStatus.CREATED,
@@ -100,12 +98,11 @@ class VFSStorageAPIHandler:
         storage_name = path.parsed.storage_name
 
         await log_client_api_entry(log, "download_file", req)
-        vfs_service = VFSStorageService(self._storage_pool)
-        file_stream = await vfs_service.stream_download(storage_name, filepath)
+        file_stream = await self._vfs_service.stream_download(storage_name, filepath)
 
         # Get file metadata for content type
         try:
-            meta = await vfs_service.get_file_meta(storage_name, filepath)
+            meta = await self._vfs_service.get_file_meta(storage_name, filepath)
             content_type = meta.content_type or "application/octet-stream"
         except Exception:
             content_type = "application/octet-stream"
@@ -134,8 +131,7 @@ class VFSStorageAPIHandler:
 
         await log_client_api_entry(log, "get_file_meta", req)
 
-        vfs_service = VFSStorageService(self._storage_pool)
-        response = await vfs_service.get_file_meta(storage_name, filepath)
+        response = await self._vfs_service.get_file_meta(storage_name, filepath)
 
         return APIResponse.build(
             status_code=HTTPStatus.OK,
@@ -157,9 +153,8 @@ class VFSStorageAPIHandler:
         storage_name = path.parsed.storage_name
 
         await log_client_api_entry(log, "delete_file", req)
-        vfs_service = VFSStorageService(self._storage_pool)
 
-        await vfs_service.delete_file(storage_name, filepath)
+        await self._vfs_service.delete_file(storage_name, filepath)
 
         return APIResponse.build(
             status_code=HTTPStatus.OK,
@@ -183,8 +178,9 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/storages/vfs"
 
+    vfs_service = VFSStorageService(ctx.storage_pool)
     api_handler = VFSStorageAPIHandler(
-        storage_pool=ctx.storage_pool,
+        vfs_service=vfs_service,
     )
 
     # File operations

@@ -29,7 +29,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.stream import MultipartFileUploadStreamReader
 
 from ....services.storages.object_storage import ObjectStorageService
-from ....storages.base import StoragePool
 from ....utils import log_client_api_entry
 
 if TYPE_CHECKING:
@@ -39,14 +38,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ObjectStorageAPIHandler:
-    _storage_pool: StoragePool
-    # _object_storage_service: ObjectStorageService
+    _object_storage_service: ObjectStorageService
 
     def __init__(
         self,
-        storage_pool: StoragePool,
+        object_storage_service: ObjectStorageService,
     ) -> None:
-        self._storage_pool = storage_pool
+        self._object_storage_service = object_storage_service
 
     @api_handler
     async def upload_object(
@@ -67,8 +65,6 @@ class ObjectStorageAPIHandler:
 
         await log_client_api_entry(log, "upload_object", req)
 
-        storage_service = ObjectStorageService(self._storage_pool)
-
         # Determine content type: use header if available, otherwise guess from filename
         content_type = multipart_ctx.content_type
         if not content_type:
@@ -76,7 +72,9 @@ class ObjectStorageAPIHandler:
 
         upload_stream = MultipartFileUploadStreamReader(file_reader, content_type)
 
-        await storage_service.stream_upload(storage_name, bucket_name, filepath, upload_stream)
+        await self._object_storage_service.stream_upload(
+            storage_name, bucket_name, filepath, upload_stream
+        )
 
         return APIResponse.no_content(
             status_code=HTTPStatus.NO_CONTENT,
@@ -98,8 +96,9 @@ class ObjectStorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "download_file", req)
-        storage_service = ObjectStorageService(self._storage_pool)
-        file_stream = await storage_service.stream_download(storage_name, bucket_name, filepath)
+        file_stream = await self._object_storage_service.stream_download(
+            storage_name, bucket_name, filepath
+        )
 
         return APIStreamResponse(
             body=file_stream,
@@ -124,8 +123,7 @@ class ObjectStorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "presigned_upload_url", req)
-        storage_service = ObjectStorageService(self._storage_pool)
-        response = await storage_service.generate_presigned_upload_url(
+        response = await self._object_storage_service.generate_presigned_upload_url(
             storage_name, bucket_name, req.key
         )
 
@@ -150,8 +148,7 @@ class ObjectStorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "presigned_download_url", req)
-        storage_service = ObjectStorageService(self._storage_pool)
-        response = await storage_service.generate_presigned_download_url(
+        response = await self._object_storage_service.generate_presigned_download_url(
             storage_name, bucket_name, filepath
         )
 
@@ -177,8 +174,9 @@ class ObjectStorageAPIHandler:
 
         await log_client_api_entry(log, "get_object_meta", req)
 
-        storage_service = ObjectStorageService(self._storage_pool)
-        response = await storage_service.get_object_info(storage_name, bucket_name, filepath)
+        response = await self._object_storage_service.get_object_info(
+            storage_name, bucket_name, filepath
+        )
 
         return APIResponse.build(
             status_code=HTTPStatus.OK,
@@ -201,9 +199,8 @@ class ObjectStorageAPIHandler:
         bucket_name = path.parsed.bucket_name
 
         await log_client_api_entry(log, "delete_object", req)
-        storage_service = ObjectStorageService(self._storage_pool)
 
-        await storage_service.delete_object(storage_name, bucket_name, prefix)
+        await self._object_storage_service.delete_object(storage_name, bucket_name, prefix)
 
         return APIResponse.no_content(
             status_code=HTTPStatus.NO_CONTENT,
@@ -215,8 +212,9 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/storages/s3"
 
+    object_storage_service = ObjectStorageService(ctx.storage_pool)
     api_handler = ObjectStorageAPIHandler(
-        storage_pool=ctx.storage_pool,
+        object_storage_service=object_storage_service,
     )
     app.router.add_route(
         "GET", "/{storage_name}/buckets/{bucket_name}/object/meta", api_handler.get_object_meta
