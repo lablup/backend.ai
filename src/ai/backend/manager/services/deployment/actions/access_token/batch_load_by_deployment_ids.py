@@ -8,8 +8,8 @@ from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAc
 
 
 @dataclass
-class GetAccessTokensByDeploymentIdAction(DeploymentBaseAction):
-    deployment_id: UUID
+class BatchLoadAccessTokensByDeploymentIdsAction(DeploymentBaseAction):
+    deployment_ids: list[UUID]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -22,8 +22,8 @@ class GetAccessTokensByDeploymentIdAction(DeploymentBaseAction):
 
 
 @dataclass
-class GetAccessTokensByDeploymentIdActionResult(BaseActionResult):
-    data: list[ModelDeploymentAccessTokenData]
+class BatchLoadAccessTokensByDeploymentIdsActionResult(BaseActionResult):
+    data: dict[UUID, list[ModelDeploymentAccessTokenData]]
 
     @override
     def entity_id(self) -> Optional[str]:
