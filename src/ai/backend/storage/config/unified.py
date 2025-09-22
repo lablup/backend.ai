@@ -622,6 +622,14 @@ class VFSStorageConfig(BaseModel):
         validation_alias=AliasChoices("base-path", "base_path"),
         serialization_alias="base-path",
     )
+    subpath: Optional[str] = Field(
+        default=None,
+        description="""
+        Optional subdirectory path appended to base_path.
+        Used to further organize storage within the base directory.
+        """,
+        examples=["models", "datasets", "user-data"],
+    )
     upload_chunk_size: int = Field(
         default=65536,  # 64KB
         ge=1024,  # Minimum 1KB

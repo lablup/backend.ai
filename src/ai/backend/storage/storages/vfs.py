@@ -62,7 +62,10 @@ class VFSStorage(AbstractStorage):
 
     def __init__(self, name: str, cfg: VFSStorageConfig) -> None:
         self._name = name
-        self._base_path = cfg.base_path.resolve()
+        base_path = cfg.base_path.resolve()
+        if cfg.subpath:
+            base_path = base_path / cfg.subpath
+        self._base_path = base_path
         self._upload_chunk_size = cfg.upload_chunk_size
         self._download_chunk_size = cfg.download_chunk_size
         self._max_file_size = cfg.max_file_size
