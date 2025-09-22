@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
@@ -30,13 +30,13 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaStateData,
     ResourceConfigData,
 )
+from ai.backend.manager.services.deployment.actions.access_token.batch_load_by_deployment_ids import (
+    BatchLoadAccessTokensByDeploymentIdsAction,
+    BatchLoadAccessTokensByDeploymentIdsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
-)
-from ai.backend.manager.services.deployment.actions.access_token.get_access_tokens_by_deployment_id import (
-    GetAccessTokensByDeploymentIdAction,
-    GetAccessTokensByDeploymentIdActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -297,20 +297,22 @@ class DeploymentService:
             )
         )
 
-    async def get_access_tokens_by_deployment_id(
-        self, action: GetAccessTokensByDeploymentIdAction
-    ) -> GetAccessTokensByDeploymentIdActionResult:
-        mock_tokens = []
-        for i in range(3):
-            mock_tokens.append(
-                ModelDeploymentAccessTokenData(
-                    id=uuid4(),
-                    token=f"test_token_{i}",
-                    valid_until=datetime.now() + timedelta(hours=24 * (i + 1)),
-                    created_at=datetime.now() - timedelta(hours=i),
+    async def batch_load_access_tokens_by_deployment_ids(
+        self, action: BatchLoadAccessTokensByDeploymentIdsAction
+    ) -> BatchLoadAccessTokensByDeploymentIdsActionResult:
+        token_map: dict[UUID, list[ModelDeploymentAccessTokenData]] = {}
+        for deployment_id in action.deployment_ids:
+            token_map[deployment_id] = []
+            for i in range(deployment_id.int % 5 + 1):
+                token_map[deployment_id].append(
+                    ModelDeploymentAccessTokenData(
+                        id=uuid4(),
+                        token=f"test_token_{i}",
+                        valid_until=datetime.now() + timedelta(hours=24 * (i + 1)),
+                        created_at=datetime.now() - timedelta(hours=i),
+                    )
                 )
-            )
-        return GetAccessTokensByDeploymentIdActionResult(data=mock_tokens)
+        return BatchLoadAccessTokensByDeploymentIdsActionResult(data=token_map)
 
     async def sync_replicas(self, action: SyncReplicaAction) -> SyncReplicaActionResult:
         return SyncReplicaActionResult(success=True)
