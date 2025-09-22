@@ -11,11 +11,11 @@ from ai.backend.common.exception import ModelDeploymentUnavailable
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
+from ai.backend.manager.services.deployment.actions.access_token.batch_load_by_deployment_ids import (
+    BatchLoadAccessTokensByDeploymentIdsAction,
+)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
-)
-from ai.backend.manager.services.deployment.actions.access_token.get_access_tokens_by_deployment_id import (
-    GetAccessTokensByDeploymentIdAction,
 )
 
 
@@ -50,13 +50,13 @@ class AccessToken(Node):
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
-        results = []
+        result = await processor.batch_load_access_tokens_by_deployment_ids.wait_for_complete(
+            BatchLoadAccessTokensByDeploymentIdsAction(deployment_ids=list(deployment_ids))
+        )
+        access_tokens = []
         for deployment_id in deployment_ids:
-            result = await processor.get_access_tokens_by_deployment_id.wait_for_complete(
-                GetAccessTokensByDeploymentIdAction(deployment_id=deployment_id)
-            )
-            results.append(result.data if result else [])
-        return results
+            access_tokens.append(result.data.get(deployment_id, []))
+        return access_tokens
 
 
 AccessTokenEdge = Edge[AccessToken]
