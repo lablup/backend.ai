@@ -752,6 +752,19 @@ class DomainNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+class ModelDeploymentNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/model-deployment-not-found"
+    error_title = "Model Deployment Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class ModelDeploymentUnavailable(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/model-deployment-unavailable"
     error_title = "Model Deployment Unavailable"
