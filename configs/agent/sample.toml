@@ -69,7 +69,7 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
+  ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
   # Blocked compute plugins
   ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
   # Allowed network plugins
