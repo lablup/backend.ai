@@ -78,6 +78,7 @@ from ai.backend.common.clients.valkey_client.valkey_container_log.client import 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
@@ -1202,7 +1203,7 @@ class AbstractAgent(
                 "architecture": get_arch_name(),
                 "auto_terminate_abusing_kernel": self.local_config.agent.force_terminate_abusing_containers,
             }
-            await self.anycast_event(AgentHeartbeatEvent(agent_info))
+            await self.anycast_event(AgentHeartbeatEvent(AgentInfo.from_dict(agent_info)))
         except asyncio.TimeoutError:
             log.warning("event dispatch timeout: instance_heartbeat")
         except Exception:
