@@ -4,28 +4,6 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@externa
   subscription: Subscription
 }
 
-<<<<<<< HEAD
-"""Added in 25.15.0"""
-type AgentResource {
-  free: JSON!
-  used: JSON!
-  capacity: JSON!
-}
-
-"""Added in 25.15.0"""
-type AgentStats {
-  """Added in 25.15.0"""
-  totalResource: AgentResource!
-}
-
-"""
-Added in 25.14.0.
-
-Input for approving an artifact revision.
-
-Admin-only operation to approve artifact revisions for general use.
-"""
-=======
 type AccessToken implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -90,8 +68,26 @@ type AddModelRevisionPayload {
   revision: ModelRevision!
 }
 
-"""Added in 25.14.0"""
->>>>>>> 16addb3b5 (feat: Modify gql schemas)
+"""Added in 25.15.0"""
+type AgentResource {
+  free: JSON!
+  used: JSON!
+  capacity: JSON!
+}
+
+"""Added in 25.15.0"""
+type AgentStats {
+  """Added in 25.15.0"""
+  totalResource: AgentResource!
+}
+
+"""
+Added in 25.14.0.
+
+Input for approving an artifact revision.
+
+Admin-only operation to approve artifact revisions for general use.
+"""
 input ApproveArtifactInput {
   artifactRevisionId: ID!
 }
@@ -435,23 +431,6 @@ enum ArtifactType {
   IMAGE
 }
 
-<<<<<<< HEAD
-"""Background task event payload"""
-type BackgroundTaskEventPayload {
-  taskId: ID!
-  eventType: BgtaskEventType!
-  message: String!
-  currentProgress: Float
-  totalProgress: Float
-}
-
-"""Type of background task event"""
-enum BgtaskEventType {
-  UPDATED
-  DONE
-  CANCELLED
-  FAILED
-=======
 """Added in 25.1.0"""
 enum AutoScalingMetricSource {
   KERNEL
@@ -485,7 +464,23 @@ type AutoScalingRule implements Node {
   maxReplicas: Int
   createdAt: DateTime!
   lastTriggeredAt: DateTime!
->>>>>>> 16addb3b5 (feat: Modify gql schemas)
+}
+
+"""Background task event payload"""
+type BackgroundTaskEventPayload {
+  taskId: ID!
+  eventType: BgtaskEventType!
+  message: String!
+  currentProgress: Float
+  totalProgress: Float
+}
+
+"""Type of background task event"""
+enum BgtaskEventType {
+  UPDATED
+  DONE
+  CANCELLED
+  FAILED
 }
 
 scalar ByteSize
@@ -555,13 +550,10 @@ enum ClusterMode {
   MULTI_NODE
 }
 
-<<<<<<< HEAD
-=======
 extend type ComputeSessionNode @key(fields: "id") {
   id: ID! @external
 }
 
->>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
 input CreateAccessTokenInput {
   """
   Added in 25.13.0: The ID of the model deployment for which the access token is created.
@@ -678,7 +670,9 @@ type CreateVFSStoragePayload {
 """Date with time (isoformat)"""
 scalar DateTime
 
-<<<<<<< HEAD
+"""Decimal (fixed-point)"""
+scalar Decimal
+
 """
 Added in 25.15.0.
 
@@ -748,12 +742,7 @@ type DelegateScanArtifactsPayload {
   """
   artifacts: [Artifact!]!
 }
-=======
-"""Decimal (fixed-point)"""
-scalar Decimal
->>>>>>> 16addb3b5 (feat: Modify gql schemas)
 
-<<<<<<< HEAD
 """Added in 25.15.0"""
 input DelegateeTarget {
   delegateeReservoirId: ID!
@@ -783,8 +772,6 @@ type DeleteArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
-=======
->>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
 input DeleteAutoScalingRuleInput {
   id: ID!
 }
@@ -833,7 +820,6 @@ type DeleteReservoirRegistryPayload {
   id: ID!
 }
 
-<<<<<<< HEAD
 """Added in 25.16.0. Input for deleting VFS storage"""
 input DeleteVFSStorageInput {
   id: ID!
@@ -844,9 +830,7 @@ type DeleteVFSStoragePayload {
   id: ID!
 }
 
-=======
 """Added in 25.13.0"""
->>>>>>> 16addb3b5 (feat: Modify gql schemas)
 input DeploymentFilter {
   name: StringFilter = null
   status: DeploymentStatusFilter = null
@@ -1683,36 +1667,13 @@ type Query {
 
   """Added in 25.14.0"""
   reservoirRegistries(before: String = null, after: String = null, first: Int = null, last: Int = null, offset: Int = null, limit: Int = null): ReservoirRegistryConnection!
-<<<<<<< HEAD
-<<<<<<< HEAD
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
 
-<<<<<<< HEAD
-<<<<<<< HEAD
   """Added in 25.15.0"""
   agentStats: AgentStats!
-=======
-=======
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> d3b85aadf (docs: Update gql schema docs)
 
-  """Added in 25.14.0"""
-  defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
-
-<<<<<<< HEAD
->>>>>>> 37dfcaedc (feat: Add compute session node ref in model replica node)
->>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
-<<<<<<< HEAD
->>>>>>> 9adb5c928 (feat: Add compute session node ref in model replica node)
-=======
-=======
->>>>>>> d3b85aadf (docs: Update gql schema docs)
->>>>>>> 03b38940d (docs: Update gql schema docs)
   """
   Added in 25.13.0 Get configuration JSON Schemas for all inference runtimes
   """
@@ -1720,26 +1681,6 @@ type Query {
 
   """Added in 25.13.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON!
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> 16addb3b5 (feat: Modify gql schemas)
-=======
-=======
->>>>>>> 03b38940d (docs: Update gql schema docs)
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
->>>>>>> Stashed changes
->>>>>>> 59a2a2f4d (feat: Modify gql schemas)
-=======
->>>>>>> 37dfcaedc (feat: Add compute session node ref in model replica node)
->>>>>>> 27805ea3c (feat: Add compute session node ref in model replica node)
-<<<<<<< HEAD
->>>>>>> 9adb5c928 (feat: Add compute session node ref in model replica node)
-=======
-=======
->>>>>>> d3b85aadf (docs: Update gql schema docs)
->>>>>>> 03b38940d (docs: Update gql schema docs)
 }
 
 """
@@ -1983,7 +1924,6 @@ type ScanArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
-<<<<<<< HEAD
 """Added in 25.15.0. Scheduling event broadcast payload"""
 type SchedulingBroadcastEventPayload {
   sessionId: ID!
@@ -2007,9 +1947,6 @@ enum SchedulingStatus {
   ERROR
 }
 
-"""Different service configurations for model runtime"""
-union ServiceConfig = RawServiceConfig
-
 """
 Added in 25.14.0.
 
@@ -2017,9 +1954,6 @@ Information about the source or registry of an artifact.
 
 Contains the name and URL of the registry where the artifact is stored or originates from.
 """
-=======
-"""Added in 25.14.0"""
->>>>>>> 16addb3b5 (feat: Modify gql schemas)
 type SourceInfo {
   name: String
   url: String
