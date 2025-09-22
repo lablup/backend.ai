@@ -10,22 +10,22 @@ from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAc
 
 
 @dataclass
-class GetReplicasByRevisionIdAction(DeploymentBaseAction):
-    revision_id: UUID
+class BatchLoadReplicasByRevisionIdsAction(DeploymentBaseAction):
+    revision_ids: list[UUID]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.revision_id)
+        return None
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "get_replicas_by_revision_id"
+        return "batch_load_replicas_by_revision_ids"
 
 
 @dataclass
-class GetReplicasByRevisionIdActionResult(BaseActionResult):
-    data: list[ModelReplicaData]
+class BatchLoadReplicasByRevisionIdsActionResult(BaseActionResult):
+    data: dict[UUID, list[ModelReplicaData]]
 
     @override
     def entity_id(self) -> Optional[str]:

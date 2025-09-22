@@ -44,8 +44,8 @@ from ai.backend.manager.repositories.deployment.types.types import (
 from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_deployment_ids import (
     BatchLoadReplicasByDeploymentIdsAction,
 )
-from ai.backend.manager.services.deployment.actions.get_replicas_by_revision_id import (
-    GetReplicasByRevisionIdAction,
+from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_revision_ids import (
+    BatchLoadReplicasByRevisionIdsAction,
 )
 from ai.backend.manager.services.deployment.actions.list_replicas import ListReplicasAction
 from ai.backend.manager.types import PaginationOptions
@@ -247,12 +247,13 @@ class ModelReplica(Node):
             )
 
         replicas = []
-
+        action_results = await processor.batch_load_replicas_by_revision_ids.wait_for_complete(
+            BatchLoadReplicasByRevisionIdsAction(revision_ids=list(revision_ids))
+        )
+        replicas_map = action_results.data
         for revision_id in revision_ids:
-            action_result = await processor.get_replicas_by_revision_id.wait_for_complete(
-                GetReplicasByRevisionIdAction(revision_id=revision_id)
-            )
-            replicas.extend(action_result.data)
+            if revision_id in replicas_map:
+                replicas.extend(replicas_map[revision_id])
 
         return [cls.from_dataclass(data) for data in replicas]
 
