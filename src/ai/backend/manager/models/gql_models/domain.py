@@ -21,7 +21,7 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.common.exception import DomainNotFoundError
+from ai.backend.common.exception import DomainNotFound
 from ai.backend.common.types import ResourceSlot, Sentinel
 from ai.backend.manager.data.domain.types import (
     DomainCreator,
@@ -320,7 +320,7 @@ class DomainNode(graphene.ObjectType):
     async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> DomainNode:
         domain_node = await DomainNode.get_node(info, self.id)
         if domain_node is None:
-            raise DomainNotFoundError()
+            raise DomainNotFound(f"Domain not found: {self.id}")
         return domain_node
 
 
