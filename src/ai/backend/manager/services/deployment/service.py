@@ -54,6 +54,10 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_aut
     UpdateAutoScalingRuleAction,
     UpdateAutoScalingRuleActionResult,
 )
+from ai.backend.manager.services.deployment.actions.batch_load_deployments import (
+    BatchLoadDeploymentsAction,
+    BatchLoadDeploymentsActionResult,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
@@ -65,10 +69,6 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
-)
-from ai.backend.manager.services.deployment.actions.get_deployment import (
-    GetDeploymentAction,
-    GetDeploymentActionResult,
 )
 from ai.backend.manager.services.deployment.actions.get_replicas_by_deployment_id import (
     GetReplicasByDeploymentIdAction,
@@ -240,6 +240,42 @@ class DeploymentService:
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DESTROYING)
         return DestroyDeploymentActionResult(success=success)
 
+    async def batch_load_deployments(
+        self, action: BatchLoadDeploymentsAction
+    ) -> BatchLoadDeploymentsActionResult:
+        return BatchLoadDeploymentsActionResult(
+            data=[
+                ModelDeploymentData(
+                    id=deployment_id,
+                    metadata=ModelDeploymentMetadataInfo(
+                        name=f"test-deployment-{i}",
+                        status=ModelDeploymentStatus.READY,
+                        tags=["tag1", "tag2"],
+                        project_id=uuid4(),
+                        domain_name="default",
+                        created_at=datetime.now(),
+                        updated_at=datetime.now(),
+                    ),
+                    network_access=DeploymentNetworkSpec(
+                        open_to_public=True,
+                        url="http://example.com",
+                        preferred_domain_name="example.com",
+                        access_token_ids=[uuid4()],
+                    ),
+                    revision_history_ids=[uuid4(), uuid4()],
+                    revision=mock_revision_data_1,
+                    scaling_rule_ids=[uuid4(), uuid4()],
+                    replica_state=ReplicaStateData(
+                        desired_replica_count=3,
+                        replica_ids=[uuid4(), uuid4(), uuid4()],
+                    ),
+                    default_deployment_strategy=DeploymentStrategy.ROLLING,
+                    created_user_id=uuid4(),
+                )
+                for i, deployment_id in enumerate(action.deployment_ids)
+            ]
+        )
+
     async def create_auto_scaling_rule(
         self, action: CreateAutoScalingRuleAction
     ) -> CreateAutoScalingRuleActionResult:
@@ -391,38 +427,6 @@ class DeploymentService:
         self, action: GetRevisionByReplicaIdAction
     ) -> GetRevisionByReplicaIdActionResult:
         return GetRevisionByReplicaIdActionResult(data=mock_revision_data_1)
-
-    async def get_deployment(self, action: GetDeploymentAction) -> GetDeploymentActionResult:
-        # For now, return mock deployment info
-        return GetDeploymentActionResult(
-            data=ModelDeploymentData(
-                id=action.deployment_id,
-                metadata=ModelDeploymentMetadataInfo(
-                    name="test-deployment",
-                    status=ModelDeploymentStatus.READY,
-                    tags=["tag1", "tag2"],
-                    project_id=uuid4(),
-                    domain_name="default",
-                    created_at=datetime.now(),
-                    updated_at=datetime.now(),
-                ),
-                network_access=DeploymentNetworkSpec(
-                    open_to_public=True,
-                    url="http://example.com",
-                    preferred_domain_name="example.com",
-                    access_token_ids=[uuid4()],
-                ),
-                revision_history_ids=[uuid4(), uuid4()],
-                revision=mock_revision_data_1,
-                scaling_rule_ids=[uuid4(), uuid4()],
-                replica_state=ReplicaStateData(
-                    desired_replica_count=3,
-                    replica_ids=[uuid4(), uuid4(), uuid4()],
-                ),
-                default_deployment_strategy=DeploymentStrategy.ROLLING,
-                created_user_id=uuid4(),
-            )
-        )
 
     async def get_revisions_by_deployment_id(
         self, action: GetRevisionsByDeploymentIdAction
