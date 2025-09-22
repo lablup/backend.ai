@@ -8,7 +8,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Callable, Optional, Protocol, override
+from typing import Callable, Final, Optional, Protocol, override
 
 import aiohttp
 
@@ -43,6 +43,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 _MiB = 1024 * 1024
 _DEFAULT_DOWNLOAD_LOGGING_INTERVAL_SECS = 15
 _DEFAULT_BYTESIZE_INTERVAL = 64 * _MiB
+
+_PROBE_HEAD_BASE_HEADER: Final[dict[str, str]] = {"Accept-Encoding": "identity"}
 
 _DOWNLOAD_RETRIABLE_ERROR = (
     aiohttp.ClientPayloadError,
@@ -152,7 +154,7 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
         etag: Optional[str] = None
         accept_ranges: bool = False
 
-        headers_base = {"Accept-Encoding": "identity"}
+        headers_base = _PROBE_HEAD_BASE_HEADER
         try:
             async with self._session.head(
                 self._url, headers=headers_base, allow_redirects=True
@@ -182,7 +184,7 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
             auto_decompress=False,
         )
 
-        headers_base = {"Accept-Encoding": "identity"}
+        headers_base = _PROBE_HEAD_BASE_HEADER
         progress_logger = _make_download_progress_logger(
             total_getter=lambda: total,
         )
