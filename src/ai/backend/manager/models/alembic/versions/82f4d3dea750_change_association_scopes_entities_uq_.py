@@ -22,23 +22,23 @@ BATCH_SIZE = 1000
 def _remove_duplicates_batch(db_conn: Connection) -> None:
     while True:
         delete_batch_query = sa.text("""
-                    WITH duplicates AS (
-                        SELECT id,
-                            ROW_NUMBER() OVER (
-                                PARTITION BY scope_type, scope_id, entity_id
-                                ORDER BY id ASC
-                            ) as rn
-                        FROM association_scopes_entities
-                    ),
-                    to_delete AS (
-                        SELECT id
-                        FROM duplicates
-                        WHERE rn > 1
-                        LIMIT :batch_size
-                    )
-                    DELETE FROM association_scopes_entities
-                    WHERE id IN (SELECT id FROM to_delete)
-                """)
+            WITH duplicates AS (
+                SELECT id,
+                    ROW_NUMBER() OVER (
+                        PARTITION BY scope_type, scope_id, entity_id
+                        ORDER BY id ASC
+                    ) as rn
+                FROM association_scopes_entities
+            ),
+            to_delete AS (
+                SELECT id
+                FROM duplicates
+                WHERE rn > 1
+                LIMIT :batch_size
+            )
+            DELETE FROM association_scopes_entities
+            WHERE id IN (SELECT id FROM to_delete)
+        """)
 
         result = db_conn.execute(delete_batch_query, {"batch_size": BATCH_SIZE})
         batch_deleted = result.rowcount

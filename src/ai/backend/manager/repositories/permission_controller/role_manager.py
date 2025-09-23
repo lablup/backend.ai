@@ -1,3 +1,4 @@
+import logging
 import uuid
 from collections.abc import Iterable, Mapping
 from typing import Protocol
@@ -6,6 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesCreateInput,
 )
@@ -38,6 +40,8 @@ from ...data.permission.role import (
     RoleData,
 )
 from ...models.rbac_models.role import RoleRow
+
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class ScopeSystemRoleData(Protocol):
@@ -131,8 +135,11 @@ class RoleManager:
                 sa.insert(AssociationScopesEntitiesRow).values(creator.fields_to_store())
             )
         except IntegrityError:
-            # already mapped
-            pass
+            log.warning(
+                "entity and scope mapping already exists: %s, %s. Skipping.",
+                entity_id.to_str(),
+                scope_id.to_str(),
+            )
 
     async def unmap_entity_from_scope(
         self,
