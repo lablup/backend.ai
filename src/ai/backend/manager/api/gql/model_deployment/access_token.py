@@ -11,8 +11,8 @@ from ai.backend.common.exception import ModelDeploymentUnavailable
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
 from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
-from ai.backend.manager.services.deployment.actions.access_token.batch_load_by_deployment_ids import (
-    BatchLoadAccessTokensByDeploymentIdsAction,
+from ai.backend.manager.services.deployment.actions.access_token.batch_load import (
+    BatchLoadAccessTokensAction,
 )
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
@@ -40,23 +40,19 @@ class AccessToken(Node):
         )
 
     @classmethod
-    async def batch_load_by_deployment_ids(
-        cls, ctx: StrawberryGQLContext, deployment_ids: Sequence[UUID]
-    ) -> list[list["AccessToken"]]:
-        """Batch load access tokens by deployment IDs."""
+    async def batch_load_by_ids(
+        cls, ctx: StrawberryGQLContext, access_token_ids: Sequence[UUID]
+    ) -> list["AccessToken"]:
+        """Batch load access tokens by IDs."""
         processor = ctx.processors.deployment
         if processor is None:
             raise ModelDeploymentUnavailable(
                 "Model Deployment feature is unavailable. Please contact support."
             )
-
-        result = await processor.batch_load_access_tokens_by_deployment_ids.wait_for_complete(
-            BatchLoadAccessTokensByDeploymentIdsAction(deployment_ids=list(deployment_ids))
+        result = await processor.batch_load_access_tokens.wait_for_complete(
+            BatchLoadAccessTokensAction(access_token_ids=list(access_token_ids))
         )
-        access_tokens = []
-        for deployment_id in deployment_ids:
-            tokens = result.data.get(deployment_id, [])
-            access_tokens.append([AccessToken.from_dataclass(token) for token in tokens])
+        access_tokens = [AccessToken.from_dataclass(token) for token in result.data]
 
         return access_tokens
 
