@@ -28,8 +28,8 @@ from .utils import dedent_strip as _d
     Namespace is a concept that divides name spaces within a storage,
     and its meaning varies depending on the storage type.
 
-    * For `object_storage` type storage, namespace corresponds to a bucket
-    * For `vfs_storage` type storage, namespace corresponds to a subpath
+    * For `object_storage`, namespace corresponds to a bucket
+    * For `vfs_storage`, namespace corresponds to a subpath
     """)
 )
 class StorageNamespace(Node):
@@ -54,7 +54,6 @@ StorageNamespaceEdge = Edge[StorageNamespace]
     Added in 25.15.0.
 
     Storage namespace connection for pagination.
-    Connection type for paginating storage namespaces.
     """)
 )
 class StorageNamespaceConnection(Connection[StorageNamespace]):
@@ -67,7 +66,6 @@ class StorageNamespaceConnection(Connection[StorageNamespace]):
     description=_d("""
     Added in 25.15.0.
 
-    Input for registering a storage namespace.
     Input type for registering a storage namespace.
     """)
 )
@@ -86,7 +84,6 @@ class RegisterStorageNamespaceInput:
     description=_d("""
     Added in 25.15.0.
 
-    Input for unregistering a storage namespace.
     Input type for unregistering a storage namespace.
     """)
 )
