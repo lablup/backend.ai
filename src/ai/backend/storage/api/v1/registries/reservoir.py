@@ -11,6 +11,7 @@ from ai.backend.common.api_handlers import (
     BodyParam,
     api_handler,
 )
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.dto.storage.request import (
     ReservoirImportModelsReq,
 )
@@ -18,7 +19,7 @@ from ai.backend.common.dto.storage.response import (
     ReservoirImportModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.config.unified import ReservoirConfig
+from ai.backend.storage.config.unified import LegacyReservoirConfig, ReservoirConfig
 from ai.backend.storage.services.artifacts.reservoir import ReservoirService, ReservoirServiceArgs
 
 from ....utils import log_client_api_entry
@@ -52,7 +53,6 @@ class ReservoirRegistryAPIHandler:
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
             storage_name=body.parsed.storage_name,
-            bucket_name=body.parsed.bucket_name,
         )
 
         return APIResponse.build(
@@ -66,15 +66,23 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/registries/reservoir"
 
+    # Get reservoir configs from new artifact_registries
     reservoir_registry_configs: list[ReservoirConfig] = [
-        r.config for r in ctx.local_config.registries if isinstance(r.config, ReservoirConfig)
+        r.reservoir
+        for r in ctx.local_config.artifact_registries.values()
+        if r.registry_type == ArtifactRegistryType.RESERVOIR and r.reservoir is not None
     ]
+
+    # Legacy registries support - add from legacy registries for backward compatibility
+    for legacy_registry in ctx.local_config.registries:
+        if isinstance(legacy_registry.config, LegacyReservoirConfig):
+            reservoir_registry_configs.append(legacy_registry.config)
 
     reservoir_service = ReservoirService(
         ReservoirServiceArgs(
             background_task_manager=ctx.background_task_manager,
             event_producer=ctx.event_producer,
-            storage_configs=ctx.local_config.storages,
+            storage_pool=ctx.storage_pool,
             reservoir_registry_configs=reservoir_registry_configs,
         )
     )

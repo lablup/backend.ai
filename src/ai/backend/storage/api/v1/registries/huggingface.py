@@ -30,11 +30,11 @@ from ai.backend.common.dto.storage.response import (
     HuggingFaceScanModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.config.unified import HuggingfaceConfig, LegacyHuggingfaceConfig
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
 )
-from ai.backend.storage.services.storages.object_storage import ObjectStorageService
 
 from ....utils import log_client_api_entry
 
@@ -143,7 +143,6 @@ class HuggingFaceRegistryAPIHandler:
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
             storage_name=body.parsed.storage_name,
-            bucket_name=body.parsed.bucket_name,
         )
 
         response = HuggingFaceImportModelsResponse(
@@ -161,17 +160,22 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/registries/huggingface"
 
-    storage_service = ObjectStorageService(storage_configs=ctx.local_config.storages)
+    # Get huggingface configs from new artifact_registries
+    huggingface_registry_configs: dict[str, HuggingfaceConfig] = {
+        name: r.huggingface
+        for name, r in ctx.local_config.artifact_registries.items()
+        if r.registry_type == ArtifactRegistryType.HUGGINGFACE and r.huggingface is not None
+    }
 
-    huggingface_registry_configs = dict(
-        (r.name, r.config)
-        for r in ctx.local_config.registries
-        if r.config.registry_type == ArtifactRegistryType.HUGGINGFACE.value
-    )
+    # Legacy registries support - add from legacy registries for backward compatibility
+    for legacy_registry in ctx.local_config.registries:
+        if isinstance(legacy_registry.config, LegacyHuggingfaceConfig):
+            huggingface_registry_configs[legacy_registry.name] = legacy_registry.config
+
     huggingface_service = HuggingFaceService(
         HuggingFaceServiceArgs(
             background_task_manager=ctx.background_task_manager,
-            storage_service=storage_service,
+            storage_pool=ctx.storage_pool,
             registry_configs=huggingface_registry_configs,
             event_producer=ctx.event_producer,
         )
