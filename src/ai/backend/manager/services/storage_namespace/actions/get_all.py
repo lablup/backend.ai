@@ -3,11 +3,11 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
+from ai.backend.manager.services.storage_namespace.actions.base import StorageNamespaceAction
 
 
 @dataclass
-class GetAllBucketsAction(ObjectStorageAction):
+class GetAllNamespacesAction(StorageNamespaceAction):
     @override
     def entity_id(self) -> Optional[str]:
         return None
@@ -15,11 +15,11 @@ class GetAllBucketsAction(ObjectStorageAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "get_all_buckets"
+        return "get_all"
 
 
 @dataclass
-class GetAllBucketsActionResult(BaseActionResult):
+class GetAllNamespacesActionResult(BaseActionResult):
     result: Dict[uuid.UUID, List[str]]
 
     @override

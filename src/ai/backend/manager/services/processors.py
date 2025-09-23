@@ -72,6 +72,8 @@ from ai.backend.manager.services.resource_preset.processors import ResourcePrese
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
+from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
@@ -132,6 +134,7 @@ class Services:
     artifact_revision: ArtifactRevisionService
     artifact_registry: ArtifactRegistryService
     deployment: DeploymentService
+    storage_namespace: StorageNamespaceService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -264,6 +267,9 @@ class Services:
             repositories.artifact_registry.repository,
         )
         deployment_service = DeploymentService(args.deployment_controller)
+        storage_namespace_service = StorageNamespaceService(
+            repositories.storage_namespace.repository
+        )
 
         return cls(
             agent=agent_service,
@@ -289,6 +295,7 @@ class Services:
             artifact_revision=artifact_revision_service,
             artifact_registry=artifact_registry_service,
             deployment=deployment_service,
+            storage_namespace=storage_namespace_service,
         )
 
 
@@ -322,6 +329,7 @@ class Processors(AbstractProcessorPackage):
     artifact_registry: ArtifactRegistryProcessors
     artifact_revision: ArtifactRevisionProcessors
     deployment: Optional[DeploymentProcessors]
+    storage_namespace: StorageNamespaceProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -376,6 +384,10 @@ class Processors(AbstractProcessorPackage):
         if services.deployment is not None:
             deployment_processors = DeploymentProcessors(services.deployment, action_monitors)
 
+        storage_namespace_processors = StorageNamespaceProcessors(
+            services.storage_namespace, action_monitors
+        )
+
         return cls(
             agent=agent_processors,
             domain=domain_processors,
@@ -400,6 +412,7 @@ class Processors(AbstractProcessorPackage):
             artifact_registry=artifact_registry_processors,
             artifact_revision=artifact_revision_processors,
             deployment=deployment_processors,
+            storage_namespace=storage_namespace_processors,
         )
 
     @override
@@ -428,4 +441,5 @@ class Processors(AbstractProcessorPackage):
             *self.artifact_revision.supported_actions(),
             *self.artifact.supported_actions(),
             *(self.deployment.supported_actions() if self.deployment else []),
+            *self.storage_namespace.supported_actions(),
         ]

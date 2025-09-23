@@ -518,8 +518,8 @@ class SessionWithInvalidStateError(BackendAIError, web.HTTPConflict):
 
 
 class StorageNamespaceNotFoundError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/object-storage-not-found"
-    error_title = "Artifact Storage Not Found"
+    error_type = "https://api.backend.ai/probs/storage-namespace-not-found"
+    error_title = "Storage Namespace Not Found"
 
     @classmethod
     def error_code(cls) -> ErrorCode:

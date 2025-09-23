@@ -3,13 +3,13 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.services.object_storage.actions.base import ObjectStorageAction
+from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.services.storage_namespace.actions.base import StorageNamespaceAction
 
 
 @dataclass
-class UnregisterBucketAction(ObjectStorageAction):
+class GetNamespacesAction(StorageNamespaceAction):
     storage_id: uuid.UUID
-    bucket_name: str
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -18,13 +18,13 @@ class UnregisterBucketAction(ObjectStorageAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "unregister_bucket"
+        return "get_multi"
 
 
 @dataclass
-class UnregisterBucketActionResult(BaseActionResult):
-    storage_id: uuid.UUID
+class GetNamespacesActionResult(BaseActionResult):
+    result: list[StorageNamespaceData]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.storage_id)
+        return None

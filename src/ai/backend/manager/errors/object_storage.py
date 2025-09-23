@@ -20,16 +20,3 @@ class ObjectStorageNotFoundError(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
-
-
-class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/object-storage-bucket-not-found"
-    error_title = "Object Storage Bucket Not Found"
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.OBJECT_STORAGE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )

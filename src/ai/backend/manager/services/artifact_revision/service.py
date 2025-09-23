@@ -251,7 +251,7 @@ class ArtifactRevisionService:
         try:
             await storage_proxy_client.delete_s3_object(
                 storage_name=storage_data.name,
-                bucket_name=storage_namespace.bucket,
+                bucket_name=storage_namespace.namespace,
                 req=DeleteObjectReq(
                     key=key,
                 ),
