@@ -37,7 +37,7 @@ def load_local_config(
         return local_config
     except Exception as e:
         print(
-            f"ConfigurationError: Validation of storage-proxy local config has failed {e}",
+            f"ConfigurationError: Validation of storage-proxy local config has failed, {e}",
             file=sys.stderr,
         )
         raise BaseConfigError(raw_cfg) from e
