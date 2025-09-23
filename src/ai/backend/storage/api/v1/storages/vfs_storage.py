@@ -27,7 +27,7 @@ from ai.backend.common.dto.storage.response import (
     VFSUploadResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.stream import MultipartFileUploadStreamReader
+from ai.backend.storage.types import MultipartFileUploadStreamReader
 
 from ....services.storages.vfs_storage import VFSStorageService
 from ....utils import log_client_api_entry

@@ -26,7 +26,7 @@ from ai.backend.common.dto.storage.request import (
     UploadObjectReq,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.stream import MultipartFileUploadStreamReader
+from ai.backend.storage.types import MultipartFileUploadStreamReader
 
 from ....services.storages.object_storage import ObjectStorageService
 from ....utils import log_client_api_entry
