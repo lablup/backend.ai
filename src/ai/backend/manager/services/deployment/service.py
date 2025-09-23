@@ -58,10 +58,6 @@ from ai.backend.manager.services.deployment.actions.batch_load_deployments impor
     BatchLoadDeploymentsAction,
     BatchLoadDeploymentsActionResult,
 )
-from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_deployment_ids import (
-    BatchLoadReplicasByDeploymentIdsAction,
-    BatchLoadReplicasByDeploymentIdsActionResult,
-)
 from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_revision_ids import (
     BatchLoadReplicasByRevisionIdsAction,
     BatchLoadReplicasByRevisionIdsActionResult,
@@ -405,11 +401,6 @@ class DeploymentService:
 
     async def list_revisions(self, action: ListRevisionsAction) -> ListRevisionsActionResult:
         return ListRevisionsActionResult(data=[], total_count=0)
-
-    async def batch_load_replicas_by_deployment_ids(
-        self, action: BatchLoadReplicasByDeploymentIdsAction
-    ) -> BatchLoadReplicasByDeploymentIdsActionResult:
-        return BatchLoadReplicasByDeploymentIdsActionResult(data={})
 
     async def get_revision_by_deployment_id(
         self, action: GetRevisionByDeploymentIdAction

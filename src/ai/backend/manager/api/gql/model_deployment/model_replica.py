@@ -41,9 +41,6 @@ from ai.backend.manager.repositories.deployment.types.types import (
 from ai.backend.manager.repositories.deployment.types.types import (
     ReadinessStatusFilter as RepoReadinessStatusFilter,
 )
-from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_deployment_ids import (
-    BatchLoadReplicasByDeploymentIdsAction,
-)
 from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_revision_ids import (
     BatchLoadReplicasByRevisionIdsAction,
 )
@@ -212,31 +209,6 @@ class ModelReplica(Node):
             created_at=data.created_at,
             live_stat=JSONString.serialize(data.live_stat),
         )
-
-    @classmethod
-    async def batch_load_by_deployment_ids(
-        cls, ctx: StrawberryGQLContext, deployment_ids: Sequence[UUID]
-    ) -> list[list["ModelReplica"]]:
-        """Batch load replicas by their deployment IDs."""
-        processor = ctx.processors.deployment
-        if processor is None:
-            raise ModelDeploymentUnavailable(
-                "Model Deployment feature is unavailable. Please contact support."
-            )
-
-        action_result = await processor.batch_load_replicas_by_deployment_ids.wait_for_complete(
-            BatchLoadReplicasByDeploymentIdsAction(deployment_ids=list(deployment_ids))
-        )
-
-        replicas_map = action_result.data
-        result = []
-        for deployment_id in deployment_ids:
-            replica_data_list = replicas_map.get(deployment_id, [])
-            replica_objects = []
-            for replica_data in replica_data_list:
-                replica_objects.append(cls.from_dataclass(replica_data))
-            result.append(replica_objects)
-        return result
 
     @classmethod
     async def batch_load_by_revision_ids(
