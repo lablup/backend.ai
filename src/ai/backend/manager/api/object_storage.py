@@ -153,6 +153,7 @@ def create_app(
     cors.add(
         app.router.add_route("POST", "/presigned/download", api_handler.get_presigned_download_url)
     )
+    # TODO: deprecate these APIs, and use /storage-namespaces instead
     cors.add(app.router.add_route("GET", "/buckets", api_handler.get_all_buckets))
     cors.add(app.router.add_route("GET", "/{storage_id}/buckets", api_handler.get_buckets))
     cors.add(app.router.add_route("GET", "/", api_handler.list_object_storages))

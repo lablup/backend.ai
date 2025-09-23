@@ -12,9 +12,6 @@ from ai.backend.manager.data.object_storage_namespace.types import StorageNamesp
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
-from ai.backend.manager.errors.object_storage import (
-    ObjectStorageBucketNotFoundError,
-)
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -95,7 +92,7 @@ class StorageNamespaceRepository:
             result = await db_session.execute(delete_query)
             deleted_storage_id = result.scalar()
             if deleted_storage_id is None:
-                raise ObjectStorageBucketNotFoundError()
+                raise StorageNamespaceNotFoundError()
             return deleted_storage_id
 
     @repository_decorator()
