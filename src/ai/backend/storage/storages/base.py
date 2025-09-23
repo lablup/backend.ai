@@ -66,7 +66,7 @@ class StoragePool:
         # Add Storage instances
         from ai.backend.storage.storages.vfs_storage import VFSStorage
 
-        for artifact_storage_config in config.artifact_storages:
+        for storage_name, artifact_storage_config in config.artifact_storages.items():
             match artifact_storage_config.storage_type:
                 case ArtifactStorageType.VFS:
                     if artifact_storage_config.vfs is None:
@@ -74,11 +74,9 @@ class StoragePool:
                             "vfs config is required when storage_type is 'vfs'"
                         )
                     log.info(
-                        f"Adding VFS storage: {artifact_storage_config.name} ({artifact_storage_config.vfs.base_path})"
+                        f"Adding VFS storage: {storage_name} ({artifact_storage_config.vfs.base_path})"
                     )
-                    storages[artifact_storage_config.name] = VFSStorage(
-                        artifact_storage_config.name, artifact_storage_config.vfs
-                    )
+                    storages[storage_name] = VFSStorage(storage_name, artifact_storage_config.vfs)
 
                 case ArtifactStorageType.OBJECT_STORAGE:
                     if artifact_storage_config.object_storage is None:
@@ -86,10 +84,10 @@ class StoragePool:
                             "object_storage config is required when storage_type is 'object_storage'"
                         )
                     log.info(
-                        f"Adding object storage: {artifact_storage_config.name} ({artifact_storage_config.object_storage.endpoint})"
+                        f"Adding object storage: {storage_name} ({artifact_storage_config.object_storage.endpoint})"
                     )
-                    storages[artifact_storage_config.name] = ObjectStorage(
-                        artifact_storage_config.name, artifact_storage_config.object_storage
+                    storages[storage_name] = ObjectStorage(
+                        storage_name, artifact_storage_config.object_storage
                     )
 
                 case ArtifactStorageType.GIT_LFS:

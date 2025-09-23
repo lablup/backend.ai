@@ -850,12 +850,6 @@ class LegacyReservoirConfig(ReservoirConfig):
 
 
 class ArtifactRegistryStorageConfig(BaseModel):
-    name: str = Field(
-        description="""
-        Name of the storage configuration.
-        Used to identify this storage in the system.
-        """,
-    )
     storage_type: ArtifactStorageType = Field(
         description="""
         Type of the artifact storage.
@@ -916,13 +910,6 @@ class LegacyArtifactRegistryConfig(BaseModel):
 
 
 class ArtifactRegistryConfig(BaseModel):
-    name: str = Field(
-        description="""
-        Name of the artifact registry configuration.
-        Used to identify this registry in the system.
-        """,
-        examples=[typ.value for typ in ArtifactRegistryType],
-    )
     registry_type: ArtifactRegistryType = Field(
         description="""
         Type of the artifact registry.
@@ -1045,19 +1032,19 @@ class StorageProxyUnifiedConfig(BaseModel):
         """,
     )
 
-    artifact_storages: list[ArtifactRegistryStorageConfig] = Field(
-        default_factory=list,
+    artifact_storages: dict[str, ArtifactRegistryStorageConfig] = Field(
+        default_factory=dict,
         description="""
-        List of artifact storage configurations.
+        Dictionary of artifact storage configurations keyed by name.
         Each configuration defines how to connect to and use an artifact storage service.
         """,
         validation_alias=AliasChoices("artifact-storages", "artifact_storages"),
         serialization_alias="artifact-storages",
     )
-    artifact_registries: list[ArtifactRegistryConfig] = Field(
-        default_factory=list,
+    artifact_registries: dict[str, ArtifactRegistryConfig] = Field(
+        default_factory=dict,
         description="""
-        List of artifact registry configurations.
+        Dictionary of artifact registry configurations keyed by name.
         Each configuration defines how to connect to and use an artifact registry service.
         """,
         validation_alias=AliasChoices("artifact-registries", "artifact_registries"),

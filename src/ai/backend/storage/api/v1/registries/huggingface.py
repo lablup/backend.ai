@@ -162,8 +162,8 @@ def create_app(ctx: RootContext) -> web.Application:
 
     # Get huggingface configs from new artifact_registries
     huggingface_registry_configs: dict[str, HuggingfaceConfig] = {
-        r.name: r.huggingface
-        for r in ctx.local_config.artifact_registries
+        name: r.huggingface
+        for name, r in ctx.local_config.artifact_registries.items()
         if r.registry_type == ArtifactRegistryType.HUGGINGFACE and r.huggingface is not None
     }
 

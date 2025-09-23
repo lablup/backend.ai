@@ -69,7 +69,7 @@ def create_app(ctx: RootContext) -> web.Application:
     # Get reservoir configs from new artifact_registries
     reservoir_registry_configs: list[ReservoirConfig] = [
         r.reservoir
-        for r in ctx.local_config.artifact_registries
+        for r in ctx.local_config.artifact_registries.values()
         if r.registry_type == ArtifactRegistryType.RESERVOIR and r.reservoir is not None
     ]
 
