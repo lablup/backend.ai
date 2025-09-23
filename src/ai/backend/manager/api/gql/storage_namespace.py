@@ -24,12 +24,12 @@ from .types import StrawberryGQLContext
     description=dedent_strip("""
     Added in 25.15.0.
 
-    Storage namespace representation.
-    Namespace is a concept that divides name spaces within a storage,
-    and its meaning varies depending on the storage type.
+    Storage namespace provides logical separation of data within a single storage system
+    to organize and isolate domain-specific concerns.
 
-    * For `object_storage`, namespace corresponds to a bucket
-    * For `vfs_storage`, namespace corresponds to a subpath
+    Implementation varies by storage type:
+    - Object Storage (S3, MinIO): Uses bucket-based namespace separation
+    - File System (VFS): Uses directory path prefix for namespace distinction
     """)
 )
 class StorageNamespace(Node):
@@ -38,7 +38,7 @@ class StorageNamespace(Node):
     namespace: str
 
     @classmethod
-    def fromdedent_stripataclass(cls, data: StorageNamespaceData) -> Self:
+    def from_dataclass(cls, data: StorageNamespaceData) -> Self:
         return cls(
             id=ID(str(data.id)),
             storage_id=ID(str(data.storage_id)),
