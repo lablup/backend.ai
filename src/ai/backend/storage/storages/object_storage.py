@@ -17,10 +17,10 @@ from ai.backend.storage.exception import (
     FileStreamDownloadError,
     FileStreamUploadError,
     ObjectInfoFetchError,
+    ObjectStorageObjectDeletionError,
     PresignedDownloadURLGenerationError,
     PresignedUploadURLGenerationError,
     StorageBucketFileNotFoundError,
-    StorageBucketNotFoundError,
 )
 from ai.backend.storage.storages.base import AbstractStorage
 
@@ -204,7 +204,7 @@ class ObjectStorage(AbstractStorage):
             s3_client = self._get_s3_client()
             await s3_client.delete_object(prefix)
         except Exception as e:
-            raise StorageBucketNotFoundError(f"Delete object failed: {str(e)}") from e
+            raise ObjectStorageObjectDeletionError(f"Delete object failed: {str(e)}") from e
 
     def _get_s3_client(self) -> S3Client:
         return S3Client(

@@ -8,7 +8,7 @@ from ai.backend.storage.config.unified import ObjectStorageConfig, ReservoirConf
 from ai.backend.storage.exception import (
     FileStreamDownloadError,
     ObjectInfoFetchError,
-    StorageBucketNotFoundError,
+    ObjectStorageBucketNotFoundError,
     StorageNotFoundError,
 )
 from ai.backend.storage.services.storages.object_storage import ObjectStorageService
@@ -102,7 +102,7 @@ async def test_stream_upload_invalid_bucket(storages_service: ObjectStorageServi
 
     test_stream = TestStreamReader([b"test data"])
 
-    with pytest.raises(StorageBucketNotFoundError):
+    with pytest.raises(ObjectStorageBucketNotFoundError):
         await storages_service.stream_upload(
             "test_storage",
             "invalid-bucket",
@@ -187,7 +187,7 @@ async def test_get_object_info_invalid_storage(storages_service: ObjectStorageSe
 @pytest.mark.asyncio
 async def test_get_object_info_invalid_bucket(storages_service: ObjectStorageService):
     """Test object info retrieval with invalid bucket"""
-    with pytest.raises(StorageBucketNotFoundError):
+    with pytest.raises(ObjectStorageBucketNotFoundError):
         await storages_service.get_object_info("test_storage", "invalid-bucket", _TEST_KEY)
 
 
@@ -222,5 +222,5 @@ async def test_delete_object_invalid_storage(storages_service: ObjectStorageServ
 @pytest.mark.asyncio
 async def test_delete_object_invalid_bucket(storages_service: ObjectStorageService):
     """Test object deletion with invalid bucket"""
-    with pytest.raises(StorageBucketNotFoundError):
+    with pytest.raises(ObjectStorageBucketNotFoundError):
         await storages_service.delete_object("test_storage", "invalid-bucket", _TEST_KEY)

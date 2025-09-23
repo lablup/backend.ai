@@ -5,7 +5,7 @@ from ai.backend.common.dto.storage.response import (
 )
 from ai.backend.common.types import StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.storage.exception import StorageNotFoundError
+from ai.backend.storage.exception import StorageNotFoundError, StorageTypeInvalidError
 from ai.backend.storage.storages.storage_pool import StoragePool
 from ai.backend.storage.storages.vfs_storage import VFSStorage
 
@@ -133,7 +133,7 @@ class VFSStorageService:
         try:
             storage = self._storage_pool.get_storage(storage_name)
             if not isinstance(storage, VFSStorage):
-                raise StorageNotFoundError(f"Storage '{storage_name}' is not a VFS storage")
+                raise StorageTypeInvalidError(f"Storage '{storage_name}' is not a VFS storage")
             return storage
         except KeyError:
             raise StorageNotFoundError(f"No VFS storage configuration found for: {storage_name}")

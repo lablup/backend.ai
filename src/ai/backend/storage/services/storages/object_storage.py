@@ -7,7 +7,11 @@ from ai.backend.common.dto.storage.response import (
 )
 from ai.backend.common.types import StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.storage.exception import StorageBucketNotFoundError, StorageNotFoundError
+from ai.backend.storage.exception import (
+    ObjectStorageBucketNotFoundError,
+    StorageNotFoundError,
+    StorageTypeInvalidError,
+)
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool
 
@@ -131,11 +135,11 @@ class ObjectStorageService:
         try:
             storage = self._storage_pool.get_storage(storage_name)
             if not isinstance(storage, ObjectStorage):
-                raise StorageNotFoundError(f"Storage '{storage_name}' is not an ObjectStorage")
+                raise StorageTypeInvalidError(f"Storage '{storage_name}' is not an ObjectStorage")
 
             # TODO: Remove this after supporting multiple buckets
             if storage._bucket != bucket_name:
-                raise StorageBucketNotFoundError(
+                raise ObjectStorageBucketNotFoundError(
                     f"Bucket '{bucket_name}' not configured for storage '{storage_name}'. "
                     f"Expected bucket: '{storage._bucket}'"
                 )

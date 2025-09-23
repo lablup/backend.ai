@@ -20,8 +20,8 @@ from ai.backend.storage.config.unified import (
 from ai.backend.storage.exception import (
     ArtifactRevisionEmptyError,
     ArtifactStorageEmptyError,
+    ObjectStorageBucketNotFoundError,
     ReservoirStorageConfigInvalidError,
-    StorageBucketNotFoundError,
     StorageNotFoundError,
 )
 from ai.backend.storage.storages.object_storage import ObjectStorage
@@ -120,7 +120,9 @@ class ReservoirService:
         # Use the configured bucket from ObjectStorage
         bucket_name = storage._bucket
         if not bucket_name:
-            raise StorageBucketNotFoundError(f"No bucket configured for storage '{storage_name}'")
+            raise ObjectStorageBucketNotFoundError(
+                f"No bucket configured for storage '{storage_name}'"
+            )
 
         # Create S3Client from ObjectStorage configuration
         s3_client = S3Client(

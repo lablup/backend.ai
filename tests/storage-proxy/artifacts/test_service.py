@@ -25,10 +25,10 @@ from ai.backend.storage.config.unified import (
 from ai.backend.storage.exception import (
     ArtifactStorageEmptyError,
     HuggingFaceAPIError,
+    ObjectStorageBucketNotFoundError,
     ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
     ReservoirStorageConfigInvalidError,
-    StorageBucketNotFoundError,
     StorageNotFoundError,
 )
 from ai.backend.storage.services.artifacts.huggingface import (
@@ -669,7 +669,7 @@ class TestReservoirService:
         assert isinstance(mock_storage, MagicMock)  # Type narrowing for mypy
         mock_storage._bucket = ""  # Simulate no bucket configured
 
-        with pytest.raises(StorageBucketNotFoundError):
+        with pytest.raises(ObjectStorageBucketNotFoundError):
             reservoir_service._get_s3_client("test_storage")
 
     @pytest.mark.asyncio
