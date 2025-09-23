@@ -1,11 +1,14 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import mimetypes
 import ssl
 import time
 import uuid
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Callable, Optional, Protocol
+from typing import Callable, Final, Optional, Protocol, override
 
 import aiohttp
 
@@ -19,7 +22,7 @@ from ai.backend.common.data.storage.registries.types import (
 )
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
-from ai.backend.common.types import DispatchResult
+from ai.backend.common.types import DispatchResult, StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.huggingface import (
     HuggingFaceClient,
@@ -33,14 +36,15 @@ from ai.backend.storage.exception import (
     ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
 )
-from ai.backend.storage.storages.base import StoragePool
-from ai.backend.storage.storages.object_storage import ObjectStorage
+from ai.backend.storage.storages.storage_pool import StoragePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _MiB = 1024 * 1024
 _DEFAULT_DOWNLOAD_LOGGING_INTERVAL_SECS = 15
 _DEFAULT_BYTESIZE_INTERVAL = 64 * _MiB
+
+_PROBE_HEAD_BASE_HEADER: Final[dict[str, str]] = {"Accept-Encoding": "identity"}
 
 _DOWNLOAD_RETRIABLE_ERROR = (
     aiohttp.ClientPayloadError,
@@ -49,6 +53,13 @@ _DOWNLOAD_RETRIABLE_ERROR = (
     asyncio.TimeoutError,
     ssl.SSLError,
 )
+
+
+@dataclass
+class _ProbeHeadInfo:
+    total: Optional[int]
+    etag: Optional[str]
+    accept_ranges: bool
 
 
 class _DownloadProgressLogger(Protocol):
@@ -117,6 +128,168 @@ def _make_download_progress_logger(
         last_bytes = offset
 
     return log_progress
+
+
+class HuggingFaceFileDownloadStreamReader(StreamReader):
+    _url: str
+    _chunk_size: int
+    _max_retries: int
+    _content_type: Optional[str]
+
+    def __init__(
+        self, url: str, chunk_size: int, max_retries: int, content_type: Optional[str]
+    ) -> None:
+        self._url = url
+        self._chunk_size = chunk_size
+        self._max_retries = max_retries
+        self._content_type = content_type
+
+    async def _probe_head(self) -> _ProbeHeadInfo:
+        """
+        Probe metadata via HEAD.
+        - May set total size, etag, and Accept-Ranges support.
+        - Any failure is swallowed (best effort).
+        """
+        total: Optional[int] = None
+        etag: Optional[str] = None
+        accept_ranges: bool = False
+
+        headers_base = _PROBE_HEAD_BASE_HEADER
+        try:
+            async with self._session.head(
+                self._url, headers=headers_base, allow_redirects=True
+            ) as resp:
+                content_length = resp.headers.get("Content-Length")
+                if content_length and content_length.isdigit():
+                    total = int(content_length)
+
+                new_etag = resp.headers.get("ETag")
+                if etag and new_etag and new_etag != etag:
+                    raise aiohttp.ClientPayloadError("ETag changed on HEAD")
+                etag = etag or new_etag
+                accept_ranges = "bytes" in (resp.headers.get("Accept-Ranges", "")).lower()
+        except Exception:
+            # HEAD is best-effort; ignore failures.
+            pass
+
+        return _ProbeHeadInfo(total=total, etag=etag, accept_ranges=accept_ranges)
+
+    @override
+    async def read(self) -> AsyncIterator[bytes]:
+        """
+        Stream bytes from `url`.
+        """
+        self._session = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=None, sock_read=None),
+            auto_decompress=False,
+        )
+
+        headers_base = _PROBE_HEAD_BASE_HEADER
+        progress_logger = _make_download_progress_logger(
+            total_getter=lambda: total,
+        )
+
+        offset = 0
+        backoff = 1.0
+        retries = 0
+
+        total: Optional[int] = None
+        etag: Optional[str] = None
+        accept_ranges = False
+
+        try:
+            probe_info = await self._probe_head()
+            total = probe_info.total
+            etag = probe_info.etag
+            accept_ranges = probe_info.accept_ranges
+
+            while True:
+                headers = dict(headers_base)
+                if offset and accept_ranges:
+                    headers["Range"] = f"bytes={offset}-"
+
+                try:
+                    async with self._session.get(
+                        self._url, headers=headers, allow_redirects=True
+                    ) as resp:
+                        # Validate partial content when resuming
+                        if offset and accept_ranges and resp.status != 206:
+                            raise aiohttp.ClientPayloadError(f"Expected 206, got {resp.status}")
+
+                        # Validate ETag across resumes
+                        resp_etag = resp.headers.get("ETag")
+                        if etag and resp_etag and resp_etag != etag:
+                            raise aiohttp.ClientPayloadError("ETag changed during resume")
+
+                        # Fill total size from response headers if still unknown
+                        if total is None:
+                            if resp.status == 200:
+                                content_length = resp.headers.get("Content-Length")
+                                if content_length and content_length.isdigit():
+                                    total = int(content_length)
+                            elif resp.status == 206:
+                                content_range = resp.headers.get(
+                                    "Content-Range"
+                                )  # e.g. "bytes 123-456/789"
+                                if content_range and "/" in content_range:
+                                    try:
+                                        total = int(content_range.split("/")[-1])
+                                    except ValueError:
+                                        pass
+                            # TODO: Handle else case
+
+                        async for chunk in resp.content.iter_chunked(self._chunk_size):
+                            if not chunk:
+                                continue
+                            offset += len(chunk)
+                            progress_logger(offset)
+                            yield chunk
+
+                    # total unknown
+                    if total is None:
+                        progress_logger(offset, final=True)
+                        log.warning("Skipped download of %s since total size is unknown", self._url)
+                        break
+
+                    # Completed
+                    if offset >= total:
+                        progress_logger(offset, final=True)
+                        break
+
+                    # Unexpected early EOF → retry
+                    raise aiohttp.ClientPayloadError("Early EOF before Content-Length")
+
+                except _DOWNLOAD_RETRIABLE_ERROR as e:
+                    retries += 1
+                    if retries > self._max_retries:
+                        progress_logger(offset, final=True)
+                        raise aiohttp.ClientPayloadError(
+                            f"Exceeded retries while downloading {self._url} at offset={offset}"
+                        ) from e
+
+                    log.warning(
+                        "Download retry {}/{} at offset {:.1f} MiB (backoff={:.1f}s, err={})",
+                        retries,
+                        self._max_retries,
+                        offset / _MiB,
+                        backoff,
+                        e.__class__.__name__,
+                    )
+                    await asyncio.sleep(backoff)
+                    backoff = min(backoff * 2, 30.0)
+
+                    # Refresh metadata before retry
+                    probe_info = await self._probe_head()
+                    total = probe_info.total
+                    etag = probe_info.etag
+                    accept_ranges = probe_info.accept_ranges
+                    continue
+        finally:
+            await self._session.close()
+
+    @override
+    def content_type(self) -> Optional[str]:
+        return self._content_type
 
 
 @dataclass
@@ -332,14 +505,6 @@ class HuggingFaceService:
                 "Storage pool not configured for import operations"
             )
 
-        # Get storage from pool and verify it's ObjectStorage type
-        storage = self._storage_pool.get_storage(storage_name)
-        if not isinstance(storage, ObjectStorage):
-            raise ObjectStorageConfigInvalidError(
-                f"Storage '{storage_name}' is not an ObjectStorage type. "
-                f"HuggingFace import requires ObjectStorage for bucket operations."
-            )
-
         registry_config = self._registry_configs.get(registry_name)
         if not registry_config:
             raise RegistryNotFoundError(f"Unknown registry: {registry_name}")
@@ -516,139 +681,6 @@ class HuggingFaceService:
         bgtask_id = await self._background_task_manager.start(_import_models_batch)
         return bgtask_id
 
-    async def _make_download_file_stream(
-        self,
-        url: str,
-        chunk_size: int,
-        *,
-        max_retries: int = 8,
-    ):
-        """
-        Stream bytes from `url`.
-        """
-        session = aiohttp.ClientSession(
-            timeout=aiohttp.ClientTimeout(total=None, sock_read=None),
-            auto_decompress=False,
-        )
-
-        headers_base = {"Accept-Encoding": "identity"}
-        total: Optional[int] = None
-        etag: Optional[str] = None
-        accept_ranges = False
-
-        progress_logger = _make_download_progress_logger(
-            total_getter=lambda: total,
-        )
-
-        async def _probe_head() -> None:
-            """
-            Probe metadata via HEAD.
-            - May set total size, etag, and Accept-Ranges support.
-            - Any failure is swallowed (best effort).
-            """
-            nonlocal total, etag, accept_ranges
-            try:
-                async with session.head(url, headers=headers_base, allow_redirects=True) as resp:
-                    content_length = resp.headers.get("Content-Length")
-                    if content_length and content_length.isdigit():
-                        total = int(content_length)
-
-                    new_etag = resp.headers.get("ETag")
-                    if etag and new_etag and new_etag != etag:
-                        raise aiohttp.ClientPayloadError("ETag changed on HEAD")
-                    etag = etag or new_etag
-
-                    accept_ranges = "bytes" in (resp.headers.get("Accept-Ranges", "")).lower()
-            except Exception:
-                # HEAD is best-effort; ignore failures.
-                pass
-
-        offset = 0
-        backoff = 1.0
-        retries = 0
-
-        try:
-            await _probe_head()
-
-            while True:
-                headers = dict(headers_base)
-                if offset and accept_ranges:
-                    headers["Range"] = f"bytes={offset}-"
-
-                try:
-                    async with session.get(url, headers=headers, allow_redirects=True) as resp:
-                        # Validate partial content when resuming
-                        if offset and accept_ranges and resp.status != 206:
-                            raise aiohttp.ClientPayloadError(f"Expected 206, got {resp.status}")
-
-                        # Validate ETag across resumes
-                        resp_etag = resp.headers.get("ETag")
-                        if etag and resp_etag and resp_etag != etag:
-                            raise aiohttp.ClientPayloadError("ETag changed during resume")
-
-                        # Fill total size from response headers if still unknown
-                        if total is None:
-                            if resp.status == 200:
-                                content_length = resp.headers.get("Content-Length")
-                                if content_length and content_length.isdigit():
-                                    total = int(content_length)
-                            elif resp.status == 206:
-                                content_range = resp.headers.get(
-                                    "Content-Range"
-                                )  # e.g. "bytes 123-456/789"
-                                if content_range and "/" in content_range:
-                                    try:
-                                        total = int(content_range.split("/")[-1])
-                                    except ValueError:
-                                        pass
-                            # TODO: Handle else case
-
-                        async for chunk in resp.content.iter_chunked(chunk_size):
-                            if not chunk:
-                                continue
-                            offset += len(chunk)
-                            progress_logger(offset)
-                            yield chunk
-
-                    # total unknown
-                    if total is None:
-                        progress_logger(offset, final=True)
-                        log.warning("Skipped download of %s since total size is unknown", url)
-                        break
-
-                    # Completed
-                    if offset >= total:
-                        progress_logger(offset, final=True)
-                        break
-
-                    # Unexpected early EOF → retry
-                    raise aiohttp.ClientPayloadError("Early EOF before Content-Length")
-
-                except _DOWNLOAD_RETRIABLE_ERROR as e:
-                    retries += 1
-                    if retries > max_retries:
-                        progress_logger(offset, final=True)
-                        raise aiohttp.ClientPayloadError(
-                            f"Exceeded retries while downloading {url} at offset={offset}"
-                        ) from e
-
-                    log.warning(
-                        "Download retry {}/{} at offset {:.1f} MiB (backoff={:.1f}s, err={})",
-                        retries,
-                        max_retries,
-                        offset / _MiB,
-                        backoff,
-                        e.__class__.__name__,
-                    )
-                    await asyncio.sleep(backoff)
-                    backoff = min(backoff * 2, 30.0)
-
-                    # Refresh metadata before retry
-                    await _probe_head()
-                    continue
-        finally:
-            await session.close()
-
     async def _pipe_single_file_to_storage(
         self,
         *,
@@ -670,13 +702,7 @@ class HuggingFaceService:
                 "Storage pool not configured for import operations"
             )
 
-        # Get storage from pool and verify it's ObjectStorage type
         storage = self._storage_pool.get_storage(storage_name)
-        if not isinstance(storage, ObjectStorage):
-            raise ObjectStorageConfigInvalidError(
-                f"Storage '{storage_name}' is not an ObjectStorage type. "
-                f"HuggingFace import requires ObjectStorage for bucket operations."
-            )
 
         try:
             # Create storage key path
@@ -688,17 +714,19 @@ class HuggingFaceService:
                 f"storage_key={storage_key}, file_size={file_info.size}"
             )
 
-            # Download from HuggingFace and stream directly to storage
-            download_stream = self._make_download_file_stream(
-                file_info.download_url, download_chunk_size
+            ctype = mimetypes.guess_type(file_info.path)[0] or "application/octet-stream"
+
+            data_stream = HuggingFaceFileDownloadStreamReader(
+                url=file_info.download_url,
+                chunk_size=download_chunk_size,
+                max_retries=8,  # TODO: Add config
+                content_type=ctype,
             )
 
-            ctype = mimetypes.guess_type(file_info.path)[0] or "application/octet-stream"
             # Upload to storage using existing service
             await storage.stream_upload(
                 filepath=storage_key,
-                data_stream=download_stream,
-                content_type=ctype,
+                data_stream=data_stream,
             )
 
             log.info(

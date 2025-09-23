@@ -121,3 +121,36 @@ class ReservoirImportModelsResponse(BaseResponseModel):
         """,
         examples=["550e8400-e29b-41d4-a716-446655440000"],
     )
+
+
+# VFS Storage Response DTOs
+class VFSFileMetaResponse(BaseResponseModel):
+    """Response for VFS file metadata operations."""
+
+    filepath: str = Field(description="The file path within VFS storage.")
+    content_length: Optional[int] = Field(description="Size of the file in bytes.")
+    content_type: Optional[str] = Field(description="MIME type of the file.")
+    last_modified: Optional[float] = Field(description="Last modification time as Unix timestamp.")
+    created: Optional[float] = Field(description="Creation time as Unix timestamp.")
+    is_directory: bool = Field(description="Whether this is a directory.")
+    metadata: dict[str, str] = Field(default_factory=dict, description="Additional file metadata.")
+
+
+class VFSOperationResponse(BaseResponseModel):
+    """Generic response for VFS operations that don't return specific data."""
+
+    filepath: Optional[str] = Field(
+        default=None, description="The file/directory path that was operated on."
+    )
+
+
+class VFSUploadResponse(BaseResponseModel):
+    """Response for VFS file upload operations."""
+
+    filepath: str = Field(description="The path of the uploaded file.")
+
+
+class VFSDeleteResponse(BaseResponseModel):
+    """Response for VFS file/directory delete operations."""
+
+    filepath: str = Field(description="The path of the deleted file or directory.")

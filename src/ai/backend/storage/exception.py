@@ -263,7 +263,20 @@ class StorageNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class StorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
+class StorageTypeInvalidError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage/object-type-invalid"
+    error_title = "Storage Config Invalid Type"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/bucket/object-not-found"
     error_title = "Storage Bucket Not Found"
 
@@ -403,4 +416,17 @@ class NotImplementedAPI(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
+class ObjectStorageObjectDeletionError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage/object/deletion/failed"
+    error_title = "Object Deletion Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.OBJECT_STORAGE,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

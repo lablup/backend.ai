@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import os
 from pathlib import Path, PurePath
-from typing import Any, Literal, Optional, Union
+from typing import Any, Literal, Optional, Self, Union
 
 from pydantic import (
     AliasChoices,
@@ -11,10 +11,13 @@ from pydantic import (
     ConfigDict,
     Field,
     FilePath,
+    model_validator,
 )
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.config.types import EtcdConfigData
+from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -609,13 +612,60 @@ class PresignedDownloadConfig(BaseModel):
     )
 
 
+class VFSStorageConfig(BaseModel):
+    base_path: Path = Field(
+        description="""
+        Base filesystem path for VFS storage.
+        This directory will serve as the root for all VFS operations.
+        """,
+        examples=["/data/ai-models", "/shared/datasets"],
+        validation_alias=AliasChoices("base-path", "base_path"),
+        serialization_alias="base-path",
+    )
+    subpath: Optional[str] = Field(
+        default=None,
+        description="""
+        Optional subdirectory path appended to base_path.
+        Used to further organize storage within the base directory.
+        """,
+        examples=["models", "datasets", "user-data"],
+    )
+    upload_chunk_size: int = Field(
+        default=65536,  # 64KB
+        ge=1024,  # Minimum 1KB
+        description="""
+        Chunk size (in bytes) for streaming file upload operations.
+        Controls how data is buffered during file uploads.
+        """,
+        examples=[8192, 65536, 1048576],
+        validation_alias=AliasChoices("upload-chunk-size", "upload_chunk_size"),
+        serialization_alias="upload-chunk-size",
+    )
+    download_chunk_size: int = Field(
+        default=65536,  # 64KB
+        ge=1024,  # Minimum 1KB
+        description="""
+        Chunk size (in bytes) for streaming file download operations.
+        Controls how data is buffered during file downloads.
+        """,
+        examples=[8192, 65536, 1048576],
+        validation_alias=AliasChoices("download-chunk-size", "download_chunk_size"),
+        serialization_alias="download-chunk-size",
+    )
+    max_file_size: Optional[int] = Field(
+        default=None,
+        description="""
+        Maximum file size (in bytes) allowed for uploads.
+        If None, no size limit is enforced.
+        """,
+        examples=[1073741824, 10737418240],  # 1GB, 10GB
+        validation_alias=AliasChoices("max-file-size", "max_file_size"),
+        serialization_alias="max-file-size",
+    )
+
+
 # TODO: Remove this after migrating this to database
 class ObjectStorageConfig(BaseModel):
-    name: str = Field(
-        description="""
-        Name of the storage configuration.
-        """,
-    )
     endpoint: str = Field(
         description="""
         Endpoint URL for the object storage service.
@@ -706,14 +756,17 @@ class ObjectStorageConfig(BaseModel):
     )
 
 
-class HuggingfaceConfig(BaseModel):
-    registry_type: Literal["huggingface"] = Field(
+class LegacyObjectStorageConfig(ObjectStorageConfig):
+    name: str = Field(
         description="""
-        Type of the registry configuration.
-        This is used to identify the specific registry type.
+        Name of the object storage configuration.
+        Used to identify this storage in the system.
         """,
-        alias="type",
+        examples=["s3-storage", "minio-storage"],
     )
+
+
+class HuggingfaceConfig(BaseModel):
     endpoint: str = Field(
         default="https://huggingface.co",
         description="""
@@ -741,14 +794,18 @@ class HuggingfaceConfig(BaseModel):
     )
 
 
-class ReservoirConfig(BaseModel):
-    registry_type: Literal["reservoir"] = Field(
+# TODO: Remove legacy config classes
+class LegacyHuggingfaceConfig(HuggingfaceConfig):
+    registry_type: Literal["huggingface"] = Field(
         description="""
         Type of the registry configuration.
         This is used to identify the specific registry type.
         """,
         alias="type",
     )
+
+
+class ReservoirConfig(BaseModel):
     endpoint: str = Field(
         default="https://huggingface.co",
         description="""
@@ -782,10 +839,61 @@ class ReservoirConfig(BaseModel):
     )
 
 
-RegistrySpecificConfig = Union[HuggingfaceConfig, ReservoirConfig]
+class LegacyReservoirConfig(ReservoirConfig):
+    registry_type: Literal["reservoir"] = Field(
+        description="""
+        Type of the registry configuration.
+        This is used to identify the specific registry type.
+        """,
+        alias="type",
+    )
 
 
-class ArtifactRegistryConfig(BaseModel):
+class ArtifactRegistryStorageConfig(BaseModel):
+    storage_type: ArtifactStorageType = Field(
+        description="""
+        Type of the artifact storage.
+        Determines how to interact with the storage service.
+        """,
+        examples=[typ.value for typ in ArtifactStorageType],
+        alias="type",
+    )
+    object_storage: Optional[ObjectStorageConfig] = Field(
+        default=None,
+        description="""
+        Object storage configuration.
+        """,
+        validation_alias=AliasChoices("object-storage", "object_storage"),
+        serialization_alias="object-storage",
+    )
+    vfs: Optional[VFSStorageConfig] = Field(
+        default=None,
+        description="""
+        VFS storage configuration.
+        """,
+    )
+
+    @model_validator(mode="after")
+    def _validate_storage_config(self) -> Self:
+        match self.storage_type:
+            case ArtifactStorageType.OBJECT_STORAGE:
+                if self.object_storage is None:
+                    raise InvalidConfigError(
+                        "object_storage config is required when storage_type is 'object_storage'"
+                    )
+            case ArtifactStorageType.VFS:
+                if self.vfs is None:
+                    raise InvalidConfigError("vfs config is required when storage_type is 'vfs'")
+            case ArtifactStorageType.GIT_LFS:
+                raise GenericNotImplementedError("git_lfs is not supported yet")
+
+        return self
+
+
+LegacyRegistrySpecificConfig = Union[LegacyHuggingfaceConfig, LegacyReservoirConfig]
+
+
+class LegacyArtifactRegistryConfig(BaseModel):
     name: str = Field(
         description="""
         Name of the artifact registry configuration.
@@ -793,12 +901,51 @@ class ArtifactRegistryConfig(BaseModel):
         """,
         examples=[typ.value for typ in ArtifactRegistryType],
     )
-    config: RegistrySpecificConfig = Field(
+    config: LegacyRegistrySpecificConfig = Field(
         discriminator="registry_type",
         description="""
         Configuration for the artifact registry.
         """,
     )
+
+
+class ArtifactRegistryConfig(BaseModel):
+    registry_type: ArtifactRegistryType = Field(
+        description="""
+        Type of the artifact registry.
+        Determines how to interact with the registry service.
+        """,
+        examples=[typ.value for typ in ArtifactRegistryType],
+        alias="type",
+    )
+    huggingface: Optional[HuggingfaceConfig] = Field(
+        default=None,
+        description="""
+        HuggingFace registry configuration.
+        """,
+    )
+    reservoir: Optional[ReservoirConfig] = Field(
+        default=None,
+        description="""
+        Reservoir registry configuration.
+        """,
+    )
+
+    @model_validator(mode="after")
+    def _validate_registry_config(self) -> Self:
+        match self.registry_type:
+            case ArtifactRegistryType.HUGGINGFACE:
+                if self.huggingface is None:
+                    raise InvalidConfigError(
+                        "huggingface config is required when registry_type is 'huggingface'"
+                    )
+            case ArtifactRegistryType.RESERVOIR:
+                if self.reservoir is None:
+                    raise InvalidConfigError(
+                        "reservoir config is required when registry_type is 'reservoir'"
+                    )
+
+        return self
 
 
 class StorageProxyUnifiedConfig(BaseModel):
@@ -866,19 +1013,42 @@ class StorageProxyUnifiedConfig(BaseModel):
         Used for distributed coordination.
         """,
     )
-    storages: list[ObjectStorageConfig] = Field(
+    storages: list[LegacyObjectStorageConfig] = Field(
         default_factory=list,
         description="""
+        Deprecated, use `artifact_storages` instead.
+
         List of object storage configurations.
         Each configuration defines how to connect to and use an object storage service.
         """,
     )
-    registries: list[ArtifactRegistryConfig] = Field(
+    registries: list[LegacyArtifactRegistryConfig] = Field(
         default_factory=list,
         description="""
+        Deprecated, use `artifact_registries` instead.
+
         List of artifact registry configurations.
         Each configuration defines how to connect to and use an artifact registry service.
         """,
+    )
+
+    artifact_storages: dict[str, ArtifactRegistryStorageConfig] = Field(
+        default_factory=dict,
+        description="""
+        Dictionary of artifact storage configurations keyed by name.
+        Each configuration defines how to connect to and use an artifact storage service.
+        """,
+        validation_alias=AliasChoices("artifact-storages", "artifact_storages"),
+        serialization_alias="artifact-storages",
+    )
+    artifact_registries: dict[str, ArtifactRegistryConfig] = Field(
+        default_factory=dict,
+        description="""
+        Dictionary of artifact registry configurations keyed by name.
+        Each configuration defines how to connect to and use an artifact registry service.
+        """,
+        validation_alias=AliasChoices("artifact-registries", "artifact_registries"),
+        serialization_alias="artifact-registries",
     )
 
     # TODO: Remove me after changing config injection logic

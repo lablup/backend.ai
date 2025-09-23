@@ -4,14 +4,14 @@ import mimetypes
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
-from ai.backend.common.types import DispatchResult
+from ai.backend.common.types import DispatchResult, StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.unified import (
@@ -20,12 +20,12 @@ from ai.backend.storage.config.unified import (
 from ai.backend.storage.exception import (
     ArtifactRevisionEmptyError,
     ArtifactStorageEmptyError,
+    ObjectStorageBucketNotFoundError,
     ReservoirStorageConfigInvalidError,
-    StorageBucketNotFoundError,
     StorageNotFoundError,
 )
-from ai.backend.storage.storages.base import StoragePool
 from ai.backend.storage.storages.object_storage import ObjectStorage
+from ai.backend.storage.storages.storage_pool import StoragePool
 from ai.backend.storage.types import BucketCopyOptions
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -37,6 +37,54 @@ class ReservoirServiceArgs:
     event_producer: EventProducer
     storage_pool: StoragePool
     reservoir_registry_configs: list[ReservoirConfig]
+
+
+class ReservoirFileDownloadStreamReader(StreamReader):
+    _src_s3_client: S3Client
+    _key: str
+    _size: int
+    _options: BucketCopyOptions
+    _download_chunk_size: int
+    _content_type: Optional[str]
+
+    def __init__(
+        self,
+        src_s3_client: S3Client,
+        key: str,
+        size: int,
+        options: BucketCopyOptions,
+        download_chunk_size: int,
+        content_type: Optional[str],
+    ):
+        self._src_s3_client = src_s3_client
+        self._key = key
+        self._size = size
+        self._options = options
+        self._download_chunk_size = download_chunk_size
+        self._content_type = content_type
+
+    @override
+    async def read(self) -> AsyncIterator[bytes]:
+        sent = 0
+        next_mark = self._options.progress_log_interval_bytes
+        download_stream = self._src_s3_client.download_stream(
+            self._key, chunk_size=self._download_chunk_size
+        )
+        async for chunk in download_stream.read():
+            sent += len(chunk)
+            if next_mark and sent >= next_mark:
+                log.trace(
+                    "[stream_bucket_to_bucket] progress key={} sent={}/{}",
+                    self._key,
+                    sent,
+                    self._size,
+                )
+                next_mark += self._options.progress_log_interval_bytes
+            yield chunk
+
+    @override
+    def content_type(self) -> Optional[str]:
+        return self._content_type
 
 
 class ReservoirService:
@@ -72,7 +120,9 @@ class ReservoirService:
         # Use the configured bucket from ObjectStorage
         bucket_name = storage._bucket
         if not bucket_name:
-            raise StorageBucketNotFoundError(f"No bucket configured for storage '{storage_name}'")
+            raise ObjectStorageBucketNotFoundError(
+                f"No bucket configured for storage '{storage_name}'"
+            )
 
         # Create S3Client from ObjectStorage configuration
         s3_client = S3Client(
@@ -159,7 +209,6 @@ class ReservoirService:
 
         if not isinstance(storage, ObjectStorage):
             raise StorageNotFoundError(f"Storage '{storage_name}' is not an ObjectStorage type")
-        download_chunk_size = storage._reservoir_download_chunk_size
 
         # List all objects under prefix
         src_s3_client = S3Client(
@@ -203,22 +252,7 @@ class ReservoirService:
                 size = size_map.get(key, -1)
                 log.trace("[stream_bucket_to_bucket] begin key={} size={}", key, size)
 
-                async def _data_stream() -> AsyncIterator[bytes]:
-                    sent = 0
-                    next_mark = options.progress_log_interval_bytes
-                    async for chunk in src_s3_client.download_stream(
-                        key, chunk_size=download_chunk_size
-                    ):
-                        sent += len(chunk)
-                        if next_mark and sent >= next_mark:
-                            log.trace(
-                                "[stream_bucket_to_bucket] progress key={} sent={}/{}",
-                                key,
-                                sent,
-                                size,
-                            )
-                            next_mark += options.progress_log_interval_bytes
-                        yield chunk
+                download_chunk_size = storage._reservoir_download_chunk_size
 
                 # Content-Type
                 object_meta = await src_s3_client.get_object_meta(key)
@@ -228,11 +262,19 @@ class ReservoirService:
                     or "application/octet-stream"
                 )
 
+                data_stream = ReservoirFileDownloadStreamReader(
+                    src_s3_client=src_s3_client,
+                    key=key,
+                    size=size,
+                    options=options,
+                    download_chunk_size=download_chunk_size,
+                    content_type=ctype,
+                )
+
                 part_size = storage._upload_chunk_size
                 await dst_client.upload_stream(
-                    _data_stream(),
+                    data_stream,
                     key,
-                    content_type=ctype,
                     part_size=part_size,
                 )
 

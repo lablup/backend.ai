@@ -106,8 +106,7 @@ async def server_main(
     from .bgtask.registry import BgtaskHandlerRegistryCreator
     from .context import RootContext
     from .migration import check_latest
-    from .storages.base import AbstractStorage, StoragePool
-    from .storages.object_storage import ObjectStorage
+    from .storages.storage_pool import StoragePool
     from .volumes.pool import VolumePool
     from .watcher import WatcherClient
 
@@ -214,11 +213,8 @@ async def server_main(
             server_id=local_config.storage_proxy.node_id,
         )
 
-        # Create StoragePool for object storage
-        storages: dict[str, AbstractStorage] = {}
-        for config in local_config.storages:
-            storages[config.name] = ObjectStorage(config)
-        storage_pool = StoragePool(storages)
+        # Create StoragePool with both object storage and VFS storage
+        storage_pool = StoragePool.from_config(local_config)
 
         ctx = RootContext(
             pid=os.getpid(),

@@ -1,11 +1,12 @@
-from collections.abc import AsyncIterable, AsyncIterator
-from typing import Optional, override
+import mimetypes
+from typing import override
 
 from ai.backend.common.dto.storage.response import (
     ObjectMetaResponse,
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
 )
+from ai.backend.common.types import StreamReader
 from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.unified import (
     ObjectStorageConfig,
@@ -16,10 +17,10 @@ from ai.backend.storage.exception import (
     FileStreamDownloadError,
     FileStreamUploadError,
     ObjectInfoFetchError,
+    ObjectStorageObjectDeletionError,
     PresignedDownloadURLGenerationError,
     PresignedUploadURLGenerationError,
     StorageBucketFileNotFoundError,
-    StorageBucketNotFoundError,
 )
 from ai.backend.storage.storages.base import AbstractStorage
 
@@ -37,8 +38,8 @@ class ObjectStorage(AbstractStorage):
     _presigned_upload_config: PresignedUploadConfig
     _presigned_download_config: PresignedDownloadConfig
 
-    def __init__(self, cfg: ObjectStorageConfig) -> None:
-        self._name = cfg.name
+    def __init__(self, name: str, cfg: ObjectStorageConfig) -> None:
+        self._name = name
         self._endpoint = cfg.endpoint
         self._access_key = cfg.access_key
         self._secret_key = cfg.secret_key
@@ -54,8 +55,7 @@ class ObjectStorage(AbstractStorage):
     async def stream_upload(
         self,
         filepath: str,
-        data_stream: AsyncIterable[bytes],
-        content_type: Optional[str] = None,
+        data_stream: StreamReader,
     ) -> None:
         """
         Upload a file to S3 using streaming.
@@ -71,28 +71,32 @@ class ObjectStorage(AbstractStorage):
             await s3_client.upload_stream(
                 data_stream,
                 filepath,
-                content_type=content_type,
                 part_size=part_size,
             )
         except Exception as e:
             raise FileStreamUploadError("Upload failed") from e
 
     @override
-    async def stream_download(self, filepath: str) -> AsyncIterator[bytes]:
+    async def stream_download(self, filepath: str) -> StreamReader:
         """
         Download a file from S3 using streaming.
 
         Args:
             filepath: Path to the file to download
 
-        Yields:
-            bytes: Chunks of file data
+        Returns:
+            FileStream: Stream for reading file data
         """
         try:
             s3_client = self._get_s3_client()
+            object_meta = await s3_client.get_object_meta(filepath)
+            ctype = (
+                (object_meta.content_type if object_meta else None)
+                or mimetypes.guess_type(filepath)[0]
+                or "application/octet-stream"
+            )
             chunk_size = self._download_chunk_size
-            async for chunk in s3_client.download_stream(filepath, chunk_size=chunk_size):
-                yield chunk
+            return s3_client.download_stream(filepath, chunk_size=chunk_size, content_type=ctype)
 
         except Exception as e:
             raise FileStreamDownloadError("Download failed") from e
@@ -200,7 +204,7 @@ class ObjectStorage(AbstractStorage):
             s3_client = self._get_s3_client()
             await s3_client.delete_object(prefix)
         except Exception as e:
-            raise StorageBucketNotFoundError(f"Delete object failed: {str(e)}") from e
+            raise ObjectStorageObjectDeletionError(f"Delete object failed: {str(e)}") from e
 
     def _get_s3_client(self) -> S3Client:
         return S3Client(
