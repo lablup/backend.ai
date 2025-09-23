@@ -66,8 +66,8 @@ from ai.backend.manager.repositories.deployment.types.types import (
 from ai.backend.manager.repositories.deployment.types.types import (
     DeploymentStatusFilter as RepoDeploymentStatusFilter,
 )
-from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule_by_deployment_id import (
-    GetAutoScalingRulesByDeploymentIdAction,
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.batch_load_auto_scaling_rules import (
+    BatchLoadAutoScalingRulesAction,
 )
 from ai.backend.manager.services.deployment.actions.batch_load_deployments import (
     BatchLoadDeploymentsAction,
@@ -144,31 +144,21 @@ class ReplicaState:
 
 @strawberry.type(description="Added in 25.15.0")
 class ScalingRule:
-    _deployment_id: strawberry.Private[UUID]
     _scaling_rule_ids: strawberry.Private[list[UUID]]
 
     @strawberry.field
-    async def auto_scaling_rules(
-        parent: strawberry.Parent["ScalingRule"], info: Info[StrawberryGQLContext]
-    ) -> list[AutoScalingRule]:
+    async def auto_scaling_rules(self, info: Info[StrawberryGQLContext]) -> list[AutoScalingRule]:
         processor = info.context.processors.deployment
         if processor is None:
             raise ModelDeploymentUnavailable(
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
-        result = await processor.get_auto_scaling_rules_by_deployment_id.wait_for_complete(
-            GetAutoScalingRulesByDeploymentIdAction(deployment_id=UUID(str(parent._deployment_id)))
+        result = await processor.batch_load_auto_scaling_rules.wait_for_complete(
+            BatchLoadAutoScalingRulesAction(auto_scaling_rule_ids=self._scaling_rule_ids)
         )
 
         return [AutoScalingRule.from_dataclass(rule) for rule in result.data]
-
-    @classmethod
-    def from_dataclass(cls, deployment_id: NodeID, scaling_rule_ids: list[UUID]) -> "ScalingRule":
-        return cls(
-            _deployment_id=deployment_id,
-            _scaling_rule_ids=scaling_rule_ids,
-        )
 
 
 @strawberry.type(description="Added in 25.15.0")
@@ -210,7 +200,6 @@ class ModelDeploymentMetadata:
 
 @strawberry.type(description="Added in 25.15.0")
 class ModelDeploymentNetworkAccess:
-    _deployment_id: strawberry.Private[UUID]
     _access_token_ids: strawberry.Private[Optional[list[UUID]]]
     endpoint_url: Optional[str] = None
     preferred_domain_name: Optional[str] = None
@@ -219,10 +208,10 @@ class ModelDeploymentNetworkAccess:
     @strawberry.field
     async def access_tokens(self, info: Info[StrawberryGQLContext]) -> AccessTokenConnection:
         """Resolve access tokens using dataloader."""
-        access_token_loader = DataLoader(
-            apartial(AccessToken.batch_load_by_deployment_ids, info.context)
+        access_token_loader = DataLoader(apartial(AccessToken.batch_load_by_ids, info.context))
+        token_nodes: list[AccessToken] = await access_token_loader.load(
+            self._access_token_ids if self._access_token_ids else []
         )
-        token_nodes: list[AccessToken] = await access_token_loader.load(self._deployment_id)
 
         edges = [
             AccessTokenEdge(node=token_node, cursor=str(token_node.id))
@@ -245,7 +234,6 @@ class ModelDeploymentNetworkAccess:
         cls, data: DeploymentNetworkSpec, deployment_id: NodeID
     ) -> "ModelDeploymentNetworkAccess":
         return cls(
-            _deployment_id=deployment_id,
             _access_token_ids=data.access_token_ids,
             endpoint_url=data.url,
             preferred_domain_name=data.preferred_domain_name,
@@ -276,7 +264,6 @@ class ModelDeployment(Node):
     @strawberry.field
     async def scaling_rule(self, info: Info[StrawberryGQLContext]) -> ScalingRule:
         return ScalingRule(
-            _deployment_id=self.id,
             _scaling_rule_ids=self._scaling_rule_ids,
         )
 

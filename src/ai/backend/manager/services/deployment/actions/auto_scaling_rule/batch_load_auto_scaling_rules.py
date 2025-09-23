@@ -12,8 +12,8 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.base impor
 
 
 @dataclass
-class GetAutoScalingRulesByDeploymentIdAction(AutoScalingRuleBaseAction):
-    deployment_id: UUID
+class BatchLoadAutoScalingRulesAction(AutoScalingRuleBaseAction):
+    auto_scaling_rule_ids: list[UUID]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -22,11 +22,11 @@ class GetAutoScalingRulesByDeploymentIdAction(AutoScalingRuleBaseAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "get"
+        return "batch_load_auto_scaling_rules"
 
 
 @dataclass
-class GetAutoScalingRulesByDeploymentIdActionResult(BaseActionResult):
+class BatchLoadAutoScalingRulesActionResult(BaseActionResult):
     data: list[ModelDeploymentAutoScalingRuleData]
 
     @override

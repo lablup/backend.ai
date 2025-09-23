@@ -3,7 +3,7 @@
 import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
@@ -30,13 +30,17 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaStateData,
     ResourceConfigData,
 )
-from ai.backend.manager.services.deployment.actions.access_token.batch_load_by_deployment_ids import (
-    BatchLoadAccessTokensByDeploymentIdsAction,
-    BatchLoadAccessTokensByDeploymentIdsActionResult,
+from ai.backend.manager.services.deployment.actions.access_token.batch_load import (
+    BatchLoadAccessTokensAction,
+    BatchLoadAccessTokensActionResult,
 )
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.batch_load_auto_scaling_rules import (
+    BatchLoadAutoScalingRulesAction,
+    BatchLoadAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -45,10 +49,6 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_aut
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_auto_scaling_rule import (
     DeleteAutoScalingRuleAction,
     DeleteAutoScalingRuleActionResult,
-)
-from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule_by_deployment_id import (
-    GetAutoScalingRulesByDeploymentIdAction,
-    GetAutoScalingRulesByDeploymentIdActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
@@ -333,22 +333,20 @@ class DeploymentService:
             )
         )
 
-    async def batch_load_access_tokens_by_deployment_ids(
-        self, action: BatchLoadAccessTokensByDeploymentIdsAction
-    ) -> BatchLoadAccessTokensByDeploymentIdsActionResult:
-        token_map: dict[UUID, list[ModelDeploymentAccessTokenData]] = {}
-        for deployment_id in action.deployment_ids:
-            token_map[deployment_id] = []
-            for i in range(deployment_id.int % 5 + 1):
-                token_map[deployment_id].append(
-                    ModelDeploymentAccessTokenData(
-                        id=uuid4(),
-                        token=f"test_token_{i}",
-                        valid_until=datetime.now() + timedelta(hours=24 * (i + 1)),
-                        created_at=datetime.now() - timedelta(hours=i),
-                    )
+    async def batch_load_access_tokens(
+        self, action: BatchLoadAccessTokensAction
+    ) -> BatchLoadAccessTokensActionResult:
+        tokens = []
+        for i in range(5):
+            tokens.append(
+                ModelDeploymentAccessTokenData(
+                    id=uuid4(),
+                    token=f"test_token_{i}",
+                    valid_until=datetime.now() + timedelta(hours=24 * (i + 1)),
+                    created_at=datetime.now() - timedelta(hours=i),
                 )
-        return BatchLoadAccessTokensByDeploymentIdsActionResult(data=token_map)
+            )
+        return BatchLoadAccessTokensActionResult(data=tokens)
 
     async def sync_replicas(self, action: SyncReplicaAction) -> SyncReplicaActionResult:
         return SyncReplicaActionResult(success=True)
@@ -358,14 +356,14 @@ class DeploymentService:
     ) -> AddModelRevisionActionResult:
         return AddModelRevisionActionResult(revision=mock_revision_data_2)
 
-    async def get_auto_scaling_rules_by_deployment_id(
-        self, action: GetAutoScalingRulesByDeploymentIdAction
-    ) -> GetAutoScalingRulesByDeploymentIdActionResult:
-        return GetAutoScalingRulesByDeploymentIdActionResult(
+    async def batch_load_auto_scaling_rules(
+        self, action: BatchLoadAutoScalingRulesAction
+    ) -> BatchLoadAutoScalingRulesActionResult:
+        return BatchLoadAutoScalingRulesActionResult(
             data=[
                 ModelDeploymentAutoScalingRuleData(
                     id=uuid4(),
-                    model_deployment_id=action.deployment_id,
+                    model_deployment_id=uuid4(),
                     metric_source=AutoScalingMetricSource.KERNEL,
                     metric_name="test-metric",
                     min_threshold=Decimal("0.5"),
@@ -379,7 +377,7 @@ class DeploymentService:
                 ),
                 ModelDeploymentAutoScalingRuleData(
                     id=uuid4(),
-                    model_deployment_id=action.deployment_id,
+                    model_deployment_id=uuid4(),
                     metric_source=AutoScalingMetricSource.KERNEL,
                     metric_name="test-metric",
                     min_threshold=Decimal("0.0"),
