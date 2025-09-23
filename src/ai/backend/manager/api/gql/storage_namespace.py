@@ -17,9 +17,21 @@ from ai.backend.manager.services.storage_namespace.actions.unregister import (
 )
 
 from .types import StrawberryGQLContext
+from .utils import dedent_strip as _d
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(
+    description=_d("""
+    Added in 25.15.0.
+
+    Storage namespace representation.
+    Namespace is a concept that divides name spaces within a storage,
+    and its meaning varies depending on the storage type.
+
+    * For `object_storage` type storage, namespace corresponds to a bucket
+    * For `vfs_storage` type storage, namespace corresponds to a subpath
+    """)
+)
 class StorageNamespace(Node):
     id: NodeID[str]
     storage_id: ID
@@ -37,14 +49,28 @@ class StorageNamespace(Node):
 StorageNamespaceEdge = Edge[StorageNamespace]
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(
+    description=_d("""
+    Added in 25.15.0.
+
+    Storage namespace connection for pagination.
+    Connection type for paginating storage namespaces.
+    """)
+)
 class StorageNamespaceConnection(Connection[StorageNamespace]):
     @strawberry.field
     def count(self) -> int:
         return len(self.edges)
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(
+    description=_d("""
+    Added in 25.15.0.
+
+    Input for registering a storage namespace.
+    Input type for registering a storage namespace.
+    """)
+)
 class RegisterStorageNamespaceInput:
     storage_id: uuid.UUID
     namespace: str
@@ -56,23 +82,48 @@ class RegisterStorageNamespaceInput:
         )
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(
+    description=_d("""
+    Added in 25.15.0.
+
+    Input for unregistering a storage namespace.
+    Input type for unregistering a storage namespace.
+    """)
+)
 class UnregisterStorageNamespaceInput:
     storage_id: uuid.UUID
     namespace: str
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(
+    description=_d("""
+    Added in 25.15.0.
+
+    Payload returned after storage namespace registration.
+    """)
+)
 class RegisterStorageNamespacePayload:
     id: uuid.UUID
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(
+    description=_d("""
+    Added in 25.15.0.
+
+    Payload returned after storage namespace unregistration.
+    """)
+)
 class UnregisterStorageNamespacePayload:
     id: uuid.UUID
 
 
-@strawberry.mutation(description="Added in 25.15.0")
+@strawberry.mutation(
+    description=_d("""
+    Added in 25.15.0.
+
+    Registers a new namespace within a storage.
+    """)
+)
 async def register_storage_namespace(
     input: RegisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> RegisterStorageNamespacePayload:
@@ -87,7 +138,13 @@ async def register_storage_namespace(
     return RegisterStorageNamespacePayload(id=action_result.storage_id)
 
 
-@strawberry.mutation(description="Added in 25.15.0")
+@strawberry.mutation(
+    description=_d("""
+    Added in 25.15.0.
+
+    Unregisters an existing namespace from a storage.
+    """)
+)
 async def unregister_storage_namespace(
     input: UnregisterStorageNamespaceInput, info: Info[StrawberryGQLContext]
 ) -> UnregisterStorageNamespacePayload:

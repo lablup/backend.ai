@@ -686,10 +686,18 @@ type Mutation {
   """Added in 25.14.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
 
-  """Added in 25.15.0"""
+  """
+  Added in 25.15.0.
+  
+  Registers a new namespace within a storage.
+  """
   registerStorageNamespace(input: RegisterStorageNamespaceInput!): RegisterStorageNamespacePayload!
 
-  """Added in 25.15.0"""
+  """
+  Added in 25.15.0.
+  
+  Unregisters an existing namespace from a storage.
+  """
   unregisterStorageNamespace(input: UnregisterStorageNamespaceInput!): UnregisterStorageNamespacePayload!
 
   """Added in 25.14.0"""
@@ -859,13 +867,22 @@ type RawServiceConfig {
   extraCliParameters: String
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Input for registering a storage namespace.
+Input type for registering a storage namespace.
+"""
 input RegisterStorageNamespaceInput {
   storageId: UUID!
   namespace: String!
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Payload returned after storage namespace registration.
+"""
 type RegisterStorageNamespacePayload {
   id: UUID!
 }
@@ -1005,7 +1022,16 @@ type SourceInfo {
   url: String
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Storage namespace representation.
+Namespace is a concept that divides name spaces within a storage,
+and its meaning varies depending on the storage type.
+
+* For `object_storage` type storage, namespace corresponds to a bucket
+* For `vfs_storage` type storage, namespace corresponds to a subpath
+"""
 type StorageNamespace implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -1013,7 +1039,12 @@ type StorageNamespace implements Node {
   namespace: String!
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Storage namespace connection for pagination.
+Connection type for paginating storage namespaces.
+"""
 type StorageNamespaceConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -1057,13 +1088,22 @@ type Subscription {
 
 scalar UUID
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Input for unregistering a storage namespace.
+Input type for unregistering a storage namespace.
+"""
 input UnregisterStorageNamespaceInput {
   storageId: UUID!
   namespace: String!
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Payload returned after storage namespace unregistration.
+"""
 type UnregisterStorageNamespacePayload {
   id: UUID!
 }

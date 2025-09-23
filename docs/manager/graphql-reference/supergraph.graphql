@@ -3794,10 +3794,18 @@ type Mutation
   """Added in 25.14.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.15.0"""
+  """
+  Added in 25.15.0.
+  
+  Registers a new namespace within a storage.
+  """
   registerStorageNamespace(input: RegisterStorageNamespaceInput!): RegisterStorageNamespacePayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.15.0"""
+  """
+  Added in 25.15.0.
+  
+  Unregisters an existing namespace from a storage.
+  """
   unregisterStorageNamespace(input: UnregisterStorageNamespaceInput!): UnregisterStorageNamespacePayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
@@ -4571,7 +4579,12 @@ type RawServiceConfig
   extraCliParameters: String
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Input for registering a storage namespace.
+Input type for registering a storage namespace.
+"""
 input RegisterStorageNamespaceInput
   @join__type(graph: STRAWBERRY)
 {
@@ -4579,7 +4592,11 @@ input RegisterStorageNamespaceInput
   namespace: String!
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Payload returned after storage namespace registration.
+"""
 type RegisterStorageNamespacePayload
   @join__type(graph: STRAWBERRY)
 {
@@ -5028,7 +5045,16 @@ type SourceInfo
   url: String
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Storage namespace representation.
+Namespace is a concept that divides name spaces within a storage,
+and its meaning varies depending on the storage type.
+
+* For `object_storage` type storage, namespace corresponds to a bucket
+* For `vfs_storage` type storage, namespace corresponds to a subpath
+"""
 type StorageNamespace implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -5039,7 +5065,12 @@ type StorageNamespace implements Node
   namespace: String!
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Storage namespace connection for pagination.
+Connection type for paginating storage namespaces.
+"""
 type StorageNamespaceConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -5135,7 +5166,12 @@ type UnloadImage
   task_id: String
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Input for unregistering a storage namespace.
+Input type for unregistering a storage namespace.
+"""
 input UnregisterStorageNamespaceInput
   @join__type(graph: STRAWBERRY)
 {
@@ -5143,7 +5179,11 @@ input UnregisterStorageNamespaceInput
   namespace: String!
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Payload returned after storage namespace unregistration.
+"""
 type UnregisterStorageNamespacePayload
   @join__type(graph: STRAWBERRY)
 {
