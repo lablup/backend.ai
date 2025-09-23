@@ -7,6 +7,7 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.object_storage_namespace.creator import StorageNamespaceCreator
 from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.services.storage_namespace.actions.register import (
@@ -17,11 +18,10 @@ from ai.backend.manager.services.storage_namespace.actions.unregister import (
 )
 
 from .types import StrawberryGQLContext
-from .utils import dedent_strip as _d
 
 
 @strawberry.type(
-    description=_d("""
+    description=dedent_strip("""
     Added in 25.15.0.
 
     Storage namespace representation.
@@ -38,7 +38,7 @@ class StorageNamespace(Node):
     namespace: str
 
     @classmethod
-    def from_dataclass(cls, data: StorageNamespaceData) -> Self:
+    def fromdedent_stripataclass(cls, data: StorageNamespaceData) -> Self:
         return cls(
             id=ID(str(data.id)),
             storage_id=ID(str(data.storage_id)),
@@ -50,7 +50,7 @@ StorageNamespaceEdge = Edge[StorageNamespace]
 
 
 @strawberry.type(
-    description=_d("""
+    description=dedent_strip("""
     Added in 25.15.0.
 
     Storage namespace connection for pagination.
@@ -63,7 +63,7 @@ class StorageNamespaceConnection(Connection[StorageNamespace]):
 
 
 @strawberry.input(
-    description=_d("""
+    description=dedent_strip("""
     Added in 25.15.0.
 
     Input type for registering a storage namespace.
@@ -81,7 +81,7 @@ class RegisterStorageNamespaceInput:
 
 
 @strawberry.input(
-    description=_d("""
+    description=dedent_strip("""
     Added in 25.15.0.
 
     Input type for unregistering a storage namespace.
@@ -93,7 +93,7 @@ class UnregisterStorageNamespaceInput:
 
 
 @strawberry.type(
-    description=_d("""
+    description=dedent_strip("""
     Added in 25.15.0.
 
     Payload returned after storage namespace registration.
@@ -104,7 +104,7 @@ class RegisterStorageNamespacePayload:
 
 
 @strawberry.type(
-    description=_d("""
+    description=dedent_strip("""
     Added in 25.15.0.
 
     Payload returned after storage namespace unregistration.
@@ -115,7 +115,7 @@ class UnregisterStorageNamespacePayload:
 
 
 @strawberry.mutation(
-    description=_d("""
+    description=dedent_strip("""
     Added in 25.15.0.
 
     Registers a new namespace within a storage.
@@ -136,7 +136,7 @@ async def register_storage_namespace(
 
 
 @strawberry.mutation(
-    description=_d("""
+    description=dedent_strip("""
     Added in 25.15.0.
 
     Unregisters an existing namespace from a storage.
