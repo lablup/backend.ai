@@ -64,7 +64,7 @@ class StoragePool:
             )
 
         # Add Storage instances
-        from ai.backend.storage.storages.vfs import VFSStorage
+        from ai.backend.storage.storages.vfs_storage import VFSStorage
 
         for artifact_storage_config in config.artifact_storages:
             match artifact_storage_config.storage_type:

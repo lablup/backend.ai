@@ -7,7 +7,7 @@ from ai.backend.common.types import StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.exception import StorageNotFoundError
 from ai.backend.storage.storages.base import StoragePool
-from ai.backend.storage.storages.vfs import VFSStorage
+from ai.backend.storage.storages.vfs_storage import VFSStorage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
