@@ -135,8 +135,8 @@ class RoleManager:
                 sa.insert(AssociationScopesEntitiesRow).values(creator.fields_to_store())
             )
         except IntegrityError:
-            log.warning(
-                "entity and scope mapping already exists: %s, %s. Skipping.",
+            log.exception(
+                "entity and scope mapping already exists: {}, {}. Skipping.",
                 entity_id.to_str(),
                 scope_id.to_str(),
             )
