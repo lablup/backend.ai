@@ -4,7 +4,6 @@ from typing import Any, Generic, Self, TypeVar
 
 from ai.backend.common.types import DispatchResult
 
-from ..reporter import ProgressReporter
 from ..types import TaskName
 
 
@@ -34,7 +33,7 @@ TFunctionArgs = TypeVar("TFunctionArgs", bound=BaseBackgroundTaskArgs)
 
 class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
     @abstractmethod
-    async def execute(self, reporter: ProgressReporter, args: TFunctionArgs) -> DispatchResult:
+    async def execute(self, args: TFunctionArgs) -> DispatchResult:
         """
         Execute the background task with the provided reporter and arguments.
         This method should be implemented by subclasses to provide

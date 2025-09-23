@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from enum import StrEnum
 from typing import Any, Mapping
-from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.bgtask.task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskHandler
 from ai.backend.common.types import DispatchResult
 
@@ -37,8 +35,7 @@ class ConcreteTaskArgs(BaseBackgroundTaskArgs):
 
 
 class ConcreteTaskHandler(BaseBackgroundTaskHandler[ConcreteTaskArgs]):
-    async def execute(self, reporter: ProgressReporter, args: ConcreteTaskArgs) -> DispatchResult:
-        await reporter.update(1, f"Processing {args.value}")
+    async def execute(self, args: ConcreteTaskArgs) -> DispatchResult:
         result = {"processed": args.value, "count": args.count}
         return DispatchResult(result=result)
 
@@ -102,17 +99,12 @@ class TestBaseBackgroundTaskHandler:
         handler = ConcreteTaskHandler()
         args = ConcreteTaskArgs(value="test-value", count=3)
 
-        reporter = AsyncMock(spec=ProgressReporter)
-        reporter.update = AsyncMock()
-
-        result = await handler.execute(reporter, args)
+        result = await handler.execute(args)
 
         assert isinstance(result, DispatchResult)
         assert result.result is not None
         assert result.result["processed"] == "test-value"
         assert result.result["count"] == 3
-
-        reporter.update.assert_called_once_with(1, "Processing test-value")
 
     def test_handler_name(self) -> None:
         assert ConcreteTaskHandler.name() == MockTaskName.MOCK_TASK_ONE
@@ -126,15 +118,10 @@ class TestBaseBackgroundTaskHandler:
 
     @pytest.mark.asyncio
     async def test_handler_with_empty_args(self) -> None:
-        from unittest.mock import AsyncMock
-
         handler = ConcreteTaskHandler()
         args = ConcreteTaskArgs(value="", count=0)
 
-        reporter = AsyncMock(spec=ProgressReporter)
-        reporter.update = AsyncMock()
-
-        result = await handler.execute(reporter, args)
+        result = await handler.execute(args)
 
         assert result.result is not None
         assert result.result["processed"] == ""
@@ -142,12 +129,8 @@ class TestBaseBackgroundTaskHandler:
 
     @pytest.mark.asyncio
     async def test_handler_with_error_result(self) -> None:
-        from unittest.mock import AsyncMock
-
         class ErrorTaskHandler(BaseBackgroundTaskHandler[ConcreteTaskArgs]):
-            async def execute(
-                self, reporter: ProgressReporter, args: ConcreteTaskArgs
-            ) -> DispatchResult:
+            async def execute(self, args: ConcreteTaskArgs) -> DispatchResult:
                 return DispatchResult(
                     result={"status": "partial"},
                     errors=["Something went wrong"],
@@ -164,8 +147,7 @@ class TestBaseBackgroundTaskHandler:
         handler = ErrorTaskHandler()
         args = ConcreteTaskArgs(value="error-test", count=1)
 
-        reporter = AsyncMock(spec=ProgressReporter)
-        result = await handler.execute(reporter, args)
+        result = await handler.execute(args)
 
         assert result.has_error()
         assert len(result.errors) == 1

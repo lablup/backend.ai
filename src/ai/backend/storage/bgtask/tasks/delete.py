@@ -3,7 +3,6 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Self, override
 
-from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.bgtask.task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskHandler
 from ai.backend.common.bgtask.types import TaskName
 from ai.backend.common.events.dispatcher import EventProducer
@@ -54,9 +53,7 @@ class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteTaskArgs])
         return TaskName.DELETE_VFOLDER
 
     @override
-    async def execute(
-        self, reporter: ProgressReporter, args: VFolderDeleteTaskArgs
-    ) -> DispatchResult:
+    async def execute(self, args: VFolderDeleteTaskArgs) -> DispatchResult:
         try:
             async with self._volume_pool.get_volume_by_name(args.volume) as volume:
                 await volume.delete_vfolder(args.vfolder_id)

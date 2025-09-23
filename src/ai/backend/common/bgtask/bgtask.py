@@ -411,15 +411,6 @@ class BackgroundTaskManager:
         tags: Optional[Iterable[str]] = None,
     ) -> TaskID:
         task_id = TaskID(uuid.uuid4())
-        await self._event_producer.broadcast_event_with_cache(
-            EventCacheDomain.BGTASK.cache_id(str(task_id)),
-            BgtaskUpdatedEvent(
-                task_id=task_id,
-                message="Task started",
-                current_progress=0,
-                total_progress=0,
-            ),
-        )
         func = self._get_task_func_by_name(task_name)
         metadata = BackgroundTaskMetadata(
             task_id=task_id,
@@ -440,36 +431,24 @@ class BackgroundTaskManager:
         metadata: BackgroundTaskMetadata,
     ) -> None:
         try:
-            await self._wrapper_broadcast_result(
+            bgtask_result_event = await self._start_retriable_bgtask(
                 func,
                 args,
                 metadata,
+            )
+            cache_id = EventCacheDomain.BGTASK.cache_id(str(metadata.task_id))
+            await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
+            log.info(
+                "Task {} ({}): {}",
+                metadata.task_id,
+                metadata.task_name or "",
+                bgtask_result_event.__class__.__name__,
             )
         finally:
             self._ongoing_tasks.pop(metadata.task_id, None)
             await self._valkey_client.unregister_task(metadata)
 
-    async def _wrapper_broadcast_result(
-        self,
-        func: BaseBackgroundTaskHandler,
-        args: BaseBackgroundTaskArgs,
-        metadata: BackgroundTaskMetadata,
-    ) -> None:
-        bgtask_result_event = await self._observe_retriable_bgtask(
-            func,
-            args,
-            metadata,
-        )
-        cache_id = EventCacheDomain.BGTASK.cache_id(str(metadata.task_id))
-        await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
-        log.info(
-            "Task {} ({}): {}",
-            metadata.task_id,
-            metadata.task_name or "",
-            bgtask_result_event.__class__.__name__,
-        )
-
-    async def _observe_retriable_bgtask(
+    async def _start_retriable_bgtask(
         self,
         func: BaseBackgroundTaskHandler,
         args: BaseBackgroundTaskArgs,
@@ -483,7 +462,7 @@ class BackgroundTaskManager:
         error_code: Optional[ErrorCode] = None
         msg = "no message"
         try:
-            result = await self._run_retriable_bgtask(func, args, metadata)
+            result = await func.execute(args)
             bgtask_result_event = self._convert_result_to_event(result, metadata)
             status = bgtask_result_event.status()
             msg = bgtask_result_event.message or msg
@@ -521,17 +500,7 @@ class BackgroundTaskManager:
                 duration=duration,
                 error_code=error_code,
             )
-
         return bgtask_result_event
-
-    async def _run_retriable_bgtask(
-        self,
-        func: BaseBackgroundTaskHandler,
-        args: BaseBackgroundTaskArgs,
-        metadata: BackgroundTaskMetadata,
-    ) -> DispatchResult:
-        reporter = ProgressReporter(self._event_producer, metadata.task_id)
-        return await func.execute(reporter, args)
 
     def _convert_result_to_event(
         self,
@@ -607,7 +576,6 @@ class BackgroundTaskManager:
             return
         args_type = func.args_type()
         args = args_type.from_metadata_body(metadata.body)
-        retry_task = self._process_retriable_task(func, args, metadata=metadata)
-        await self._valkey_client.register_task(metadata)
-        task = asyncio.create_task(retry_task)
+        await self._valkey_client.claim_task(metadata)
+        task = asyncio.create_task(self._process_retriable_task(func, args, metadata=metadata))
         self._ongoing_tasks[metadata.task_id] = SingleBgtask(task_id=metadata.task_id, task=task)
