@@ -15,7 +15,7 @@ class GetAllNamespacesAction(StorageNamespaceAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "get_all_namespaces"
+        return "get_all"
 
 
 @dataclass

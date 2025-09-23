@@ -19,7 +19,7 @@ class RegisterNamespaceAction(StorageNamespaceAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "register_namespace"
+        return "register"
 
 
 @dataclass

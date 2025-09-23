@@ -18,7 +18,7 @@ class UnregisterNamespaceAction(StorageNamespaceAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "unregister_namespace"
+        return "unregister"
 
 
 @dataclass
