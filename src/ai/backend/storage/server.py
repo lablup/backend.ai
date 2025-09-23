@@ -472,7 +472,7 @@ def main(
                     log_config.debug("debug mode enabled.")
                 if local_config.debug.enabled:
                     print("== Storage proxy configuration ==")
-                    pprint(local_config)
+                    pprint(local_config.model_dump())
                 if local_config.storage_proxy.event_loop == "uvloop":
                     import uvloop
 
