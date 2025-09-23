@@ -33,10 +33,6 @@ from ai.backend.manager.services.deployment.actions.batch_load_deployments impor
     BatchLoadDeploymentsAction,
     BatchLoadDeploymentsActionResult,
 )
-from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_deployment_ids import (
-    BatchLoadReplicasByDeploymentIdsAction,
-    BatchLoadReplicasByDeploymentIdsActionResult,
-)
 from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_revision_ids import (
     BatchLoadReplicasByRevisionIdsAction,
     BatchLoadReplicasByRevisionIdsActionResult,
@@ -150,10 +146,6 @@ class DeploymentServiceProtocol(Protocol):
         self, action: BatchLoadAutoScalingRulesAction
     ) -> BatchLoadAutoScalingRulesActionResult: ...
 
-    async def batch_load_replicas_by_deployment_ids(
-        self, action: BatchLoadReplicasByDeploymentIdsAction
-    ) -> BatchLoadReplicasByDeploymentIdsActionResult: ...
-
     async def get_revision_by_deployment_id(
         self, action: GetRevisionByDeploymentIdAction
     ) -> GetRevisionByDeploymentIdActionResult: ...
@@ -219,9 +211,6 @@ class DeploymentProcessors(AbstractProcessorPackage):
     ]
     get_revision_by_id: ActionProcessor[GetRevisionByIdAction, GetRevisionByIdActionResult]
     batch_load_revisions: ActionProcessor[BatchLoadRevisionsAction, BatchLoadRevisionsActionResult]
-    batch_load_replicas_by_deployment_ids: ActionProcessor[
-        BatchLoadReplicasByDeploymentIdsAction, BatchLoadReplicasByDeploymentIdsActionResult
-    ]
     get_revision_by_deployment_id: ActionProcessor[
         GetRevisionByDeploymentIdAction, GetRevisionByDeploymentIdActionResult
     ]
@@ -274,9 +263,6 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.batch_load_auto_scaling_rules = ActionProcessor(
             service.batch_load_auto_scaling_rules, action_monitors
         )
-        self.batch_load_replicas_by_deployment_ids = ActionProcessor(
-            service.batch_load_replicas_by_deployment_ids, action_monitors
-        )
         self.get_revision_by_replica_id = ActionProcessor(
             service.get_revision_by_replica_id, action_monitors
         )
@@ -316,6 +302,5 @@ class DeploymentProcessors(AbstractProcessorPackage):
             BatchLoadRevisionsAction.spec(),
             BatchLoadDeploymentsAction.spec(),
             BatchLoadAccessTokensAction.spec(),
-            BatchLoadReplicasByDeploymentIdsAction.spec(),
             BatchLoadReplicasByRevisionIdsAction.spec(),
         ]
