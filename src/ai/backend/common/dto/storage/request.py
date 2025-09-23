@@ -247,9 +247,6 @@ class VFSUploadFileReq(BaseRequestModel):
     """
 
     filepath: str = Field(description="The file path within VFS storage to upload the file to.")
-    overwrite: bool = Field(
-        default=False, description="Whether to overwrite the file if it already exists."
-    )
     content_type: Optional[str] = Field(
         default=None, description="MIME type of the file being uploaded (optional for VFS)."
     )
@@ -277,4 +274,3 @@ class VFSDeleteFileReq(BaseRequestModel):
     """
 
     filepath: str = Field(description="The file path within VFS storage to delete.")
-    recursive: bool = Field(default=False, description="Whether to delete directories recursively.")
