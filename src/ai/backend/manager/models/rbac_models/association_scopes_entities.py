@@ -22,7 +22,7 @@ class AssociationScopesEntitiesRow(Base):
     __tablename__ = "association_scopes_entities"
     __table_args__ = (
         # constraint
-        sa.UniqueConstraint("scope_id", "entity_id", name="uq_scope_id_entity_id"),
+        sa.UniqueConstraint("scope_type", "scope_id", "entity_id", name="uq_scope_id_entity_id"),
     )
 
     id: uuid.UUID = IDColumn()
