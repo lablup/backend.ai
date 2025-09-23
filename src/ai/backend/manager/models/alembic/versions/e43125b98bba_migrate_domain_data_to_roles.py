@@ -402,6 +402,10 @@ class RoleMapper:
 
 
 def upgrade() -> None:
+    op.execute("""
+        ALTER TABLE association_scopes_entities
+        DROP CONSTRAINT IF EXISTS uq_scope_id_entity_id
+    """)
     conn = op.get_bind()
     RoleCreator.create_domain_roles_and_permissions(conn)
     RoleMapper.map_users_to_domain(conn)
