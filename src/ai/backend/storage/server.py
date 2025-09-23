@@ -106,7 +106,7 @@ async def server_main(
     from .bgtask.registry import BgtaskHandlerRegistryCreator
     from .context import RootContext
     from .migration import check_latest
-    from .storages.base import StoragePool
+    from .storages.storage_pool import StoragePool
     from .volumes.pool import VolumePool
     from .watcher import WatcherClient
 

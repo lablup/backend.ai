@@ -36,7 +36,7 @@ from ai.backend.storage.exception import (
     ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
 )
-from ai.backend.storage.storages.base import StoragePool
+from ai.backend.storage.storages.storage_pool import StoragePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

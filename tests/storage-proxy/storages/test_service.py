@@ -12,8 +12,9 @@ from ai.backend.storage.exception import (
     StorageNotFoundError,
 )
 from ai.backend.storage.services.storages.object_storage import ObjectStorageService
-from ai.backend.storage.storages.base import AbstractStorage, StoragePool
+from ai.backend.storage.storages.base import AbstractStorage
 from ai.backend.storage.storages.object_storage import ObjectStorage
+from ai.backend.storage.storages.storage_pool import StoragePool
 
 _BUCKET_FIXTURE_NAME = "test-bucket"
 

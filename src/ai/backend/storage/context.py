@@ -36,7 +36,7 @@ from .plugin import (
     StoragePluginContext,
 )
 from .services.service import VolumeService
-from .storages.base import StoragePool
+from .storages.storage_pool import StoragePool
 from .types import VolumeInfo
 from .volumes.abc import AbstractVolume
 from .volumes.cephfs import CephFSVolume

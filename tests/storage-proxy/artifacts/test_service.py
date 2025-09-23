@@ -40,8 +40,8 @@ from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirService,
     ReservoirServiceArgs,
 )
-from ai.backend.storage.storages.base import StoragePool
 from ai.backend.storage.storages.object_storage import ObjectStorage
+from ai.backend.storage.storages.storage_pool import StoragePool
 from ai.backend.storage.types import BucketCopyOptions
 
 _DEFAULT_CHUNK_SIZE = 8192

@@ -24,8 +24,8 @@ from ai.backend.storage.exception import (
     StorageBucketNotFoundError,
     StorageNotFoundError,
 )
-from ai.backend.storage.storages.base import StoragePool
 from ai.backend.storage.storages.object_storage import ObjectStorage
+from ai.backend.storage.storages.storage_pool import StoragePool
 from ai.backend.storage.types import BucketCopyOptions
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
