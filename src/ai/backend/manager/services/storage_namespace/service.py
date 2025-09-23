@@ -2,19 +2,19 @@ import logging
 
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
-from ai.backend.manager.services.storage_namespace.actions.get_all_namespaces import (
+from ai.backend.manager.services.storage_namespace.actions.get_all import (
     GetAllNamespacesAction,
     GetAllNamespacesActionResult,
 )
-from ai.backend.manager.services.storage_namespace.actions.get_namespaces import (
+from ai.backend.manager.services.storage_namespace.actions.get_multi import (
     GetNamespacesAction,
     GetNamespacesActionResult,
 )
-from ai.backend.manager.services.storage_namespace.actions.register_namespace import (
+from ai.backend.manager.services.storage_namespace.actions.register import (
     RegisterNamespaceAction,
     RegisterNamespaceActionResult,
 )
-from ai.backend.manager.services.storage_namespace.actions.unregister_namespace import (
+from ai.backend.manager.services.storage_namespace.actions.unregister import (
     UnregisterNamespaceAction,
     UnregisterNamespaceActionResult,
 )
@@ -31,23 +31,19 @@ class StorageNamespaceService:
     ) -> None:
         self._storage_namespace_repository = storage_namespace_repository
 
-    async def register_namespace(
-        self, action: RegisterNamespaceAction
-    ) -> RegisterNamespaceActionResult:
+    async def register(self, action: RegisterNamespaceAction) -> RegisterNamespaceActionResult:
         log.info("Registering storage namespace")
-        storage_namespace = await self._storage_namespace_repository.register_namespace(
-            action.creator
-        )
+        storage_namespace = await self._storage_namespace_repository.register(action.creator)
         return RegisterNamespaceActionResult(
             storage_id=storage_namespace.storage_id, result=storage_namespace
         )
 
-    async def unregister_namespace(
+    async def unregister(
         self, action: UnregisterNamespaceAction
     ) -> UnregisterNamespaceActionResult:
         log.info("Unregistering storage namespace")
-        storage_id = await self._storage_namespace_repository.unregister_namespace(
-            action.storage_id, action.namespace_name
+        storage_id = await self._storage_namespace_repository.unregister(
+            action.storage_id, action.namespace
         )
         return UnregisterNamespaceActionResult(storage_id=storage_id)
 

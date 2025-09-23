@@ -862,7 +862,7 @@ type RawServiceConfig {
 """Added in 25.15.0"""
 input RegisterStorageNamespaceInput {
   storageId: UUID!
-  namespaceName: String!
+  namespace: String!
 }
 
 """Added in 25.15.0"""
@@ -1060,7 +1060,7 @@ scalar UUID
 """Added in 25.15.0"""
 input UnregisterStorageNamespaceInput {
   storageId: UUID!
-  namespaceName: String!
+  namespace: String!
 }
 
 """Added in 25.15.0"""

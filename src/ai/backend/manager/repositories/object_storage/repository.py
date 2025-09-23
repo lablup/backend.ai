@@ -10,13 +10,11 @@ from ai.backend.common.metrics.metric import LayerType
 from ai.backend.manager.data.object_storage.creator import ObjectStorageCreator
 from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.data.object_storage_namespace.creator import ObjectStorageNamespaceCreator
 from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.errors.object_storage import (
-    ObjectStorageBucketNotFoundError,
     ObjectStorageNotFoundError,
 )
 from ai.backend.manager.models.object_storage import ObjectStorageRow
@@ -177,72 +175,3 @@ class ObjectStorageRepository:
             result = await db_session.execute(query)
             rows: list[ObjectStorageRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
-
-    @repository_decorator()
-    async def register_bucket(self, creator: ObjectStorageNamespaceCreator) -> StorageNamespaceData:
-        """
-        Register a new bucket for the specified object storage.
-        """
-        async with self._db.begin_session() as db_session:
-            object_storage_namespace_data = creator.fields_to_store()
-            object_storage_namespace_row = StorageNamespaceRow(**object_storage_namespace_data)
-            db_session.add(object_storage_namespace_row)
-            await db_session.flush()
-            await db_session.refresh(object_storage_namespace_row)
-            return object_storage_namespace_row.to_dataclass()
-
-    @repository_decorator()
-    async def unregister_bucket(self, storage_id: uuid.UUID, bucket_name: str) -> uuid.UUID:
-        """
-        Unregister a bucket from the specified object storage.
-        """
-        async with self._db.begin_session() as db_session:
-            delete_query = (
-                sa.delete(StorageNamespaceRow)
-                .where(
-                    StorageNamespaceRow.storage_id == storage_id,
-                    StorageNamespaceRow.namespace == bucket_name,
-                )
-                .returning(StorageNamespaceRow.storage_id)
-            )
-            result = await db_session.execute(delete_query)
-            deleted_storage_id = result.scalar()
-            if deleted_storage_id is None:
-                raise ObjectStorageBucketNotFoundError()
-            return deleted_storage_id
-
-    @repository_decorator()
-    async def get_buckets(self, storage_id: uuid.UUID) -> list[StorageNamespaceData]:
-        """
-        Get all buckets for the specified object storage.
-        """
-        async with self._db.begin_session() as db_session:
-            query = sa.select(StorageNamespaceRow).where(
-                StorageNamespaceRow.storage_id == storage_id
-            )
-            result = await db_session.execute(query)
-            rows: list[StorageNamespaceRow] = result.scalars().all()
-            return [row.to_dataclass() for row in rows]
-
-    @repository_decorator()
-    async def get_all_buckets_by_storage(self) -> dict[uuid.UUID, list[str]]:
-        """
-        Get all buckets grouped by storage ID.
-
-        Returns:
-            Dictionary mapping storage_id to list of bucket names
-        """
-        async with self._db.begin_session() as db_session:
-            query = sa.select(StorageNamespaceRow.storage_id, StorageNamespaceRow.namespace)
-            result = await db_session.execute(query)
-            rows = result.all()
-
-            buckets_by_storage: dict[uuid.UUID, list[str]] = {}
-            for row in rows:
-                storage_id = row.storage_id
-                namespace = row.namespace
-                if storage_id not in buckets_by_storage:
-                    buckets_by_storage[storage_id] = []
-                buckets_by_storage[storage_id].append(namespace)
-
-            return buckets_by_storage

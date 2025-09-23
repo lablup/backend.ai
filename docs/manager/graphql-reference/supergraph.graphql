@@ -4576,7 +4576,7 @@ input RegisterStorageNamespaceInput
   @join__type(graph: STRAWBERRY)
 {
   storageId: UUID!
-  namespaceName: String!
+  namespace: String!
 }
 
 """Added in 25.15.0"""
@@ -5140,7 +5140,7 @@ input UnregisterStorageNamespaceInput
   @join__type(graph: STRAWBERRY)
 {
   storageId: UUID!
-  namespaceName: String!
+  namespace: String!
 }
 
 """Added in 25.15.0"""

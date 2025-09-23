@@ -7,7 +7,7 @@ from ai.backend.common.exception import (
     StorageNamespaceNotFoundError,
 )
 from ai.backend.common.metrics.metric import LayerType
-from ai.backend.manager.data.object_storage_namespace.creator import ObjectStorageNamespaceCreator
+from ai.backend.manager.data.object_storage_namespace.creator import StorageNamespaceCreator
 from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
@@ -30,7 +30,7 @@ class StorageNamespaceRepository:
 
     @repository_decorator()
     async def get_by_storage_and_namespace(
-        self, storage_id: uuid.UUID, namespace_name: str
+        self, storage_id: uuid.UUID, namespace: str
     ) -> StorageNamespaceData:
         """
         Get an existing storage namespace from the database.
@@ -38,13 +38,13 @@ class StorageNamespaceRepository:
         async with self._db.begin_session() as db_session:
             query = sa.select(StorageNamespaceRow).where(
                 StorageNamespaceRow.storage_id == storage_id,
-                StorageNamespaceRow.namespace == namespace_name,
+                StorageNamespaceRow.namespace == namespace,
             )
             result = await db_session.execute(query)
             row: StorageNamespaceRow = result.scalar_one_or_none()
             if row is None:
                 raise StorageNamespaceNotFoundError(
-                    f"Storage namespace with namespace_name {namespace_name} not found."
+                    f"Storage namespace with namespace {namespace} not found."
                 )
             return row.to_dataclass()
 
@@ -66,9 +66,7 @@ class StorageNamespaceRepository:
             return row.to_dataclass()
 
     @repository_decorator()
-    async def register_namespace(
-        self, creator: ObjectStorageNamespaceCreator
-    ) -> StorageNamespaceData:
+    async def register(self, creator: StorageNamespaceCreator) -> StorageNamespaceData:
         """
         Register a new namespace for the specified storage.
         """
@@ -81,7 +79,7 @@ class StorageNamespaceRepository:
             return storage_namespace_row.to_dataclass()
 
     @repository_decorator()
-    async def unregister_namespace(self, storage_id: uuid.UUID, namespace_name: str) -> uuid.UUID:
+    async def unregister(self, storage_id: uuid.UUID, namespace: str) -> uuid.UUID:
         """
         Unregister a namespace from the specified storage.
         """
@@ -90,7 +88,7 @@ class StorageNamespaceRepository:
                 sa.delete(StorageNamespaceRow)
                 .where(
                     StorageNamespaceRow.storage_id == storage_id,
-                    StorageNamespaceRow.namespace == namespace_name,
+                    StorageNamespaceRow.namespace == namespace,
                 )
                 .returning(StorageNamespaceRow.storage_id)
             )

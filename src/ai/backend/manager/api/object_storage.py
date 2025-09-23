@@ -24,10 +24,6 @@ from ai.backend.common.dto.manager.response import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import ProcessorsCtx
-from ai.backend.manager.services.object_storage.actions.get_all_buckets import GetAllBucketsAction
-from ai.backend.manager.services.object_storage.actions.get_buckets import (
-    GetBucketsAction,
-)
 from ai.backend.manager.services.object_storage.actions.get_download_presigned_url import (
     GetDownloadPresignedURLAction,
 )
@@ -37,6 +33,8 @@ from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url
 from ai.backend.manager.services.object_storage.actions.list import (
     ListObjectStorageAction,
 )
+from ai.backend.manager.services.storage_namespace.actions.get_all import GetAllNamespacesAction
+from ai.backend.manager.services.storage_namespace.actions.get_multi import GetNamespacesAction
 
 from .auth import auth_required_for_method
 from .types import CORSOptions, WebMiddleware
@@ -96,8 +94,8 @@ class APIHandler:
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         processors = processors_ctx.processors
-        action_result = await processors.object_storage.get_all_buckets.wait_for_complete(
-            GetAllBucketsAction()
+        action_result = await processors.storage_namespace.get_all_namespaces.wait_for_complete(
+            GetAllNamespacesAction()
         )
 
         resp = ObjectStorageAllBucketsResponse(buckets_by_storage=action_result.result)
@@ -113,8 +111,8 @@ class APIHandler:
         processors = processors_ctx.processors
         storage_id: uuid.UUID = path.parsed.storage_id
 
-        action_result = await processors.object_storage.get_buckets.wait_for_complete(
-            GetBucketsAction(storage_id=storage_id)
+        action_result = await processors.storage_namespace.get_namespaces.wait_for_complete(
+            GetNamespacesAction(storage_id=storage_id)
         )
 
         bucket_names = [namespace_data.namespace for namespace_data in action_result.result]

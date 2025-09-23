@@ -15,7 +15,7 @@ from ai.backend.manager.services.object_storage.actions.get_download_presigned_u
 from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
     GetUploadPresignedURLAction,
 )
-from ai.backend.manager.services.storage_namespace.actions.get_namespaces import (
+from ai.backend.manager.services.storage_namespace.actions.get_multi import (
     GetNamespacesAction,
 )
 
