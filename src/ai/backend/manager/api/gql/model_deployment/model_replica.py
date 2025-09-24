@@ -4,9 +4,7 @@ from typing import AsyncGenerator, Optional
 from uuid import UUID
 
 import strawberry
-from aiotools import apartial
 from strawberry import ID, Info
-from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 
 from ai.backend.common.data.model_deployment.types import ActivenessStatus as CommonActivenessStatus
@@ -191,7 +189,9 @@ class ModelReplica(Node):
     @strawberry.field
     async def revision(self, info: Info[StrawberryGQLContext]) -> ModelRevision:
         """Resolve revision using dataloader."""
-        revision_loader = DataLoader(apartial(ModelRevision.batch_load_by_ids, info.context))
+        revision_loader = info.context.dataloader_registry.get_loader(
+            ModelRevision.batch_load_by_ids, info.context
+        )
         revision: list[ModelRevision] = await revision_loader.load(self._revision_id)
         return revision[0]
 
@@ -271,7 +271,9 @@ class ReplicaStatusChangedPayload:
 async def replica(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelReplica]:
     """Get a specific replica by ID."""
     _, replica_id = resolve_global_id(id)
-    replica_loader = DataLoader(apartial(ModelReplica.batch_load_by_revision_ids, info.context))
+    replica_loader = info.context.dataloader_registry.get_loader(
+        ModelReplica.batch_load_by_revision_ids, info.context
+    )
     replicas: list[ModelReplica] = await replica_loader.load(UUID(replica_id))
     return replicas[0]
 

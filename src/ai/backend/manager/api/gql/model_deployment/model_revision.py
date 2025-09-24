@@ -6,9 +6,7 @@ from typing import Any, Optional, cast
 from uuid import UUID
 
 import strawberry
-from aiotools import apartial
 from strawberry import ID, Info
-from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 from strawberry.scalars import JSON
 
@@ -611,7 +609,9 @@ async def revisions(
 async def revision(id: ID, info: Info[StrawberryGQLContext]) -> ModelRevision:
     """Get a specific revision by ID."""
     _, revision_id = resolve_global_id(id)
-    revision_loader = DataLoader(apartial(ModelRevision.batch_load_by_ids, info.context))
+    revision_loader = info.context.dataloader_registry.get_loader(
+        ModelRevision.batch_load_by_ids, info.context
+    )
     revision: list[ModelRevision] = await revision_loader.load(revision_id)
     return revision[0]
 
