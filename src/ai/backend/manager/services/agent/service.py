@@ -187,7 +187,6 @@ class AgentService:
     async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
         now = datetime.now(tzutc())
         reported_agent_info = action.agent_info
-        print("Heartbeat received:", action.agent_id, reported_agent_info)
 
         reported_agent_state_sync_data = AgentStateSyncData(
             now=now,
