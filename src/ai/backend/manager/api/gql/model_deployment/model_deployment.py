@@ -4,9 +4,7 @@ from typing import AsyncGenerator, Optional
 from uuid import UUID, uuid4
 
 import strawberry
-from aiotools import apartial
 from strawberry import ID, Info
-from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
 
 from ai.backend.common.contexts.user import current_user
@@ -208,7 +206,9 @@ class ModelDeploymentNetworkAccess:
     @strawberry.field
     async def access_tokens(self, info: Info[StrawberryGQLContext]) -> AccessTokenConnection:
         """Resolve access tokens using dataloader."""
-        access_token_loader = DataLoader(apartial(AccessToken.batch_load_by_ids, info.context))
+        access_token_loader = info.context.dataloader_registry.get_loader(
+            AccessToken.batch_load_by_ids, info.context
+        )
         token_nodes: list[AccessToken] = await access_token_loader.load(
             self._access_token_ids if self._access_token_ids else []
         )
@@ -647,8 +647,10 @@ async def deployments(
 async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelDeployment]:
     """Get a specific deployment by ID."""
     _, deployment_id = resolve_global_id(id)
-    dataloader = DataLoader(apartial(ModelDeployment.batch_load_by_ids, info.context))
-    deployment: list[ModelDeployment] = await dataloader.load(deployment_id)
+    deployment_dataloader = info.context.dataloader_registry.get_loader(
+        ModelDeployment.batch_load_by_ids, info.context
+    )
+    deployment: list[ModelDeployment] = await deployment_dataloader.load(deployment_id)
 
     return deployment[0]
 
