@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, MutableMapping
 from dataclasses import dataclass
 from typing import (
     Awaitable,
@@ -13,7 +14,7 @@ from typing import (
     Concatenate,
     Final,
     Optional,
-    Protocol,
+    ParamSpec,
     Self,
     Sequence,
     TypeAlias,
@@ -25,11 +26,13 @@ from ai.backend.common.bgtask.types import (
     TaskID,
     TaskName,
 )
-from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
+from ai.backend.common.clients.valkey_client.valkey_bgtask.client import (
+    TaskSetKey,
+    ValkeyBgtaskClient,
+)
 from ai.backend.common.events.types import EventCacheDomain
 from ai.backend.common.exception import (
     BackendAIError,
-    BgtaskNotRegisteredError,
     ErrorCode,
     ErrorDetail,
     ErrorDomain,
@@ -49,12 +52,24 @@ from ..events.event_types.bgtask.broadcast import (
     BgtaskUpdatedEvent,
 )
 from ..types import DispatchResult, Sentinel
+from .hooks import (
+    BackgroundTaskObserver,
+    CompositeTaskHook,
+    EventProducerHook,
+    MetricObserverHook,
+    NopBackgroundTaskObserver,
+    TaskContext,
+    ValkeyUnregisterHook,
+)
 from .reporter import ProgressReporter
-from .task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskHandler
+from .task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskResult
 from .task.registry import BackgroundTaskHandlerRegistry
+from .task_result import TaskCancelledResult, TaskFailedResult, TaskResult, TaskSuccessResult
 
 sentinel: Final = Sentinel.TOKEN
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+P = ParamSpec("P")
 
 
 BgtaskEvents: TypeAlias = (
@@ -117,23 +132,6 @@ class BgTaskInfo:
 BackgroundTask = Callable[
     Concatenate[ProgressReporter, ...], Awaitable[str | DispatchResult | None]
 ]
-
-
-class BackgroundTaskObserver(Protocol):
-    def observe_bgtask_started(self, *, task_name: str) -> None: ...
-    def observe_bgtask_done(
-        self, *, task_name: str, status: str, duration: float, error_code: Optional[ErrorCode]
-    ) -> None: ...
-
-
-class NopBackgroundTaskObserver:
-    def observe_bgtask_started(self, *, task_name: str) -> None:
-        pass
-
-    def observe_bgtask_done(
-        self, *, task_name: str, status: str, duration: float, error_code: Optional[ErrorCode]
-    ) -> None:
-        pass
 
 
 @dataclass
@@ -212,7 +210,10 @@ class MultipleBgtask(BackgroundTaskMeta):
     _tasks: Sequence[asyncio.Task]
 
     def __init__(
-        self, task_id: TaskID, sub_keys: Iterable[str], tasks: Sequence[asyncio.Task]
+        self,
+        task_id: TaskID,
+        sub_keys: Iterable[str],
+        tasks: Sequence[asyncio.Task],
     ) -> None:
         self._task_id = task_id
         self._sub_keys = list(sub_keys)
@@ -228,37 +229,74 @@ class MultipleBgtask(BackgroundTaskMeta):
         return self._tasks
 
 
+def _exception_to_task_result(
+    func: Callable[P, Awaitable[BaseBackgroundTaskResult]],
+) -> Callable[P, Awaitable[TaskResult]]:
+    """
+    Decorator that converts exceptions raised during background task execution
+    into TaskResult objects.
+
+    This decorator handles:
+    - asyncio.CancelledError -> TaskCancelledResult
+    - BackendAIError -> TaskFailedResult with the exception
+    - General Exception -> TaskFailedResult with the exception
+
+    The decorator also handles logging of exceptions appropriately.
+    """
+
+    @functools.wraps(func)
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> TaskResult:
+        try:
+            result = await func(*args, **kwargs)
+            return TaskSuccessResult(result)
+        except asyncio.CancelledError:
+            log.warning("Task cancelled")
+            return TaskCancelledResult()
+        except BackendAIError as e:
+            log.exception("BackendAIError in task: {}", e)
+            return TaskFailedResult(e)
+        except Exception as e:
+            log.exception("Unhandled error in task: {}", e)
+            return TaskFailedResult(e)
+
+    return wrapper
+
+
 class BackgroundTaskManager:
     _event_producer: EventProducer
-    _ongoing_tasks: dict[TaskID, BackgroundTaskMeta]
-    _metric_observer: BackgroundTaskObserver
-    _dict_lock: asyncio.Lock
-
+    _ongoing_tasks: MutableMapping[TaskID, BackgroundTaskMeta]
+    _hook: CompositeTaskHook
+    _metric_observer: BackgroundTaskObserver  # Keep for backward compatibility
     _valkey_client: ValkeyBgtaskClient
-    _server_id: str
-    _tags: set[str]
+    _task_set_key: TaskSetKey
     _task_registry: BackgroundTaskHandlerRegistry
+
+    _heartbeat_loop_task: asyncio.Task
+    _retry_loop_task: asyncio.Task
 
     def __init__(
         self,
         event_producer: EventProducer,
         *,
-        task_registry: Optional[BackgroundTaskHandlerRegistry] = None,
         valkey_client: ValkeyBgtaskClient,
         server_id: str,
         tags: Optional[Iterable[str]] = None,
         bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
+        task_registry: Optional[BackgroundTaskHandlerRegistry] = None,
     ) -> None:
         self._event_producer = event_producer
         self._ongoing_tasks = {}
-        self._metric_observer = bgtask_observer
-        self._dict_lock = asyncio.Lock()
 
         self._valkey_client = valkey_client
-        self._server_id = server_id
-        self._tags = set(tags) if tags is not None else set()
+        self._task_set_key = TaskSetKey(
+            server_id=server_id, tags=set(tags) if tags is not None else set()
+        )
+        self._hook = CompositeTaskHook([
+            MetricObserverHook(bgtask_observer),
+            EventProducerHook(event_producer),
+            ValkeyUnregisterHook(valkey_client, self._task_set_key),
+        ])
         self._task_registry = task_registry or BackgroundTaskHandlerRegistry()
-
         self._heartbeat_loop_task = asyncio.create_task(self._heartbeat_loop())
         self._retry_loop_task = asyncio.create_task(self._retry_loop())
 
@@ -401,120 +439,60 @@ class BackgroundTaskManager:
         finally:
             self._ongoing_tasks.pop(TaskID(task_id), None)
 
-    def _get_task_func_by_name(self, name: TaskName) -> BaseBackgroundTaskHandler:
-        return self._task_registry.get_task(name)
-
     async def start_retriable(
         self,
         task_name: TaskName,
         args: BaseBackgroundTaskArgs,
-        tags: Optional[Iterable[str]] = None,
     ) -> TaskID:
         task_id = TaskID(uuid.uuid4())
-        func = self._get_task_func_by_name(task_name)
+        task = asyncio.create_task(self._execute_new_task(task_name, task_id, args))
+        self._ongoing_tasks[task_id] = SingleBgtask(task_id=task_id, task=task)
         metadata = BackgroundTaskMetadata(
             task_id=task_id,
             task_name=task_name,
-            body=args.to_metadata_body(),
-            server_id=self._server_id,
-            tags=set(tags) if tags is not None else set(),
+            body=args.to_redis_json(),
         )
-        await self._valkey_client.register_task(metadata)
-        task = asyncio.create_task(self._process_retriable_task(func, args, metadata))
-        self._ongoing_tasks[task_id] = SingleBgtask(task_id=task_id, task=task)
+        await self._valkey_client.register_task(metadata, self._task_set_key)
         return task_id
 
-    async def _process_retriable_task(
+    @_exception_to_task_result
+    async def _try_to_execute_new_task(
         self,
-        func: BaseBackgroundTaskHandler,
+        task_name: TaskName,
         args: BaseBackgroundTaskArgs,
-        metadata: BackgroundTaskMetadata,
+    ) -> BaseBackgroundTaskResult:
+        return await self._task_registry.execute_new_task(task_name, args)
+
+    @_exception_to_task_result
+    async def _try_to_revive_task(
+        self, task_name: TaskName, metadata: BackgroundTaskMetadata
+    ) -> BaseBackgroundTaskResult:
+        return await self._task_registry.revive_task(task_name, metadata.body)
+
+    async def _execute_new_task(
+        self,
+        task_name: TaskName,
+        task_id: TaskID,
+        args: BaseBackgroundTaskArgs,
     ) -> None:
-        try:
-            bgtask_result_event = await self._start_retriable_bgtask(
-                func,
-                args,
-                metadata,
-            )
-            cache_id = EventCacheDomain.BGTASK.cache_id(str(metadata.task_id))
-            await self._event_producer.broadcast_event_with_cache(cache_id, bgtask_result_event)
-            log.info(
-                "Task {} ({}): {}",
-                metadata.task_id,
-                metadata.task_name or "",
-                bgtask_result_event.__class__.__name__,
-            )
-        finally:
-            self._ongoing_tasks.pop(metadata.task_id, None)
-            await self._valkey_client.unregister_task(metadata)
-
-    async def _start_retriable_bgtask(
-        self,
-        func: BaseBackgroundTaskHandler,
-        args: BaseBackgroundTaskArgs,
-        metadata: BackgroundTaskMetadata,
-    ) -> BaseBgtaskDoneEvent:
-        task_name = func.name()
-        task_id = metadata.task_id
-        self._metric_observer.observe_bgtask_started(task_name=task_name)
-        start_time = time.perf_counter()
-        status = BgtaskStatus.STARTED
-        error_code: Optional[ErrorCode] = None
-        msg = "no message"
-        try:
-            result = await func.execute(args)
-            bgtask_result_event = self._convert_result_to_event(result, metadata)
-            status = bgtask_result_event.status()
-            msg = bgtask_result_event.message or msg
-        except asyncio.CancelledError:
-            status = BgtaskStatus.CANCELLED
-            error_code = ErrorCode(
-                domain=ErrorDomain.BGTASK,
-                operation=ErrorOperation.EXECUTE,
-                error_detail=ErrorDetail.CANCELED,
-            )
-            log.warning("Task {} ({}): cancelled", task_id, task_name)
-            msg = "Task cancelled"
-            return BgtaskCancelledEvent(task_id, msg)
-        except BackendAIError as e:
-            status = BgtaskStatus.FAILED
-            error_code = e.error_code()
-            log.exception("Task {} ({}): BackendAIError: {}", task_id, task_name, e)
-            msg = repr(e)
-            return BgtaskFailedEvent(task_id, msg)
-        except Exception as e:
-            status = BgtaskStatus.FAILED
-            error_code = ErrorCode(
-                domain=ErrorDomain.BGTASK,
-                operation=ErrorOperation.EXECUTE,
-                error_detail=ErrorDetail.INTERNAL_ERROR,
-            )
-            log.exception("Task {} ({}): unhandled error: {}", task_id, task_name, e)
-            msg = repr(e)
-            return BgtaskFailedEvent(task_id, msg)
-        finally:
-            duration = time.perf_counter() - start_time
-            self._metric_observer.observe_bgtask_done(
+        async with self._hook.apply(
+            TaskContext(
                 task_name=task_name,
-                status=status,
-                duration=duration,
-                error_code=error_code,
+                task_id=task_id,
             )
-        return bgtask_result_event
+        ) as context:
+            task_result = await self._try_to_execute_new_task(task_name, args)
+            context.result = task_result
 
-    def _convert_result_to_event(
-        self,
-        bgtask_result: DispatchResult,
-        metadata: BackgroundTaskMetadata,
-    ) -> BaseBgtaskDoneEvent:
-        task_id = metadata.task_id
-        message = bgtask_result.message()
-        if bgtask_result.has_error():
-            return BgtaskPartialSuccessEvent(
-                task_id=task_id, message=message, errors=bgtask_result.errors
+    async def _revive_task(self, task_name: TaskName, metadata: BackgroundTaskMetadata) -> None:
+        async with self._hook.apply(
+            TaskContext(
+                task_name=task_name,
+                task_id=metadata.task_id,
             )
-        else:
-            return BgtaskDoneEvent(task_id=task_id, message=message)
+        ) as context:
+            task_result = await self._try_to_revive_task(task_name, metadata)
+            context.result = task_result
 
     async def _heartbeat_loop(self) -> None:
         """Periodically update heartbeat for running background tasks"""
@@ -527,8 +505,7 @@ class BackgroundTaskManager:
                         alive_task_ids.append(task_id)
                 await self._valkey_client.heartbeat(
                     alive_task_ids,
-                    server_id=self._server_id,
-                    tags=self._tags,
+                    self._task_set_key,
                 )
             except Exception as e:
                 log.exception("Exception in heartbeat loop: {}", e)
@@ -538,44 +515,24 @@ class BackgroundTaskManager:
         """Main recovery loop that checks for failed/stale tasks"""
         while True:
             try:
-                await self._check_server_tasks()
-                await self._check_tagged_tasks()
+                unmanaged_task_metadata_list = await self._valkey_client.fetch_unmanaged_tasks(
+                    self._task_set_key
+                )
+                async_tasks = [
+                    self._retry_bgtask(metadata) for metadata in unmanaged_task_metadata_list
+                ]
+                results = await asyncio.gather(*async_tasks, return_exceptions=True)
+                for result in results:
+                    if isinstance(result, BaseException):
+                        log.exception("Exception in retry loop: {}", result)
             except Exception as e:
                 log.exception("Exception in retry loop: {}", e)
             await asyncio.sleep(_HEARTBEAT_CHECK_INTERVAL)
 
-    async def _check_server_tasks(self) -> None:
-        timeout_task_metadata = await self._valkey_client.list_timeout_tasks_by_server_id(
-            self._server_id
-        )
-
-        for metadata in timeout_task_metadata:
-            await self._retry_bgtask(metadata)
-
-    async def _check_tagged_tasks(self) -> None:
-        """Check tasks for a specific server type"""
-        timeout_task_metadata = await self._valkey_client.list_timeout_tasks_by_tags(self._tags)
-
-        for metadata in timeout_task_metadata:
-            await self._retry_bgtask(metadata)
-
     async def _retry_bgtask(self, metadata: BackgroundTaskMetadata) -> None:
         """Retry a background task"""
 
-        metadata.server_id = self._server_id  # Claim the task
         task_name = metadata.task_name
-        try:
-            func = self._get_task_func_by_name(task_name)
-        except BgtaskNotRegisteredError:
-            log.exception(
-                "Task {} ({}): not registered in {} server, skipping retry",
-                metadata.task_id,
-                task_name,
-                self._server_id,
-            )
-            return
-        args_type = func.args_type()
-        args = args_type.from_metadata_body(metadata.body)
-        await self._valkey_client.claim_task(metadata)
-        task = asyncio.create_task(self._process_retriable_task(func, args, metadata=metadata))
+        task = asyncio.create_task(self._revive_task(task_name, metadata))
         self._ongoing_tasks[metadata.task_id] = SingleBgtask(task_id=metadata.task_id, task=task)
+        await self._valkey_client.claim_task(metadata, self._task_set_key)

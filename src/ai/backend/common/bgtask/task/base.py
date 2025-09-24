@@ -1,17 +1,16 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from typing import Any, Generic, Self, TypeVar
-
-from ai.backend.common.types import DispatchResult
+from dataclasses import dataclass
+from typing import Any, Generic, Optional, Self, Type, TypeVar, override
 
 from ..types import TaskName
 
 
 class BaseBackgroundTaskArgs(ABC):
     @abstractmethod
-    def to_metadata_body(self) -> dict[str, Any]:
+    def to_redis_json(self) -> Mapping[str, Any]:
         """
-        Convert the arguments to a metadata body dictionary.
+        Convert the instance to a metadata body dictionary.
         This method should be implemented by subclasses to provide
         the specific conversion logic.
         """
@@ -19,13 +18,30 @@ class BaseBackgroundTaskArgs(ABC):
 
     @classmethod
     @abstractmethod
-    def from_metadata_body(cls, body: Mapping[str, Any]) -> Self:
+    def from_redis_json(cls, body: Mapping[str, Any]) -> Self:
         """
-        Create an instance from a metadata body dictionary.
+        Create an instance from the given metadata body dictionary.
         This method should be implemented by subclasses to provide
-        the specific conversion logic.
+        the specific loading logic.
         """
         raise NotImplementedError("Subclasses must implement this method")
+
+
+class BaseBackgroundTaskResult(ABC):
+    """
+    Abstract base class for background task results.
+    This represents the result of a background task execution.
+    """
+
+    @abstractmethod
+    def serialize(self) -> Optional[str]:
+        """Serialize the task result to a string."""
+        raise NotImplementedError("Subclasses must implement this method")
+
+
+class EmptyTaskResult(BaseBackgroundTaskResult):
+    def serialize(self) -> Optional[str]:
+        return None
 
 
 TFunctionArgs = TypeVar("TFunctionArgs", bound=BaseBackgroundTaskArgs)
@@ -33,7 +49,7 @@ TFunctionArgs = TypeVar("TFunctionArgs", bound=BaseBackgroundTaskArgs)
 
 class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
     @abstractmethod
-    async def execute(self, args: TFunctionArgs) -> DispatchResult:
+    async def execute(self, args: TFunctionArgs) -> BaseBackgroundTaskResult:
         """
         Execute the background task with the provided reporter and arguments.
         This method should be implemented by subclasses to provide
@@ -60,3 +76,41 @@ class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
         the specific argument type.
         """
         raise NotImplementedError("Subclasses must implement this method")
+
+
+class TaskExecutor(ABC):
+    @abstractmethod
+    async def revive_task(self, args: Mapping[str, Any]) -> BaseBackgroundTaskResult:
+        """
+        Revive the background task with the provided arguments.
+        This method should be implemented by subclasses to provide
+        the specific revival logic.
+        """
+        raise NotImplementedError("Subclasses must implement this method")
+
+    @abstractmethod
+    async def execute_new_task(self, args: BaseBackgroundTaskArgs) -> BaseBackgroundTaskResult:
+        """
+        Execute the background task with the provided reporter and arguments.
+        This method should be implemented by subclasses to provide
+        the specific execution logic.
+        """
+        raise NotImplementedError("Subclasses must implement this method")
+
+
+@dataclass
+class TaskDefinition(TaskExecutor, Generic[TFunctionArgs]):
+    name: TaskName
+    handler: BaseBackgroundTaskHandler[TFunctionArgs]
+    args_type: Type[TFunctionArgs]
+
+    @override
+    async def revive_task(self, args: Mapping[str, Any]) -> BaseBackgroundTaskResult:
+        args_instance = self.args_type.from_redis_json(args)
+        return await self.handler.execute(args_instance)
+
+    @override
+    async def execute_new_task(self, args: BaseBackgroundTaskArgs) -> BaseBackgroundTaskResult:
+        if not isinstance(args, self.args_type):
+            raise TypeError(f"Expected args of type {self.args_type}, got {type(args)}")
+        return await self.handler.execute(args)

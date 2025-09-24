@@ -3,14 +3,19 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Self, override
 
-from ai.backend.common.bgtask.task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskHandler
+from ai.backend.common.bgtask.task.base import (
+    BaseBackgroundTaskArgs,
+    BaseBackgroundTaskHandler,
+    BaseBackgroundTaskResult,
+    EmptyTaskResult,
+)
 from ai.backend.common.bgtask.types import TaskName
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
-from ai.backend.common.types import DispatchResult, VFolderID
+from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
 
 from ...volumes.pool import VolumePool
@@ -24,7 +29,7 @@ class VFolderDeleteTaskArgs(BaseBackgroundTaskArgs):
     vfolder_id: VFolderID
 
     @override
-    def to_metadata_body(self) -> dict[str, Any]:
+    def to_redis_json(self) -> Mapping[str, Any]:
         return {
             "volume": self.volume,
             "vfolder_id": str(self.vfolder_id),
@@ -32,7 +37,7 @@ class VFolderDeleteTaskArgs(BaseBackgroundTaskArgs):
 
     @classmethod
     @override
-    def from_metadata_body(cls, body: Mapping[str, Any]) -> Self:
+    def from_redis_json(cls, body: Mapping[str, Any]) -> Self:
         return cls(
             volume=body["volume"],
             vfolder_id=VFolderID.from_str(body["vfolder_id"]),
@@ -53,7 +58,7 @@ class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteTaskArgs])
         return TaskName.DELETE_VFOLDER
 
     @override
-    async def execute(self, args: VFolderDeleteTaskArgs) -> DispatchResult:
+    async def execute(self, args: VFolderDeleteTaskArgs) -> BaseBackgroundTaskResult:
         try:
             async with self._volume_pool.get_volume_by_name(args.volume) as volume:
                 await volume.delete_vfolder(args.vfolder_id)
@@ -70,14 +75,14 @@ class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteTaskArgs])
                     str(e),
                 )
             )
-            return DispatchResult(errors=[str(e)])
+            raise e
         else:
             await self._event_producer.anycast_event(
                 VFolderDeletionSuccessEvent(
                     args.vfolder_id,
                 )
             )
-        return DispatchResult()
+        return EmptyTaskResult()
 
     @classmethod
     @override

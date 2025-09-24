@@ -6,6 +6,7 @@ import logging
 import textwrap
 import uuid
 from collections.abc import Collection
+from dataclasses import dataclass
 from functools import lru_cache
 from typing import Optional, Self, cast
 
@@ -55,6 +56,12 @@ class _ScriptResult(enum.StrEnum):
     @classmethod
     def from_bytes(cls, value: bytes) -> _ScriptResult:
         return cls(value.decode())
+
+
+@dataclass
+class TaskSetKey:
+    server_id: str
+    tags: Collection[str]
 
 
 class ValkeyBgtaskClient:
@@ -108,7 +115,9 @@ class ValkeyBgtaskClient:
 
     # Task metadata operations
     @valkey_decorator()
-    async def register_task(self, metadata: BackgroundTaskMetadata) -> None:
+    async def register_task(
+        self, metadata: BackgroundTaskMetadata, task_set_key: TaskSetKey
+    ) -> None:
         """
         Register a background task with 24-hour TTL and index it by tags and server ID.
         """
@@ -116,47 +125,61 @@ class ValkeyBgtaskClient:
         key = self._get_task_key(metadata.task_id)
         value = metadata.to_json()
         batch.set(key, value, expiry=ExpirySet(ExpiryType.SEC, TASK_METADATA_TTL))
-        batch = await self._build_claim_task(batch, metadata)
+        batch = await self._build_claim_task(batch, metadata.task_id, task_set_key)
         await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_decorator()
-    async def claim_task(self, metadata: BackgroundTaskMetadata) -> None:
+    async def claim_task(self, metadata: BackgroundTaskMetadata, task_set_key: TaskSetKey) -> None:
         """
         Claim an existing task by adding index references. Idempotent operation.
         """
         batch = self._create_batch()
-        batch = await self._build_claim_task(batch, metadata)
+        batch = await self._build_claim_task(batch, metadata.task_id, task_set_key)
         await self._client.client.exec(batch, raise_on_error=True)
 
-    async def _build_claim_task(self, batch: Batch, metadata: BackgroundTaskMetadata) -> Batch:
-        for tag in metadata.tags:
+    async def _build_claim_task(
+        self, batch: Batch, task_id: TaskID, task_set_key: TaskSetKey
+    ) -> Batch:
+        for tag in task_set_key.tags:
             tag_key = self._get_tag_key(tag)
-            batch.sadd(tag_key, [metadata.task_id.hex])
+            batch.sadd(tag_key, [task_id.hex])
             batch.expire(tag_key, TASK_METADATA_TTL)
 
-        server_key = self._get_server_key(metadata.server_id)
-        batch.sadd(server_key, [metadata.task_id.hex])
+        server_key = self._get_server_key(task_set_key.server_id)
+        batch.sadd(server_key, [task_id.hex])
         batch.expire(server_key, TASK_METADATA_TTL)
         return batch
 
     @valkey_decorator()
-    async def unregister_task(self, metadata: BackgroundTaskMetadata) -> None:
+    async def unregister_task(self, task_id: TaskID, task_set_key: TaskSetKey) -> None:
         """
         Remove task and all its index references. Idempotent operation.
         """
         batch = self._create_batch()
-        key = self._get_task_key(metadata.task_id)
+        key = self._get_task_key(task_id)
         batch.delete([key])
 
-        for tag in metadata.tags:
+        for tag in task_set_key.tags:
             tag_key = self._get_tag_key(tag)
-            batch.srem(tag_key, [metadata.task_id.hex])
+            batch.srem(tag_key, [task_id.hex])
 
-        server_key = self._get_server_key(metadata.server_id)
-        batch.srem(server_key, [metadata.task_id.hex])
+        server_key = self._get_server_key(task_set_key.server_id)
+        batch.srem(server_key, [task_id.hex])
         await self._client.client.exec(batch, raise_on_error=True)
 
-    async def _fetch_registered_task_ids(self, keys: Collection[str]) -> set[TaskID]:
+    @valkey_decorator()
+    async def fetch_unmanaged_tasks(self, task_set_key: TaskSetKey) -> list[BackgroundTaskMetadata]:
+        """
+        Fetch unmanaged tasks with insufficient TTL for a specific TaskSetKey.
+        """
+        keys = []
+        keys.append(self._get_server_key(task_set_key.server_id))
+        tag_keys = [self._get_tag_key(tag) for tag in task_set_key.tags]
+        keys.extend(tag_keys)
+        task_ids = await self._fetch_task_ids_by_groups(keys)
+        return await self._fetch_unmanaged_tasks(task_ids)
+
+    async def _fetch_task_ids_by_groups(self, keys: Collection[str]) -> set[TaskID]:
         if not keys:
             return set()
         batch = self._create_batch()
@@ -172,30 +195,7 @@ class ValkeyBgtaskClient:
                 task_ids |= {TaskID(uuid.UUID(hex=hex_id.decode())) for hex_id in raw_result}
         return task_ids
 
-    @valkey_decorator()
-    async def list_timeout_tasks_by_tags(
-        self, tags: Collection[str]
-    ) -> list[BackgroundTaskMetadata]:
-        """
-        List tasks with insufficient TTL filtered by tags.
-        """
-        if not tags:
-            return []
-        keys = [self._get_tag_key(tag) for tag in tags]
-        task_ids = await self._fetch_registered_task_ids(keys)
-        results = await self._list_timeout_tasks(task_ids)
-        return results
-
-    @valkey_decorator()
-    async def list_timeout_tasks_by_server_id(self, server_id: str) -> list[BackgroundTaskMetadata]:
-        """
-        List tasks with insufficient TTL owned by a specific server.
-        """
-        key = self._get_server_key(server_id)
-        task_ids = await self._fetch_registered_task_ids([key])
-        return await self._list_timeout_tasks(task_ids)
-
-    async def _list_timeout_tasks(
+    async def _fetch_unmanaged_tasks(
         self, task_ids: Collection[TaskID]
     ) -> list[BackgroundTaskMetadata]:
         if not task_ids:
@@ -268,8 +268,7 @@ class ValkeyBgtaskClient:
     async def heartbeat(
         self,
         task_ids: Collection[TaskID],
-        server_id: Optional[str],
-        tags: Collection[str],
+        task_set_key: TaskSetKey,
     ) -> None:
         """
         Extend TTL to 24 hours for active tasks. Non-existent tasks are ignored.
@@ -278,10 +277,11 @@ class ValkeyBgtaskClient:
 
         task_keys = [self._get_task_key(task_id) for task_id in task_ids]
         keys.extend(task_keys)
-        if server_id is not None:
-            server_key = self._get_server_key(server_id)
-            keys.append(server_key)
-        tag_keys = [self._get_tag_key(tag) for tag in tags]
+
+        server_key = self._get_server_key(task_set_key.server_id)
+        keys.append(server_key)
+
+        tag_keys = [self._get_tag_key(tag) for tag in task_set_key.tags]
         keys.extend(tag_keys)
 
         if not keys:
