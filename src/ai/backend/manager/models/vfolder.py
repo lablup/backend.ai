@@ -963,16 +963,20 @@ async def prepare_vfolder_mounts(
     for requested_key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
-        await ensure_host_permission_allowed(
-            conn,
-            vfolder["host"],
-            allowed_vfolder_types=allowed_vfolder_types,
-            user_uuid=user_scope.user_uuid,
-            resource_policy=resource_policy,
-            domain_name=user_scope.domain_name,
-            group_id=user_scope.group_id,
-            permission=VFolderHostPermission.MOUNT_IN_SESSION,
-        )
+        try:
+            await ensure_host_permission_allowed(
+                conn,
+                vfolder["host"],
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=user_scope.user_uuid,
+                resource_policy=resource_policy,
+                domain_name=user_scope.domain_name,
+                group_id=user_scope.group_id,
+                permission=VFolderHostPermission.MOUNT_IN_SESSION,
+            )
+        except InvalidAPIParameters:
+            log.exception("Cannot mount vfolder of host {}, skipping", vfolder["host"])
+            continue
         if unmanaged_path := cast(Optional[str], vfolder["unmanaged_path"]):
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(".")
