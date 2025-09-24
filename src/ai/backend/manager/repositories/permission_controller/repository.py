@@ -15,6 +15,11 @@ from ...data.permission.role import (
 from ...decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
+from ...errors.common import ObjectNotFound
+from ...models.rbac_models.association_scopes_entities import AssociationScopesEntitiesRow
+from ...models.rbac_models.permission.permission_group import PermissionGroupRow
+from ...models.rbac_models.role import RoleRow
+from ...models.rbac_models.user_role import UserRoleRow
 from ...models.utils import ExtendedAsyncSAEngine
 from .db_source import PermissionDBSource
 
@@ -91,3 +96,29 @@ class PermissionControllerRepository:
                     if permission.operation == data.operation:
                         return True
         return False
+
+    @repository_decorator()
+    async def check_permission_of_entities(
+        self, data: PermissionCheckEntityInput
+    ) -> Mapping[ObjectId, bool]:
+        """
+        Check if the user has the requested operation permission on the given entity IDs.
+        Returns a mapping of entity ID to a boolean indicating permission.
+        """
+        requested_operation = data.operation
+        result: dict[ObjectId, bool] = {entity_id: False for entity_id in data.target_entity_ids}
+        async with self._db.begin_readonly_session() as db_session:
+            permission_data = await self._get_permissions(db_session, data.user_id)
+            if requested_operation in permission_data.global_permissions:
+                # Early return if the user has global permission
+                return {entity_id: True for entity_id in data.target_entity_ids}
+
+            entity_scope_map = await self._get_scopes_mapped_to_entity_ids(
+                db_session, data.target_entity_ids
+            )
+            for entity_id, scopes in entity_scope_map.items():
+                has_perm = self._check_object_permission(
+                    permission_data, requested_operation, entity_id, scopes
+                )
+                result[entity_id] = has_perm
+        return result
