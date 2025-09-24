@@ -125,7 +125,6 @@ class AgentHeartbeatUpsert:
 
 @dataclass
 class UpsertResult:
-    was_insert: bool
     was_revived: bool
     need_resource_slot_update: bool
 
@@ -135,7 +134,6 @@ class UpsertResult:
     ) -> Self:
         if existing_row is None:
             return cls(
-                was_insert=True,
                 was_revived=False,
                 need_resource_slot_update=True,
             )
@@ -154,7 +152,6 @@ class UpsertResult:
             != upsert_data.metadata.auto_terminate_abusing_kernel
         )
         return cls(
-            was_insert=False,
             was_revived=was_revived,
             need_resource_slot_update=need_resource_slot_update,
         )
