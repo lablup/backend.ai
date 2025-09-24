@@ -60,6 +60,11 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
     def name(cls) -> TaskName:
         return TaskName.CLONE_VFOLDER
 
+    @classmethod
+    @override
+    def args_type(cls) -> type[VFolderCloneTaskArgs]:
+        return VFolderCloneTaskArgs
+
     @override
     async def execute(self, args: VFolderCloneTaskArgs) -> BaseBackgroundTaskResult:
         try:
@@ -88,8 +93,3 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
                 )
             )
         return EmptyTaskResult()
-
-    @classmethod
-    @override
-    def args_type(cls) -> type[VFolderCloneTaskArgs]:
-        return VFolderCloneTaskArgs

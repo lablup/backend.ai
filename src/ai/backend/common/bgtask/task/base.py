@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import Any, Generic, Optional, Self, Type, TypeVar, override
+from typing import Any, Generic, Optional, Self, TypeVar
 
 from ..types import TaskName
 
@@ -48,15 +47,6 @@ TFunctionArgs = TypeVar("TFunctionArgs", bound=BaseBackgroundTaskArgs)
 
 
 class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
-    @abstractmethod
-    async def execute(self, args: TFunctionArgs) -> BaseBackgroundTaskResult:
-        """
-        Execute the background task with the provided reporter and arguments.
-        This method should be implemented by subclasses to provide
-        the specific execution logic.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
-
     @classmethod
     @abstractmethod
     def name(cls) -> TaskName:
@@ -77,40 +67,11 @@ class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
         """
         raise NotImplementedError("Subclasses must implement this method")
 
-
-class TaskExecutor(ABC):
     @abstractmethod
-    async def revive_task(self, args: Mapping[str, Any]) -> BaseBackgroundTaskResult:
-        """
-        Revive the background task with the provided arguments.
-        This method should be implemented by subclasses to provide
-        the specific revival logic.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
-
-    @abstractmethod
-    async def execute_new_task(self, args: BaseBackgroundTaskArgs) -> BaseBackgroundTaskResult:
+    async def execute(self, args: TFunctionArgs) -> BaseBackgroundTaskResult:
         """
         Execute the background task with the provided reporter and arguments.
         This method should be implemented by subclasses to provide
         the specific execution logic.
         """
         raise NotImplementedError("Subclasses must implement this method")
-
-
-@dataclass
-class TaskDefinition(TaskExecutor, Generic[TFunctionArgs]):
-    name: TaskName
-    handler: BaseBackgroundTaskHandler[TFunctionArgs]
-    args_type: Type[TFunctionArgs]
-
-    @override
-    async def revive_task(self, args: Mapping[str, Any]) -> BaseBackgroundTaskResult:
-        args_instance = self.args_type.from_redis_json(args)
-        return await self.handler.execute(args_instance)
-
-    @override
-    async def execute_new_task(self, args: BaseBackgroundTaskArgs) -> BaseBackgroundTaskResult:
-        if not isinstance(args, self.args_type):
-            raise TypeError(f"Expected args of type {self.args_type}, got {type(args)}")
-        return await self.handler.execute(args)
