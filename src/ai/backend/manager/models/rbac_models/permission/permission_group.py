@@ -67,4 +67,5 @@ class PermissionGroupRow(Base):
             id=self.id,
             role_id=self.role_id,
             scope_id=ScopeId(scope_type=self.scope_type, scope_id=self.scope_id),
+            permissions=[permission.to_data() for permission in self.permission_rows],
         )

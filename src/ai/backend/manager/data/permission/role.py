@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import uuid
-from dataclasses import dataclass, field
+from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import Any, Optional, Self, override
 
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
@@ -10,7 +13,7 @@ from .object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
     ObjectPermissionData,
 )
-from .permission_group import PermissionGroupCreatorBeforeRoleCreation
+from .permission_group import PermissionGroupCreatorBeforeRoleCreation, PermissionGroupData
 from .status import RoleStatus
 from .types import EntityType, OperationType, RoleSource
 
@@ -71,6 +74,7 @@ class RoleDataWithPermissions:
     source: RoleSource
     status: RoleStatus
 
+    permission_groups: list[PermissionGroupData]
     object_permissions: list[ObjectPermissionData]
 
     created_at: datetime
