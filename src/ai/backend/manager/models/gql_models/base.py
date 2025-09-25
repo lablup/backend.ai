@@ -23,7 +23,7 @@ class ResourceLimit(graphene.ObjectType):
     key = graphene.String()
     min = graphene.String()
     max = graphene.String(
-        deprecation_reason="Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete."
+        deprecation_reason="Deprecated since 25.6.15. The max slot limit validation has been removed as it was deemed obsolete."
     )
 
 
@@ -36,7 +36,7 @@ class ResourceLimitInput(graphene.InputObjectType):
     key = graphene.String()
     min = graphene.String()
     max = graphene.String(
-        deprecation_reason="Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete."
+        deprecation_reason="Deprecated since 25.6.15. The max slot limit validation has been removed as it was deemed obsolete."
     )
 
 
