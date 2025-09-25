@@ -672,6 +672,7 @@ class KernelCreationInfo:
     stdin_port: Optional[int] = None
     stdout_port: Optional[int] = None
     service_ports: list[int] = field(default_factory=list)
+    kernel_host: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "KernelCreationInfo":
@@ -685,6 +686,7 @@ class KernelCreationInfo:
             stdin_port=data.get("stdin_port"),
             stdout_port=data.get("stdout_port"),
             service_ports=data.get("service_ports", []),
+            kernel_host=data.get("kernel_host"),
         )
 
     def get_resource_allocations(self) -> ResourceSlot:

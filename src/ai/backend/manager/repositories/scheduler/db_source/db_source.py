@@ -1907,6 +1907,7 @@ class ScheduleDBSource:
                     stdin_port=creation_info.stdin_port,
                     stdout_port=creation_info.stdout_port,
                     service_ports=creation_info.service_ports,
+                    kernel_host=creation_info.kernel_host,
                     status_history=sql_json_merge(
                         KernelRow.status_history,
                         (),
