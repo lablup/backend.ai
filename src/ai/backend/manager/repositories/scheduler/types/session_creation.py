@@ -4,7 +4,7 @@ import secrets
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
-from typing import Any, Optional, Self, Union
+from typing import Any, Optional, Self
 from uuid import UUID
 
 import yarl
@@ -24,9 +24,8 @@ from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.models import NetworkRow
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
+from ai.backend.manager.models.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.manager.types import UserScope
-
-SESSION_PRIORITY_DEFAULT = 10
 
 
 @dataclass
@@ -305,7 +304,7 @@ class ImageInfo:
     labels: dict[str, Any]
     # Resource spec maps slot names to {"min": value, "max": value}
     # Values can be strings (for BinarySize), numbers, or None
-    resource_spec: dict[str, dict[str, Union[str, int, Decimal, None]]]
+    resource_spec: dict[str, dict[str, Optional[str | int | Decimal]]]
 
 
 @dataclass

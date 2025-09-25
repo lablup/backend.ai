@@ -340,15 +340,6 @@ class ResourceCalculator:
                 f"Your resource request is smaller than the minimum required by the image. ({min_humanized})"
             )
 
-        # Check if: requested <= image-maximum
-        if not (requested_slots <= image_max_slots):
-            max_humanized = " ".join(
-                f"{k}={v}" for k, v in image_max_slots.to_humanized(known_slot_types).items()
-            )
-            raise InvalidAPIParameters(
-                f"Your resource request is larger than the maximum allowed by the image. ({max_humanized})"
-            )
-
         # Check if: shmem < memory
         if shmem and shmem >= requested_slots["mem"]:
             raise InvalidAPIParameters(
