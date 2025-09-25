@@ -1184,16 +1184,14 @@ type User implements Item {
   """
   container_gids: [Int]
   groups: [UserGroup]
+
+  """Added in 25.15.0."""
+  keypairs: [KeyPair]
 }
 
 type UserGroup {
   id: UUID
   name: String
-}
-
-type UserList implements PaginatedList {
-  items: [User]!
-  total_count: Int!
 }
 
 type KeyPair implements Item {
@@ -1310,6 +1308,11 @@ type ComputeSession implements Item {
 type UserInfo {
   email: String
   full_name: String
+}
+
+type UserList implements PaginatedList {
+  items: [User]!
+  total_count: Int!
 }
 
 type KeyPairList implements PaginatedList {
