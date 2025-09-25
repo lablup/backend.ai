@@ -303,6 +303,22 @@ type CreateReservoirRegistryPayload {
 scalar DateTime
 
 """Added in 25.15.0"""
+input DelegateImportArtifactsInput {
+  artifactRevisionIds: [ID!]!
+}
+
+"""Added in 25.15.0"""
+type DelegateImportArtifactsPayload {
+  artifactRevisions: ArtifactRevisionConnection!
+  tasks: [ArtifactRevisionImportTask!]!
+}
+
+"""Added in 25.15.0"""
+input DelegateScanArtifactsInput {
+  artifactRevisionIds: [ID!]!
+}
+
+"""Added in 25.15.0"""
 input DeleteArtifactsInput {
   artifactIds: [ID!]!
 }
@@ -657,6 +673,12 @@ type Mutation {
 
   """Added in 25.14.0"""
   importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload!
+
+  """Added in 25.15.0"""
+  delegateScanArtifacts(input: DelegateScanArtifactsInput!): DelegateImportArtifactsPayload!
+
+  """Added in 25.15.0"""
+  delegateImportArtifacts(input: DelegateImportArtifactsInput!): DelegateImportArtifactsPayload!
 
   """Added in 25.14.0"""
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
