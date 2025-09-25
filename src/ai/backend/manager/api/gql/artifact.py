@@ -32,6 +32,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.artifact import ArtifactScanLimitExceededError
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
@@ -177,6 +178,16 @@ class ScanArtifactsInput:
 
 @strawberry.input(description="Added in 25.14.0")
 class ImportArtifactsInput:
+    artifact_revision_ids: list[ID]
+
+
+@strawberry.input(description="Added in 25.15.0")
+class DelegateScanArtifactsInput:
+    artifact_revision_ids: list[ID]
+
+
+@strawberry.input(description="Added in 25.15.0")
+class DelegateImportArtifactsInput:
     artifact_revision_ids: list[ID]
 
 
@@ -395,6 +406,12 @@ class ArtifactRevisionImportTask:
 # Mutation Payloads
 @strawberry.type(description="Added in 25.14.0")
 class ImportArtifactsPayload:
+    artifact_revisions: ArtifactRevisionConnection
+    tasks: list[ArtifactRevisionImportTask]
+
+
+@strawberry.type(description="Added in 25.15.0")
+class DelegateImportArtifactsPayload:
     artifact_revisions: ArtifactRevisionConnection
     tasks: list[ArtifactRevisionImportTask]
 
@@ -846,6 +863,21 @@ async def import_artifacts(
     )
 
     return ImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
+
+
+# Mutations
+@strawberry.mutation(description="Added in 25.15.0")
+async def delegate_scan_artifacts(
+    input: DelegateScanArtifactsInput, info: Info[StrawberryGQLContext]
+) -> DelegateImportArtifactsPayload:
+    raise NotImplementedAPI("This mutation is not implemented yet.")
+
+
+@strawberry.mutation(description="Added in 25.15.0")
+async def delegate_import_artifacts(
+    input: DelegateImportArtifactsInput, info: Info[StrawberryGQLContext]
+) -> DelegateImportArtifactsPayload:
+    raise NotImplementedAPI("This mutation is not implemented yet.")
 
 
 @strawberry.mutation(description="Added in 25.14.0")
