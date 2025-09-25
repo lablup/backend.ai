@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.user.types import UserCreator, UserData
+from ai.backend.manager.data.user.types import UserCreateResultData, UserCreator
 from ai.backend.manager.services.user.actions.base import UserAction
 
 
@@ -23,8 +23,8 @@ class CreateUserAction(UserAction):
 
 @dataclass
 class CreateUserActionResult(BaseActionResult):
-    data: UserData
+    data: UserCreateResultData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.data.id)
+        return str(self.data.user.id)

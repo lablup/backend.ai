@@ -15,7 +15,7 @@ from ai.backend.common.utils import nmget
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.data.user.types import UserCreator, UserData
+from ai.backend.manager.data.user.types import UserCreateResultData, UserCreator, UserData
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
@@ -33,7 +33,7 @@ from ai.backend.manager.models import kernels
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
-from ai.backend.manager.models.keypair import KeyPairRow, keypairs, prepare_new_keypair
+from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data, keypairs
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.user.actions.modify_user import UserModifier
@@ -78,7 +78,7 @@ class UserRepository:
     @repository_decorator()
     async def create_user_validated(
         self, user_creator: UserCreator, group_ids: Optional[list[str]]
-    ) -> UserData:
+    ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
         """
@@ -124,16 +124,16 @@ class UserRepository:
                 resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
                 rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
             )
-            kp_data = prepare_new_keypair(email, keypair_creator)
-            kp_insert_query = sa.insert(KeyPairRow).values(
-                **kp_data,
-                user=created_user.uuid,
-            )
-            await db_session.execute(kp_insert_query)
+            kp_data = generate_keypair_data()
+            kp_row = KeyPairRow.from_creator(keypair_creator, kp_data, email)
+            db_session.add(kp_row)
+            await db_session.flush()
+            await db_session.refresh(kp_row)
+            kp_data = kp_row.to_data()
 
             # Update user main_access_key
-            row.main_access_key = kp_data["access_key"]
-            created_user.main_access_key = kp_data["access_key"]
+            row.main_access_key = kp_data.access_key
+            created_user.main_access_key = kp_data.access_key
 
             # Add user to groups including model store project
             await self._add_user_to_groups(
@@ -148,7 +148,7 @@ class UserRepository:
                 ScopeId(ScopeType.DOMAIN, str(created_user.domain_name)),
             )
 
-        return created_user
+        return UserCreateResultData(created_user, kp_data)
 
     @repository_decorator()
     async def update_user_validated(
