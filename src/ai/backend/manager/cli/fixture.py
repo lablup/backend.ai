@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import quote_plus as urlquote
@@ -9,6 +10,7 @@ from urllib.parse import quote_plus as urlquote
 import click
 import sqlalchemy as sa
 
+from ai.backend.cli.types import ExitCode
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 
@@ -49,6 +51,7 @@ def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
             log.exception(
                 "Failed to populate fixtures from {} due to the following error:", fixture_path
             )
+            sys.exit(ExitCode.FAILURE)
         else:
             log.info("Done")
             log.warning("Some rows may be skipped if they already exist.")
