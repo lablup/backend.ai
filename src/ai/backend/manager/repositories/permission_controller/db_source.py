@@ -56,7 +56,7 @@ class PermissionDBSource:
             await db_session.refresh(role_row)
             return role_row
 
-    async def _get_role(self, role_id: uuid.UUID, db_session: SASession) -> RoleRow:
+    async def _get_role(self, db_session: SASession, role_id: uuid.UUID) -> RoleRow:
         stmt = sa.select(RoleRow).where(RoleRow.id == role_id)
         role_row = await db_session.scalar(stmt)
         result = cast(Optional[RoleRow], role_row)
@@ -69,12 +69,12 @@ class PermissionDBSource:
         async with self._db.begin_session() as db_session:
             stmt = sa.update(RoleRow).where(RoleRow.id == data.id).values(**to_update)
             await db_session.execute(stmt)
-            role_row = await self._get_role(data.id, db_session)
+            role_row = await self._get_role(db_session, data.id)
             return role_row
 
     async def delete_role(self, data: RoleDeleteInput) -> RoleRow:
         async with self._db.begin_session() as db_session:
-            role_row = await self._get_role(data.id, db_session)
+            role_row = await self._get_role(db_session, data.id)
             role_row.status = RoleStatus.DELETED
             await db_session.flush()
             await db_session.refresh(role_row)
@@ -91,7 +91,7 @@ class PermissionDBSource:
     async def get_role(self, role_id: uuid.UUID) -> Optional[RoleRow]:
         async with self._db.begin_readonly_session() as db_session:
             try:
-                result = await self._get_role(role_id, db_session)
+                result = await self._get_role(db_session, role_id)
             except ObjectNotFound:
                 return None
             return result
