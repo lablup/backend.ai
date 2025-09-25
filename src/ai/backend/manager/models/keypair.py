@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import os
 import secrets
+import uuid
 from typing import Any, List, Optional, Self, Sequence, Tuple, TypedDict
 
 import sqlalchemy as sa
@@ -121,10 +122,12 @@ class KeyPairRow(Base):
         cls,
         creator: KeyPairCreator,
         generated_data: GeneratedKeyPairData,
+        user_id: uuid.UUID,
         email: str,
     ) -> Self:
         return cls(
             user_id=email,
+            user=user_id,
             access_key=generated_data.access_key,
             secret_key=generated_data.secret_key,
             is_active=creator.is_active,
