@@ -1,11 +1,6 @@
 import logging
-from collections import defaultdict
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.permission.id import (
-    ObjectId,
-    ScopeId,
-)
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -21,10 +16,6 @@ from ai.backend.manager.services.permission_contoller.actions.create_role import
 from ai.backend.manager.services.permission_contoller.actions.delete_role import (
     DeleteRoleAction,
     DeleteRoleActionResult,
-)
-from ai.backend.manager.services.permission_contoller.actions.list_access import (
-    ListAccessAction,
-    ListAccessActionResult,
 )
 from ai.backend.manager.services.permission_contoller.actions.update_role import (
     UpdateRoleAction,
@@ -82,26 +73,3 @@ class PermissionControllerService:
         data = await self._repository.assign_role(action.input)
 
         return AssignRoleActionResult(success=True, data=data)
-
-    async def list_access(self, action: ListAccessAction) -> ListAccessActionResult:
-        """
-        Lists the access permissions for a user based on their roles.
-        It returns the allowed operations for both scope and object permissions.
-        """
-        roles = await self._repository.get_active_roles(action.user_id)
-
-        scope_allowed_operations: defaultdict[ScopeId, set[str]] = defaultdict(set)
-        object_allowed_operations: defaultdict[ObjectId, set[str]] = defaultdict(set)
-        for role in roles:
-            for scope_perm in role.scope_permissions:
-                if scope_perm.operation != action.operation:
-                    continue
-                scope_allowed_operations[scope_perm.scope_id].add(scope_perm.operation)
-            for object_perm in role.object_permissions:
-                if object_perm.operation != action.operation:
-                    continue
-                object_allowed_operations[object_perm.object_id].add(object_perm.operation)
-        return ListAccessActionResult(
-            scope_allowed_operations=dict(scope_allowed_operations),
-            object_allowed_operations=dict(object_allowed_operations),
-        )

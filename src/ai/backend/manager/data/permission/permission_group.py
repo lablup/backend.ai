@@ -11,6 +11,17 @@ class PermissionGroupCreator:
 
 
 @dataclass
+class PermissionGroupCreatorBeforeRoleCreation:
+    scope_id: ScopeId
+
+    def to_input(self, role_id: uuid.UUID) -> PermissionGroupCreator:
+        return PermissionGroupCreator(
+            role_id=role_id,
+            scope_id=self.scope_id,
+        )
+
+
+@dataclass
 class PermissionGroupData:
     id: uuid.UUID
     role_id: uuid.UUID
