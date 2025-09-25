@@ -5,10 +5,14 @@ from typing import Any, Optional, override
 
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
-from .object_permission import ObjectPermissionData
-from .scope_permission import ScopePermissionData
+from .id import ObjectId, ScopeId
+from .object_permission import (
+    ObjectPermissionCreateInputBeforeRoleCreation,
+    ObjectPermissionData,
+)
+from .permission_group import PermissionGroupCreatorBeforeRoleCreation
 from .status import RoleStatus
-from .types import EntityType, RoleSource
+from .types import EntityType, OperationType, RoleSource
 
 
 @dataclass
@@ -18,8 +22,10 @@ class RoleCreateInput:
     status: RoleStatus = RoleStatus.ACTIVE
     description: Optional[str] = None
 
-    scope_permissions: list[ScopePermissionData] = field(default_factory=list)
-    object_permissions: list[ObjectPermissionData] = field(default_factory=list)
+    permission_groups: list[PermissionGroupCreatorBeforeRoleCreation] = field(default_factory=list)
+    object_permissions: list[ObjectPermissionCreateInputBeforeRoleCreation] = field(
+        default_factory=list
+    )
 
 
 @dataclass
@@ -74,11 +80,18 @@ class RoleDataWithPermissions:
 
 
 @dataclass
-class PermissionCheckInput:
+class ScopePermissionCheckInput:
     user_id: uuid.UUID
-    operation: str
     target_entity_type: EntityType
-    target_entity_id: str
+    target_scope_id: ScopeId
+    operation: OperationType
+
+
+@dataclass
+class SingleEntityPermissionCheckInput:
+    user_id: uuid.UUID
+    target_object_id: ObjectId
+    operation: OperationType
 
 
 @dataclass
