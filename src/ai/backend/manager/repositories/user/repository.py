@@ -124,8 +124,8 @@ class UserRepository:
                 resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
                 rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
             )
-            kp_data = generate_keypair_data()
-            kp_row = KeyPairRow.from_creator(keypair_creator, kp_data, created_user.id, email)
+            generated = generate_keypair_data()
+            kp_row = KeyPairRow.from_creator(keypair_creator, generated, created_user.id, email)
             db_session.add(kp_row)
             await db_session.flush()
             await db_session.refresh(kp_row)
