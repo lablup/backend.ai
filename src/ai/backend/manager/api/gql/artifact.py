@@ -183,7 +183,12 @@ class ImportArtifactsInput:
 
 @strawberry.input(description="Added in 25.15.0")
 class DelegateScanArtifactsInput:
-    artifact_revision_ids: list[ID]
+    registry_id: Optional[ID] = None
+    limit: int = strawberry.field(
+        description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})"
+    )
+    artifact_type: Optional[ArtifactType] = None
+    search: Optional[str] = None
 
 
 @strawberry.input(description="Added in 25.15.0")
@@ -394,6 +399,11 @@ class ArtifactImportProgressUpdatedPayload:
 
 @strawberry.type(description="Added in 25.14.0")
 class ScanArtifactsPayload:
+    artifacts: list[Artifact]
+
+
+@strawberry.type(description="Added in 25.15.0")
+class DelegateScanArtifactsPayload:
     artifacts: list[Artifact]
 
 
@@ -869,7 +879,7 @@ async def import_artifacts(
 @strawberry.mutation(description="Added in 25.15.0")
 async def delegate_scan_artifacts(
     input: DelegateScanArtifactsInput, info: Info[StrawberryGQLContext]
-) -> DelegateImportArtifactsPayload:
+) -> DelegateScanArtifactsPayload:
     raise NotImplementedAPI("This mutation is not implemented yet.")
 
 

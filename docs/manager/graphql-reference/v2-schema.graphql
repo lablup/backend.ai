@@ -328,7 +328,17 @@ type DelegateImportArtifactsPayload {
 
 """Added in 25.15.0"""
 input DelegateScanArtifactsInput {
-  artifactRevisionIds: [ID!]!
+  registryId: ID = null
+
+  """Maximum number of artifacts to scan (max: 500)"""
+  limit: Int!
+  artifactType: ArtifactType = null
+  search: String = null
+}
+
+"""Added in 25.15.0"""
+type DelegateScanArtifactsPayload {
+  artifacts: [Artifact!]!
 }
 
 """Added in 25.15.0"""
@@ -693,7 +703,7 @@ type Mutation {
   importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload!
 
   """Added in 25.15.0"""
-  delegateScanArtifacts(input: DelegateScanArtifactsInput!): DelegateImportArtifactsPayload!
+  delegateScanArtifacts(input: DelegateScanArtifactsInput!): DelegateScanArtifactsPayload!
 
   """Added in 25.15.0"""
   delegateImportArtifacts(input: DelegateImportArtifactsInput!): DelegateImportArtifactsPayload!
