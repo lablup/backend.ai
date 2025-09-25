@@ -2515,7 +2515,7 @@ class ScheduleDBSource:
         # Convert to ImageConfigData
         for image_row in image_rows:
             try:
-                img_ref = image_row.image_ref
+                img_ref: ImageRef = image_row.image_ref
                 registry_row = image_row.registry_row
 
                 image_config = ImageConfigData(
@@ -2531,7 +2531,7 @@ class ScheduleDBSource:
                     registry_password=registry_row.password,
                 )
                 # Use the canonical name as key (which is what KernelRow.image contains)
-                image_configs[image_row.name] = image_config
+                image_configs[img_ref.canonical] = image_config
             except Exception as e:
                 log.error(f"Failed to process image {image_row.name}: {e}")
                 continue
