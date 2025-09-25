@@ -331,7 +331,7 @@ scalar BigInt
 type ResourceLimit {
   key: String
   min: String
-  max: String
+  max: String @deprecated(reason: "Deprecated since 24.09.15. The max slot limit validation has been removed as it was deemed obsolete.")
 }
 
 type AgentList implements PaginatedList {
@@ -1871,7 +1871,7 @@ input KVPairInput {
 input ResourceLimitInput {
   key: String
   min: String
-  max: String
+  max: String @deprecated(reason: "Deprecated since 24.09.15. The max slot limit validation has been removed as it was deemed obsolete.")
 }
 
 """Added in 24.03.0."""
