@@ -66,7 +66,6 @@ from ..user import (
     UserStatus,
     users,
 )
-from .keypair import KeyPair
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
@@ -420,7 +419,9 @@ class User(graphene.ObjectType):
     )
 
     groups = graphene.List(lambda: UserGroup)
-    keypairs = graphene.List(lambda: KeyPair, description="Added in 25.15.0.")
+    keypairs = graphene.List(
+        "ai.backend.manager.models.gql_models.keypair.KeyPair", description="Added in 25.15.0."
+    )
 
     async def resolve_groups(
         self,
@@ -461,6 +462,8 @@ class User(graphene.ObjectType):
 
     @classmethod
     def from_create_result(cls, result: UserCreateResultData) -> Self:
+        from .keypair import KeyPair
+
         user = cls.from_dto(result.user)
         user.keypairs = [KeyPair.from_data(result.keypair)]
         return user
