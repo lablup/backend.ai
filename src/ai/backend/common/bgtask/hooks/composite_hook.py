@@ -17,6 +17,6 @@ class CompositeTaskHook(AbstractTaskHook):
         async with AsyncExitStack() as stack:
             # Apply all hooks in sequence
             for hook in self._hooks:
-                await stack.enter_async_context(hook.apply(context))
+                context = await stack.enter_async_context(hook.apply(context))
 
             yield context

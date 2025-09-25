@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import uuid
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import AsyncIterator, Optional
 
 from ..task_result import TaskResult
-from ..types import TaskName
+from ..types import TaskID, TaskName
 
 
 @dataclass
@@ -15,7 +14,7 @@ class TaskContext:
     """Context object that holds task execution information."""
 
     task_name: TaskName
-    task_id: uuid.UUID
+    task_id: TaskID
     result: Optional[TaskResult] = None
 
 

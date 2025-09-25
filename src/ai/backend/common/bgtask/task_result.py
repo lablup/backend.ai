@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Generic, Optional, TypeVar
 
+from ai.backend.common.bgtask.task.base import BaseBackgroundTaskResult
+
 from ..events.event_types.bgtask.broadcast import (
     BaseBgtaskDoneEvent,
     BgtaskCancelledEvent,
@@ -20,7 +22,7 @@ from ..exception import (
 )
 from .types import BgtaskStatus
 
-R = TypeVar("R")
+R = TypeVar("R", bound=BaseBackgroundTaskResult)
 
 
 class TaskResult(ABC):
@@ -51,7 +53,11 @@ class TaskSuccessResult(TaskResult, Generic[R]):
     def to_broadcast_event(self, task_id: uuid.UUID) -> BaseBgtaskDoneEvent:
         # For now, convert the result to string for the message
         # This assumes the result has a meaningful string representation
-        message = str(self.result) if self.result is not None else "Task completed successfully"
+        message = (
+            str(self.result.serialize())
+            if self.result is not None
+            else "Task completed successfully"
+        )
         return BgtaskDoneEvent(task_id=task_id, message=message)
 
     def status(self) -> BgtaskStatus:
