@@ -11,7 +11,9 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.keypair.types import GeneratedKeyPairData
 from ai.backend.manager.data.user.types import UserCreator, UserData
 from ai.backend.manager.errors.auth import UserNotFound
 from ai.backend.manager.models.hasher.types import PasswordInfo
@@ -244,12 +246,14 @@ class TestUserRepository:
                 ):
                     # Mock keypair preparation
                     with patch(
-                        "ai.backend.manager.repositories.user.repository.prepare_new_keypair"
+                        "ai.backend.manager.repositories.user.repository.generate_keypair_data"
                     ) as mock_prepare_keypair:
-                        mock_prepare_keypair.return_value = {
-                            "access_key": "test_access_key",
-                            "secret_key": "test_secret_key",
-                        }
+                        mock_prepare_keypair.return_value = GeneratedKeyPairData(
+                            access_key=AccessKey("test_access_key"),
+                            secret_key=SecretKey("test_secret_key"),
+                            ssh_public_key="",
+                            ssh_private_key="",
+                        )
 
                         # Mock the _add_user_to_groups method
                         with patch.object(
@@ -260,11 +264,10 @@ class TestUserRepository:
                             )
 
                             assert result is not None
-                            assert isinstance(result, UserData)
-                            assert result.email == sample_user_creator.email
-                            assert result.username == sample_user_creator.username
-                            assert result.role == sample_user_creator.role
-                            assert result.main_access_key == "test_access_key"
+                            assert result.user.email == sample_user_creator.email
+                            assert result.user.username == sample_user_creator.username
+                            assert result.user.role == sample_user_creator.role
+                            assert result.user.main_access_key == "test_access_key"
 
     @pytest.mark.asyncio
     async def test_create_user_validated_failure(
