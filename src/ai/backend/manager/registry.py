@@ -1175,7 +1175,7 @@ class AgentRegistry:
                     "enqueue_session(): image ref => {} ({})", image_ref, image_ref.architecture
                 )
                 image_row = await ImageRow.resolve(session, [image_ref])
-            image_min_slots, image_max_slots = await image_row.get_slot_ranges(self.shared_config)
+            image_min_slots = await image_row.get_min_slot(self.shared_config)
             known_slot_types = await self.shared_config.get_resource_slots()
 
             labels = cast(dict, image_row.labels)
@@ -1286,7 +1286,6 @@ class AgentRegistry:
             log.debug(log_fmt + " -> requested_slots: {}", *log_args, requested_slots)
             log.debug(log_fmt + " -> resource_opts: {}", *log_args, resource_opts)
             log.debug(log_fmt + " -> image_min_slots: {}", *log_args, image_min_slots)
-            log.debug(log_fmt + " -> image_max_slots: {}", *log_args, image_max_slots)
 
             # Check if: requested >= image-minimum
             if image_min_slots > requested_slots:
@@ -1296,18 +1295,6 @@ class AgentRegistry:
                         " ".join(
                             f"{k}={v}"
                             for k, v in image_min_slots.to_humanized(known_slot_types).items()
-                        )
-                    )
-                )
-
-            # Check if: requested <= image-maximum
-            if not (requested_slots <= image_max_slots):
-                raise InvalidAPIParameters(
-                    "Your resource request is larger than "
-                    "the maximum allowed by the image. ({})".format(
-                        " ".join(
-                            f"{k}={v}"
-                            for k, v in image_max_slots.to_humanized(known_slot_types).items()
                         )
                     )
                 )
