@@ -20,7 +20,12 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.manager.data.user.types import UserCreator, UserData, UserInfoContext
+from ai.backend.manager.data.user.types import (
+    UserCreateResultData,
+    UserCreator,
+    UserData,
+    UserInfoContext,
+)
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
@@ -61,6 +66,7 @@ from ..user import (
     UserStatus,
     users,
 )
+from .keypair import KeyPair
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
@@ -414,6 +420,7 @@ class User(graphene.ObjectType):
     )
 
     groups = graphene.List(lambda: UserGroup)
+    keypairs = graphene.List(lambda: KeyPair, description="Added in 25.15.0.")
 
     async def resolve_groups(
         self,
@@ -451,6 +458,12 @@ class User(graphene.ObjectType):
             container_main_gid=dto.container_main_gid,
             container_gids=dto.container_gids,
         )
+
+    @classmethod
+    def from_create_result(cls, result: UserCreateResultData) -> Self:
+        user = cls.from_dto(result.user)
+        user.keypairs = [KeyPair.from_data(result.keypair)]
+        return user
 
     @classmethod
     def from_row(
@@ -947,7 +960,7 @@ class CreateUser(graphene.Mutation):
         return cls(
             ok=True,
             msg="success",
-            user=User.from_dto(action_result.data),
+            user=User.from_create_result(action_result.data),
         )
 
 
