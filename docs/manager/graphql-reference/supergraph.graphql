@@ -1471,7 +1471,19 @@ type DelegateImportArtifactsPayload
 input DelegateScanArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
-  artifactRevisionIds: [ID!]!
+  registryId: ID = null
+
+  """Maximum number of artifacts to scan (max: 500)"""
+  limit: Int!
+  artifactType: ArtifactType = null
+  search: String = null
+}
+
+"""Added in 25.15.0"""
+type DelegateScanArtifactsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  artifacts: [Artifact!]!
 }
 
 """Added in 25.15.0"""
@@ -3789,7 +3801,7 @@ type Mutation
   importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.15.0"""
-  delegateScanArtifacts(input: DelegateScanArtifactsInput!): DelegateImportArtifactsPayload! @join__field(graph: STRAWBERRY)
+  delegateScanArtifacts(input: DelegateScanArtifactsInput!): DelegateScanArtifactsPayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.15.0"""
   delegateImportArtifacts(input: DelegateImportArtifactsInput!): DelegateImportArtifactsPayload! @join__field(graph: STRAWBERRY)
