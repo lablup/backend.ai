@@ -500,7 +500,9 @@ class ValkeyStatClient:
         if not results:
             return None
         try:
-            result = cast(bytes, results[0])
+            result = cast(Optional[bytes], results[0])
+            if not result:
+                return None
             return result.decode("utf-8")
         except UnicodeDecodeError:
             return None
