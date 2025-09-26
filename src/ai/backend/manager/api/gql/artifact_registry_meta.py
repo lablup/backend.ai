@@ -8,11 +8,10 @@ import strawberry
 from aiotools import apartial
 from strawberry import ID
 from strawberry.dataloader import DataLoader
-from strawberry.relay import Node, NodeID
+from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.manager.api.gql.huggingface_registry import HuggingFaceRegistry
-from ai.backend.manager.api.gql.reservoir_registry import ReservoirRegistry
+from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryData,
 )
@@ -24,7 +23,14 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Represents common metadata for an artifact registry.
+    All artifact registry nodes expose that information regardless of type.
+""")
+)
 class ArtifactRegistryMeta(Node):
     id: NodeID[str]
     name: str
@@ -46,6 +52,9 @@ class ArtifactRegistryMeta(Node):
     async def load_by_id(
         cls, ctx: StrawberryGQLContext, registry_ids: Sequence[uuid.UUID]
     ) -> list[Self]:
+        from ai.backend.manager.api.gql.huggingface_registry import HuggingFaceRegistry
+        from ai.backend.manager.api.gql.reservoir_registry import ReservoirRegistry
+
         # Get all registry metas in a single batch query
         registry_metas_action = (
             await ctx.processors.artifact_registry.get_registry_metas.wait_for_complete(
@@ -81,3 +90,15 @@ class ArtifactRegistryMeta(Node):
 
             registries.append(cls.from_dataclass(registry_meta, url=url))
         return registries
+
+
+ArtifactRegistryMetaEdge = Edge[ArtifactRegistryMeta]
+
+
+@strawberry.type(description="Added in 25.15.0")
+class ArtifactRegistryMetaConnection(Connection[ArtifactRegistryMeta]):
+    count: int
+
+    def __init__(self, *args, count: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.count = count

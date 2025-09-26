@@ -96,6 +96,40 @@ type ArtifactRegistry {
   type: ArtifactRegistryType!
 }
 
+"""
+Added in 25.15.0.
+
+Represents common metadata for an artifact registry.
+All artifact registry nodes expose that information regardless of type.
+"""
+type ArtifactRegistryMeta implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  registryId: ID!
+  type: ArtifactRegistryType!
+  url: String!
+}
+
+"""Added in 25.15.0"""
+type ArtifactRegistryMetaConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ArtifactRegistryMetaEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ArtifactRegistryMetaEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ArtifactRegistryMeta!
+}
+
 enum ArtifactRegistryType {
   HUGGINGFACE
   RESERVOIR
@@ -1015,7 +1049,7 @@ type ReservoirRegistry implements Node {
   accessKey: String!
   secretKey: String!
   apiVersion: String!
-  remoteArtifactRegistryIds: [ID!]!
+  remoteArtifactRegistries: ArtifactRegistryMetaConnection!
 }
 
 """Added in 25.14.0"""
