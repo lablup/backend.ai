@@ -19,6 +19,8 @@ from ai.backend.manager.data.permission.types import (
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.types import Creator
 
+from ..keypair.types import KeyPairData
+
 
 class UserStatus(enum.StrEnum):
     """
@@ -190,3 +192,9 @@ class UserData:
             container_main_gid=row.container_main_gid,
             container_gids=row.container_gids,
         )
+
+
+@dataclass
+class UserCreateResultData:
+    user: UserData
+    keypair: KeyPairData

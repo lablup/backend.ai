@@ -5345,6 +5345,9 @@ type User implements Item
   """
   container_gids: [Int]
   groups: [UserGroup]
+
+  """Added in 25.15.0."""
+  keypairs: [KeyPair]
 }
 
 """Added in 24.03.0"""
