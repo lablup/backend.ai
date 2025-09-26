@@ -2417,6 +2417,9 @@
                   },
                   "password": {
                     "type": "string"
+                  },
+                  "sToken": {
+                    "type": "string"
                   }
                 },
                 "required": [
