@@ -29,6 +29,3 @@ class PermissionGroupData:
     scope_id: ScopeId
 
     permissions: list[PermissionData]
-
-    def is_global(self) -> bool:
-        return self.scope_id.is_global()
