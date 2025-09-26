@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime
-from decimal import Decimal
 
 import aiohttp
 import yarl
@@ -13,9 +12,6 @@ from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AgentId,
-    ResourceSlot,
-    SlotName,
-    SlotTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.agent_cache import AgentRPCCache
@@ -190,9 +186,7 @@ class AgentService:
 
         reported_agent_state_sync_data = AgentStateSyncData(
             now=now,
-            slot_key_and_units={
-                SlotName(k): SlotTypes(v[0]) for k, v in reported_agent_info.resource_slots.items()
-            },
+            slot_key_and_units=reported_agent_info.slot_key_and_units,
             current_addr=reported_agent_info.addr,
             public_key=reported_agent_info.public_key,
         )
@@ -225,10 +219,7 @@ class AgentService:
             (
                 action.agent_id,
                 reported_agent_info.scaling_group,
-                ResourceSlot({
-                    SlotName(k): Decimal(v[1])
-                    for k, v in reported_agent_info.resource_slots.items()
-                }),
+                reported_agent_info.available_resource_slots,
             ),
         )
         return HandleHeartbeatActionResult(agent_id=action.agent_id)

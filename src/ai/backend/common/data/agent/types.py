@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass, field
-from typing import Any, Optional, Self
+from dataclasses import dataclass
+from typing import Any, Mapping, Optional, Self
+
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from ai.backend.common.auth import PublicKey
-from ai.backend.common.types import DeviceName
+from ai.backend.common.types import DeviceName, ResourceSlot, SlotName, SlotTypes
 
 
 @dataclass
@@ -13,25 +14,31 @@ class ImageOpts:
     compression: str
 
 
-@dataclass
-class AgentInfo:
+class AgentInfo(BaseModel):
     ip: str
     region: Optional[str]
     scaling_group: str
     addr: str
     public_key: Optional[PublicKey]
     public_host: str
-    resource_slots: dict[Any, Any]
+    available_resource_slots: ResourceSlot
+    slot_key_and_units: dict[SlotName, SlotTypes]
     version: str
-    compute_plugins: dict[DeviceName, dict[str, str]]
+    compute_plugins: dict[DeviceName, dict[str, Any]]
     images: bytes
     architecture: str
     auto_terminate_abusing_kernel: bool
-    images_opts: ImageOpts = field(default_factory=lambda: ImageOpts(compression="zlib"))
+    images_opts: ImageOpts = Field(
+        default_factory=lambda: ImageOpts(compression="zlib"),
+        validation_alias=AliasChoices("images.opts", "images_opts", "imagesOpts"),
+    )
+
+    # Pydantic model configuration
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @classmethod
     def from_dict(cls, data: Mapping[Any, Any]) -> Self:
-        images_opts_data = data.get("images.opts", {"compression": "zlib"})
+        images_opts_data = data.get("images_opts", {"compression": "zlib"})
         return cls(
             ip=data["ip"],
             region=data["region"],
@@ -39,7 +46,8 @@ class AgentInfo:
             addr=data["addr"],
             public_key=data["public_key"],
             public_host=data["public_host"],
-            resource_slots=data["resource_slots"],
+            available_resource_slots=data["available_resource_slots"],
+            slot_key_and_units=data["slot_key_and_units"],
             version=data["version"],
             compute_plugins=data["compute_plugins"],
             images=data["images"],
@@ -56,13 +64,14 @@ class AgentInfo:
             "addr": self.addr,
             "public_key": self.public_key,
             "public_host": self.public_host,
-            "resource_slots": self.resource_slots,
+            "available_resource_slots": self.available_resource_slots,
+            "slot_key_and_units": self.slot_key_and_units,
             "version": self.version,
             "compute_plugins": self.compute_plugins,
             "images": self.images,
             "architecture": self.architecture,
             "auto_terminate_abusing_kernel": self.auto_terminate_abusing_kernel,
-            "images.opts": {
+            "images_opts": {
                 "compression": self.images_opts.compression,
             },
         }

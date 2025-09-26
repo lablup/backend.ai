@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Optional, Self
 
 from ai.backend.common.auth import PublicKey
@@ -113,9 +112,7 @@ class AgentHeartbeatUpsert:
                 public_key=agent_info.public_key,
             ),
             resource_info=AgentResourceInfo(
-                available_slots=ResourceSlot({
-                    SlotName(k): Decimal(v[1]) for k, v in agent_info.resource_slots.items()
-                }),
+                available_slots=agent_info.available_resource_slots,
                 compute_plugins=agent_info.compute_plugins,
             ),
             lost_at=None,
