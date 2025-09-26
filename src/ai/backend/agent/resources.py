@@ -88,7 +88,7 @@ class KernelResourceSpec:
     while kernel containers are running.
     """
 
-    slots: Mapping[SlotName, str]
+    slots: ResourceSlot
     """Stores the original user-requested resource slots."""
 
     allocations: MutableMapping[DeviceName, Mapping[SlotName, Mapping[DeviceId, Decimal]]]
@@ -116,7 +116,7 @@ class KernelResourceSpec:
 
     def write_to_string(self) -> str:
         mounts_str = ",".join(map(str, self.mounts))
-        slots_str = dump_json_str({k: str(v) for k, v in self.slots.items()})
+        slots_str = dump_json_str(self.slots.to_json())
 
         resource_str = ""
         resource_str += f"SCRATCH_SIZE={BinarySize(self.scratch_disk_size):m}\n"

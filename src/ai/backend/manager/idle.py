@@ -68,6 +68,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionExecutionStatus,
     SessionTypes,
+    SlotName,
 )
 from ai.backend.common.utils import nmget
 from ai.backend.logging import BraceStyleAdapter
@@ -1103,6 +1104,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 excluded_resources.add(resource_key)
 
         # Get current utilization data from all containers of the session.
+        kernel_ids: list[KernelId]
         if kernel["cluster_size"] > 1:
             query = sa.select([kernels.c.id]).where(
                 (kernels.c.session_id == session_id) & (kernels.c.status.in_(LIVE_STATUS)),
@@ -1208,7 +1210,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
     async def get_current_utilization(
         self,
         kernel_ids: Sequence[KernelId],
-        occupied_slots: Mapping[str, Any],
+        occupied_slots: ResourceSlot,
     ) -> Mapping[str, float] | None:
         """
         Return the current utilization key-value pairs of multiple kernels, possibly the
@@ -1239,10 +1241,12 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 # mem.capacity does not report total amount of memory allocated to
                 # the container, and mem.pct always report >90% even when nothing is
                 # executing. So, we just replace it with the value of occupied slot.
-                mem_slots = float(occupied_slots.get("mem", 0))
-                mem_current = float(nmget(live_stat, "mem.current", 0.0))
+                mem_slots = Decimal(occupied_slots.get(SlotName("mem"), 0))
+                mem_current = Decimal(nmget(live_stat, "mem.current", 0.0))
                 utilizations["mem"] = (
-                    utilizations["mem"] + mem_current / mem_slots * 100 if mem_slots > 0 else 0
+                    utilizations["mem"] + float(mem_current / mem_slots * 100)
+                    if mem_slots > 0
+                    else 0.0
                 )
 
                 kernel_counter += 1

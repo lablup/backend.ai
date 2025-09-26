@@ -14,6 +14,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
+    SlotName,
 )
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
 from ai.backend.manager.sokovan.scheduler.scheduler import (
@@ -48,7 +49,8 @@ def create_session_workload(
     session_id = session_id or SessionId(uuid.uuid4())
     access_key = kwargs.get("access_key", AccessKey("test-key"))
     requested_slots = kwargs.get(
-        "requested_slots", ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")})
+        "requested_slots",
+        ResourceSlot({SlotName("cpu"): Decimal("1"), SlotName("mem"): Decimal("1024")}),
     )
     user_uuid = kwargs.get("user_uuid", uuid.uuid4())
     group_id = kwargs.get("group_id", uuid.uuid4())
@@ -91,7 +93,7 @@ def create_kernel_workload(
         kernel_id=kernel_id or uuid.uuid4(),
         image="test-image",
         architecture=architecture,
-        requested_slots=ResourceSlot({"cpu": cpu, "mem": mem}),
+        requested_slots=ResourceSlot({SlotName("cpu"): cpu, SlotName("mem"): mem}),
     )
 
 
@@ -108,8 +110,11 @@ def create_agent_info(
         agent_id=AgentId(agent_id),
         agent_addr=f"{agent_id}:6001",
         architecture="x86_64",
-        available_slots=ResourceSlot({"cpu": available_cpu, "mem": available_mem}),
-        occupied_slots=ResourceSlot({"cpu": occupied_cpu, "mem": occupied_mem}),
+        available_slots=ResourceSlot({
+            SlotName("cpu"): available_cpu,
+            SlotName("mem"): available_mem,
+        }),
+        occupied_slots=ResourceSlot({SlotName("cpu"): occupied_cpu, SlotName("mem"): occupied_mem}),
         scaling_group="default",
         container_count=container_count,
     )
@@ -180,8 +185,8 @@ class TestSchedulerAllocation:
             max_available = Decimal("-1")
             for agent in agents:
                 available_slots = agent.available_slots - agent.occupied_slots
-                available_cpu = available_slots.get("cpu", Decimal("0"))
-                requested_cpu = resource_req.requested_slots.get("cpu", Decimal("0"))
+                available_cpu = Decimal(available_slots.get(SlotName("cpu"), 0))
+                requested_cpu = Decimal(resource_req.requested_slots.get(SlotName("cpu"), 0))
                 if available_cpu >= requested_cpu and available_cpu > max_available:
                     best_agent = agent
                     max_available = available_cpu
@@ -302,14 +307,14 @@ class TestSchedulerAllocation:
         assert len(result.agent_allocations[0].allocated_slots) == 1
         # Total requested: 3 CPU, 3072 memory
         assert result.agent_allocations[0].allocated_slots[0] == ResourceSlot({
-            "cpu": Decimal("3"),
-            "mem": Decimal("3072"),
+            SlotName("cpu"): Decimal("3"),
+            SlotName("mem"): Decimal("3072"),
         })
 
         # Verify agent state was updated
         assert agents[0].occupied_slots == ResourceSlot({
-            "cpu": Decimal("5"),
-            "mem": Decimal("3072"),
+            SlotName("cpu"): Decimal("5"),
+            SlotName("mem"): Decimal("3072"),
         })  # 2 + 3
         assert agents[0].container_count == 5  # 2 + 3
 
@@ -323,8 +328,8 @@ class TestSchedulerAllocation:
             assert len(mock_selector.call_history) == 1
             call = mock_selector.call_history[0]
             assert call["requested_slots"] == ResourceSlot({
-                "cpu": Decimal("3"),
-                "mem": Decimal("3072"),
+                SlotName("cpu"): Decimal("3"),
+                SlotName("mem"): Decimal("3072"),
             })
 
     async def test_allocate_multi_node_session_success(self, scheduler: Scheduler) -> None:
@@ -378,13 +383,13 @@ class TestSchedulerAllocation:
 
         # Verify final agent states
         assert agents[0].occupied_slots == ResourceSlot({
-            "cpu": Decimal("3"),
-            "mem": Decimal("3072"),
+            SlotName("cpu"): Decimal("3"),
+            SlotName("mem"): Decimal("3072"),
         })  # 2 + 1
         assert agents[0].container_count == 2  # 0 + 2 kernels
         assert agents[1].occupied_slots == ResourceSlot({
-            "cpu": Decimal("3"),
-            "mem": Decimal("2048"),
+            SlotName("cpu"): Decimal("3"),
+            SlotName("mem"): Decimal("2048"),
         })  # 1 + 2
         assert agents[1].container_count == 1  # 0 + 1 kernel
 
@@ -597,8 +602,8 @@ class TestSchedulerAllocation:
 
         # Verify agent state accumulation
         assert agents[0].occupied_slots == ResourceSlot({
-            "cpu": Decimal("3"),
-            "mem": Decimal("3072"),
+            SlotName("cpu"): Decimal("3"),
+            SlotName("mem"): Decimal("3072"),
         })
         assert agents[0].container_count == 3
 
@@ -636,11 +641,11 @@ class TestSchedulerAllocation:
         assert result1 is not None
 
         # Verify session 1 agents were modified
-        assert agents_session1[0].occupied_slots["cpu"] == Decimal("2")
+        assert agents_session1[0].occupied_slots[SlotName("cpu")] == Decimal("2")
         assert agents_session1[0].container_count == 1
 
         # Verify session 2 agents remain unchanged
-        assert agents_session2[0].occupied_slots["cpu"] == Decimal("0")
+        assert agents_session2[0].occupied_slots[SlotName("cpu")] == Decimal("0")
         assert agents_session2[0].container_count == 0
 
     async def test_empty_kernel_allocations_returns_proper_result(

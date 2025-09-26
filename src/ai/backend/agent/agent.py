@@ -947,12 +947,11 @@ class AbstractAgent(
         self.timer_tasks.append(aiotools.create_timer(self.update_slots_periodically, 30.0))
 
         # Use ValkeyStatClient batch operations for better performance
-        field_value_map = {}
+        encoded_metadata_map: dict[str, bytes] = {}
         for metadata in metadatas:
-            field_value_map[metadata["slot_name"]] = dump_json_str(metadata).encode()
-
-        if field_value_map:
-            await self.valkey_stat_client.store_computer_metadata(field_value_map)
+            encoded_metadata_map[str(metadata["slot_name"])] = dump_json_str(metadata).encode()
+        if encoded_metadata_map:
+            await self.valkey_stat_client.store_computer_metadata(encoded_metadata_map)
 
         self.affinity_map = AffinityMap.build(all_devices)
 

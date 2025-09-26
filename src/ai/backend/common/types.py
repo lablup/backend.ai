@@ -10,7 +10,7 @@ import numbers
 import textwrap
 import uuid
 from abc import ABC, ABCMeta, abstractmethod
-from collections import UserDict, defaultdict, namedtuple
+from collections import UserDict, UserString, defaultdict, namedtuple
 from collections.abc import AsyncIterator, Iterable
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -313,7 +313,49 @@ AGENTID_MANAGER = AgentId("manager")
 AGENTID_STORAGE = AgentId("storage")
 DeviceName = NewType("DeviceName", str)
 DeviceId = NewType("DeviceId", str)
-SlotName = NewType("SlotName", str)
+
+
+class SlotName(UserString):
+    __slots__ = ("_parsed", "_device_name", "_major_type", "_minor_type")
+
+    def __init__(self, value: str | SlotName) -> None:
+        super().__init__(value)
+        self._parsed = False
+
+    def _parse(self) -> None:
+        # Do lazy-parsing for when required only because SlotName is used
+        # very frequently in certain code paths to represent subtypes,
+        # without actually needing to access parsed attributes.
+        if self._parsed:
+            return
+        name, _, type_ = self.data.partition(".")
+        major_type, _, minor_type = type_.partition(":")
+        self._device_name = name
+        self._major_type = major_type
+        self._minor_type = minor_type
+        self._parsed = True
+
+    @property
+    def device_name(self) -> str:
+        self._parse()
+        return self._device_name
+
+    @property
+    def major_type(self) -> str:
+        self._parse()
+        return self._major_type
+
+    @property
+    def minor_type(self) -> str:
+        self._parse()
+        return self._minor_type
+
+    def is_accelerator(self) -> bool:
+        if self.major_type in ("device", "devices", "share", "shares"):
+            return True
+        return False
+
+
 MetricKey = NewType("MetricKey", str)
 
 AccessKey = NewType("AccessKey", str)
@@ -806,16 +848,18 @@ def _validate_binary_size(v: Any) -> BinarySize:
 BinarySizeField = Annotated[BinarySize, PlainValidator(_validate_binary_size)]
 
 
-class ResourceSlot(UserDict):
+class ResourceSlot(UserDict[SlotName, str | Decimal]):
     """
-    key: `str` type slot name.
-    value: `str` or `Decimal` type value. Do not convert this to `float` or `int`.
+    key: `SlotName`
+    value: `str` or `Decimal` value. Do not convert this to `float` or `int`.
     """
 
     __slots__ = ("data",)
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(self, data: Mapping[SlotName, str | Decimal] | None = None) -> None:
+        if data is None:
+            data = {}
+        super().__init__({k: v for k, v in data.items()})
 
     @classmethod
     def from_known_slots(cls, known_slots: Mapping[SlotName, SlotTypes]) -> ResourceSlot:
@@ -833,24 +877,27 @@ class ResourceSlot(UserDict):
         assert isinstance(other, ResourceSlot), "Only can add ResourceSlot to ResourceSlot."
         self.sync_keys(other)
         return type(self)({
-            k: self.get(k, 0) + other.get(k, 0) for k in (self.keys() | other.keys())
+            k: Decimal(self.get(k, 0)) + Decimal(other.get(k, 0))
+            for k in (self.keys() | other.keys())
         })
 
     def __sub__(self, other: ResourceSlot) -> ResourceSlot:
         assert isinstance(other, ResourceSlot), "Only can subtract ResourceSlot from ResourceSlot."
         self.sync_keys(other)
-        return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
+        return type(self)({
+            k: Decimal(self.data[k]) - Decimal(other.get(k, 0)) for k in self.keys()
+        })
 
     def __neg__(self):
-        return type(self)({k: -v for k, v in self.data.items()})
+        return type(self)({k: -Decimal(v) for k, v in self.data.items()})
 
     def __eq__(self, other: object) -> bool:
         if other is self:
             return True
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
-        self_values = [self.data[k] for k in sorted(self.data.keys())]
-        other_values = [other.data[k] for k in sorted(other.data.keys())]
+        self_values = [Decimal(self.data[k]) for k in sorted(self.data.keys())]
+        other_values = [Decimal(other.data[k]) for k in sorted(self.data.keys())]
         return self_values == other_values
 
     def __ne__(self, other: object) -> bool:
@@ -862,30 +909,30 @@ class ResourceSlot(UserDict):
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         common_keys = sorted(other.keys() & self.keys())
         only_other_keys = other.keys() - self.keys()
-        self_values = [self.data[k] for k in common_keys]
-        other_values = [other.data[k] for k in common_keys]
+        self_values = [Decimal(self.data[k]) for k in common_keys]
+        other_values = [Decimal(other.data[k]) for k in common_keys]
         return self_values == other_values and all(other[k] == 0 for k in only_other_keys)
 
     def eq_contained(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         common_keys = sorted(other.keys() & self.keys())
         only_self_keys = self.keys() - other.keys()
-        self_values = [self.data[k] for k in common_keys]
-        other_values = [other.data[k] for k in common_keys]
+        self_values = [Decimal(self.data[k]) for k in common_keys]
+        other_values = [Decimal(other.data[k]) for k in common_keys]
         return self_values == other_values and all(self[k] == 0 for k in only_self_keys)
 
     def __le__(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
-        self_values = [self.data[k] for k in self.keys()]
-        other_values = [other.data[k] for k in self.keys()]
+        self_values = [Decimal(self.data[k]) for k in self.keys()]
+        other_values = [Decimal(other.data[k]) for k in self.keys()]
         return not any(s > o for s, o in zip(self_values, other_values))
 
     def __lt__(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
-        self_values = [self.data[k] for k in self.keys()]
-        other_values = [other.data[k] for k in self.keys()]
+        self_values = [Decimal(self.data[k]) for k in self.keys()]
+        other_values = [Decimal(other.data[k]) for k in self.keys()]
         return not any(s > o for s, o in zip(self_values, other_values)) and not (
             self_values == other_values
         )
@@ -893,16 +940,16 @@ class ResourceSlot(UserDict):
     def __ge__(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
-        self_values = [self.data[k] for k in other.keys()]
-        other_values = [other.data[k] for k in other.keys()]
+        self_values = [Decimal(self.data[k]) for k in self.keys()]
+        other_values = [Decimal(other.data[k]) for k in self.keys()]
         return not any(s < o for s, o in zip(self_values, other_values))
 
     def __gt__(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
-        self_values = [self.data[k] for k in other.keys()]
-        other_values = [other.data[k] for k in other.keys()]
-        return not any(s < o for s, o in zip(self_values, other_values)) and not (
+        self_values = [Decimal(self.data[k]) for k in self.keys()]
+        other_values = [Decimal(other.data[k]) for k in self.keys()]
+        return not any(s > o for s, o in zip(self_values, other_values)) and not (
             self_values == other_values
         )
 
@@ -917,7 +964,7 @@ class ResourceSlot(UserDict):
         return type(self)(data)
 
     @classmethod
-    def _normalize_value(cls, key: str, value: Any, unit: SlotTypes) -> Decimal:
+    def _normalize_value(cls, key: str | SlotName, value: Any, unit: SlotTypes) -> Decimal:
         try:
             if unit == SlotTypes.BYTES:
                 if isinstance(value, Decimal):
@@ -948,13 +995,17 @@ class ResourceSlot(UserDict):
         return result
 
     @classmethod
-    def _guess_slot_type(cls, key: str) -> SlotTypes:
+    def _guess_slot_type(cls, key: str | SlotName) -> SlotTypes:
         if "mem" in key:
             return SlotTypes.BYTES
         return SlotTypes.COUNT
 
     @classmethod
-    def from_policy(cls, policy: Mapping[str, Any], slot_types: Mapping) -> "ResourceSlot":
+    def from_policy(
+        cls,
+        policy: Mapping[str, Any],
+        slot_types: Mapping[SlotName, SlotTypes],
+    ) -> Self:
         try:
             data = {
                 k: cls._normalize_value(k, v, slot_types[k])
@@ -977,8 +1028,8 @@ class ResourceSlot(UserDict):
         cls,
         obj: Mapping[str, Any],
         slot_types: Optional[Mapping[SlotName, SlotTypes]],
-    ) -> "ResourceSlot":
-        pruned_obj = {k: v for k, v in obj.items() if v != 0}
+    ) -> Self:
+        pruned_obj = {SlotName(k): v for k, v in obj.items() if v != 0}
 
         try:
             if slot_types is None:
@@ -1007,7 +1058,7 @@ class ResourceSlot(UserDict):
     def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
         try:
             return {
-                k: type(self)._humanize_value(v, slot_types[k])
+                str(k): type(self)._humanize_value(Decimal(v), slot_types[k])
                 for k, v in self.data.items()
                 if v is not None
             }
@@ -1020,7 +1071,9 @@ class ResourceSlot(UserDict):
         return cls(data)
 
     def to_json(self) -> Mapping[str, str]:
-        return {k: _stringify_number(Decimal(v)) for k, v in self.data.items() if v is not None}
+        return {
+            str(k): _stringify_number(Decimal(v)) for k, v in self.data.items() if v is not None
+        }
 
     def has_intrinsic_slots(self) -> bool:
         return all(k in self.data.keys() for k in [name.value for name in IntrinsicSlotNames])

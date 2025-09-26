@@ -8,10 +8,18 @@ the row-based implementation details of the legacy selectors.
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass, field
+from decimal import Decimal
 from typing import Mapping, Optional, Sequence
 from uuid import UUID
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+    SlotName,
+)
 
 from .exceptions import (
     ContainerLimitExceededError,
@@ -411,15 +419,15 @@ class AgentSelector:
         available_slots = agent.available_slots - occupied_slots
         if not (available_slots >= resource_req.requested_slots):
             # Build detailed message showing which resources are insufficient
-            insufficient = []
+            insufficient: list[SlotName] = []
             for k in resource_req.requested_slots.keys():
-                requested_val = resource_req.requested_slots.get(k, 0)
-                available_val = available_slots.get(k, 0)
+                requested_val = Decimal(resource_req.requested_slots.get(k, 0))
+                available_val = Decimal(available_slots.get(k, 0))
                 if requested_val > available_val:
                     insufficient.append(k)
 
             # Format values similar to group_resource_limit.py
-            insufficient_details = {}
+            insufficient_details: dict[str, tuple[str, str]] = {}
             for resource_name in insufficient:
                 requested = resource_req.requested_slots.get(resource_name, 0)
                 available = available_slots.get(resource_name, 0)
@@ -428,13 +436,13 @@ class AgentSelector:
                 if resource_name == "mem":
                     from ai.backend.common.types import BinarySize
 
-                    insufficient_details[resource_name] = (
+                    insufficient_details[str(resource_name)] = (
                         str(BinarySize(requested)),
                         str(BinarySize(available)),
                     )
                 else:
                     # Store raw values for other resources
-                    insufficient_details[resource_name] = (
+                    insufficient_details[str(resource_name)] = (
                         str(requested),
                         str(available),
                     )

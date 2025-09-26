@@ -13,6 +13,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionResult,
     SessionTypes,
+    SlotName,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import (
@@ -55,8 +56,14 @@ AGENT_ROW_FIXTURE = AgentRow(
     status_changed=datetime.now(timezone.utc),
     region="us-east-1",
     scaling_group="default",
-    available_slots=ResourceSlot(cpu=16, mem=32768),
-    occupied_slots=ResourceSlot(cpu=0, mem=0),
+    available_slots=ResourceSlot({
+        SlotName("cpu"): "16",
+        SlotName("mem"): "32768",
+    }),
+    occupied_slots=ResourceSlot({
+        SlotName("cpu"): "0",
+        SlotName("mem"): "0",
+    }),
     addr="tcp://127.0.0.1:6011",
     first_contact=datetime.now(timezone.utc),
     lost_at=None,
@@ -95,8 +102,14 @@ SESSION_ROW_FIXTURE = SessionRow(
     access_key="AKIAIOSFODNN7EXAMPLE",
     images=["cr.backend.ai/stable/python:latest"],
     tag=None,
-    occupying_slots=ResourceSlot(cpu=1, mem=1024),
-    requested_slots=ResourceSlot(cpu=1, mem=1024),
+    occupying_slots=ResourceSlot({
+        SlotName("cpu"): "1",
+        SlotName("mem"): "1024",
+    }),
+    requested_slots=ResourceSlot({
+        SlotName("cpu"): "1",
+        SlotName("mem"): "1024",
+    }),
     vfolder_mounts=[],
     environ={},
     bootstrap_script=None,
@@ -147,8 +160,14 @@ KERNEL_ROW_FIXTURE = KernelRow(
     registry="registry.example.com",
     tag=None,
     container_id=uuid4().hex[:12],
-    occupied_slots=ResourceSlot(cpu=1, mem=1024),
-    requested_slots=ResourceSlot(cpu=1, mem=1024),
+    occupied_slots=ResourceSlot({
+        SlotName("cpu"): "1",
+        SlotName("mem"): "1024",
+    }),
+    requested_slots=ResourceSlot({
+        SlotName("cpu"): "1",
+        SlotName("mem"): "1024",
+    }),
     occupied_shares={},
     environ=[],
     mounts=None,
@@ -528,8 +547,14 @@ SESSION_ROW_FIXTURE2 = SessionRow(
     access_key="AKIAIOSFODNN7EXAMPLE",
     images=["cr.backend.ai/stable/python:latest"],
     tag=None,
-    occupying_slots=ResourceSlot(cpu=1, mem=1024),
-    requested_slots=ResourceSlot(cpu=1, mem=1024),
+    occupying_slots=ResourceSlot({
+        SlotName("cpu"): "1",
+        SlotName("mem"): "1024",
+    }),
+    requested_slots=ResourceSlot({
+        SlotName("cpu"): "1",
+        SlotName("mem"): "1024",
+    }),
     vfolder_mounts=[],
     environ={},
     bootstrap_script=None,
@@ -579,8 +604,14 @@ KERNEL_ROW_FIXTURE2 = KernelRow(
     registry="registry.example.com",
     tag=None,
     container_id=uuid4().hex[:12],
-    occupied_slots=ResourceSlot(cpu=1, mem=1024),
-    requested_slots=ResourceSlot(cpu=1, mem=1024),
+    occupied_slots=ResourceSlot({
+        SlotName("cpu"): "1",
+        SlotName("mem"): "1024",
+    }),
+    requested_slots=ResourceSlot({
+        SlotName("cpu"): "1",
+        SlotName("mem"): "1024",
+    }),
     occupied_shares={},
     environ=[],
     mounts=None,

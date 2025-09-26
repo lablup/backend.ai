@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotName
 from ai.backend.manager.sokovan.scheduler.sequencers.drf import DRFSequencer
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
@@ -25,7 +25,10 @@ class TestDRFSequencer:
     @pytest.fixture
     def empty_system_snapshot(self) -> SystemSnapshot:
         return SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                SlotName("cpu"): Decimal("100"),
+                SlotName("mem"): Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={},
@@ -55,21 +58,33 @@ class TestDRFSequencer:
     @pytest.fixture
     def system_snapshot_with_allocations(self) -> SystemSnapshot:
         return SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                SlotName("cpu"): Decimal("100"),
+                SlotName("mem"): Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("20"), mem=Decimal("10")),
+                        occupied_slots=ResourceSlot({
+                            SlotName("cpu"): Decimal("20"),
+                            SlotName("mem"): Decimal("10"),
+                        }),
                         session_count=1,
                         sftp_session_count=0,
                     ),  # dominant share: 20%
                     AccessKey("user2"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("30")),
+                        occupied_slots=ResourceSlot({
+                            SlotName("cpu"): Decimal("10"),
+                            SlotName("mem"): Decimal("30"),
+                        }),
                         session_count=1,
                         sftp_session_count=0,
                     ),  # dominant share: 30%
                     AccessKey("user3"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("5"), mem=Decimal("5")),
+                        occupied_slots=ResourceSlot({
+                            SlotName("cpu"): Decimal("5"),
+                            SlotName("mem"): Decimal("5"),
+                        }),
                         session_count=1,
                         sftp_session_count=0,
                     ),  # dominant share: 5%
@@ -117,7 +132,10 @@ class TestDRFSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user1"),
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -127,7 +145,10 @@ class TestDRFSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user1"),
-                requested_slots=ResourceSlot(cpu=Decimal("20"), mem=Decimal("20")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("20"),
+                    SlotName("mem"): Decimal("20"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -153,7 +174,10 @@ class TestDRFSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user2"),  # 30% dominant share
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -163,7 +187,10 @@ class TestDRFSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user3"),  # 5% dominant share (lowest)
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -173,7 +200,10 @@ class TestDRFSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user1"),  # 20% dominant share
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -199,7 +229,10 @@ class TestDRFSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user1"),
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -209,7 +242,10 @@ class TestDRFSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user2"),
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -219,7 +255,10 @@ class TestDRFSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user3"),
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -246,7 +285,10 @@ class TestDRFSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user2"),  # 30% dominant share
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -256,7 +298,10 @@ class TestDRFSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("new_user"),  # 0% dominant share (new user)
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -278,13 +323,17 @@ class TestDRFSequencer:
     ) -> None:
         # Test edge case where some resource has zero capacity
         system_snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(
-                cpu=Decimal("100"), mem=Decimal("0")
-            ),  # Zero memory capacity
+            total_capacity=ResourceSlot({
+                SlotName("cpu"): Decimal("100"),
+                SlotName("mem"): Decimal("0"),
+            }),  # Zero memory capacity
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("50"), mem=Decimal("10")),
+                        occupied_slots=ResourceSlot({
+                            SlotName("cpu"): Decimal("50"),
+                            SlotName("mem"): Decimal("10"),
+                        }),
                         session_count=1,
                         sftp_session_count=0,
                     ),
@@ -317,7 +366,10 @@ class TestDRFSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user1"),
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",

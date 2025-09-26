@@ -3,7 +3,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotName
 from ai.backend.manager.sokovan.scheduler.sequencers.fifo import FIFOSequencer
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
@@ -25,7 +25,10 @@ class TestFIFOSequencer:
     @pytest.fixture
     def system_snapshot(self) -> SystemSnapshot:
         return SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                SlotName("cpu"): Decimal("100"),
+                SlotName("mem"): Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={},
@@ -71,7 +74,10 @@ class TestFIFOSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user1"),
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -81,7 +87,10 @@ class TestFIFOSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user2"),
-                requested_slots=ResourceSlot(cpu=Decimal("20"), mem=Decimal("20")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("20"),
+                    SlotName("mem"): Decimal("20"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -91,7 +100,10 @@ class TestFIFOSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user3"),
-                requested_slots=ResourceSlot(cpu=Decimal("30"), mem=Decimal("30")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("30"),
+                    SlotName("mem"): Decimal("30"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -112,16 +124,25 @@ class TestFIFOSequencer:
     async def test_ignores_system_snapshot(self, sequencer: FIFOSequencer) -> None:
         # FIFO should work the same regardless of system state
         snapshot_with_allocations = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                SlotName("cpu"): Decimal("100"),
+                SlotName("mem"): Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={
                     AccessKey("user1"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("50"), mem=Decimal("50")),
+                        occupied_slots=ResourceSlot({
+                            SlotName("cpu"): Decimal("50"),
+                            SlotName("mem"): Decimal("50"),
+                        }),
                         session_count=1,
                         sftp_session_count=0,
                     ),
                     AccessKey("user2"): KeypairOccupancy(
-                        occupied_slots=ResourceSlot(cpu=Decimal("30"), mem=Decimal("30")),
+                        occupied_slots=ResourceSlot({
+                            SlotName("cpu"): Decimal("30"),
+                            SlotName("mem"): Decimal("30"),
+                        }),
                         session_count=1,
                         sftp_session_count=0,
                     ),
@@ -154,7 +175,10 @@ class TestFIFOSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user2"),  # User with more allocation
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",
@@ -164,7 +188,10 @@ class TestFIFOSequencer:
             SessionWorkload(
                 session_id=SessionId(uuid.uuid4()),
                 access_key=AccessKey("user1"),  # User with less allocation
-                requested_slots=ResourceSlot(cpu=Decimal("10"), mem=Decimal("10")),
+                requested_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("10"),
+                    SlotName("mem"): Decimal("10"),
+                }),
                 user_uuid=uuid.uuid4(),
                 group_id=uuid.uuid4(),
                 domain_name="default",

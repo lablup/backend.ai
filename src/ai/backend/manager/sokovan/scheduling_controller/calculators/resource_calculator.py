@@ -153,7 +153,7 @@ class ResourceCalculator:
                         min_value = Decimal(0)
                     elif slot_unit == "bytes":
                         if not isinstance(min_value, Decimal):
-                            min_value = BinarySize.from_str(str(min_value))
+                            min_value = Decimal(BinarySize.from_str(str(min_value)))
                     else:
                         if not isinstance(min_value, Decimal):
                             min_value = Decimal(str(min_value))
@@ -166,7 +166,7 @@ class ResourceCalculator:
                         max_value = Decimal("Infinity")
                     elif slot_unit == "bytes":
                         if not isinstance(max_value, Decimal):
-                            max_value = BinarySize.from_str(str(max_value))
+                            max_value = Decimal(BinarySize.from_str(str(max_value)))
                     else:
                         if not isinstance(max_value, Decimal):
                             max_value = Decimal(str(max_value))
@@ -259,11 +259,11 @@ class ResourceCalculator:
         """Calculate slots from legacy client format."""
         cpu = creation_config.get("instanceCores")
         if cpu is None:
-            cpu = image_min_slots["cpu"]
+            cpu = image_min_slots[SlotName("cpu")]
 
         mem = creation_config.get("instanceMemory")
         if mem is None:
-            mem = image_min_slots["mem"]
+            mem = image_min_slots[SlotName("mem")]
         else:
             # In legacy clients, memory is normalized to GiB
             mem = str(mem) + "g"
@@ -299,13 +299,13 @@ class ResourceCalculator:
             raw_shmem = DEFAULT_SHARED_MEMORY_SIZE
 
         try:
-            shmem = BinarySize.from_str(raw_shmem)
+            shmem = Decimal(BinarySize.from_str(raw_shmem))
         except ValueError:
             log.warning(
                 f"Failed to convert raw `shmem({raw_shmem})` "
                 f"to a decimal value. Fallback to default({DEFAULT_SHARED_MEMORY_SIZE})."
             )
-            shmem = BinarySize.from_str(DEFAULT_SHARED_MEMORY_SIZE)
+            shmem = Decimal(BinarySize.from_str(DEFAULT_SHARED_MEMORY_SIZE))
 
         resource_opts["shmem"] = shmem
 
@@ -318,7 +318,7 @@ class ResourceCalculator:
         resource_opts["allow_fractional_resource_fragmentation"] = allow_fractional
 
         # Adjust image minimum slots for shared memory
-        image_min_slots["mem"] += shmem
+        image_min_slots[SlotName("mem")] = Decimal(image_min_slots[SlotName("mem")]) + shmem
 
         return resource_opts
 
@@ -341,7 +341,7 @@ class ResourceCalculator:
             )
 
         # Check if: shmem < memory
-        if shmem and shmem >= requested_slots["mem"]:
+        if shmem and shmem >= Decimal(requested_slots[SlotName("mem")]):
             raise InvalidAPIParameters(
-                f"Shared memory should be less than the main memory. (s:{shmem}, m:{BinarySize(requested_slots['mem'])})"
+                f"Shared memory should be less than the main memory. (s:{shmem}, m:{BinarySize(requested_slots[SlotName('mem')])})"
             )

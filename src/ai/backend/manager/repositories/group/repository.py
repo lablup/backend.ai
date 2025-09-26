@@ -2,6 +2,7 @@ import copy
 import logging
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional, Sequence, cast
 from uuid import UUID
 
@@ -10,6 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -239,11 +241,10 @@ class GroupRepository:
                         device_type.add(dev_info["model_name"])
                     smp += int(nmget(dev_info, "data.smp", 0))
                     gpu_mem_allocated += int(nmget(dev_info, "data.mem", 0))
-            gpu_allocated = 0
-            if "cuda.devices" in row.occupied_slots:
-                gpu_allocated = row.occupied_slots["cuda.devices"]
-            if "cuda.shares" in row.occupied_slots:
-                gpu_allocated = row.occupied_slots["cuda.shares"]
+            gpu_allocated = Decimal(0)
+            for key, value in row.occupied_slots.items():
+                if SlotName(key).is_accelerator():
+                    gpu_allocated += value
             c_info = {
                 "id": str(row["id"]),
                 "session_id": str(row["session_id"]),
@@ -270,7 +271,7 @@ class GroupRepository:
                 "device_type": list(device_type),
                 "smp": float(smp),
                 "gpu_mem_allocated": float(gpu_mem_allocated),
-                "gpu_allocated": float(gpu_allocated),  # devices or shares
+                "gpu_allocated": float(gpu_allocated),
                 "nfs": nfs,
                 "image_id": row["image"],  # TODO: image id
                 "image_name": row["image"],

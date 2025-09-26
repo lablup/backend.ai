@@ -22,6 +22,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
+    SlotName,
 )
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent import AgentRow
@@ -99,20 +100,20 @@ def create_example_agents() -> Sequence[AgentRow]:
             AgentId("i-001"),
             scaling_group=example_sgroup_name1,
             available_slots=ResourceSlot({
-                "cpu": Decimal(4),
-                "mem": Decimal(4096),
-                "cuda.shares": Decimal(4),
-                "rocm.devices": Decimal(2),
+                SlotName("cpu"): Decimal(4),
+                SlotName("mem"): Decimal(4096),
+                SlotName("cuda.shares"): Decimal(4),
+                SlotName("rocm.devices"): Decimal(2),
             }),
         ),
         create_mock_agent(
             AgentId("i-101"),
             scaling_group=example_sgroup_name2,
             available_slots=ResourceSlot({
-                "cpu": Decimal(3),
-                "mem": Decimal(2560),
-                "cuda.shares": Decimal(1),
-                "rocm.devices": Decimal(8),
+                SlotName("cpu"): Decimal(3),
+                SlotName("mem"): Decimal(2560),
+                SlotName("cuda.shares"): Decimal(1),
+                SlotName("rocm.devices"): Decimal(8),
             }),
         ),
     ]
@@ -124,18 +125,18 @@ def create_example_mixed_agents() -> Sequence[AgentRow]:
             AgentId("i-gpu"),
             scaling_group=example_sgroup_name1,
             available_slots=ResourceSlot({
-                "cpu": Decimal(4),
-                "mem": Decimal(4096),
-                "cuda.shares": Decimal(4),
+                SlotName("cpu"): Decimal(4),
+                SlotName("mem"): Decimal(4096),
+                SlotName("cuda.shares"): Decimal(4),
             }),
         ),
         create_mock_agent(
             AgentId("i-cpu"),
             scaling_group=example_sgroup_name2,
             available_slots=ResourceSlot({
-                "cpu": Decimal(3),
-                "mem": Decimal(2560),
-                "cuda.shares": Decimal(0),
+                SlotName("cpu"): Decimal(3),
+                SlotName("mem"): Decimal(2560),
+                SlotName("cuda.shares"): Decimal(0),
             }),
         ),
     ]
@@ -147,30 +148,39 @@ def create_example_pending_sessions() -> Sequence[SessionRow]:
             SessionId(uuid4()),
             access_key=AccessKey("user01"),
             requested_slots=ResourceSlot({
-                "cpu": Decimal(2),
-                "mem": Decimal(1024),
-                "cuda.shares": Decimal(0),
-                "rocm.devices": Decimal(1),
+                SlotName("cpu"): Decimal(2),
+                SlotName("mem"): Decimal(1024),
+                SlotName("cuda.shares"): Decimal(0),
+                SlotName("rocm.devices"): Decimal(1),
             }),
         ),
         create_mock_session(  # cuda
             SessionId(uuid4()),
             access_key=AccessKey("user02"),
             requested_slots=ResourceSlot({
-                "cpu": Decimal(1),
-                "mem": Decimal(2048),
-                "cuda.shares": Decimal("0.5"),
-                "rocm.devices": Decimal(0),
+                SlotName("cpu"): Decimal(1),
+                SlotName("mem"): Decimal(2048),
+                SlotName("cuda.shares"): Decimal("0.5"),
+                SlotName("rocm.devices"): Decimal(0),
             }),
         ),
         create_mock_session(  # cpu-only, single-node cluster
             SessionId(uuid4()),
             access_key=AccessKey("user03"),
-            requested_slots=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal(1024)}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1.0"),
+                SlotName("mem"): Decimal(1024),
+            }),
             kernel_opts=[
-                KernelOpt(ResourceSlot({"cpu": Decimal("0.4"), "mem": Decimal(512)})),
-                KernelOpt(ResourceSlot({"cpu": Decimal("0.3"), "mem": Decimal(256)})),
-                KernelOpt(ResourceSlot({"cpu": Decimal("0.3"), "mem": Decimal(256)})),
+                KernelOpt(
+                    ResourceSlot({SlotName("cpu"): Decimal("0.4"), SlotName("mem"): Decimal(512)})
+                ),
+                KernelOpt(
+                    ResourceSlot({SlotName("cpu"): Decimal("0.3"), SlotName("mem"): Decimal(256)})
+                ),
+                KernelOpt(
+                    ResourceSlot({SlotName("cpu"): Decimal("0.3"), SlotName("mem"): Decimal(256)})
+                ),
             ],
         ),
     ]
@@ -183,26 +193,26 @@ def create_example_existing_sessions() -> Sequence[SessionRow]:
             status=SessionStatus.RUNNING,
             access_key=AccessKey("user01"),
             requested_slots=ResourceSlot({
-                "cpu": Decimal(3),
-                "mem": Decimal(1024),
-                "cuda.shares": Decimal(0),
-                "rocm.devices": Decimal(1),
+                SlotName("cpu"): Decimal(3),
+                SlotName("mem"): Decimal(1024),
+                SlotName("cuda.shares"): Decimal(0),
+                SlotName("rocm.devices"): Decimal(1),
             }),
             kernel_opts=[
                 KernelOpt(
                     ResourceSlot({
-                        "cpu": Decimal(1),
-                        "mem": Decimal(512),
-                        "cuda.shares": Decimal(0),
-                        "rocm.devices": Decimal(0),
+                        SlotName("cpu"): Decimal(1),
+                        SlotName("mem"): Decimal(512),
+                        SlotName("cuda.shares"): Decimal(0),
+                        SlotName("rocm.devices"): Decimal(0),
                     })
                 ),
                 KernelOpt(
                     ResourceSlot({
-                        "cpu": Decimal(2),
-                        "mem": Decimal(512),
-                        "cuda.shares": Decimal(0),
-                        "rocm.devices": Decimal(1),
+                        SlotName("cpu"): Decimal(2),
+                        SlotName("mem"): Decimal(512),
+                        SlotName("cuda.shares"): Decimal(0),
+                        SlotName("rocm.devices"): Decimal(1),
                     })
                 ),
             ],
@@ -212,10 +222,10 @@ def create_example_existing_sessions() -> Sequence[SessionRow]:
             status=SessionStatus.RUNNING,
             access_key=AccessKey("user02"),
             requested_slots=ResourceSlot({
-                "cpu": Decimal(1),
-                "mem": Decimal(2048),
-                "cuda.shares": Decimal("0.5"),
-                "rocm.devices": Decimal(0),
+                SlotName("cpu"): Decimal(1),
+                SlotName("mem"): Decimal(2048),
+                SlotName("cuda.shares"): Decimal("0.5"),
+                SlotName("rocm.devices"): Decimal(0),
             }),
         ),
         create_mock_session(
@@ -223,10 +233,10 @@ def create_example_existing_sessions() -> Sequence[SessionRow]:
             status=SessionStatus.RUNNING,
             access_key=AccessKey("user03"),
             requested_slots=ResourceSlot({
-                "cpu": Decimal(4),
-                "mem": Decimal(4096),
-                "cuda.shares": Decimal(0),
-                "rocm.devices": Decimal(0),
+                SlotName("cpu"): Decimal(4),
+                SlotName("mem"): Decimal(4096),
+                SlotName("cuda.shares"): Decimal(0),
+                SlotName("rocm.devices"): Decimal(0),
             }),
         ),
     ]
@@ -246,7 +256,7 @@ async def test_fifo_scheduler() -> None:
         state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
     picked_session_id = scheduler.pick_session(
-        sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
+        sum((ag.available_slots for ag in example_agents), start=ResourceSlot({})),
         example_pending_sessions,
         example_existing_sessions,
     )
@@ -276,7 +286,7 @@ async def test_lifo_scheduler() -> None:
         state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
     picked_session_id = scheduler.pick_session(
-        sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
+        sum((ag.available_slots for ag in example_agents), start=ResourceSlot({})),
         example_pending_sessions,
         example_existing_sessions,
     )
@@ -304,7 +314,9 @@ async def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators() -> N
         agent_selection_resource_priority,
         state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
-    total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
+    total_capacity = sum(
+        (ag.available_slots for ag in example_mixed_agents), start=ResourceSlot({})
+    )
     for idx in range(3):
         picked_session_id = scheduler.pick_session(
             total_capacity,
@@ -331,7 +343,7 @@ async def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators() -> N
             assert agent_id == AgentId("i-cpu")
 
 
-_holb_capacity = ResourceSlot({"cpu": Decimal(4), "mem": Decimal(4096)})
+_holb_capacity = ResourceSlot({SlotName("cpu"): Decimal(4), SlotName("mem"): Decimal(4096)})
 _holb_session_ids = {
     "s0": SessionId(uuid4()),
     "s1": SessionId(uuid4()),
@@ -348,7 +360,7 @@ def create_pending_session_holb(
         status=SessionStatus.PENDING,
         status_data=status_data,
         access_key=AccessKey("ak1"),
-        requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1024)}),
+        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1024)}),
     )
 
 
@@ -458,7 +470,9 @@ async def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators() -> N
         agent_selection_resource_priority,
         state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
-    total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
+    total_capacity = sum(
+        (ag.available_slots for ag in example_mixed_agents), start=ResourceSlot({})
+    )
     for idx in range(3):
         picked_session_id = scheduler.pick_session(total_capacity, example_pending_sessions, [])
         assert picked_session_id == example_pending_sessions[-1].id
@@ -493,7 +507,7 @@ async def test_drf_scheduler() -> None:
         state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
     picked_session_id = scheduler.pick_session(
-        sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
+        sum((ag.available_slots for ag in example_agents), start=ResourceSlot({})),
         example_pending_sessions,
         example_existing_sessions,
     )

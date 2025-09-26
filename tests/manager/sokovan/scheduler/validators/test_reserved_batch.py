@@ -1,6 +1,8 @@
+from decimal import Decimal
+
 import pytest
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotName
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -19,7 +21,10 @@ from ai.backend.manager.sokovan.scheduler.validators.reserved_batch import (
 def create_empty_snapshot() -> SystemSnapshot:
     """Create an empty system snapshot for testing."""
     return SystemSnapshot(
-        total_capacity=ResourceSlot({"cpu": 100, "memory": 1024}),
+        total_capacity=ResourceSlot({
+            SlotName("cpu"): Decimal(100),
+            SlotName("memory"): Decimal(1024),
+        }),
         resource_occupancy=ResourceOccupancySnapshot(
             by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
         ),

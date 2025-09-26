@@ -6,7 +6,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common import msgpack
-from ai.backend.common.types import KernelId, SessionId, SessionTypes
+from ai.backend.common.types import KernelId, ResourceSlot, SessionId, SessionTypes, SlotName
 from ai.backend.manager.api.context import RootContext
 from ai.backend.manager.idle import (
     BaseIdleChecker,
@@ -613,9 +613,9 @@ async def utilization_idle_checker__utilization(
         "cuda_mem": 0.0,
         "cuda_util": 0.0,
     }
-    occupied_slots = {
-        "mem": 10.0,
-    }
+    occupied_slots = ResourceSlot({
+        SlotName("mem"): Decimal("10.0"),
+    })
     live_stat = {
         "mem": {
             "current": "5.0",
@@ -699,9 +699,9 @@ async def utilization_idle_checker(
 
     mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
 
-    occupied_slots: Mapping[str, Decimal] = {
-        "mem": Decimal(10.0),
-    }
+    occupied_slots = ResourceSlot({
+        SlotName("mem"): Decimal("10.0"),
+    })
     live_stat = {
         "mem": {
             "current": "5.0",
@@ -781,9 +781,9 @@ async def utilization_idle_checker(
 
     mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
 
-    occupied_slots = {
-        "mem": Decimal(10.0),
-    }
+    occupied_slots = ResourceSlot({
+        SlotName("mem"): Decimal("10.0"),
+    })
     live_stat = {
         "mem": {
             "current": "5.0",
@@ -861,9 +861,9 @@ async def utilization_idle_checker(
 
     mocker.patch("ai.backend.manager.idle.get_db_now", return_value=now)
 
-    occupied_slots = {
-        "mem": Decimal(10.0),
-    }
+    occupied_slots = ResourceSlot({
+        SlotName("mem"): Decimal("10.0"),
+    })
     live_stat = {
         "mem": {
             "current": "5.0",

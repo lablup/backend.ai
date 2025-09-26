@@ -23,6 +23,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionResult,
     SessionTypes,
+    SlotName,
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -74,7 +75,10 @@ async def minimal_setup(
         # Create domain
         domain = DomainRow(
             name="test-domain",
-            total_resource_slots=ResourceSlot({"cpu": Decimal("1000"), "mem": Decimal("1048576")}),
+            total_resource_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1000"),
+                SlotName("mem"): Decimal("1048576"),
+            }),
         )
         db_sess.add(domain)
         data["domain"] = domain
@@ -99,7 +103,10 @@ async def minimal_setup(
 
         kp_policy = KeyPairResourcePolicyRow(
             name="test-policy",
-            total_resource_slots=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("102400")}),
+            total_resource_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("100"),
+                SlotName("mem"): Decimal("102400"),
+            }),
             max_concurrent_sessions=10,
             max_concurrent_sftp_sessions=2,
             max_pending_session_count=5,
@@ -117,7 +124,10 @@ async def minimal_setup(
             id=uuid.uuid4(),
             name="test-group",
             domain_name=domain.name,
-            total_resource_slots=ResourceSlot({"cpu": Decimal("500"), "mem": Decimal("524288")}),
+            total_resource_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("500"),
+                SlotName("mem"): Decimal("524288"),
+            }),
             resource_policy="test-policy",
         )
         db_sess.add(group)
@@ -172,7 +182,10 @@ async def minimal_setup(
             scaling_group_name=sg.name,
             status=SessionStatus.PENDING,
             cluster_mode=ClusterMode.SINGLE_NODE,
-            requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("2"),
+                SlotName("mem"): Decimal("4096"),
+            }),
             created_at=datetime.now(tzutc()),
             images=["python:3.8"],
             vfolder_mounts=[],
@@ -198,8 +211,14 @@ async def minimal_setup(
             registry="docker.io",
             status=KernelStatus.PENDING,
             status_changed=datetime.now(tzutc()),
-            occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
-            requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
+            occupied_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("2"),
+                SlotName("mem"): Decimal("4096"),
+            }),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("2"),
+                SlotName("mem"): Decimal("4096"),
+            }),
             domain_name=domain.name,
             group_id=group.id,
             user_uuid=user.uuid,
@@ -248,7 +267,9 @@ def mock_config_provider() -> ManagerConfigProvider:
     """Create mock config provider"""
     mock_provider = MagicMock(spec=ManagerConfigProvider)
     mock_legacy_loader = MagicMock(spec=LegacyEtcdLoader)
-    mock_legacy_loader.get_resource_slots = AsyncMock(return_value={"cpu": "count", "mem": "bytes"})
+    mock_legacy_loader.get_resource_slots = AsyncMock(
+        return_value={"cpu": "count", SlotName("mem"): "bytes"}
+    )
     mock_legacy_loader.get_raw = AsyncMock(return_value="10")
     mock_provider.legacy_etcd_config_loader = mock_legacy_loader
     return mock_provider
