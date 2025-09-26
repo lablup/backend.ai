@@ -374,3 +374,7 @@ class ModelRevisionOrderField(enum.StrEnum):
 class ReplicaOrderField(enum.StrEnum):
     CREATED_AT = "CREATED_AT"
     ID = "ID"
+
+
+class AccessTokenOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"
