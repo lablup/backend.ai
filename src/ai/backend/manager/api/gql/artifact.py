@@ -183,7 +183,7 @@ class ImportArtifactsInput:
 
 
 @strawberry.input(description="Added in 25.15.0")
-class DelegateTarget:
+class DelegateeTarget:
     delegatee_reservoir_id: ID
     target_registry_id: ID
 
@@ -199,7 +199,7 @@ class DelegateScanArtifactsInput:
     delegator_reservoir_id: Optional[ID] = strawberry.field(
         default=None, description="ID of the reservoir registry to delegate the scan request to"
     )
-    delegatee_target: Optional[DelegateTarget] = strawberry.field(
+    delegatee_target: Optional[DelegateeTarget] = strawberry.field(
         default=None,
         description="Target delegatee reservoir registry and its remote registry to scan",
     )

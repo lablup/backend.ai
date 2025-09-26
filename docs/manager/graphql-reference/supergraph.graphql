@@ -1493,6 +1493,14 @@ type DealiasImage
   msg: String
 }
 
+"""Added in 25.15.0"""
+input DelegateeTarget
+  @join__type(graph: STRAWBERRY)
+{
+  delegateeReservoirId: ID!
+  targetRegistryId: ID!
+}
+
 """
 Added in 25.15.0.
 
@@ -1538,7 +1546,7 @@ input DelegateScanArtifactsInput
   delegatorReservoirId: ID = null
 
   """Target delegatee reservoir registry and its remote registry to scan"""
-  delegateeTarget: DelegateTarget = null
+  delegateeTarget: DelegateeTarget = null
 
   """Maximum number of artifacts to scan (max: 500)"""
   limit: Int!
@@ -1564,14 +1572,6 @@ type DelegateScanArtifactsPayload
   List of artifacts discovered during the delegated scan from the reservoir registry's remote registry
   """
   artifacts: [Artifact!]!
-}
-
-"""Added in 25.15.0"""
-input DelegateTarget
-  @join__type(graph: STRAWBERRY)
-{
-  delegateeReservoirId: ID!
-  targetRegistryId: ID!
 }
 
 """Added in 25.15.0"""
