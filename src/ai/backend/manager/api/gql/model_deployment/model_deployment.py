@@ -110,7 +110,6 @@ class DeploymentStrategy:
 
 @strawberry.type(description="Added in 25.15.0")
 class ReplicaState:
-    _deployment_id: strawberry.Private[UUID]
     _replica_ids: strawberry.Private[list[UUID]]
     desired_replica_count: int
 
@@ -127,9 +126,13 @@ class ReplicaState:
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ModelReplicaConnection:
+        final_filter = ReplicaFilter(ids_in=self._replica_ids)
+        if filter:
+            final_filter = ReplicaFilter(AND=[final_filter, filter])
+
         return await resolve_replicas(
             info=info,
-            filter=filter,
+            filter=final_filter,
             order_by=order_by,
             before=before,
             after=after,
