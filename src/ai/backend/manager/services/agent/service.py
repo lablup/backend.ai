@@ -18,7 +18,6 @@ from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
-    AgentStateSyncData,
     UpsertResult,
 )
 from ai.backend.manager.registry import AgentRegistry
@@ -181,25 +180,16 @@ class AgentService:
         return GetTotalResourcesActionResult(total_resources=total_resources)
 
     async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
-        now = datetime.now(tzutc())
         reported_agent_info = action.agent_info
-
-        reported_agent_state_sync_data = AgentStateSyncData(
-            now=now,
-            slot_key_and_units=reported_agent_info.slot_key_and_units,
-            current_addr=reported_agent_info.addr,
-            public_key=reported_agent_info.public_key,
-        )
 
         upsert_data = AgentHeartbeatUpsert.from_agent_info(
             agent_id=action.agent_id,
             agent_info=action.agent_info,
-            heartbeat_received=now,
+            heartbeat_received=datetime.now(tzutc()),
         )
         result: UpsertResult = await self._agent_repository.sync_agent_heartbeat(
             action.agent_id,
             upsert_data,
-            reported_agent_state_sync_data,
         )
         self._agent_cache.update(
             action.agent_id,
