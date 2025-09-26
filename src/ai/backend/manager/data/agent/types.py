@@ -11,7 +11,28 @@ from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName,
 from ai.backend.manager.models.agent import AgentStatus
 
 if TYPE_CHECKING:
-    from sqlalchemy.engine import Row
+    pass
+
+
+@dataclass
+class AgentData:
+    id: AgentId
+    status: AgentStatus
+    status_changed: Optional[datetime]
+    region: str
+    scaling_group: str
+    schedulable: bool
+    available_slots: ResourceSlot
+    occupied_slots: ResourceSlot
+    addr: str
+    public_host: Optional[str]
+    first_contact: datetime
+    lost_at: Optional[datetime]
+    version: str
+    architecture: str
+    compute_plugins: list[str]
+    public_key: Optional[PublicKey]
+    auto_terminate_abusing_kernel: bool
 
 
 @dataclass
@@ -127,25 +148,19 @@ class UpsertResult:
 
     @classmethod
     def from_state_comparison(
-        cls, existing_row: Optional["Row"], upsert_data: "AgentHeartbeatUpsert"
+        cls, existing_data: AgentData, upsert_data: "AgentHeartbeatUpsert"
     ) -> Self:
-        if existing_row is None:
-            return cls(
-                was_revived=False,
-                need_resource_slot_update=True,
-            )
-
-        was_revived = existing_row.status in (AgentStatus.LOST, AgentStatus.TERMINATED)
+        was_revived = existing_data.status in (AgentStatus.LOST, AgentStatus.TERMINATED)
         need_resource_slot_update = (
-            existing_row.available_slots != upsert_data.resource_info.available_slots
-            or existing_row.scaling_group != upsert_data.metadata.scaling_group
-            or existing_row.addr != upsert_data.network_info.addr
-            or existing_row.public_host != upsert_data.network_info.public_host
-            or existing_row.public_key != upsert_data.network_info.public_key
-            or existing_row.version != upsert_data.metadata.version
-            or existing_row.compute_plugins != upsert_data.resource_info.compute_plugins
-            or existing_row.architecture != upsert_data.metadata.architecture
-            or existing_row.auto_terminate_abusing_kernel
+            existing_data.available_slots != upsert_data.resource_info.available_slots
+            or existing_data.scaling_group != upsert_data.metadata.scaling_group
+            or existing_data.addr != upsert_data.network_info.addr
+            or existing_data.public_host != upsert_data.network_info.public_host
+            or existing_data.public_key != upsert_data.network_info.public_key
+            or existing_data.version != upsert_data.metadata.version
+            or existing_data.compute_plugins != upsert_data.resource_info.compute_plugins
+            or existing_data.architecture != upsert_data.metadata.architecture
+            or existing_data.auto_terminate_abusing_kernel
             != upsert_data.metadata.auto_terminate_abusing_kernel
         )
         return cls(

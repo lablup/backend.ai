@@ -610,6 +610,7 @@ class InvalidConfigError(BackendAIError, web.HTTPInternalServerError):
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
+
 class ScalingGroupNotFoundError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/scaling-group-not-found"
     error_title = "Scaling Group Not Found"
