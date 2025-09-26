@@ -66,7 +66,7 @@ class AgentHeartbeatUpsert:
     network_info: AgentNetworkInfo
     resource_info: AgentResourceInfo
     lost_at: Optional[datetime]
-    first_contact: datetime
+    heartbeat_received: datetime
 
     @property
     def insert_fields(self) -> dict[str, Any]:
@@ -85,7 +85,7 @@ class AgentHeartbeatUpsert:
             "auto_terminate_abusing_kernel": self.metadata.auto_terminate_abusing_kernel,
             "lost_at": None,
             "occupied_slots": {},
-            "first_contact": self.first_contact,
+            "first_contact": self.heartbeat_received,
         }
 
     @property
@@ -131,7 +131,7 @@ class AgentHeartbeatUpsert:
                 compute_plugins=agent_info.compute_plugins,
             ),
             lost_at=None,
-            first_contact=heartbeat_received,
+            heartbeat_received=heartbeat_received,
         )
 
 
