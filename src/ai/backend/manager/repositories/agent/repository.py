@@ -66,7 +66,9 @@ class AgentRepository:
         with suppress_with_log(
             [Exception], message=f"Failed to update last seen for agent: {agent_id}"
         ):
-            await self._cache_source.update_agent_last_seen(agent_id, upsert_data.first_contact)
+            await self._cache_source.update_agent_last_seen(
+                agent_id, upsert_data.heartbeat_received
+            )
 
         upsert_result = await self._db_source.upsert_agent_with_state(upsert_data)
         if upsert_result.need_resource_slot_update:
