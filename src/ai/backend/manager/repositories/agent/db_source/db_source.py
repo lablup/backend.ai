@@ -59,12 +59,7 @@ class AgentDBSource:
             )
             result = await conn.execute(query)
             row: Optional[AgentRow] = result.first()
-            if row is None:
-                return UpsertResult(
-                    was_revived=False,
-                    need_resource_slot_update=True,
-                )
-            agent_data = row.to_data()
+            agent_data = row.to_data() if row is not None else None
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
             stmt = pg_insert(agents).values(upsert_data.insert_fields)

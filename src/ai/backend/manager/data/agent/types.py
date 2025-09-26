@@ -142,8 +142,14 @@ class UpsertResult:
 
     @classmethod
     def from_state_comparison(
-        cls, existing_data: AgentData, upsert_data: "AgentHeartbeatUpsert"
+        cls, existing_data: Optional[AgentData], upsert_data: "AgentHeartbeatUpsert"
     ) -> Self:
+        if existing_data is None:
+            return cls(
+                was_revived=False,
+                need_resource_slot_update=True,
+            )
+
         was_revived = existing_data.status in (AgentStatus.LOST, AgentStatus.TERMINATED)
         need_resource_slot_update = (
             existing_data.available_slots != upsert_data.resource_info.available_slots
