@@ -1,20 +1,34 @@
 import logging
+from datetime import datetime
 
 import aiohttp
 import yarl
 from async_timeout import timeout as _timeout
+from dateutil.tz import tzutc
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.agent.anycast import AgentStartedEvent
+from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.agent.types import (
+    AgentHeartbeatUpsert,
+    UpsertResult,
+)
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
     GetWatcherStatusActionResult,
+)
+from ai.backend.manager.services.agent.actions.handle_heartbeat import (
+    HandleHeartbeatAction,
+    HandleHeartbeatActionResult,
 )
 from ai.backend.manager.services.agent.actions.recalculate_usage import (
     RecalculateUsageAction,
@@ -45,6 +59,9 @@ class AgentService:
     _config_provider: ManagerConfigProvider
     _agent_registry: AgentRegistry
     _agent_repository: AgentRepository
+    _hook_plugin_ctx: HookPluginContext
+    _event_producer: EventProducer
+    _agent_cache: AgentRPCCache
 
     def __init__(
         self,
@@ -52,11 +69,17 @@ class AgentService:
         agent_registry: AgentRegistry,
         config_provider: ManagerConfigProvider,
         agent_repository: AgentRepository,
+        hook_plugin_ctx: HookPluginContext,
+        event_producer: EventProducer,
+        agent_cache: AgentRPCCache,
     ) -> None:
         self._etcd = etcd
         self._agent_registry = agent_registry
         self._config_provider = config_provider
         self._agent_repository = agent_repository
+        self._hook_plugin_ctx = hook_plugin_ctx
+        self._event_producer = event_producer
+        self._agent_cache = agent_cache
 
     async def _get_watcher_info(self, agent_id: AgentId) -> dict:
         """
@@ -141,3 +164,38 @@ class AgentService:
     ) -> RecalculateUsageActionResult:
         await self._agent_registry.recalc_resource_usage()
         return RecalculateUsageActionResult()
+
+    async def handle_heartbeat(self, action: HandleHeartbeatAction) -> HandleHeartbeatActionResult:
+        reported_agent_info = action.agent_info
+
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=action.agent_id,
+            agent_info=action.agent_info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+        result: UpsertResult = await self._agent_repository.sync_agent_heartbeat(
+            action.agent_id,
+            upsert_data,
+        )
+        self._agent_cache.update(
+            action.agent_id,
+            reported_agent_info.addr,
+            reported_agent_info.public_key,
+        )
+        if result.was_revived:
+            await self._event_producer.anycast_event(
+                AgentStartedEvent("revived"), source_override=action.agent_id
+            )
+        await self._agent_repository.add_agent_to_images(
+            agent_id=action.agent_id, images=action.agent_info.images
+        )
+
+        await self._hook_plugin_ctx.notify(
+            "POST_AGENT_HEARTBEAT",
+            (
+                action.agent_id,
+                reported_agent_info.scaling_group,
+                reported_agent_info.available_resource_slots,
+            ),
+        )
+        return HandleHeartbeatActionResult(agent_id=action.agent_id)

@@ -7,6 +7,10 @@ from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
     GetWatcherStatusActionResult,
 )
+from ai.backend.manager.services.agent.actions.handle_heartbeat import (
+    HandleHeartbeatAction,
+    HandleHeartbeatActionResult,
+)
 from ai.backend.manager.services.agent.actions.recalculate_usage import (
     RecalculateUsageAction,
     RecalculateUsageActionResult,
@@ -39,6 +43,7 @@ class AgentProcessors(AbstractProcessorPackage):
     ]
     watcher_agent_stop: ActionProcessor[WatcherAgentStopAction, WatcherAgentStopActionResult]
     recalculate_usage: ActionProcessor[RecalculateUsageAction, RecalculateUsageActionResult]
+    handle_heartbeat: ActionProcessor[HandleHeartbeatAction, HandleHeartbeatActionResult]
 
     def __init__(self, service: AgentService, action_monitors: list[ActionMonitor]) -> None:
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
@@ -47,6 +52,7 @@ class AgentProcessors(AbstractProcessorPackage):
         self.watcher_agent_restart = ActionProcessor(service.watcher_agent_restart, action_monitors)
         self.watcher_agent_stop = ActionProcessor(service.watcher_agent_stop, action_monitors)
         self.recalculate_usage = ActionProcessor(service.recalculate_usage, action_monitors)
+        self.handle_heartbeat = ActionProcessor(service.handle_heartbeat, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -57,4 +63,5 @@ class AgentProcessors(AbstractProcessorPackage):
             WatcherAgentRestartAction.spec(),
             WatcherAgentStopAction.spec(),
             RecalculateUsageAction.spec(),
+            HandleHeartbeatAction.spec(),
         ]
