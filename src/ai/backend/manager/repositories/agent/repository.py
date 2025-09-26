@@ -6,6 +6,7 @@ from sqlalchemy.orm import contains_eager
 
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import AgentId
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.decorators.repository_decorator import (
@@ -23,9 +24,11 @@ repository_decorator = create_layer_aware_repository_decorator(LayerType.AGENT)
 
 class AgentRepository:
     _db: ExtendedAsyncSAEngine
+    _config_provider: ManagerConfigProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, config_provider: ManagerConfigProvider) -> None:
         self._db = db
+        self._config_provider = config_provider
 
     @repository_decorator()
     async def get_by_id(self, agent_id: AgentId) -> Optional[AgentData]:
@@ -82,7 +85,10 @@ class AgentRepository:
         if order_by:
             stmt = stmt.order_by(*order_by)
 
+        known_slot_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
+        )
         async with self._db.begin_readonly_session() as db_session:
             result = await db_session.scalars(stmt)
             agent_rows = cast(list[AgentRow], result.all())
-            return [agent_row.to_extended_data() for agent_row in agent_rows]
+            return [agent_row.to_extended_data(known_slot_types) for agent_row in agent_rows]

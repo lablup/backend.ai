@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import enum
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional, override
 
-from ai.backend.common.types import AgentId, ResourceSlot
+from ai.backend.common.types import AgentId, ResourceSlot, SlotName, SlotTypes
 
 from ..kernel.types import KernelInfo, KernelStatus
 
@@ -58,11 +59,12 @@ class AgentData:
 
 @dataclass
 class AgentDataExtended(AgentData):
+    known_slot_types: Mapping[SlotName, SlotTypes]
     kernels: list[KernelInfo]
 
     def running_kernel_occupied_slots(self) -> ResourceSlot:
-        total = ResourceSlot()
+        occupied_slots = ResourceSlot.from_known_slots(self.known_slot_types)
         for kernel in self.kernels:
             if kernel.lifecycle.status == KernelStatus.RUNNING:
-                total += kernel.resource.occupied_slots
-        return total
+                occupied_slots += kernel.resource.occupied_slots
+        return occupied_slots
