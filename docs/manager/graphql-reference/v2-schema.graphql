@@ -387,8 +387,13 @@ input DelegateScanArtifactsInput {
   """ID of the reservoir registry to delegate the scan request to"""
   delegatorReservoirId: ID = null
 
-  """ID of the artifact registry that initiated the scan request"""
-  delegateeRegistryId: ID = null
+  """ID of the reservoir registry to be scanned"""
+  delegateeReservoirId: ID = null
+
+  """
+  ID of the remote registry within the delegatee reservoir registry to scan artifacts from
+  """
+  targetRegistryId: ID = null
 
   """Maximum number of artifacts to scan (max: 500)"""
   limit: Int!

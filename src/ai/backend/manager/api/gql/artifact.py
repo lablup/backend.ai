@@ -193,9 +193,12 @@ class DelegateScanArtifactsInput:
     delegator_reservoir_id: Optional[ID] = strawberry.field(
         default=None, description="ID of the reservoir registry to delegate the scan request to"
     )
-    delegatee_registry_id: Optional[ID] = strawberry.field(
+    delegatee_reservoir_id: Optional[ID] = strawberry.field(
+        default=None, description="ID of the reservoir registry to be scanned"
+    )
+    target_registry_id: Optional[ID] = strawberry.field(
         default=None,
-        description="ID of the artifact registry that initiated the scan request",
+        description="ID of the remote registry within the delegatee reservoir registry to scan artifacts from",
     )
     limit: int = strawberry.field(
         description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})"
