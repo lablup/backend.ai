@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
+    AgentData,
     AgentHeartbeatUpsert,
     UpsertResult,
 )
@@ -15,7 +16,6 @@ from ai.backend.manager.models import agents
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.services.agent.types import AgentData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -33,10 +33,12 @@ class AgentDBSource:
 
     async def get_by_id(self, agent_id: AgentId) -> Optional[AgentData]:
         async with self._db.begin_readonly_session() as db_session:
-            agent_row = await db_session.scalar(sa.select(AgentRow).where(AgentRow.id == agent_id))
+            agent_row: Optional[AgentRow] = await db_session.scalar(
+                sa.select(AgentRow).where(AgentRow.id == agent_id)
+            )
             if agent_row is None:
                 return None
-            return AgentData.from_row(agent_row)
+            return agent_row.to_data()
 
     async def _check_scaling_group_exists(
         self, conn: SAConnection, scaling_group_name: str
@@ -56,8 +58,14 @@ class AgentDBSource:
                 sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
             )
             result = await conn.execute(query)
-            row = result.first()
-            upsert_result = UpsertResult.from_state_comparison(row, upsert_data)
+            row: Optional[AgentRow] = result.first()
+            if row is None:
+                return UpsertResult(
+                    was_revived=False,
+                    need_resource_slot_update=True,
+                )
+            agent_data = row.to_data()
+            upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
             stmt = pg_insert(agents).values(upsert_data.insert_fields)
             final_query = stmt.on_conflict_do_update(

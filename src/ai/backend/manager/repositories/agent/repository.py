@@ -10,6 +10,7 @@ from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
+    AgentData,
     AgentHeartbeatUpsert,
     AgentStateSyncData,
     UpsertResult,
@@ -21,7 +22,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
-from ai.backend.manager.services.agent.types import AgentData
 
 # Layer-specific decorator for agent repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.AGENT)
