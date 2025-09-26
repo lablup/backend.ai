@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
@@ -19,6 +19,9 @@ from ai.backend.manager.services.agent.types import AgentData
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+
 
 class AgentDBSource:
     """Database source for agent-related operations."""
@@ -35,18 +38,19 @@ class AgentDBSource:
                 return None
             return AgentData.from_row(agent_row)
 
-    async def _check_scaling_group_exists(self, scaling_group_name: str) -> None:
-        async with self._db.begin_readonly_session() as db_session:
-            scaling_group_row = await db_session.scalar(
-                sa.select(ScalingGroupRow).where(ScalingGroupRow.name == scaling_group_name)
-            )
-            if not scaling_group_row:
-                log.error("Scaling group named [{}] does not exist.", scaling_group_name)
-                raise ScalingGroupNotFound(scaling_group_name)
+    async def _check_scaling_group_exists(
+        self, conn: SAConnection, scaling_group_name: str
+    ) -> None:
+        scaling_group_row = await conn.scalar(
+            sa.select(ScalingGroupRow).where(ScalingGroupRow.name == scaling_group_name)
+        )
+        if not scaling_group_row:
+            log.error("Scaling group named [{}] does not exist.", scaling_group_name)
+            raise ScalingGroupNotFound(scaling_group_name)
 
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin() as conn:
-            await self._check_scaling_group_exists(upsert_data.metadata.scaling_group)
+            await self._check_scaling_group_exists(conn, upsert_data.metadata.scaling_group)
 
             query = (
                 sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
