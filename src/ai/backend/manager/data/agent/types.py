@@ -62,14 +62,15 @@ class AgentData:
 
 @dataclass
 class AgentDataExtended(AgentData):
+    known_slot_types: Mapping[SlotName, SlotTypes]
     kernels: list[KernelInfo]
 
     def running_kernel_occupied_slots(self) -> ResourceSlot:
-        total = ResourceSlot()
+        occupied_slots = ResourceSlot.from_known_slots(self.known_slot_types)
         for kernel in self.kernels:
             if kernel.lifecycle.status == KernelStatus.RUNNING:
-                total += kernel.resource.occupied_slots
-        return total
+                occupied_slots += kernel.resource.occupied_slots
+        return occupied_slots
 
 
 @dataclass

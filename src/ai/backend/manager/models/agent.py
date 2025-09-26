@@ -110,7 +110,7 @@ class AgentRow(Base):
             auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
         )
 
-    def to_extended_data(self) -> AgentDataExtended:
+    def to_extended_data(self, known_slot_types: Mapping[SlotName, SlotTypes]) -> AgentDataExtended:
         kernel_rows = cast(list[KernelRow], self.kernels)
         return AgentDataExtended(
             id=self.id,
@@ -130,6 +130,7 @@ class AgentRow(Base):
             compute_plugins=self.compute_plugins,
             public_key=self.public_key,
             auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
+            known_slot_types=known_slot_types,
             kernels=[k.to_kernel_info() for k in kernel_rows],
         )
 

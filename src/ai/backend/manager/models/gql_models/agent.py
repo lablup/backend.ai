@@ -386,6 +386,7 @@ class Agent(graphene.ObjectType):
 
     @classmethod
     def from_data(cls, data: AgentData) -> Self:
+        mega = 2**20
         return cls(
             id=data.id,
             status=data.status.name,
@@ -403,11 +404,11 @@ class Agent(graphene.ObjectType):
             compute_plugins=data.compute_plugins,
             auto_terminate_abusing_kernel=False,  # legacy field
             # legacy fields
-            mem_slots=data.available_slots.get("mem", 0) // (2**20),
+            mem_slots=data.available_slots.get("mem", 0) // mega,
             cpu_slots=data.available_slots.get("cpu", 0),
             gpu_slots=data.available_slots.get("cuda.device", 0),
             tpu_slots=data.available_slots.get("tpu.device", 0),
-            used_mem_slots=data.occupied_slots.get("mem", 0) // (2**20),
+            used_mem_slots=data.occupied_slots.get("mem", 0) // mega,
             used_cpu_slots=float(data.occupied_slots.get("cpu", 0)),
             used_gpu_slots=float(data.occupied_slots.get("cuda.device", 0)),
             used_tpu_slots=float(data.occupied_slots.get("tpu.device", 0)),

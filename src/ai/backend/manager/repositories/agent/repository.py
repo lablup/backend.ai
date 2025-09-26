@@ -163,7 +163,10 @@ class AgentRepository:
         if order_by:
             stmt = stmt.order_by(*order_by)
 
+        known_slot_types = (
+            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
+        )
         async with self._db_source._db.begin_readonly_session() as db_session:
             result = await db_session.scalars(stmt)
             agent_rows = cast(list[AgentRow], result.all())
-            return [agent_row.to_extended_data() for agent_row in agent_rows]
+            return [agent_row.to_extended_data(known_slot_types) for agent_row in agent_rows]
