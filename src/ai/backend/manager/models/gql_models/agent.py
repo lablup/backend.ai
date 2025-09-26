@@ -175,33 +175,6 @@ class AgentNode(graphene.ObjectType):
             auto_terminate_abusing_kernel=data.auto_terminate_abusing_kernel,
         )
 
-    @classmethod
-    async def from_row(
-        cls,
-        ctx: GraphQueryContext,
-        row: AgentRow,
-    ) -> Self:
-        known_slot_types = await ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
-        occupied_slots = await row.get_occupied_slots(ctx.db, row.id, known_slot_types)
-        return cls(
-            id=row.id,
-            row_id=row.id,
-            status=row.status.name,
-            status_changed=row.status_changed,
-            region=row.region,
-            scaling_group=row.scaling_group,
-            schedulable=row.schedulable,
-            available_slots=row.available_slots.to_json(),
-            occupied_slots=occupied_slots.to_json(),
-            addr=row.addr,
-            architecture=row.architecture,
-            first_contact=row.first_contact,
-            lost_at=row.lost_at,
-            version=row.version,
-            compute_plugins=row.compute_plugins,
-            auto_terminate_abusing_kernel=row.auto_terminate_abusing_kernel,
-        )
-
     async def resolve_kernel_nodes(
         self, info: graphene.ResolveInfo
     ) -> ConnectionResolverResult[KernelNode]:
