@@ -36,14 +36,6 @@ class AgentData:
 
 
 @dataclass
-class AgentStateSyncData:
-    now: datetime
-    slot_key_and_units: dict[SlotName, SlotTypes]
-    current_addr: str
-    public_key: Optional[PublicKey]
-
-
-@dataclass
 class AgentMetadata:
     id: AgentId
     status: AgentStatus
@@ -63,6 +55,7 @@ class AgentNetworkInfo:
 
 @dataclass
 class AgentResourceInfo:
+    slot_key_and_units: dict[SlotName, SlotTypes]
     available_slots: ResourceSlot
     compute_plugins: Mapping[DeviceName, Mapping[str, str]]
 
@@ -133,6 +126,7 @@ class AgentHeartbeatUpsert:
                 public_key=agent_info.public_key,
             ),
             resource_info=AgentResourceInfo(
+                slot_key_and_units=agent_info.slot_key_and_units,
                 available_slots=agent_info.available_resource_slots,
                 compute_plugins=agent_info.compute_plugins,
             ),

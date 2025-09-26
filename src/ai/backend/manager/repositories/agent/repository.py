@@ -12,7 +12,6 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentHeartbeatUpsert,
-    AgentStateSyncData,
     UpsertResult,
 )
 from ai.backend.manager.decorators.repository_decorator import (
@@ -63,17 +62,16 @@ class AgentRepository:
         self,
         agent_id: AgentId,
         upsert_data: AgentHeartbeatUpsert,
-        state_sync_data: AgentStateSyncData,
     ) -> UpsertResult:
         with suppress_with_log(
             [Exception], message=f"Failed to update last seen for agent: {agent_id}"
         ):
-            await self._cache_source.update_agent_last_seen(agent_id, state_sync_data.now)
+            await self._cache_source.update_agent_last_seen(agent_id, upsert_data.first_contact)
 
         upsert_result = await self._db_source.upsert_agent_with_state(upsert_data)
         if upsert_result.need_resource_slot_update:
             await self._config_provider.legacy_etcd_config_loader.update_resource_slots(
-                state_sync_data.slot_key_and_units
+                upsert_data.resource_info.slot_key_and_units
             )
 
         return upsert_result
