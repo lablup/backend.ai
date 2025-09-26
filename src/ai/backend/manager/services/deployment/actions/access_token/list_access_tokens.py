@@ -1,15 +1,17 @@
 from dataclasses import dataclass
 from typing import Optional, override
-from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
+from ai.backend.manager.repositories.deployment.types.types import AccessTokenOrderingOptions
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
+from ai.backend.manager.types import PaginationOptions
 
 
 @dataclass
-class GetAccessTokensByDeploymentIdAction(DeploymentBaseAction):
-    deployment_id: UUID
+class ListAccessTokensAction(DeploymentBaseAction):
+    pagination: PaginationOptions
+    ordering: Optional[AccessTokenOrderingOptions] = None
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -18,12 +20,13 @@ class GetAccessTokensByDeploymentIdAction(DeploymentBaseAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "read"
+        return "list_access_tokens"
 
 
 @dataclass
-class GetAccessTokensByDeploymentIdActionResult(BaseActionResult):
+class ListAccessTokensActionResult(BaseActionResult):
     data: list[ModelDeploymentAccessTokenData]
+    total_count: int
 
     @override
     def entity_id(self) -> Optional[str]:

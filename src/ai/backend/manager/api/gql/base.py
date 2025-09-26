@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Mapping
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, Optional, Protocol, Type, TypeVar, cast
 
 import graphene
-import orjson
 import strawberry
 from graphql import StringValueNode
 from graphql_relay.utils import base64, unbase64
 from strawberry.types import get_object_definition, has_object_definition
 
+from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.types import ResourceSlot
 
 if TYPE_CHECKING:
@@ -137,24 +138,24 @@ class Ordering(StrEnum):
     DESC_NULLS_LAST = "DESC_NULLS_LAST"
 
 
-@strawberry.scalar(description="Added in 25.13.0")
+@strawberry.scalar(description="Added in 25.15.0")
 class JSONString:
     @staticmethod
     def parse_value(value: str | bytes) -> Mapping[str, Any]:
         if isinstance(value, str):
-            return orjson.loads(value)
+            return load_json(value)
         if isinstance(value, bytes):
-            return orjson.loads(value)
+            return load_json(value)
         return value
 
     @staticmethod
     def serialize(value: Any) -> JSONString:
         if isinstance(value, (dict, list)):
-            return cast(JSONString, orjson.dumps(value).decode("utf-8"))
+            return cast(JSONString, dump_json_str(value))
         elif isinstance(value, str):
             return cast(JSONString, value)
         else:
-            return cast(JSONString, orjson.dumps(value).decode("utf-8"))
+            return cast(JSONString, dump_json_str(value))
 
     @staticmethod
     def from_resource_slot(resource_slot: ResourceSlot) -> JSONString:
@@ -214,3 +215,75 @@ def build_pagination_options(
         pagination.backward = BackwardPaginationOptions(before=before, last=last)
 
     return pagination
+
+
+@dataclass
+class PageInfo:
+    has_next_page: bool
+    has_previous_page: bool
+    start_cursor: Optional[str] = None
+    end_cursor: Optional[str] = None
+
+    def to_strawberry_page_info(self) -> "strawberry.relay.PageInfo":
+        return strawberry.relay.PageInfo(
+            has_next_page=self.has_next_page,
+            has_previous_page=self.has_previous_page,
+            start_cursor=self.start_cursor,
+            end_cursor=self.end_cursor,
+        )
+
+
+class HasCursor(Protocol):
+    cursor: str
+
+
+TEdge = TypeVar("TEdge", bound=HasCursor)
+
+
+def build_page_info(
+    edges: list[TEdge], total_count: int, pagination_options: PaginationOptions
+) -> PageInfo:
+    """Build PageInfo from edges and pagination options"""
+    has_next_page = False
+    has_previous_page = False
+
+    if pagination_options.offset:
+        # Offset-based pagination
+        offset = pagination_options.offset.offset or 0
+
+        has_previous_page = offset > 0
+        has_next_page = (offset + len(edges)) < total_count
+
+    elif pagination_options.forward:
+        # Forward pagination (after/first)
+        first = pagination_options.forward.first
+        if first is not None:
+            # If we got exactly the requested number and there might be more
+            has_next_page = len(edges) == first
+        else:
+            # If no first specified, check if we have all items
+            has_next_page = len(edges) < total_count
+        has_previous_page = pagination_options.forward.after is not None
+
+    elif pagination_options.backward:
+        # Backward pagination (before/last)
+        last = pagination_options.backward.last
+        if last is not None:
+            # If we got exactly the requested number, there might be more before
+            has_previous_page = len(edges) == last
+        else:
+            # If no last specified, assume there could be previous items
+            has_previous_page = True
+        has_next_page = pagination_options.backward.before is not None
+
+    else:
+        # Default case - assume we have all items if no pagination specified
+        has_next_page = len(edges) < total_count
+        has_previous_page = False
+
+    return PageInfo(
+        has_next_page=has_next_page,
+        has_previous_page=has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )

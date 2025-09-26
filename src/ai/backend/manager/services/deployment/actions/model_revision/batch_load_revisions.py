@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Optional, override
 from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.deployment.creator import ModelRevisionCreator
 from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.services.deployment.actions.model_revision.base import (
     ModelRevisionBaseAction,
@@ -11,9 +12,8 @@ from ai.backend.manager.services.deployment.actions.model_revision.base import (
 
 
 @dataclass
-class AddModelRevisionAction(ModelRevisionBaseAction):
-    model_deployment_id: UUID
-    adder: ModelRevisionCreator
+class BatchLoadRevisionsAction(ModelRevisionBaseAction):
+    revision_ids: list[UUID]
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -22,13 +22,13 @@ class AddModelRevisionAction(ModelRevisionBaseAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "create"
+        return "batch_load_revisions"
 
 
 @dataclass
-class AddModelRevisionActionResult(BaseActionResult):
-    revision: ModelRevisionData
+class BatchLoadRevisionsActionResult(BaseActionResult):
+    data: list[ModelRevisionData]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.revision.id)
+        return None

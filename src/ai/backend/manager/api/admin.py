@@ -22,6 +22,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, MiddlewarePar
 from ai.backend.common.dto.manager.request import GraphQLReq
 from ai.backend.common.dto.manager.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.data_loader.registry import DataLoaderRegistry
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.dto.context import ProcessorsCtx
@@ -231,6 +232,7 @@ class GQLAPIHandler:
         strawberry_ctx = StrawberryGQLContext(
             processors=processors_ctx.processors,
             config_provider=config_provider_ctx.config_provider,
+            dataloader_registry=DataLoaderRegistry(),
         )
 
         query, variables, operation_name = (

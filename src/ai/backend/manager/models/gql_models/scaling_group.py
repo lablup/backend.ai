@@ -19,7 +19,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import load_only
 
-from ai.backend.common.exception import ScalingGroupNotFoundError
+from ai.backend.common.exception import ScalingGroupNotFound
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.user import UserRole
@@ -125,7 +125,7 @@ class ScalingGroupNode(graphene.ObjectType):
             )
             result = await db_session.scalar(query_stmt)
             if result is None:
-                raise ScalingGroupNotFoundError()
+                raise ScalingGroupNotFound(f"Scaling group not found: {scaling_group_name}")
             return ScalingGroupNode.from_row(graph_ctx, result)
 
     @classmethod
