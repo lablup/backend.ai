@@ -138,6 +138,7 @@ class ModelReplicaFilterOptions:
     liveness_status_filter: Optional[LivenessStatusFilter] = None
     activeness_status_filter: Optional[ActivenessStatusFilter] = None
     id: Optional[UUID] = None
+    ids_in: Optional[list[UUID]] = None
 
     # Logical operations
     AND: Optional[list["ModelReplicaFilterOptions"]] = None
