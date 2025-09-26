@@ -92,6 +92,7 @@ class ReplicaFilter:
     liveness_status: Optional[LivenessStatusFilter] = None
     activeness_status: Optional[ActivenessStatusFilter] = None
     id: Optional[ID] = None
+    ids_in: strawberry.Private[Optional[Sequence[UUID]]] = None
 
     AND: Optional[list["ReplicaFilter"]] = None
     OR: Optional[list["ReplicaFilter"]] = None
@@ -136,6 +137,8 @@ class ReplicaFilter:
 
         if self.id:
             repo_filter.id = UUID(self.id)
+        if self.ids_in:
+            repo_filter.ids_in = list(self.ids_in)
 
         # Handle logical operations
         if self.AND:
