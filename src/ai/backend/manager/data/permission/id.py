@@ -20,9 +20,6 @@ class ScopeId:
     def to_str(self) -> str:
         return f"{self.scope_type}:{self.scope_id}"
 
-    def is_global(self) -> bool:
-        return self.scope_type == ScopeType.GLOBAL
-
 
 @dataclass
 class ObjectId:
