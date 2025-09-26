@@ -1,3 +1,7 @@
+"""
+Deprecated: Use `ai.backend.manager.data.agent.types` instead of this module.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
