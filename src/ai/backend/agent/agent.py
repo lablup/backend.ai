@@ -78,7 +78,7 @@ from ai.backend.common.clients.valkey_client.valkey_container_log.client import 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
-from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
@@ -194,6 +194,7 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     RedisTarget,
+    ResourceSlot,
     RuntimeVariant,
     Sentinel,
     ServicePort,
@@ -201,6 +202,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
     SlotName,
+    SlotTypes,
     VFolderMount,
     VFolderUsageMode,
     VolumeMountableNodeType,
@@ -1168,42 +1170,42 @@ class AbstractAgent(
         """
         Send my status information and available kernel images to the manager(s).
         """
-        res_slots = {}
+        slot_key_and_units: dict[SlotName, SlotTypes] = {}
+        res_slots: dict[SlotName, Decimal] = {}
         try:
             for cctx in self.computers.values():
                 for slot_key, slot_type in cctx.instance.slot_types:
-                    res_slots[slot_key] = (
-                        slot_type,
-                        str(self.slots.get(slot_key, 0)),
-                    )
+                    slot_key_and_units[slot_key] = slot_type
+                    res_slots[slot_key] = Decimal(str(self.slots.get(slot_key, 0)))
             if self.local_config.agent.advertised_rpc_addr:
                 rpc_addr = self.local_config.agent.advertised_rpc_addr
             else:
                 rpc_addr = self.local_config.agent.rpc_listen_addr
-            agent_info = {
-                "ip": str(rpc_addr.host),
-                "region": self.local_config.agent.region,
-                "scaling_group": self.local_config.agent.scaling_group,
-                "addr": f"tcp://{rpc_addr}",
-                "public_key": self.agent_public_key,
-                "public_host": str(self._get_public_host()),
-                "resource_slots": res_slots,
-                "version": VERSION,
-                "compute_plugins": {
+            agent_info = AgentInfo(
+                ip=str(rpc_addr.host),
+                region=self.local_config.agent.region,
+                scaling_group=self.local_config.agent.scaling_group,
+                addr=f"tcp://{rpc_addr}",
+                public_key=self.agent_public_key,
+                public_host=str(self._get_public_host()),
+                available_resource_slots=ResourceSlot(res_slots),
+                slot_key_and_units=slot_key_and_units,
+                version=VERSION,
+                compute_plugins={
                     key: {
                         "version": computer.instance.get_version(),
                         **(await computer.instance.extra_info()),
                     }
                     for key, computer in self.computers.items()
                 },
-                "images": zlib.compress(
+                images=zlib.compress(
                     msgpack.packb([(repo_tag, digest) for repo_tag, digest in self.images.items()])
                 ),
-                "images.opts": {"compression": "zlib"},  # compression: zlib or None
-                "architecture": get_arch_name(),
-                "auto_terminate_abusing_kernel": self.local_config.agent.force_terminate_abusing_containers,
-            }
-            await self.anycast_event(AgentHeartbeatEvent(AgentInfo.from_dict(agent_info)))
+                images_opts=ImageOpts(compression="zlib"),  # compression: zlib or None
+                architecture=get_arch_name(),
+                auto_terminate_abusing_kernel=self.local_config.agent.force_terminate_abusing_containers,
+            )
+            await self.anycast_event(AgentHeartbeatEvent(agent_info))
         except asyncio.TimeoutError:
             log.warning("event dispatch timeout: instance_heartbeat")
         except Exception:
