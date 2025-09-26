@@ -186,16 +186,16 @@ class ImportArtifactsInput:
     description=dedent_strip("""
     Added in 25.15.0.
 
-    Input type for delegated scanning of artifacts from a reservoir registry's remote registry.
+    Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
 """)
 )
 class DelegateScanArtifactsInput:
-    registry_id: Optional[ID] = strawberry.field(
-        default=None, description="ID of the reservoir registry to perform the scan on"
+    delegator_reservoir_id: Optional[ID] = strawberry.field(
+        default=None, description="ID of the reservoir registry to delegate the scan request to"
     )
-    remote_registry_name: Optional[str] = strawberry.field(
+    delegatee_registry_id: Optional[ID] = strawberry.field(
         default=None,
-        description="Name of the remote registry to scan from (if not specified, uses the default remote registry configured for the remote reservoir)",
+        description="ID of the artifact registry that initiated the scan request",
     )
     limit: int = strawberry.field(
         description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})"
@@ -219,7 +219,7 @@ class DelegateScanArtifactsInput:
 )
 class DelegateImportArtifactsInput:
     artifact_revision_ids: list[ID] = strawberry.field(
-        description="List of artifact revision IDs to import from the reservoir registry's remote registry"
+        description="List of artifact revision IDs of delegatee artifact registry"
     )
 
 
@@ -928,16 +928,16 @@ async def import_artifacts(
     description=dedent_strip("""
     Added in 25.15.0.
 
-    Triggers artifact scanning on a reservoir registry from its configured remote registry.
+    Triggers artifact scanning on a remote reservoir registry.
 
     This mutation instructs a reservoir-type registry to initiate a scan of artifacts
-    from its associated remote registry source. The scan process will discover and
-    catalog artifacts available in the remote registry, making them accessible
+    from its associated remote reservoir registry source. The scan process will discover and
+    catalog artifacts available in the remote reservoir, making them accessible
     through the local reservoir registry.
 
     Requirements:
-    - The target registry must be of type 'reservoir'
-    - The reservoir registry must have a valid remote registry configuration
+    - The delegator registry must be of type 'reservoir'
+    - The delegator reservoir registry must have a valid remote registry configuration
 """)
 )
 async def delegate_scan_artifacts(
@@ -950,15 +950,15 @@ async def delegate_scan_artifacts(
     description=dedent_strip("""
     Added in 25.15.0.
 
-    Delegates the import of artifact revisions on a reservoir registry.
+    Trigger import of artifact revisions from a remote reservoir registry.
+
     This mutation instructs a reservoir-type registry to import specific artifact revisions
     that were previously discovered during a scan from its remote registry.
-    The import process will fetch and store the selected artifact revisions locally,
-    making them available for use within the local reservoir registry.
+    Note that this operation does not import the artifacts directly into the local registry, but only into the delegator reservoir's storage.
 
     Requirements:
-    - The target registry must be of type 'reservoir'
-    - The reservoir registry must have a valid remote registry configuration
+    - The delegator registry must be of type 'reservoir'
+    - The delegator registry must have a valid remote registry configuration
 """)
 )
 async def delegate_import_artifacts(
