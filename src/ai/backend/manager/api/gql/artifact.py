@@ -43,6 +43,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactStatusFilter,
     ArtifactStatusFilterType,
 )
+from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
@@ -949,7 +950,41 @@ async def import_artifacts(
 async def delegate_scan_artifacts(
     input: DelegateScanArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DelegateScanArtifactsPayload:
-    raise NotImplementedAPI("This mutation is not implemented yet.")
+    if input.limit > ARTIFACT_MAX_SCAN_LIMIT:
+        raise ArtifactScanLimitExceededError(f"Limit cannot exceed {ARTIFACT_MAX_SCAN_LIMIT}")
+
+    delegator_reservoir_id = (
+        uuid.UUID(input.delegator_reservoir_id) if input.delegator_reservoir_id else None
+    )
+    delegatee_reservoir_id = (
+        uuid.UUID(input.delegatee_target.delegatee_reservoir_id) if input.delegatee_target else None
+    )
+    target_registry_id = (
+        uuid.UUID(input.delegatee_target.target_registry_id) if input.delegatee_target else None
+    )
+
+    action_result = await info.context.processors.artifact.delegate_scan.wait_for_complete(
+        DelegateScanArtifactsAction(
+            delegator_reservoir_id=delegator_reservoir_id,
+            delegatee_reservoir_id=delegatee_reservoir_id,
+            target_registry_id=target_registry_id,
+            artifact_type=input.artifact_type,
+            limit=input.limit,
+            order=ModelSortKey.DOWNLOADS,
+            search=input.search,
+        )
+    )
+
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
+    )
+
+    artifacts = []
+    for item in action_result.result:
+        registry_data = await registry_meta_loader.load(item.registry_id)
+        source_registry_data = await registry_meta_loader.load(item.source_registry_id)
+        artifacts.append(Artifact.from_dataclass(item, registry_data.url, source_registry_data.url))
+    return DelegateScanArtifactsPayload(artifacts=artifacts)
 
 
 @strawberry.mutation(

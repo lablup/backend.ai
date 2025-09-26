@@ -91,7 +91,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
         self.retrieve_single_model = ActionProcessor(service.retrieve_single_model, action_monitors)
         self.delete_artifacts = ActionProcessor(service.delete_artifacts, action_monitors)
         self.restore_artifacts = ActionProcessor(service.restore_artifacts, action_monitors)
-        self.delegate_scan = ActionProcessor(service.delegate_scan, action_monitors)
+        self.delegate_scan = ActionProcessor(service.delegate_scan_artifacts, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:

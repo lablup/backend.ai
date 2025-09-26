@@ -10,12 +10,13 @@ from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 @dataclass
 class DelegateScanArtifactsAction(ArtifactAction):
+    delegator_reservoir_id: Optional[uuid.UUID]
     artifact_type: Optional[ArtifactType]
-    registry_name: Optional[uuid.UUID]
-    registry_id: Optional[uuid.UUID]
-    limit: Optional[int]
-    order: Optional[ModelSortKey]
     search: Optional[str]
+    order: Optional[ModelSortKey]
+    delegatee_reservoir_id: Optional[uuid.UUID]
+    target_registry_id: Optional[uuid.UUID]
+    limit: Optional[int]
 
     @override
     def entity_id(self) -> Optional[str]:

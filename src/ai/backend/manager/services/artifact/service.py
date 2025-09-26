@@ -24,7 +24,7 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.dto.request import ScanArtifactsReq, SearchArtifactsReq
-from ai.backend.manager.dto.response import SearchArtifactsResponse
+from ai.backend.manager.dto.response import ScanArtifactsResponse, SearchArtifactsResponse
 from ai.backend.manager.errors.artifact_registry import (
     ArtifactRegistryBadScanRequestError,
     ReservoirConnectionError,
@@ -437,13 +437,12 @@ class ArtifactService:
 
         return registry_meta
 
-    async def delegate_scan(
+    async def delegate_scan_artifacts(
         self, action: DelegateScanArtifactsAction
     ) -> DelegateScanArtifactsActionResult:
         # TODO: Abstract remote registry client layer (scan, import)
-        print("action.registry_id!", action.registry_id)
         registry_meta = await self._resolve_artifact_registry_meta(
-            action.artifact_type, action.registry_id
+            action.artifact_type, action.delegator_reservoir_id
         )
         registry_type = registry_meta.type
         registry_id = registry_meta.registry_id
@@ -459,104 +458,79 @@ class ArtifactService:
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
 
         # TODO: Apply client_decorator instead of retrying here
-        offset = 0
-        limit = 10
         all_artifacts: list[ArtifactDataWithRevisions] = []
-        MAX_RETRIES = 3
+        client_resp = None
 
-        while True:
-            retry_count = 0
-            client_resp = None
+        if not (action.limit and action.order):
+            raise ArtifactRegistryBadScanRequestError()
 
-            while retry_count < MAX_RETRIES:
+        req = ScanArtifactsReq(
+            registry_id=registry_id,
+            artifact_type=action.artifact_type,
+            limit=action.limit,
+            search=action.search,
+            order=action.order,
+        )
+        client_resp = await remote_reservoir_client.scan_artifacts(req)
+
+        if client_resp is None:
+            log.warning(
+                "Failed to connect to reservoir registry after {} attempts: {}",
+                registry_data.endpoint,
+            )
+            raise ReservoirConnectionError()
+
+        RespTypeAdapter = TypeAdapter(ScanArtifactsResponse)
+        parsed = RespTypeAdapter.validate_python(client_resp)
+
+        # Convert response data back to full data with readme
+        for response_artifact in parsed.artifacts:
+            # Convert response revisions back to full revisions
+            full_revisions = []
+            for response_revision in response_artifact.revisions:
+                # Get readme for this revision from reservoir
                 try:
-                    req = ScanArtifactsReq(
-                        registry_id=registry_id,
-                        artifact_type=action.artifact_type,
-                        limit=limit,
-                        search=action.search,
-                    )
-                    client_resp = await remote_reservoir_client.scan_artifacts(req)
-                    break
-                except ClientConnectorError as e:
-                    retry_count += 1
+                    readme_resp = await remote_reservoir_client.get_readme(response_revision.id)
+                    readme = readme_resp.readme
+                except Exception as e:
                     log.warning(
-                        "Cannot connect to reservoir registry: {} (attempt {}/{}). Error: {}",
-                        registry_data.endpoint,
-                        retry_count,
-                        MAX_RETRIES,
+                        "Failed to fetch readme for artifact {} revision {}: {}",
+                        response_revision.artifact_id,
+                        response_revision.version,
                         e,
                     )
-                    if retry_count < MAX_RETRIES:
-                        await asyncio.sleep(1)
+                    readme = None
 
-            if client_resp is None:
-                log.warning(
-                    "Failed to connect to reservoir registry after {} attempts: {}",
-                    MAX_RETRIES,
-                    registry_data.endpoint,
+                # Create full revision data with readme
+                full_revision = ArtifactRevisionData(
+                    id=response_revision.id,
+                    artifact_id=response_revision.artifact_id,
+                    version=response_revision.version,
+                    readme=readme,
+                    size=response_revision.size,
+                    status=response_revision.status,
+                    created_at=response_revision.created_at,
+                    updated_at=response_revision.updated_at,
                 )
-                raise ReservoirConnectionError()
+                full_revisions.append(full_revision)
 
-            RespTypeAdapter = TypeAdapter(SearchArtifactsResponse)
-            parsed = RespTypeAdapter.validate_python(client_resp)
-
-            if not parsed.artifacts:
-                break
-
-            # Convert response data back to full data with readme
-            for response_artifact in parsed.artifacts:
-                # Convert response revisions back to full revisions
-                full_revisions = []
-                for response_revision in response_artifact.revisions:
-                    # Get readme for this revision from reservoir
-                    try:
-                        readme_resp = await remote_reservoir_client.get_readme(response_revision.id)
-                        readme = readme_resp.readme
-                    except Exception as e:
-                        log.warning(
-                            "Failed to fetch readme for artifact {} revision {}: {}",
-                            response_revision.artifact_id,
-                            response_revision.version,
-                            e,
-                        )
-                        readme = None
-
-                    # Create full revision data with readme
-                    full_revision = ArtifactRevisionData(
-                        id=response_revision.id,
-                        artifact_id=response_revision.artifact_id,
-                        version=response_revision.version,
-                        readme=readme,
-                        size=response_revision.size,
-                        status=response_revision.status,
-                        created_at=response_revision.created_at,
-                        updated_at=response_revision.updated_at,
-                    )
-                    full_revisions.append(full_revision)
-
-                # Create full artifact data
-                full_artifact = ArtifactDataWithRevisions(
-                    id=response_artifact.id,
-                    name=response_artifact.name,
-                    type=response_artifact.type,
-                    description=response_artifact.description,
-                    registry_id=response_artifact.registry_id,
-                    source_registry_id=response_artifact.source_registry_id,
-                    registry_type=response_artifact.registry_type,
-                    source_registry_type=response_artifact.source_registry_type,
-                    scanned_at=response_artifact.scanned_at,
-                    updated_at=response_artifact.updated_at,
-                    readonly=response_artifact.readonly,
-                    availability=response_artifact.availability,
-                    revisions=full_revisions,
-                )
-                all_artifacts.append(full_artifact)
-
-            if len(parsed.artifacts) < limit:
-                break
-
-            offset += limit
+            # Create full artifact data
+            full_artifact = ArtifactDataWithRevisions(
+                id=response_artifact.id,
+                name=response_artifact.name,
+                type=response_artifact.type,
+                description=response_artifact.description,
+                registry_id=response_artifact.registry_id,
+                source_registry_id=response_artifact.source_registry_id,
+                registry_type=response_artifact.registry_type,
+                source_registry_type=response_artifact.source_registry_type,
+                scanned_at=response_artifact.scanned_at,
+                updated_at=response_artifact.updated_at,
+                readonly=response_artifact.readonly,
+                availability=response_artifact.availability,
+                revisions=full_revisions,
+            )
+            all_artifacts.append(full_artifact)
 
         if all_artifacts:
             for artifact_data in all_artifacts:
