@@ -27,7 +27,6 @@ from typing import (
     Type,
 )
 from unittest.mock import AsyncMock, MagicMock
-from urllib.parse import quote_plus as urlquote
 
 import aiofiles.os
 import aiohttp
@@ -39,6 +38,7 @@ from aiohttp import web
 from dateutil.tz import tzutc
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
+from sqlalchemy.ext.asyncio.engine import create_async_engine
 
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.config import ConfigurationError
@@ -435,20 +435,17 @@ def database(request, bootstrap_config: BootstrapConfig, test_db: str) -> None:
     Create a new database for the current test session
     and install the table schema using alembic.
     """
-    db_addr = bootstrap_config.db.addr.to_legacy()
-    db_user = bootstrap_config.db.user
-    db_pass = bootstrap_config.db.password
-
-    # Create database using low-level core API.
-    # Temporarily use "testing" dbname until we create our own db.
-    if db_pass:
-        db_url = f"postgresql+asyncpg://{urlquote(db_user)}:{urlquote(db_pass)}@{db_addr}/testing"
-    else:
-        db_url = f"postgresql+asyncpg://{urlquote(db_user)}@{db_addr}/testing"
+    db_url = (
+        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/testing")
+        .with_port(bootstrap_config.db.addr.port)
+        .with_user(bootstrap_config.db.user)
+    )
+    if bootstrap_config.db.password is not None:
+        db_url = db_url.with_password(bootstrap_config.db.password)
 
     async def init_db() -> None:
-        engine = sa.ext.asyncio.create_async_engine(
-            db_url,
+        engine = create_async_engine(
+            str(db_url),
             connect_args=pgsql_connect_opts,
             isolation_level="AUTOCOMMIT",
         )
@@ -467,8 +464,8 @@ def database(request, bootstrap_config: BootstrapConfig, test_db: str) -> None:
     asyncio.run(init_db())
 
     async def finalize_db() -> None:
-        engine = sa.ext.asyncio.create_async_engine(
-            db_url,
+        engine = create_async_engine(
+            str(db_url),
             connect_args=pgsql_connect_opts,
             isolation_level="AUTOCOMMIT",
         )
@@ -521,10 +518,10 @@ def database(request, bootstrap_config: BootstrapConfig, test_db: str) -> None:
         log_level=LogLevel.DEBUG,
     )
     cli_ctx._bootstrap_config = bootstrap_config  # override the lazy-loaded config
-    sqlalchemy_url = f"postgresql+asyncpg://{db_user}:{db_pass}@{db_addr}/{test_db}"
+    test_db_url = db_url.with_path(test_db)
     with tempfile.NamedTemporaryFile(mode="w", encoding="utf8") as alembic_cfg:
         alembic_cfg_data = alembic_config_template.format(
-            sqlalchemy_url=sqlalchemy_url,
+            sqlalchemy_url=str(test_db_url),
         )
         alembic_cfg.write(alembic_cfg_data)
         alembic_cfg.flush()
@@ -555,10 +552,13 @@ async def database_fixture(
     Populate the example data as fixtures to the database
     and delete them after use.
     """
-    db_addr = bootstrap_config.db.addr.to_legacy()
-    db_user = bootstrap_config.db.user
-    db_pass = bootstrap_config.db.password
-    db_url = f"postgresql+asyncpg://{db_user}:{urlquote(db_pass)}@{db_addr}/{test_db}"
+    db_url = (
+        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{test_db}")
+        .with_port(bootstrap_config.db.addr.port)
+        .with_user(bootstrap_config.db.user)
+    )
+    if bootstrap_config.db.password is not None:
+        db_url = db_url.with_password(bootstrap_config.db.password)
 
     build_root = Path(os.environ["BACKEND_BUILD_ROOT"])
 
@@ -592,8 +592,8 @@ async def database_fixture(
     ]
 
     async def init_fixture() -> None:
-        engine: SAEngine = sa.ext.asyncio.create_async_engine(
-            db_url,
+        engine: SAEngine = create_async_engine(
+            str(db_url),
             connect_args=pgsql_connect_opts,
         )
         try:
@@ -616,8 +616,8 @@ async def database_fixture(
         if extra_fixture_file_path.exists():
             await aiofiles.os.remove(extra_fixture_file_path)
 
-        engine: SAEngine = sa.ext.asyncio.create_async_engine(
-            db_url,
+        engine: SAEngine = create_async_engine(
+            str(db_url),
             connect_args=pgsql_connect_opts,
         )
         try:

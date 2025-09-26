@@ -21,7 +21,6 @@ from typing import (
     TypeVar,
     overload,
 )
-from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
@@ -40,6 +39,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+from yarl import URL
 
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
@@ -342,18 +342,15 @@ async def connect_database(
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     from .base import pgsql_connect_opts
 
-    addr = db_config.addr
-    username = db_config.user
-    password = db_config.password
-    dbname = db_config.name
+    db_url = (
+        URL(f"postgresql+asyncpg://{db_config.addr.host}/{db_config.name}")
+        .with_port(db_config.addr.port)
+        .with_user(db_config.user)
+    )
+    if db_config.password is not None:
+        db_url = db_url.with_password(db_config.password)
 
-    if password is None:
-        raise RuntimeError("password is required for database connection")
-
-    address = addr.to_legacy()
-    url = f"postgresql+asyncpg://{urlquote(username)}:{urlquote(password)}@{address}/{urlquote(dbname)}"
-
-    version_check_db = create_async_engine(url)
+    version_check_db = create_async_engine(str(db_url))
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
         version_str = result.scalar()
@@ -363,7 +360,7 @@ async def connect_database(
     await version_check_db.dispose()
 
     db = create_async_engine(
-        url,
+        str(db_url),
         connect_args=pgsql_connect_opts,
         pool_size=db_config.pool_size,
         pool_recycle=db_config.pool_recycle,
