@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import uuid
-from collections import defaultdict
 from datetime import datetime
 from typing import (
     TYPE_CHECKING,
@@ -14,9 +13,7 @@ from sqlalchemy.orm import (
     relationship,
 )
 
-from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.role import (
-    MergedPermissionData,
     RoleCreateInput,
     RoleData,
     RoleDataWithPermissions,
@@ -24,7 +21,7 @@ from ai.backend.manager.data.permission.role import (
 from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
-from ai.backend.manager.data.permission.types import OperationType, RoleSource
+from ai.backend.manager.data.permission.types import RoleSource
 
 from ..base import (
     Base,
@@ -111,25 +108,25 @@ class RoleRow(Base):
             object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
         )
 
-    def to_permission_data(self) -> MergedPermissionData:
-        scope_permissions = {}
-        global_permissions: set[OperationType] = set()
-        for pg_row in self.permission_group_rows:
-            permissions = {perm.operation for perm in pg_row.permission_rows}
-            scope_permissions[pg_row.parsed_scope_id] = permissions
-            if pg_row.parsed_scope_id.is_global():
-                global_permissions = permissions
-        object_permissions: defaultdict[ObjectId, set[OperationType]] = defaultdict(set)
-        for op_row in self.object_permission_rows:
-            object_permissions[op_row.parsed_object_id].add(op_row.operation)
-        return MergedPermissionData(
-            scope_permissions={
-                pg_row.parsed_scope_id: {perm.operation for perm in pg_row.permission_rows}
-                for pg_row in self.permission_group_rows
-            },
-            global_permissions=global_permissions,
-            object_permissions=object_permissions,
-        )
+    # def to_permission_data(self) -> MergedPermissionData:
+    #     scope_permissions = {}
+    #     global_permissions: set[OperationType] = set()
+    #     for pg_row in self.permission_group_rows:
+    #         permissions = {perm.operation for perm in pg_row.permission_rows}
+    #         scope_permissions[pg_row.parsed_scope_id] = permissions
+    #         if pg_row.parsed_scope_id.is_global():
+    #             global_permissions = permissions
+    #     object_permissions: defaultdict[ObjectId, set[OperationType]] = defaultdict(set)
+    #     for op_row in self.object_permission_rows:
+    #         object_permissions[op_row.parsed_object_id].add(op_row.operation)
+    #     return MergedPermissionData(
+    #         scope_permissions={
+    #             pg_row.parsed_scope_id: {perm.operation for perm in pg_row.permission_rows}
+    #             for pg_row in self.permission_group_rows
+    #         },
+    #         global_permissions=global_permissions,
+    #         object_permissions=object_permissions,
+    #     )
 
     @classmethod
     def from_input(cls, data: RoleCreateInput) -> Self:
