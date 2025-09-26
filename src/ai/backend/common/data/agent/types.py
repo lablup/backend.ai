@@ -37,7 +37,7 @@ class AgentInfo(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     @classmethod
-    def from_dict(cls, data: Mapping[Any, Any]) -> Self:
+    def from_dict(cls, data: Mapping[str, Any]) -> Self:
         images_opts_data = data.get("images_opts", {"compression": "zlib"})
         return cls(
             ip=data["ip"],
