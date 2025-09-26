@@ -388,7 +388,7 @@ input DelegateScanArtifactsInput {
   delegatorReservoirId: ID = null
 
   """Target delegatee reservoir registry and its remote registry to scan"""
-  delegateeTarget: DelegateTarget = null
+  delegateeTarget: DelegateeTarget = null
 
   """Maximum number of artifacts to scan (max: 500)"""
   limit: Int!
@@ -415,7 +415,7 @@ type DelegateScanArtifactsPayload {
 }
 
 """Added in 25.15.0"""
-input DelegateTarget {
+input DelegateeTarget {
   delegateeReservoirId: ID!
   targetRegistryId: ID!
 }
