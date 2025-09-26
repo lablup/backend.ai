@@ -30,13 +30,13 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaStateData,
     ResourceConfigData,
 )
-from ai.backend.manager.services.deployment.actions.access_token.batch_load import (
-    BatchLoadAccessTokensAction,
-    BatchLoadAccessTokensActionResult,
-)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
+)
+from ai.backend.manager.services.deployment.actions.access_token.list_access_tokens import (
+    ListAccessTokensAction,
+    ListAccessTokensActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.batch_load_auto_scaling_rules import (
     BatchLoadAutoScalingRulesAction,
@@ -329,9 +329,9 @@ class DeploymentService:
             )
         )
 
-    async def batch_load_access_tokens(
-        self, action: BatchLoadAccessTokensAction
-    ) -> BatchLoadAccessTokensActionResult:
+    async def list_access_tokens(
+        self, action: ListAccessTokensAction
+    ) -> ListAccessTokensActionResult:
         tokens = []
         for i in range(5):
             tokens.append(
@@ -342,7 +342,10 @@ class DeploymentService:
                     created_at=datetime.now() - timedelta(hours=i),
                 )
             )
-        return BatchLoadAccessTokensActionResult(data=tokens)
+        return ListAccessTokensActionResult(
+            data=tokens,
+            total_count=len(tokens),
+        )
 
     async def sync_replicas(self, action: SyncReplicaAction) -> SyncReplicaActionResult:
         return SyncReplicaActionResult(success=True)

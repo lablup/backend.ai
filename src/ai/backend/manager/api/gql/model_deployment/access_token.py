@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from datetime import datetime
 from typing import Self
 from uuid import UUID
@@ -7,16 +6,22 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.exception import ModelDeploymentUnavailable
+from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
-from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
-from ai.backend.manager.services.deployment.actions.access_token.batch_load import (
-    BatchLoadAccessTokensAction,
+from ai.backend.manager.data.deployment.types import (
+    AccessTokenOrderField,
+    ModelDeploymentAccessTokenData,
 )
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
 )
+
+
+@strawberry.input(description="Added in 25.15.0")
+class AccessTokenOrderBy:
+    field: AccessTokenOrderField
+    direction: OrderDirection = OrderDirection.DESC
 
 
 @strawberry.type
@@ -38,23 +43,6 @@ class AccessToken(Node):
             created_at=data.created_at,
             valid_until=data.valid_until,
         )
-
-    @classmethod
-    async def batch_load_by_ids(
-        cls, ctx: StrawberryGQLContext, access_token_ids: Sequence[UUID]
-    ) -> list["AccessToken"]:
-        """Batch load access tokens by IDs."""
-        processor = ctx.processors.deployment
-        if processor is None:
-            raise ModelDeploymentUnavailable(
-                "Model Deployment feature is unavailable. Please contact support."
-            )
-        result = await processor.batch_load_access_tokens.wait_for_complete(
-            BatchLoadAccessTokensAction(access_token_ids=list(access_token_ids))
-        )
-        access_tokens = [AccessToken.from_dataclass(token) for token in result.data]
-
-        return access_tokens
 
 
 AccessTokenEdge = Edge[AccessToken]

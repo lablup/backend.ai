@@ -13,6 +13,7 @@ from ai.backend.common.data.model_deployment.types import (
 )
 from ai.backend.manager.api.gql.base import StringFilter
 from ai.backend.manager.data.deployment.types import (
+    AccessTokenOrderField,
     DeploymentOrderField,
     ModelRevisionOrderField,
     ReplicaOrderField,
@@ -43,6 +44,15 @@ class ModelReplicaOrderingOptions:
 
     order_by: list[tuple[ReplicaOrderField, bool]] = field(
         default_factory=lambda: [(ReplicaOrderField.CREATED_AT, True)]
+    )  # (field, desc)
+
+
+@dataclass
+class AccessTokenOrderingOptions:
+    """Ordering options for access token queries."""
+
+    order_by: list[tuple[AccessTokenOrderField, bool]] = field(
+        default_factory=lambda: [(AccessTokenOrderField.CREATED_AT, True)]
     )  # (field, desc)
 
 
