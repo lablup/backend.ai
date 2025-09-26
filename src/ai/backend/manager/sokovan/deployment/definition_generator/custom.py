@@ -5,8 +5,8 @@ from ai.backend.manager.data.deployment.types import (
     DefinitionFiles,
     ModelRevisionSpec,
 )
+from ai.backend.manager.data.model_serving.types import ModelServiceDefinition
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.services.model_serving.types import ModelServiceDefinition
 from ai.backend.manager.sokovan.deployment.definition_generator.base import ModelDefinitionGenerator
 
 
