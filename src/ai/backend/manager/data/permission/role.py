@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self, override
+from typing import Any, Optional, override
 
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
@@ -96,6 +95,28 @@ class SingleEntityPermissionCheckInput:
     user_id: uuid.UUID
     target_object_id: ObjectId
     operation: OperationType
+
+
+@dataclass
+class BatchEntityPermissionCheckInput:
+    user_id: uuid.UUID
+    target_object_ids: list[ObjectId]
+    operation: OperationType
+
+
+@dataclass
+class ScopePermissionSet:
+    scope_id: ScopeId
+    scope_permissions: set[OperationType]
+    global_permissions: Optional[set[OperationType]]
+
+
+@dataclass
+class ObjectPermissionSet:
+    object_id: ObjectId
+    object_permissions: set[OperationType]
+    mapped_scopes: dict[ScopeId, set[OperationType]]
+    global_permissions: Optional[set[OperationType]]
 
 
 @dataclass

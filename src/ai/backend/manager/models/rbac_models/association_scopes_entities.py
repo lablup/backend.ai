@@ -50,9 +50,6 @@ class AssociationScopesEntitiesRow(Base):
         server_default=sa.func.now(),
     )
 
-    def parsed_scope_id(self) -> ScopeId:
-        return ScopeId(scope_type=self.scope_type, scope_id=self.scope_id)
-
     def object_id(self) -> ObjectId:
         return ObjectId(entity_type=self.entity_type, entity_id=self.entity_id)
 
