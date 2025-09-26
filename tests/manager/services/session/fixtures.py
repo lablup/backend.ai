@@ -292,6 +292,7 @@ KERNEL_FIXTURE_DATA = KernelInfo(
         identifier=None,
         registry=KERNEL_ROW_FIXTURE.registry,
         tag=KERNEL_ROW_FIXTURE.tag,
+        architecture=KERNEL_ROW_FIXTURE.architecture,
     ),
     network=NetworkConfig(
         kernel_host=KERNEL_ROW_FIXTURE.kernel_host,
@@ -691,6 +692,7 @@ KERNEL_FIXTURE_DATA2 = KernelInfo(
         identifier=None,
         registry=KERNEL_ROW_FIXTURE2.registry,
         tag=KERNEL_ROW_FIXTURE2.tag,
+        architecture=KERNEL_ROW_FIXTURE2.architecture,
     ),
     network=NetworkConfig(
         kernel_host=KERNEL_ROW_FIXTURE2.kernel_host,
