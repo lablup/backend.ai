@@ -182,6 +182,12 @@ class ImportArtifactsInput:
     artifact_revision_ids: list[ID]
 
 
+@strawberry.input(description="Added in 25.15.0")
+class DelegateTarget:
+    delegatee_reservoir_id: ID
+    target_registry_id: ID
+
+
 @strawberry.input(
     description=dedent_strip("""
     Added in 25.15.0.
@@ -193,12 +199,9 @@ class DelegateScanArtifactsInput:
     delegator_reservoir_id: Optional[ID] = strawberry.field(
         default=None, description="ID of the reservoir registry to delegate the scan request to"
     )
-    delegatee_reservoir_id: Optional[ID] = strawberry.field(
-        default=None, description="ID of the reservoir registry to be scanned"
-    )
-    target_registry_id: Optional[ID] = strawberry.field(
+    delegatee_target: Optional[DelegateTarget] = strawberry.field(
         default=None,
-        description="ID of the remote registry within the delegatee reservoir registry to scan artifacts from",
+        description="Target delegatee reservoir registry and its remote registry to scan",
     )
     limit: int = strawberry.field(
         description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})"

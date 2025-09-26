@@ -1557,13 +1557,8 @@ input DelegateScanArtifactsInput
   """ID of the reservoir registry to delegate the scan request to"""
   delegatorReservoirId: ID = null
 
-  """ID of the reservoir registry to be scanned"""
-  delegateeReservoirId: ID = null
-
-  """
-  ID of the remote registry within the delegatee reservoir registry to scan artifacts from
-  """
-  targetRegistryId: ID = null
+  """Target delegatee reservoir registry and its remote registry to scan"""
+  delegateeTarget: DelegateTarget = null
 
   """Maximum number of artifacts to scan (max: 500)"""
   limit: Int!
@@ -1589,6 +1584,14 @@ type DelegateScanArtifactsPayload
   List of artifacts discovered during the delegated scan from the reservoir registry's remote registry
   """
   artifacts: [Artifact!]!
+}
+
+"""Added in 25.15.0"""
+input DelegateTarget
+  @join__type(graph: STRAWBERRY)
+{
+  delegateeReservoirId: ID!
+  targetRegistryId: ID!
 }
 
 """Added in 25.15.0"""
