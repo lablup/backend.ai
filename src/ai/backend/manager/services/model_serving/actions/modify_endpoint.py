@@ -4,11 +4,8 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.model_serving.modifier import EndpointModifier
-from ai.backend.manager.data.model_serving.types import EndpointData
+from ai.backend.manager.data.model_serving.types import EndpointData, RequesterCtx
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
-from ai.backend.manager.services.model_serving.types import (
-    RequesterCtx,
-)
 
 
 @dataclass

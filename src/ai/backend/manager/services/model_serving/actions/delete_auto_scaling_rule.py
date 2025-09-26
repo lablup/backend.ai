@@ -3,8 +3,8 @@ from typing import Optional, override
 
 from ai.backend.common.types import RuleId
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.services.model_serving.actions.base import ModelServiceAction
-from ai.backend.manager.services.model_serving.types import RequesterCtx
 
 
 @dataclass

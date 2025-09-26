@@ -4,13 +4,20 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
 import yarl
+from pydantic import AnyUrl
 
 from ai.backend.common.types import (
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
     ClusterMode,
     RuntimeVariant,
     VFolderMount,
 )
-from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.data.model_serving.types import (
+    EndpointLifecycle,
+    ModelServicePrepareCtx,
+    ServiceConfig,
+)
 from ai.backend.manager.types import Creator
 
 
@@ -71,4 +78,54 @@ class EndpointCreator(Creator):
             "cluster_mode": self.cluster_mode,
             "cluster_size": self.cluster_size,
             "extra_mounts": self.extra_mounts,
+        }
+
+
+@dataclass
+class ModelServiceCreator(Creator):
+    service_name: str
+    replicas: int
+    image: str
+    runtime_variant: RuntimeVariant
+    architecture: str
+    group_name: str
+    domain_name: str
+    cluster_size: int
+    cluster_mode: ClusterMode
+    open_to_public: bool
+    config: ServiceConfig
+    sudo_session_enabled: bool
+    model_service_prepare_ctx: ModelServicePrepareCtx
+    tag: Optional[str] = None
+    startup_command: Optional[str] = None
+    bootstrap_script: Optional[str] = None
+    callback_url: Optional[AnyUrl] = None
+
+    @override
+    def fields_to_store(self) -> dict[str, Any]:
+        return {}
+
+
+@dataclass
+class EndpointAutoScalingRuleCreator(Creator):
+    metric_source: AutoScalingMetricSource
+    metric_name: str
+    threshold: str
+    comparator: AutoScalingMetricComparator
+    step_size: int
+    cooldown_seconds: int
+    min_replicas: Optional[int] = None
+    max_replicas: Optional[int] = None
+
+    @override
+    def fields_to_store(self) -> dict[str, Any]:
+        return {
+            "metric_source": self.metric_source,
+            "metric_name": self.metric_name,
+            "threshold": self.threshold,
+            "comparator": self.comparator,
+            "step_size": self.step_size,
+            "cooldown_seconds": self.cooldown_seconds,
+            "min_replicas": self.min_replicas,
+            "max_replicas": self.max_replicas,
         }

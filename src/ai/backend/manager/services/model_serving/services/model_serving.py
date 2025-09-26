@@ -39,6 +39,14 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.creator import EndpointCreator
 from ai.backend.manager.data.model_serving.types import (
+    CompactServiceInfo,
+    ErrorInfo,
+    ModelServiceDefinition,
+    RequesterCtx,
+    RouteInfo,
+    ServiceInfo,
+)
+from ai.backend.manager.data.model_serving.types import (
     EndpointTokenData as ServiceEndpointTokenData,
 )
 from ai.backend.manager.errors.service import (
@@ -112,14 +120,6 @@ from ai.backend.manager.services.model_serving.actions.update_route import (
 from ai.backend.manager.services.model_serving.exceptions import (
     GenericForbidden,
     InvalidAPIParameters,
-)
-from ai.backend.manager.services.model_serving.types import (
-    CompactServiceInfo,
-    ErrorInfo,
-    ModelServiceDefinition,
-    RequesterCtx,
-    RouteInfo,
-    ServiceInfo,
 )
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType

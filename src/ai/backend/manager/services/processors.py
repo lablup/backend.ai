@@ -1,18 +1,5 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Self, override
-
-from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
-from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
-from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
-from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
-from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.deployment.service import DeploymentService
-from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
-from ai.backend.manager.services.object_storage.service import ObjectStorageService
-
-if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.deployment import DeploymentController
-    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from typing import Optional, Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -35,10 +22,16 @@ from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
+from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
+from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
+from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
+from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.deployment.processors import DeploymentProcessors
+from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.group.processors import GroupProcessors
@@ -64,6 +57,8 @@ from ai.backend.manager.services.model_serving.services.auto_scaling import Auto
 from ai.backend.manager.services.model_serving.services.model_serving import (
     ModelServingService,
 )
+from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
+from ai.backend.manager.services.object_storage.service import ObjectStorageService
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -86,6 +81,8 @@ from ai.backend.manager.services.vfolder.processors import (
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 
 @dataclass
@@ -105,8 +102,8 @@ class ServiceArgs:
     idle_checker_host: IdleCheckerHost
     event_dispatcher: EventDispatcher
     hook_plugin_ctx: HookPluginContext
-    scheduling_controller: "SchedulingController"
-    deployment_controller: "DeploymentController"
+    scheduling_controller: SchedulingController
+    deployment_controller: DeploymentController
 
 
 @dataclass

@@ -48,6 +48,14 @@ from ai.backend.manager.data.deployment.types import (
     ResourceSpec,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
+from ai.backend.manager.data.model_serving.creator import ModelServiceCreator
+from ai.backend.manager.data.model_serving.types import (
+    ModelServicePrepareCtx,
+    MountOption,
+    RequesterCtx,
+    ServiceConfig,
+    ServiceInfo,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
@@ -83,14 +91,6 @@ from ai.backend.manager.services.model_serving.actions.scale_service_replicas im
     ScaleServiceReplicasAction,
 )
 from ai.backend.manager.services.model_serving.actions.update_route import UpdateRouteAction
-from ai.backend.manager.services.model_serving.types import (
-    ModelServiceCreator,
-    ModelServicePrepareCtx,
-    MountOption,
-    RequesterCtx,
-    ServiceConfig,
-    ServiceInfo,
-)
 
 from ..defs import DEFAULT_IMAGE_ARCH
 from ..errors.api import InvalidAPIParameters

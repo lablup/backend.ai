@@ -31,12 +31,18 @@ from ai.backend.common.types import (
     RuleId,
     RuntimeVariant,
 )
+from ai.backend.manager.data.model_serving.creator import EndpointAutoScalingRuleCreator
 from ai.backend.manager.data.model_serving.modifier import (
+    EndpointAutoScalingRuleModifier,
     EndpointModifier,
     ExtraMount,
     ImageRef,
 )
-from ai.backend.manager.data.model_serving.types import EndpointAutoScalingRuleData, EndpointData
+from ai.backend.manager.data.model_serving.types import (
+    EndpointAutoScalingRuleData,
+    EndpointData,
+    RequesterCtx,
+)
 from ai.backend.manager.defs import SERVICE_MAX_RETRIES
 from ai.backend.manager.models.gql_models.base import ImageRefType
 from ai.backend.manager.models.gql_models.image import ImageNode
@@ -54,11 +60,6 @@ from ai.backend.manager.services.model_serving.actions.modify_auto_scaling_rule 
     ModifyEndpointAutoScalingRuleAction,
 )
 from ai.backend.manager.services.model_serving.actions.modify_endpoint import ModifyEndpointAction
-from ai.backend.manager.services.model_serving.types import (
-    EndpointAutoScalingRuleCreator,
-    EndpointAutoScalingRuleModifier,
-    RequesterCtx,
-)
 from ai.backend.manager.types import OptionalState, TriState
 
 from ...errors.common import (

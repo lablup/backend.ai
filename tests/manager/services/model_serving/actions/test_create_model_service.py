@@ -5,6 +5,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.types import AccessKey, ClusterMode, RuntimeVariant
+from ai.backend.manager.data.model_serving.creator import ModelServiceCreator
+from ai.backend.manager.data.model_serving.types import (
+    ModelServicePrepareCtx,
+    ServiceConfig,
+    ServiceInfo,
+)
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.services.model_serving.actions.create_model_service import (
@@ -14,12 +20,6 @@ from ai.backend.manager.services.model_serving.actions.create_model_service impo
 from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParameters
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
-)
-from ai.backend.manager.services.model_serving.types import (
-    ModelServiceCreator,
-    ModelServicePrepareCtx,
-    ServiceConfig,
-    ServiceInfo,
 )
 
 from ...utils import ScenarioBase

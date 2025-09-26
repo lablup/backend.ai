@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.manager.data.model_serving.types import RequesterCtx
 from ai.backend.manager.errors.service import ModelServiceNotFound
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.delete_model_service import (
@@ -12,7 +13,6 @@ from ai.backend.manager.services.model_serving.actions.delete_model_service impo
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-from ai.backend.manager.services.model_serving.types import RequesterCtx
 
 from ...utils import ScenarioBase
 
