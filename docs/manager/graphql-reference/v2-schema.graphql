@@ -37,6 +37,16 @@ type AccessTokenEdge {
   node: AccessToken!
 }
 
+"""Added in 25.15.0"""
+input AccessTokenOrderBy {
+  field: AccessTokenOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum AccessTokenOrderField {
+  CREATED_AT
+}
+
 """
 Added in 25.15.0. This enum represents the activeness status of a replica, indicating whether the deployment is currently active and able to serve requests.
 """
@@ -1117,7 +1127,7 @@ type ModelDeploymentNetworkAccess {
   endpointUrl: String
   preferredDomainName: String
   openToPublic: Boolean!
-  accessTokens: AccessTokenConnection!
+  accessTokens(orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
 }
 
 """Added in 25.15.0"""
