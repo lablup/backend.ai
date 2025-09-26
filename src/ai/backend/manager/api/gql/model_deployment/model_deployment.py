@@ -5,7 +5,7 @@ from uuid import UUID, uuid4
 
 import strawberry
 from strawberry import ID, Info
-from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import (
@@ -28,6 +28,7 @@ from ai.backend.manager.api.gql.model_deployment.access_token import (
     AccessToken,
     AccessTokenConnection,
     AccessTokenEdge,
+    AccessTokenOrderBy,
 )
 from ai.backend.manager.api.gql.model_deployment.auto_scaling_rule import (
     AutoScalingRule,
@@ -57,12 +58,16 @@ from ai.backend.manager.models.gql_models.domain import DomainNode
 from ai.backend.manager.models.gql_models.group import GroupNode
 from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.repositories.deployment.types.types import (
+    AccessTokenOrderingOptions,
     DeploymentFilterOptions,
     DeploymentOrderingOptions,
     DeploymentStatusFilterType,
 )
 from ai.backend.manager.repositories.deployment.types.types import (
     DeploymentStatusFilter as RepoDeploymentStatusFilter,
+)
+from ai.backend.manager.services.deployment.actions.access_token.list_access_tokens import (
+    ListAccessTokensAction,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.batch_load_auto_scaling_rules import (
     BatchLoadAutoScalingRulesAction,
@@ -199,6 +204,20 @@ class ModelDeploymentMetadata:
         )
 
 
+def _convert_gql_revision_ordering_to_repo_ordering(
+    order_by: Optional[list[AccessTokenOrderBy]],
+) -> AccessTokenOrderingOptions:
+    if order_by is None or len(order_by) == 0:
+        return AccessTokenOrderingOptions()
+
+    repo_ordering = []
+    for order in order_by:
+        desc = order.direction == OrderDirection.DESC
+        repo_ordering.append((order.field, desc))
+
+    return AccessTokenOrderingOptions(order_by=repo_ordering)
+
+
 @strawberry.type(description="Added in 25.15.0")
 class ModelDeploymentNetworkAccess:
     _access_token_ids: strawberry.Private[Optional[list[UUID]]]
@@ -207,35 +226,60 @@ class ModelDeploymentNetworkAccess:
     open_to_public: bool = False
 
     @strawberry.field
-    async def access_tokens(self, info: Info[StrawberryGQLContext]) -> AccessTokenConnection:
+    async def access_tokens(
+        self,
+        info: Info[StrawberryGQLContext],
+        order_by: Optional[list[AccessTokenOrderBy]] = None,
+        before: Optional[str] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        last: Optional[int] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> AccessTokenConnection:
         """Resolve access tokens using dataloader."""
-        access_token_loader = info.context.dataloader_registry.get_loader(
-            AccessToken.batch_load_by_ids, info.context
-        )
-        token_nodes: list[AccessToken] = await access_token_loader.load(
-            self._access_token_ids if self._access_token_ids else []
+        repo_ordering = _convert_gql_revision_ordering_to_repo_ordering(order_by)
+
+        pagination_options = build_pagination_options(
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
         )
 
-        edges = [
-            AccessTokenEdge(node=token_node, cursor=str(token_node.id))
-            for token_node in token_nodes
-        ]
+        processor = info.context.processors.deployment
+        if processor is None:
+            raise ModelDeploymentUnavailable(
+                "Model Deployment feature is unavailable. Please contact support."
+            )
+        action_result = await processor.list_access_tokens.wait_for_complete(
+            ListAccessTokensAction(
+                pagination=pagination_options,
+                ordering=repo_ordering,
+            )
+        )
+        edges = []
+        tokens = action_result.data
+        total_count = action_result.total_count
+
+        for token in tokens:
+            edges.append(
+                AccessTokenEdge(
+                    node=AccessToken.from_dataclass(token),
+                    cursor=to_global_id(AccessToken, token.id),
+                )
+            )
+
+        page_info = build_page_info(edges, total_count, pagination_options)
 
         return AccessTokenConnection(
-            count=len(edges),
-            edges=edges,
-            page_info=PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
+            count=total_count, edges=edges, page_info=page_info.to_strawberry_page_info()
         )
 
     @classmethod
-    def from_dataclass(
-        cls, data: DeploymentNetworkSpec, deployment_id: NodeID
-    ) -> "ModelDeploymentNetworkAccess":
+    def from_dataclass(cls, data: DeploymentNetworkSpec) -> "ModelDeploymentNetworkAccess":
         return cls(
             _access_token_ids=data.access_token_ids,
             endpoint_url=data.url,
@@ -272,10 +316,7 @@ class ModelDeployment(Node):
 
     @strawberry.field
     async def replica_state(self, info: Info[StrawberryGQLContext]) -> ReplicaState:
-        _, deployment_id = resolve_global_id(self.id)
-
         return ReplicaState(
-            _deployment_id=UUID(deployment_id),
             desired_replica_count=self._replica_state_data.desired_replica_count,
             _replica_ids=self._replica_state_data.replica_ids,
         )
@@ -352,9 +393,7 @@ class ModelDeployment(Node):
         return cls(
             id=ID(str(data.id)),
             metadata=metadata,
-            network_access=ModelDeploymentNetworkAccess.from_dataclass(
-                data.network_access, ID(str(data.id))
-            ),
+            network_access=ModelDeploymentNetworkAccess.from_dataclass(data.network_access),
             revision=ModelRevision.from_dataclass(data.revision) if data.revision else None,
             default_deployment_strategy=DeploymentStrategy(
                 type=DeploymentStrategyType(data.default_deployment_strategy)
