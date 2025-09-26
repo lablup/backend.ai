@@ -320,7 +320,7 @@ Then put the followings in ``.vimrc`` (or ``.nvimrc`` for NeoVim) in the build r
    let g:ale_fix_on_save = 1
 
 When using CoC, run ``:CocInstall coc-basedpyright @yaegassy/coc-ruff`` and ``:CocLocalConfig`` after opening a file
-in the local working copy to initialize Pyright functionalities.
+in the local working copy to initialize basedpyright functionalities.
 In the local configuration file (``.vim/coc-settings.json``), you may put the linter/formatter configurations
 just like VSCode (see `the official reference <https://www.npmjs.com/package/coc-pyright>`_,
 as basedpyright shares most configurations with pyright).
