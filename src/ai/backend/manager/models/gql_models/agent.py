@@ -160,7 +160,7 @@ class AgentNode(graphene.ObjectType):
         row: AgentRow,
     ) -> Self:
         known_slot_types = await ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
-        occupied_slots = await row.get_occupied_slots(ctx.db, known_slot_types)
+        occupied_slots = await row.get_occupied_slots(ctx.db, row.id, known_slot_types)
         return cls(
             id=row.id,
             row_id=row.id,
@@ -362,12 +362,14 @@ class Agent(graphene.ObjectType):
     compute_containers = graphene.List(ComputeContainer, status=graphene.String())
 
     @classmethod
-    def from_row(
+    async def from_row(
         cls,
         ctx: GraphQueryContext,
         row: Row,
-    ) -> Agent:
+    ) -> Self:
         mega = 2**20
+        known_slot_types = await ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
+        occupied_slots = await AgentRow.get_occupied_slots(ctx.db, row["id"], known_slot_types)
         return cls(
             id=row["id"],
             status=row["status"].name,
@@ -376,7 +378,7 @@ class Agent(graphene.ObjectType):
             scaling_group=row["scaling_group"],
             schedulable=row["schedulable"],
             available_slots=row["available_slots"].to_json(),
-            occupied_slots=row["occupied_slots"].to_json(),
+            occupied_slots=occupied_slots.to_json(),
             addr=row["addr"],
             architecture=row["architecture"],
             first_contact=row["first_contact"],
@@ -531,8 +533,12 @@ class Agent(graphene.ObjectType):
                 agents.c.scaling_group.asc(),
                 agents.c.id.asc(),
             )
+        result: list[Self] = []
         async with graph_ctx.db.begin_readonly() as conn:
-            return [cls.from_row(graph_ctx, row) async for row in (await conn.stream(query))]
+            async for row in await conn.stream(query):
+                resolved = await cls.from_row(graph_ctx, row)
+                result.append(resolved)
+            return result
 
     @classmethod
     async def load_all(
@@ -547,8 +553,12 @@ class Agent(graphene.ObjectType):
             query = query.where(agents.c.scaling_group == scaling_group)
         if raw_status is not None:
             query = query.where(agents.c.status == AgentStatus[raw_status])
+        result: list[Self] = []
         async with graph_ctx.db.begin_readonly() as conn:
-            return [cls.from_row(graph_ctx, row) async for row in (await conn.stream(query))]
+            async for row in await conn.stream(query):
+                resolved = await cls.from_row(graph_ctx, row)
+                result.append(resolved)
+            return result
 
     @classmethod
     async def batch_load(
