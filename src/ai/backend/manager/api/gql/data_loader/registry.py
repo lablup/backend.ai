@@ -1,9 +1,10 @@
-from typing import Any, Awaitable, Callable
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 from aiotools import apartial
 from strawberry.dataloader import DataLoader
 
-from ai.backend.manager.api.gql.types import StrawberryGQLContext
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 
 class DataLoaderRegistry:
@@ -14,8 +15,8 @@ class DataLoaderRegistry:
 
     def get_loader(
         self,
-        func: Callable[[StrawberryGQLContext, Any], Awaitable[Any]],
-        context: StrawberryGQLContext,
+        func: Callable[["StrawberryGQLContext", Any], Awaitable[Any]],
+        context: "StrawberryGQLContext",
     ) -> DataLoader:
         loader = self._loader.get(func, None)
         if loader is None:
