@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -8,6 +10,8 @@ from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
 
+from ..kernel.types import KernelInfo, KernelStatus
+
 
 class AgentStatus(enum.Enum):
     ALIVE = 0
@@ -17,7 +21,7 @@ class AgentStatus(enum.Enum):
 
     @override
     @classmethod
-    def _missing_(cls, value: Any) -> Optional["AgentStatus"]:
+    def _missing_(cls, value: Any) -> Optional[AgentStatus]:
         if isinstance(value, int):
             for member in cls:
                 if member.value == value:
@@ -54,6 +58,18 @@ class AgentData:
     compute_plugins: list[str]
     public_key: Optional[PublicKey]
     auto_terminate_abusing_kernel: bool
+
+
+@dataclass
+class AgentDataExtended(AgentData):
+    kernels: list[KernelInfo]
+
+    def running_kernel_occupied_slots(self) -> ResourceSlot:
+        total = ResourceSlot()
+        for kernel in self.kernels:
+            if kernel.lifecycle.status == KernelStatus.RUNNING:
+                total += kernel.resource.occupied_slots
+        return total
 
 
 @dataclass
@@ -163,7 +179,7 @@ class UpsertResult:
 
     @classmethod
     def from_state_comparison(
-        cls, existing_data: Optional[AgentData], upsert_data: "AgentHeartbeatUpsert"
+        cls, existing_data: Optional[AgentData], upsert_data: AgentHeartbeatUpsert
     ) -> Self:
         if existing_data is None:
             return cls(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -15,7 +15,6 @@ import graphene
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
-from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common.bgtask.bgtask import ProgressReporter
@@ -23,11 +22,12 @@ from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
-    BinarySize,
     HardwareMetadata,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.repositories.agent.query import QueryConditions
 
 from ..agent import (
     ADMIN_PERMISSIONS,
@@ -154,15 +154,26 @@ class AgentNode(graphene.ObjectType):
     )
 
     @classmethod
-    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Optional[Self]:
-        graphene_ctx: GraphQueryContext = info.context
-        _, raw_agent_id = AsyncNode.resolve_global_id(info, id)
-
-        async with graphene_ctx.db.begin_readonly_session() as session:
-            agent_row = await session.scalar(sa.select(AgentRow).where(AgentRow.id == raw_agent_id))
-            if agent_row is None:
-                return None
-            return await cls.from_row(graphene_ctx, agent_row)
+    def from_extended_data(cls, data: AgentDataExtended) -> Self:
+        occupied_slots = data.running_kernel_occupied_slots().to_json()
+        return cls(
+            id=data.id,
+            row_id=data.id,
+            status=data.status.name,
+            status_changed=data.status_changed,
+            region=data.region,
+            scaling_group=data.scaling_group,
+            schedulable=data.schedulable,
+            available_slots=data.available_slots.to_json(),
+            occupied_slots=occupied_slots,
+            addr=data.addr,
+            architecture=data.architecture,
+            first_contact=data.first_contact,
+            lost_at=data.lost_at,
+            version=data.version,
+            compute_plugins=data.compute_plugins,
+            auto_terminate_abusing_kernel=data.auto_terminate_abusing_kernel,
+        )
 
     @classmethod
     async def from_row(
@@ -190,17 +201,6 @@ class AgentNode(graphene.ObjectType):
             compute_plugins=row.compute_plugins,
             auto_terminate_abusing_kernel=row.auto_terminate_abusing_kernel,
         )
-
-    @classmethod
-    async def parse(
-        cls,
-        info: graphene.ResolveInfo,
-        row: AgentRow,
-        permissions: Iterable[AgentPermission],
-    ) -> Self:
-        result = await cls.from_row(info.context, row)
-        result.permissions = list(permissions)
-        return result
 
     async def resolve_kernel_nodes(
         self, info: graphene.ResolveInfo
@@ -317,10 +317,22 @@ class AgentNode(graphene.ObjectType):
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 agent_rows = (await db_session.scalars(query)).all()
                 total_cnt = await db_session.scalar(cnt_query)
+        agent_ids: list[AgentId] = []
 
-        result: list[AgentNode] = [
-            await cls.parse(info, row, await permission_getter(row)) for row in agent_rows
-        ]
+        agent_permissions: dict[AgentId, list[AgentPermission]] = {}
+        for row in agent_rows:
+            agent_ids.append(row.id)
+            permissions = await permission_getter(row)
+            agent_permissions[row.id] = list(permissions)
+        list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
+        condition = [QueryConditions.by_ids(agent_ids)]
+        agent_list = await graph_ctx.agent_repository.list_extended_data(condition)
+
+        result: list[AgentNode] = []
+        for agent in sorted(agent_list, key=lambda obj: list_order[obj.id]):
+            agent_node = cls.from_extended_data(agent)
+            agent_node.permissions = agent_permissions.get(agent.id, [])
+            result.append(agent_node)
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
@@ -373,40 +385,39 @@ class Agent(graphene.ObjectType):
     compute_containers = graphene.List(ComputeContainer, status=graphene.String())
 
     @classmethod
-    async def from_row(
-        cls,
-        ctx: GraphQueryContext,
-        row: Row,
-    ) -> Self:
-        mega = 2**20
-        known_slot_types = await ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
-        occupied_slots = await AgentRow.get_occupied_slots(ctx.db, row["id"], known_slot_types)
+    def from_data(cls, data: AgentData) -> Self:
         return cls(
-            id=row["id"],
-            status=row["status"].name,
-            status_changed=row["status_changed"],
-            region=row["region"],
-            scaling_group=row["scaling_group"],
-            schedulable=row["schedulable"],
-            available_slots=row["available_slots"].to_json(),
-            occupied_slots=occupied_slots.to_json(),
-            addr=row["addr"],
-            architecture=row["architecture"],
-            first_contact=row["first_contact"],
-            lost_at=row["lost_at"],
-            version=row["version"],
-            compute_plugins=row["compute_plugins"],
-            auto_terminate_abusing_kernel=row["auto_terminate_abusing_kernel"],
+            id=data.id,
+            status=data.status.name,
+            status_changed=data.status_changed,
+            region=data.region,
+            scaling_group=data.scaling_group,
+            schedulable=data.schedulable,
+            available_slots=data.available_slots.to_json(),
+            occupied_slots=data.occupied_slots.to_json(),
+            addr=data.addr,
+            architecture=data.architecture,
+            first_contact=data.first_contact,
+            lost_at=data.lost_at,
+            version=data.version,
+            compute_plugins=data.compute_plugins,
+            auto_terminate_abusing_kernel=False,  # legacy field
             # legacy fields
-            mem_slots=BinarySize.from_str(row["available_slots"]["mem"]) // mega,
-            cpu_slots=row["available_slots"]["cpu"],
-            gpu_slots=row["available_slots"].get("cuda.device", 0),
-            tpu_slots=row["available_slots"].get("tpu.device", 0),
-            used_mem_slots=BinarySize.from_str(row["occupied_slots"].get("mem", 0)) // mega,
-            used_cpu_slots=float(row["occupied_slots"].get("cpu", 0)),
-            used_gpu_slots=float(row["occupied_slots"].get("cuda.device", 0)),
-            used_tpu_slots=float(row["occupied_slots"].get("tpu.device", 0)),
+            mem_slots=data.available_slots.get("mem", 0) // (2**20),
+            cpu_slots=data.available_slots.get("cpu", 0),
+            gpu_slots=data.available_slots.get("cuda.device", 0),
+            tpu_slots=data.available_slots.get("tpu.device", 0),
+            used_mem_slots=data.occupied_slots.get("mem", 0) // (2**20),
+            used_cpu_slots=float(data.occupied_slots.get("cpu", 0)),
+            used_gpu_slots=float(data.occupied_slots.get("cuda.device", 0)),
+            used_tpu_slots=float(data.occupied_slots.get("tpu.device", 0)),
         )
+
+    @classmethod
+    def from_extended_data(cls, data: AgentDataExtended) -> Self:
+        instance = cls.from_data(data)
+        instance.occupied_slots = data.running_kernel_occupied_slots().to_json()
+        return instance
 
     async def resolve_compute_containers(
         self, info: graphene.ResolveInfo, *, status: Optional[str] = None
@@ -544,12 +555,17 @@ class Agent(graphene.ObjectType):
                 agents.c.scaling_group.asc(),
                 agents.c.id.asc(),
             )
-        result: list[Self] = []
+        agent_ids: list[AgentId] = []
         async with graph_ctx.db.begin_readonly() as conn:
             async for row in await conn.stream(query):
-                resolved = await cls.from_row(graph_ctx, row)
-                result.append(resolved)
-            return result
+                agent_ids.append(row.id)
+        list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
+        condition = [QueryConditions.by_ids(agent_ids)]
+        agent_list = await graph_ctx.agent_repository.list_extended_data(condition)
+        return [
+            cls.from_extended_data(agent)
+            for agent in sorted(agent_list, key=lambda obj: list_order[obj.id])
+        ]
 
     @classmethod
     async def load_all(
@@ -559,17 +575,14 @@ class Agent(graphene.ObjectType):
         scaling_group: Optional[str] = None,
         raw_status: Optional[str] = None,
     ) -> Sequence[Agent]:
-        query = sa.select([agents]).select_from(agents)
+        conditions = []
         if scaling_group is not None:
-            query = query.where(agents.c.scaling_group == scaling_group)
+            conditions.append(QueryConditions.by_scaling_group(scaling_group))
         if raw_status is not None:
-            query = query.where(agents.c.status == AgentStatus[raw_status])
-        result: list[Self] = []
-        async with graph_ctx.db.begin_readonly() as conn:
-            async for row in await conn.stream(query):
-                resolved = await cls.from_row(graph_ctx, row)
-                result.append(resolved)
-            return result
+            conditions.append(QueryConditions.by_statuses([AgentStatus[raw_status]]))
+
+        agent_list = await graph_ctx.agent_repository.list_extended_data(conditions)
+        return [cls.from_extended_data(agent) for agent in agent_list]
 
     @classmethod
     async def batch_load(
@@ -715,19 +728,15 @@ class AgentSummary(graphene.ObjectType):
     architecture = graphene.String()
 
     @classmethod
-    def from_row(
-        cls,
-        ctx: GraphQueryContext,
-        row: Row,
-    ) -> Self:
+    def from_data(cls, data: AgentData) -> Self:
         return cls(
-            id=row["id"],
-            status=row["status"].name,
-            scaling_group=row["scaling_group"],
-            schedulable=row["schedulable"],
-            available_slots=row["available_slots"].to_json(),
-            occupied_slots=row["occupied_slots"].to_json(),
-            architecture=row["architecture"],
+            id=data.id,
+            status=data.status.name,
+            scaling_group=data.scaling_group,
+            schedulable=data.schedulable,
+            available_slots=data.available_slots.to_json(),
+            occupied_slots=data.occupied_slots.to_json(),
+            architecture=data.architecture,
         )
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
@@ -838,8 +847,17 @@ class AgentSummary(graphene.ObjectType):
                 agents.c.scaling_group.asc(),
                 agents.c.id.asc(),
             )
+        agent_ids: list[AgentId] = []
         async with graph_ctx.db.begin_readonly() as conn:
-            return [cls.from_row(graph_ctx, row) async for row in (await conn.stream(query))]
+            async for row in await conn.stream(query):
+                agent_ids.append(row.id)
+
+        list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
+        condition = [QueryConditions.by_ids(agent_ids)]
+        agent_list = await graph_ctx.agent_repository.list_data(condition)
+        return [
+            cls.from_data(agent) for agent in sorted(agent_list, key=lambda obj: list_order[obj.id])
+        ]
 
 
 class AgentSummaryList(graphene.ObjectType):

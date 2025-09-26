@@ -92,6 +92,7 @@ if TYPE_CHECKING:
     from ..idle import IdleCheckerHost
     from ..models.utils import ExtendedAsyncSAEngine
     from ..registry import AgentRegistry
+    from ..repositories.agent.repository import AgentRepository
     from ..repositories.scheduler.repository import SchedulerRepository
     from ..repositories.user.repository import UserRepository
     from .storage import StorageSessionManager
@@ -330,6 +331,7 @@ class GraphQueryContext:
     processors: Processors
     scheduler_repository: SchedulerRepository
     user_repository: UserRepository
+    agent_repository: AgentRepository
 
 
 class Mutation(graphene.ObjectType):
