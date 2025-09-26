@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.data.storage.registries.types import ModelTarget
+from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import ArtifactType
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
@@ -20,6 +20,7 @@ class ScanArtifactsReq(BaseRequestModel):
         lt=ARTIFACT_MAX_SCAN_LIMIT,
         description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})",
     )
+    order: Optional[ModelSortKey] = None
     search: Optional[str] = None
 
 

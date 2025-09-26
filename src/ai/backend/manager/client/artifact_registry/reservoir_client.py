@@ -9,9 +9,10 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.auth.utils import generate_signature
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
-from ai.backend.manager.dto.request import SearchArtifactsReq
+from ai.backend.manager.dto.request import ScanArtifactsReq, SearchArtifactsReq
 from ai.backend.manager.dto.response import (
     GetArtifactRevisionReadmeResponse,
+    ScanArtifactsResponse,
     SearchArtifactsResponse,
 )
 
@@ -68,6 +69,11 @@ class ReservoirRegistryClient:
             async with session.request(method, str(url), headers=header, **kwargs) as response:
                 response.raise_for_status()
                 return await response.json()
+
+    async def scan_artifacts(self, req: ScanArtifactsReq) -> ScanArtifactsResponse:
+        return await self._request(
+            "POST", "/artifact-registries/scan", json=req.model_dump(mode="json")
+        )
 
     async def search_artifacts(self, req: SearchArtifactsReq) -> SearchArtifactsResponse:
         return await self._request(
