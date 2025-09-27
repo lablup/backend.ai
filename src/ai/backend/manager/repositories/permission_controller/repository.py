@@ -1,9 +1,13 @@
 import uuid
+from collections.abc import Mapping
 from typing import Optional
 
 from ai.backend.common.metrics.metric import LayerType
 
+from ...data.permission.id import ObjectId
 from ...data.permission.role import (
+    BatchEntityPermissionCheckInput,
+    ObjectPermissionSet,
     RoleCreateInput,
     RoleData,
     RoleDeleteInput,
@@ -12,6 +16,7 @@ from ...data.permission.role import (
     SingleEntityPermissionCheckInput,
     UserRoleAssignmentInput,
 )
+from ...data.permission.types import OperationType
 from ...decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
@@ -82,12 +87,52 @@ class PermissionControllerRepository:
     @repository_decorator()
     async def check_permission_in_scope(self, data: ScopePermissionCheckInput) -> bool:
         target_scope_id = data.target_scope_id
-        role_rows = await self._db_source.get_user_roles(data.user_id)
-        for role in role_rows:
-            for permission_group in role.permission_group_rows:
-                if permission_group.parsed_scope_id() != target_scope_id:
-                    continue
-                for permission in permission_group.permission_rows:
-                    if permission.operation == data.operation:
-                        return True
+        scope_permissions = await self._db_source.get_scope_permissions(
+            data.user_id, target_scope_id
+        )
+        if (
+            scope_permissions.global_permissions is not None
+            and data.operation in scope_permissions.global_permissions
+        ):
+            return True
+        if data.operation in scope_permissions.scope_permissions:
+            return True
         return False
+
+    def _determine_permission_from_set(
+        self, permission_set: ObjectPermissionSet, requested_operation: OperationType
+    ) -> bool:
+        if (
+            permission_set.global_permissions is not None
+            and requested_operation in permission_set.global_permissions
+        ):
+            return True
+        if requested_operation in permission_set.object_permissions:
+            return True
+        for scope_perms in permission_set.mapped_scopes.values():
+            if requested_operation in scope_perms:
+                return True
+        return False
+
+    @repository_decorator()
+    async def check_permission_of_entities(
+        self,
+        data: BatchEntityPermissionCheckInput,
+    ) -> Mapping[ObjectId, bool]:
+        """
+        Check if the user has the requested operation permission on the given entity IDs.
+        Returns a mapping of entity ID to a boolean indicating permission.
+        """
+        object_permissions = await self._db_source.get_batch_object_permissions(
+            data.user_id, data.target_object_ids
+        )
+        requested_operation = data.operation
+
+        result: dict[ObjectId, bool] = {}
+        for obj_id in data.target_object_ids:
+            perm_set = object_permissions.get(obj_id)
+            if perm_set is not None:
+                result[obj_id] = self._determine_permission_from_set(perm_set, requested_operation)
+            else:
+                result[obj_id] = False
+        return result

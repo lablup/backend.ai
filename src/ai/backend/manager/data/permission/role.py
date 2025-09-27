@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -10,7 +12,7 @@ from .object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
     ObjectPermissionData,
 )
-from .permission_group import PermissionGroupCreatorBeforeRoleCreation
+from .permission_group import PermissionGroupCreatorBeforeRoleCreation, PermissionGroupData
 from .status import RoleStatus
 from .types import EntityType, OperationType, RoleSource
 
@@ -71,6 +73,7 @@ class RoleDataWithPermissions:
     source: RoleSource
     status: RoleStatus
 
+    permission_groups: list[PermissionGroupData]
     object_permissions: list[ObjectPermissionData]
 
     created_at: datetime
@@ -92,6 +95,28 @@ class SingleEntityPermissionCheckInput:
     user_id: uuid.UUID
     target_object_id: ObjectId
     operation: OperationType
+
+
+@dataclass
+class BatchEntityPermissionCheckInput:
+    user_id: uuid.UUID
+    target_object_ids: list[ObjectId]
+    operation: OperationType
+
+
+@dataclass
+class ScopePermissionSet:
+    scope_id: ScopeId
+    scope_permissions: set[OperationType]
+    global_permissions: Optional[set[OperationType]]
+
+
+@dataclass
+class ObjectPermissionSet:
+    object_id: ObjectId
+    object_permissions: set[OperationType]
+    mapped_scopes: dict[ScopeId, set[OperationType]]
+    global_permissions: Optional[set[OperationType]]
 
 
 @dataclass
