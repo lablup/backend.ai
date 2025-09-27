@@ -1,3 +1,3 @@
 from typing import Final, Literal
 
-ROOT_PRIVILEGED_TAG: Final[Literal["privileged"]] = "privileged"
+PRIVILEGED_WORKER_TAG: Final[Literal["privileged"]] = "privileged"
