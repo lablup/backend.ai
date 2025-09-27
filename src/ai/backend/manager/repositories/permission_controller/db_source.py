@@ -163,8 +163,10 @@ class PermissionDBSource:
                 sa.and_(
                     RoleRow.status == RoleStatus.ACTIVE,
                     UserRoleRow.user_id == user_id,
-                    PermissionGroupRow.scope_type == scope_id.scope_type,
-                    PermissionGroupRow.scope_id == scope_id.scope_id,
+                    sa.or_(
+                        PermissionGroupRow.scope_type == ScopeType.GLOBAL,
+                        PermissionGroupRow.scope_id == scope_id.scope_id,
+                    ),
                 )
             )
             .options(
@@ -212,6 +214,7 @@ class PermissionDBSource:
                     RoleRow.status == RoleStatus.ACTIVE,
                     UserRoleRow.user_id == user_id,
                     sa.or_(
+                        PermissionGroupRow.scope_type == ScopeType.GLOBAL,
                         AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),  # type: ignore[attr-defined]
                         ObjectPermissionRow.entity_id.in_(object_id_for_cond),  # type: ignore[attr-defined]
                     ),
