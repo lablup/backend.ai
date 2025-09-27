@@ -3,15 +3,19 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Self, override
 
-from ai.backend.common.bgtask.reporter import ProgressReporter
-from ai.backend.common.bgtask.task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskHandler
+from ai.backend.common.bgtask.task.base import (
+    BaseBackgroundTaskArgs,
+    BaseBackgroundTaskHandler,
+    BaseBackgroundTaskResult,
+    EmptyTaskResult,
+)
 from ai.backend.common.bgtask.types import TaskName
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderCloneFailureEvent,
     VFolderCloneSuccessEvent,
 )
-from ai.backend.common.types import DispatchResult, VFolderID
+from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
 
 from ...volumes.pool import VolumePool
@@ -26,7 +30,7 @@ class VFolderCloneTaskArgs(BaseBackgroundTaskArgs):
     dst_vfolder: VFolderID
 
     @override
-    def to_metadata_body(self) -> dict[str, Any]:
+    def to_redis_json(self) -> Mapping[str, Any]:
         return {
             "volume": self.volume,
             "src_vfolder": str(self.src_vfolder),
@@ -35,7 +39,7 @@ class VFolderCloneTaskArgs(BaseBackgroundTaskArgs):
 
     @classmethod
     @override
-    def from_metadata_body(cls, body: Mapping[str, Any]) -> Self:
+    def from_redis_json(cls, body: Mapping[str, Any]) -> Self:
         return cls(
             volume=body["volume"],
             src_vfolder=VFolderID.from_str(body["src_vfolder"]),
@@ -56,10 +60,13 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
     def name(cls) -> TaskName:
         return TaskName.CLONE_VFOLDER
 
+    @classmethod
     @override
-    async def execute(
-        self, reporter: ProgressReporter, args: VFolderCloneTaskArgs
-    ) -> DispatchResult:
+    def args_type(cls) -> type[VFolderCloneTaskArgs]:
+        return VFolderCloneTaskArgs
+
+    @override
+    async def execute(self, args: VFolderCloneTaskArgs) -> BaseBackgroundTaskResult:
         try:
             async with self._volume_pool.get_volume_by_name(args.volume) as volume:
                 await volume.clone_vfolder(
@@ -77,7 +84,7 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
                     str(e),
                 )
             )
-            return DispatchResult(errors=[str(e)])
+            raise e
         else:
             await self._event_producer.anycast_event(
                 VFolderCloneSuccessEvent(
@@ -85,9 +92,4 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
                     args.dst_vfolder,
                 )
             )
-        return DispatchResult()
-
-    @classmethod
-    @override
-    def args_type(cls) -> type[VFolderCloneTaskArgs]:
-        return VFolderCloneTaskArgs
+        return EmptyTaskResult()
