@@ -12,7 +12,7 @@ def _sitepkg_version() -> str:
     return f"python{version[0]}.{version[1]}{abi_thread}"
 
 
-def _reexec_with_argv0(argv0: str) -> None:
+def _reexec_with_argv0(display_name: str) -> None:
     if os.environ.get("BACKEND_REEXECED") != "1":
         env = os.environ.copy()
         env["BACKEND_REEXECED"] = "1"
@@ -23,18 +23,18 @@ def _reexec_with_argv0(argv0: str) -> None:
                 mod_name = spec.name
         except Exception:
             pass
-        argv1 = sys.argv[1]
-        # Prevent being terminated by "pkill -f python" by aliasing the runtime-type argument.
-        if argv1 == "python":
-            argv1 = "default"
+        # Pass original argv via file to hide strings including "python" in runtime-type and runtime-path.
+        args_path = Path(f"/tmp/{os.getpid()}.krunner-args")
+        args_path.write_text("\0".join(sys.argv[1:]))
         # "-s" option is to disable user site configurations.
         if mod_name:
-            argv = [argv0, "-s", "-m", mod_name, argv1] + sys.argv[2:]
+            argv = [display_name, "-s", "-m", mod_name]
         else:
-            argv = [argv0, "-s", sys.argv[0], argv1] + sys.argv[2:]
+            argv = [display_name, "-s", sys.argv[0]]
         venv = os.environ.get("VIRTUAL_ENV", None)
         if venv is None:
             env["PYTHONHOME"] = sys.prefix
+        # The process is re-executed in place, overriding argv and cmdline.
         os.execvpe(sys.executable, argv, env)
     else:
         venv = os.environ.get("VIRTUAL_ENV", None)
@@ -61,7 +61,6 @@ __all__ = (
 lang_map = {
     "app": "ai.backend.kernel.app.Runner",
     "python": "ai.backend.kernel.python.Runner",
-    "default": "ai.backend.kernel.python.Runner",
     "c": "ai.backend.kernel.c.Runner",
     "cpp": "ai.backend.kernel.cpp.Runner",
     "golang": "ai.backend.kernel.golang.Runner",

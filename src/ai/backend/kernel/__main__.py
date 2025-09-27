@@ -26,11 +26,17 @@ def setproctitle(title):
     libc.prctl(PR_SET_NAME, title)
 
 
-def parse_args(args=None):
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("lang", type=str, choices=lang_map.keys())
     parser.add_argument("runtime_path", type=Path, nargs="?", default=None)
+    if os.environ.get("BACKEND_REEXECED") == "1":
+        args_path = Path(f"/tmp/{os.getpid()}.krunner-args")
+        args = args_path.read_text().split("\0")
+        args_path.unlink()
+    else:
+        args = None  # read from sys.argv
     return parser.parse_args(args)
 
 
