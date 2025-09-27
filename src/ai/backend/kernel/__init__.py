@@ -32,9 +32,13 @@ def _reexec_with_argv0(argv0: str) -> None:
             argv = [argv0, "-s", "-m", mod_name, argv1] + sys.argv[2:]
         else:
             argv = [argv0, "-s", sys.argv[0], argv1] + sys.argv[2:]
+        venv = os.environ.get("VIRTUAL_ENV", None)
+        if venv is None:
+            env["PYTHONHOME"] = sys.prefix
         os.execvpe(sys.executable, argv, env)
     else:
         venv = os.environ.get("VIRTUAL_ENV", None)
+        os.environ.pop("PYTHONHOME", None)
         if venv is not None:
             sys.prefix = venv
             sys.path.insert(0, str(Path(venv) / "lib" / _sitepkg_version() / "site-packages"))
