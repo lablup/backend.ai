@@ -68,6 +68,7 @@ from ..defs import (
 from ..errors.api import InvalidAPIParameters
 from ..errors.common import ObjectNotFound
 from ..errors.storage import (
+    InsufficientStoragePermission,
     VFolderGone,
     VFolderNotFound,
     VFolderOperationFailed,
@@ -963,16 +964,28 @@ async def prepare_vfolder_mounts(
     for requested_key, vfolder_name in requested_vfolder_names.items():
         if not (vfolder := accessible_vfolders_map.get(vfolder_name)):
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
-        await ensure_host_permission_allowed(
-            conn,
-            vfolder["host"],
-            allowed_vfolder_types=allowed_vfolder_types,
-            user_uuid=user_scope.user_uuid,
-            resource_policy=resource_policy,
-            domain_name=user_scope.domain_name,
-            group_id=user_scope.group_id,
-            permission=VFolderHostPermission.MOUNT_IN_SESSION,
-        )
+        try:
+            await ensure_host_permission_allowed(
+                conn,
+                vfolder["host"],
+                allowed_vfolder_types=allowed_vfolder_types,
+                user_uuid=user_scope.user_uuid,
+                resource_policy=resource_policy,
+                domain_name=user_scope.domain_name,
+                group_id=user_scope.group_id,
+                permission=VFolderHostPermission.MOUNT_IN_SESSION,
+            )
+        except InsufficientStoragePermission as e:
+            if vfolder["name"].startswith("."):
+                log.warning(
+                    "Skipping auto-mount VFolder '{}' due to insufficient permission",
+                    vfolder["name"],
+                )
+                continue
+            raise InsufficientStoragePermission(
+                f"Permission denied to mount VFolder '{vfolder_name}' on host '{vfolder['host']}'. {e.extra_msg}",
+                e.extra_data,
+            ) from e
         if unmanaged_path := cast(Optional[str], vfolder["unmanaged_path"]):
             vfid = VFolderID(vfolder["quota_scope_id"], vfolder["id"])
             vfsubpath = PurePosixPath(".")
@@ -1174,7 +1187,9 @@ async def ensure_host_permission_allowed(
         group_id=group_id,
     )
     if folder_host not in allowed_hosts or permission not in allowed_hosts[folder_host]:
-        raise InvalidAPIParameters(f"`{permission}` Not allowed in vfolder host(`{folder_host}`)")
+        raise InsufficientStoragePermission(
+            f"`{permission}` Not allowed in vfolder host(`{folder_host}`)"
+        )
 
 
 async def filter_host_allowed_permission(
@@ -1189,7 +1204,7 @@ async def filter_host_allowed_permission(
     allowed_hosts = VFolderHostPermissionMap()
     if "user" in allowed_vfolder_types:
         allowed_hosts_by_user = await get_allowed_vfolder_hosts_by_user(
-            db_conn, resource_policy, domain_name, user_uuid
+            db_conn, resource_policy, domain_name, user_uuid, group_id
         )
         allowed_hosts = allowed_hosts | allowed_hosts_by_user
     if "group" in allowed_vfolder_types and group_id is not None:
