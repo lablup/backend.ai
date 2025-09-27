@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import enum
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional, Self, TypeAlias, cast, override
+from typing import Optional, Self, TypeAlias, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -13,6 +12,7 @@ from sqlalchemy.orm import joinedload, load_only, relationship, selectinload, wi
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
+from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 
 from .base import (
@@ -45,32 +45,6 @@ __all__: Sequence[str] = (
     "recalc_agent_resource_occupancy",
     "list_schedulable_agents_by_sgroup",
 )
-
-
-class AgentStatus(enum.Enum):
-    ALIVE = 0
-    LOST = 1
-    RESTARTING = 2
-    TERMINATED = 3
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Optional[AgentStatus]:
-        if isinstance(value, int):
-            for member in cls:
-                if member.value == value:
-                    return member
-        if isinstance(value, str):
-            match value.upper():
-                case "ALIVE":
-                    return cls.ALIVE
-                case "LOST":
-                    return cls.LOST
-                case "RESTARTING":
-                    return cls.RESTARTING
-                case "TERMINATED":
-                    return cls.TERMINATED
-        return None
 
 
 agents = sa.Table(
@@ -115,6 +89,49 @@ class AgentRow(Base):
     __table__ = agents
     kernels = relationship("KernelRow", back_populates="agent_row")
     scaling_group_row = relationship("ScalingGroupRow", back_populates="agents")
+
+    def to_data(self) -> AgentData:
+        return AgentData(
+            id=self.id,
+            status=self.status,
+            status_changed=self.status_changed,
+            region=self.region,
+            scaling_group=self.scaling_group,
+            schedulable=self.schedulable,
+            available_slots=self.available_slots,
+            occupied_slots=self.occupied_slots,
+            addr=self.addr,
+            public_host=self.public_host,
+            first_contact=self.first_contact,
+            lost_at=self.lost_at,
+            version=self.version,
+            architecture=self.architecture,
+            compute_plugins=self.compute_plugins,
+            auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
+        )
+
+    def to_extended_data(self, known_slot_types: Mapping[SlotName, SlotTypes]) -> AgentDataExtended:
+        kernel_rows = cast(list[KernelRow], self.kernels)
+        return AgentDataExtended(
+            id=self.id,
+            status=self.status,
+            status_changed=self.status_changed,
+            region=self.region,
+            scaling_group=self.scaling_group,
+            schedulable=self.schedulable,
+            available_slots=self.available_slots,
+            occupied_slots=self.occupied_slots,
+            addr=self.addr,
+            public_host=self.public_host,
+            first_contact=self.first_contact,
+            lost_at=self.lost_at,
+            version=self.version,
+            architecture=self.architecture,
+            compute_plugins=self.compute_plugins,
+            auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
+            known_slot_types=known_slot_types,
+            kernels=[k.to_kernel_info() for k in kernel_rows],
+        )
 
     @classmethod
     async def get_agents_by_condition(

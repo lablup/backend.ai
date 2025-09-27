@@ -910,6 +910,7 @@ class KernelRow(Base):
                 else None,
                 registry=self.registry,
                 tag=self.tag,
+                architecture=self.architecture,
             ),
             network=NetworkConfig(
                 kernel_host=self.kernel_host,

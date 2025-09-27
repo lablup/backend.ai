@@ -11,7 +11,7 @@ class AgentRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = AgentRepository(args.db)
+        repository = AgentRepository(args.db, args.config_provider)
 
         return cls(
             repository=repository,
