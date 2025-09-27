@@ -6,15 +6,6 @@ import sys
 from pathlib import Path
 
 
-def _sitepkg_version() -> str:
-    version = sys.version_info
-    if hasattr(sys, "abiflags") and "t" in sys.abiflags:
-        abi_thread = "t"
-    else:
-        abi_thread = ""
-    return f"python{version[0]}.{version[1]}{abi_thread}"
-
-
 def _reexec_with_argv0(display_name: str) -> None:
     if os.environ.get("BACKEND_REEXECED") != "1":
         env = os.environ.copy()
