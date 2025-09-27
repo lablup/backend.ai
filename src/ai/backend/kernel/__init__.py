@@ -1,4 +1,7 @@
+from __future__ import annotations
+
 import os
+import site
 import sys
 from pathlib import Path
 
@@ -40,8 +43,9 @@ def _reexec_with_argv0(display_name: str) -> None:
         venv = os.environ.get("VIRTUAL_ENV", None)
         os.environ.pop("PYTHONHOME", None)
         if venv is not None:
+            venv_sitepkg_path = site.getsitepackages([str(Path(venv))])[0]
             sys.prefix = venv
-            sys.path.insert(0, str(Path(venv) / "lib" / _sitepkg_version() / "site-packages"))
+            sys.path.insert(0, venv_sitepkg_path)
 
 
 # Prevent being terminated by "pkill -f python" by overriding the cmdline executable name.
