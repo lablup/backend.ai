@@ -143,13 +143,17 @@ class AgentRow(Base):
             db=db,
         )
 
+    @classmethod
     async def get_occupied_slots(
-        self, db: ExtendedAsyncSAEngine, known_slot_types: Mapping[SlotName, SlotTypes]
+        cls,
+        db: ExtendedAsyncSAEngine,
+        agent_id: AgentId,
+        known_slot_types: Mapping[SlotName, SlotTypes],
     ) -> ResourceSlot:
         async with db.begin_readonly_session() as db_session:
             query = sa.select(KernelRow.occupied_slots).where(
                 sa.and_(
-                    KernelRow.agent == self.id,
+                    KernelRow.agent == agent_id,
                     KernelRow.status == KernelStatus.RUNNING,
                 )
             )

@@ -369,6 +369,15 @@ class ServiceConfig(BaseModel):
         validation_alias=AliasChoices("default_file_browser_image", "default-file-browser-image"),
         serialization_alias="default-file-browser-image",
     )
+    enable_reservoir: bool = Field(
+        default=False,
+        description="""
+        Whether to enable reservoir feature.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices("enable_reservoir", "enable-reservoir"),
+        serialization_alias="enable-reservoir",
+    )
 
     @field_validator("static_path")
     @classmethod

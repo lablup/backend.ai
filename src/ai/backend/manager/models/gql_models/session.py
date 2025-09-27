@@ -482,6 +482,10 @@ class ComputeSessionNode(graphene.ObjectType):
             kernel_nodes, None, None, None, total_count=len(kernel_nodes)
         )
 
+    async def resolve_resource_opts(self, info: graphene.ResolveInfo) -> dict[str, Any]:
+        kernel_nodes = self.kernel_nodes
+        return {kernel.cluster_hostname: kernel.resource_opts for kernel in kernel_nodes.node_list}
+
     async def resolve_dependees(
         self,
         info: graphene.ResolveInfo,
