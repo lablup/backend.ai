@@ -45,7 +45,9 @@ def _reexec_with_argv0(display_name: str) -> None:
 
 
 # Prevent being terminated by "pkill -f python" by overriding the cmdline executable name.
-_reexec_with_argv0("bai-krunner")
+# Though, this trick should NOT be used within pytest sessions.
+if os.environ.get("PYTEST_VERSION") is None:
+    _reexec_with_argv0("bai-krunner")
 
 
 # The above reexec function must run before ANY import!
