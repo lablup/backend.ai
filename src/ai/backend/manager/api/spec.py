@@ -89,7 +89,15 @@ GRAPHIQL_V2_HTML = """
     ></script>
 
     <script>
-      const fetcher = GraphiQL.createFetcher({ url: '../../admin/gql/strawberry' });
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      // Use Web Server proxy for GraphQL WebSocket subscriptions
+      const wsUrl = `${wsProtocol}//${window.location.host}/func/admin/gql/strawberry/ws`;
+      // const wsUrl = `${wsProtocol}//${window.location.host}/func/stream/gql`;
+
+      const fetcher = GraphiQL.createFetcher({
+        url: '../../admin/gql/strawberry',
+        subscriptionUrl: wsUrl,
+      });
 
       ReactDOM.render(
         React.createElement(GraphiQL, { fetcher: fetcher }),
