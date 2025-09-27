@@ -12,6 +12,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
+    SlotName,
 )
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
@@ -49,7 +50,10 @@ async def test_agent_selection_strategy_rr() -> None:
     example_homogeneous_pending_sessions = [
         create_mock_session(
             SessionId(uuid4()),
-            requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("1024")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("2"),
+                SlotName("mem"): Decimal("1024"),
+            }),
         )
         for _ in range(20)
     ]
@@ -71,7 +75,9 @@ async def test_agent_selection_strategy_rr() -> None:
     )
 
     num_agents = len(example_homogeneous_agents)
-    total_capacity = sum((ag.available_slots for ag in example_homogeneous_agents), ResourceSlot())
+    total_capacity = sum(
+        (ag.available_slots for ag in example_homogeneous_agents), ResourceSlot({})
+    )
     agent_ids = []
     # Repeat the allocation for two iterations
     for _ in range(num_agents * 2):
@@ -99,25 +105,37 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents() -> None:
     agents: Sequence[AgentRow] = [
         create_mock_agent(
             AgentId("i-001"),
-            available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("4096")}),
+            available_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("8"),
+                SlotName("mem"): Decimal("4096"),
+            }),
         ),
         create_mock_agent(
             AgentId("i-002"),
-            available_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("2048")}),
+            available_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("4"),
+                SlotName("mem"): Decimal("2048"),
+            }),
         ),
         create_mock_agent(
             AgentId("i-003"),
-            available_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("1024")}),
+            available_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("2"),
+                SlotName("mem"): Decimal("1024"),
+            }),
         ),
         create_mock_agent(
             AgentId("i-004"),
-            available_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("512")}),
+            available_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("512"),
+            }),
         ),
     ]
     pending_sessions = [
         create_mock_session(
             SessionId(uuid4()),
-            ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("500")}),
+            ResourceSlot({SlotName("cpu"): Decimal("2"), SlotName("mem"): Decimal("500")}),
         )
         for _ in range(8)
     ]
@@ -143,7 +161,7 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents() -> None:
         state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
 
-    total_capacity = sum((ag.available_slots for ag in agents), ResourceSlot())
+    total_capacity = sum((ag.available_slots for ag in agents), ResourceSlot({}))
 
     results: list[tuple[AgentId | None, SessionId]] = []
     scheduled_sessions: list[SessionRow] = []
@@ -199,27 +217,27 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents() -> None:
     [
         {
             "agents": [
-                {"id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
-                {"id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
-                {"id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
+                {"id": "i-001", "available_slots": {"cpu": "1", SlotName("mem"): "512"}},
+                {"id": "i-002", "available_slots": {"cpu": "4", SlotName("mem"): "2048"}},
+                {"id": "i-003", "available_slots": {"cpu": "4", SlotName("mem"): "2048"}},
             ],
             "kernel_counts_at_same_endpoint": {},
             "picked_agent": "i-001",
         },
         {
             "agents": [
-                {"id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
-                {"id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
-                {"id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
+                {"id": "i-001", "available_slots": {"cpu": "1", SlotName("mem"): "512"}},
+                {"id": "i-002", "available_slots": {"cpu": "4", SlotName("mem"): "2048"}},
+                {"id": "i-003", "available_slots": {"cpu": "4", SlotName("mem"): "2048"}},
             ],
             "kernel_counts_at_same_endpoint": {"i-001": 1, "i-002": 1},
             "picked_agent": "i-003",
         },
         {
             "agents": [
-                {"id": "i-001", "available_slots": {"cpu": "1", "mem": "512"}},
-                {"id": "i-002", "available_slots": {"cpu": "4", "mem": "2048"}},
-                {"id": "i-003", "available_slots": {"cpu": "4", "mem": "2048"}},
+                {"id": "i-001", "available_slots": {"cpu": "1", SlotName("mem"): "512"}},
+                {"id": "i-002", "available_slots": {"cpu": "4", SlotName("mem"): "2048"}},
+                {"id": "i-003", "available_slots": {"cpu": "4", SlotName("mem"): "2048"}},
             ],
             "kernel_counts_at_same_endpoint": {"i-001": 2, "i-002": 1, "i-003": 2},
             "picked_agent": "i-002",
@@ -261,7 +279,7 @@ async def test_enforce_spreading_endpoint_replica(test_case) -> None:
 
     mock_session = create_mock_session(
         SessionId(uuid4()),
-        ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("100")}),
+        ResourceSlot({SlotName("cpu"): Decimal("1"), SlotName("mem"): Decimal("100")}),
         session_type=SessionTypes.INFERENCE,
     )
 

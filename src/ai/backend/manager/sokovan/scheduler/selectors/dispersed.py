@@ -9,6 +9,8 @@ import sys
 from decimal import Decimal
 from typing import Sequence, Union
 
+from ai.backend.common.types import SlotName
+
 from .selector import (
     AbstractAgentSelector,
     AgentSelectionConfig,
@@ -28,7 +30,7 @@ class DispersedAgentSelector(AbstractAgentSelector):
     2. More available resources (to spread workloads)
     """
 
-    def __init__(self, agent_selection_resource_priority: list[str]) -> None:
+    def __init__(self, agent_selection_resource_priority: Sequence[str | SlotName]) -> None:
         """
         Initialize the dispersed selector.
 
@@ -76,7 +78,11 @@ class DispersedAgentSelector(AbstractAgentSelector):
                 ),
                 # Then, prefer agents with more available resources (using current state)
                 *[
-                    (tracker.original_agent.available_slots - occupied_slots).get(key, -sys.maxsize)
+                    Decimal(
+                        (tracker.original_agent.available_slots - occupied_slots).get(
+                            key, -sys.maxsize
+                        )
+                    )
                     for key in resource_priorities
                 ],
             ]

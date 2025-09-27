@@ -9,7 +9,7 @@ import sys
 from decimal import Decimal
 from typing import Sequence, Union
 
-from ai.backend.common.types import SessionTypes
+from ai.backend.common.types import SessionTypes, SlotName
 
 from .selector import (
     AbstractAgentSelector,
@@ -31,7 +31,7 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
     3. Less available resources (to concentrate workloads)
     """
 
-    def __init__(self, agent_selection_resource_priority: list[str]) -> None:
+    def __init__(self, agent_selection_resource_priority: Sequence[str | SlotName]) -> None:
         """
         Initialize the concentrated selector.
 
@@ -89,7 +89,9 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
 
             # Finally, prefer agents with less available resources (using current state)
             for key in resource_priorities:
-                sort_key.append((agent.available_slots - occupied_slots).get(key, sys.maxsize))
+                sort_key.append(
+                    Decimal((agent.available_slots - occupied_slots).get(key, sys.maxsize))
+                )
 
             return tuple(sort_key)
 

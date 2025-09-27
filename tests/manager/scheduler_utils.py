@@ -24,6 +24,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
+    SlotName,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -46,7 +47,7 @@ common_image_ref: Final = ImageRef(
 )
 
 example_group_id = uuid4()
-example_total_capacity = ResourceSlot({"cpu": "4.0", "mem": "4096"})
+example_total_capacity = ResourceSlot({SlotName("cpu"): "4.0", SlotName("mem"): "4096"})
 example_sgroup_name1: Final = "sg01"
 example_sgroup_name2: Final = "sg02"
 
@@ -188,7 +189,7 @@ def create_mock_session(
         occupying_slots=(
             requested_slots
             if status not in (SessionStatus.PENDING, SessionStatus.SCHEDULED)
-            else ResourceSlot()
+            else ResourceSlot({})
         ),
         target_sgroup_names=[],
         **_common_dummy_for_pending_session,
@@ -201,7 +202,7 @@ def create_mock_agent(
     *,
     scaling_group: str = example_sgroup_name1,
     available_slots: ResourceSlot,
-    occupied_slots: ResourceSlot = ResourceSlot(),
+    occupied_slots: ResourceSlot = ResourceSlot({}),
 ) -> AgentRow:
     return AgentRow(
         id=id,

@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import yarl
 
-from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant, SlotName
 from ai.backend.manager.data.model_serving.creator import EndpointCreator
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.models.endpoint import (
@@ -187,7 +187,7 @@ def sample_endpoint_creator(sample_user, sample_image, sample_vfolder) -> Endpoi
         bootstrap_script="pip install -r requirements.txt",
         callback_url=yarl.URL("https://callback.example.com"),
         environ={"MODEL_NAME": "test"},
-        resource_slots=ResourceSlot({"cpu": "2", "mem": "4g"}),
+        resource_slots=ResourceSlot({SlotName("cpu"): "2", SlotName("mem"): "4g"}),
         resource_opts={},
         image=sample_image.id,
         replicas=1,
@@ -393,7 +393,7 @@ def assert_endpoint_creation_operations(mock_session, endpoint_row):
 
 
 def create_full_featured_endpoint(sample_user, sample_image, sample_vfolder):
-    from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant
+    from ai.backend.common.types import ClusterMode, ResourceSlot, RuntimeVariant, SlotName
 
     endpoint_row = EndpointRow(
         name="full-featured-endpoint",
@@ -410,7 +410,11 @@ def create_full_featured_endpoint(sample_user, sample_image, sample_vfolder):
         bootstrap_script="pip install -r requirements.txt",
         callback_url=yarl.URL("https://webhook.example.com/callback"),
         environ={"API_KEY": "secret", "DEBUG": "false"},
-        resource_slots=ResourceSlot({"cpu": "4", "mem": "8g", "cuda.device": "1"}),
+        resource_slots=ResourceSlot({
+            SlotName("cpu"): "4",
+            SlotName("mem"): "8g",
+            SlotName("cuda.device"): "1",
+        }),
         resource_opts={"shmem": "2g"},
         image=sample_image,
         replicas=3,

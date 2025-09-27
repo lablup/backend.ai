@@ -5,7 +5,14 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+    SlotName,
+)
 from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.dispersed import DispersedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.legacy import LegacyAgentSelector
@@ -60,24 +67,45 @@ class TestSelectorIntegration:
         agents = [
             create_agent_info(
                 agent_id="agent-1",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("14"), "mem": Decimal("28672")},
+                available_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("16"),
+                    SlotName("mem"): Decimal("32768"),
+                }),
+                occupied_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("14"),
+                    SlotName("mem"): Decimal("28672"),
+                }),
             ),
             create_agent_info(
                 agent_id="agent-2",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                available_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("16"),
+                    SlotName("mem"): Decimal("32768"),
+                }),
+                occupied_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("8"),
+                    SlotName("mem"): Decimal("16384"),
+                }),
             ),
             create_agent_info(
                 agent_id="agent-3",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
+                available_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("16"),
+                    SlotName("mem"): Decimal("32768"),
+                }),
+                occupied_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("2"),
+                    SlotName("mem"): Decimal("4096"),
+                }),
             ),
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -116,40 +144,40 @@ class TestSelectorIntegration:
         agents = [
             create_agent_info(
                 agent_id="gpu-specialist",
-                available_slots={
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                    "cuda.shares": Decimal("8"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                    "cuda.shares": Decimal("0"),
-                },
+                available_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("8"),
+                    SlotName("mem"): Decimal("16384"),
+                    SlotName("cuda.shares"): Decimal("8"),
+                }),
+                occupied_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("4"),
+                    SlotName("mem"): Decimal("8192"),
+                    SlotName("cuda.shares"): Decimal("0"),
+                }),
             ),
             create_agent_info(
                 agent_id="tpu-specialist",
-                available_slots={
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                    "tpu": Decimal("4"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                    "tpu": Decimal("0"),
-                },
+                available_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("8"),
+                    SlotName("mem"): Decimal("16384"),
+                    SlotName("tpu"): Decimal("4"),
+                }),
+                occupied_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("4"),
+                    SlotName("mem"): Decimal("8192"),
+                    SlotName("tpu"): Decimal("0"),
+                }),
             ),
             create_agent_info(
                 agent_id="cpu-generalist",
-                available_slots={
-                    "cpu": Decimal("16"),
-                    "mem": Decimal("32768"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                },
+                available_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("16"),
+                    SlotName("mem"): Decimal("32768"),
+                }),
+                occupied_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("8"),
+                    SlotName("mem"): Decimal("16384"),
+                }),
             ),
         ]
 
@@ -157,10 +185,10 @@ class TestSelectorIntegration:
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
-                "cpu": Decimal("2"),
-                "mem": Decimal("4096"),
-                "cuda.shares": Decimal("0"),  # Explicitly not needed
-                "tpu": Decimal("0"),  # Explicitly not needed
+                SlotName("cpu"): Decimal("2"),
+                SlotName("mem"): Decimal("4096"),
+                SlotName("cuda.shares"): Decimal("0"),  # Explicitly not needed
+                SlotName("tpu"): Decimal("0"),  # Explicitly not needed
             }),
             required_architecture="x86_64",
         )
@@ -209,22 +237,25 @@ class TestSelectorIntegration:
             agents.append(
                 create_agent_info(
                     agent_id=f"agent-{i:03d}",
-                    available_slots={
-                        "cpu": Decimal("16"),
-                        "mem": Decimal("32768"),
-                        "cuda.shares": Decimal("4") if i % 3 == 0 else Decimal("0"),
-                    },
-                    occupied_slots={
-                        "cpu": occupied_cpu,
-                        "mem": occupied_mem,
-                        "cuda.shares": Decimal("0"),
-                    },
+                    available_slots=ResourceSlot({
+                        SlotName("cpu"): Decimal("16"),
+                        SlotName("mem"): Decimal("32768"),
+                        SlotName("cuda.shares"): Decimal("4") if i % 3 == 0 else Decimal("0"),
+                    }),
+                    occupied_slots=ResourceSlot({
+                        SlotName("cpu"): occupied_cpu,
+                        SlotName("mem"): occupied_mem,
+                        SlotName("cuda.shares"): Decimal("0"),
+                    }),
                 )
             )
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -285,24 +316,45 @@ class TestSelectorIntegration:
         agents = [
             create_agent_info(
                 agent_id="agent-1",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                available_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("16"),
+                    SlotName("mem"): Decimal("32768"),
+                }),
+                occupied_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("8"),
+                    SlotName("mem"): Decimal("16384"),
+                }),
             ),
             create_agent_info(
                 agent_id="agent-2",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                available_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("16"),
+                    SlotName("mem"): Decimal("32768"),
+                }),
+                occupied_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("8"),
+                    SlotName("mem"): Decimal("16384"),
+                }),
             ),
             create_agent_info(
                 agent_id="agent-3",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                available_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("16"),
+                    SlotName("mem"): Decimal("32768"),
+                }),
+                occupied_slots=ResourceSlot({
+                    SlotName("cpu"): Decimal("8"),
+                    SlotName("mem"): Decimal("16384"),
+                }),
             ),
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 

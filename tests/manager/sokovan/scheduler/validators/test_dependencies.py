@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SessionResult
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SessionResult, SlotName
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
@@ -32,14 +32,20 @@ class TestDependenciesValidator:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("1"),
+            }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
         )
         snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                SlotName("cpu"): Decimal("100"),
+                SlotName("mem"): Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
@@ -61,14 +67,20 @@ class TestDependenciesValidator:
         workload = SessionWorkload(
             session_id=session_id,
             access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("1"),
+            }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
         )
         snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                SlotName("cpu"): Decimal("100"),
+                SlotName("mem"): Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
@@ -100,14 +112,20 @@ class TestDependenciesValidator:
         workload = SessionWorkload(
             session_id=session_id,
             access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("1"),
+            }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
         )
         snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                SlotName("cpu"): Decimal("100"),
+                SlotName("mem"): Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
@@ -144,14 +162,20 @@ class TestDependenciesValidator:
         workload = SessionWorkload(
             session_id=session_id,
             access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("1"),
+            }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
         )
         snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                SlotName("cpu"): Decimal("100"),
+                SlotName("mem"): Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),

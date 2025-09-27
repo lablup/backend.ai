@@ -139,12 +139,40 @@ def test_binary_size():
     assert "{:s}".format(BinarySize(2**30)) == "1g"
 
 
+def test_slot_name_parsing() -> None:
+    s = SlotName("cuda.shares")
+    assert s.is_accelerator()
+    assert s.device_name == "cuda"
+    assert s.major_type == "shares"
+    assert s.minor_type == ""
+    s = SlotName("cuda.device")
+    assert s.is_accelerator()
+    assert s.device_name == "cuda"
+    assert s.major_type == "device"
+    assert s.minor_type == ""
+    s = SlotName("cpu")
+    assert not s.is_accelerator()
+    assert s.device_name == "cpu"
+    assert s.major_type == ""
+    assert s.minor_type == ""
+    s = SlotName("mem")
+    assert not s.is_accelerator()
+    assert s.device_name == "mem"
+    assert s.major_type == ""
+    assert s.minor_type == ""
+    s = SlotName("cuda.device:mig-10g")
+    assert s.is_accelerator()
+    assert s.device_name == "cuda"
+    assert s.major_type == "device"
+    assert s.minor_type == "mig-10g"
+
+
 def test_resource_slot_serialization():
     # from_user_input() and from_policy() takes the explicit slot type information to
     # convert human-readable values to raw decimal values,
     # while from_json() treats those values as stringified decimal expressions "as-is".
 
-    st = {"a": "count", "b": "bytes"}
+    st = {SlotName("a"): SlotTypes.COUNT, SlotName("b"): SlotTypes.BYTES}
     r1 = ResourceSlot.from_user_input({"a": "1", "b": "2g"}, st)
     r2 = ResourceSlot.from_user_input({"a": "2", "b": "1g"}, st)
     r3 = ResourceSlot.from_user_input({"a": "1"}, st)

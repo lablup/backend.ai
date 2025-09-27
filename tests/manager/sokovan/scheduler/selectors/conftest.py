@@ -5,7 +5,7 @@ from typing import Optional
 
 import pytest
 
-from ai.backend.common.types import AgentId, ResourceSlot
+from ai.backend.common.types import AgentId, ResourceSlot, SlotName
 from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
 
 
@@ -13,8 +13,8 @@ def create_agent_info(
     agent_id: Optional[str] = None,
     agent_addr: Optional[str] = None,
     architecture: str = "x86_64",
-    available_slots: Optional[dict] = None,
-    occupied_slots: Optional[dict] = None,
+    available_slots: Optional[ResourceSlot] = None,
+    occupied_slots: Optional[ResourceSlot] = None,
     scaling_group: str = "default",
     container_count: int = 0,
 ) -> AgentInfo:
@@ -26,25 +26,25 @@ def create_agent_info(
         agent_addr = f"{agent_id}:6001"
 
     if available_slots is None:
-        available_slots = {
-            "cpu": Decimal("8.0"),
-            "mem": Decimal("16384"),  # 16GB
-            "cuda.shares": Decimal("0"),
-        }
+        available_slots = ResourceSlot({
+            SlotName("cpu"): Decimal("8.0"),
+            SlotName("mem"): Decimal("16384"),  # 16GB
+            SlotName("cuda.shares"): Decimal("0"),
+        })
 
     if occupied_slots is None:
-        occupied_slots = {
-            "cpu": Decimal("0"),
-            "mem": Decimal("0"),
-            "cuda.shares": Decimal("0"),
-        }
+        occupied_slots = ResourceSlot({
+            SlotName("cpu"): Decimal("0"),
+            SlotName("mem"): Decimal("0"),
+            SlotName("cuda.shares"): Decimal("0"),
+        })
 
     return AgentInfo(
         agent_id=AgentId(agent_id),
         agent_addr=agent_addr,
         architecture=architecture,
-        available_slots=ResourceSlot(available_slots),
-        occupied_slots=ResourceSlot(occupied_slots),
+        available_slots=available_slots,
+        occupied_slots=occupied_slots,
         scaling_group=scaling_group,
         container_count=container_count,
     )

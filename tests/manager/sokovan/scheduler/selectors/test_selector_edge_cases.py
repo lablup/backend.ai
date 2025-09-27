@@ -6,7 +6,14 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+    SlotName,
+)
 from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.dispersed import DispersedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.legacy import LegacyAgentSelector
@@ -51,13 +58,13 @@ class TestSelectorEdgeCases:
         agents = [
             create_agent_info(
                 agent_id="agent-1",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
+                available_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
+                occupied_slots={"cpu": Decimal("4"), SlotName("mem"): Decimal("8192")},
             ),
             create_agent_info(
                 agent_id="agent-2",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
+                available_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
+                occupied_slots={"cpu": Decimal("2"), SlotName("mem"): Decimal("4096")},
             ),
         ]
 
@@ -88,7 +95,7 @@ class TestSelectorEdgeCases:
         agents = [
             create_agent_info(
                 agent_id="agent-1",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                available_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
             )
         ]
 
@@ -116,7 +123,7 @@ class TestSelectorEdgeCases:
         agents = [
             create_agent_info(
                 agent_id="cpu-only",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                available_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
             ),
             create_agent_info(
                 agent_id="gpu-agent",
@@ -178,7 +185,10 @@ class TestSelectorEdgeCases:
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -248,13 +258,16 @@ class TestSelectorEdgeCases:
         """Test all strategies with only one agent available."""
         agent = create_agent_info(
             agent_id="lonely",
-            available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+            available_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
         )
         agents = [agent]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -277,15 +290,18 @@ class TestSelectorEdgeCases:
         agents = [
             create_agent_info(
                 agent_id=f"full-{i}",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                available_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
+                occupied_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
             )
             for i in range(3)
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -303,19 +319,22 @@ class TestSelectorEdgeCases:
         agents = [
             create_agent_info(
                 agent_id="agent-1",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("6"), "mem": Decimal("12288")},
+                available_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
+                occupied_slots={"cpu": Decimal("6"), SlotName("mem"): Decimal("12288")},
             ),
             create_agent_info(
                 agent_id="agent-2",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
+                available_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
+                occupied_slots={"cpu": Decimal("2"), SlotName("mem"): Decimal("4096")},
             ),
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 

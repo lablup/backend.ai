@@ -5,7 +5,14 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+    SlotName,
+)
 from ai.backend.manager.sokovan.scheduler.selectors.legacy import LegacyAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
@@ -112,19 +119,22 @@ class TestLegacyAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="agent-low-resources",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("6"), "mem": Decimal("12288")},
+                available_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
+                occupied_slots={"cpu": Decimal("6"), SlotName("mem"): Decimal("12288")},
             ),
             create_agent_info(
                 agent_id="agent-high-resources",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
+                available_slots={"cpu": Decimal("16"), SlotName("mem"): Decimal("32768")},
+                occupied_slots={"cpu": Decimal("4"), SlotName("mem"): Decimal("8192")},
             ),
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -153,19 +163,22 @@ class TestLegacyAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="high-cpu-low-mem",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("8192")},
-                occupied_slots={"cpu": Decimal("2"), "mem": Decimal("6144")},
+                available_slots={"cpu": Decimal("16"), SlotName("mem"): Decimal("8192")},
+                occupied_slots={"cpu": Decimal("2"), SlotName("mem"): Decimal("6144")},
             ),
             create_agent_info(
                 agent_id="low-cpu-high-mem",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("6"), "mem": Decimal("4096")},
+                available_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
+                occupied_slots={"cpu": Decimal("6"), SlotName("mem"): Decimal("4096")},
             ),
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("1024"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -290,7 +303,10 @@ class TestLegacyAgentSelector:
         # Request only CPU and memory
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 

@@ -428,7 +428,7 @@ class CUDAPlugin(AbstractComputePlugin):
 
     def get_metadata(self) -> AcceleratorMetadata:
         return {
-            "slot_name": self.slot_types[0][0],
+            "slot_name": str(self.slot_types[0][0]),
             "human_readable_name": "GPU",
             "description": "CUDA-capable GPU",
             "display_unit": "GPU",

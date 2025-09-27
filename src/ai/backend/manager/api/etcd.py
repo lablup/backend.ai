@@ -106,18 +106,18 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
     # Collect plugin-reported accelerator metadata
     computer_metadata = await root_ctx.valkey_stat.get_computer_metadata()
     reported_accelerator_metadata: dict[str, AcceleratorMetadata] = {
-        slot_name: cast(AcceleratorMetadata, load_json(metadata_json))
+        str(slot_name): cast(AcceleratorMetadata, load_json(metadata_json))
         for slot_name, metadata_json in computer_metadata.items()
     }
 
     # Merge the reported metadata and preconfigured metadata (for legacy plugins)
-    accelerator_metadata: dict[str, AcceleratorMetadata] = {}
+    serializable_accelerator_metadata: dict[str, AcceleratorMetadata] = {}
     for slot_name, metadata in collections.ChainMap(
         reported_accelerator_metadata,
         KNOWN_SLOT_METADATA,
     ).items():
         if slot_name in known_slots:  # include only explicitly reported ones
-            accelerator_metadata[slot_name] = metadata
+            serializable_accelerator_metadata[str(slot_name)] = metadata
 
     # Optionally filter by the slots reported by the given resource group's agents
     if params["sgroup"] is not None:
@@ -131,12 +131,12 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
             result = await db_sess.execute(query)
             for agent in result.scalars().all():
                 available_slot_keys.update(agent.available_slots.keys())
-        accelerator_metadata = {
-            k: v
-            for k, v in accelerator_metadata.items()
+        serializable_accelerator_metadata = {
+            str(k): v
+            for k, v in serializable_accelerator_metadata.items()
             if k in {"cpu", "mem", *available_slot_keys}
         }
-    return web.json_response(accelerator_metadata, status=HTTPStatus.OK)
+    return web.json_response(serializable_accelerator_metadata, status=HTTPStatus.OK)
 
 
 async def get_vfolder_types(request: web.Request) -> web.Response:
