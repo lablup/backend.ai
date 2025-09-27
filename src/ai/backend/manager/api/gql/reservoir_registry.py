@@ -6,6 +6,7 @@ import strawberry
 from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMetaConnection
 from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
@@ -14,6 +15,7 @@ from ai.backend.manager.data.artifact_registries.types import (
 from ai.backend.manager.data.reservoir_registry.creator import ReservoirRegistryCreator
 from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.services.artifact_registry.actions.reservoir.create import (
     CreateReservoirRegistryAction,
 )
@@ -72,6 +74,13 @@ class ReservoirRegistry(Node):
             reservoirs.append(ReservoirRegistry.from_dataclass(reservoir))
 
         return reservoirs
+
+    @strawberry.field
+    @classmethod
+    async def remote_artifact_registries(
+        cls, ctx: strawberry.Info[StrawberryGQLContext]
+    ) -> ArtifactRegistryMetaConnection:
+        raise NotImplementedAPI("This API is not implemented.")
 
 
 ReservoirRegistryEdge = Edge[ReservoirRegistry]

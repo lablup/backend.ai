@@ -21,6 +21,7 @@ from ai.backend.manager.api.gql.base import (
     to_global_id,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -32,6 +33,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
+from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.artifact import ArtifactScanLimitExceededError
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
@@ -178,6 +180,53 @@ class ScanArtifactsInput:
 @strawberry.input(description="Added in 25.14.0")
 class ImportArtifactsInput:
     artifact_revision_ids: list[ID]
+
+
+@strawberry.input(description="Added in 25.15.0")
+class DelegateeTarget:
+    delegatee_reservoir_id: ID
+    target_registry_id: ID
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
+""")
+)
+class DelegateScanArtifactsInput:
+    delegator_reservoir_id: Optional[ID] = strawberry.field(
+        default=None, description="ID of the reservoir registry to delegate the scan request to"
+    )
+    delegatee_target: Optional[DelegateeTarget] = strawberry.field(
+        default=None,
+        description="Target delegatee reservoir registry and its remote registry to scan",
+    )
+    limit: int = strawberry.field(
+        description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})"
+    )
+    artifact_type: Optional[ArtifactType] = strawberry.field(
+        default=None, description="Filter artifacts by type (e.g., model, image, package)"
+    )
+    search: Optional[str] = strawberry.field(
+        default=None, description="Search term to filter artifacts by name or description"
+    )
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
+    Used to specify which artifact revisions should be imported from the remote registry source
+    into the local reservoir registry storage.
+""")
+)
+class DelegateImportArtifactsInput:
+    artifact_revision_ids: list[ID] = strawberry.field(
+        description="List of artifact revision IDs of delegatee artifact registry"
+    )
 
 
 @strawberry.input(description="Added in 25.14.0")
@@ -386,6 +435,21 @@ class ScanArtifactsPayload:
     artifacts: list[Artifact]
 
 
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Response payload for delegated artifact scanning operation.
+    Contains the list of artifacts discovered during the scan of a reservoir registry's remote registry.
+    These artifacts are now available for import or direct use.
+""")
+)
+class DelegateScanArtifactsPayload:
+    artifacts: list[Artifact] = strawberry.field(
+        description="List of artifacts discovered during the delegated scan from the reservoir registry's remote registry"
+    )
+
+
 @strawberry.type(description="Added in 25.14.0")
 class ArtifactRevisionImportTask:
     task_id: ID
@@ -397,6 +461,24 @@ class ArtifactRevisionImportTask:
 class ImportArtifactsPayload:
     artifact_revisions: ArtifactRevisionConnection
     tasks: list[ArtifactRevisionImportTask]
+
+
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Response payload for delegated artifact import operation.
+    Contains the imported artifact revisions and associated background tasks.
+    The tasks can be monitored to track the progress of the import operation.
+""")
+)
+class DelegateImportArtifactsPayload:
+    artifact_revisions: ArtifactRevisionConnection = strawberry.field(
+        description="Connection of artifact revisions that were imported from the reservoir registry's remote registry"
+    )
+    tasks: list[ArtifactRevisionImportTask] = strawberry.field(
+        description="List of background tasks created for importing the artifact revisions"
+    )
 
 
 @strawberry.type(description="Added in 25.14.0")
@@ -846,6 +928,49 @@ async def import_artifacts(
     )
 
     return ImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Triggers artifact scanning on a remote reservoir registry.
+
+    This mutation instructs a reservoir-type registry to initiate a scan of artifacts
+    from its associated remote reservoir registry source. The scan process will discover and
+    catalog artifacts available in the remote reservoir, making them accessible
+    through the local reservoir registry.
+
+    Requirements:
+    - The delegator registry must be of type 'reservoir'
+    - The delegator reservoir registry must have a valid remote registry configuration
+""")
+)
+async def delegate_scan_artifacts(
+    input: DelegateScanArtifactsInput, info: Info[StrawberryGQLContext]
+) -> DelegateScanArtifactsPayload:
+    raise NotImplementedAPI("This mutation is not implemented yet.")
+
+
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Trigger import of artifact revisions from a remote reservoir registry.
+
+    This mutation instructs a reservoir-type registry to import specific artifact revisions
+    that were previously discovered during a scan from its remote registry.
+    Note that this operation does not import the artifacts directly into the local registry, but only into the delegator reservoir's storage.
+
+    Requirements:
+    - The delegator registry must be of type 'reservoir'
+    - The delegator registry must have a valid remote registry configuration
+""")
+)
+async def delegate_import_artifacts(
+    input: DelegateImportArtifactsInput, info: Info[StrawberryGQLContext]
+) -> DelegateImportArtifactsPayload:
+    raise NotImplementedAPI("This mutation is not implemented yet.")
 
 
 @strawberry.mutation(description="Added in 25.14.0")
