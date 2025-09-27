@@ -34,7 +34,7 @@ def _reexec_with_argv0(display_name: str) -> None:
         venv = os.environ.get("VIRTUAL_ENV", None)
         os.environ.pop("PYTHONHOME", None)
         if venv is not None:
-            venv_sitepkg_path = site.getsitepackages([str(Path(venv))])[0]
+            venv_sitepkg_path = site.getsitepackages([venv])[0]
             sys.prefix = venv
             sys.path.insert(0, venv_sitepkg_path)
 
