@@ -13,7 +13,7 @@ from . import lang_map
 from .compat import asyncio_run_forever
 
 
-def setproctitle(title):
+def setproctitle(title: str) -> None:
     # setproctitle package doesn't work for unknown reasons
     # We don't need a portable implementation, so here is a Linux-only version
     import ctypes
@@ -22,11 +22,11 @@ def setproctitle(title):
     libc_path = ctypes.util.find_library("c")
     libc = ctypes.CDLL(libc_path)
     PR_SET_NAME = 15
-    title = ctypes.c_char_p(bytes(title, "utf-8"))
-    libc.prctl(PR_SET_NAME, title)
+    raw_title = ctypes.c_char_p(title.encode())
+    libc.prctl(PR_SET_NAME, raw_title)
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true", default=False)
     parser.add_argument("lang", type=str, choices=lang_map.keys())
@@ -40,7 +40,7 @@ def parse_args():
     return parser.parse_args(args)
 
 
-def main(args) -> None:
+def main(args: argparse.Namespace) -> None:
     cls_name = lang_map[args.lang]
     imp_path, cls_name = cls_name.rsplit(".", 1)
     mod = importlib.import_module(imp_path)
