@@ -137,7 +137,6 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
                     self.redis_keys.update(keys)
         except Exception:
             log.exception("_active_circuit_writer():")
-            raise
 
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> TraefikBackend:
         return TraefikBackend(self.root_context, circuit, routes)
