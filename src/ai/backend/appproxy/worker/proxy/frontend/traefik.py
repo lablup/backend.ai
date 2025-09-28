@@ -104,7 +104,6 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
             log.debug("Wrote {} keys", len(keys))
         except Exception:
             log.exception("_last_used_time_marker_writer():")
-            raise
 
     async def mark_last_used_time(self, request: web.Request) -> web.StreamResponse:
         key = request.match_info["key"]
