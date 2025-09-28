@@ -119,7 +119,10 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
 
     async def mark_inactive(self, request: web.Request) -> web.StreamResponse:
         key = request.match_info["key"]
-        self.active_circuits.remove(uuid.UUID(key))
+        try:
+            self.active_circuits.remove(uuid.UUID(key))
+        except KeyError:
+            log.warning("mark_inactive(): key {!r} not found in active circuits", key)
 
         return web.StreamResponse(status=204)
 
