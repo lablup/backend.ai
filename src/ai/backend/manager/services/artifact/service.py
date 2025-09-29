@@ -446,6 +446,32 @@ class ArtifactService:
     async def delegate_scan_artifacts(
         self, action: DelegateScanArtifactsAction
     ) -> DelegateScanArtifactsActionResult:
+        if self._config_provider.config.reservoir.is_delegation_leaf:
+            if action.delegatee_target is None:
+                raise ArtifactRegistryBadScanRequestError(
+                    "target_registry_id must be specified for leaf delegation"
+                )
+
+            registry_meta = await self._resolve_artifact_registry_meta(
+                action.artifact_type, action.delegatee_target.target_registry_id
+            )
+
+            scan_result = await self.scan(
+                ScanArtifactsAction(
+                    artifact_type=action.artifact_type,
+                    registry_id=action.delegatee_target.target_registry_id,
+                    limit=action.limit,
+                    order=action.order,
+                    search=action.search,
+                )
+            )
+
+            return DelegateScanArtifactsActionResult(
+                result=scan_result.result,
+                source_registry_id=action.delegatee_target.target_registry_id,
+                source_registry_type=registry_meta.type,
+            )
+
         print("delegate_scan_artifacts!")
         # TODO: Abstract remote registry client layer (scan, import)
         registry_meta = await self._resolve_artifact_registry_meta(
@@ -462,29 +488,6 @@ class ArtifactService:
         registry_data = await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
             registry_id
         )
-
-        if self._config_provider.config.reservoir.is_delegation_leaf:
-            # TODO: Fix this
-            if action.delegatee_target is None:
-                raise ArtifactRegistryBadScanRequestError(
-                    "Delegatee target must be specified when delegation leaf is enabled"
-                )
-
-            scan_result = await self.scan(
-                ScanArtifactsAction(
-                    artifact_type=action.artifact_type,
-                    registry_id=action.delegatee_target.target_registry_id,
-                    limit=action.limit,
-                    order=action.order,
-                    search=action.search,
-                )
-            )
-
-            return DelegateScanArtifactsActionResult(
-                result=scan_result.result,
-                source_registry_id=registry_id,
-                source_registry_type=registry_type,
-            )
 
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
 
@@ -583,6 +586,6 @@ class ArtifactService:
 
         return DelegateScanArtifactsActionResult(
             result=scanned_models,
-            source_registry_id=registry_id,
-            source_registry_type=registry_type,
+            source_registry_id=parsed.source_registry_id,
+            source_registry_type=parsed.source_registry_type,
         )

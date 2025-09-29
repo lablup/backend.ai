@@ -104,6 +104,8 @@ class APIHandler:
                 ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(artifact)
                 for artifact in action_result.result
             ],
+            source_registry_id=action_result.source_registry_id,
+            source_registry_type=action_result.source_registry_type,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -189,7 +191,7 @@ def create_app(
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     api_handler = APIHandler()
     cors.add(app.router.add_route("POST", "/scan", api_handler.scan_artifacts))
-    cors.add(app.router.add_route("POST", "/delegation/scan", api_handler.scan_artifacts))
+    cors.add(app.router.add_route("POST", "/delegation/scan", api_handler.delegate_scan_artifacts))
     cors.add(
         app.router.add_route("POST", "/delegation/propagation/scan", api_handler.scan_artifacts)
     )
