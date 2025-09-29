@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import (
@@ -34,6 +35,8 @@ class DelegateScanArtifactsAction(ArtifactAction):
 @dataclass
 class DelegateScanArtifactsActionResult(BaseActionResult):
     result: list[ArtifactDataWithRevisions]
+    source_registry_id: uuid.UUID
+    source_registry_type: ArtifactRegistryType
 
     @override
     def entity_id(self) -> Optional[str]:

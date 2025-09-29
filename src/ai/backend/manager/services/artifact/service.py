@@ -27,7 +27,10 @@ from ai.backend.manager.dto.request import (
     DelegateScanArtifactsReq,
     SearchArtifactsReq,
 )
-from ai.backend.manager.dto.response import ScanArtifactsResponse, SearchArtifactsResponse
+from ai.backend.manager.dto.response import (
+    DelegateScanArtifactsResponse,
+    SearchArtifactsResponse,
+)
 from ai.backend.manager.errors.artifact_registry import (
     ArtifactRegistryBadScanRequestError,
     ReservoirConnectionError,
@@ -461,17 +464,27 @@ class ArtifactService:
         )
 
         if self._config_provider.config.reservoir.is_delegation_leaf:
+            # TODO: Fix this
+            if action.delegatee_target is None:
+                raise ArtifactRegistryBadScanRequestError(
+                    "Delegatee target must be specified when delegation leaf is enabled"
+                )
+
             scan_result = await self.scan(
                 ScanArtifactsAction(
                     artifact_type=action.artifact_type,
-                    registry_id=action.delegator_reservoir_id,
+                    registry_id=action.delegatee_target.target_registry_id,
                     limit=action.limit,
                     order=action.order,
                     search=action.search,
                 )
             )
 
-            return DelegateScanArtifactsActionResult(result=scan_result.result)
+            return DelegateScanArtifactsActionResult(
+                result=scan_result.result,
+                source_registry_id=registry_id,
+                source_registry_type=registry_type,
+            )
 
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
 
@@ -501,7 +514,7 @@ class ArtifactService:
             )
             raise ReservoirConnectionError()
 
-        RespTypeAdapter = TypeAdapter(ScanArtifactsResponse)
+        RespTypeAdapter = TypeAdapter(DelegateScanArtifactsResponse)
         parsed = RespTypeAdapter.validate_python(client_resp)
 
         print("parsed!", parsed)
@@ -558,6 +571,8 @@ class ArtifactService:
         if all_artifacts:
             for artifact_data in all_artifacts:
                 # Override registry information
+                artifact_data.source_registry_id = parsed.source_registry_id
+                artifact_data.source_registry_type = parsed.source_registry_type
                 artifact_data.registry_id = registry_id
                 artifact_data.registry_type = ArtifactRegistryType.RESERVOIR
 
@@ -566,4 +581,8 @@ class ArtifactService:
             )
             scanned_models = upsert_result.result
 
-        return DelegateScanArtifactsActionResult(result=scanned_models)
+        return DelegateScanArtifactsActionResult(
+            result=scanned_models,
+            source_registry_id=registry_id,
+            source_registry_type=registry_type,
+        )

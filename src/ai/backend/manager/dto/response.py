@@ -1,6 +1,8 @@
+import uuid
 from typing import Optional
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
@@ -19,6 +21,8 @@ class ScanArtifactsResponse(BaseResponseModel):
 
 class DelegateScanArtifactsResponse(BaseResponseModel):
     artifacts: list[ArtifactDataWithRevisionsResponse]
+    source_registry_id: uuid.UUID
+    source_registry_type: ArtifactRegistryType
 
 
 class ScanArtifactModelsResponse(BaseResponseModel):
