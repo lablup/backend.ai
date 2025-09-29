@@ -6,9 +6,24 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
-from ai.backend.manager.data.artifact.types import ArtifactType
+from ai.backend.manager.data.artifact.types import ArtifactType, DelegateeTarget
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
 from ai.backend.manager.types import PaginationOptions, TriState
+
+
+class DelegateScanArtifactsReq(BaseRequestModel):
+    delegator_reservoir_id: Optional[uuid.UUID] = Field(default=None, description="")
+    delegatee_target: Optional[DelegateeTarget] = Field(
+        default=None,
+        description="The unique identifier of the target reservoir to delegate the scan.",
+    )
+    artifact_type: Optional[ArtifactType] = None
+    limit: int = Field(
+        lt=ARTIFACT_MAX_SCAN_LIMIT,
+        description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})",
+    )
+    order: Optional[ModelSortKey] = None
+    search: Optional[str] = None
 
 
 class ScanArtifactsReq(BaseRequestModel):

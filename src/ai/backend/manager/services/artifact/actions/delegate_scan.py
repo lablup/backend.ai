@@ -4,7 +4,11 @@ from typing import Optional, override
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions, ArtifactType
+from ai.backend.manager.data.artifact.types import (
+    ArtifactDataWithRevisions,
+    ArtifactType,
+    DelegateeTarget,
+)
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
 
 
@@ -14,8 +18,7 @@ class DelegateScanArtifactsAction(ArtifactAction):
     artifact_type: Optional[ArtifactType]
     search: Optional[str]
     order: Optional[ModelSortKey]
-    delegatee_reservoir_id: Optional[uuid.UUID]
-    target_registry_id: Optional[uuid.UUID]
+    delegatee_target: Optional[DelegateeTarget]
     limit: Optional[int]
 
     @override

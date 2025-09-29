@@ -17,6 +17,10 @@ class ScanArtifactsResponse(BaseResponseModel):
     artifacts: list[ArtifactDataWithRevisionsResponse]
 
 
+class DelegateScanArtifactsResponse(BaseResponseModel):
+    artifacts: list[ArtifactDataWithRevisionsResponse]
+
+
 class ScanArtifactModelsResponse(BaseResponseModel):
     artifacts: list[ArtifactDataWithRevisionsResponse]
 

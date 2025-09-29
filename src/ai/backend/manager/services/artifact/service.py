@@ -23,7 +23,10 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
-from ai.backend.manager.dto.request import ScanArtifactsReq, SearchArtifactsReq
+from ai.backend.manager.dto.request import (
+    DelegateScanArtifactsReq,
+    SearchArtifactsReq,
+)
 from ai.backend.manager.dto.response import ScanArtifactsResponse, SearchArtifactsResponse
 from ai.backend.manager.errors.artifact_registry import (
     ArtifactRegistryBadScanRequestError,
@@ -464,14 +467,15 @@ class ArtifactService:
         if not (action.limit and action.order):
             raise ArtifactRegistryBadScanRequestError()
 
-        req = ScanArtifactsReq(
-            registry_id=registry_id,
+        req = DelegateScanArtifactsReq(
+            delegator_reservoir_id=action.delegator_reservoir_id,
+            delegatee_target=action.delegatee_target,
             artifact_type=action.artifact_type,
             limit=action.limit,
             search=action.search,
             order=action.order,
         )
-        client_resp = await remote_reservoir_client.scan_artifacts(req)
+        client_resp = await remote_reservoir_client.delegate_scan_artifacts(req)
 
         if client_resp is None:
             log.warning(
@@ -486,33 +490,7 @@ class ArtifactService:
         # Convert response data back to full data with readme
         for response_artifact in parsed.artifacts:
             # Convert response revisions back to full revisions
-            full_revisions = []
-            for response_revision in response_artifact.revisions:
-                # Get readme for this revision from reservoir
-                try:
-                    readme_resp = await remote_reservoir_client.get_readme(response_revision.id)
-                    readme = readme_resp.readme
-                except Exception as e:
-                    log.warning(
-                        "Failed to fetch readme for artifact {} revision {}: {}",
-                        response_revision.artifact_id,
-                        response_revision.version,
-                        e,
-                    )
-                    readme = None
-
-                # Create full revision data with readme
-                full_revision = ArtifactRevisionData(
-                    id=response_revision.id,
-                    artifact_id=response_revision.artifact_id,
-                    version=response_revision.version,
-                    readme=readme,
-                    size=response_revision.size,
-                    status=response_revision.status,
-                    created_at=response_revision.created_at,
-                    updated_at=response_revision.updated_at,
-                )
-                full_revisions.append(full_revision)
+            full_revisions: list[ArtifactRevisionData] = []
 
             # Create full artifact data
             full_artifact = ArtifactDataWithRevisions(

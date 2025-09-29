@@ -184,3 +184,9 @@ class ArtifactRevisionOrderField(enum.StrEnum):
     CREATED_AT = "CREATED_AT"
     UPDATED_AT = "UPDATED_AT"
     STATUS = "STATUS"
+
+
+@dataclass
+class DelegateeTarget:
+    delegatee_reservoir_id: uuid.UUID
+    target_registry_id: uuid.UUID
