@@ -192,6 +192,41 @@ class PermissionDBSource:
 
         return ScopePermissionSet(scope_id, scope_permissions, global_permissions)
 
+    async def check_scope_permission_exist(
+        self,
+        user_id: uuid.UUID,
+        scope_id: ScopeId,
+        operation: OperationType,
+    ) -> bool:
+        role_query = (
+            sa.select(sa.func.count())
+            .select_from(
+                sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
+                .join(PermissionGroupRow, RoleRow.id == PermissionGroupRow.role_id)
+                .join(PermissionRow, PermissionGroupRow.id == PermissionRow.permission_group_id)
+            )
+            .where(
+                sa.and_(
+                    RoleRow.status == RoleStatus.ACTIVE,
+                    UserRoleRow.user_id == user_id,
+                    sa.or_(
+                        PermissionGroupRow.scope_type == ScopeType.GLOBAL,
+                        PermissionGroupRow.scope_id == scope_id.scope_id,
+                    ),
+                    PermissionRow.operation == operation,
+                )
+            )
+            .options(
+                contains_eager(RoleRow.permission_group_rows).options(
+                    selectinload(PermissionGroupRow.permission_rows)
+                )
+            )
+        )
+        async with self._db.begin_readonly_session() as db_session:
+            count_result = await db_session.scalar(role_query)
+            count_result = cast(int, count_result)
+            return count_result > 0
+
     def _make_query_statement_for_object_permission(
         self,
         user_id: uuid.UUID,
@@ -289,4 +324,93 @@ class PermissionDBSource:
                         if global_permissions is not None:
                             result[object_id].global_permissions = global_permissions
                         result[object_id].mapped_scopes.update(mapped_scopes)
+        return result
+
+    def _make_query_statement_for_object_permissions(
+        self,
+        user_id: uuid.UUID,
+        object_ids: Iterable[ObjectId],
+        operation: OperationType,
+    ) -> sa.sql.Select:
+        object_id_for_cond = [obj_id.entity_id for obj_id in object_ids]
+        return (
+            sa.select(RoleRow)
+            .select_from(
+                sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
+                .join(PermissionGroupRow, RoleRow.id == PermissionGroupRow.role_id)
+                .join(
+                    AssociationScopesEntitiesRow,
+                    PermissionGroupRow.scope_id == AssociationScopesEntitiesRow.scope_id,
+                )
+                .join(PermissionRow, PermissionGroupRow.id == PermissionRow.permission_group_id)
+                .join(ObjectPermissionRow, RoleRow.id == ObjectPermissionRow.role_id)
+            )
+            .where(
+                sa.and_(
+                    RoleRow.status == RoleStatus.ACTIVE,
+                    UserRoleRow.user_id == user_id,
+                    sa.or_(
+                        sa.and_(
+                            PermissionGroupRow.scope_type == ScopeType.GLOBAL,
+                            PermissionRow.operation == operation,
+                        ),
+                        sa.and_(
+                            AssociationScopesEntitiesRow.entity_id.in_(object_id_for_cond),  # type: ignore[attr-defined]
+                            PermissionRow.operation == operation,
+                        ),
+                        sa.and_(
+                            ObjectPermissionRow.entity_id.in_(object_id_for_cond),  # type: ignore[attr-defined]
+                            ObjectPermissionRow.operation == operation,
+                        ),
+                    ),
+                )
+            )
+            .options(
+                contains_eager(RoleRow.permission_group_rows).options(
+                    contains_eager(PermissionGroupRow.mapped_entities),
+                    contains_eager(PermissionGroupRow.permission_rows),
+                ),
+                contains_eager(RoleRow.object_permission_rows),
+            )
+        )
+
+    async def check_object_permission_exist(
+        self,
+        user_id: uuid.UUID,
+        object_id: ObjectId,
+        operation: OperationType,
+    ) -> bool:
+        role_query = self._make_query_statement_for_object_permissions(
+            user_id, [object_id], operation
+        )
+        async with self._db.begin_readonly_session() as db_session:
+            result = await db_session.scalars(role_query)
+            role_rows = cast(list[RoleRow], result.all())
+            return len(role_rows) > 0
+
+    async def check_batch_object_permission_exist(
+        self,
+        user_id: uuid.UUID,
+        object_ids: Iterable[ObjectId],
+        operation: OperationType,
+    ) -> dict[ObjectId, bool]:
+        result: dict[ObjectId, bool] = {object_id: False for object_id in object_ids}
+        role_query = self._make_query_statement_for_object_permissions(
+            user_id, object_ids, operation
+        )
+        async with self._db.begin_readonly_session() as db_session:
+            role_rows = await db_session.scalars(role_query)
+            role_rows = cast(list[RoleRow], role_rows.all())
+
+            for role in role_rows:
+                for op in role.object_permission_rows:
+                    object_id = op.object_id()
+                    result[object_id] = True
+                for pg in role.permission_group_rows:
+                    if pg.scope_type == ScopeType.GLOBAL:
+                        return {obj_id: True for obj_id in object_ids}
+                    else:
+                        for object in pg.mapped_entities:
+                            object_id = object.object_id()
+                            result[object_id] = True
         return result

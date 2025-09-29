@@ -86,18 +86,9 @@ class PermissionControllerRepository:
 
     @repository_decorator()
     async def check_permission_in_scope(self, data: ScopePermissionCheckInput) -> bool:
-        target_scope_id = data.target_scope_id
-        scope_permissions = await self._db_source.get_scope_permissions(
-            data.user_id, target_scope_id
+        return await self._db_source.check_scope_permission_exist(
+            data.user_id, data.target_scope_id, data.operation
         )
-        if (
-            scope_permissions.global_permissions is not None
-            and data.operation in scope_permissions.global_permissions
-        ):
-            return True
-        if data.operation in scope_permissions.scope_permissions:
-            return True
-        return False
 
     def _determine_permission_from_set(
         self, permission_set: ObjectPermissionSet, requested_operation: OperationType
@@ -123,16 +114,6 @@ class PermissionControllerRepository:
         Check if the user has the requested operation permission on the given entity IDs.
         Returns a mapping of entity ID to a boolean indicating permission.
         """
-        object_permissions = await self._db_source.get_batch_object_permissions(
-            data.user_id, data.target_object_ids
+        return await self._db_source.check_batch_object_permission_exist(
+            data.user_id, data.target_object_ids, data.operation
         )
-        requested_operation = data.operation
-
-        result: dict[ObjectId, bool] = {}
-        for obj_id in data.target_object_ids:
-            perm_set = object_permissions.get(obj_id)
-            if perm_set is not None:
-                result[obj_id] = self._determine_permission_from_set(perm_set, requested_operation)
-            else:
-                result[obj_id] = False
-        return result
