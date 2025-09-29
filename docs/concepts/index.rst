@@ -29,3 +29,4 @@ In the :doc:`development setup </dev/development-setup>`, all these components r
    configuration
    monitoring
    faq
+   artifact
