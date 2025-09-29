@@ -609,3 +609,16 @@ class InvalidConfigError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class ProcessorNotReadyError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/processor-not-ready"
+    error_title = "Processor Not Ready"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

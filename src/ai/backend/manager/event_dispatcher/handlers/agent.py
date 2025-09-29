@@ -14,6 +14,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
+from ai.backend.common.exception import ProcessorNotReadyError
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
 from ai.backend.common.types import (
     AgentId,
@@ -68,7 +69,9 @@ class AgentEventHandler:
                     return self._processors
                 except Exception:
                     await asyncio.sleep(0.1)
-        assert self._processors is not None
+        if self._processors is None:
+            log.error("Agent processors not ready after multiple attempts.")
+            raise ProcessorNotReadyError("Agent processors not ready. Try again after a while.")
         return self._processors
 
     async def handle_agent_started(
