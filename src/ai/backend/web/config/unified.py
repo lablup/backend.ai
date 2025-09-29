@@ -7,7 +7,6 @@ from typing import Optional
 
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
     FilePath,
@@ -15,6 +14,7 @@ from pydantic import (
     field_validator,
 )
 
+from ai.backend.common.config import BaseConfigModel
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
@@ -35,7 +35,7 @@ class ForceEndpointProtocol(enum.StrEnum):
     HTTP = "http"
 
 
-class WebSocketProxyConfig(BaseModel):
+class WebSocketProxyConfig(BaseConfigModel):
     url: str = Field(
         default="",
         description="""
@@ -47,7 +47,7 @@ class WebSocketProxyConfig(BaseModel):
     )
 
 
-class ServiceConfig(BaseModel):
+class ServiceConfig(BaseConfigModel):
     ip: str = Field(
         default="0.0.0.0",
         description="""
@@ -385,7 +385,7 @@ class ServiceConfig(BaseModel):
         return v.resolve()
 
 
-class CSPConfig(BaseModel):
+class CSPConfig(BaseConfigModel):
     default_src: Optional[list[str]] = Field(
         default=None,
         description="""
@@ -487,7 +487,7 @@ class CSPConfig(BaseModel):
     )
 
 
-class SecurityConfig(BaseModel):
+class SecurityConfig(BaseConfigModel):
     request_policies: list[str] = Field(
         default_factory=list,
         description="""
@@ -515,7 +515,7 @@ class SecurityConfig(BaseModel):
     )
 
 
-class ResourcesConfig(BaseModel):
+class ResourcesConfig(BaseConfigModel):
     open_port_to_public: bool = Field(
         default=False,
         description="""
@@ -680,7 +680,7 @@ class ResourcesConfig(BaseModel):
     )
 
 
-class EnvironmentsConfig(BaseModel):
+class EnvironmentsConfig(BaseConfigModel):
     allowlist: Optional[CommaSeparatedStrList] = Field(
         default=None,
         description="""
@@ -699,7 +699,7 @@ class EnvironmentsConfig(BaseModel):
     )
 
 
-class PluginConfig(BaseModel):
+class PluginConfig(BaseConfigModel):
     page: Optional[CommaSeparatedStrList] = Field(
         default=None,
         description="""
@@ -709,7 +709,7 @@ class PluginConfig(BaseModel):
     )
 
 
-class PipelineConfig(BaseModel):
+class PipelineConfig(BaseConfigModel):
     endpoint: HttpUrl = Field(
         default_factory=lambda: HttpUrl("http://127.0.0.1:9500"),
         description="""
@@ -728,7 +728,7 @@ class PipelineConfig(BaseModel):
     )
 
 
-class UIConfig(BaseModel):
+class UIConfig(BaseConfigModel):
     default_environment: Optional[str] = Field(
         default=None,
         description="""
@@ -776,7 +776,7 @@ class UIConfig(BaseModel):
     )
 
 
-class APIConfig(BaseModel):
+class APIConfig(BaseConfigModel):
     domain: str = Field(
         default="default",
         description="""
@@ -830,7 +830,7 @@ class APIConfig(BaseModel):
     )
 
 
-class EtcdConfig(BaseModel):
+class EtcdConfig(BaseConfigModel):
     namespace: str = Field(
         default="ETCD_NAMESPACE",
         description="""
@@ -883,7 +883,7 @@ class EtcdConfig(BaseModel):
         )
 
 
-class RedisHelperConfig(BaseModel):
+class RedisHelperConfig(BaseConfigModel):
     socket_timeout: float = Field(
         default=5.0,
         description="""
@@ -913,7 +913,7 @@ class RedisHelperConfig(BaseModel):
     )
 
 
-class WebServerRedisConfig(RedisConfig):
+class WebServerRedisConfig(BaseConfigModel):
     db: int = Field(
         default=0,
         description="""
@@ -923,7 +923,7 @@ class WebServerRedisConfig(RedisConfig):
     )
 
 
-class SessionConfig(BaseModel):
+class SessionConfig(BaseConfigModel):
     redis: RedisConfig = Field(
         default_factory=RedisConfig,
         description="""
@@ -995,7 +995,7 @@ class SessionConfig(BaseModel):
     )
 
 
-class LicenseConfig(BaseModel):
+class LicenseConfig(BaseConfigModel):
     edition: str = Field(
         default="Open Source",
         description="""
@@ -1028,7 +1028,7 @@ class EventLoopType(enum.StrEnum):
     uvloop = "uvloop"
 
 
-class WebServerConfig(BaseModel):
+class WebServerConfig(BaseConfigModel):
     event_loop: EventLoopType = Field(
         default=EventLoopType.uvloop,
         description="""
@@ -1066,7 +1066,7 @@ class LogLevel(enum.StrEnum):
     DEBUG = "DEBUG"
 
 
-class OTELConfig(BaseModel):
+class OTELConfig(BaseConfigModel):
     enabled: bool = Field(
         default=False,
         description="""
@@ -1092,7 +1092,7 @@ class OTELConfig(BaseModel):
     )
 
 
-class ApolloRouterConfig(BaseModel):
+class ApolloRouterConfig(BaseConfigModel):
     enabled: bool = Field(
         default=False,
         description="""
@@ -1109,7 +1109,7 @@ class ApolloRouterConfig(BaseModel):
     )
 
 
-class DebugConfig(BaseModel):
+class DebugConfig(BaseConfigModel):
     enabled: bool = Field(
         default=False,
         description="""
@@ -1119,7 +1119,7 @@ class DebugConfig(BaseModel):
     )
 
 
-class WebServerUnifiedConfig(BaseModel):
+class WebServerUnifiedConfig(BaseConfigModel):
     service: ServiceConfig = Field(
         default_factory=ServiceConfig,
         description="""
