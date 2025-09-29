@@ -1893,7 +1893,7 @@
     },
     "/artifact-registries/delegation/scan": {
       "post": {
-        "operationId": "artifact-registries.scan_artifacts.2",
+        "operationId": "artifact-registries.delegate_scan_artifacts",
         "tags": [
           "artifact-registries"
         ],
@@ -1913,7 +1913,7 @@
     },
     "/artifact-registries/delegation/propagation/scan": {
       "post": {
-        "operationId": "artifact-registries.scan_artifacts.3",
+        "operationId": "artifact-registries.scan_artifacts.2",
         "tags": [
           "artifact-registries"
         ],
