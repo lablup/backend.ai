@@ -62,11 +62,14 @@ def order_slots_by_priority(
         An ordered list of slot names
     """
 
-    def get_slot_index(slot_name: str | SlotName, order_reference: list[str | SlotName]) -> int:
+    def get_slot_index(
+        slot_name: str | SlotName, order_reference: list[str | SlotName]
+    ) -> tuple[int, str]:
         try:
-            return order_reference.index(slot_name)
+            return (order_reference.index(slot_name), str(slot_name))
         except ValueError:
-            return sys.maxsize
+            # Slots missing in the priority order will be pushed back and sorted alphabetically there.
+            return (sys.maxsize, str(slot_name))
 
     # Fill missing concrete slot names, by inserting slot names after corresponding device names.
     priority_order_including_slot_names = [*priority_order]

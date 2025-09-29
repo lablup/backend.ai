@@ -182,7 +182,7 @@ async def test_convert_resource_spec_to_resource_slot(
         },
     }
     converted_allocations = registry.convert_resource_spec_to_resource_slot(allocations)
-    assert converted_allocations["cuda.shares"] == "4.5"
+    assert converted_allocations["cuda.shares"] == Decimal("4.5")
     allocations = {
         "cpu": {
             SlotName("cpu"): {
@@ -198,5 +198,5 @@ async def test_convert_resource_spec_to_resource_slot(
         },
     }
     converted_allocations = registry.convert_resource_spec_to_resource_slot(allocations)
-    assert converted_allocations["cpu"] == "4"
-    assert converted_allocations["ram"] == str(Decimal(BinarySize.from_str("1g")) * 3)
+    assert converted_allocations["cpu"] == Decimal("4")
+    assert converted_allocations["ram"] == Decimal(BinarySize.from_str("1g")) * 3

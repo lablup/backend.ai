@@ -84,7 +84,7 @@ async def test_create_cluster_with_template(
     mock_create_cluster_rpc,
     processors: SessionProcessors,
     session_repository,
-):
+) -> None:
     # Create the action using template
     action = CreateClusterAction(
         session_name=cast(str, SESSION_FIXTURE_DATA.name),
@@ -168,7 +168,7 @@ async def test_create_cluster_with_gpu_template(
     mock_create_cluster_rpc,
     processors: SessionProcessors,
     session_repository,
-):
+) -> None:
     # Create the action using GPU template
     action = CreateClusterAction(
         session_name="gpu_test_session",
