@@ -134,7 +134,7 @@ class TestCreateModelService:
                             scaling_group="default",
                             resources=ResourceSlot({
                                 "cpu": Decimal(2),
-                                "mem": Decimal(BinarySize("4g")),
+                                "mem": Decimal(BinarySize.from_str("4g")),
                             }),
                             resource_opts={},
                         ),
@@ -194,7 +194,7 @@ class TestCreateModelService:
                             scaling_group="default",
                             resources=ResourceSlot({
                                 "cpu": Decimal(100),
-                                "mem": Decimal(BinarySize("1t")),
+                                "mem": Decimal(BinarySize.from_str("1t")),
                             }),
                             resource_opts={},
                         ),
@@ -240,7 +240,7 @@ class TestCreateModelService:
                             scaling_group="default",
                             resources=ResourceSlot({
                                 "cpu": Decimal(2),
-                                "mem": Decimal(BinarySize("4g")),
+                                "mem": Decimal(BinarySize.from_str("4g")),
                             }),
                             resource_opts={},
                         ),
@@ -286,7 +286,7 @@ class TestCreateModelService:
                             scaling_group="default",
                             resources=ResourceSlot({
                                 "cpu": Decimal(2),
-                                "mem": Decimal(BinarySize("4g")),
+                                "mem": Decimal(BinarySize.from_str("4g")),
                             }),
                             resource_opts={},
                         ),

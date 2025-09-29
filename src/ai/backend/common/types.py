@@ -51,7 +51,8 @@ import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
-from pydantic import BaseModel, ConfigDict, Field, PlainValidator, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field, GetCoreSchemaHandler, PlainValidator, TypeAdapter
+from pydantic_core import core_schema
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
@@ -845,7 +846,7 @@ def _validate_binary_size(v: Any) -> BinarySize:
 
 
 # Create a custom type annotation for BinarySize fields
-BinarySizeField = Annotated[BinarySize, PlainValidator(_validate_binary_size)]
+type BinarySizeField = Annotated[BinarySize, PlainValidator(_validate_binary_size)]
 
 
 class ResourceSlot(UserDict[SlotName, Decimal]):
@@ -869,6 +870,35 @@ class ResourceSlot(UserDict[SlotName, Decimal]):
     @classmethod
     def from_known_slots(cls, known_slots: Mapping[SlotName, SlotTypes]) -> ResourceSlot:
         return cls({k: Decimal(0) for k in known_slots.keys()})
+
+    @classmethod
+    def __get_pydantic_core_schema__(
+        cls, source: type[Any], handler: GetCoreSchemaHandler
+    ) -> core_schema.CoreSchema:
+        assert source is ResourceSlot
+        return core_schema.no_info_after_validator_function(
+            cls._validate,
+            core_schema.dict_schema(
+                core_schema.any_schema(),  # TODO: make SlotName also compatible with pydantic schema
+                core_schema.any_schema(),
+            ),
+            serialization=core_schema.plain_serializer_function_ser_schema(
+                cls._serialize,
+                info_arg=False,
+                return_schema=core_schema.dict_schema(
+                    core_schema.str_schema(),
+                    core_schema.str_schema(),
+                ),
+            ),
+        )
+
+    @staticmethod
+    def _validate(value: Mapping[str, Any]) -> ResourceSlot:
+        return ResourceSlot.from_json(value)
+
+    @staticmethod
+    def _serialize(value: ResourceSlot) -> Mapping[str, Any]:
+        return value.to_json()
 
     def __getitem__(self, key: str | SlotName) -> Decimal:
         if isinstance(key, SlotName):

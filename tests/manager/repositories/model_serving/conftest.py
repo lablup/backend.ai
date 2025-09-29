@@ -187,7 +187,7 @@ def sample_endpoint_creator(sample_user, sample_image, sample_vfolder) -> Endpoi
         bootstrap_script="pip install -r requirements.txt",
         callback_url=yarl.URL("https://callback.example.com"),
         environ={"MODEL_NAME": "test"},
-        resource_slots=ResourceSlot({"cpu": 2, "mem": BinarySize("4g")}),
+        resource_slots=ResourceSlot({"cpu": 2, "mem": BinarySize.from_str("4g")}),
         resource_opts={},
         image=sample_image.id,
         replicas=1,

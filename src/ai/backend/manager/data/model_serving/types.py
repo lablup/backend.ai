@@ -285,7 +285,7 @@ class ModelServiceDefinition(BaseModel):
         Resource slots used by the model service session.
         """,
         examples=[
-            ResourceSlot({"cpu": 1, "mem": BinarySize("2gb")}),
+            ResourceSlot({"cpu": 1, "mem": BinarySize.from_str("2g")}),
         ],
     )
     environ: Optional[dict[str, str]] = Field(

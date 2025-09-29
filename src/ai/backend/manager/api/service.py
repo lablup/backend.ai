@@ -377,7 +377,7 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         examples=[
             ResourceSlot({
                 "cpu": Decimal(4),
-                "mem": Decimal(BinarySize("32g")),
+                "mem": Decimal(BinarySize.from_str("32g")),
                 "cuda.shares": Decimal("2.5"),
             })
         ]

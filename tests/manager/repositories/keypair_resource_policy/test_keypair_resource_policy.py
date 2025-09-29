@@ -43,7 +43,7 @@ class TestKeypairResourcePolicyRepository:
             name="test-policy",
             max_concurrent_sessions=5,
             max_containers_per_session=2,
-            total_resource_slots=ResourceSlot({"cpu": 8, "mem": BinarySize("16g")}),
+            total_resource_slots=ResourceSlot({"cpu": 8, "mem": BinarySize.from_str("16g")}),
             idle_timeout=3600,
         )
 
@@ -54,11 +54,14 @@ class TestKeypairResourcePolicyRepository:
             name="test-policy",
             created_at=datetime.now(),
             default_for_unspecified=DefaultForUnspecified.UNLIMITED,
-            total_resource_slots=ResourceSlot({"cpu": 8, "mem": BinarySize("16g")}),
+            total_resource_slots=ResourceSlot({"cpu": 8, "mem": BinarySize.from_str("16g")}),
             max_session_lifetime=86400,
             max_concurrent_sessions=5,
             max_pending_session_count=10,
-            max_pending_session_resource_slots=ResourceSlot({"cpu": 2, "mem": BinarySize("4g")}),
+            max_pending_session_resource_slots=ResourceSlot({
+                "cpu": 2,
+                "mem": BinarySize.from_str("4g"),
+            }),
             max_concurrent_sftp_sessions=3,
             max_containers_per_session=2,
             idle_timeout=3600,
@@ -71,11 +74,14 @@ class TestKeypairResourcePolicyRepository:
         return {
             "name": "new-policy",
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
-            "total_resource_slots": ResourceSlot({"cpu": 16, "mem": BinarySize("32g")}),
+            "total_resource_slots": ResourceSlot({"cpu": 16, "mem": BinarySize.from_str("32g")}),
             "max_session_lifetime": 86400,
             "max_concurrent_sessions": 10,
             "max_pending_session_count": 20,
-            "max_pending_session_resource_slots": ResourceSlot({"cpu": 4, "mem": BinarySize("8g")}),
+            "max_pending_session_resource_slots": ResourceSlot({
+                "cpu": 4,
+                "mem": BinarySize.from_str("8g"),
+            }),
             "max_concurrent_sftp_sessions": 5,
             "max_containers_per_session": 3,
             "idle_timeout": 7200,
@@ -358,7 +364,7 @@ class TestKeypairResourcePolicyRepository:
         max_containers_per_session = 5
         total_resource_slots = ResourceSlot({
             "cpu": 32,
-            "mem": BinarySize("64g"),
+            "mem": BinarySize.from_str("64g"),
             "cuda.device": 2,
         })
         idle_timeout = 14400
@@ -372,7 +378,7 @@ class TestKeypairResourcePolicyRepository:
             "max_pending_session_count": 50,
             "max_pending_session_resource_slots": ResourceSlot({
                 "cpu": 8,
-                "mem": BinarySize("16g"),
+                "mem": BinarySize.from_str("16g"),
             }),
             "max_concurrent_sftp_sessions": 10,
             "max_containers_per_session": max_containers_per_session,
@@ -390,7 +396,7 @@ class TestKeypairResourcePolicyRepository:
             max_pending_session_count=50,
             max_pending_session_resource_slots=ResourceSlot({
                 "cpu": 8,
-                "mem": BinarySize("16g"),
+                "mem": BinarySize.from_str("16g"),
             }),
             max_concurrent_sftp_sessions=10,
             max_containers_per_session=max_containers_per_session,
@@ -440,11 +446,14 @@ class TestKeypairResourcePolicyRepository:
         policy_fields = {
             "name": "fail-policy",
             "default_for_unspecified": DefaultForUnspecified.UNLIMITED,
-            "total_resource_slots": ResourceSlot({"cpu": 8, "mem": BinarySize("16g")}),
+            "total_resource_slots": ResourceSlot({"cpu": 8, "mem": BinarySize.from_str("16g")}),
             "max_session_lifetime": 86400,
             "max_concurrent_sessions": 10,
             "max_pending_session_count": 20,
-            "max_pending_session_resource_slots": ResourceSlot({"cpu": 2, "mem": BinarySize("4g")}),
+            "max_pending_session_resource_slots": ResourceSlot({
+                "cpu": 2,
+                "mem": BinarySize.from_str("4g"),
+            }),
             "max_concurrent_sftp_sessions": 3,
             "max_containers_per_session": 2,
             "idle_timeout": 3600,
