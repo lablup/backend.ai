@@ -10,7 +10,6 @@ import re
 import secrets
 import time
 import uuid
-import zlib
 from collections import defaultdict
 from collections.abc import (
     Iterable,
@@ -51,7 +50,6 @@ from sqlalchemy.orm.exc import NoResultFound
 from typeguard import check_type
 from yarl import URL
 
-from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_tasks
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.clients.http_client.client_pool import (
@@ -68,7 +66,6 @@ from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageR
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import (
-    AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
@@ -149,7 +146,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
     SlotName,
-    SlotTypes,
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
@@ -3116,170 +3112,6 @@ class AgentRegistry:
         # noop for performance reasons
         pass
 
-    async def handle_heartbeat(self, agent_id, agent_info):
-        now = datetime.now(tzutc())
-        slot_key_and_units = {
-            SlotName(k): SlotTypes(v[0]) for k, v in agent_info["resource_slots"].items()
-        }
-        available_slots = ResourceSlot({
-            SlotName(k): Decimal(v[1]) for k, v in agent_info["resource_slots"].items()
-        })
-        current_addr = agent_info["addr"]
-        sgroup = agent_info.get("scaling_group", "default")
-        auto_terminate_abusing_kernel = agent_info.get("auto_terminate_abusing_kernel", False)
-        async with self.heartbeat_lock:
-            instance_rejoin = False
-
-            # Update "last seen" timestamp for liveness tracking
-            await self.valkey_live.update_agent_last_seen(agent_id, now.timestamp())
-
-            # Check and update status of the agent record in DB
-            async def _update() -> None:
-                nonlocal instance_rejoin
-                async with self.db.begin() as conn:
-                    fetch_query = (
-                        sa.select([
-                            agents.c.status,
-                            agents.c.addr,
-                            agents.c.public_host,
-                            agents.c.public_key,
-                            agents.c.scaling_group,
-                            agents.c.available_slots,
-                            agents.c.version,
-                            agents.c.compute_plugins,
-                            agents.c.architecture,
-                            agents.c.auto_terminate_abusing_kernel,
-                        ])
-                        .select_from(agents)
-                        .where(agents.c.id == agent_id)
-                        .with_for_update()
-                    )
-                    result = await conn.execute(fetch_query)
-                    row = result.first()
-
-                    if row is None or row["status"] is None:
-                        # new agent detected!
-                        log.info("instance_lifecycle: agent {0} joined (via heartbeat)!", agent_id)
-                        await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
-                            slot_key_and_units
-                        )
-                        self.agent_cache.update(
-                            agent_id,
-                            current_addr,
-                            agent_info["public_key"],
-                        )
-                        insert_query = sa.insert(agents).values({
-                            "id": agent_id,
-                            "status": AgentStatus.ALIVE,
-                            "region": agent_info["region"],
-                            "scaling_group": sgroup,
-                            "available_slots": available_slots,
-                            "occupied_slots": {},
-                            "addr": agent_info["addr"],
-                            "public_host": agent_info["public_host"],
-                            "public_key": agent_info["public_key"],
-                            "first_contact": now,
-                            "lost_at": sa.null(),
-                            "version": agent_info["version"],
-                            "compute_plugins": agent_info["compute_plugins"],
-                            "architecture": agent_info.get("architecture", "x86_64"),
-                            "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
-                        })
-                        result = await conn.execute(insert_query)
-                        assert result.rowcount == 1
-                    elif row["status"] == AgentStatus.ALIVE:
-                        updates = {}
-                        invalidate_agent_cache = False
-                        if row["available_slots"] != available_slots:
-                            updates["available_slots"] = available_slots
-                        if row["scaling_group"] != sgroup:
-                            updates["scaling_group"] = sgroup
-                        if row["addr"] != current_addr:
-                            updates["addr"] = current_addr
-                            invalidate_agent_cache = True
-                        if row["public_host"] != agent_info["public_host"]:
-                            updates["public_host"] = agent_info["public_host"]
-                        if row["public_key"] != agent_info["public_key"]:
-                            updates["public_key"] = agent_info["public_key"]
-                            invalidate_agent_cache = True
-                        if row["version"] != agent_info["version"]:
-                            updates["version"] = agent_info["version"]
-                        if row["compute_plugins"] != agent_info["compute_plugins"]:
-                            updates["compute_plugins"] = agent_info["compute_plugins"]
-                        if row["architecture"] != agent_info["architecture"]:
-                            updates["architecture"] = agent_info["architecture"]
-                        if row["auto_terminate_abusing_kernel"] != auto_terminate_abusing_kernel:
-                            updates["auto_terminate_abusing_kernel"] = auto_terminate_abusing_kernel
-                        # occupied_slots are updated when kernels starts/terminates
-                        if invalidate_agent_cache:
-                            self.agent_cache.update(
-                                agent_id,
-                                current_addr,
-                                agent_info["public_key"],
-                            )
-                        if updates:
-                            await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
-                                slot_key_and_units
-                            )
-                            update_query = (
-                                sa.update(agents).values(updates).where(agents.c.id == agent_id)
-                            )
-                            await conn.execute(update_query)
-                    elif row["status"] in (AgentStatus.LOST, AgentStatus.TERMINATED):
-                        await self.config_provider.legacy_etcd_config_loader.update_resource_slots(
-                            slot_key_and_units
-                        )
-                        instance_rejoin = True
-                        self.agent_cache.update(
-                            agent_id,
-                            current_addr,
-                            agent_info["public_key"],
-                        )
-                        update_query = (
-                            sa.update(agents)
-                            .values({
-                                "status": AgentStatus.ALIVE,
-                                "region": agent_info["region"],
-                                "scaling_group": sgroup,
-                                "addr": agent_info["addr"],
-                                "public_host": agent_info["public_host"],
-                                "public_key": agent_info["public_key"],
-                                "lost_at": sa.null(),
-                                "available_slots": available_slots,
-                                "version": agent_info["version"],
-                                "compute_plugins": agent_info["compute_plugins"],
-                                "architecture": agent_info["architecture"],
-                                "auto_terminate_abusing_kernel": auto_terminate_abusing_kernel,
-                            })
-                            .where(agents.c.id == agent_id)
-                        )
-                        await conn.execute(update_query)
-                    else:
-                        log.error("should not reach here! {0}", type(row["status"]))
-
-            try:
-                await execute_with_retry(_update)
-            except sa.exc.IntegrityError:
-                log.error("Scaling group named [{}] does not exist.", sgroup)
-                return
-
-            if instance_rejoin:
-                await self.event_producer.anycast_event(
-                    AgentStartedEvent("revived"),
-                    source_override=agent_id,
-                )
-
-            # Update the mapping of kernel images to agents.
-            images = msgpack.unpackb(zlib.decompress(agent_info["images"]))
-            image_canonicals = set(img_info[0] for img_info in images)
-
-            await self.valkey_image.add_agent_to_images(agent_id, image_canonicals)
-
-        await self.hook_plugin_ctx.notify(
-            "POST_AGENT_HEARTBEAT",
-            (agent_id, sgroup, available_slots),
-        )
-
     async def handle_agent_images_remove(
         self, agent_id: AgentId, image_canonicals: list[str]
     ) -> None:
@@ -4283,14 +4115,6 @@ async def handle_agent_lifecycle(
             # triggered by the agent.
             await context.mark_agent_terminated(source, AgentStatus.TERMINATED)
             context.agent_cache.discard(source)
-
-
-async def handle_agent_heartbeat(
-    context: AgentRegistry,
-    source: AgentId,
-    event: AgentHeartbeatEvent,
-) -> None:
-    await context.handle_heartbeat(source, event.agent_info)
 
 
 async def handle_agent_images_remove(
