@@ -161,6 +161,10 @@ class CoreDumpConfig(BaseConfigModel):
     )
     _core_path: Optional[Path]
 
+    def __init__(self, _core_path: Optional[Path] = None, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._core_path = _core_path
+
     def set_core_path(self, core_path: Path) -> None:
         """
         Set the core path for core dumps.
