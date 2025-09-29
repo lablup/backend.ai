@@ -1,17 +1,12 @@
-from __future__ import annotations
-
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Optional, Self
+from typing import Any, Optional, Self
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.models.agent import AgentStatus
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass
