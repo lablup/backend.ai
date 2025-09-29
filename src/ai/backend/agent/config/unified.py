@@ -14,13 +14,13 @@ from typing import Any, Mapping, Optional
 
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
     FilePath,
     field_validator,
 )
 
+from ai.backend.common.config import BaseConfigModel
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
@@ -62,7 +62,7 @@ class ScratchType(enum.StrEnum):
     K8S_NFS = "k8s-nfs"
 
 
-class SyncContainerLifecyclesConfig(BaseModel):
+class SyncContainerLifecyclesConfig(BaseConfigModel):
     enabled: bool = Field(
         default=True,
         description="Whether to enable container lifecycle synchronization",
@@ -76,7 +76,7 @@ class SyncContainerLifecyclesConfig(BaseModel):
     )
 
 
-class PyroscopeConfig(BaseModel):
+class PyroscopeConfig(BaseConfigModel):
     enabled: bool = Field(
         default=False,
         description="Whether to enable Pyroscope profiling",
@@ -105,7 +105,7 @@ class PyroscopeConfig(BaseModel):
     )
 
 
-class OTELConfig(BaseModel):
+class OTELConfig(BaseConfigModel):
     enabled: bool = Field(
         default=False,
         description="Whether to enable OpenTelemetry",
@@ -125,7 +125,7 @@ class OTELConfig(BaseModel):
     )
 
 
-class ServiceDiscoveryConfig(BaseModel):
+class ServiceDiscoveryConfig(BaseConfigModel):
     type: ServiceDiscoveryType = Field(
         default=ServiceDiscoveryType.REDIS,
         description="Type of service discovery to use",
@@ -133,7 +133,7 @@ class ServiceDiscoveryConfig(BaseModel):
     )
 
 
-class CoreDumpConfig(BaseModel):
+class CoreDumpConfig(BaseConfigModel):
     enabled: bool = Field(
         default=False,
         description="Whether to enable core dump collection",
@@ -185,7 +185,7 @@ class CoreDumpConfig(BaseModel):
     )
 
 
-class DebugConfig(BaseModel):
+class DebugConfig(BaseConfigModel):
     enabled: bool = Field(
         default=False,
         description="Master switch for debug mode",
@@ -274,7 +274,7 @@ class DebugConfig(BaseModel):
     )
 
 
-class AgentConfig(BaseModel):
+class AgentConfig(BaseConfigModel):
     backend: AgentBackend = Field(
         description=textwrap.dedent("""
         Backend type for the agent.
@@ -581,7 +581,7 @@ class AgentConfig(BaseModel):
     )
 
 
-class ContainerConfig(BaseModel):
+class ContainerConfig(BaseConfigModel):
     kernel_uid: UserID = Field(
         default=UserID(-1),
         description="Kernel user ID",
@@ -721,7 +721,7 @@ class ContainerConfig(BaseModel):
         raise ValueError("port_range must be a tuple of two integers")
 
 
-class ResourceConfig(BaseModel):
+class ResourceConfig(BaseConfigModel):
     reserved_cpu: int = Field(
         default=1,
         description="The number of CPU cores reserved for the operating system and the agent service.",
@@ -795,7 +795,7 @@ class ResourceConfig(BaseModel):
         return v
 
 
-class EtcdConfig(BaseModel):
+class EtcdConfig(BaseConfigModel):
     namespace: str = Field(
         description="Etcd namespace",
         examples=["local", "backend"],
@@ -830,7 +830,7 @@ class EtcdConfig(BaseModel):
         )
 
 
-class ContainerLogsConfig(BaseModel):
+class ContainerLogsConfig(BaseConfigModel):
     max_length: BinarySizeField = Field(
         default=BinarySize.finite_from_str("10M"),
         description="Maximum length of container logs",
@@ -851,7 +851,7 @@ class ContainerLogsConfig(BaseModel):
     )
 
 
-class APIConfig(BaseModel):
+class APIConfig(BaseConfigModel):
     pull_timeout: Optional[float] = Field(
         default=7200.0,  # 2 hours
         ge=0,
@@ -870,7 +870,7 @@ class APIConfig(BaseModel):
     )
 
 
-class KernelLifecyclesConfig(BaseModel):
+class KernelLifecyclesConfig(BaseConfigModel):
     init_polling_attempt: int = Field(
         default=10,
         description="Number of init polling attempts",
@@ -894,7 +894,7 @@ class KernelLifecyclesConfig(BaseModel):
     )
 
 
-class DockerExtraConfig(BaseModel):
+class DockerExtraConfig(BaseConfigModel):
     """
     For checking additional Docker configurations
     """
@@ -908,7 +908,7 @@ class DockerExtraConfig(BaseModel):
     )
 
 
-class AgentUnifiedConfig(BaseModel):
+class AgentUnifiedConfig(BaseConfigModel):
     # Local config
     agent: AgentConfig = Field(
         description="Agent configuration",
