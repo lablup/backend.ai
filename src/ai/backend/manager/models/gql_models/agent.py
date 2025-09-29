@@ -154,6 +154,17 @@ class AgentNode(graphene.ObjectType):
     )
 
     @classmethod
+    async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Optional[Self]:
+        graphene_ctx: GraphQueryContext = info.context
+        _, raw_agent_id = AsyncNode.resolve_global_id(info, id)
+
+        async with graphene_ctx.db.begin_readonly_session() as session:
+            agent_row = await session.scalar(sa.select(AgentRow).where(AgentRow.id == raw_agent_id))
+            if agent_row is None:
+                return None
+            return await cls.from_row(graphene_ctx, agent_row)
+
+    @classmethod
     async def from_row(
         cls,
         ctx: GraphQueryContext,
