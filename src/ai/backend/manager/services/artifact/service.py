@@ -458,6 +458,20 @@ class ArtifactService:
         registry_data = await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
             registry_id
         )
+
+        if self._config_provider.config.reservoir.is_delegation_leaf:
+            scan_result = await self.scan(
+                ScanArtifactsAction(
+                    artifact_type=action.artifact_type,
+                    registry_id=action.delegator_reservoir_id,
+                    limit=action.limit,
+                    order=action.order,
+                    search=action.search,
+                )
+            )
+
+            return DelegateScanArtifactsActionResult(result=scan_result.result)
+
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
 
         # TODO: Apply client_decorator instead of retrying here
