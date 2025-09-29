@@ -446,6 +446,7 @@ class ArtifactService:
     async def delegate_scan_artifacts(
         self, action: DelegateScanArtifactsAction
     ) -> DelegateScanArtifactsActionResult:
+        # If this is a leaf node, perform local scan instead of delegation
         if self._config_provider.config.reservoir.is_delegation_leaf:
             if action.delegatee_target is None:
                 raise ArtifactRegistryBadScanRequestError(
@@ -472,15 +473,12 @@ class ArtifactService:
                 source_registry_type=registry_meta.type,
             )
 
-        print("delegate_scan_artifacts!")
-        # TODO: Abstract remote registry client layer (scan, import)
+        # If not a leaf node, perform delegation to remote reservoir
         registry_meta = await self._resolve_artifact_registry_meta(
             action.artifact_type, action.delegator_reservoir_id
         )
         registry_type = registry_meta.type
         registry_id = registry_meta.registry_id
-
-        scanned_models = []
 
         if registry_type != ArtifactRegistryType.RESERVOIR:
             raise NotImplementedError("Only Reservoir registry is supported for delegated scan")
@@ -490,10 +488,6 @@ class ArtifactService:
         )
 
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
-
-        # TODO: Apply client_decorator instead of retrying here
-        all_artifacts: list[ArtifactDataWithRevisions] = []
-        client_resp = None
 
         if not (action.limit and action.order):
             raise ArtifactRegistryBadScanRequestError()
@@ -508,8 +502,6 @@ class ArtifactService:
         )
         client_resp = await remote_reservoir_client.delegate_scan_artifacts(req)
 
-        print("client_resp!", client_resp)
-
         if client_resp is None:
             log.warning(
                 "Failed to connect to reservoir registry after {} attempts: {}",
@@ -520,7 +512,8 @@ class ArtifactService:
         RespTypeAdapter = TypeAdapter(DelegateScanArtifactsResponse)
         parsed = RespTypeAdapter.validate_python(client_resp)
 
-        print("parsed!", parsed)
+        all_artifacts: list[ArtifactDataWithRevisions] = []
+
         # Convert response data back to full data with readme
         for response_artifact in parsed.artifacts:
             # Convert response revisions back to full revisions
@@ -571,6 +564,7 @@ class ArtifactService:
             )
             all_artifacts.append(full_artifact)
 
+        scanned_models = []
         if all_artifacts:
             for artifact_data in all_artifacts:
                 # Override registry information
