@@ -13,6 +13,7 @@ from typing import (
     Optional,
     Tuple,
 )
+from weakref import WeakSet
 
 import aiohttp_cors
 import attrs
@@ -116,6 +117,10 @@ async def push_session_events(
         group_name,
         scope,
     )
+    priv_ctx: PrivateContext = request.app["events.context"]
+    current_task = asyncio.current_task()
+    assert current_task is not None
+    priv_ctx.active_tasks.add(current_task)
 
     # Resolve session name to session ID
     if session_name == "*":
@@ -185,9 +190,13 @@ async def push_background_task_events(
     params: Mapping[str, Any],
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
+    priv_ctx: PrivateContext = request.app["events.context"]
     task_id: uuid.UUID = params["task_id"]
     access_key = request["keypair"]["access_key"]
     log.info("PUSH_BACKGROUND_TASK_EVENTS (ak:{}, t:{})", access_key, task_id)
+    current_task = asyncio.current_task()
+    assert current_task is not None
+    priv_ctx.active_tasks.add(current_task)
     async with sse_response(request) as resp:
         propagator = WithCachePropagator(root_ctx.event_fetcher)
         root_ctx.event_hub.register_event_propagator(
@@ -233,9 +242,9 @@ async def _propagate_events(
     await root_ctx.event_hub.propagate_event(event)
 
 
-@attrs.define(slots=True, auto_attribs=True, init=False)
+@attrs.define(slots=True, auto_attribs=True)
 class PrivateContext:
-    pass
+    active_tasks: WeakSet[asyncio.Task[web.StreamResponse]] = attrs.field(factory=WeakSet)
 
 
 async def events_app_ctx(app: web.Application) -> AsyncIterator[None]:
@@ -282,8 +291,15 @@ async def events_shutdown(app: web.Application) -> None:
     Shutdown handler for events app.
     Note: No longer needs to handle session event queues as they are managed by event hub.
     """
-    # No cleanup needed - event hub handles propagator cleanup automatically
-    pass
+    root_ctx: RootContext = app["_root.context"]
+    priv_ctx: PrivateContext = app["events.context"]
+    await root_ctx.event_hub.shutdown()
+    cancelled_tasks = []
+    for task in priv_ctx.active_tasks:
+        if not task.done():
+            task.cancel()
+            cancelled_tasks.append(task)
+    await asyncio.gather(*cancelled_tasks, return_exceptions=True)
 
 
 def create_app(
