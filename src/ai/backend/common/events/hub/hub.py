@@ -132,9 +132,8 @@ class EventHub:
         :raises RuntimeError: If the propagator is already closed.
         """
         propagator_id_set: set[uuid.UUID] = set()
-        propagator_id_set.update(self._wildcard_alias.get(alias_domain, []))
-        if (alias_domain, domain_id) not in self._key_alias:
-            log.debug("Propagator not registered with alias {}:{}", alias_domain, domain_id)
+        if domain_id == WILDCARD:
+            propagator_id_set.update(self._wildcard_alias.get(alias_domain, []))
         propagator_id_set.update(self._key_alias.get((alias_domain, domain_id), []))
         for propagator_id in propagator_id_set:
             if (info := self._propagators.get(propagator_id)) is not None:
