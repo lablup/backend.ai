@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.exception import ResourcePresetConflict
-from ai.backend.common.types import BinarySize, ResourceSlot, SlotName
+from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
 from ai.backend.manager.models.resource_preset import ResourcePresetRow
@@ -82,8 +82,8 @@ class TestResourcePresetRepository:
             id=uuid.uuid4(),
             name="test-preset",
             resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("4"),
-                SlotName("mem"): Decimal("8589934592"),
+                "cpu": "4",
+                "mem": "8G",
             }),
             shared_memory=BinarySize(BinarySize.from_str("2G")),
             scaling_group_name=None,
@@ -104,7 +104,7 @@ class TestResourcePresetRepository:
         """Create sample resource preset creator for testing"""
         return ResourcePresetCreator(
             name="new-preset",
-            resource_slots=ResourceSlot({SlotName("cpu"): "2", SlotName("mem"): "4G"}),
+            resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
             shared_memory="1 GiB",
             scaling_group_name=None,
         )
@@ -262,9 +262,7 @@ class TestResourcePresetRepository:
         preset_data = sample_preset_row.to_dataclass()
         modifier = ResourcePresetModifier(
             name=OptionalState.update("modified-preset"),
-            resource_slots=OptionalState.update(
-                ResourceSlot({SlotName("cpu"): "8", SlotName("mem"): "16G"})
-            ),
+            resource_slots=OptionalState.update(ResourceSlot({"cpu": "8", "mem": "16G"})),
             shared_memory=TriState.nullify(),
             scaling_group_name=TriState.update("new-group"),
         )
@@ -387,7 +385,7 @@ class TestResourcePresetRepository:
             ResourcePresetData(
                 id=uuid.uuid4(),
                 name=f"preset-{i}",
-                resource_slots=ResourceSlot({SlotName("cpu"): "2", SlotName("mem"): "4G"}),
+                resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
                 shared_memory=None,
                 scaling_group_name=None,
             )
@@ -417,11 +415,7 @@ class TestResourcePresetRepository:
             ResourcePresetData(
                 id=uuid.uuid4(),
                 name="gpu-preset",
-                resource_slots=ResourceSlot({
-                    SlotName("cpu"): "4",
-                    SlotName("mem"): "8G",
-                    SlotName("cuda.device"): "1",
-                }),
+                resource_slots=ResourceSlot({"cpu": "4", "mem": "8G", "cuda.device": "1"}),
                 shared_memory=None,
                 scaling_group_name=scaling_group,
             )
@@ -486,8 +480,8 @@ class TestResourcePresetDataModels:
             id=uuid.uuid4(),
             name="test-preset",
             resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("4"),
-                SlotName("mem"): Decimal("8589934592"),
+                "cpu": Decimal("4"),
+                "mem": Decimal("8589934592"),
             }),
             shared_memory=BinarySize(1073741824),  # 1 GiB
             scaling_group_name="default",
@@ -512,9 +506,9 @@ class TestResourcePresetDataModels:
     def test_resource_slot_validation(self) -> None:
         """Test ResourceSlot validation and conversion"""
         # Valid resource slot - use Decimal values directly
-        slot = ResourceSlot({SlotName("cpu"): Decimal("4"), SlotName("mem"): Decimal("8589934592")})
-        assert slot[SlotName("cpu")] == Decimal("4")
-        assert slot[SlotName("mem")] == Decimal("8589934592")
+        slot = ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")})
+        assert slot["cpu"] == Decimal("4")
+        assert slot["mem"] == Decimal("8589934592")
 
         # JSON conversion
         json_data = slot.to_json()
@@ -535,7 +529,7 @@ class TestResourcePresetDataModels:
         preset_data = ResourcePresetData(
             id=uuid.uuid4(),
             name="test-preset",
-            resource_slots=ResourceSlot({SlotName("cpu"): "4", SlotName("mem"): "8G"}),
+            resource_slots=ResourceSlot({"cpu": "4", "mem": "8G"}),
             shared_memory=None,
             scaling_group_name=None,  # Can be None
         )
@@ -544,7 +538,7 @@ class TestResourcePresetDataModels:
         preset_data_with_group = ResourcePresetData(
             id=uuid.uuid4(),
             name="test-preset",
-            resource_slots=ResourceSlot({SlotName("cpu"): "4", SlotName("mem"): "8G"}),
+            resource_slots=ResourceSlot({"cpu": "4", "mem": "8G"}),
             shared_memory=None,
             scaling_group_name="gpu-cluster",
         )

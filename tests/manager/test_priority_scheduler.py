@@ -8,7 +8,6 @@ import pytest
 from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
-    SlotName,
 )
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
 from ai.backend.manager.scheduler.fifo import FIFOSlotScheduler, LIFOSlotScheduler
@@ -22,8 +21,8 @@ from .scheduler_utils import (
 @pytest.mark.asyncio
 async def test_priority_scheduler_fifo() -> None:
     sid = lambda: SessionId(uuid4())
-    rs = ResourceSlot({SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1024)})
-    total_capacity = ResourceSlot({SlotName("cpu"): Decimal(8), SlotName("mem"): Decimal(8192)})
+    rs = ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1024)})
+    total_capacity = ResourceSlot({"cpu": Decimal(8), "mem": Decimal(8192)})
     pending_sessions = [
         create_mock_session(sid(), rs, priority=10),
         create_mock_session(sid(), rs, priority=8),
@@ -53,8 +52,8 @@ async def test_priority_scheduler_fifo() -> None:
 @pytest.mark.asyncio
 async def test_priority_scheduler_lifo() -> None:
     sid = lambda: SessionId(uuid4())
-    rs = ResourceSlot({SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1024)})
-    total_capacity = ResourceSlot({SlotName("cpu"): Decimal(8), SlotName("mem"): Decimal(8192)})
+    rs = ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1024)})
+    total_capacity = ResourceSlot({"cpu": Decimal(8), "mem": Decimal(8192)})
     pending_sessions = [
         create_mock_session(sid(), rs, priority=10),
         create_mock_session(sid(), rs, priority=8),

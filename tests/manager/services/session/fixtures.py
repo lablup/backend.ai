@@ -13,7 +13,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionResult,
     SessionTypes,
-    SlotName,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import (
@@ -57,12 +56,12 @@ AGENT_ROW_FIXTURE = AgentRow(
     region="us-east-1",
     scaling_group="default",
     available_slots=ResourceSlot({
-        SlotName("cpu"): "16",
-        SlotName("mem"): "32768",
+        "cpu": "16",
+        "mem": "32768",
     }),
     occupied_slots=ResourceSlot({
-        SlotName("cpu"): "0",
-        SlotName("mem"): "0",
+        "cpu": "0",
+        "mem": "0",
     }),
     addr="tcp://127.0.0.1:6011",
     first_contact=datetime.now(timezone.utc),
@@ -103,12 +102,12 @@ SESSION_ROW_FIXTURE = SessionRow(
     images=["cr.backend.ai/stable/python:latest"],
     tag=None,
     occupying_slots=ResourceSlot({
-        SlotName("cpu"): "1",
-        SlotName("mem"): "1024",
+        "cpu": "1",
+        "mem": "1024",
     }),
     requested_slots=ResourceSlot({
-        SlotName("cpu"): "1",
-        SlotName("mem"): "1024",
+        "cpu": "1",
+        "mem": "1024",
     }),
     vfolder_mounts=[],
     environ={},
@@ -161,12 +160,12 @@ KERNEL_ROW_FIXTURE = KernelRow(
     tag=None,
     container_id=uuid4().hex[:12],
     occupied_slots=ResourceSlot({
-        SlotName("cpu"): "1",
-        SlotName("mem"): "1024",
+        "cpu": "1",
+        "mem": "1024",
     }),
     requested_slots=ResourceSlot({
-        SlotName("cpu"): "1",
-        SlotName("mem"): "1024",
+        "cpu": "1",
+        "mem": "1024",
     }),
     occupied_shares={},
     environ=[],
@@ -548,12 +547,12 @@ SESSION_ROW_FIXTURE2 = SessionRow(
     images=["cr.backend.ai/stable/python:latest"],
     tag=None,
     occupying_slots=ResourceSlot({
-        SlotName("cpu"): "1",
-        SlotName("mem"): "1024",
+        "cpu": "1",
+        "mem": "1024",
     }),
     requested_slots=ResourceSlot({
-        SlotName("cpu"): "1",
-        SlotName("mem"): "1024",
+        "cpu": "1",
+        "mem": "1024",
     }),
     vfolder_mounts=[],
     environ={},
@@ -605,12 +604,12 @@ KERNEL_ROW_FIXTURE2 = KernelRow(
     tag=None,
     container_id=uuid4().hex[:12],
     occupied_slots=ResourceSlot({
-        SlotName("cpu"): "1",
-        SlotName("mem"): "1024",
+        "cpu": "1",
+        "mem": "1024",
     }),
     requested_slots=ResourceSlot({
-        SlotName("cpu"): "1",
-        SlotName("mem"): "1024",
+        "cpu": "1",
+        "mem": "1024",
     }),
     occupied_shares={},
     environ=[],

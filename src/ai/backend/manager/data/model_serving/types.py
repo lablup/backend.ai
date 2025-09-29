@@ -12,7 +12,6 @@ from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
-    BinarySize,
     ClusterMode,
     MountPermission,
     MountTypes,
@@ -285,7 +284,7 @@ class ModelServiceDefinition(BaseModel):
         Resource slots used by the model service session.
         """,
         examples=[
-            ResourceSlot({"cpu": 1, "mem": BinarySize.from_str("2g")}),
+            {"cpu": 1, "mem": "2g"},
         ],
     )
     environ: Optional[dict[str, str]] = Field(

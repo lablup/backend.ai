@@ -12,7 +12,6 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
-    SlotName,
 )
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
@@ -31,7 +30,7 @@ def basic_session_workload() -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("test-key"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name="default",
@@ -53,7 +52,7 @@ def batch_session_workload() -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("test-key"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name="default",
@@ -75,7 +74,7 @@ def inference_session_workload() -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("test-key"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name="default",
@@ -97,7 +96,7 @@ def minimal_resource_workload() -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name="default",
@@ -119,7 +118,7 @@ def small_resource_workload() -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(2), SlotName("mem"): Decimal(2)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(2), "mem": Decimal(2)}),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name="default",
@@ -141,7 +140,7 @@ def medium_resource_workload() -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(5), SlotName("mem"): Decimal(5)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(5), "mem": Decimal(5)}),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name="default",
@@ -164,8 +163,8 @@ def large_resource_workload() -> SessionWorkload:
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({
-            SlotName("cpu"): Decimal(100),
-            SlotName("mem"): Decimal(100),
+            "cpu": Decimal(100),
+            "mem": Decimal(100),
         }),
         user_uuid=uuid4(),
         group_id=uuid4(),
@@ -194,7 +193,7 @@ def test_domain_small_resource_workload(test_domain_name: str) -> SessionWorkloa
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(2), SlotName("mem"): Decimal(2)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(2), "mem": Decimal(2)}),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name=test_domain_name,
@@ -216,7 +215,7 @@ def test_domain_medium_resource_workload(test_domain_name: str) -> SessionWorklo
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(5), SlotName("mem"): Decimal(5)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(5), "mem": Decimal(5)}),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name=test_domain_name,
@@ -239,8 +238,8 @@ def test_domain_large_resource_workload(test_domain_name: str) -> SessionWorkloa
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
         requested_slots=ResourceSlot({
-            SlotName("cpu"): Decimal(100),
-            SlotName("mem"): Decimal(100),
+            "cpu": Decimal(100),
+            "mem": Decimal(100),
         }),
         user_uuid=uuid4(),
         group_id=uuid4(),
@@ -263,7 +262,7 @@ def user1_minimal_workload() -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name="default",
@@ -291,7 +290,7 @@ def user_specific_small_workload(test_user_id: uuid.UUID) -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(2), SlotName("mem"): Decimal(2)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(2), "mem": Decimal(2)}),
         user_uuid=test_user_id,
         group_id=uuid4(),
         domain_name="default",
@@ -313,7 +312,7 @@ def user_specific_medium_workload(test_user_id: uuid.UUID) -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(5), SlotName("mem"): Decimal(5)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(5), "mem": Decimal(5)}),
         user_uuid=test_user_id,
         group_id=uuid4(),
         domain_name="default",
@@ -335,7 +334,7 @@ def user_specific_minimal_workload(test_user_id: uuid.UUID) -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
         user_uuid=test_user_id,
         group_id=uuid4(),
         domain_name="default",
@@ -362,7 +361,7 @@ def batch_session_past_start_time() -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("test-key"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name="default",
@@ -389,7 +388,7 @@ def batch_session_future_start_time() -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("test-key"),
-        requested_slots=ResourceSlot({SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1)}),
+        requested_slots=ResourceSlot({"cpu": Decimal(1), "mem": Decimal(1)}),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name="default",
@@ -410,8 +409,8 @@ def empty_system_snapshot() -> SystemSnapshot:
     """Create an empty system snapshot for testing."""
     return SystemSnapshot(
         total_capacity=ResourceSlot({
-            SlotName("cpu"): Decimal("100"),
-            SlotName("mem"): Decimal("100"),
+            "cpu": Decimal("100"),
+            "mem": Decimal("100"),
         }),
         resource_occupancy=ResourceOccupancySnapshot(
             by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}

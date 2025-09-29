@@ -865,7 +865,16 @@ class ResourceSlot(UserDict[SlotName, Decimal]):
     ) -> None:
         if data is None:
             data = {}
-        super().__init__({SlotName(k): Decimal(v) for k, v in data.items() if v is not None})
+        normalized = {}
+        for k, v in data.items():
+            if v is None:
+                continue
+            if self._guess_slot_type(k) == SlotTypes.BYTES and isinstance(v, str):
+                v = Decimal(BinarySize.from_str(v))
+            else:
+                v = Decimal(v)
+            normalized[SlotName(k)] = v
+        super().__init__(normalized)
 
     @classmethod
     def from_known_slots(cls, known_slots: Mapping[SlotName, SlotTypes]) -> ResourceSlot:
@@ -1106,8 +1115,7 @@ class ResourceSlot(UserDict[SlotName, Decimal]):
 
     @classmethod
     def from_json(cls, obj: Mapping[str, Any]) -> Self:
-        data = {k: Decimal(v) for k, v in obj.items() if v is not None}
-        return cls(data)
+        return cls(obj)
 
     def to_json(self) -> Mapping[str, str]:
         return {

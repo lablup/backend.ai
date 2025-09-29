@@ -17,7 +17,6 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
-    SlotName,
 )
 from ai.backend.manager.clients.agent import AgentClient, AgentPool
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -126,8 +125,8 @@ class TestTerminateSessions:
                     agent_id=agent_id,
                     agent_addr="10.0.0.1:2001",
                     occupied_slots=ResourceSlot({
-                        SlotName("cpu"): Decimal("2"),
-                        SlotName("mem"): Decimal("4096"),
+                        "cpu": Decimal("2"),
+                        "mem": Decimal("4096"),
                     }),
                 )
             ],
@@ -183,8 +182,8 @@ class TestTerminateSessions:
                     agent_id=agent_ids[i],
                     agent_addr=f"10.0.0.{i + 1}:2001",
                     occupied_slots=ResourceSlot({
-                        SlotName("cpu"): Decimal("1"),
-                        SlotName("mem"): Decimal("2048"),
+                        "cpu": Decimal("1"),
+                        "mem": Decimal("2048"),
                     }),
                 )
                 for i in range(3)
@@ -239,8 +238,8 @@ class TestTerminateSessions:
                     agent_id=agent_ids[0],
                     agent_addr="10.0.0.1:2001",
                     occupied_slots=ResourceSlot({
-                        SlotName("cpu"): Decimal("1"),
-                        SlotName("mem"): Decimal("2048"),
+                        "cpu": Decimal("1"),
+                        "mem": Decimal("2048"),
                     }),
                 ),
                 TerminatingKernelData(
@@ -250,8 +249,8 @@ class TestTerminateSessions:
                     agent_id=agent_ids[1],
                     agent_addr="10.0.0.2:2001",
                     occupied_slots=ResourceSlot({
-                        SlotName("cpu"): Decimal("1"),
-                        SlotName("mem"): Decimal("2048"),
+                        "cpu": Decimal("1"),
+                        "mem": Decimal("2048"),
                     }),
                 ),
             ],

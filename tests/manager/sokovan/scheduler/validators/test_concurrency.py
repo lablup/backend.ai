@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotName
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     KeyPairResourcePolicy,
@@ -37,8 +37,8 @@ class TestConcurrencyValidator:
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
             requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("1"),
-                SlotName("mem"): Decimal("1"),
+                "cpu": Decimal("1"),
+                "mem": Decimal("1"),
             }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -53,8 +53,8 @@ class TestConcurrencyValidator:
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
             requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("1"),
-                SlotName("mem"): Decimal("1"),
+                "cpu": Decimal("1"),
+                "mem": Decimal("1"),
             }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -68,8 +68,8 @@ class TestConcurrencyValidator:
     ) -> None:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
@@ -79,8 +79,8 @@ class TestConcurrencyValidator:
                     AccessKey("user1"): KeyPairResourcePolicy(
                         name="default",
                         total_resource_slots=ResourceSlot({
-                            SlotName("cpu"): Decimal("10"),
-                            SlotName("mem"): Decimal("10"),
+                            "cpu": Decimal("10"),
+                            "mem": Decimal("10"),
                         }),
                         max_concurrent_sessions=3,
                         max_concurrent_sftp_sessions=1,
@@ -109,8 +109,8 @@ class TestConcurrencyValidator:
     ) -> None:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
@@ -120,8 +120,8 @@ class TestConcurrencyValidator:
                     AccessKey("user1"): KeyPairResourcePolicy(
                         name="default",
                         total_resource_slots=ResourceSlot({
-                            SlotName("cpu"): Decimal("10"),
-                            SlotName("mem"): Decimal("10"),
+                            "cpu": Decimal("10"),
+                            "mem": Decimal("10"),
                         }),
                         max_concurrent_sessions=3,
                         max_concurrent_sftp_sessions=1,
@@ -151,8 +151,8 @@ class TestConcurrencyValidator:
     ) -> None:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
@@ -162,8 +162,8 @@ class TestConcurrencyValidator:
                     AccessKey("user1"): KeyPairResourcePolicy(
                         name="default",
                         total_resource_slots=ResourceSlot({
-                            SlotName("cpu"): Decimal("10"),
-                            SlotName("mem"): Decimal("10"),
+                            "cpu": Decimal("10"),
+                            "mem": Decimal("10"),
                         }),
                         max_concurrent_sessions=3,
                         max_concurrent_sftp_sessions=1,
@@ -193,8 +193,8 @@ class TestConcurrencyValidator:
     ) -> None:
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
@@ -223,8 +223,8 @@ class TestConcurrencyValidator:
         """Test that None values in max_concurrent_sessions means unlimited."""
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
@@ -234,8 +234,8 @@ class TestConcurrencyValidator:
                     AccessKey("user1"): KeyPairResourcePolicy(
                         name="unlimited",
                         total_resource_slots=ResourceSlot({
-                            SlotName("cpu"): Decimal("10"),
-                            SlotName("mem"): Decimal("10"),
+                            "cpu": Decimal("10"),
+                            "mem": Decimal("10"),
                         }),
                         max_concurrent_sessions=None,  # None means unlimited
                         max_concurrent_sftp_sessions=None,  # None means unlimited
@@ -269,8 +269,8 @@ class TestConcurrencyValidator:
         """Test that 0 in max_concurrent_sessions means unlimited."""
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
@@ -280,8 +280,8 @@ class TestConcurrencyValidator:
                     AccessKey("user1"): KeyPairResourcePolicy(
                         name="unlimited",
                         total_resource_slots=ResourceSlot({
-                            SlotName("cpu"): Decimal("10"),
-                            SlotName("mem"): Decimal("10"),
+                            "cpu": Decimal("10"),
+                            "mem": Decimal("10"),
                         }),
                         max_concurrent_sessions=0,  # 0 also means unlimited
                         max_concurrent_sftp_sessions=0,  # 0 also means unlimited

@@ -24,7 +24,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionResult,
     SessionTypes,
-    SlotName,
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -69,8 +68,8 @@ async def sample_domain_and_policies(
         domain = DomainRow(
             name="test-termination-domain",
             total_resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("1000"),
-                SlotName("mem"): Decimal("1048576"),
+                "cpu": Decimal("1000"),
+                "mem": Decimal("1048576"),
             }),
         )
         db_sess.add(domain)
@@ -99,15 +98,15 @@ async def sample_domain_and_policies(
         kp_policy = KeyPairResourcePolicyRow(
             name="test-termination-policy",
             total_resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("102400"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("102400"),
             }),
             max_concurrent_sessions=10,
             max_concurrent_sftp_sessions=2,
             max_pending_session_count=5,
             max_pending_session_resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("50"),
-                SlotName("mem"): Decimal("51200"),
+                "cpu": Decimal("50"),
+                "mem": Decimal("51200"),
             }),
             max_containers_per_session=10,
             idle_timeout=3600,
@@ -162,12 +161,12 @@ async def sample_scaling_group_and_agent(
             scaling_group=sg.name,
             schedulable=True,
             available_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("16.0"),
-                SlotName("mem"): Decimal("32768"),
+                "cpu": Decimal("16.0"),
+                "mem": Decimal("32768"),
             }),
             occupied_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("4.0"),
-                SlotName("mem"): Decimal("8192"),
+                "cpu": Decimal("4.0"),
+                "mem": Decimal("8192"),
             }),
             addr="10.0.0.1:2001",
             architecture="x86_64",
@@ -203,8 +202,8 @@ async def sample_user_and_keypair(
             name="test-termination-group",
             domain_name=domain.name,
             total_resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("500"),
-                SlotName("mem"): Decimal("524288"),
+                "cpu": Decimal("500"),
+                "mem": Decimal("524288"),
             }),
             resource_policy="test-termination-policy",
         )
@@ -309,8 +308,8 @@ async def sample_sessions_for_termination(
                 status_info="",  # Will be updated when marked for termination
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 requested_slots=ResourceSlot({
-                    SlotName("cpu"): Decimal("2"),
-                    SlotName("mem"): Decimal("4096"),
+                    "cpu": Decimal("2"),
+                    "mem": Decimal("4096"),
                 }),
                 created_at=datetime.now(tzutc()),
                 images=["python:3.8"],
@@ -347,12 +346,12 @@ async def sample_sessions_for_termination(
                 status=kernel_status,
                 status_changed=datetime.now(tzutc()),
                 occupied_slots=ResourceSlot({
-                    SlotName("cpu"): Decimal("2"),
-                    SlotName("mem"): Decimal("4096"),
+                    "cpu": Decimal("2"),
+                    "mem": Decimal("4096"),
                 }),
                 requested_slots=ResourceSlot({
-                    SlotName("cpu"): Decimal("2"),
-                    SlotName("mem"): Decimal("4096"),
+                    "cpu": Decimal("2"),
+                    "mem": Decimal("4096"),
                 }),
                 domain_name=domain.name,
                 group_id=group.id,
@@ -396,9 +395,7 @@ def mock_config_provider() -> ManagerConfigProvider:
     """Create mock config provider"""
     mock_provider = MagicMock(spec=ManagerConfigProvider)
     mock_legacy_loader = MagicMock(spec=LegacyEtcdLoader)
-    mock_legacy_loader.get_resource_slots = AsyncMock(
-        return_value={SlotName("cpu"): "count", SlotName("mem"): "bytes"}
-    )
+    mock_legacy_loader.get_resource_slots = AsyncMock(return_value={"cpu": "count", "mem": "bytes"})
     mock_legacy_loader.get_raw = AsyncMock(return_value="10")
     mock_provider.legacy_etcd_config_loader = mock_legacy_loader
     return mock_provider

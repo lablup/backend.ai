@@ -63,7 +63,7 @@ async def test_handle_heartbeat(
         "i-001",
         {
             "scaling_group": "sg-testing",
-            "resource_slots": {"cpu": ("count", _1), SlotName("mem"): ("bytes", _1g)},
+            "resource_slots": {"cpu": ("count", _1), "mem": ("bytes", _1g)},
             "region": "ap-northeast-2",
             "addr": "10.0.0.5",
             "public_host": "10.0.0.5",
@@ -90,7 +90,7 @@ async def test_handle_heartbeat(
             "public_key": None,
             "architecture": DEFAULT_IMAGE_ARCH,
             "scaling_group": "sg-testing",
-            "available_slots": ResourceSlot({SlotName("cpu"): _1, SlotName("mem"): _1g}),
+            "available_slots": ResourceSlot({"cpu": _1, "mem": _1g}),
             "version": "19.12.0",
             "compute_plugins": [],
             "auto_terminate_abusing_kernel": False,
@@ -100,7 +100,7 @@ async def test_handle_heartbeat(
         "i-001",
         {
             "scaling_group": "sg-testing",
-            "resource_slots": {"cpu": ("count", _1), SlotName("mem"): ("bytes", _2g)},
+            "resource_slots": {"cpu": ("count", _1), "mem": ("bytes", _2g)},
             "region": "ap-northeast-2",
             "addr": "10.0.0.6",
             "public_host": "10.0.0.5",
@@ -117,7 +117,7 @@ async def test_handle_heartbeat(
     assert isinstance(q, Update)
     q_params = q.compile().params
     assert q_params["addr"] == "10.0.0.6"
-    assert q_params["available_slots"] == ResourceSlot({SlotName("cpu"): _1, SlotName("mem"): _2g})
+    assert q_params["available_slots"] == ResourceSlot({"cpu": _1, "mem": _2g})
     assert "scaling_group" not in q_params
 
     # Rejoin
@@ -131,7 +131,7 @@ async def test_handle_heartbeat(
             "public_key": None,
             "architecture": DEFAULT_IMAGE_ARCH,
             "scaling_group": "sg-testing",
-            "available_slots": ResourceSlot({SlotName("cpu"): _1, SlotName("mem"): _1g}),
+            "available_slots": ResourceSlot({"cpu": _1, "mem": _1g}),
             "version": "19.12.0",
             "compute_plugins": [],
             "auto_terminate_abusing_kernel": False,
@@ -141,7 +141,7 @@ async def test_handle_heartbeat(
         "i-001",
         {
             "scaling_group": "sg-testing2",
-            "resource_slots": {"cpu": ("count", _4), SlotName("mem"): ("bytes", _2g)},
+            "resource_slots": {"cpu": ("count", _4), "mem": ("bytes", _2g)},
             "region": "ap-northeast-2",
             "addr": "10.0.0.6",
             "public_host": "10.0.0.5",
@@ -160,7 +160,7 @@ async def test_handle_heartbeat(
     assert q_params["status"] == AgentStatus.ALIVE
     assert q_params["addr"] == "10.0.0.6"
     assert "lost_at=NULL" in str(q)  # stringified and removed from bind params
-    assert q_params["available_slots"] == ResourceSlot({SlotName("cpu"): _4, SlotName("mem"): _2g})
+    assert q_params["available_slots"] == ResourceSlot({"cpu": _4, "mem": _2g})
     assert q_params["scaling_group"] == "sg-testing2"
     assert "compute_plugins" in q_params
     assert "version" in q_params

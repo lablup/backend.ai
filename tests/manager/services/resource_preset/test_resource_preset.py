@@ -104,8 +104,8 @@ class TestResourcePresetServiceCompatibility:
             id=uuid.uuid4(),
             name="cpu-small",
             resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("2"),
-                SlotName("mem"): Decimal("4294967296"),
+                "cpu": Decimal("2"),
+                "mem": Decimal("4294967296"),
             }),
             shared_memory=BinarySize(BinarySize.from_str("1G")),
             scaling_group_name=None,
@@ -119,7 +119,7 @@ class TestResourcePresetServiceCompatibility:
         action = CreateResourcePresetAction(
             creator=ResourcePresetCreator(
                 name="cpu-small",
-                resource_slots=ResourceSlot({SlotName("cpu"): "2", SlotName("mem"): "4G"}),
+                resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
                 shared_memory=str(BinarySize.from_str("1G")),
                 scaling_group_name=None,
             )
@@ -141,10 +141,10 @@ class TestResourcePresetServiceCompatibility:
             id=uuid.uuid4(),
             name="gpu-standard",
             resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("4"),
-                SlotName("mem"): Decimal("17179869184"),
-                SlotName("gpu"): Decimal("1"),
-                SlotName("gpu_memory"): Decimal("8589934592"),
+                "cpu": Decimal("4"),
+                "mem": Decimal("17179869184"),
+                "gpu": Decimal("1"),
+                "gpu_memory": Decimal("8589934592"),
             }),
             shared_memory=BinarySize(BinarySize.from_str("2G")),
             scaling_group_name="gpu-cluster",
@@ -158,10 +158,10 @@ class TestResourcePresetServiceCompatibility:
             creator=ResourcePresetCreator(
                 name="gpu-standard",
                 resource_slots=ResourceSlot({
-                    SlotName("cpu"): Decimal("4"),
-                    SlotName("mem"): Decimal("17179869184"),
-                    SlotName("gpu"): Decimal("1"),
-                    SlotName("gpu_memory"): Decimal("8589934592"),
+                    "cpu": Decimal("4"),
+                    "mem": Decimal("17179869184"),
+                    "gpu": Decimal("1"),
+                    "gpu_memory": Decimal("8589934592"),
                 }),
                 shared_memory=str(BinarySize.from_str("2G")),
                 scaling_group_name="gpu-cluster",
@@ -179,7 +179,7 @@ class TestResourcePresetServiceCompatibility:
         action = CreateResourcePresetAction(
             creator=ResourcePresetCreator(
                 name="invalid-preset",
-                resource_slots=ResourceSlot({SlotName("gpu"): "1"}),  # Missing CPU and mem
+                resource_slots=ResourceSlot({"gpu": "1"}),  # Missing CPU and mem
                 shared_memory=None,
                 scaling_group_name=None,
             )
@@ -201,7 +201,7 @@ class TestResourcePresetServiceCompatibility:
         action = CreateResourcePresetAction(
             creator=ResourcePresetCreator(
                 name="existing-preset",
-                resource_slots=ResourceSlot({SlotName("cpu"): "2", SlotName("mem"): "4G"}),
+                resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
                 shared_memory=None,
                 scaling_group_name=None,
             )
@@ -219,8 +219,8 @@ class TestResourcePresetServiceCompatibility:
             id=uuid.uuid4(),
             name="cpu-small",
             resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("4"),
-                SlotName("mem"): Decimal("8589934592"),
+                "cpu": Decimal("4"),
+                "mem": Decimal("8589934592"),
             }),
             shared_memory=BinarySize(BinarySize.from_str("1G")),
             scaling_group_name=None,
@@ -235,9 +235,7 @@ class TestResourcePresetServiceCompatibility:
             name="cpu-small",
             id=None,
             modifier=ResourcePresetModifier(
-                resource_slots=OptionalState.update(
-                    ResourceSlot({SlotName("cpu"): "4", SlotName("mem"): "8G"})
-                )
+                resource_slots=OptionalState.update(ResourceSlot({"cpu": "4", "mem": "8G"}))
             ),
         )
 
@@ -257,8 +255,8 @@ class TestResourcePresetServiceCompatibility:
             id=preset_id,
             name="cpu-medium",
             resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("2"),
-                SlotName("mem"): Decimal("4294967296"),
+                "cpu": Decimal("2"),
+                "mem": Decimal("4294967296"),
             }),
             shared_memory=BinarySize(BinarySize.from_str("1G")),
             scaling_group_name=None,
@@ -299,8 +297,8 @@ class TestResourcePresetServiceCompatibility:
             id=uuid.uuid4(),
             name="unused-preset",
             resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("2"),
-                SlotName("mem"): Decimal("4294967296"),
+                "cpu": Decimal("2"),
+                "mem": Decimal("4294967296"),
             }),
             shared_memory=None,
             scaling_group_name=None,
@@ -342,8 +340,8 @@ class TestResourcePresetServiceCompatibility:
                 id=uuid.uuid4(),
                 name="cpu-small",
                 resource_slots=ResourceSlot({
-                    SlotName("cpu"): Decimal("2"),
-                    SlotName("mem"): Decimal("4294967296"),
+                    "cpu": Decimal("2"),
+                    "mem": Decimal("4294967296"),
                 }),
                 shared_memory=BinarySize(BinarySize.from_str("1G")),
                 scaling_group_name=None,
@@ -352,10 +350,10 @@ class TestResourcePresetServiceCompatibility:
                 id=uuid.uuid4(),
                 name="gpu-standard",
                 resource_slots=ResourceSlot({
-                    SlotName("cpu"): Decimal("4"),
-                    SlotName("mem"): Decimal("17179869184"),
-                    SlotName("gpu"): Decimal("1"),
-                    SlotName("gpu_memory"): Decimal("8589934592"),
+                    "cpu": Decimal("4"),
+                    "mem": Decimal("17179869184"),
+                    "gpu": Decimal("1"),
+                    "gpu_memory": Decimal("8589934592"),
                 }),
                 shared_memory=BinarySize(BinarySize.from_str("2G")),
                 scaling_group_name=None,
@@ -391,8 +389,8 @@ class TestResourcePresetServiceCompatibility:
             resource_policy={
                 "total_resource_slots": {
                     "cpu": "100",
-                    SlotName("mem"): "100G",
-                    SlotName("gpu"): "10",
+                    "mem": "100G",
+                    "gpu": "10",
                 },
                 "default_for_unspecified": "UNLIMITED",
             },
@@ -425,14 +423,12 @@ class TestResourcePresetServiceCompatibility:
         mock_result = MagicMock()
         mock_result.first.return_value = {
             "id": uuid.uuid4(),
-            "total_resource_slots": {"cpu": "50", SlotName("mem"): "50G"},
+            "total_resource_slots": {"cpu": "50", "mem": "50G"},
         }
         mock_conn.execute = AsyncMock(return_value=mock_result)
 
         # Mock domain query
-        mock_conn.scalar = AsyncMock(
-            return_value={"cpu": "200", SlotName("mem"): "200G", SlotName("gpu"): "20"}
-        )
+        mock_conn.scalar = AsyncMock(return_value={"cpu": "200", "mem": "200G", "gpu": "20"})
 
         # Mock scaling group query - this is now handled by repository
         from ai.backend.common.types import ResourceSlot
@@ -447,8 +443,8 @@ class TestResourcePresetServiceCompatibility:
             id=uuid.uuid4(),
             name="test-preset",
             resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("2"),
-                SlotName("mem"): Decimal("4294967296"),
+                "cpu": Decimal("2"),
+                "mem": Decimal("4294967296"),
             }),
             shared_memory=None,
             scaling_group_name=None,
@@ -458,35 +454,35 @@ class TestResourcePresetServiceCompatibility:
         mock_check_result = CheckPresetsResult(
             presets=[PresetAllocatabilityData(preset=preset_data, allocatable=True)],
             keypair_limits=ResourceSlot({
-                SlotName("cpu"): "100",
-                SlotName("mem"): "100G",
-                SlotName("gpu"): "10",
+                "cpu": "100",
+                "mem": "100G",
+                "gpu": "10",
             }),
             keypair_using=ResourceSlot({
-                SlotName("cpu"): "10",
-                SlotName("mem"): "10G",
-                SlotName("gpu"): "1",
+                "cpu": "10",
+                "mem": "10G",
+                "gpu": "1",
             }),
             keypair_remaining=ResourceSlot({
-                SlotName("cpu"): "90",
-                SlotName("mem"): "90G",
-                SlotName("gpu"): "9",
+                "cpu": "90",
+                "mem": "90G",
+                "gpu": "9",
             }),
             group_limits=ResourceSlot({
-                SlotName("cpu"): "100",
-                SlotName("mem"): "100G",
-                SlotName("gpu"): "10",
+                "cpu": "100",
+                "mem": "100G",
+                "gpu": "10",
             }),
-            group_using=ResourceSlot({SlotName("cpu"): "5", SlotName("mem"): "5G"}),
+            group_using=ResourceSlot({"cpu": "5", "mem": "5G"}),
             group_remaining=ResourceSlot({
-                SlotName("cpu"): "95",
-                SlotName("mem"): "95G",
-                SlotName("gpu"): "10",
+                "cpu": "95",
+                "mem": "95G",
+                "gpu": "10",
             }),
             scaling_group_remaining=ResourceSlot({
-                SlotName("cpu"): "1000",
-                SlotName("mem"): "1000G",
-                SlotName("gpu"): "100",
+                "cpu": "1000",
+                "mem": "1000G",
+                "gpu": "100",
             }),
             scaling_groups={},
         )
@@ -503,10 +499,10 @@ class TestResourcePresetServiceCompatibility:
             id=uuid.uuid4(),
             name="custom-preset",
             resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("4"),
-                SlotName("mem"): Decimal("8589934592"),
-                SlotName("npu"): Decimal("2"),
-                SlotName("tpu"): Decimal("1"),
+                "cpu": Decimal("4"),
+                "mem": Decimal("8589934592"),
+                "npu": Decimal("2"),
+                "tpu": Decimal("1"),
             }),
             shared_memory=None,
             scaling_group_name=None,
@@ -520,10 +516,10 @@ class TestResourcePresetServiceCompatibility:
             creator=ResourcePresetCreator(
                 name="custom-preset",
                 resource_slots=ResourceSlot({
-                    SlotName("cpu"): "4",
-                    SlotName("mem"): "8G",
-                    SlotName("npu"): "2",
-                    SlotName("tpu"): "1",
+                    "cpu": "4",
+                    "mem": "8G",
+                    "npu": "2",
+                    "tpu": "1",
                 }),
                 shared_memory=None,
                 scaling_group_name=None,
@@ -544,10 +540,10 @@ class TestResourcePresetServiceCompatibility:
             id=uuid.uuid4(),
             name="gpu-standard",
             resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("4"),
-                SlotName("mem"): Decimal("17179869184"),
-                SlotName("gpu"): Decimal("1"),
-                SlotName("gpu_memory"): Decimal("8589934592"),
+                "cpu": Decimal("4"),
+                "mem": Decimal("17179869184"),
+                "gpu": Decimal("1"),
+                "gpu_memory": Decimal("8589934592"),
             }),
             shared_memory=BinarySize(BinarySize.from_str("4G")),
             scaling_group_name="gpu-cluster",

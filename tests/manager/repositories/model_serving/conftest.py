@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 import yarl
 
-from ai.backend.common.types import BinarySize, ClusterMode, ResourceSlot, RuntimeVariant, SlotName
+from ai.backend.common.types import BinarySize, ClusterMode, ResourceSlot, RuntimeVariant
 from ai.backend.manager.data.model_serving.creator import EndpointCreator
 from ai.backend.manager.data.model_serving.types import EndpointData
 from ai.backend.manager.models.endpoint import (
@@ -411,9 +411,9 @@ def create_full_featured_endpoint(sample_user, sample_image, sample_vfolder):
         callback_url=yarl.URL("https://webhook.example.com/callback"),
         environ={"API_KEY": "secret", "DEBUG": "false"},
         resource_slots=ResourceSlot({
-            SlotName("cpu"): "4",
-            SlotName("mem"): "8g",
-            SlotName("cuda.device"): "1",
+            "cpu": "4",
+            "mem": "8g",
+            "cuda.device": "1",
         }),
         resource_opts={"shmem": "2g"},
         image=sample_image,

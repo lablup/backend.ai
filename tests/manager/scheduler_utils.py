@@ -24,7 +24,6 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
-    SlotName,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -47,7 +46,7 @@ common_image_ref: Final = ImageRef(
 )
 
 example_group_id = uuid4()
-example_total_capacity = ResourceSlot({SlotName("cpu"): "4.0", SlotName("mem"): "4096"})
+example_total_capacity = ResourceSlot({"cpu": "4.0", "mem": "4096"})
 example_sgroup_name1: Final = "sg01"
 example_sgroup_name2: Final = "sg02"
 

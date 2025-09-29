@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotName
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     KeyPairResourcePolicy,
@@ -33,8 +33,8 @@ class TestPendingSessionResourceLimitValidator:
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
             requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("2"),
-                SlotName("mem"): Decimal("2"),
+                "cpu": Decimal("2"),
+                "mem": Decimal("2"),
             }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -43,8 +43,8 @@ class TestPendingSessionResourceLimitValidator:
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
@@ -54,15 +54,15 @@ class TestPendingSessionResourceLimitValidator:
                     AccessKey("user1"): KeyPairResourcePolicy(
                         name="default",
                         total_resource_slots=ResourceSlot({
-                            SlotName("cpu"): Decimal("10"),
-                            SlotName("mem"): Decimal("10"),
+                            "cpu": Decimal("10"),
+                            "mem": Decimal("10"),
                         }),
                         max_concurrent_sessions=3,
                         max_concurrent_sftp_sessions=1,
                         max_pending_session_count=5,
                         max_pending_session_resource_slots=ResourceSlot({
-                            SlotName("cpu"): Decimal("10"),
-                            SlotName("mem"): Decimal("10"),
+                            "cpu": Decimal("10"),
+                            "mem": Decimal("10"),
                         }),
                     )
                 },
@@ -77,8 +77,8 @@ class TestPendingSessionResourceLimitValidator:
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot({
-                                SlotName("cpu"): Decimal("3"),
-                                SlotName("mem"): Decimal("3"),
+                                "cpu": Decimal("3"),
+                                "mem": Decimal("3"),
                             }),
                             creation_time=datetime.now(),
                         ),
@@ -97,8 +97,8 @@ class TestPendingSessionResourceLimitValidator:
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
             requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -107,8 +107,8 @@ class TestPendingSessionResourceLimitValidator:
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
@@ -118,8 +118,8 @@ class TestPendingSessionResourceLimitValidator:
                     AccessKey("user1"): KeyPairResourcePolicy(
                         name="default",
                         total_resource_slots=ResourceSlot({
-                            SlotName("cpu"): Decimal("10"),
-                            SlotName("mem"): Decimal("10"),
+                            "cpu": Decimal("10"),
+                            "mem": Decimal("10"),
                         }),
                         max_concurrent_sessions=3,
                         max_concurrent_sftp_sessions=1,
@@ -138,8 +138,8 @@ class TestPendingSessionResourceLimitValidator:
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot({
-                                SlotName("cpu"): Decimal("50"),
-                                SlotName("mem"): Decimal("50"),
+                                "cpu": Decimal("50"),
+                                "mem": Decimal("50"),
                             }),
                             creation_time=datetime.now(),
                         ),
@@ -158,8 +158,8 @@ class TestPendingSessionResourceLimitValidator:
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
             requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("10"),
-                SlotName("mem"): Decimal("10"),
+                "cpu": Decimal("10"),
+                "mem": Decimal("10"),
             }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -168,8 +168,8 @@ class TestPendingSessionResourceLimitValidator:
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
@@ -187,8 +187,8 @@ class TestPendingSessionResourceLimitValidator:
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot({
-                                SlotName("cpu"): Decimal("10"),
-                                SlotName("mem"): Decimal("10"),
+                                "cpu": Decimal("10"),
+                                "mem": Decimal("10"),
                             }),
                             creation_time=datetime.now(),
                         ),
@@ -209,8 +209,8 @@ class TestPendingSessionResourceLimitValidator:
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
             requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("1"),
-                SlotName("mem"): Decimal("1"),
+                "cpu": Decimal("1"),
+                "mem": Decimal("1"),
             }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
@@ -219,8 +219,8 @@ class TestPendingSessionResourceLimitValidator:
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
@@ -230,15 +230,15 @@ class TestPendingSessionResourceLimitValidator:
                     AccessKey("user1"): KeyPairResourcePolicy(
                         name="default",
                         total_resource_slots=ResourceSlot({
-                            SlotName("cpu"): Decimal("10"),
-                            SlotName("mem"): Decimal("10"),
+                            "cpu": Decimal("10"),
+                            "mem": Decimal("10"),
                         }),
                         max_concurrent_sessions=3,
                         max_concurrent_sftp_sessions=1,
                         max_pending_session_count=5,
                         max_pending_session_resource_slots=ResourceSlot({
-                            SlotName("cpu"): Decimal("10"),
-                            SlotName("mem"): Decimal("10"),
+                            "cpu": Decimal("10"),
+                            "mem": Decimal("10"),
                         }),
                     )
                 },
@@ -253,24 +253,24 @@ class TestPendingSessionResourceLimitValidator:
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot({
-                                SlotName("cpu"): Decimal("3"),
-                                SlotName("mem"): Decimal("3"),
+                                "cpu": Decimal("3"),
+                                "mem": Decimal("3"),
                             }),
                             creation_time=datetime.now(),
                         ),
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot({
-                                SlotName("cpu"): Decimal("3"),
-                                SlotName("mem"): Decimal("3"),
+                                "cpu": Decimal("3"),
+                                "mem": Decimal("3"),
                             }),
                             creation_time=datetime.now(),
                         ),
                         PendingSessionInfo(
                             session_id=SessionId(uuid.uuid4()),
                             requested_slots=ResourceSlot({
-                                SlotName("cpu"): Decimal("3"),
-                                SlotName("mem"): Decimal("3"),
+                                "cpu": Decimal("3"),
+                                "mem": Decimal("3"),
                             }),
                             creation_time=datetime.now(),
                         ),

@@ -9,7 +9,6 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
-    SlotName,
 )
 from ai.backend.manager.sokovan.scheduler.types import SessionWorkload
 
@@ -20,8 +19,8 @@ def create_session_workload(**kwargs):
         "session_id": SessionId(uuid4()),
         "access_key": AccessKey("test-key"),
         "requested_slots": ResourceSlot({
-            SlotName("cpu"): Decimal("1"),
-            SlotName("memory"): Decimal("1"),
+            "cpu": Decimal("1"),
+            "memory": Decimal("1"),
         }),
         "user_uuid": uuid4(),
         "group_id": uuid4(),

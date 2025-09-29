@@ -11,7 +11,6 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
-    SlotName,
 )
 from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
@@ -100,8 +99,8 @@ class TestConcentratedAgentSelector:
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("1"),
-                SlotName("mem"): Decimal("2048"),
+                "cpu": Decimal("1"),
+                "mem": Decimal("2048"),
             }),
             required_architecture="x86_64",
         )
@@ -324,8 +323,8 @@ class TestConcentratedAgentSelector:
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
             requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("1"),
-                SlotName("mem"): Decimal("2048"),
+                "cpu": Decimal("1"),
+                "mem": Decimal("2048"),
             }),
             required_architecture="x86_64",
         )

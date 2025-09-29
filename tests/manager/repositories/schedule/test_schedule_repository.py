@@ -23,7 +23,6 @@ from ai.backend.common.types import (
     SessionId,
     SessionResult,
     SessionTypes,
-    SlotName,
 )
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -105,12 +104,12 @@ async def sample_agents(
                 scaling_group=sample_scaling_groups[0].name,
                 schedulable=i != 1,  # Second agent is not schedulable
                 available_slots=ResourceSlot({
-                    SlotName("cpu"): Decimal("8.0"),
-                    SlotName("mem"): Decimal("16384"),
+                    "cpu": Decimal("8.0"),
+                    "mem": Decimal("16384"),
                 }),
                 occupied_slots=ResourceSlot({
-                    SlotName("cpu"): Decimal("2.0"),
-                    SlotName("mem"): Decimal("4096"),
+                    "cpu": Decimal("2.0"),
+                    "mem": Decimal("4096"),
                 }),
                 addr=f"10.0.0.{i + 1}:2001",
                 architecture="x86_64",
@@ -128,12 +127,12 @@ async def sample_agents(
             scaling_group=sample_scaling_groups[1].name,
             schedulable=True,
             available_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("16.0"),
-                SlotName("mem"): Decimal("32768"),
+                "cpu": Decimal("16.0"),
+                "mem": Decimal("32768"),
             }),
             occupied_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("0.0"),
-                SlotName("mem"): Decimal("0"),
+                "cpu": Decimal("0.0"),
+                "mem": Decimal("0"),
             }),
             addr="10.0.0.4:2001",
             architecture="aarch64",
@@ -182,8 +181,8 @@ async def sample_resource_policies(
         kp_policy = KeyPairResourcePolicyRow(
             name="test-keypair-policy",
             total_resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("102400"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("102400"),
             }),
             max_concurrent_sessions=10,
             max_concurrent_sftp_sessions=2,
@@ -236,8 +235,8 @@ async def sample_sessions_and_kernels(
         domain = DomainRow(
             name="test-domain",
             total_resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("1000"),
-                SlotName("mem"): Decimal("1048576"),
+                "cpu": Decimal("1000"),
+                "mem": Decimal("1048576"),
             }),
         )
         db_sess.add(domain)
@@ -249,8 +248,8 @@ async def sample_sessions_and_kernels(
             name="test-group",
             domain_name=domain.name,
             total_resource_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("500"),
-                SlotName("mem"): Decimal("524288"),
+                "cpu": Decimal("500"),
+                "mem": Decimal("524288"),
             }),
             resource_policy=sample_resource_policies["keypair_policy"].name,  # Use the same policy
         )
@@ -313,8 +312,8 @@ async def sample_sessions_and_kernels(
                 status=status,
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 requested_slots=ResourceSlot({
-                    SlotName("cpu"): Decimal("2"),
-                    SlotName("mem"): Decimal("4096"),
+                    "cpu": Decimal("2"),
+                    "mem": Decimal("4096"),
                 }),
                 created_at=datetime.now(tzutc()) - timedelta(minutes=i * 2),
                 # Required fields
@@ -345,12 +344,12 @@ async def sample_sessions_and_kernels(
                 else KernelStatus.RUNNING,
                 status_changed=datetime.now(tzutc()),
                 occupied_slots=ResourceSlot({
-                    SlotName("cpu"): Decimal("2"),
-                    SlotName("mem"): Decimal("4096"),
+                    "cpu": Decimal("2"),
+                    "mem": Decimal("4096"),
                 }),
                 requested_slots=ResourceSlot({
-                    SlotName("cpu"): Decimal("2"),
-                    SlotName("mem"): Decimal("4096"),
+                    "cpu": Decimal("2"),
+                    "mem": Decimal("4096"),
                 }),
                 domain_name=domain.name,
                 group_id=group.id,
@@ -420,9 +419,7 @@ def mock_config_provider() -> ManagerConfigProvider:
     """Create mock config provider"""
     mock_provider = MagicMock(spec=ManagerConfigProvider)
     mock_legacy_loader = MagicMock(spec=LegacyEtcdLoader)
-    mock_legacy_loader.get_resource_slots = AsyncMock(
-        return_value={"cpu": "count", SlotName("mem"): "bytes"}
-    )
+    mock_legacy_loader.get_resource_slots = AsyncMock(return_value={"cpu": "count", "mem": "bytes"})
     mock_legacy_loader.get_raw = AsyncMock(return_value="10")  # max_container_count
     mock_provider.legacy_etcd_config_loader = mock_legacy_loader
     return mock_provider

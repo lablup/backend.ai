@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ResourceSlot, SessionId, SlotName
+from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -37,8 +37,8 @@ class TestGroupResourceLimitValidator:
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
             requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("2"),
-                SlotName("mem"): Decimal("2"),
+                "cpu": Decimal("2"),
+                "mem": Decimal("2"),
             }),
             user_uuid=uuid.uuid4(),
             group_id=group_id,
@@ -47,16 +47,16 @@ class TestGroupResourceLimitValidator:
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={},
                 by_group={
                     group_id: ResourceSlot({
-                        SlotName("cpu"): Decimal("3"),
-                        SlotName("mem"): Decimal("3"),
+                        "cpu": Decimal("3"),
+                        "mem": Decimal("3"),
                     })
                 },
                 by_domain={},
@@ -67,8 +67,8 @@ class TestGroupResourceLimitValidator:
                 user_policies={},
                 group_limits={
                     group_id: ResourceSlot({
-                        SlotName("cpu"): Decimal("10"),
-                        SlotName("mem"): Decimal("10"),
+                        "cpu": Decimal("10"),
+                        "mem": Decimal("10"),
                     })
                 },
                 domain_limits={},
@@ -89,8 +89,8 @@ class TestGroupResourceLimitValidator:
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
             requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("5"),
-                SlotName("mem"): Decimal("5"),
+                "cpu": Decimal("5"),
+                "mem": Decimal("5"),
             }),
             user_uuid=uuid.uuid4(),
             group_id=group_id,
@@ -99,16 +99,16 @@ class TestGroupResourceLimitValidator:
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={},
                 by_group={
                     group_id: ResourceSlot({
-                        SlotName("cpu"): Decimal("8"),
-                        SlotName("mem"): Decimal("8"),
+                        "cpu": Decimal("8"),
+                        "mem": Decimal("8"),
                     })
                 },
                 by_domain={},
@@ -119,8 +119,8 @@ class TestGroupResourceLimitValidator:
                 user_policies={},
                 group_limits={
                     group_id: ResourceSlot({
-                        SlotName("cpu"): Decimal("10"),
-                        SlotName("mem"): Decimal("10"),
+                        "cpu": Decimal("10"),
+                        "mem": Decimal("10"),
                     })
                 },
                 domain_limits={},
@@ -142,8 +142,8 @@ class TestGroupResourceLimitValidator:
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
             requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             user_uuid=uuid.uuid4(),
             group_id=group_id,
@@ -152,16 +152,16 @@ class TestGroupResourceLimitValidator:
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={},
                 by_group={
                     group_id: ResourceSlot({
-                        SlotName("cpu"): Decimal("50"),
-                        SlotName("mem"): Decimal("50"),
+                        "cpu": Decimal("50"),
+                        "mem": Decimal("50"),
                     })
                 },
                 by_domain={},
@@ -189,8 +189,8 @@ class TestGroupResourceLimitValidator:
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
             requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("5"),
-                SlotName("mem"): Decimal("5"),
+                "cpu": Decimal("5"),
+                "mem": Decimal("5"),
             }),
             user_uuid=uuid.uuid4(),
             group_id=group_id,
@@ -199,8 +199,8 @@ class TestGroupResourceLimitValidator:
         )
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
@@ -214,8 +214,8 @@ class TestGroupResourceLimitValidator:
                 user_policies={},
                 group_limits={
                     group_id: ResourceSlot({
-                        SlotName("cpu"): Decimal("10"),
-                        SlotName("mem"): Decimal("10"),
+                        "cpu": Decimal("10"),
+                        "mem": Decimal("10"),
                     })
                 },
                 domain_limits={},

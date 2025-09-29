@@ -11,7 +11,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ai.backend.common.types import BinarySize, DefaultForUnspecified, ResourceSlot, SlotName
+from ai.backend.common.types import BinarySize, DefaultForUnspecified, ResourceSlot
 from ai.backend.manager.data.resource.types import KeyPairResourcePolicyData
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
@@ -124,7 +124,7 @@ class TestKeypairResourcePolicyRepository:
             assert result.name == "new-policy"
             assert result.max_concurrent_sessions == 10
             assert result.max_containers_per_session == 3
-            assert result.total_resource_slots == {"cpu": 16, SlotName("mem"): "32g"}
+            assert result.total_resource_slots == ResourceSlot({"cpu": "16", "mem": "32G"})
             assert result.idle_timeout == 7200
             assert result.max_session_lifetime == 86400
             assert result.max_pending_session_count == 20

@@ -4,7 +4,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import ResourceSlot, SlotName
+from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     PendingSessionSnapshot,
@@ -33,8 +33,8 @@ class TestDomainResourceLimitValidator:
         workload = test_domain_small_resource_workload
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
@@ -42,8 +42,8 @@ class TestDomainResourceLimitValidator:
                 by_group={},
                 by_domain={
                     workload.domain_name: ResourceSlot({
-                        SlotName("cpu"): Decimal("3"),
-                        SlotName("mem"): Decimal("3"),
+                        "cpu": Decimal("3"),
+                        "mem": Decimal("3"),
                     })
                 },
                 by_agent={},
@@ -54,8 +54,8 @@ class TestDomainResourceLimitValidator:
                 group_limits={},
                 domain_limits={
                     workload.domain_name: ResourceSlot({
-                        SlotName("cpu"): Decimal("10"),
-                        SlotName("mem"): Decimal("10"),
+                        "cpu": Decimal("10"),
+                        "mem": Decimal("10"),
                     })
                 },
             ),
@@ -76,8 +76,8 @@ class TestDomainResourceLimitValidator:
         workload = test_domain_medium_resource_workload
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
@@ -85,8 +85,8 @@ class TestDomainResourceLimitValidator:
                 by_group={},
                 by_domain={
                     workload.domain_name: ResourceSlot({
-                        SlotName("cpu"): Decimal("8"),
-                        SlotName("mem"): Decimal("8"),
+                        "cpu": Decimal("8"),
+                        "mem": Decimal("8"),
                     })
                 },
                 by_agent={},
@@ -97,8 +97,8 @@ class TestDomainResourceLimitValidator:
                 group_limits={},
                 domain_limits={
                     workload.domain_name: ResourceSlot({
-                        SlotName("cpu"): Decimal("10"),
-                        SlotName("mem"): Decimal("10"),
+                        "cpu": Decimal("10"),
+                        "mem": Decimal("10"),
                     })
                 },
             ),
@@ -120,8 +120,8 @@ class TestDomainResourceLimitValidator:
         workload = test_domain_large_resource_workload
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
@@ -129,8 +129,8 @@ class TestDomainResourceLimitValidator:
                 by_group={},
                 by_domain={
                     workload.domain_name: ResourceSlot({
-                        SlotName("cpu"): Decimal("50"),
-                        SlotName("mem"): Decimal("50"),
+                        "cpu": Decimal("50"),
+                        "mem": Decimal("50"),
                     })
                 },
                 by_agent={},
@@ -158,8 +158,8 @@ class TestDomainResourceLimitValidator:
         workload = test_domain_medium_resource_workload
         snapshot = SystemSnapshot(
             total_capacity=ResourceSlot({
-                SlotName("cpu"): Decimal("100"),
-                SlotName("mem"): Decimal("100"),
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
             }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
@@ -174,8 +174,8 @@ class TestDomainResourceLimitValidator:
                 group_limits={},
                 domain_limits={
                     workload.domain_name: ResourceSlot({
-                        SlotName("cpu"): Decimal("10"),
-                        SlotName("mem"): Decimal("10"),
+                        "cpu": Decimal("10"),
+                        "mem": Decimal("10"),
                     })
                 },
             ),
