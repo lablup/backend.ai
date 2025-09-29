@@ -90,7 +90,8 @@ async def get_resource_slots(request: web.Request) -> web.Response:
     log.info("ETCD.GET_RESOURCE_SLOTS ()")
     root_ctx: RootContext = request.app["_root.context"]
     known_slots = await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
-    return web.json_response(known_slots, status=HTTPStatus.OK)
+    serializable_known_slots = {str(k): v.value for k, v in known_slots.items()}
+    return web.json_response(serializable_known_slots, status=HTTPStatus.OK)
 
 
 @check_api_params(
