@@ -443,6 +443,7 @@ class ArtifactService:
     async def delegate_scan_artifacts(
         self, action: DelegateScanArtifactsAction
     ) -> DelegateScanArtifactsActionResult:
+        print("delegate_scan_artifacts!")
         # TODO: Abstract remote registry client layer (scan, import)
         registry_meta = await self._resolve_artifact_registry_meta(
             action.artifact_type, action.delegator_reservoir_id
@@ -491,6 +492,8 @@ class ArtifactService:
         )
         client_resp = await remote_reservoir_client.delegate_scan_artifacts(req)
 
+        print("client_resp!", client_resp)
+
         if client_resp is None:
             log.warning(
                 "Failed to connect to reservoir registry after {} attempts: {}",
@@ -501,10 +504,38 @@ class ArtifactService:
         RespTypeAdapter = TypeAdapter(ScanArtifactsResponse)
         parsed = RespTypeAdapter.validate_python(client_resp)
 
+        print("parsed!", parsed)
         # Convert response data back to full data with readme
         for response_artifact in parsed.artifacts:
             # Convert response revisions back to full revisions
             full_revisions: list[ArtifactRevisionData] = []
+
+            for response_revision in response_artifact.revisions:
+                # Get readme for this revision from reservoir
+                try:
+                    readme_resp = await remote_reservoir_client.get_readme(response_revision.id)
+                    readme = readme_resp.readme
+                except Exception as e:
+                    log.warning(
+                        "Failed to fetch readme for artifact {} revision {}: {}",
+                        response_revision.artifact_id,
+                        response_revision.version,
+                        e,
+                    )
+                    readme = None
+
+                # Create full revision data with readme
+                full_revision = ArtifactRevisionData(
+                    id=response_revision.id,
+                    artifact_id=response_revision.artifact_id,
+                    version=response_revision.version,
+                    readme=readme,
+                    size=response_revision.size,
+                    status=response_revision.status,
+                    created_at=response_revision.created_at,
+                    updated_at=response_revision.updated_at,
+                )
+                full_revisions.append(full_revision)
 
             # Create full artifact data
             full_artifact = ArtifactDataWithRevisions(
