@@ -1,6 +1,7 @@
-from .hub import EventHub, EventPropagator
+from .hub import WILDCARD, EventHub, EventPropagator
 
 __all__ = (
     "EventHub",
     "EventPropagator",
+    "WILDCARD",
 )

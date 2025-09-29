@@ -124,24 +124,23 @@ class EventHub:
     async def close_by_alias(
         self,
         alias_domain: EventDomain,
-        alias_id: str,
+        domain_id: str,
     ) -> None:
         """
         Close all propagators associated with the specified alias.
         :param alias_domain: The domain of the alias (e.g., USER, SESSION, KERNEL).
-        :param alias_id: The ID of the alias.
-        :raises
-            ValueError: If the alias is not found.
-        :raises
-            RuntimeError: If the propagator is already closed.
+        :param domain_id: The target ID within the alias domain.
+        :raises ValueError: If the alias is not found.
+        :raises RuntimeError: If the propagator is already closed.
         """
-        if (alias_domain, alias_id) not in self._key_alias:
-            log.debug("Propagator not registered with alias {}:{}", alias_domain, alias_id)
-            return
-
-        propagator_set = self._key_alias[(alias_domain, alias_id)]
-        for propagator_id in propagator_set:
-            await self._propagators[propagator_id].propagator.close()
+        propagator_id_set: set[uuid.UUID] = set()
+        propagator_id_set.update(self._wildcard_alias.get(alias_domain, []))
+        if (alias_domain, domain_id) not in self._key_alias:
+            log.debug("Propagator not registered with alias {}:{}", alias_domain, domain_id)
+        propagator_id_set.update(self._key_alias.get((alias_domain, domain_id), []))
+        for propagator_id in propagator_id_set:
+            if (info := self._propagators.get(propagator_id)) is not None:
+                await info.propagator.close()
 
     def _get_propagators_by_alias(
         self,
@@ -151,7 +150,7 @@ class EventHub:
         """
         Get the propagator associated with the specified alias.
         :param alias_domain: The domain of the alias (e.g., USER, SESSION, KERNEL).
-        :param alias_id: The ID of the alias.
+        :param domain_id: The target ID within the alias domain.
         :return: The propagator associated with the alias.
         """
         propagators: set[EventPropagator] = set()
