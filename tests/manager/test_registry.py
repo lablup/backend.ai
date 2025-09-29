@@ -10,8 +10,8 @@ from sqlalchemy.sql.dml import Insert, Update
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import BinarySize, DeviceId, ResourceSlot, SlotName
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.defs import DEFAULT_IMAGE_ARCH
-from ai.backend.manager.models import AgentStatus
 from ai.backend.manager.registry import AgentRegistry
 
 

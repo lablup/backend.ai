@@ -28,6 +28,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -38,7 +39,6 @@ from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models import (
     AgentRow,
-    AgentStatus,
     DefaultForUnspecified,
     DomainRow,
     GroupRow,

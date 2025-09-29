@@ -54,6 +54,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_watcher_info
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.permission.types import ScopeType
@@ -73,7 +74,6 @@ from ..errors.storage import (
 )
 from ..models import (
     ACTIVE_USER_STATUSES,
-    AgentStatus,
     EndpointRow,
     UserRole,
     UserStatus,

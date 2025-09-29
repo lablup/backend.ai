@@ -160,6 +160,7 @@ from ai.backend.manager.clients.wsproxy.types import (
     TagsModel,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointData
@@ -193,7 +194,6 @@ from .models import (
     USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     USER_RESOURCE_OCCUPYING_SESSION_STATUSES,
     AgentRow,
-    AgentStatus,
     EndpointRow,
     ImageRow,
     KernelLoadingStrategy,

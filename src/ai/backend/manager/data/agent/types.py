@@ -1,12 +1,38 @@
+import enum
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, Self
+from typing import Any, Optional, Self, override
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
-from ai.backend.manager.models.agent import AgentStatus
+
+
+class AgentStatus(enum.Enum):
+    ALIVE = 0
+    LOST = 1
+    RESTARTING = 2
+    TERMINATED = 3
+
+    @override
+    @classmethod
+    def _missing_(cls, value: Any) -> Optional["AgentStatus"]:
+        if isinstance(value, int):
+            for member in cls:
+                if member.value == value:
+                    return member
+        if isinstance(value, str):
+            match value.upper():
+                case "ALIVE":
+                    return cls.ALIVE
+                case "LOST":
+                    return cls.LOST
+                case "RESTARTING":
+                    return cls.RESTARTING
+                case "TERMINATED":
+                    return cls.TERMINATED
+        return None
 
 
 @dataclass

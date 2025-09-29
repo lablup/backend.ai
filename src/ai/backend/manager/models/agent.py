@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import enum
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Optional, Self, TypeAlias, cast, override
+from typing import Optional, Self, TypeAlias, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -13,7 +12,7 @@ from sqlalchemy.orm import joinedload, load_only, relationship, selectinload, wi
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
-from ai.backend.manager.data.agent.types import AgentData
+from ai.backend.manager.data.agent.types import AgentData, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 
 from .base import (
@@ -42,36 +41,9 @@ from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 __all__: Sequence[str] = (
     "agents",
     "AgentRow",
-    "AgentStatus",
     "recalc_agent_resource_occupancy",
     "list_schedulable_agents_by_sgroup",
 )
-
-
-class AgentStatus(enum.Enum):
-    ALIVE = 0
-    LOST = 1
-    RESTARTING = 2
-    TERMINATED = 3
-
-    @override
-    @classmethod
-    def _missing_(cls, value: Any) -> Optional[AgentStatus]:
-        if isinstance(value, int):
-            for member in cls:
-                if member.value == value:
-                    return member
-        if isinstance(value, str):
-            match value.upper():
-                case "ALIVE":
-                    return cls.ALIVE
-                case "LOST":
-                    return cls.LOST
-                case "RESTARTING":
-                    return cls.RESTARTING
-                case "TERMINATED":
-                    return cls.TERMINATED
-        return None
 
 
 agents = sa.Table(
