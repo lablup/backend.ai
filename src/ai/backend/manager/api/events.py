@@ -45,6 +45,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionTerminatedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
+from ai.backend.common.events.hub import WILDCARD
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
 from ai.backend.common.json import dump_json_str
@@ -118,7 +119,7 @@ async def push_session_events(
 
     # Resolve session name to session ID
     if session_name == "*":
-        session_id = "*"
+        session_id = WILDCARD
     else:
         async with root_ctx.db.begin_readonly_session(isolation_level="READ COMMITTED") as db_sess:
             rows = await SessionRow.match_sessions(
@@ -127,12 +128,10 @@ async def push_session_events(
             if not rows:
                 raise SessionNotFound
             session_id = rows[0].id
-    if session_id is None:
-        raise InvalidArgument("Either session_name or session_id must be given.")
 
     # Resolve group name to group ID
     if group_name == "*":
-        group_id = "*"
+        group_id = WILDCARD
     else:
         async with root_ctx.db.begin_readonly(isolation_level="READ COMMITTED") as conn:
             query = sa.select([groups.c.id]).select_from(groups).where(groups.c.name == group_name)

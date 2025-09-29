@@ -31,7 +31,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionTerminatedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
-from ai.backend.common.events.hub import EventPropagator
+from ai.backend.common.events.hub import WILDCARD, EventPropagator
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
@@ -277,7 +277,7 @@ class SessionEventPropagator(EventPropagator):
             return False
 
         # Session ID filtering (takes precedence over name/access key)
-        if session_id is not None:
+        if session_id is not None and session_id != WILDCARD:
             if event_data.get("session_id") != session_id:
                 return False
         else:
