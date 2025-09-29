@@ -134,7 +134,8 @@ class EventHub:
         propagator_id_set: set[uuid.UUID] = set()
         if domain_id == WILDCARD:
             propagator_id_set.update(self._wildcard_alias.get(alias_domain, []))
-        propagator_id_set.update(self._key_alias.get((alias_domain, domain_id), []))
+        else:
+            propagator_id_set.update(self._key_alias.get((alias_domain, domain_id), []))
         for propagator_id in propagator_id_set:
             if (info := self._propagators.get(propagator_id)) is not None:
                 await info.propagator.close()

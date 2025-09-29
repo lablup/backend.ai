@@ -154,7 +154,7 @@ async def test_hub_wildcard_aliases():
 
 
 @pytest.mark.asyncio
-async def test_hub_close_aliases():
+async def test_hub_close_by_alias():
     hub = EventHub()
     aliases = [
         (EventDomain.SESSION, WILDCARD),
