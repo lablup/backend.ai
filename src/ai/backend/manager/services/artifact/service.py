@@ -33,6 +33,7 @@ from ai.backend.manager.dto.response import (
 )
 from ai.backend.manager.errors.artifact_registry import (
     ArtifactRegistryBadScanRequestError,
+    RemoteReservoirScanError,
     ReservoirConnectionError,
 )
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
@@ -457,15 +458,20 @@ class ArtifactService:
                 action.artifact_type, action.delegatee_target.target_registry_id
             )
 
-            scan_result = await self.scan(
-                ScanArtifactsAction(
-                    artifact_type=action.artifact_type,
-                    registry_id=action.delegatee_target.target_registry_id,
-                    limit=action.limit,
-                    order=action.order,
-                    search=action.search,
+            try:
+                scan_result = await self.scan(
+                    ScanArtifactsAction(
+                        artifact_type=action.artifact_type,
+                        registry_id=action.delegatee_target.target_registry_id,
+                        limit=action.limit,
+                        order=action.order,
+                        search=action.search,
+                    )
                 )
-            )
+            except Exception as e:
+                raise RemoteReservoirScanError(
+                    f"Failed to scan artifacts from remote reservoir: {e}"
+                ) from e
 
             return DelegateScanArtifactsActionResult(
                 result=scan_result.result,
@@ -481,7 +487,9 @@ class ArtifactService:
         registry_id = registry_meta.registry_id
 
         if registry_type != ArtifactRegistryType.RESERVOIR:
-            raise NotImplementedError("Only Reservoir registry is supported for delegated scan")
+            raise ArtifactRegistryBadScanRequestError(
+                "Only Reservoir type registry is supported for delegated scan"
+            )
 
         registry_data = await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
             registry_id
@@ -490,7 +498,9 @@ class ArtifactService:
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
 
         if not (action.limit and action.order):
-            raise ArtifactRegistryBadScanRequestError()
+            raise ArtifactRegistryBadScanRequestError(
+                "Invalid scan request, one of `limit` or `order` argument required"
+            )
 
         req = DelegateScanArtifactsReq(
             delegator_reservoir_id=action.delegator_reservoir_id,
@@ -504,18 +514,18 @@ class ArtifactService:
 
         if client_resp is None:
             log.warning(
-                "Failed to connect to reservoir registry after {} attempts: {}",
+                "Failed to connect to reservoir registry after {}",
                 registry_data.endpoint,
             )
-            raise ReservoirConnectionError()
+            raise ReservoirConnectionError("Failed to connect to remote reservoir")
 
         RespTypeAdapter = TypeAdapter(DelegateScanArtifactsResponse)
-        parsed = RespTypeAdapter.validate_python(client_resp)
+        parsed_resp = RespTypeAdapter.validate_python(client_resp)
 
         all_artifacts: list[ArtifactDataWithRevisions] = []
 
         # Convert response data back to full data with readme
-        for response_artifact in parsed.artifacts:
+        for response_artifact in parsed_resp.artifacts:
             # Convert response revisions back to full revisions
             full_revisions: list[ArtifactRevisionData] = []
 
@@ -568,8 +578,8 @@ class ArtifactService:
         if all_artifacts:
             for artifact_data in all_artifacts:
                 # Override registry information
-                artifact_data.source_registry_id = parsed.source_registry_id
-                artifact_data.source_registry_type = parsed.source_registry_type
+                artifact_data.source_registry_id = parsed_resp.source_registry_id
+                artifact_data.source_registry_type = parsed_resp.source_registry_type
                 artifact_data.registry_id = registry_id
                 artifact_data.registry_type = ArtifactRegistryType.RESERVOIR
 
@@ -580,6 +590,6 @@ class ArtifactService:
 
         return DelegateScanArtifactsActionResult(
             result=scanned_models,
-            source_registry_id=parsed.source_registry_id,
-            source_registry_type=parsed.source_registry_type,
+            source_registry_id=parsed_resp.source_registry_id,
+            source_registry_type=parsed_resp.source_registry_type,
         )
