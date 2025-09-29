@@ -20,7 +20,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 if TYPE_CHECKING:
-    from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class AgentDBSource:
@@ -41,9 +41,9 @@ class AgentDBSource:
             return agent_row.to_data()
 
     async def _check_scaling_group_exists(
-        self, conn: SAConnection, scaling_group_name: str
+        self, session: "AsyncSession", scaling_group_name: str
     ) -> None:
-        scaling_group_row = await conn.scalar(
+        scaling_group_row = await session.scalar(
             sa.select(ScalingGroupRow).where(ScalingGroupRow.name == scaling_group_name)
         )
         if not scaling_group_row:
@@ -51,14 +51,13 @@ class AgentDBSource:
             raise ScalingGroupNotFound(scaling_group_name)
 
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
-        async with self._db.begin() as conn:
-            await self._check_scaling_group_exists(conn, upsert_data.metadata.scaling_group)
+        async with self._db.begin_session() as session:
+            await self._check_scaling_group_exists(session, upsert_data.metadata.scaling_group)
 
             query = (
                 sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
             )
-            result = await conn.execute(query)
-            row: Optional[AgentRow] = result.first()
+            row: Optional[AgentRow] = await session.scalar(query)
             agent_data = row.to_data() if row is not None else None
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
@@ -67,6 +66,6 @@ class AgentDBSource:
                 index_elements=["id"], set_=upsert_data.update_fields
             )
 
-            await conn.execute(final_query)
+            await session.execute(final_query)
 
             return upsert_result
