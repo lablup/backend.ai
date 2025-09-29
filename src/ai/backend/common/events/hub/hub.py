@@ -99,10 +99,8 @@ class EventHub:
         # Collect aliases for metrics
         metric_aliases = []
         for alias in propagator_info.aliases:
-            if alias in self._key_alias:
-                self._remove_alias(alias, propagator_id)
-                metric_aliases.append((alias[0].value, alias[1]))
-
+            self._remove_alias(alias, propagator_id)
+            metric_aliases.append((alias[0].value, alias[1]))
         del self._propagators[propagator_id]
 
         # Track metrics

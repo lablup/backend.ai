@@ -90,6 +90,11 @@ async def test_hub_normal_aliases():
     await hub.propagate_event(DummyKernelEvent("k103"))  # skipped
 
     hub.unregister_event_propagator(propagator1.id())
+    assert (EventDomain.SESSION, "s001") not in hub._key_alias
+    assert (EventDomain.SESSION, "s002") not in hub._key_alias
+    assert (EventDomain.SESSION, "s003") not in hub._key_alias
+    assert (EventDomain.SESSION, "s004") in hub._key_alias
+    assert (EventDomain.SESSION, "s005") in hub._key_alias
 
     await hub.propagate_event(DummySessionEvent("s002"))  # skipped
     await hub.propagate_event(DummyKernelEvent("k101"))  # skipped
@@ -123,11 +128,14 @@ async def test_hub_wildcard_aliases():
     await hub.propagate_event(DummySessionEvent("s001"))
     await hub.propagate_event(DummySessionEvent("s001"))
     await hub.propagate_event(DummySessionEvent("s003"))
-    await hub.propagate_event(DummySessionEvent("s004"))
+    await hub.propagate_event(DummySessionEvent("s004"))  # sent to both propagators
     await hub.propagate_event(DummyKernelEvent("k102"))  # skipped
     await hub.propagate_event(DummyKernelEvent("k103"))  # skipped
 
     hub.unregister_event_propagator(propagator1.id())
+    assert EventDomain.SESSION not in hub._wildcard_alias
+    assert (EventDomain.SESSION, "s004") in hub._key_alias
+    assert (EventDomain.SESSION, "s005") in hub._key_alias
 
     await hub.propagate_event(DummySessionEvent("s002"))  # skipped
     await hub.propagate_event(DummyKernelEvent("k101"))  # skipped
