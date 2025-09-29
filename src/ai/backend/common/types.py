@@ -998,7 +998,7 @@ class ResourceSlot(UserDict[SlotName, Decimal]):
         self.sync_keys(other)
         self_values = [Decimal(self.data[k]) for k in self.keys()]
         other_values = [Decimal(other.data[k]) for k in self.keys()]
-        return not any(s > o for s, o in zip(self_values, other_values)) and not (
+        return not any(s < o for s, o in zip(self_values, other_values)) and not (
             self_values == other_values
         )
 
