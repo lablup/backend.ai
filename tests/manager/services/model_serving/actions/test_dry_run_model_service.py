@@ -1,10 +1,11 @@
 import uuid
+from decimal import Decimal
 from typing import cast
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.types import AccessKey, ClusterMode, RuntimeVariant
+from ai.backend.common.types import AccessKey, BinarySize, ClusterMode, ResourceSlot, RuntimeVariant
 from ai.backend.manager.data.model_serving.types import ModelServicePrepareCtx, ServiceConfig
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.dry_run_model_service import (
@@ -90,7 +91,10 @@ class TestDryRunModelService:
                         extra_mounts={},
                         environ={},
                         scaling_group="default",
-                        resources={"cpu": "2", "memory": "4G"},
+                        resources=ResourceSlot({
+                            "cpu": Decimal(2),
+                            "mem": Decimal(BinarySize("4g")),
+                        }),
                         resource_opts={},
                     ),
                     request_user_id=uuid.UUID("00000000-0000-0000-0000-000000000001"),

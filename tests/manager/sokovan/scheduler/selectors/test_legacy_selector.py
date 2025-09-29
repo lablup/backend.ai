@@ -11,7 +11,6 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
-    SlotName,
 )
 from ai.backend.manager.sokovan.scheduler.selectors.legacy import LegacyAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
@@ -61,29 +60,23 @@ class TestLegacyAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="agent-gpu-unutilized",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("16"),
                     "mem": Decimal("32768"),
                     "cuda.shares": Decimal("4"),
                     "tpu": Decimal("2"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("8"),
                     "mem": Decimal("16384"),
                     "cuda.shares": Decimal("0"),
                     "tpu": Decimal("0"),
-                },
+                }),
             ),
             create_agent_info(
                 agent_id="agent-minimal",
-                available_slots={
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("8192"),
-                },
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             ),
         ]
 
@@ -119,22 +112,19 @@ class TestLegacyAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="agent-low-resources",
-                available_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
-                occupied_slots={"cpu": Decimal("6"), SlotName("mem"): Decimal("12288")},
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("6"), "mem": Decimal("12288")}),
             ),
             create_agent_info(
                 agent_id="agent-high-resources",
-                available_slots={"cpu": Decimal("16"), SlotName("mem"): Decimal("32768")},
-                occupied_slots={"cpu": Decimal("4"), SlotName("mem"): Decimal("8192")},
+                available_slots=ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             ),
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("1"),
-                SlotName("mem"): Decimal("2048"),
-            }),
+            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
 
@@ -163,22 +153,19 @@ class TestLegacyAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="high-cpu-low-mem",
-                available_slots={"cpu": Decimal("16"), SlotName("mem"): Decimal("8192")},
-                occupied_slots={"cpu": Decimal("2"), SlotName("mem"): Decimal("6144")},
+                available_slots=ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("8192")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("6144")}),
             ),
             create_agent_info(
                 agent_id="low-cpu-high-mem",
-                available_slots={"cpu": Decimal("8"), SlotName("mem"): Decimal("16384")},
-                occupied_slots={"cpu": Decimal("6"), SlotName("mem"): Decimal("4096")},
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("6"), "mem": Decimal("4096")}),
             ),
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("1"),
-                SlotName("mem"): Decimal("1024"),
-            }),
+            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
             required_architecture="x86_64",
         )
 
@@ -207,29 +194,29 @@ class TestLegacyAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="gpu-partially-used",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("16"),
                     "mem": Decimal("32768"),
                     "cuda.shares": Decimal("4"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("8"),
                     "mem": Decimal("16384"),
                     "cuda.shares": Decimal("2"),  # GPU is partially used
-                },
+                }),
             ),
             create_agent_info(
                 agent_id="gpu-unused",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("16"),
                     "mem": Decimal("32768"),
                     "cuda.shares": Decimal("4"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("8"),
                     "mem": Decimal("16384"),
                     "cuda.shares": Decimal("0"),  # GPU is completely unused
-                },
+                }),
             ),
         ]
 
@@ -276,37 +263,28 @@ class TestLegacyAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="agent-specialized",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("8"),
                     "mem": Decimal("16384"),
                     "cuda.shares": Decimal("4"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("6"),
                     "mem": Decimal("12288"),
                     "cuda.shares": Decimal("0"),
-                },
+                }),
             ),
             create_agent_info(
                 agent_id="agent-general",
-                available_slots={
-                    "cpu": Decimal("8"),
-                    "mem": Decimal("16384"),
-                },
-                occupied_slots={
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
-                },
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
             ),
         ]
 
         # Request only CPU and memory
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({
-                SlotName("cpu"): Decimal("1"),
-                SlotName("mem"): Decimal("2048"),
-            }),
+            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
             required_architecture="x86_64",
         )
 
@@ -341,29 +319,29 @@ class TestLegacyAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="custom-rich",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("8"),
                     "mem": Decimal("16384"),
                     "custom.accelerator": Decimal("10"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("4"),
                     "mem": Decimal("8192"),
                     "custom.accelerator": Decimal("2"),
-                },
+                }),
             ),
             create_agent_info(
                 agent_id="custom-poor",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("16"),
                     "mem": Decimal("32768"),
                     "custom.accelerator": Decimal("4"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("4"),
                     "mem": Decimal("8192"),
                     "custom.accelerator": Decimal("3"),
-                },
+                }),
             ),
         ]
 

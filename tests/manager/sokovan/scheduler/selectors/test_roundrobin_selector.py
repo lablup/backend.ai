@@ -210,13 +210,25 @@ class TestRoundRobinAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="agent-empty",
-                available_slots={"cpu": Decimal("1"), SlotName("mem"): Decimal("1024")},
-                occupied_slots={"cpu": Decimal("0.9"), SlotName("mem"): Decimal("1000")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("1"),
+                    "mem": Decimal("1024"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("0.9"),
+                    "mem": Decimal("1000"),
+                }),
             ),
             create_agent_info(
                 agent_id="agent-full",
-                available_slots={"cpu": Decimal("100"), SlotName("mem"): Decimal("204800")},
-                occupied_slots={"cpu": Decimal("1"), SlotName("mem"): Decimal("2048")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("100"),
+                    "mem": Decimal("204800"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("1"),
+                    "mem": Decimal("2048"),
+                }),
             ),
         ]
 

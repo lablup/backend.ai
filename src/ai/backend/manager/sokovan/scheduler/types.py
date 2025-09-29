@@ -743,7 +743,7 @@ class KernelCreationInfo:
                     # If it's not the expected nested structure,
                     # try to use it directly as a value
                     if allocation_by_device is not None:
-                        slots[slot_name] = str(allocation_by_device)
+                        slots[slot_name] = Decimal(allocation_by_device)
                     continue
 
                 # Sum allocations across devices
@@ -764,7 +764,7 @@ class KernelCreationInfo:
                         total_allocs.append(Decimal(allocation))
 
                 if total_allocs:
-                    slots[slot_name] = str(sum(total_allocs))
+                    slots[slot_name] = sum(total_allocs, Decimal(0))
 
         return slots
 

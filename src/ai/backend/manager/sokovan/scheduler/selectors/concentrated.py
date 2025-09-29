@@ -73,7 +73,7 @@ class ConcentratedAgentSelector(AbstractAgentSelector):
         def tracker_sort_key(tracker: AgentStateTracker) -> tuple[Union[int, Decimal], ...]:
             agent = tracker.original_agent
             occupied_slots = tracker.get_current_occupied_slots()
-            sort_key = []
+            sort_key: list[int | Decimal] = []
 
             # First, consider kernel counts at endpoint for replica spreading
             if (

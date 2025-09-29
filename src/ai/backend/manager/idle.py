@@ -1088,8 +1088,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         # Register requested resources.
         requested_resource_names: set[str] = set()
-        for slot_name, val in requested_slots.items():
-            if Decimal(val) == 0:
+        for slot_name, slot_alloc in requested_slots.items():
+            if Decimal(slot_alloc) == 0:
                 # The resource is not allocated to this session.
                 continue
             _slot_name = cast(str, slot_name)
@@ -1139,10 +1139,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
 
         do_idle_check: bool = True
 
-        for metric_key, val in current_utilizations.items():
+        for metric_key, metric_value in current_utilizations.items():
             if metric_key not in util_series:
                 util_series[metric_key] = []
-            util_series[metric_key].append(val)
+            util_series[metric_key].append(metric_value)
             if len(util_series[metric_key]) > window_size:
                 util_series[metric_key].pop(0)
             else:

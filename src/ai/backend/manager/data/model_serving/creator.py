@@ -1,5 +1,4 @@
 import uuid
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Optional, override
 
@@ -10,6 +9,7 @@ from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
+    ResourceSlot,
     RuntimeVariant,
     VFolderMount,
 )
@@ -32,7 +32,7 @@ class EndpointCreator(Creator):
     domain: str
     project: uuid.UUID
     resource_group: str  # Resource group row ID which is the name
-    resource_slots: Mapping[str, Any]
+    resource_slots: ResourceSlot
     replicas: int = 0
     lifecycle_stage: EndpointLifecycle = EndpointLifecycle.CREATED
     tag: Optional[str] = None

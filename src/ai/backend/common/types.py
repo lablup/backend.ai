@@ -848,22 +848,32 @@ def _validate_binary_size(v: Any) -> BinarySize:
 BinarySizeField = Annotated[BinarySize, PlainValidator(_validate_binary_size)]
 
 
-class ResourceSlot(UserDict[SlotName, str | Decimal]):
+class ResourceSlot(UserDict[SlotName, Decimal]):
     """
     key: `SlotName`
-    value: `str` or `Decimal` value. Do not convert this to `float` or `int`.
+    value: `Decimal` value. Do not convert this to `float` or `int`.
     """
 
     __slots__ = ("data",)
 
-    def __init__(self, data: Mapping[SlotName, str | Decimal] | None = None) -> None:
+    def __init__(
+        self,
+        data: Mapping[SlotName, int | str | Decimal | BinarySize | None]
+        | Mapping[str, int | str | Decimal | BinarySize | None]
+        | None = None,
+    ) -> None:
         if data is None:
             data = {}
-        super().__init__({k: v for k, v in data.items()})
+        super().__init__({SlotName(k): Decimal(v) for k, v in data.items() if v is not None})
 
     @classmethod
     def from_known_slots(cls, known_slots: Mapping[SlotName, SlotTypes]) -> ResourceSlot:
         return cls({k: Decimal(0) for k in known_slots.keys()})
+
+    def __getitem__(self, key: str | SlotName) -> Decimal:
+        if isinstance(key, SlotName):
+            return super().__getitem__(key)
+        return super().__getitem__(SlotName(key))
 
     def sync_keys(self, other: ResourceSlot) -> None:
         self_only_keys = self.data.keys() - other.data.keys()
@@ -1026,11 +1036,10 @@ class ResourceSlot(UserDict[SlotName, str | Decimal]):
     @classmethod
     def from_user_input(
         cls,
-        obj: Mapping[str, Any],
+        obj: Mapping[str, Any] | ResourceSlot,
         slot_types: Optional[Mapping[SlotName, SlotTypes]],
     ) -> Self:
         pruned_obj = {SlotName(k): v for k, v in obj.items() if v != 0}
-
         try:
             if slot_types is None:
                 data = {
@@ -1066,7 +1075,7 @@ class ResourceSlot(UserDict[SlotName, str | Decimal]):
             raise ValueError(f"Unknown slot type: {e.args[0]!r}")
 
     @classmethod
-    def from_json(cls, obj: Mapping[str, Any]) -> "ResourceSlot":
+    def from_json(cls, obj: Mapping[str, Any]) -> Self:
         data = {k: Decimal(v) for k, v in obj.items() if v is not None}
         return cls(data)
 

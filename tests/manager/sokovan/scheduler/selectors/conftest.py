@@ -5,7 +5,7 @@ from typing import Optional
 
 import pytest
 
-from ai.backend.common.types import AgentId, ResourceSlot, SlotName
+from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
 
 
@@ -27,16 +27,16 @@ def create_agent_info(
 
     if available_slots is None:
         available_slots = ResourceSlot({
-            SlotName("cpu"): Decimal("8.0"),
-            SlotName("mem"): Decimal("16384"),  # 16GB
-            SlotName("cuda.shares"): Decimal("0"),
+            "cpu": Decimal("8.0"),
+            "mem": Decimal("16384"),  # 16GB
+            "cuda.shares": Decimal("0"),
         })
 
     if occupied_slots is None:
         occupied_slots = ResourceSlot({
-            SlotName("cpu"): Decimal("0"),
-            SlotName("mem"): Decimal("0"),
-            SlotName("cuda.shares"): Decimal("0"),
+            "cpu": Decimal("0"),
+            "mem": Decimal("0"),
+            "cuda.shares": Decimal("0"),
         })
 
     return AgentInfo(
@@ -56,40 +56,44 @@ def sample_agents() -> list[AgentInfo]:
     return [
         create_agent_info(
             agent_id="agent-1",
-            available_slots={
+            available_slots=ResourceSlot({
                 "cpu": Decimal("8"),
                 "mem": Decimal("16384"),
                 "cuda.shares": Decimal("0"),
-            },
-            occupied_slots={
+            }),
+            occupied_slots=ResourceSlot({
                 "cpu": Decimal("2"),
                 "mem": Decimal("4096"),
                 "cuda.shares": Decimal("0"),
-            },
+            }),
             container_count=2,
         ),
         create_agent_info(
             agent_id="agent-2",
-            available_slots={
+            available_slots=ResourceSlot({
                 "cpu": Decimal("8"),
                 "mem": Decimal("16384"),
                 "cuda.shares": Decimal("0"),
-            },
-            occupied_slots={
+            }),
+            occupied_slots=ResourceSlot({
                 "cpu": Decimal("4"),
                 "mem": Decimal("8192"),
                 "cuda.shares": Decimal("0"),
-            },
+            }),
             container_count=4,
         ),
         create_agent_info(
             agent_id="agent-3",
-            available_slots={
+            available_slots=ResourceSlot({
                 "cpu": Decimal("8"),
                 "mem": Decimal("16384"),
                 "cuda.shares": Decimal("0"),
-            },
-            occupied_slots={"cpu": Decimal("0"), "mem": Decimal("0"), "cuda.shares": Decimal("0")},
+            }),
+            occupied_slots=ResourceSlot({
+                "cpu": Decimal("0"),
+                "mem": Decimal("0"),
+                "cuda.shares": Decimal("0"),
+            }),
             container_count=0,
         ),
     ]
@@ -101,30 +105,30 @@ def gpu_agents() -> list[AgentInfo]:
     return [
         create_agent_info(
             agent_id="gpu-agent-1",
-            available_slots={
+            available_slots=ResourceSlot({
                 "cpu": Decimal("16"),
                 "mem": Decimal("32768"),
                 "cuda.shares": Decimal("4"),
-            },
-            occupied_slots={
+            }),
+            occupied_slots=ResourceSlot({
                 "cpu": Decimal("4"),
                 "mem": Decimal("8192"),
                 "cuda.shares": Decimal("1"),
-            },
+            }),
             container_count=1,
         ),
         create_agent_info(
             agent_id="gpu-agent-2",
-            available_slots={
+            available_slots=ResourceSlot({
                 "cpu": Decimal("16"),
                 "mem": Decimal("32768"),
                 "cuda.shares": Decimal("4"),
-            },
-            occupied_slots={
+            }),
+            occupied_slots=ResourceSlot({
                 "cpu": Decimal("8"),
                 "mem": Decimal("16384"),
                 "cuda.shares": Decimal("2"),
-            },
+            }),
             container_count=2,
         ),
     ]

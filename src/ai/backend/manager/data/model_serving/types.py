@@ -12,6 +12,7 @@ from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
+    BinarySize,
     ClusterMode,
     MountPermission,
     MountTypes,
@@ -176,7 +177,7 @@ class ServiceConfig:
     extra_mounts: dict[uuid.UUID, MountOption]
     environ: Optional[dict[str, str]]
     scaling_group: str
-    resources: dict[str, str | int]
+    resources: ResourceSlot
     resource_opts: dict[str, str | int | bool]
 
     def to_dict(self) -> dict[str, Any]:
@@ -278,13 +279,13 @@ class ModelServiceDefinition(BaseModel):
             }
         ],
     )
-    resource_slots: Optional[dict[str, Any]] = Field(
+    resource_slots: Optional[ResourceSlot] = Field(
         default=None,
         description="""
         Resource slots used by the model service session.
         """,
         examples=[
-            {"cpu": 1, "mem": "2gb"},
+            ResourceSlot({"cpu": 1, "mem": BinarySize("2gb")}),
         ],
     )
     environ: Optional[dict[str, str]] = Field(

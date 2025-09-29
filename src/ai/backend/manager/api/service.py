@@ -3,6 +3,7 @@ import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any, Optional, Self
 
@@ -29,7 +30,9 @@ from ai.backend.common.api_handlers import BaseFieldModel
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
+    BinarySize,
     ClusterMode,
+    ResourceSlot,
     RuntimeVariant,
     VFolderID,
     VFolderMount,
@@ -370,7 +373,15 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         examples=["nvidia-H100"],
         alias="scalingGroup",
     )
-    resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
+    resources: ResourceSlot = Field(
+        examples=[
+            ResourceSlot({
+                "cpu": Decimal(4),
+                "mem": Decimal(BinarySize("32g")),
+                "cuda.shares": Decimal("2.5"),
+            })
+        ]
+    )
     resource_opts: dict[str, str | int | bool] = Field(examples=[{"shmem": "2g"}], default={})
 
     def to_dataclass(self) -> ServiceConfig:
