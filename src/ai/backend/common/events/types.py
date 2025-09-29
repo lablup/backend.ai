@@ -98,8 +98,8 @@ class AbstractEvent(ABC):
     @abstractmethod
     def domain_id(self) -> Optional[str]:
         """
-        Return the domain ID.
-        It's used to identify the event domain in the event hub.
+        Return the ID within the event domain.
+        It's used to reverse-look up the event domain in the event hub.
         """
         raise NotImplementedError
 

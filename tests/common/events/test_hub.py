@@ -1,0 +1,140 @@
+import uuid
+from typing import Optional, Self
+
+import pytest
+
+from ai.backend.common.events.hub import EventHub, EventPropagator
+from ai.backend.common.events.types import AbstractEvent, DeliveryPattern, EventDomain
+from ai.backend.common.events.user_event.user_event import UserEvent
+
+
+class DummyBaseEvent(AbstractEvent):
+    def __init__(self, domain_id: str) -> None:
+        self._domain_id = domain_id
+
+    def domain_id(self) -> Optional[str]:
+        return self._domain_id
+
+    @classmethod
+    def delivery_pattern(cls) -> DeliveryPattern:
+        return DeliveryPattern.BROADCAST
+
+    def serialize(self) -> tuple[bytes, ...]:
+        raise NotImplementedError
+
+    @classmethod
+    def deserialize(cls, value: tuple[bytes, ...]) -> Self:
+        raise NotImplementedError
+
+    @classmethod
+    def event_name(cls) -> str:
+        return "dummy"
+
+    def user_event(self) -> Optional[UserEvent]:
+        return None
+
+
+class DummySessionEvent(DummyBaseEvent):
+    @classmethod
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.SESSION
+
+
+class DummyKernelEvent(DummyBaseEvent):
+    @classmethod
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.KERNEL
+
+
+class DummyEventPropagator(EventPropagator):
+    def __init__(self) -> None:
+        self._id = uuid.uuid4()
+        self.records = []
+
+    def id(self) -> uuid.UUID:
+        return self._id
+
+    async def propagate_event(self, event: AbstractEvent) -> None:
+        self.records.append(event.domain_id())
+
+    async def close(self) -> None:
+        pass
+
+
+@pytest.mark.asyncio
+async def test_hub_normal_aliases():
+    hub = EventHub()
+    aliases = [
+        (EventDomain.SESSION, "s001"),
+        (EventDomain.SESSION, "s002"),
+        (EventDomain.SESSION, "s003"),
+    ]
+    propagator1 = DummyEventPropagator()
+    hub.register_event_propagator(propagator1, aliases)
+    aliases = [
+        (EventDomain.SESSION, "s004"),
+        (EventDomain.SESSION, "s005"),
+    ]
+    propagator2 = DummyEventPropagator()
+    hub.register_event_propagator(propagator2, aliases)
+
+    await hub.propagate_event(DummySessionEvent("s001"))
+    await hub.propagate_event(DummySessionEvent("s001"))
+    await hub.propagate_event(DummySessionEvent("s004"))
+    await hub.propagate_event(DummyKernelEvent("k102"))  # skipped
+    await hub.propagate_event(DummyKernelEvent("k103"))  # skipped
+
+    hub.unregister_event_propagator(propagator1.id())
+
+    await hub.propagate_event(DummySessionEvent("s002"))  # skipped
+    await hub.propagate_event(DummyKernelEvent("k101"))  # skipped
+    await hub.propagate_event(DummySessionEvent("s005"))
+
+    assert propagator1.records == [
+        "s001",
+        "s001",
+    ]
+    assert propagator2.records == [
+        "s004",
+        "s005",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_hub_wildcard_aliases():
+    hub = EventHub()
+    aliases = [
+        (EventDomain.SESSION, "*"),
+    ]
+    propagator1 = DummyEventPropagator()
+    hub.register_event_propagator(propagator1, aliases)
+    aliases = [
+        (EventDomain.SESSION, "s004"),
+        (EventDomain.SESSION, "s005"),
+    ]
+    propagator2 = DummyEventPropagator()
+    hub.register_event_propagator(propagator2, aliases)
+
+    await hub.propagate_event(DummySessionEvent("s001"))
+    await hub.propagate_event(DummySessionEvent("s001"))
+    await hub.propagate_event(DummySessionEvent("s003"))
+    await hub.propagate_event(DummySessionEvent("s004"))
+    await hub.propagate_event(DummyKernelEvent("k102"))  # skipped
+    await hub.propagate_event(DummyKernelEvent("k103"))  # skipped
+
+    hub.unregister_event_propagator(propagator1.id())
+
+    await hub.propagate_event(DummySessionEvent("s002"))  # skipped
+    await hub.propagate_event(DummyKernelEvent("k101"))  # skipped
+    await hub.propagate_event(DummySessionEvent("s005"))
+
+    assert propagator1.records == [
+        "s001",
+        "s001",
+        "s003",
+        "s004",
+    ]
+    assert propagator2.records == [
+        "s004",
+        "s005",
+    ]

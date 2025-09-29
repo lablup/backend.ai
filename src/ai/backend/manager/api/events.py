@@ -118,7 +118,7 @@ async def push_session_events(
 
     # Resolve session name to session ID
     if session_name == "*":
-        raise InvalidArgument("Wildcard session ID is not yet supported in the Event Hub.")
+        session_id = "*"
     else:
         async with root_ctx.db.begin_readonly_session(isolation_level="READ COMMITTED") as db_sess:
             rows = await SessionRow.match_sessions(

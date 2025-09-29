@@ -31,7 +31,7 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionTerminatedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
-from ai.backend.common.events.hub.hub import EventPropagator
+from ai.backend.common.events.hub import EventPropagator
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
