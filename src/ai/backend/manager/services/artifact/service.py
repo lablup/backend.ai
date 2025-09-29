@@ -449,6 +449,7 @@ class ArtifactService:
     ) -> DelegateScanArtifactsActionResult:
         # If this is a leaf node, perform local scan instead of delegation
         if self._config_provider.config.reservoir.is_delegation_leaf:
+            # TODO: Handle default correctly
             if action.delegatee_target is None:
                 raise ArtifactRegistryBadScanRequestError(
                     "target_registry_id must be specified for leaf delegation"
@@ -502,8 +503,12 @@ class ArtifactService:
                 "Invalid scan request, one of `limit` or `order` argument required"
             )
 
+        # Pass delegatee_reservoir_id to delegator_reservoir_id
+        delegatee_reservoir_id = (
+            action.delegatee_target.delegatee_reservoir_id if action.delegatee_target else None
+        )
         req = DelegateScanArtifactsReq(
-            delegator_reservoir_id=action.delegator_reservoir_id,
+            delegator_reservoir_id=delegatee_reservoir_id,
             delegatee_target=action.delegatee_target,
             artifact_type=action.artifact_type,
             limit=action.limit,

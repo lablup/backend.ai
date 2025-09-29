@@ -192,9 +192,6 @@ def create_app(
     api_handler = APIHandler()
     cors.add(app.router.add_route("POST", "/scan", api_handler.scan_artifacts))
     cors.add(app.router.add_route("POST", "/delegation/scan", api_handler.delegate_scan_artifacts))
-    cors.add(
-        app.router.add_route("POST", "/delegation/propagation/scan", api_handler.scan_artifacts)
-    )
     cors.add(app.router.add_route("POST", "/search", api_handler.search_artifacts))
 
     cors.add(app.router.add_route("GET", "/model/{model_id}", api_handler.scan_single_model))
