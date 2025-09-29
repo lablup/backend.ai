@@ -46,8 +46,10 @@ class BaseConfigModel(BaseModel):
         validate_by_name=True,
         from_attributes=True,
         use_enum_values=True,
+        # TODO: Consider to remove this.
         extra="allow",
         alias_generator=snake_to_kebab_case,
+        validate_default=True,
     )
 
 
