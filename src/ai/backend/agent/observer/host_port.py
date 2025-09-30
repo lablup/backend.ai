@@ -13,6 +13,9 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+PORT_USAGE_THRESHOLD = 2
+
+
 class HostPortObserver(AbstractObserver):
     def __init__(
         self,
@@ -42,7 +45,7 @@ class HostPortObserver(AbstractObserver):
 
         for port in occupied_host_ports:
             self._real_used_candidate_ports[port] += 1
-            if self._real_used_candidate_ports[port] >= 2:
+            if self._real_used_candidate_ports[port] >= PORT_USAGE_THRESHOLD:
                 real_used_ports.add(port)
         self._agent.reset_port_pool(real_used_ports)
 
