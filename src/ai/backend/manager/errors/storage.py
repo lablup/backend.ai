@@ -205,6 +205,19 @@ class VFolderDeletionNotAllowed(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class InsufficientStoragePermission(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage-permission-not-allowed"
+    error_title = "The specified storage permission is not allowed."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
 class VFolderInvalidParameter(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-invalid-parameter"
     error_title = "Invalid parameter for virtual folder operation."
