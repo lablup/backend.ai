@@ -14,7 +14,7 @@ type AgentResource {
 """Added in 25.15.0"""
 type AgentStats {
   """Added in 25.15.0"""
-  resource: AgentResource!
+  totalResource: AgentResource!
 }
 
 """Added in 25.14.0"""

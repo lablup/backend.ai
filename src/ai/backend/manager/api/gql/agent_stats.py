@@ -15,7 +15,7 @@ async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStats:
     )
 
     return AgentStats(
-        resource=AgentResource(
+        total_resource=AgentResource(
             free=result.total_resources.total_free_slots.to_json(),
             used=result.total_resources.total_used_slots.to_json(),
             capacity=result.total_resources.total_capacity_slots.to_json(),
@@ -32,4 +32,4 @@ class AgentResource:
 
 @strawberry.type(description="Added in 25.15.0")
 class AgentStats:
-    resource: AgentResource = strawberry.field(description="Added in 25.15.0")
+    total_resource: AgentResource = strawberry.field(description="Added in 25.15.0")

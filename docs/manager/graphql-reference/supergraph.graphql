@@ -154,7 +154,7 @@ type AgentStats
   @join__type(graph: STRAWBERRY)
 {
   """Added in 25.15.0"""
-  resource: AgentResource!
+  totalResource: AgentResource!
 }
 
 """A schema for normal users."""
