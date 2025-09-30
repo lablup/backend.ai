@@ -22,6 +22,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactRegistryType,
     ArtifactRevisionData,
     ArtifactRevisionReadme,
+    ArtifactStatus,
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
@@ -624,21 +625,20 @@ class ArtifactService:
     ) -> DelegateScanArtifactsActionResult:
         # If this is a leaf node, perform local scan instead of delegation
         if self._config_provider.config.reservoir.is_delegation_leaf:
-            # TODO: Handle default correctly
-            if action.delegatee_target is None:
-                raise ArtifactRegistryBadScanRequestError(
-                    "target_registry_id must be specified for leaf delegation"
-                )
+            registry_id = None
+            if action.delegatee_target:
+                registry_id = action.delegatee_target.target_registry_id
 
             registry_meta = await self._resolve_artifact_registry_meta(
-                action.artifact_type, action.delegatee_target.target_registry_id
+                action.artifact_type, registry_id
             )
+            target_registry_id = registry_meta.registry_id
 
             try:
                 scan_result = await self.scan_sync(
                     ScanArtifactsSyncAction(
                         artifact_type=action.artifact_type,
-                        registry_id=action.delegatee_target.target_registry_id,
+                        registry_id=target_registry_id,
                         limit=action.limit,
                         order=action.order,
                         search=action.search,
@@ -656,7 +656,7 @@ class ArtifactService:
             }
             return DelegateScanArtifactsActionResult(
                 result=scan_result.result,
-                source_registry_id=action.delegatee_target.target_registry_id,
+                source_registry_id=target_registry_id,
                 source_registry_type=registry_meta.type,
                 readme_data=readme_data,
             )
@@ -725,7 +725,8 @@ class ArtifactService:
                     version=response_revision.version,
                     readme=readme.readme,
                     size=response_revision.size,
-                    status=response_revision.status,
+                    # Reset status to SCANNED
+                    status=ArtifactStatus.SCANNED,
                     created_at=response_revision.created_at,
                     updated_at=response_revision.updated_at,
                 )
