@@ -20,4 +20,4 @@ class AgentStats:
         result = await info.context.processors.agent.get_total_resources.wait_for_complete(
             GetTotalResourcesAction()
         )
-        return result.total_resources.total_used_slots.to_json()
+        return result.total_resources.total_used_slots

@@ -24,6 +24,7 @@ from ai.backend.common.clients.valkey_client.client import (
     create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
+from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import ValkeyTarget
@@ -1386,13 +1387,13 @@ class ValkeyStatClient:
             return None
 
         try:
-            data = msgpack.unpackb(result, raw=False)
+            data = load_json(result.decode("utf-8"))
             return TotalResourceData(
                 total_used_slots=data["total_used_slots"],
                 total_free_slots=data["total_free_slots"],
                 total_capable_slots=data["total_capable_slots"],
             )
-        except (ExtraData, UnpackException, ValueError, KeyError) as e:
+        except (json.JSONDecodeError, ValueError, KeyError, UnicodeDecodeError) as e:
             log.warning("Failed to deserialize TotalResourceData from cache: {}", e)
             return None
 
@@ -1406,12 +1407,8 @@ class ValkeyStatClient:
         :param ttl_seconds: TTL in seconds (default: 300 = 5 minutes)
         """
         try:
-            data = {
-                "total_used_slots": total_slots.total_used_slots,
-                "total_free_slots": total_slots.total_free_slots,
-                "total_capable_slots": total_slots.total_capable_slots,
-            }
-            serialized = msgpack.packb(data)
+            total_slots_obj = total_slots.to_json()
+            serialized = dump_json_str(total_slots_obj)
             await self._client.client.set(
                 _TOTAL_RESOURCE_SLOTS_KEY, serialized, expiry=ExpirySet(ExpiryType.SEC, ttl_seconds)
             )
