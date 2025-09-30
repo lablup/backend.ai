@@ -29,6 +29,7 @@ class AbstractObserver(ABC):
         """
         raise NotImplementedError("Subclasses must implement this method.")
 
+    @classmethod
     @abstractmethod
     def timeout(cls) -> Optional[float]:
         """

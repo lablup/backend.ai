@@ -229,6 +229,7 @@ from .kernel import (
     match_distro_data,
 )
 from .observer.heartbeat import HeartbeatObserver
+from .observer.host_port import HostPortObserver
 from .resources import (
     AbstractComputeDevice,
     AbstractComputePlugin,
@@ -991,7 +992,9 @@ class AbstractAgent(
 
         self._agent_runner = Runner(resources=[])
         container_observer = HeartbeatObserver(self, self.event_producer)
+        host_port_observer = HostPortObserver(self)
         await self._agent_runner.register_observer(container_observer)
+        await self._agent_runner.register_observer(host_port_observer)
         await self._agent_runner.start()
 
         if abuse_report_path := self.local_config.agent.abuse_report_path:
@@ -1438,7 +1441,7 @@ class AbstractAgent(
                     if kernel_obj is not None:
                         host_ports = kernel_obj.get("host_ports")
                         if host_ports is not None:
-                            self._restore_ports(host_ports)
+                            self.restore_ports(host_ports)
                         await kernel_obj.close()
                 finally:
                     if restart_tracker := self.restarting_kernels.get(ev.kernel_id, None):
@@ -1462,7 +1465,7 @@ class AbstractAgent(
             "Handled clean event for kernel {0} with container {1}", ev.kernel_id, ev.container_id
         )
 
-    def _restore_ports(self, host_ports: Iterable[int]) -> None:
+    def restore_ports(self, host_ports: Iterable[int]) -> None:
         # Restore used ports to the port pool.
         port_range = self.local_config.container.port_range
         # Exclude out-of-range ports, because when the agent restarts
@@ -1567,7 +1570,7 @@ class AbstractAgent(
             await kernel_obj.close()
             host_ports = kernel_obj.get("host_ports")
             if host_ports is not None:
-                self._restore_ports(host_ports)
+                self.restore_ports(host_ports)
         except KeyError:
             log.warning(
                 "kernel object already removed (kernel:{})",
