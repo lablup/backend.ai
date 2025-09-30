@@ -1,6 +1,5 @@
 import logging
 import zlib
-from typing import Optional
 
 from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
@@ -45,7 +44,7 @@ class AgentRepository:
         self._config_provider = config_provider
 
     @repository_decorator()
-    async def get_by_id(self, agent_id: AgentId) -> Optional[AgentData]:
+    async def get_by_id(self, agent_id: AgentId) -> AgentData:
         return await self._db_source.get_by_id(agent_id)
 
     @repository_decorator()

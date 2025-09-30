@@ -622,3 +622,16 @@ class ProcessorNotReadyError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class AgentNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/agent-not-found"
+    error_title = "Agent Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
