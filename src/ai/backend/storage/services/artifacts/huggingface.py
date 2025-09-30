@@ -364,6 +364,42 @@ class HuggingFaceService:
 
         return models
 
+    async def scan_models_sync(
+        self,
+        registry_name: str,
+        limit: int,
+        sort: ModelSortKey,
+        search: Optional[str] = None,
+    ) -> list[ModelData]:
+        """List HuggingFace models with metadata including README content synchronously.
+
+        This method waits for all metadata (including README) to be fully downloaded before returning.
+
+        Args:
+            registry_name: Name of the HuggingFace registry
+            limit: Maximum number of models to retrieve
+            search: Search query to filter models
+            sort: Sort criteria ("downloads", "likes", "created_at", "last_modified")
+
+        Returns:
+            List of models with complete metadata including README content
+
+        Raises:
+            HuggingFaceAPIError: If API call fails
+        """
+        log.info(
+            f"Scanning HuggingFace models synchronously: limit={limit}, search={search}, sort={sort}"
+        )
+
+        scanner = self._make_scanner(registry_name)
+        models = await scanner.scan_models(limit=limit, search=search, sort=sort)
+
+        # Download metadata synchronously and update models with README content
+        if models:
+            await scanner.download_metadata_batch_sync(models)
+
+        return models
+
     async def retrieve_model(
         self,
         registry_name: str,
