@@ -1,7 +1,7 @@
 import logging
 import zlib
 from collections.abc import Collection, Sequence
-from typing import Optional, cast
+from typing import cast
 
 import sqlalchemy as sa
 from sqlalchemy.orm import contains_eager
