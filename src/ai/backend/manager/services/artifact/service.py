@@ -654,7 +654,6 @@ class ArtifactService:
                 for artifact in scan_result.result
                 for rev in artifact.revisions
             }
-            print("readme_data!", readme_data)
             return DelegateScanArtifactsActionResult(
                 result=scan_result.result,
                 source_registry_id=action.delegatee_target.target_registry_id,
@@ -717,19 +716,6 @@ class ArtifactService:
             full_revisions: list[ArtifactRevisionData] = []
 
             for response_revision in response_artifact.revisions:
-                # Get readme for this revision from reservoir
-
-                # try:
-                #     readme_resp = await remote_reservoir_client.get_readme(response_revision.id)
-                #     readme = readme_resp.readme
-                # except Exception as e:
-                #     log.warning(
-                #         "Failed to fetch readme for artifact {} revision {}: {}",
-                #         response_revision.artifact_id,
-                #         response_revision.version,
-                #         e,
-                #     )
-                #     readme = None
                 readme = parsed_resp.readme_data[response_revision.id]
 
                 # Create full revision data with readme
