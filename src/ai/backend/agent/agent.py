@@ -1481,12 +1481,12 @@ class AbstractAgent(
 
     def reset_port_pool(self, used_ports: Iterable[int]) -> None:
         """
-        Reset the port pool by excluding the used ports.
+        Reset the port pool by excluding the given used ports.
         """
         used_port_set = set(used_ports)
         port_range = self.local_config.container.port_range
         log.info(
-            "synchronizing port pool with used ports. current port-pool length: ({}), used ports length: ({})",
+            "reset port pool with used ports. current port-pool length: {}, used ports length: {}",
             len(self.port_pool),
             len(used_port_set),
         )

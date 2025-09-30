@@ -1,4 +1,5 @@
 import logging
+from collections import defaultdict
 from typing import TYPE_CHECKING, Optional, override
 
 from ai.backend.common.observer.types import AbstractObserver
@@ -18,6 +19,7 @@ class HostPortObserver(AbstractObserver):
         agent: "AbstractAgent",
     ) -> None:
         self._agent = agent
+        self._real_used_candidate_ports: defaultdict[int, int] = defaultdict(int)
 
     @property
     @override
@@ -30,9 +32,19 @@ class HostPortObserver(AbstractObserver):
 
         occupied_host_ports: set[int] = set()
         for _, container in containers:
-            for port in container.ports:
-                occupied_host_ports.add(port.host_port)
-        self._agent.reset_port_pool(occupied_host_ports)
+            for container_port in container.ports:
+                occupied_host_ports.add(container_port.host_port)
+
+        real_used_ports: set[int] = set()
+        for port in self._real_used_candidate_ports:
+            if port not in occupied_host_ports:
+                self._real_used_candidate_ports[port] = 0
+
+        for port in occupied_host_ports:
+            self._real_used_candidate_ports[port] += 1
+            if self._real_used_candidate_ports[port] >= 2:
+                real_used_ports.add(port)
+        self._agent.reset_port_pool(real_used_ports)
 
     @override
     def observe_interval(self) -> float:
