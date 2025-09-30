@@ -1441,7 +1441,7 @@ class AbstractAgent(
                     if kernel_obj is not None:
                         host_ports = kernel_obj.get("host_ports")
                         if host_ports is not None:
-                            self.restore_ports(host_ports)
+                            self._restore_ports(host_ports)
                         await kernel_obj.close()
                 finally:
                     if restart_tracker := self.restarting_kernels.get(ev.kernel_id, None):
@@ -1465,7 +1465,7 @@ class AbstractAgent(
             "Handled clean event for kernel {0} with container {1}", ev.kernel_id, ev.container_id
         )
 
-    def restore_ports(self, host_ports: Iterable[int]) -> None:
+    def _restore_ports(self, host_ports: Iterable[int]) -> None:
         # Restore used ports to the port pool.
         port_range = self.local_config.container.port_range
         # Exclude out-of-range ports, because when the agent restarts
@@ -1478,6 +1478,24 @@ class AbstractAgent(
             )
         ]
         self.port_pool.update(restored_ports)
+
+    def sync_port_pool(self, used_ports: Iterable[int]) -> None:
+        """
+        Synchronize the port pool with the actually used ports.
+        """
+        formated_port_pool = ", ".join(map(str, self.port_pool))
+        formated_used_ports = ", ".join(map(str, used_ports))
+        log.info(
+            "synchronizing port pool with used ports. current port pool: ({}), used ports: ({})",
+            formated_port_pool,
+            formated_used_ports,
+        )
+        port_range = self.local_config.container.port_range
+        used_port_set = set(used_ports)
+        original_port_pool: set[int] = {
+            p for p in range(port_range[0], port_range[1] + 1) if p not in used_port_set
+        }
+        self.port_pool = original_port_pool
 
     async def purge_containers(self, containers: Iterable[ContainerKernelId]) -> None:
         tasks = [self._purge_container(container) for container in containers]
@@ -1570,7 +1588,7 @@ class AbstractAgent(
             await kernel_obj.close()
             host_ports = kernel_obj.get("host_ports")
             if host_ports is not None:
-                self.restore_ports(host_ports)
+                self._restore_ports(host_ports)
         except KeyError:
             log.warning(
                 "kernel object already removed (kernel:{})",
