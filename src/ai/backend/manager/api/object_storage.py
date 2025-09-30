@@ -50,6 +50,13 @@ class APIHandler:
         body: BodyParam[GetPresignedDownloadURLReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Generate a presigned URL for safely downloading artifact files.
+
+        Creates a time-limited, secure URL that allows direct download of specific
+        artifact files from object storage without exposing storage credentials.
+        Used to provide secure access to AVAILABLE artifact files.
+        """
         processors = processors_ctx.processors
 
         action_result = (
@@ -72,6 +79,13 @@ class APIHandler:
         body: BodyParam[GetPresignedUploadURLReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Generate a presigned URL for uploading artifact files.
+
+        Creates a time-limited, secure URL that allows direct upload of files
+        to object storage without exposing storage credentials. Includes
+        additional form fields required for the upload operation.
+        """
         processors = processors_ctx.processors
 
         action_result = await processors.object_storage.get_presigned_upload_url.wait_for_complete(
@@ -93,6 +107,15 @@ class APIHandler:
         self,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Retrieve all storage namespaces (buckets) across all storage systems.
+
+        Returns a mapping of storage systems to their available namespaces.
+        This provides an overview of all available storage compartments
+        where artifacts can be stored.
+
+        Note: This API is deprecated. Use /storage-namespaces instead.
+        """
         processors = processors_ctx.processors
         action_result = await processors.storage_namespace.get_all_namespaces.wait_for_complete(
             GetAllNamespacesAction()
@@ -108,6 +131,14 @@ class APIHandler:
         path: PathParam[ObjectStoragePathParam],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Retrieve storage namespaces (buckets) for a specific storage system.
+
+        Returns the list of available namespaces within the specified storage
+        system where artifacts can be organized and stored.
+
+        Note: This API is deprecated. Use /storage-namespaces instead.
+        """
         processors = processors_ctx.processors
         storage_id: uuid.UUID = path.parsed.storage_id
 
@@ -125,6 +156,12 @@ class APIHandler:
         self,
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        List all configured object storage systems.
+
+        Returns information about all available storage systems that can be
+        used for storing artifacts, including their configuration and capabilities.
+        """
         processors = processors_ctx.processors
 
         action_result = await processors.object_storage.list_storages.wait_for_complete(
