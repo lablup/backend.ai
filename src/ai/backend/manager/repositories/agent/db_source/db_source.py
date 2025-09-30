@@ -75,19 +75,14 @@ class AgentDBSource:
     async def update_agent_status_exit(
         self, agent_id: AgentId, modifier: AgentStatusModifier
     ) -> None:
-        async with self._db.begin() as conn:
+        async with self._db.begin_session() as session:
             fetch_query = (
-                sa.select([
-                    agents.c.status,
-                    agents.c.addr,
-                ])
-                .select_from(agents)
-                .where(agents.c.id == agent_id)
+                sa.select(AgentRow.status)
+                .select_from(AgentRow)
+                .where(AgentRow.id == agent_id)
                 .with_for_update()
             )
-            result = await conn.execute(fetch_query)
-            row = result.first()
-            prev_status = row["status"]
+            prev_status = await session.scalar(fetch_query)
             if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
                 return
 
@@ -97,13 +92,17 @@ class AgentDBSource:
                 log.info("agent {0} has terminated.", agent_id)
 
             update_query = (
-                sa.update(agents).values(modifier.fields_to_update()).where(agents.c.id == agent_id)
+                sa.update(AgentRow)
+                .values(modifier.fields_to_update())
+                .where(AgentRow.id == agent_id)
             )
-            await conn.execute(update_query)
+            await session.execute(update_query)
 
     async def update_agent_status(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
-        async with self._db.begin() as conn:
+        async with self._db.begin_session() as session:
             query = (
-                sa.update(agents).values(modifier.fields_to_update()).where(agents.c.id == agent_id)
+                sa.update(AgentRow)
+                .values(modifier.fields_to_update())
+                .where(AgentRow.id == agent_id)
             )
-            await conn.execute(query)
+            await session.execute(query)
