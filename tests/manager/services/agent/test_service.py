@@ -78,6 +78,7 @@ def agent_service(
         hook_plugin_ctx=mock_hook_plugin_ctx,
         event_producer=mock_event_producer,
         agent_cache=mock_agent_cache,
+        scheduler_repository=AsyncMock(),  # Not used in these tests
     )
 
 
