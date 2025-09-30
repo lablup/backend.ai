@@ -3360,6 +3360,8 @@ class ScheduleDBSource:
             agent_stmt = sa.select(
                 AgentRow.id,
                 AgentRow.available_slots,
+            ).where(
+                sa.and_(AgentRow.status == AgentStatus.ALIVE, AgentRow.schedulable == sa.true())
             )
 
             agent_result = await db_sess.execute(agent_stmt)
