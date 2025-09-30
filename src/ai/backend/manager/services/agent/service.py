@@ -12,6 +12,11 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.services.agent.actions.get_total_resources import (
+    GetTotalResourcesAction,
+    GetTotalResourcesActionResult,
+)
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
     GetWatcherStatusActionResult,
@@ -45,6 +50,7 @@ class AgentService:
     _config_provider: ManagerConfigProvider
     _agent_registry: AgentRegistry
     _agent_repository: AgentRepository
+    _scheduler_repository: SchedulerRepository
 
     def __init__(
         self,
@@ -52,11 +58,13 @@ class AgentService:
         agent_registry: AgentRegistry,
         config_provider: ManagerConfigProvider,
         agent_repository: AgentRepository,
+        scheduler_repository: SchedulerRepository,
     ) -> None:
         self._etcd = etcd
         self._agent_registry = agent_registry
         self._config_provider = config_provider
         self._agent_repository = agent_repository
+        self._scheduler_repository = scheduler_repository
 
     async def _get_watcher_info(self, agent_id: AgentId) -> dict:
         """
@@ -141,3 +149,9 @@ class AgentService:
     ) -> RecalculateUsageActionResult:
         await self._agent_registry.recalc_resource_usage()
         return RecalculateUsageActionResult()
+
+    async def get_total_resources(
+        self, action: GetTotalResourcesAction
+    ) -> GetTotalResourcesActionResult:
+        total_resources = await self._scheduler_repository.get_total_resource_slots()
+        return GetTotalResourcesActionResult(total_resources=total_resources)

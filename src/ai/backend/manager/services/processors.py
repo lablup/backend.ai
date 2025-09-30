@@ -141,6 +141,7 @@ class Services:
             args.agent_registry,
             args.config_provider,
             repositories.agent.repository,
+            repositories.scheduler.repository,
         )
         domain_service = DomainService(
             repositories.domain.repository, repositories.domain.admin_repository

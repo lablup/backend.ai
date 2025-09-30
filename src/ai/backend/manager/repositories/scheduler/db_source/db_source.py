@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload, sessionmaker
 
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -3346,3 +3347,46 @@ class ScheduleDBSource:
                 )
             )
             await db_sess.execute(update_stmt)
+
+    async def calculate_total_resource_slots(self) -> TotalResourceData:
+        """
+        Calculate total resource slots from all agents in the database.
+        Uses AgentRow.available_slots for capable slots and kernel-based calculation for occupied slots.
+
+        :return: TotalResourceData with total used, free, and capable slots
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            # Get all active agent IDs and their available slots
+            agent_stmt = sa.select(
+                AgentRow.id,
+                AgentRow.available_slots,
+            )
+
+            agent_result = await db_sess.execute(agent_stmt)
+            agent_rows = agent_result.fetchall()
+
+            # Extract agent IDs and calculate total capable slots
+            agent_ids = set()
+            total_capable_slots = ResourceSlot()
+
+            for agent_row in agent_rows:
+                agent_ids.add(agent_row.id)
+                if agent_row.available_slots:
+                    total_capable_slots += agent_row.available_slots
+
+            # Calculate occupied slots from kernels using existing method
+            agent_occupied_slots = await self._calculate_agent_occupied_slots(db_sess, agent_ids)
+
+            # Sum up all occupied slots
+            total_used_slots = ResourceSlot()
+            for occupied_slots in agent_occupied_slots.values():
+                total_used_slots += occupied_slots
+
+            # Calculate free slots
+            total_free_slots = total_capable_slots - total_used_slots
+
+            return TotalResourceData(
+                total_used_slots=total_used_slots,
+                total_free_slots=total_free_slots,
+                total_capable_slots=total_capable_slots,
+            )

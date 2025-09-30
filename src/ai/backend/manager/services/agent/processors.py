@@ -3,6 +3,10 @@ from typing import override
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.processor import ActionProcessor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.services.agent.actions.get_total_resources import (
+    GetTotalResourcesAction,
+    GetTotalResourcesActionResult,
+)
 from ai.backend.manager.services.agent.actions.get_watcher_status import (
     GetWatcherStatusAction,
     GetWatcherStatusActionResult,
@@ -39,6 +43,7 @@ class AgentProcessors(AbstractProcessorPackage):
     ]
     watcher_agent_stop: ActionProcessor[WatcherAgentStopAction, WatcherAgentStopActionResult]
     recalculate_usage: ActionProcessor[RecalculateUsageAction, RecalculateUsageActionResult]
+    get_total_resources: ActionProcessor[GetTotalResourcesAction, GetTotalResourcesActionResult]
 
     def __init__(self, service: AgentService, action_monitors: list[ActionMonitor]) -> None:
         self.sync_agent_registry = ActionProcessor(service.sync_agent_registry, action_monitors)
@@ -47,6 +52,7 @@ class AgentProcessors(AbstractProcessorPackage):
         self.watcher_agent_restart = ActionProcessor(service.watcher_agent_restart, action_monitors)
         self.watcher_agent_stop = ActionProcessor(service.watcher_agent_stop, action_monitors)
         self.recalculate_usage = ActionProcessor(service.recalculate_usage, action_monitors)
+        self.get_total_resources = ActionProcessor(service.get_total_resources, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -57,4 +63,5 @@ class AgentProcessors(AbstractProcessorPackage):
             WatcherAgentRestartAction.spec(),
             WatcherAgentStopAction.spec(),
             RecalculateUsageAction.spec(),
+            GetTotalResourcesAction.spec(),
         ]

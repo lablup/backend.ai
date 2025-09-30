@@ -140,6 +140,14 @@ Added in 24.12.0. One of ['read_attribute', 'update_attribute', 'create_compute_
 scalar AgentPermissionField
   @join__type(graph: GRAPHENE)
 
+"""Added in 25.15.0"""
+type AgentStats
+  @join__type(graph: STRAWBERRY)
+{
+  """Added in 25.15.0"""
+  totalUsedSlots: JSON!
+}
+
 """A schema for normal users."""
 type AgentSummary implements Item
   @join__implements(graph: GRAPHENE, interface: "Item")
@@ -2430,6 +2438,13 @@ enum join__Graph {
 }
 
 """
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
+"""
+scalar JSON
+  @join__type(graph: STRAWBERRY)
+  @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
+"""
 Allows use of a JSON String for input / output from the GraphQL schema.
 
 Use of this type is *not recommended* as you lose the benefits of having a defined, static
@@ -4546,6 +4561,9 @@ type Query
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
+
+  """Added in 25.14.0"""
+  agentStats: AgentStats! @join__field(graph: STRAWBERRY)
 }
 
 type QuotaDetails
