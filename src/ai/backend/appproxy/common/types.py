@@ -316,6 +316,14 @@ class HealthCheckState(BaseModel):
     status: ModelServiceStatus | None = None
 
 
+class HealthResponse(BaseModel):
+    """Standard health check response"""
+
+    status: str
+    version: str
+    component: str
+
+
 TBaseModel = TypeVar("TBaseModel", bound=Union[BaseModel, Sequence[BaseModel]])
 
 

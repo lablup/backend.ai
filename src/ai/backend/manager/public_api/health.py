@@ -12,6 +12,8 @@ from aiohttp import web
 from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
 from ai.backend.logging import BraceStyleAdapter
 
+from .. import __version__
+from ..dto.response import HealthResponse
 from ..models.health import (
     SQLAlchemyConnectionInfo,
     get_manager_db_cxn_status,
@@ -117,6 +119,18 @@ class RedisConnectionMetricGroup(PromMetricGroup[RedisConnectionMetric]):
         return PromMetricPrimitive.gauge
 
 
+async def hello(request: web.Request) -> web.Response:
+    """Simple health check endpoint"""
+    request["do_not_print_access_log"] = True
+
+    response = HealthResponse(
+        status="healthy",
+        version=__version__,
+        component="manager",
+    )
+    return web.json_response(response.model_dump())
+
+
 async def get_manager_status_for_prom(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     status = await get_manager_db_cxn_status(root_ctx)
@@ -182,6 +196,12 @@ def create_app(default_cors_options: CORSOptions):
     app.on_startup.append(init)
     app.on_shutdown.append(shutdown)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
+
+    # Basic health check endpoint
+    root_resource = cors.add(app.router.add_resource(r""))
+    cors.add(root_resource.add_route("GET", hello))
+
     prom_resource = cors.add(app.router.add_resource("/prom"))
     cors.add(prom_resource.add_route("GET", get_manager_status_for_prom))
+
     return app, []
