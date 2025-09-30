@@ -32,7 +32,7 @@ class HostPortObserver(AbstractObserver):
         for _, container in containers:
             for port in container.ports:
                 occupied_host_ports.add(port.host_port)
-        self._agent.sync_port_pool(occupied_host_ports)
+        self._agent.reset_port_pool(occupied_host_ports)
 
     @override
     def observe_interval(self) -> float:

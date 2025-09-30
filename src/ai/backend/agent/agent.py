@@ -1479,19 +1479,17 @@ class AbstractAgent(
         ]
         self.port_pool.update(restored_ports)
 
-    def sync_port_pool(self, used_ports: Iterable[int]) -> None:
+    def reset_port_pool(self, used_ports: Iterable[int]) -> None:
         """
-        Synchronize the port pool with the actually used ports.
+        Reset the port pool by excluding the used ports.
         """
-        formatted_port_pool = ", ".join(map(str, self.port_pool))
-        formatted_used_ports = ", ".join(map(str, used_ports))
-        log.info(
-            "synchronizing port pool with used ports. current port pool: ({}), used ports: ({})",
-            formatted_port_pool,
-            formatted_used_ports,
-        )
-        port_range = self.local_config.container.port_range
         used_port_set = set(used_ports)
+        port_range = self.local_config.container.port_range
+        log.info(
+            "synchronizing port pool with used ports. current port-pool length: ({}), used ports length: ({})",
+            len(self.port_pool),
+            len(used_port_set),
+        )
         original_port_pool: set[int] = {
             p for p in range(port_range[0], port_range[1] + 1) if p not in used_port_set
         }
