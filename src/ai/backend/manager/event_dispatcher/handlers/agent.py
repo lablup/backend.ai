@@ -26,6 +26,8 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.resource import InstanceNotFound
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.agent.actions.handle_heartbeat import HandleHeartbeatAction
+from ai.backend.manager.services.agent.actions.mark_agent_exit import MarkAgentExitAction
+from ai.backend.manager.services.agent.actions.mark_agent_running import MarkAgentRunningAction
 from ai.backend.manager.services.processors import Processors
 
 from ...models.agent import AgentStatus, agents
@@ -81,11 +83,12 @@ class AgentEventHandler:
         event: AgentStartedEvent,
     ) -> None:
         log.info("instance_lifecycle: ag:{0} joined (via event, {1})", source, event.reason)
-        await self._registry.update_instance(
-            source,
-            {
-                "status": AgentStatus.ALIVE,
-            },
+        processors = await self.get_processors()
+        await processors.agent.mark_agent_running.wait_for_complete(
+            MarkAgentRunningAction(
+                agent_id=source,
+                agent_status=AgentStatus.ALIVE,
+            )
         )
 
     async def handle_agent_terminated(
@@ -94,22 +97,31 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentTerminatedEvent,
     ) -> None:
+        processors = await self.get_processors()
         if event.reason == "agent-lost":
-            await self._registry.mark_agent_terminated(source, AgentStatus.LOST)
-            self._registry.agent_cache.discard(source)
+            await processors.agent.mark_agent_exit.wait_for_complete(
+                MarkAgentExitAction(
+                    agent_id=source,
+                    agent_status=AgentStatus.LOST,
+                )
+            )
         elif event.reason == "agent-restart":
             log.info("agent@{0} restarting for maintenance.", source)
-            await self._registry.update_instance(
-                source,
-                {
-                    "status": AgentStatus.RESTARTING,
-                },
+            await processors.agent.mark_agent_running.wait_for_complete(
+                MarkAgentRunningAction(
+                    agent_id=source,
+                    agent_status=AgentStatus.RESTARTING,
+                )
             )
         else:
             # On normal instance termination, kernel_terminated events were already
             # triggered by the agent.
-            await self._registry.mark_agent_terminated(source, AgentStatus.TERMINATED)
-            self._registry.agent_cache.discard(source)
+            await processors.agent.mark_agent_exit.wait_for_complete(
+                MarkAgentExitAction(
+                    agent_id=source,
+                    agent_status=AgentStatus.TERMINATED,
+                )
+            )
 
     async def handle_agent_heartbeat(
         self,

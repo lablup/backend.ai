@@ -7,9 +7,11 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentHeartbeatUpsert,
+    AgentStatus,
     UpsertResult,
 )
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
@@ -71,3 +73,38 @@ class AgentDBSource:
             await session.execute(final_query)
 
             return upsert_result
+
+    async def update_agent_status_exit(
+        self, agent_id: AgentId, modifier: AgentStatusModifier
+    ) -> None:
+        async with self._db.begin_session() as session:
+            fetch_query = (
+                sa.select(AgentRow.status)
+                .select_from(AgentRow)
+                .where(AgentRow.id == agent_id)
+                .with_for_update()
+            )
+            prev_status = await session.scalar(fetch_query)
+            if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
+                return
+
+            if modifier.status == AgentStatus.LOST:
+                log.warning("agent {0} heartbeat timeout detected.", agent_id)
+            elif modifier.status == AgentStatus.TERMINATED:
+                log.info("agent {0} has terminated.", agent_id)
+
+            update_query = (
+                sa.update(AgentRow)
+                .values(modifier.fields_to_update())
+                .where(AgentRow.id == agent_id)
+            )
+            await session.execute(update_query)
+
+    async def update_agent_status(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
+        async with self._db.begin_session() as session:
+            query = (
+                sa.update(AgentRow)
+                .values(modifier.fields_to_update())
+                .where(AgentRow.id == agent_id)
+            )
+            await session.execute(query)
