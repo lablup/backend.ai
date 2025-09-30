@@ -42,6 +42,7 @@ python_distribution(
     name="dist",
     dependencies=[
         ":src",
+        ":src-watcher",
         "src/ai/backend/kernel:src",  # included only in binary dists
         "!!stubs/trafaret:stubs",
     ],
