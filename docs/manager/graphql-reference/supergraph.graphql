@@ -4562,7 +4562,7 @@ type Query
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
+  """Added in 25.15.0"""
   agentStats: AgentStats! @join__field(graph: STRAWBERRY)
 }
 

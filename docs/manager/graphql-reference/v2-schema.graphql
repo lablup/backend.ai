@@ -872,7 +872,7 @@ type Query {
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
 
-  """Added in 25.14.0"""
+  """Added in 25.15.0"""
   agentStats: AgentStats!
 }
 
