@@ -13,7 +13,7 @@ from pydantic import (
     model_validator,
 )
 
-from ai.backend.common.config import BaseConfigModel
+from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.data.storage.types import ArtifactStorageType
@@ -44,7 +44,7 @@ class EventLoopType(enum.StrEnum):
     uvloop = "uvloop"
 
 
-class VolumeInfoConfig(BaseConfigModel):
+class VolumeInfoConfig(BaseConfigSchema):
     backend: str = Field(
         description="""
         Storage backend type to use for this volume.
@@ -85,7 +85,7 @@ class VolumeInfoConfig(BaseConfigModel):
         )
 
 
-class EtcdConfig(BaseConfigModel):
+class EtcdConfig(BaseConfigSchema):
     namespace: str = Field(
         default="ETCD_NAMESPACE",
         description="""
@@ -138,7 +138,7 @@ class EtcdConfig(BaseConfigModel):
         )
 
 
-class PyroscopeConfig(BaseConfigModel):
+class PyroscopeConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="""
@@ -183,7 +183,7 @@ class PyroscopeConfig(BaseConfigModel):
     )
 
 
-class ClientAPIConfig(BaseConfigModel):
+class ClientAPIConfig(BaseConfigSchema):
     service_addr: HostPortPair = Field(
         default=HostPortPair(host="127.0.0.1", port=6021),
         description="""
@@ -224,7 +224,7 @@ class ClientAPIConfig(BaseConfigModel):
     )
 
 
-class ManagerAPIConfig(BaseConfigModel):
+class ManagerAPIConfig(BaseConfigSchema):
     service_addr: HostPortPair = Field(
         default=HostPortPair(host="127.0.0.1", port=6022),
         description="""
@@ -299,7 +299,7 @@ class ManagerAPIConfig(BaseConfigModel):
     )
 
 
-class APIConfig(BaseConfigModel):
+class APIConfig(BaseConfigSchema):
     client: ClientAPIConfig = Field(
         description="""
         Configuration for the client-facing API.
@@ -314,7 +314,7 @@ class APIConfig(BaseConfigModel):
     )
 
 
-class DebugConfig(BaseConfigModel):
+class DebugConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="""
@@ -357,7 +357,7 @@ class DebugConfig(BaseConfigModel):
     )
 
 
-class OTELConfig(BaseConfigModel):
+class OTELConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="""
@@ -386,7 +386,7 @@ class OTELConfig(BaseConfigModel):
     )
 
 
-class ServiceDiscoveryConfig(BaseConfigModel):
+class ServiceDiscoveryConfig(BaseConfigSchema):
     type: ServiceDiscoveryType = Field(
         default=ServiceDiscoveryType.REDIS,
         description="""
@@ -396,7 +396,7 @@ class ServiceDiscoveryConfig(BaseConfigModel):
     )
 
 
-class StorageProxyConfig(BaseConfigModel):
+class StorageProxyConfig(BaseConfigSchema):
     ipc_base_path: AutoDirectoryPath = Field(
         default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
         description="""
@@ -572,7 +572,7 @@ class StorageProxyConfig(BaseConfigModel):
     )
 
 
-class PresignedUploadConfig(BaseConfigModel):
+class PresignedUploadConfig(BaseConfigSchema):
     min_size: Optional[int] = Field(
         default=None,
         description="""
@@ -602,7 +602,7 @@ class PresignedUploadConfig(BaseConfigModel):
     )
 
 
-class PresignedDownloadConfig(BaseConfigModel):
+class PresignedDownloadConfig(BaseConfigSchema):
     expiration: int = Field(
         default=60 * 5,  # 5 minutes
         description="""
@@ -612,7 +612,7 @@ class PresignedDownloadConfig(BaseConfigModel):
     )
 
 
-class VFSStorageConfig(BaseConfigModel):
+class VFSStorageConfig(BaseConfigSchema):
     base_path: Path = Field(
         description="""
         Base filesystem path for VFS storage.
@@ -665,7 +665,7 @@ class VFSStorageConfig(BaseConfigModel):
 
 
 # TODO: Remove this after migrating this to database
-class ObjectStorageConfig(BaseConfigModel):
+class ObjectStorageConfig(BaseConfigSchema):
     endpoint: str = Field(
         description="""
         Endpoint URL for the object storage service.
@@ -766,7 +766,7 @@ class LegacyObjectStorageConfig(ObjectStorageConfig):
     )
 
 
-class HuggingfaceConfig(BaseConfigModel):
+class HuggingfaceConfig(BaseConfigSchema):
     endpoint: str = Field(
         default="https://huggingface.co",
         description="""
@@ -805,7 +805,7 @@ class LegacyHuggingfaceConfig(HuggingfaceConfig):
     )
 
 
-class ReservoirConfig(BaseConfigModel):
+class ReservoirConfig(BaseConfigSchema):
     endpoint: str = Field(
         default="https://huggingface.co",
         description="""
@@ -849,7 +849,7 @@ class LegacyReservoirConfig(ReservoirConfig):
     )
 
 
-class ArtifactRegistryStorageConfig(BaseConfigModel):
+class ArtifactRegistryStorageConfig(BaseConfigSchema):
     storage_type: ArtifactStorageType = Field(
         description="""
         Type of the artifact storage.
@@ -893,7 +893,7 @@ class ArtifactRegistryStorageConfig(BaseConfigModel):
 LegacyRegistrySpecificConfig = Union[LegacyHuggingfaceConfig, LegacyReservoirConfig]
 
 
-class LegacyArtifactRegistryConfig(BaseConfigModel):
+class LegacyArtifactRegistryConfig(BaseConfigSchema):
     name: str = Field(
         description="""
         Name of the artifact registry configuration.
@@ -909,7 +909,7 @@ class LegacyArtifactRegistryConfig(BaseConfigModel):
     )
 
 
-class ArtifactRegistryConfig(BaseConfigModel):
+class ArtifactRegistryConfig(BaseConfigSchema):
     registry_type: ArtifactRegistryType = Field(
         description="""
         Type of the artifact registry.
@@ -948,7 +948,7 @@ class ArtifactRegistryConfig(BaseConfigModel):
         return self
 
 
-class StorageProxyUnifiedConfig(BaseConfigModel):
+class StorageProxyUnifiedConfig(BaseConfigSchema):
     storage_proxy: StorageProxyConfig = Field(
         description="""
         Core storage-proxy service configuration.
