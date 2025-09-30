@@ -3365,14 +3365,14 @@ class ScheduleDBSource:
             agent_result = await db_sess.execute(agent_stmt)
             agent_rows = agent_result.fetchall()
 
-            # Extract agent IDs and calculate total capable slots
+            # Extract agent IDs and calculate total capacity slots
             agent_ids = set()
-            total_capable_slots = ResourceSlot()
+            total_capacity_slots = ResourceSlot()
 
             for agent_row in agent_rows:
                 agent_ids.add(agent_row.id)
                 if agent_row.available_slots:
-                    total_capable_slots += agent_row.available_slots
+                    total_capacity_slots += agent_row.available_slots
 
             # Calculate occupied slots from kernels using existing method
             agent_occupied_slots = await self._calculate_agent_occupied_slots(db_sess, agent_ids)
@@ -3383,10 +3383,10 @@ class ScheduleDBSource:
                 total_used_slots += occupied_slots
 
             # Calculate free slots
-            total_free_slots = total_capable_slots - total_used_slots
+            total_free_slots = total_capacity_slots - total_used_slots
 
             return TotalResourceData(
                 total_used_slots=total_used_slots,
                 total_free_slots=total_free_slots,
-                total_capable_slots=total_capable_slots,
+                total_capacity_slots=total_capacity_slots,
             )

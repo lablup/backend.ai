@@ -1388,11 +1388,7 @@ class ValkeyStatClient:
 
         try:
             data = load_json(result.decode("utf-8"))
-            return TotalResourceData(
-                total_used_slots=data["total_used_slots"],
-                total_free_slots=data["total_free_slots"],
-                total_capable_slots=data["total_capable_slots"],
-            )
+            return TotalResourceData.from_json(data)
         except (json.JSONDecodeError, ValueError, KeyError, UnicodeDecodeError) as e:
             log.warning("Failed to deserialize TotalResourceData from cache: {}", e)
             return None
