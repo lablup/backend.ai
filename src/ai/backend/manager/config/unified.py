@@ -181,7 +181,6 @@ from typing import Any, Literal, Optional, Union
 
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
     FilePath,
@@ -190,6 +189,7 @@ from pydantic import (
     field_validator,
 )
 
+from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
@@ -233,7 +233,7 @@ class DatabaseType(enum.StrEnum):
     postgresql = "postgresql"
 
 
-class DatabaseConfig(BaseModel):
+class DatabaseConfig(BaseConfigSchema):
     type: Literal["postgresql"] = Field(
         default="postgresql",
         description="""
@@ -351,7 +351,7 @@ class DistributedLockType(enum.StrEnum):
     etcetra = "etcetra"
 
 
-class EtcdConfig(BaseModel):
+class EtcdConfig(BaseConfigSchema):
     namespace: str = Field(
         default="ETCD_NAMESPACE",
         description="""
@@ -404,7 +404,7 @@ class EtcdConfig(BaseModel):
         )
 
 
-class AuthConfig(BaseModel):
+class AuthConfig(BaseConfigSchema):
     max_password_age: Optional[TimeDuration] = Field(
         default=None,
         description="""
@@ -467,7 +467,7 @@ class AuthConfig(BaseModel):
     )
 
 
-class ManagerConfig(BaseModel):
+class ManagerConfig(BaseConfigSchema):
     ipc_base_path: AutoDirectoryPath = Field(
         default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
         description="""
@@ -926,7 +926,7 @@ class ManagerConfig(BaseModel):
 
 
 # Deprecated: v20.09
-class DockerRegistryConfig(BaseModel):
+class DockerRegistryConfig(BaseConfigSchema):
     ssl_verify: bool = Field(
         default=True,
         description="""
@@ -939,7 +939,7 @@ class DockerRegistryConfig(BaseModel):
     )
 
 
-class PyroscopeConfig(BaseModel):
+class PyroscopeConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="""
@@ -984,7 +984,7 @@ class PyroscopeConfig(BaseModel):
     )
 
 
-class SMTPReporterConfig(BaseModel):
+class SMTPReporterConfig(BaseConfigSchema):
     name: str = Field(
         description="""
         Name of the SMTP reporter.
@@ -1082,7 +1082,7 @@ class SMTPReporterConfig(BaseModel):
     )
 
 
-class ActionMonitorsConfig(BaseModel):
+class ActionMonitorsConfig(BaseConfigSchema):
     subscribed_actions: list[str] = Field(
         default=[],
         description="""
@@ -1101,7 +1101,7 @@ class ActionMonitorsConfig(BaseModel):
     )
 
 
-class ReporterConfig(BaseModel):
+class ReporterConfig(BaseConfigSchema):
     smtp: list[SMTPReporterConfig] = Field(
         default=[],
         description="""
@@ -1121,7 +1121,7 @@ class ReporterConfig(BaseModel):
     )
 
 
-class DebugConfig(BaseModel):
+class DebugConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="""
@@ -1188,7 +1188,7 @@ class DebugConfig(BaseModel):
     )
 
 
-class SystemConfig(BaseModel):
+class SystemConfig(BaseConfigSchema):
     timezone: TimeZone = Field(
         default_factory=lambda: timezone.utc,
         description="""
@@ -1199,7 +1199,7 @@ class SystemConfig(BaseModel):
     )
 
 
-class ResourcesConfig(BaseModel):
+class ResourcesConfig(BaseConfigSchema):
     group_resource_visibility: bool = Field(
         default=False,
         description="""
@@ -1210,7 +1210,7 @@ class ResourcesConfig(BaseModel):
     )
 
 
-class APIConfig(BaseModel):
+class APIConfig(BaseConfigSchema):
     allow_origins: str = Field(
         default="*",
         description="""
@@ -1290,7 +1290,7 @@ class DockerImageAutoPullPolicy(enum.StrEnum):
     none = "none"
 
 
-class DockerImageConfig(BaseModel):
+class DockerImageConfig(BaseConfigSchema):
     auto_pull: DockerImageAutoPullPolicy = Field(
         default=DockerImageAutoPullPolicy.digest,
         description="""
@@ -1305,7 +1305,7 @@ class DockerImageConfig(BaseModel):
     )
 
 
-class DockerConfig(BaseModel):
+class DockerConfig(BaseConfigSchema):
     image: DockerImageConfig = Field(
         default_factory=DockerImageConfig,
         description="""
@@ -1315,7 +1315,7 @@ class DockerConfig(BaseModel):
     )
 
 
-class PluginsConfig(BaseModel):
+class PluginsConfig(BaseConfigSchema):
     accelerator: dict[str, Any] = Field(
         default_factory=dict,
         description="""
@@ -1354,7 +1354,7 @@ class PluginsConfig(BaseModel):
     )
 
 
-class InterContainerNetworkConfig(BaseModel):
+class InterContainerNetworkConfig(BaseConfigSchema):
     default_driver: Optional[str] = Field(
         default="overlay",
         description="""
@@ -1382,7 +1382,7 @@ class InterContainerNetworkConfig(BaseModel):
     )
 
 
-class SubnetNetworkConfig(BaseModel):
+class SubnetNetworkConfig(BaseConfigSchema):
     agent: IPvAnyNetwork = Field(
         default=IPv4Network("0.0.0.0/0"),
         description="""
@@ -1403,7 +1403,7 @@ class SubnetNetworkConfig(BaseModel):
     )
 
 
-class RpcConfig(BaseModel):
+class RpcConfig(BaseConfigSchema):
     keepalive_timeout: float = Field(
         default=60.0,
         # TODO: Write description
@@ -1415,7 +1415,7 @@ class RpcConfig(BaseModel):
     )
 
 
-class NetworkConfig(BaseModel):
+class NetworkConfig(BaseConfigSchema):
     inter_container: InterContainerNetworkConfig = Field(
         default_factory=InterContainerNetworkConfig,
         description="""
@@ -1439,7 +1439,7 @@ class NetworkConfig(BaseModel):
     )
 
 
-class WatcherConfig(BaseModel):
+class WatcherConfig(BaseConfigSchema):
     token: Optional[str] = Field(
         default=None,
         description="""
@@ -1462,7 +1462,7 @@ class WatcherConfig(BaseModel):
     )
 
 
-class HangToleranceThresholdConfig(BaseModel):
+class HangToleranceThresholdConfig(BaseConfigSchema):
     PREPARING: Optional[datetime] = Field(
         default=None,
         description="""
@@ -1483,7 +1483,7 @@ class HangToleranceThresholdConfig(BaseModel):
     )
 
 
-class HangToleranceConfig(BaseModel):
+class HangToleranceConfig(BaseConfigSchema):
     threshold: HangToleranceThresholdConfig = Field(
         default_factory=HangToleranceThresholdConfig,
         description="""
@@ -1493,7 +1493,7 @@ class HangToleranceConfig(BaseModel):
     )
 
 
-class SessionConfig(BaseModel):
+class SessionConfig(BaseConfigSchema):
     hang_tolerance: HangToleranceConfig = Field(
         default_factory=HangToleranceConfig,
         description="""
@@ -1505,7 +1505,7 @@ class SessionConfig(BaseModel):
     )
 
 
-class MetricConfig(BaseModel):
+class MetricConfig(BaseConfigSchema):
     address: HostPortPair = Field(
         default=HostPortPair(host="127.0.0.1", port=9090),
         description="""
@@ -1528,7 +1528,7 @@ class MetricConfig(BaseModel):
         return None if addr is None else f"{addr.host}:{addr.port}"
 
 
-class IdleCheckerConfig(BaseModel):
+class IdleCheckerConfig(BaseConfigSchema):
     enabled: str = Field(
         default="",
         description="""
@@ -1583,7 +1583,7 @@ class IdleCheckerConfig(BaseModel):
     )
 
 
-class VolumeTypeConfig(BaseModel):
+class VolumeTypeConfig(BaseConfigSchema):
     user: Optional[dict[str, Any] | str] = Field(
         default=None,
         description="""
@@ -1602,7 +1602,7 @@ class VolumeTypeConfig(BaseModel):
     )
 
 
-class VolumeProxyConfig(BaseModel):
+class VolumeProxyConfig(BaseConfigSchema):
     client_api: str = Field(
         description="""
         Client-facing API endpoint URL of the volume proxy.
@@ -1654,7 +1654,7 @@ class VolumeProxyConfig(BaseModel):
     )
 
 
-class VolumesConfig(BaseModel):
+class VolumesConfig(BaseConfigSchema):
     types: VolumeTypeConfig = Field(
         default_factory=lambda: VolumeTypeConfig(user={}),
         description="""
@@ -1705,13 +1705,13 @@ class VolumesConfig(BaseModel):
 
 
 # TODO: Make this more precise type
-class ResourceSlotsConfig(BaseModel):
+class ResourceSlotsConfig(BaseConfigSchema):
     model_config = ConfigDict(
         extra="allow",
     )
 
 
-class OTELConfig(BaseModel):
+class OTELConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="""
@@ -1740,7 +1740,7 @@ class OTELConfig(BaseModel):
     )
 
 
-class ServiceDiscoveryConfig(BaseModel):
+class ServiceDiscoveryConfig(BaseConfigSchema):
     type: ServiceDiscoveryType = Field(
         default=ServiceDiscoveryType.REDIS,
         description="""
@@ -1750,7 +1750,7 @@ class ServiceDiscoveryConfig(BaseModel):
     )
 
 
-class ReservoirObjectStorageConfig(BaseModel):
+class ReservoirObjectStorageConfig(BaseConfigSchema):
     storage_type: Literal["object_storage"] = Field(
         default="object_storage",
         description="""
@@ -1773,7 +1773,7 @@ class ReservoirObjectStorageConfig(BaseModel):
 StorageSpecificConfig = Union[ReservoirObjectStorageConfig]
 
 
-class ReservoirConfig(BaseModel):
+class ReservoirConfig(BaseConfigSchema):
     enable_approve_process: bool = Field(
         default=False,
         description="""
@@ -1803,7 +1803,7 @@ class ReservoirConfig(BaseModel):
     )
 
 
-class ModelRegistryConfig(BaseModel):
+class ModelRegistryConfig(BaseConfigSchema):
     model_registry: str = Field(
         default="MODEL_REGISTRY_NAME",
         description="""
@@ -1816,7 +1816,7 @@ class ModelRegistryConfig(BaseModel):
     )
 
 
-class ManagerUnifiedConfig(BaseModel):
+class ManagerUnifiedConfig(BaseConfigSchema):
     # From legacy local config
     db: DatabaseConfig = Field(
         default_factory=DatabaseConfig,
