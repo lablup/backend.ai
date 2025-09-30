@@ -6,18 +6,17 @@ from typing import Any
 import aiohttp
 import yarl
 from dateutil.tz import tzutc
+from pydantic import TypeAdapter
 
 from ai.backend.common.auth.utils import generate_signature
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.dto.request import (
     DelegateScanArtifactsReq,
-    ScanArtifactsReq,
     SearchArtifactsReq,
 )
 from ai.backend.manager.dto.response import (
     DelegateScanArtifactsResponse,
     GetArtifactRevisionReadmeResponse,
-    ScanArtifactsResponse,
     SearchArtifactsResponse,
 )
 
@@ -75,24 +74,25 @@ class ReservoirRegistryClient:
                 response.raise_for_status()
                 return await response.json()
 
-    async def scan_artifacts(self, req: ScanArtifactsReq) -> ScanArtifactsResponse:
-        return await self._request(
-            "POST", "/artifact-registries/scan", json=req.model_dump(mode="json")
-        )
-
     async def delegate_scan_artifacts(
         self, req: DelegateScanArtifactsReq
     ) -> DelegateScanArtifactsResponse:
-        return await self._request(
+        resp = await self._request(
             "POST", "/artifact-registries/delegation/scan", json=req.model_dump(mode="json")
         )
+        RespTypeAdapter = TypeAdapter(DelegateScanArtifactsResponse)
+        return RespTypeAdapter.validate_python(resp)
 
     async def search_artifacts(self, req: SearchArtifactsReq) -> SearchArtifactsResponse:
-        return await self._request(
+        resp = await self._request(
             "POST", "/artifact-registries/search", json=req.model_dump(mode="json")
         )
+        RespTypeAdapter = TypeAdapter(SearchArtifactsResponse)
+        return RespTypeAdapter.validate_python(resp)
 
     async def get_readme(
         self, artifact_revision_id: uuid.UUID
     ) -> GetArtifactRevisionReadmeResponse:
-        return await self._request("GET", f"/artifacts/revisions/{artifact_revision_id}/readme")
+        resp = await self._request("GET", f"/artifacts/revisions/{artifact_revision_id}/readme")
+        RespTypeAdapter = TypeAdapter(GetArtifactRevisionReadmeResponse)
+        return RespTypeAdapter.validate_python(resp)
