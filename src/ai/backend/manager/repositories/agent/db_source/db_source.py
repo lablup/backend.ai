@@ -6,9 +6,11 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentHeartbeatUpsert,
+    AgentStatus,
     UpsertResult,
 )
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
@@ -69,3 +71,39 @@ class AgentDBSource:
             await session.execute(final_query)
 
             return upsert_result
+
+    async def update_agent_status_exit(
+        self, agent_id: AgentId, modifier: AgentStatusModifier
+    ) -> None:
+        async with self._db.begin() as conn:
+            fetch_query = (
+                sa.select([
+                    agents.c.status,
+                    agents.c.addr,
+                ])
+                .select_from(agents)
+                .where(agents.c.id == agent_id)
+                .with_for_update()
+            )
+            result = await conn.execute(fetch_query)
+            row = result.first()
+            prev_status = row["status"]
+            if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
+                return
+
+            if modifier.status == AgentStatus.LOST:
+                log.warning("agent {0} heartbeat timeout detected.", agent_id)
+            elif modifier.status == AgentStatus.TERMINATED:
+                log.info("agent {0} has terminated.", agent_id)
+
+            update_query = (
+                sa.update(agents).values(modifier.fields_to_update()).where(agents.c.id == agent_id)
+            )
+            await conn.execute(update_query)
+
+    async def update_agent_status(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
+        async with self._db.begin() as conn:
+            query = (
+                sa.update(agents).values(modifier.fields_to_update()).where(agents.c.id == agent_id)
+            )
+            await conn.execute(query)

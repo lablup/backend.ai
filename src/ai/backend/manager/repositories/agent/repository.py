@@ -9,6 +9,7 @@ from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentHeartbeatUpsert,
@@ -77,3 +78,21 @@ class AgentRepository:
             )
 
         return upsert_result
+
+    @repository_decorator()
+    async def cleanup_agent_on_exit(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
+        with suppress_with_log(
+            [Exception], message=f"Failed to remove last seen for agent: {agent_id}"
+        ):
+            await self._cache_source.remove_agent_last_seen(agent_id)
+
+        await self._db_source.update_agent_status_exit(agent_id, modifier)
+
+        with suppress_with_log(
+            [Exception], message=f"Failed to remove agent: {agent_id} from all images"
+        ):
+            await self._cache_source.remove_agent_from_all_images(agent_id)
+
+    @repository_decorator()
+    async def update_agent_status(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
+        await self._db_source.update_agent_status(agent_id, modifier)

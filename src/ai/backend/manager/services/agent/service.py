@@ -16,6 +16,7 @@ from ai.backend.common.types import (
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
@@ -34,6 +35,14 @@ from ai.backend.manager.services.agent.actions.get_watcher_status import (
 from ai.backend.manager.services.agent.actions.handle_heartbeat import (
     HandleHeartbeatAction,
     HandleHeartbeatActionResult,
+)
+from ai.backend.manager.services.agent.actions.mark_agent_exit import (
+    MarkAgentExitAction,
+    MarkAgentExitActionResult,
+)
+from ai.backend.manager.services.agent.actions.mark_agent_running import (
+    MarkAgentRunningAction,
+    MarkAgentRunningActionResult,
 )
 from ai.backend.manager.services.agent.actions.recalculate_usage import (
     RecalculateUsageAction,
@@ -55,6 +64,7 @@ from ai.backend.manager.services.agent.actions.watcher_agent_stop import (
     WatcherAgentStopAction,
     WatcherAgentStopActionResult,
 )
+from ai.backend.manager.types import OptionalState
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -213,3 +223,27 @@ class AgentService:
             ),
         )
         return HandleHeartbeatActionResult(agent_id=action.agent_id)
+
+    async def mark_agent_exit(self, action: MarkAgentExitAction) -> MarkAgentExitActionResult:
+        now = datetime.now(tzutc())
+        self._agent_repository.cleanup_agent_on_exit(
+            agent_id=action.agent_id,
+            modifier=AgentStatusModifier(
+                status=action.agent_status, status_changed=now, lost_at=OptionalState.update(now)
+            ),
+        )
+        self._agent_cache.discard(action.agent_id)
+        return MarkAgentExitActionResult(agent_id=action.agent_id)
+
+    async def mark_agent_running(
+        self, action: MarkAgentRunningAction
+    ) -> MarkAgentRunningActionResult:
+        now = datetime.now(tzutc())
+        await self._agent_repository.update_agent_status(
+            agent_id=action.agent_id,
+            modifier=AgentStatusModifier(
+                status=action.agent_status,
+                status_changed=now,
+            ),
+        )
+        return MarkAgentRunningActionResult(agent_id=action.agent_id)

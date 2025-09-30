@@ -29,3 +29,9 @@ class AgentCacheSource:
 
     async def update_agent_last_seen(self, agent_id: AgentId, time: datetime) -> None:
         await self._valkey_live.update_agent_last_seen(agent_id, time.timestamp())
+
+    async def remove_agent_last_seen(self, agent_id: AgentId) -> None:
+        await self._valkey_live.remove_agent_last_seen(agent_id)
+
+    async def remove_agent_from_all_images(self, agent_id: AgentId) -> None:
+        await self._valkey_image.remove_agent_from_all_images(agent_id)
