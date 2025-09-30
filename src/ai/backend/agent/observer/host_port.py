@@ -47,6 +47,8 @@ class HostPortObserver(AbstractObserver):
             self._real_used_candidate_ports[port] += 1
             if self._real_used_candidate_ports[port] >= PORT_USAGE_THRESHOLD:
                 real_used_ports.add(port)
+                # Set the value to 1 to avoid overflow in long-running agents
+                self._real_used_candidate_ports[port] = 1
         self._agent.reset_port_pool(real_used_ports)
 
     @override
