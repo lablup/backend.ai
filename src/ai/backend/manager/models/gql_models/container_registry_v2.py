@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import uuid
 from typing import TYPE_CHECKING, Any, TypeAlias
 
@@ -9,14 +8,12 @@ import graphene
 import sqlalchemy as sa
 from graphql import GraphQLError, Undefined
 
-from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.errors.container_registry import (
-    ContainerRegistryProjectInvalid,
-)
 
 from ..container_registry import (
     ContainerRegistryRow,
+    ContainerRegistryValidator,
+    ContainerRegistryValidatorArgs,
 )
 from ..gql_relay import AsyncNode
 from ..user import UserRole
@@ -54,22 +51,6 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
     extra = graphene.JSONString(description="Added in 25.3.0.")
     allowed_groups = AllowedGroups(description="Added in 25.3.0.")
 
-    def validate(self) -> None:
-        """
-        Validate the input fields.
-        """
-        match self.type:
-            case ContainerRegistryType.HARBOR | ContainerRegistryType.HARBOR2:
-                if self.project is None:
-                    raise ContainerRegistryProjectInvalid("Project name is required for Harbor.")
-                if not (1 <= len(self.project) <= 255):
-                    raise ContainerRegistryProjectInvalid("Invalid project name length.")
-                pattern = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
-                if not pattern.match(self.project):
-                    raise ContainerRegistryProjectInvalid("Invalid project name format.")
-            case _:
-                pass
-
 
 class CreateContainerRegistryNodeV2(graphene.Mutation):
     class Meta:
@@ -90,7 +71,15 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
         props: CreateContainerRegistryNodeInputV2,
     ) -> CreateContainerRegistryNodeV2:
         ctx: GraphQueryContext = info.context
-        props.validate()
+        validator = ContainerRegistryValidator(
+            ContainerRegistryValidatorArgs(
+                url=props.url,
+                type=props.type,
+                project=props.project,
+            )
+        )
+
+        validator.validate()
 
         input_config: dict[str, Any] = {
             "registry_name": props.registry_name,
