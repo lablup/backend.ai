@@ -1,5 +1,7 @@
 from typing import Optional
 
+from pydantic import BaseModel
+
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
@@ -7,6 +9,14 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisionsResponse,
     ArtifactRevisionResponseData,
 )
+
+
+class HealthResponse(BaseModel):
+    """Standard health check response"""
+
+    status: str
+    version: str
+    component: str
 
 
 class SearchArtifactsResponse(BaseResponseModel):

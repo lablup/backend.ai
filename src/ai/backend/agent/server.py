@@ -1145,6 +1145,21 @@ async def server_main_logwrapper(
             yield
 
 
+async def check_health(request: web.Request) -> web.Response:
+    """Simple health check endpoint"""
+    from . import __version__
+    from .types import HealthResponse
+
+    request["do_not_print_access_log"] = True
+
+    response = HealthResponse(
+        status="healthy",
+        version=__version__,
+        component="agent",
+    )
+    return web.json_response(response.model_dump())
+
+
 def build_root_server() -> web.Application:
     metric_registry = CommonMetricRegistry.instance()
     app = web.Application(
@@ -1160,6 +1175,7 @@ def build_root_server() -> web.Application:
             ),
         },
     )
+    cors.add(app.router.add_route("GET", r"/health", check_health))
     cors.add(
         app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     )

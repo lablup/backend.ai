@@ -110,6 +110,21 @@ def skip_token_auth(
 
 
 @skip_token_auth
+async def check_health(request: web.Request) -> web.Response:
+    """Simple health check endpoint"""
+    from ..types import HealthResponse
+
+    request["do_not_print_access_log"] = True
+
+    response = HealthResponse(
+        status="healthy",
+        version=__version__,
+        component="storage-proxy",
+    )
+    return web.json_response(response.model_dump())
+
+
+@skip_token_auth
 async def check_status(request: web.Request) -> web.Response:
     async with check_params(request, None) as params:
         await log_manager_api_entry(log, "get_status", params)
@@ -1185,6 +1200,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app.on_shutdown.append(_shutdown)
     app.router.add_route("GET", "/", check_status)
+    app.router.add_route("GET", "/health", check_health)
     app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
