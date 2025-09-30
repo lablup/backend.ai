@@ -141,7 +141,7 @@ class Context(metaclass=ABCMeta):
             case "SUSE":
                 await self.run_shell(f"sudo zypper install -y {distro_pkg_name}")
             case "Darwin":
-                await self.run_shell(f"brew install -y {distro_pkg_name}")
+                await self.run_shell(f"brew install {distro_pkg_name}")
 
     async def run_exec(self, cmdargs: Sequence[str], **kwargs) -> int:
         p = await asyncio.create_subprocess_exec(
