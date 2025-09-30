@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal, Optional, override
+from typing import Optional, override
 
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import BaseActionResult
@@ -10,7 +10,7 @@ from ai.backend.manager.services.agent.actions.base import AgentAction
 @dataclass
 class MarkAgentExitAction(AgentAction):
     agent_id: AgentId
-    agent_status: Literal[AgentStatus.LOST, AgentStatus.TERMINATED]
+    agent_status: AgentStatus
 
     @override
     def entity_id(self) -> Optional[str]:
