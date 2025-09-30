@@ -116,12 +116,12 @@ class AgentHeartbeatEvent(AgentOperationEvent):
 
     @override
     def serialize(self) -> tuple:
-        return (self.agent_info.serialize(),)
+        return (self.agent_info.model_dump(),)
 
     @classmethod
     @override
     def deserialize(cls, value: tuple) -> Self:
-        return cls(AgentInfo.from_dict(value[0]))
+        return cls(AgentInfo.model_validate(value[0]))
 
     @classmethod
     @override
