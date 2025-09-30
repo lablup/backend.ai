@@ -101,11 +101,7 @@ class SchedulerRepository:
         Returns:
             List of ScheduledSessionData for allocated sessions
         """
-        result = await self._db_source.allocate_sessions(allocation_batch)
-        if result:
-            # Invalidate cache when sessions are allocated (affects resource usage)
-            await self.invalidate_total_resource_slots_cache()
-        return result
+        return await self._db_source.allocate_sessions(allocation_batch)
 
     async def get_pending_timeout_sessions(self) -> list[SweptSessionInfo]:
         """
@@ -126,8 +122,6 @@ class SchedulerRepository:
             return
 
         await self._db_source.batch_update_terminated_status(session_results)
-        # Invalidate cache when sessions are terminated (affects resource usage)
-        await self.invalidate_total_resource_slots_cache()
 
     async def mark_sessions_terminating(
         self, session_ids: list[SessionId], reason: str = "USER_REQUESTED"
@@ -321,9 +315,6 @@ class SchedulerRepository:
         Update sessions from CREATING to RUNNING state with occupying_slots.
         """
         await self._db_source.update_sessions_to_running(sessions_data)
-        if sessions_data:
-            # Invalidate cache when sessions start running (affects resource usage)
-            await self.invalidate_total_resource_slots_cache()
 
     async def get_sessions_ready_to_terminate(self) -> list[SessionId]:
         """
@@ -337,9 +328,6 @@ class SchedulerRepository:
         Update sessions from TERMINATING to TERMINATED state.
         """
         await self._db_source.update_sessions_to_terminated(session_ids)
-        if session_ids:
-            # Invalidate cache when sessions are terminated (affects resource usage)
-            await self.invalidate_total_resource_slots_cache()
 
     async def update_kernels_to_pulling_for_image(
         self, agent_id: AgentId, image: str, image_ref: Optional[str] = None
@@ -414,13 +402,7 @@ class SchedulerRepository:
         self, kernel_id: UUID, reason: str, creation_info: KernelCreationInfo
     ) -> bool:
         """Update kernel status to RUNNING."""
-        result = await self._db_source.update_kernel_status_running(
-            kernel_id, reason, creation_info
-        )
-        if result:
-            # Invalidate cache when kernel starts running (affects resource usage)
-            await self.invalidate_total_resource_slots_cache()
-        return result
+        return await self._db_source.update_kernel_status_running(kernel_id, reason, creation_info)
 
     async def update_kernel_status_preparing(self, kernel_id: UUID) -> bool:
         """Update kernel status to PREPARING."""
@@ -428,21 +410,13 @@ class SchedulerRepository:
 
     async def update_kernel_status_cancelled(self, kernel_id: UUID, reason: str) -> bool:
         """Update kernel status to CANCELLED."""
-        result = await self._db_source.update_kernel_status_cancelled(kernel_id, reason)
-        if result:
-            # Invalidate cache when kernel is cancelled (affects resource usage)
-            await self.invalidate_total_resource_slots_cache()
-        return result
+        return await self._db_source.update_kernel_status_cancelled(kernel_id, reason)
 
     async def update_kernel_status_terminated(
         self, kernel_id: UUID, reason: str, exit_code: Optional[int] = None
     ) -> bool:
         """Update kernel status to TERMINATED."""
-        result = await self._db_source.update_kernel_status_terminated(kernel_id, reason, exit_code)
-        if result:
-            # Invalidate cache when kernel is terminated (affects resource usage)
-            await self.invalidate_total_resource_slots_cache()
-        return result
+        return await self._db_source.update_kernel_status_terminated(kernel_id, reason, exit_code)
 
     async def update_kernel_heartbeat(self, kernel_id: UUID) -> bool:
         """Update kernel heartbeat timestamp."""
@@ -581,6 +555,13 @@ class SchedulerRepository:
         """
         await self._cache_source.invalidate_keypair_concurrencies(access_keys)
 
+    async def invalidate_total_resource_slots_cache(self) -> None:
+        """
+        Invalidate the total resource slots cache.
+        Should be called when kernel states change that affect resource calculations.
+        """
+        await self._cache_source.invalidate_total_resource_slots()
+
     async def update_session_network_id(
         self,
         session_id: SessionId,
@@ -622,13 +603,3 @@ class SchedulerRepository:
             log.warning("Failed to update total resource slots cache: {}", e)
 
         return total_resource_data
-
-    async def invalidate_total_resource_slots_cache(self) -> None:
-        """
-        Invalidate the total resource slots cache.
-        Should be called when kernel states change that affect resource calculations.
-        """
-        try:
-            await self._cache_source.invalidate_total_resource_slots()
-        except Exception as e:
-            log.warning("Failed to invalidate total resource slots cache: {}", e)

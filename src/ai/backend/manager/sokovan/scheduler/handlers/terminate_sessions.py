@@ -58,6 +58,7 @@ class TerminateSessionsHandler(SchedulerHandler):
             event_data.access_key for event_data in result.scheduled_sessions
         }
         await self._repository.invalidate_keypair_concurrency_cache(list(affected_keys))
+        await self._repository.invalidate_total_resource_slots_cache()
 
         # Broadcast batch event for sessions that transitioned to TERMINATED
         events: list[AbstractBroadcastEvent] = [
