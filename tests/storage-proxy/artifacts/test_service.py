@@ -9,7 +9,6 @@ import pytest
 from aiohttp import ClientError
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
     ModelData,
@@ -83,7 +82,6 @@ def create_mock_aiohttp_session() -> Tuple[Mock, Mock]:
 def mock_huggingface_config() -> HuggingfaceConfig:
     """Mock HuggingfaceConfig object."""
     return HuggingfaceConfig(
-        type=ArtifactRegistryType.HUGGINGFACE.value,
         token="test_token",
         endpoint="https://huggingface.co",
     )
@@ -177,7 +175,6 @@ def mock_progress_reporter() -> MagicMock:
 def mock_reservoir_config() -> ReservoirConfig:
     """Mock ReservoirConfig object."""
     return ReservoirConfig(
-        type="reservoir",
         endpoint="https://s3.amazonaws.com",
         object_storage_region="us-west-2",
         object_storage_access_key="test_access_key",
@@ -189,7 +186,6 @@ def mock_reservoir_config() -> ReservoirConfig:
 def mock_object_storage_config() -> ObjectStorageConfig:
     """Mock ObjectStorageConfig object."""
     return ObjectStorageConfig(
-        name="test_storage",
         endpoint="https://s3.amazonaws.com",
         region="us-west-2",
         access_key="test_access_key",
