@@ -28,6 +28,9 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.services.agent.actions.handle_heartbeat import HandleHeartbeatAction
 from ai.backend.manager.services.agent.actions.mark_agent_exit import MarkAgentExitAction
 from ai.backend.manager.services.agent.actions.mark_agent_running import MarkAgentRunningAction
+from ai.backend.manager.services.agent.actions.remove_agent_from_images import (
+    RemoveAgentFromImagesAction,
+)
 from ai.backend.manager.services.processors import Processors
 
 from ...models.agent import AgentStatus, agents
@@ -140,7 +143,12 @@ class AgentEventHandler:
         source: AgentId,
         event: AgentImagesRemoveEvent,
     ) -> None:
-        await self._registry.handle_agent_images_remove(source, event.image_canonicals)
+        processor = await self.get_processors()
+        await processor.agent.remove_agent_from_images.wait_for_complete(
+            action=RemoveAgentFromImagesAction(
+                agent_id=source, image_canonicals=event.image_canonicals
+            )
+        )
 
     async def handle_check_agent_resource(
         self, context: None, source: AgentId, event: DoAgentResourceCheckEvent

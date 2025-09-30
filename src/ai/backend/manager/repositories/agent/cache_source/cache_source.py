@@ -35,3 +35,8 @@ class AgentCacheSource:
 
     async def remove_agent_from_all_images(self, agent_id: AgentId) -> None:
         await self._valkey_image.remove_agent_from_all_images(agent_id)
+
+    async def remove_agent_from_images(
+        self, agent_id: AgentId, image_canonicals: list[str]
+    ) -> None:
+        await self._valkey_image.remove_agent_from_images(agent_id, image_canonicals)
