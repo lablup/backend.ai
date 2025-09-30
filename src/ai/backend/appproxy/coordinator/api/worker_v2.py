@@ -275,7 +275,7 @@ async def delete_worker(request: web.Request) -> PydanticResponse[StubResponseMo
         worker = await Worker.get(sess, worker_id)
         worker.nodes -= 1
         if worker.nodes == 0:
-            await sess.delete(worker)
+            worker.status = WorkerStatus.LOST
 
     async with root_ctx.db.connect() as db_conn:
         await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
