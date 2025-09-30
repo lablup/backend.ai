@@ -21,7 +21,7 @@ class HostPortObserver(AbstractObserver):
 
     @property
     @override
-    def name(cls) -> str:
+    def name(self) -> str:
         return "agent_host_port"
 
     @override

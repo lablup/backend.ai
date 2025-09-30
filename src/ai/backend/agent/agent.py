@@ -1483,12 +1483,12 @@ class AbstractAgent(
         """
         Synchronize the port pool with the actually used ports.
         """
-        formated_port_pool = ", ".join(map(str, self.port_pool))
-        formated_used_ports = ", ".join(map(str, used_ports))
+        formatted_port_pool = ", ".join(map(str, self.port_pool))
+        formatted_used_ports = ", ".join(map(str, used_ports))
         log.info(
             "synchronizing port pool with used ports. current port pool: ({}), used ports: ({})",
-            formated_port_pool,
-            formated_used_ports,
+            formatted_port_pool,
+            formatted_used_ports,
         )
         port_range = self.local_config.container.port_range
         used_port_set = set(used_ports)
