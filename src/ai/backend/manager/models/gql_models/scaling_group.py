@@ -691,7 +691,6 @@ class DeleteScalingGroup(graphene.Mutation):
             async with graph_ctx.db.connect() as conn:
                 await execute_with_txn_retry(delete, graph_ctx.db.begin_session, conn)
         except (DBAPIError, IntegrityError) as e:
-            log.exception("Failed to delete scaling group '{}', error: {}", name, repr(e))
             raise ScalingGroupDeletionFailure from e
         return cls(ok=True, msg="success")
 
