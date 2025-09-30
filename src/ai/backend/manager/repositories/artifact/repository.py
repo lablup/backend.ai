@@ -388,6 +388,7 @@ class ArtifactRepository:
                         readme=revision_data.readme,
                         size=revision_data.size,
                         status=ArtifactStatus.SCANNED,
+                        remote_status=revision_data.remote_status,
                         created_at=revision_data.created_at,
                         updated_at=revision_data.updated_at,
                     )
@@ -410,6 +411,7 @@ class ArtifactRepository:
                         existing_revision.size = revision_data.size
                         existing_revision.created_at = revision_data.created_at
                         existing_revision.updated_at = revision_data.updated_at
+                        existing_revision.remote_status = revision_data.remote_status
                         artifact_ids_to_update.add(revision_data.artifact_id)
 
                     await db_sess.flush()
