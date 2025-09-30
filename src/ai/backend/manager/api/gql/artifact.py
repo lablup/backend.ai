@@ -27,6 +27,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
     ArtifactOrderField,
+    ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionOrderField,
     ArtifactStatus,
@@ -363,6 +364,7 @@ class Artifact(Node):
 class ArtifactRevision(Node):
     id: NodeID[str]
     status: ArtifactStatus
+    remote_status: Optional[ArtifactRemoteStatus] = strawberry.field(description="Added in 25.15.0")
     version: str
     readme: Optional[str]
     size: Optional[ByteSize]
@@ -374,6 +376,7 @@ class ArtifactRevision(Node):
         return cls(
             id=ID(str(data.id)),
             status=ArtifactStatus(data.status),
+            remote_status=ArtifactRemoteStatus(data.remote_status) if data.remote_status else None,
             readme=data.readme,
             version=data.version,
             size=ByteSize(data.size) if data.size is not None else None,

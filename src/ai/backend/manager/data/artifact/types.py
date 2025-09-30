@@ -28,6 +28,17 @@ class ArtifactStatus(enum.StrEnum):
     REJECTED = "REJECTED"
 
 
+class ArtifactRemoteStatus(enum.StrEnum):
+    """
+    ArtifactRevision's remote status.
+
+    Only used for tracking remote reservoir registry's artifact statuses.
+    """
+
+    SCANNED = "SCANNED"
+    AVAILABLE = "AVAILABLE"
+
+
 class ArtifactAvailability(enum.StrEnum):
     """
     Artifact's availability.
@@ -61,6 +72,7 @@ class ArtifactRevisionData:
     readme: Optional[str]
     size: Optional[int]
     status: ArtifactStatus
+    remote_status: Optional[ArtifactRemoteStatus]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
 

@@ -20,6 +20,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
     ArtifactRegistryType,
+    ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionReadme,
     ArtifactStatus,
@@ -252,6 +253,7 @@ class ArtifactService:
                                 readme=readme,
                                 size=response_revision.size,
                                 status=response_revision.status,
+                                remote_status=None,
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
                             )
@@ -419,6 +421,7 @@ class ArtifactService:
                                 readme=readme,
                                 size=response_revision.size,
                                 status=response_revision.status,
+                                remote_status=None,
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
                             )
@@ -718,15 +721,18 @@ class ArtifactService:
             for response_revision in response_artifact.revisions:
                 readme = parsed_resp.readme_data[response_revision.id]
 
-                # Create full revision data with readme
+                remote_status = ArtifactRemoteStatus.SCANNED
+                if response_revision.status == ArtifactStatus.AVAILABLE:
+                    remote_status = ArtifactRemoteStatus.AVAILABLE
+
                 full_revision = ArtifactRevisionData(
                     id=response_revision.id,
                     artifact_id=response_revision.artifact_id,
                     version=response_revision.version,
                     readme=readme.readme,
                     size=response_revision.size,
-                    # Reset status to SCANNED
-                    status=ArtifactStatus.SCANNED,
+                    status=ArtifactStatus.SCANNED,  # Reset status to SCANNED
+                    remote_status=remote_status,
                     created_at=response_revision.created_at,
                     updated_at=response_revision.updated_at,
                 )

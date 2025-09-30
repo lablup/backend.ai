@@ -135,11 +135,19 @@ enum ArtifactRegistryType {
   RESERVOIR
 }
 
+enum ArtifactRemoteStatus {
+  SCANNED
+  AVAILABLE
+}
+
 """Added in 25.14.0"""
 type ArtifactRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   status: ArtifactStatus!
+
+  """Added in 25.15.0"""
+  remoteStatus: ArtifactRemoteStatus
   version: String!
   readme: String
   size: ByteSize
