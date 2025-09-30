@@ -43,7 +43,10 @@ from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
 )
-from ai.backend.manager.services.artifact.actions.scan_sync import ScanArtifactsSyncAction
+from ai.backend.manager.services.artifact.actions.scan_sync import (
+    ScanArtifactsSyncAction,
+    ScanArtifactsSyncActionResult,
+)
 from ai.backend.manager.services.artifact.actions.update import (
     UpdateArtifactAction,
     UpdateArtifactActionResult,
@@ -58,6 +61,7 @@ from .service import ArtifactService
 
 class ArtifactProcessors(AbstractProcessorPackage):
     scan: ActionProcessor[ScanArtifactsAction, ScanArtifactsActionResult]
+    scan_sync: ActionProcessor[ScanArtifactsSyncAction, ScanArtifactsSyncActionResult]
     get: ActionProcessor[GetArtifactAction, GetArtifactActionResult]
     list_artifacts: ActionProcessor[ListArtifactsAction, ListArtifactsActionResult]
     list_artifacts_with_revisions: ActionProcessor[
