@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Optional
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
+from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.types import (
@@ -31,13 +32,14 @@ class AgentDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def get_by_id(self, agent_id: AgentId) -> Optional[AgentData]:
+    async def get_by_id(self, agent_id: AgentId) -> AgentData:
         async with self._db.begin_readonly_session() as db_session:
             agent_row: Optional[AgentRow] = await db_session.scalar(
                 sa.select(AgentRow).where(AgentRow.id == agent_id)
             )
             if agent_row is None:
-                return None
+                log.error(f"Agent with id {agent_id} not found")
+                raise AgentNotFound(f"Agent with id {agent_id} not found")
             return agent_row.to_data()
 
     async def _check_scaling_group_exists(

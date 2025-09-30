@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
 from ai.backend.manager.data.agent.types import (
     AgentData,
@@ -131,11 +132,9 @@ class TestAgentDBSource:
         mock_db_session.scalar.return_value = None
         mock_db_engine.begin_readonly_session.return_value.__aenter__.return_value = mock_db_session
 
-        # When
-        result = await db_source.get_by_id(agent_id)
-
-        # Then
-        assert result is None
+        # When & Then
+        with pytest.raises(AgentNotFound):
+            await db_source.get_by_id(agent_id)
         mock_db_session.scalar.assert_called_once()
 
     @pytest.mark.asyncio

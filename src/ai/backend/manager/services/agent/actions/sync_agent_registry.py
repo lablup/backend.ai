@@ -25,8 +25,8 @@ class SyncAgentRegistryAction(AgentAction):
 class SyncAgentRegistryActionResult(BaseActionResult):
     # TODO: Add proper type
     result: Any
-    agent_data: Optional[AgentData]
+    agent_data: AgentData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.agent_data.id) if self.agent_data else None
+        return str(self.agent_data.id)

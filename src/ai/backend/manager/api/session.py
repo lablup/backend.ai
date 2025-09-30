@@ -821,15 +821,11 @@ async def sync_agent_registry(request: web.Request, params: Any) -> web.StreamRe
     log.info(
         "SYNC_AGENT_REGISTRY (ak:{}/{}, a:{})", requester_access_key, owner_access_key, agent_id
     )
-    try:
-        await root_ctx.processors.agent.sync_agent_registry.wait_for_complete(
-            SyncAgentRegistryAction(
-                agent_id=agent_id,
-            )
+    await root_ctx.processors.agent.sync_agent_registry.wait_for_complete(
+        SyncAgentRegistryAction(
+            agent_id=agent_id,
         )
-    except BackendAIError:
-        log.exception("SYNC_AGENT_REGISTRY: exception")
-        raise
+    )
     return web.json_response({}, status=HTTPStatus.OK)
 
 
