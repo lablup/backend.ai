@@ -22,7 +22,7 @@ class HostPortObserver(AbstractObserver):
         agent: "AbstractAgent",
     ) -> None:
         self._agent = agent
-        self._real_used_candidate_ports: defaultdict[int, int] = defaultdict(int)
+        self._port_usage_counts: defaultdict[int, int] = defaultdict(int)
 
     @property
     @override
@@ -38,18 +38,18 @@ class HostPortObserver(AbstractObserver):
             for container_port in container.ports:
                 occupied_host_ports.add(container_port.host_port)
 
-        real_used_ports: set[int] = set()
-        for port in self._real_used_candidate_ports:
+        confirmed_occupied_ports: set[int] = set()
+        for port in self._port_usage_counts:
             if port not in occupied_host_ports:
-                self._real_used_candidate_ports[port] = 0
+                self._port_usage_counts[port] = 0
 
         for port in occupied_host_ports:
-            self._real_used_candidate_ports[port] += 1
-            if self._real_used_candidate_ports[port] >= PORT_USAGE_THRESHOLD:
-                real_used_ports.add(port)
+            self._port_usage_counts[port] += 1
+            if self._port_usage_counts[port] >= PORT_USAGE_THRESHOLD:
+                confirmed_occupied_ports.add(port)
                 # Set the value to 1 to avoid overflow in long-running agents
-                self._real_used_candidate_ports[port] = 1
-        self._agent.reset_port_pool(real_used_ports)
+                self._port_usage_counts[port] = 1
+        self._agent.reset_port_pool(confirmed_occupied_ports)
 
     @override
     def observe_interval(self) -> float:
