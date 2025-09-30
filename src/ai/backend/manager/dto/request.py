@@ -39,6 +39,19 @@ class ScanArtifactsReq(BaseRequestModel):
     search: Optional[str] = None
 
 
+class ScanArtifactsSyncReq(BaseRequestModel):
+    registry_id: Optional[uuid.UUID] = Field(
+        default=None, description="The unique identifier of the artifact registry to scan."
+    )
+    artifact_type: Optional[ArtifactType] = None
+    limit: int = Field(
+        lt=ARTIFACT_MAX_SCAN_LIMIT,
+        description=f"Maximum number of artifacts to scan (max: {ARTIFACT_MAX_SCAN_LIMIT})",
+    )
+    order: Optional[ModelSortKey] = None
+    search: Optional[str] = None
+
+
 class SearchArtifactsReq(BaseRequestModel):
     pagination: PaginationOptions
     # TODO: Support this. (we need to make strawberry independent types)

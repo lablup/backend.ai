@@ -106,6 +106,7 @@ class APIHandler:
             ],
             source_registry_id=action_result.source_registry_id,
             source_registry_type=action_result.source_registry_type,
+            readme_data=action_result.readme_data,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 

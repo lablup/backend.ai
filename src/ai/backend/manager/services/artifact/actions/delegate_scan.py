@@ -7,6 +7,7 @@ from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
+    ArtifactRevisionReadme,
     ArtifactType,
     DelegateeTarget,
 )
@@ -37,6 +38,7 @@ class DelegateScanArtifactsActionResult(BaseActionResult):
     result: list[ArtifactDataWithRevisions]
     source_registry_id: uuid.UUID
     source_registry_type: ArtifactRegistryType
+    readme_data: dict[uuid.UUID, ArtifactRevisionReadme]
 
     @override
     def entity_id(self) -> Optional[str]:

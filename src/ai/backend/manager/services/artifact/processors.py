@@ -43,6 +43,7 @@ from ai.backend.manager.services.artifact.actions.scan import (
     ScanArtifactsAction,
     ScanArtifactsActionResult,
 )
+from ai.backend.manager.services.artifact.actions.scan_sync import ScanArtifactsSyncAction
 from ai.backend.manager.services.artifact.actions.update import (
     UpdateArtifactAction,
     UpdateArtifactActionResult,
@@ -77,6 +78,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
     def __init__(self, service: ArtifactService, action_monitors: list[ActionMonitor]) -> None:
         # TODO: Move scan action to ArtifactRegistryService
         self.scan = ActionProcessor(service.scan, action_monitors)
+        self.scan_sync = ActionProcessor(service.scan_sync, action_monitors)
         self.get = ActionProcessor(service.get, action_monitors)
         self.list_artifacts = ActionProcessor(service.list, action_monitors)
         self.list_artifacts_with_revisions = ActionProcessor(
@@ -97,6 +99,7 @@ class ArtifactProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             ScanArtifactsAction.spec(),
+            ScanArtifactsSyncAction.spec(),
             DelegateScanArtifactsAction.spec(),
             GetArtifactAction.spec(),
             ListArtifactsAction.spec(),

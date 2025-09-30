@@ -15,6 +15,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceRetrieveModelReqQueryParam,
     HuggingFaceRetrieveModelsReq,
     HuggingFaceScanModelsReq,
+    HuggingFaceScanModelsSyncReq,
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
     ReservoirImportModelsReq,
@@ -24,6 +25,7 @@ from ai.backend.common.dto.storage.response import (
     HuggingFaceRetrieveModelResponse,
     HuggingFaceRetrieveModelsResponse,
     HuggingFaceScanModelsResponse,
+    HuggingFaceScanModelsSyncResponse,
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
     ReservoirImportModelsResponse,
@@ -669,6 +671,21 @@ class StorageProxyManagerFacingClient:
             body=req.model_dump(by_alias=True),
         )
         return HuggingFaceScanModelsResponse.model_validate(resp)
+
+    @client_decorator()
+    async def scan_huggingface_models_sync(
+        self,
+        req: HuggingFaceScanModelsSyncReq,
+    ) -> HuggingFaceScanModelsSyncResponse:
+        """
+        Scan HuggingFace models in the specified registry.
+        """
+        resp = await self._client.request_with_response(
+            "POST",
+            "v1/registries/huggingface/scan/sync",
+            body=req.model_dump(by_alias=True),
+        )
+        return HuggingFaceScanModelsSyncResponse.model_validate(resp)
 
     @client_decorator()
     async def retrieve_huggingface_models(
