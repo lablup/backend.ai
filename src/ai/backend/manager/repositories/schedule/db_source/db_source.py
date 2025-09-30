@@ -21,13 +21,13 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models import (
     AgentRow,
-    AgentStatus,
     DefaultForUnspecified,
     DomainRow,
     GroupRow,

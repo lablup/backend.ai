@@ -1,32 +1,31 @@
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Optional, override
 
+from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.agent.types import AgentData
 from ai.backend.manager.services.agent.actions.base import AgentAction
 
 
 @dataclass
-class SyncAgentRegistryAction(AgentAction):
+class HandleHeartbeatAction(AgentAction):
     agent_id: AgentId
+    agent_info: AgentInfo
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.agent_id)
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "sync_agent_registry"
+        return "handle_heartbeat"
 
 
 @dataclass
-class SyncAgentRegistryActionResult(BaseActionResult):
-    # TODO: Add proper type
-    result: Any
-    agent_data: Optional[AgentData]
+class HandleHeartbeatActionResult(BaseActionResult):
+    agent_id: AgentId
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.agent_data.id) if self.agent_data else None
+        return str(self.agent_id)
