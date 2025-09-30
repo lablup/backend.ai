@@ -9,15 +9,27 @@ from ai.backend.manager.services.agent.actions.get_total_resources import GetTot
 
 
 @strawberry.field(description="Added in 25.15.0")
-async def agent_stats() -> AgentStats:
-    return AgentStats()
+async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStats:
+    result = await info.context.processors.agent.get_total_resources.wait_for_complete(
+        GetTotalResourcesAction()
+    )
+
+    return AgentStats(
+        resource=AgentResource(
+            free=result.total_resources.total_free_slots.to_json(),
+            used=result.total_resources.total_used_slots.to_json(),
+            capacity=result.total_resources.total_capacity_slots.to_json(),
+        )
+    )
+
+
+@strawberry.type(description="Added in 25.15.0")
+class AgentResource:
+    free: JSON
+    used: JSON
+    capacity: JSON
 
 
 @strawberry.type(description="Added in 25.15.0")
 class AgentStats:
-    @strawberry.field(description="Added in 25.15.0")
-    async def total_used_slots(self, info: Info["StrawberryGQLContext"]) -> JSON:
-        result = await info.context.processors.agent.get_total_resources.wait_for_complete(
-            GetTotalResourcesAction()
-        )
-        return result.total_resources.total_used_slots.to_json()
+    resource: AgentResource = strawberry.field(description="Added in 25.15.0")

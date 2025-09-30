@@ -141,11 +141,20 @@ scalar AgentPermissionField
   @join__type(graph: GRAPHENE)
 
 """Added in 25.15.0"""
+type AgentResource
+  @join__type(graph: STRAWBERRY)
+{
+  free: JSON!
+  used: JSON!
+  capacity: JSON!
+}
+
+"""Added in 25.15.0"""
 type AgentStats
   @join__type(graph: STRAWBERRY)
 {
   """Added in 25.15.0"""
-  totalUsedSlots: JSON!
+  resource: AgentResource!
 }
 
 """A schema for normal users."""

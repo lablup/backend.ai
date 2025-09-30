@@ -5,9 +5,16 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@externa
 }
 
 """Added in 25.15.0"""
+type AgentResource {
+  free: JSON!
+  used: JSON!
+  capacity: JSON!
+}
+
+"""Added in 25.15.0"""
 type AgentStats {
   """Added in 25.15.0"""
-  totalUsedSlots: JSON!
+  resource: AgentResource!
 }
 
 """Added in 25.14.0"""
