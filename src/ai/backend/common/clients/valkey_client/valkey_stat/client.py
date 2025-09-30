@@ -24,7 +24,9 @@ from ai.backend.common.clients.valkey_client.client import (
     create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
+from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -45,6 +47,7 @@ _INFERENCE_PREFIX: Final[str] = "inference"
 _COMPUTER_METADATA_KEY: Final[str] = "computer.metadata"
 _COMPUTE_CONCURRENCY_USED_KEY_PREFIX: Final[str] = "keypair.concurrency_used."
 _SYSTEM_CONCURRENCY_USED_KEY_PREFIX: Final[str] = "keypair.sftp_concurrency_used."
+_TOTAL_RESOURCE_SLOTS_KEY: Final[str] = "system.total_resource_slots"
 
 
 class ValkeyStatClient:
@@ -1372,3 +1375,45 @@ class ValkeyStatClient:
             batch.set(key, value, expiry=ExpirySet(ExpiryType.SEC, cache_lifespan))
 
         await self._client.client.exec(batch, raise_on_error=True)
+
+    async def get_total_resource_slots(self) -> Optional[TotalResourceData]:
+        """
+        Get total resource slots data from cache.
+
+        :return: TotalResourceData if cached, None if not in cache
+        """
+        result = await self._client.client.get(_TOTAL_RESOURCE_SLOTS_KEY)
+        if result is None:
+            return None
+
+        try:
+            data = load_json(result.decode("utf-8"))
+            return TotalResourceData.from_json(data)
+        except (json.JSONDecodeError, ValueError, KeyError, UnicodeDecodeError) as e:
+            log.warning("Failed to deserialize TotalResourceData from cache: {}", e)
+            return None
+
+    async def set_total_resource_slots(
+        self, total_slots: TotalResourceData, ttl_seconds: int = 300
+    ) -> None:
+        """
+        Set the total number of resource slots available in the system.
+
+        :param total_slots: The TotalResourceData to cache
+        :param ttl_seconds: TTL in seconds (default: 300 = 5 minutes)
+        """
+        try:
+            total_slots_obj = total_slots.to_json()
+            serialized = dump_json_str(total_slots_obj)
+            await self._client.client.set(
+                _TOTAL_RESOURCE_SLOTS_KEY, serialized, expiry=ExpirySet(ExpiryType.SEC, ttl_seconds)
+            )
+        except Exception as e:
+            log.warning("Failed to serialize TotalResourceData to cache: {}", e)
+            raise
+
+    async def invalidate_total_resource_slots(self) -> None:
+        """
+        Invalidate (delete) the total resource slots cache.
+        """
+        await self._client.client.delete([_TOTAL_RESOURCE_SLOTS_KEY])

@@ -1,10 +1,13 @@
 """Repository pattern implementation for schedule operations."""
 
+from __future__ import annotations
+
 import logging
 from typing import Mapping, Optional
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.resource.types import TotalResourceData
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -552,6 +555,13 @@ class SchedulerRepository:
         """
         await self._cache_source.invalidate_keypair_concurrencies(access_keys)
 
+    async def invalidate_total_resource_slots_cache(self) -> None:
+        """
+        Invalidate the total resource slots cache.
+        Should be called when kernel states change that affect resource calculations.
+        """
+        await self._cache_source.invalidate_total_resource_slots()
+
     async def update_session_network_id(
         self,
         session_id: SessionId,
@@ -566,3 +576,30 @@ class SchedulerRepository:
             session_id,
             network_id,
         )
+
+    async def get_total_resource_slots(self) -> TotalResourceData:
+        """
+        Get total resource slots from all agents.
+        Uses cache-through pattern: checks cache first, falls back to DB calculation,
+        and updates cache.
+
+        :return: TotalResourceData with total used, free, and capable slots
+        """
+        # Try to get from cache first
+        try:
+            cached_data = await self._cache_source.get_total_resource_slots()
+            if cached_data is not None:
+                return cached_data
+        except Exception as e:
+            log.warning("Failed to get total resource slots from cache: {}", e)
+
+        # Cache miss - calculate from DB
+        total_resource_data = await self._db_source.calculate_total_resource_slots()
+
+        # Update cache with calculated value
+        try:
+            await self._cache_source.set_total_resource_slots(total_resource_data)
+        except Exception as e:
+            log.warning("Failed to update total resource slots cache: {}", e)
+
+        return total_resource_data

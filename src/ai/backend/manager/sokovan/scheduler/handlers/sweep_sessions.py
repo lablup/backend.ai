@@ -48,4 +48,5 @@ class SweepSessionsHandler(SchedulerHandler):
             event_data.access_key for event_data in result.scheduled_sessions
         }
         await self._repository.invalidate_keypair_concurrency_cache(list(affected_keys))
+        await self._repository.invalidate_total_resource_slots_cache()
         log.debug("Invalidated concurrency cache for {} access keys", len(affected_keys))

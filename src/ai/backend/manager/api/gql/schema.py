@@ -2,6 +2,9 @@ import strawberry
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
+from .agent_stats import (
+    agent_stats,
+)
 from .artifact import (
     approve_artifact_revision,
     artifact,
@@ -83,6 +86,7 @@ class Query:
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
     default_artifact_registry = default_artifact_registry
+    agent_stats = agent_stats
 
 
 @strawberry.type

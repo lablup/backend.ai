@@ -4,6 +4,19 @@ schema @link(url: "https://specs.apollo.dev/federation/v2.7", import: ["@externa
   subscription: Subscription
 }
 
+"""Added in 25.15.0"""
+type AgentResource {
+  free: JSON!
+  used: JSON!
+  capacity: JSON!
+}
+
+"""Added in 25.15.0"""
+type AgentStats {
+  """Added in 25.15.0"""
+  totalResource: AgentResource!
+}
+
 """Added in 25.14.0"""
 input ApproveArtifactInput {
   artifactRevisionId: ID!
@@ -483,6 +496,11 @@ input IntFilter {
   lessThanOrEqual: Int = null
 }
 
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
+"""
+scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
+
 """A custom scalar for JSON strings using orjson"""
 scalar JSONString
 
@@ -860,6 +878,9 @@ type Query {
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry
+
+  """Added in 25.15.0"""
+  agentStats: AgentStats!
 }
 
 type RawServiceConfig {
