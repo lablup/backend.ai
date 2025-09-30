@@ -58,7 +58,6 @@ class BaseConfigModel(BaseModel):
     model_config = ConfigDict(
         validate_by_name=True,
         from_attributes=True,
-        use_enum_values=True,
         extra="allow",
         alias_generator=snake_to_kebab_case,
     )
