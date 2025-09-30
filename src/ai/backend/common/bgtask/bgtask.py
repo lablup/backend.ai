@@ -7,6 +7,7 @@ import time
 import uuid
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Mapping, MutableMapping
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import (
     Awaitable,
@@ -20,11 +21,18 @@ from typing import (
     TypeAlias,
 )
 
+from ai.backend.common.bgtask.exception import InvalidTaskMetadataError
 from ai.backend.common.bgtask.types import (
-    BackgroundTaskMetadata,
+    WHOLE_TASK_KEY,
+    BgTaskKey,
     BgtaskStatus,
     TaskID,
+    TaskInfo,
     TaskName,
+    TaskStatus,
+    TaskSubKeyInfo,
+    TaskTotalInfo,
+    TaskType,
 )
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import (
     TaskSetKey,
@@ -134,15 +142,9 @@ BackgroundTask = Callable[
 ]
 
 
-@dataclass
-class BgtaskKey:
-    task_id: TaskID
-    sub_key: Optional[str] = None
-
-
 class BackgroundTaskMeta(ABC):
     @abstractmethod
-    def task_keys(self) -> Sequence[BgtaskKey]:
+    def total_info(self) -> TaskTotalInfo:
         raise NotImplementedError
 
     @abstractmethod
@@ -169,15 +171,13 @@ class BackgroundTaskMeta(ABC):
 
 
 class LocalBgtask(BackgroundTaskMeta):
-    _task_id: TaskID
     _task: asyncio.Task
 
-    def __init__(self, task_id: TaskID, task: asyncio.Task) -> None:
-        self._task_id = task_id
+    def __init__(self, task: asyncio.Task) -> None:
         self._task = task
 
-    def task_keys(self) -> Sequence[BgtaskKey]:
-        return [BgtaskKey(self._task_id)]
+    def total_info(self) -> TaskTotalInfo:
+        raise NotImplementedError("LocalBgtask is not recoverable and cannot be stored")
 
     def retriable(self) -> bool:
         return False
@@ -187,15 +187,19 @@ class LocalBgtask(BackgroundTaskMeta):
 
 
 class SingleBgtask(BackgroundTaskMeta):
-    _task_id: TaskID
+    _total_info: TaskTotalInfo
     _task: asyncio.Task
 
-    def __init__(self, task_id: TaskID, task: asyncio.Task) -> None:
-        self._task_id = task_id
+    def __init__(
+        self,
+        total_info: TaskTotalInfo,
+        task: asyncio.Task,
+    ) -> None:
+        self._total_info = total_info
         self._task = task
 
-    def task_keys(self) -> Sequence[BgtaskKey]:
-        return [BgtaskKey(self._task_id)]
+    def total_info(self) -> TaskTotalInfo:
+        return self._total_info
 
     def retriable(self) -> bool:
         return True
@@ -204,23 +208,20 @@ class SingleBgtask(BackgroundTaskMeta):
         return [self._task]
 
 
-class MultipleBgtask(BackgroundTaskMeta):
-    _task_id: TaskID
-    _sub_keys: list[str]
+class ParallelBgtask(BackgroundTaskMeta):
+    _total_info: TaskTotalInfo
     _tasks: Sequence[asyncio.Task]
 
     def __init__(
         self,
-        task_id: TaskID,
-        sub_keys: Iterable[str],
+        total_info: TaskTotalInfo,
         tasks: Sequence[asyncio.Task],
     ) -> None:
-        self._task_id = task_id
-        self._sub_keys = list(sub_keys)
-        self._tasks = list(tasks)
+        self._total_info = total_info
+        self._tasks = tasks
 
-    def task_keys(self) -> Sequence[BgtaskKey]:
-        return [BgtaskKey(self._task_id, sub_key) for sub_key in self._sub_keys]
+    def total_info(self) -> TaskTotalInfo:
+        return self._total_info
 
     def retriable(self) -> bool:
         return True
@@ -317,7 +318,7 @@ class BackgroundTaskManager:
             ),
         )
         task = asyncio.create_task(self._wrapper_task(func, task_id, name, **kwargs))
-        self._ongoing_tasks[TaskID(task_id)] = LocalBgtask(task_id=TaskID(task_id), task=task)
+        self._ongoing_tasks[TaskID(task_id)] = LocalBgtask(task=task)
         return task_id
 
     async def shutdown(self) -> None:
@@ -445,14 +446,32 @@ class BackgroundTaskManager:
         args: BaseBackgroundTaskArgs,
     ) -> TaskID:
         task_id = TaskID(uuid.uuid4())
-        task = asyncio.create_task(self._execute_new_task(task_name, task_id, args))
-        self._ongoing_tasks[task_id] = SingleBgtask(task_id=task_id, task=task)
-        metadata = BackgroundTaskMetadata(
+        task = asyncio.create_task(self._execute_new_task(task_name, task_id, WHOLE_TASK_KEY, args))
+
+        # Create TaskTotalInfo for storage
+        task_info = TaskInfo(
             task_id=task_id,
             task_name=task_name,
+            task_type=TaskType.SINGLE,
             body=args.to_redis_json(),
+            ongoing_count=1,
+            success_count=0,
+            failure_count=0,
         )
-        await self._valkey_client.register_task(metadata, self._task_set_key)
+        # For single tasks, create a subtask entry representing the whole task
+        whole_task_subkey = TaskSubKeyInfo(
+            task_id=task_id,
+            key=WHOLE_TASK_KEY,
+            status=TaskStatus.ONGOING,
+            last_message="",
+        )
+        total_info = TaskTotalInfo(task_info=task_info, task_key_list=[whole_task_subkey])
+
+        self._ongoing_tasks[task_id] = SingleBgtask(
+            total_info=total_info,
+            task=task,
+        )
+        await self._valkey_client.register_task(total_info, self._task_set_key)
         return task_id
 
     @_exception_to_task_result
@@ -465,14 +484,15 @@ class BackgroundTaskManager:
 
     @_exception_to_task_result
     async def _try_to_revive_task(
-        self, task_name: TaskName, metadata: BackgroundTaskMetadata
+        self, task_name: TaskName, task_info: TaskInfo
     ) -> BaseBackgroundTaskResult:
-        return await self._task_registry.revive_task(task_name, metadata.body)
+        return await self._task_registry.revive_task(task_name, task_info.body)
 
     async def _execute_new_task(
         self,
         task_name: TaskName,
         task_id: TaskID,
+        subkey: BgTaskKey,
         args: BaseBackgroundTaskArgs,
     ) -> None:
         async with self._hook.apply(
@@ -481,30 +501,62 @@ class BackgroundTaskManager:
                 task_id=task_id,
             )
         ) as context:
-            task_result = await self._try_to_execute_new_task(task_name, args)
-            context.result = task_result
+            task_status: TaskStatus = TaskStatus.SUCCESS
+            last_message = "Task completed successfully"
+            try:
+                task_result = await self._try_to_execute_new_task(task_name, args)
+                context.result = task_result
+            except Exception as e:
+                task_status = TaskStatus.FAILURE
+                last_message = f"Task failed with exception: {e}"
+                raise e
+            finally:
+                with suppress(Exception):
+                    await self._valkey_client.finish_subtask(
+                        task_id=task_id,
+                        subkey=subkey,
+                        status=task_status,
+                        last_message=last_message,
+                    )
 
-    async def _revive_task(self, task_name: TaskName, metadata: BackgroundTaskMetadata) -> None:
+    async def _revive_task(
+        self, task_name: TaskName, task_info: TaskInfo, task_key: BgTaskKey
+    ) -> None:
         async with self._hook.apply(
             TaskContext(
                 task_name=task_name,
-                task_id=metadata.task_id,
+                task_id=task_info.task_id,
             )
         ) as context:
-            task_result = await self._try_to_revive_task(task_name, metadata)
-            context.result = task_result
+            task_status: TaskStatus = TaskStatus.SUCCESS
+            last_message = "Task completed successfully"
+            try:
+                task_result = await self._try_to_revive_task(task_name, task_info)
+                context.result = task_result
+            except Exception as e:
+                task_status = TaskStatus.FAILURE
+                last_message = f"Task failed with exception: {e}"
+                raise e
+            finally:
+                with suppress(Exception):
+                    await self._valkey_client.finish_subtask(
+                        task_id=task_info.task_id,
+                        subkey=task_key,
+                        status=task_status,
+                        last_message=last_message,
+                    )
 
     async def _heartbeat_loop(self) -> None:
         """Periodically update heartbeat for running background tasks"""
         while True:
             try:
                 # Update heartbeat for all ongoing background tasks
-                alive_task_ids: list[TaskID] = []
-                for task_id, bg_task in self._ongoing_tasks.items():
+                alive_task_info: list[TaskTotalInfo] = []
+                for bg_task in self._ongoing_tasks.values():
                     if bg_task.retriable():
-                        alive_task_ids.append(task_id)
+                        alive_task_info.append(bg_task.total_info())
                 await self._valkey_client.heartbeat(
-                    alive_task_ids,
+                    alive_task_info,
                     self._task_set_key,
                 )
             except Exception as e:
@@ -515,11 +567,11 @@ class BackgroundTaskManager:
         """Main recovery loop that checks for failed/stale tasks"""
         while True:
             try:
-                unmanaged_task_metadata_list = await self._valkey_client.fetch_unmanaged_tasks(
+                unmanaged_task_total_info_list = await self._valkey_client.fetch_unmanaged_tasks(
                     self._task_set_key
                 )
                 async_tasks = [
-                    self._retry_bgtask(metadata) for metadata in unmanaged_task_metadata_list
+                    self._retry_bgtask(total_info) for total_info in unmanaged_task_total_info_list
                 ]
                 results = await asyncio.gather(*async_tasks, return_exceptions=True)
                 for result in results:
@@ -529,10 +581,48 @@ class BackgroundTaskManager:
                 log.exception("Exception in retry loop: {}", e)
             await asyncio.sleep(_HEARTBEAT_CHECK_INTERVAL)
 
-    async def _retry_bgtask(self, metadata: BackgroundTaskMetadata) -> None:
+    async def _retry_bgtask(self, total_info: TaskTotalInfo) -> None:
         """Retry a background task"""
 
-        task_name = metadata.task_name
-        task = asyncio.create_task(self._revive_task(task_name, metadata))
-        self._ongoing_tasks[metadata.task_id] = SingleBgtask(task_id=metadata.task_id, task=task)
-        await self._valkey_client.claim_task(metadata, self._task_set_key)
+        task_info = total_info.task_info
+        task_name = task_info.task_name
+        async_tasks: list[asyncio.Task] = []
+        for subkey_info in total_info.task_key_list:
+            if subkey_info.status == TaskStatus.ONGOING:
+                task_key = subkey_info.key
+                async_task = asyncio.create_task(self._revive_task(task_name, task_info, task_key))
+                async_tasks.append(async_task)
+        task: Optional[BackgroundTaskMeta] = None
+        match task_info.task_type:
+            case TaskType.SINGLE:
+                if len(async_tasks) != 1:
+                    log.error(
+                        "Inconsistent task type and subtask count for SINGLE task: {}",
+                        task_info.task_id,
+                    )
+                    raise InvalidTaskMetadataError(
+                        f"SINGLE task must have exactly one ongoing subtask: {task_info.task_id}"
+                    )
+                task = SingleBgtask(
+                    total_info=total_info,
+                    task=async_tasks[0],
+                )
+            case TaskType.PARALLEL:
+                if len(async_tasks) < 1:
+                    log.error(
+                        "Inconsistent task type and subtask count for PARALLEL task: {}",
+                        task_info.task_id,
+                    )
+                    raise InvalidTaskMetadataError(
+                        f"PARALLEL task must have at least one ongoing subtask: {task_info.task_id}"
+                    )
+                task = ParallelBgtask(
+                    tasks=async_tasks,
+                    total_info=total_info,
+                )
+            case _:
+                log.error("Unsuuported task type: {}", task_info.task_type)
+                raise InvalidTaskMetadataError(f"Unsupported task type: {task_info.task_type}")
+        if task is not None:
+            self._ongoing_tasks[task_info.task_id] = task
+        await self._valkey_client.claim_task(task_info.task_id, self._task_set_key)
