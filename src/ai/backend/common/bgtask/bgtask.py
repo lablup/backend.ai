@@ -292,6 +292,7 @@ class BackgroundTaskManager:
         self._task_set_key = TaskSetKey(
             server_id=server_id, tags=set(tags) if tags is not None else set()
         )
+        self._metric_observer = bgtask_observer
         self._hook = CompositeTaskHook([
             MetricObserverHook(bgtask_observer),
             EventProducerHook(event_producer),
