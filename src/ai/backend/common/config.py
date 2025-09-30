@@ -61,7 +61,6 @@ class BaseConfigModel(BaseModel):
         use_enum_values=True,
         extra="allow",
         alias_generator=snake_to_kebab_case,
-        validate_default=True,
     )
 
 
