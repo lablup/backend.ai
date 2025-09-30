@@ -20,7 +20,7 @@ import trafaret as t
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.engine.row import Row
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common import validators as tx
 from ai.backend.common.exception import SessionWithInvalidStateError
@@ -276,6 +276,23 @@ class ComputeSessionNode(graphene.ObjectType):
         "ai.backend.manager.models.gql_models.session.ComputeSessionConnection",
         description="Added in 24.09.0.",
     )
+
+    @classmethod
+    async def get_node(
+        cls,
+        info: graphene.ResolveInfo,
+        id: str,
+    ) -> Optional[Self]:
+        graphene_ctx: GraphQueryContext = info.context
+        _, raw_session_id = AsyncNode.resolve_global_id(info, id)
+        async with graphene_ctx.db.begin_readonly_session() as db_session:
+            stmt = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == uuid.UUID(raw_session_id))
+                .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
+            )
+            query_result = await db_session.scalar(stmt)
+            return cls.from_row(graphene_ctx, query_result) if query_result is not None else None
 
     @classmethod
     def _add_basic_options_to_query(
