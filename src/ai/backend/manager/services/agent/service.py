@@ -226,7 +226,7 @@ class AgentService:
 
     async def mark_agent_exit(self, action: MarkAgentExitAction) -> MarkAgentExitActionResult:
         now = datetime.now(tzutc())
-        self._agent_repository.cleanup_agent_on_exit(
+        await self._agent_repository.cleanup_agent_on_exit(
             agent_id=action.agent_id,
             modifier=AgentStatusModifier(
                 status=action.agent_status, status_changed=now, lost_at=OptionalState.update(now)
