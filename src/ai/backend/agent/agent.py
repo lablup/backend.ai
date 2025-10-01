@@ -229,6 +229,7 @@ from .kernel import (
     match_distro_data,
 )
 from .observer.heartbeat import HeartbeatObserver
+from .observer.host_port import HostPortObserver
 from .resources import (
     AbstractComputeDevice,
     AbstractComputePlugin,
@@ -991,7 +992,9 @@ class AbstractAgent(
 
         self._agent_runner = Runner(resources=[])
         container_observer = HeartbeatObserver(self, self.event_producer)
+        host_port_observer = HostPortObserver(self)
         await self._agent_runner.register_observer(container_observer)
+        await self._agent_runner.register_observer(host_port_observer)
         await self._agent_runner.start()
 
         if abuse_report_path := self.local_config.agent.abuse_report_path:
@@ -1475,6 +1478,47 @@ class AbstractAgent(
             )
         ]
         self.port_pool.update(restored_ports)
+
+    def current_used_port_set(self) -> set[int]:
+        """
+        Get the current port pool.
+        """
+        total_port_set = set(
+            range(
+                self.local_config.container.port_range[0],
+                self.local_config.container.port_range[1] + 1,
+            )
+        )
+        return total_port_set - self.port_pool
+
+    def release_unused_ports(self, unused_ports: set[int]) -> None:
+        """
+        Release the given unused ports back to the port pool.
+        """
+        if not unused_ports:
+            return
+        log.info(
+            "releasing unused ports back to port pool. current port-pool length: {}, releasing length: {}",
+            len(self.port_pool),
+            len(unused_ports),
+        )
+        self.port_pool.update(unused_ports)
+
+    def reset_port_pool(self, used_ports: Iterable[int]) -> None:
+        """
+        Reset the port pool by excluding the given used ports.
+        """
+        used_port_set = set(used_ports)
+        port_range = self.local_config.container.port_range
+        log.info(
+            "reset port pool with used ports. current port-pool length: {}, used ports length: {}",
+            len(self.port_pool),
+            len(used_port_set),
+        )
+        original_port_pool: set[int] = {
+            p for p in range(port_range[0], port_range[1] + 1) if p not in used_port_set
+        }
+        self.port_pool = original_port_pool
 
     async def purge_containers(self, containers: Iterable[ContainerKernelId]) -> None:
         tasks = [self._purge_container(container) for container in containers]
