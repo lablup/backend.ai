@@ -94,6 +94,19 @@ class ScalingGroupNotFound(ObjectNotFound):
         )
 
 
+class ScalingGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/scaling-group-deletion-failure"
+    error_title = "Failed to delete scaling group."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class InstanceNotFound(ObjectNotFound):
     object_name = "agent instance"
 
