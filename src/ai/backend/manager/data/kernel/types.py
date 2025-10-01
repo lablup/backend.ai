@@ -155,6 +155,7 @@ class ImageInfo:
     identifier: Optional[ImageIdentifier]
     registry: Optional[str]
     tag: Optional[str]
+    architecture: Optional[str]
 
 
 @dataclass

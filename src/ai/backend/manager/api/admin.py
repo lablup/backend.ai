@@ -119,6 +119,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
         processors=root_ctx.processors,
         scheduler_repository=root_ctx.repositories.scheduler.repository,
         user_repository=root_ctx.repositories.user.repository,
+        agent_repository=root_ctx.repositories.agent.repository,
     )
     result = await app_ctx.gql_schema.execute_async(
         params["query"],

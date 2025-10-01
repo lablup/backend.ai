@@ -12,7 +12,7 @@ from sqlalchemy.orm import joinedload, load_only, relationship, selectinload, wi
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
-from ai.backend.manager.data.agent.types import AgentData, AgentStatus
+from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 
 from .base import (
@@ -89,6 +89,51 @@ class AgentRow(Base):
     kernels = relationship("KernelRow", back_populates="agent_row")
     scaling_group_row = relationship("ScalingGroupRow", back_populates="agents")
 
+    def to_data(self) -> AgentData:
+        return AgentData(
+            id=self.id,
+            status=self.status,
+            status_changed=self.status_changed,
+            region=self.region,
+            scaling_group=self.scaling_group,
+            schedulable=self.schedulable,
+            available_slots=self.available_slots,
+            occupied_slots=self.occupied_slots,
+            addr=self.addr,
+            public_host=self.public_host,
+            first_contact=self.first_contact,
+            lost_at=self.lost_at,
+            version=self.version,
+            architecture=self.architecture,
+            compute_plugins=self.compute_plugins,
+            public_key=self.public_key,
+            auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
+        )
+
+    def to_extended_data(self, known_slot_types: Mapping[SlotName, SlotTypes]) -> AgentDataExtended:
+        kernel_rows = cast(list[KernelRow], self.kernels)
+        return AgentDataExtended(
+            id=self.id,
+            status=self.status,
+            status_changed=self.status_changed,
+            region=self.region,
+            scaling_group=self.scaling_group,
+            schedulable=self.schedulable,
+            available_slots=self.available_slots,
+            occupied_slots=self.occupied_slots,
+            addr=self.addr,
+            public_host=self.public_host,
+            first_contact=self.first_contact,
+            lost_at=self.lost_at,
+            version=self.version,
+            architecture=self.architecture,
+            compute_plugins=self.compute_plugins,
+            public_key=self.public_key,
+            auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
+            known_slot_types=known_slot_types,
+            kernels=[k.to_kernel_info() for k in kernel_rows],
+        )
+
     @classmethod
     async def get_agents_by_condition(
         cls, conditions: Sequence[QueryCondition], *, db: ExtendedAsyncSAEngine
@@ -135,27 +180,6 @@ class AgentRow(Base):
             for slots in kernel_slots:
                 occupied_slots += slots
             return occupied_slots
-
-    def to_data(self) -> AgentData:
-        return AgentData(
-            id=self.id,
-            status=self.status,
-            status_changed=self.status_changed,
-            region=self.region,
-            scaling_group=self.scaling_group,
-            schedulable=self.schedulable,
-            available_slots=self.available_slots,
-            occupied_slots=self.occupied_slots,
-            addr=self.addr,
-            public_host=self.public_host,
-            first_contact=self.first_contact,
-            lost_at=self.lost_at,
-            version=self.version,
-            architecture=self.architecture,
-            compute_plugins=self.compute_plugins,
-            public_key=self.public_key,
-            auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
-        )
 
 
 def by_scaling_group(
