@@ -6,6 +6,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Mapping, MutableMapping, Optional, Self, cast
+from urllib.parse import urlparse
 
 import graphene
 import sqlalchemy as sa
@@ -20,6 +21,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryProject,
+    InvalidContainerRegistryURL,
 )
 
 from ..defs import PASSWORD_PLACEHOLDER
@@ -67,12 +69,23 @@ class ContainerRegistryValidator:
         self._type = args.type
         self._project = args.project
 
+    def _is_valid_url(self, url: str):
+        try:
+            url = url.strip()
+            if not url.startswith("http://") and not url.startswith("https://"):
+                url = "http://" + url
+            result = urlparse(url)
+            return all([result.scheme, result.netloc])
+        except Exception:
+            return False
+
     def validate(self) -> None:
         """
         Validate container registry configuration.
         """
-        # TODO: Implement this
         # Validate URL format
+        if not self._is_valid_url(self._url):
+            raise InvalidContainerRegistryURL(f"Invalid URL format: {self._url}")
 
         # Validate project name for Harbor
         if self._type is not None:
