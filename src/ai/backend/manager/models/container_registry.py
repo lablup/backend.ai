@@ -55,6 +55,7 @@ class ContainerRegistryValidatorArgs:
     project: Optional[str]
 
 
+# TODO: Refactor this using inheritance
 class ContainerRegistryValidator:
     """
     Validator for container registry configuration.
