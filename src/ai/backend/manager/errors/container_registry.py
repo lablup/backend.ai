@@ -9,7 +9,7 @@ from ai.backend.common.exception import (
 )
 
 
-class ContainerRegistryProjectInvalid(BackendAIError, web.HTTPBadRequest):
+class InvalidContainerRegistryProject(BackendAIError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
@@ -19,7 +19,7 @@ class ContainerRegistryProjectInvalid(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class ContainerRegistryURLInvalid(BackendAIError, web.HTTPBadRequest):
+class InvalidContainerRegistryURL(BackendAIError, web.HTTPBadRequest):
     @classmethod
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
