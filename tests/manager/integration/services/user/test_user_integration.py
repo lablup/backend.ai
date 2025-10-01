@@ -175,12 +175,12 @@ class TestCreateUserIntegration:
 
         result = await processors.create_user.wait_for_complete(action)
 
-        assert result.data.email == "testnewuser@example.com"
-        assert result.data.username == "testnewuser"
-        assert result.data.full_name == "New User"
-        assert result.data.role == UserRole.USER
-        assert result.data.domain_name == "default"
-        assert result.data.status == UserStatus.ACTIVE
+        assert result.data.user.email == "testnewuser@example.com"
+        assert result.data.user.username == "testnewuser"
+        assert result.data.user.full_name == "New User"
+        assert result.data.user.role == UserRole.USER
+        assert result.data.user.domain_name == "default"
+        assert result.data.user.status == UserStatus.ACTIVE
 
     @pytest.mark.asyncio
     async def test_create_user_admin_with_sudo(
@@ -211,9 +211,9 @@ class TestCreateUserIntegration:
 
         result = await processors.create_user.wait_for_complete(action)
 
-        assert result.data.email == "testadmin@example.com"
-        assert result.data.role == UserRole.ADMIN
-        assert result.data.sudo_session_enabled is True
+        assert result.data.user.email == "testadmin@example.com"
+        assert result.data.user.role == UserRole.ADMIN
+        assert result.data.user.sudo_session_enabled is True
 
     @pytest.mark.asyncio
     async def test_create_user_container_config(
@@ -245,9 +245,9 @@ class TestCreateUserIntegration:
 
         result = await processors.create_user.wait_for_complete(action)
 
-        assert result.data.container_uid == 2000
-        assert result.data.container_main_gid == 2000
-        assert result.data.container_gids == [2000, 2001]
+        assert result.data.user.container_uid == 2000
+        assert result.data.user.container_main_gid == 2000
+        assert result.data.user.container_gids == [2000, 2001]
 
     @pytest.mark.asyncio
     async def test_create_user_resource_policy_and_ip_restriction(
@@ -277,9 +277,9 @@ class TestCreateUserIntegration:
 
         result = await processors.create_user.wait_for_complete(action)
 
-        assert result.data.resource_policy == "default"
-        assert result.data.allowed_client_ip is not None
-        assert str(result.data.allowed_client_ip[0]) == "192.168.1.0/24"
+        assert result.data.user.resource_policy == "default"
+        assert result.data.user.allowed_client_ip is not None
+        assert str(result.data.user.allowed_client_ip[0]) == "192.168.1.0/24"
 
 
 class TestModifyUserIntegration:

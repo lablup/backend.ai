@@ -230,23 +230,23 @@ async def test_create_user(
 
     result = await processors.create_user.wait_for_complete(action)
 
-    assert result.data.username == "testuser"
-    assert result.data.email == "test_user@test.com"
-    assert result.data.need_password_change is False
-    assert result.data.full_name == "Test User"
-    assert result.data.description == "Test user description"
-    assert result.data.is_active is True
-    assert result.data.status == UserStatus.ACTIVE
+    assert result.data.user.username == "testuser"
+    assert result.data.user.email == "test_user@test.com"
+    assert result.data.user.need_password_change is False
+    assert result.data.user.full_name == "Test User"
+    assert result.data.user.description == "Test user description"
+    assert result.data.user.is_active is True
+    assert result.data.user.status == UserStatus.ACTIVE
     # status_info is None for newly created users
-    assert result.data.domain_name == "default"
-    assert result.data.role == UserRole.USER
-    assert result.data.resource_policy == "default"
-    assert result.data.allowed_client_ip is None
-    assert result.data.totp_activated is False
-    assert result.data.sudo_session_enabled is False
-    assert result.data.container_uid is None
-    assert result.data.container_main_gid is None
-    assert result.data.container_gids is None
+    assert result.data.user.domain_name == "default"
+    assert result.data.user.role == UserRole.USER
+    assert result.data.user.resource_policy == "default"
+    assert result.data.user.allowed_client_ip is None
+    assert result.data.user.totp_activated is False
+    assert result.data.user.sudo_session_enabled is False
+    assert result.data.user.container_uid is None
+    assert result.data.user.container_main_gid is None
+    assert result.data.user.container_gids is None
 
 
 async def test_create_user_non_existing_domain(

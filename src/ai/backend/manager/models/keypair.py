@@ -3,7 +3,8 @@ from __future__ import annotations
 import base64
 import os
 import secrets
-from typing import Any, List, Optional, Sequence, Tuple, TypedDict
+import uuid
+from typing import Any, List, Optional, Self, Sequence, Tuple, TypedDict
 
 import sqlalchemy as sa
 from cryptography.exceptions import InvalidSignature
@@ -18,7 +19,7 @@ from sqlalchemy.sql.expression import false
 
 from ai.backend.common import msgpack
 from ai.backend.common.types import AccessKey, SecretKey
-from ai.backend.manager.data.keypair.types import KeyPairCreator
+from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.models.session import SessionRow
 
 from ..defs import RESERVED_DOTFILES
@@ -116,6 +117,45 @@ class KeyPairRow(Base):
             "bootstrap_script": self.bootstrap_script,
         }
 
+    @classmethod
+    def from_creator(
+        cls,
+        creator: KeyPairCreator,
+        generated_data: GeneratedKeyPairData,
+        user_id: uuid.UUID,
+        email: str,
+    ) -> Self:
+        return cls(
+            user_id=email,
+            user=user_id,
+            access_key=generated_data.access_key,
+            secret_key=generated_data.secret_key,
+            is_active=creator.is_active,
+            is_admin=creator.is_admin,
+            resource_policy=creator.resource_policy,
+            rate_limit=creator.rate_limit,
+            num_queries=0,
+            ssh_public_key=generated_data.ssh_public_key,
+            ssh_private_key=generated_data.ssh_private_key,
+        )
+
+    def to_data(self) -> KeyPairData:
+        return KeyPairData(
+            user_id=self.user,
+            access_key=self.access_key,
+            secret_key=self.secret_key,
+            is_active=self.is_active,
+            is_admin=self.is_admin,
+            created_at=self.created_at,
+            modified_at=self.modified_at,
+            resource_policy_name=self.resource_policy,
+            rate_limit=self.rate_limit,
+            ssh_public_key=self.ssh_public_key,
+            ssh_private_key=self.ssh_private_key,
+            dotfiles=self.dotfiles,
+            bootstrap_script=self.bootstrap_script,
+        )
+
 
 class Dotfile(TypedDict):
     data: str
@@ -175,6 +215,17 @@ def prepare_new_keypair(user_email: str, creator: KeyPairCreator) -> dict[str, A
         "ssh_private_key": privkey,
     }
     return data
+
+
+def generate_keypair_data() -> GeneratedKeyPairData:
+    ak, sk = generate_keypair()
+    pubkey, privkey = generate_ssh_keypair()
+    return GeneratedKeyPairData(
+        access_key=ak,
+        secret_key=sk,
+        ssh_public_key=pubkey,
+        ssh_private_key=privkey,
+    )
 
 
 def _generate_random_bytes_to_verify_keypairs() -> bytes:

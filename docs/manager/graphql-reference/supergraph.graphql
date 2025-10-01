@@ -1418,6 +1418,9 @@ type CreateUser
   ok: Boolean
   msg: String
   user: User
+
+  """Added in 25.15.0."""
+  keypair: KeyPair
 }
 
 type CreateUserResourcePolicy

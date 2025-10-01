@@ -20,7 +20,11 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.manager.data.user.types import UserCreator, UserData, UserInfoContext
+from ai.backend.manager.data.user.types import (
+    UserCreator,
+    UserData,
+    UserInfoContext,
+)
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
@@ -930,6 +934,9 @@ class CreateUser(graphene.Mutation):
     ok = graphene.Boolean()
     msg = graphene.String()
     user = graphene.Field(lambda: User, required=False)
+    keypair = graphene.Field(
+        "ai.backend.manager.models.gql_models.keypair.KeyPair", description="Added in 25.15.0."
+    )
 
     @classmethod
     async def mutate(
@@ -939,15 +946,19 @@ class CreateUser(graphene.Mutation):
         email: str,
         props: UserInput,
     ) -> CreateUser:
+        from .keypair import KeyPair
+
         graph_ctx: GraphQueryContext = info.context
         action: CreateUserAction = props.to_action(email, graph_ctx)
 
         action_result = await graph_ctx.processors.user.create_user.wait_for_complete(action)
+        keypair = KeyPair.from_data(action_result.data.keypair)
 
         return cls(
             ok=True,
             msg="success",
-            user=User.from_dto(action_result.data),
+            user=User.from_dto(action_result.data.user),
+            keypair=keypair,
         )
 
 
