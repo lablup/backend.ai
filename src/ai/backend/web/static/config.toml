@@ -32,6 +32,7 @@ enableExtendLoginSession = false        # If true, enables login session extensi
 enableImportFromHuggingFace = false     # Enable import from Hugging Face feature. (From Backend.AI 24.09)
 enableInteractiveLoginAccountSwitch = true  # If false, hide the "Sign in with a different account" button from the interactive login page.
 enableModelFolders = true               # Enable model folders feature. (From Backend.AI 23.03)
+enableReservoir = false                 # Enable reservoir page
 
 [wsproxy]
 proxyURL = "[Proxy URL]"

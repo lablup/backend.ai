@@ -81,6 +81,8 @@
   enable_interactive_login_account_switch = true
   # Default file browser image name.
   default_file_browser_image = ""
+  # Whether to enable reservoir feature.
+  enable_reservoir = false
 
   [service.wsproxy]
     # WebSocket proxy URL.
