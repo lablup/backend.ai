@@ -38,15 +38,32 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         name = str(quota_scope_id)
-        path = self._mount_path / name
-        await self._client.create_share(
-            CreateShareParams(
+        qspath = self.mangle_qspath(quota_scope_id)
+
+        objective = await self._client.get_singleton_objectives()
+        if objective is None:
+            objective = await self._client.create_singleton_objective(mount_path=self._mount_path)
+        await self._client.create_share_with_objective(
+            params=CreateShareParams(
                 name=name,
-                path=str(path),
+                path=str(qspath),
                 create_path=True,
                 validate_only=False,
-            )
+            ),
+            objective=objective,
         )
+        # share = await self._client.create_share(
+        #     CreateShareParams(
+        #         name=name,
+        #         path=str(qspath),
+        #         create_path=True,
+        #         validate_only=False,
+        #     )
+        # )
+        # await self._client.set_objective_to_share(
+        #     objective=objective,
+        #     share_id=share.uoid.uuid,
+        # )
 
     @override
     async def delete_quota_scope(
@@ -81,8 +98,16 @@ class HammerspaceVolume(BaseVolume):
         address = self.config.get("address")
         if not address:
             raise ValueError("Hammerspace volume requires 'address' in options")
+        username = self.config.get("username")
+        if not username:
+            raise ValueError("Hammerspace volume requires 'username' in options")
+        password = self.config.get("password")
+        if not password:
+            raise ValueError("Hammerspace volume requires 'password' in options")
         self._connection_info = ConnectionInfo(
             address=address,
+            username=username,
+            password=password,
         )
 
     @override
