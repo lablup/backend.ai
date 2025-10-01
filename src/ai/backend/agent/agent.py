@@ -1479,6 +1479,25 @@ class AbstractAgent(
         ]
         self.port_pool.update(restored_ports)
 
+    def current_port_pool(self) -> set[int]:
+        """
+        Get the current port pool.
+        """
+        return self.port_pool.copy()
+
+    def release_unused_ports(self, unused_ports: set[int]) -> None:
+        """
+        Release the given unused ports back to the port pool.
+        """
+        if not unused_ports:
+            return
+        log.info(
+            "releasing unused ports back to port pool. current port-pool length: {}, releasing length: {}",
+            len(self.port_pool),
+            len(unused_ports),
+        )
+        self.port_pool.update(unused_ports)
+
     def reset_port_pool(self, used_ports: Iterable[int]) -> None:
         """
         Reset the port pool by excluding the given used ports.

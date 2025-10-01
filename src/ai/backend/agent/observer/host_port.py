@@ -17,12 +17,16 @@ PORT_USAGE_THRESHOLD = 2
 
 
 class HostPortObserver(AbstractObserver):
+    _agent: "AbstractAgent"
+    _port_unused_counts: defaultdict[int, int]
+
     def __init__(
         self,
         agent: "AbstractAgent",
     ) -> None:
         self._agent = agent
         self._port_usage_counts: defaultdict[int, int] = defaultdict(int)
+        self._port_unused_counts: defaultdict[int, int] = defaultdict(int)
 
     @property
     @override
@@ -38,18 +42,14 @@ class HostPortObserver(AbstractObserver):
             for container_port in container.ports:
                 occupied_host_ports.add(container_port.host_port)
 
-        confirmed_occupied_ports: set[int] = set()
-        for port in self._port_usage_counts:
-            if port not in occupied_host_ports:
-                self._port_usage_counts[port] = 0
-
-        for port in occupied_host_ports:
-            self._port_usage_counts[port] += 1
-            if self._port_usage_counts[port] >= PORT_USAGE_THRESHOLD:
-                confirmed_occupied_ports.add(port)
-                # Set the value to 1 to avoid overflow in long-running agents
-                self._port_usage_counts[port] = 1
-        self._agent.reset_port_pool(confirmed_occupied_ports)
+        unused_ports = self._agent.current_port_pool() - occupied_host_ports
+        ports_to_remove = set()
+        for port in unused_ports:
+            self._port_unused_counts[port] += 1
+            if self._port_unused_counts[port] >= PORT_USAGE_THRESHOLD:
+                ports_to_remove.add(port)
+                del self._port_unused_counts[port]
+        self._agent.release_unused_ports(ports_to_remove)
 
     @override
     def observe_interval(self) -> float:
