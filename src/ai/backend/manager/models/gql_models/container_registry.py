@@ -15,7 +15,11 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.image import (
     ContainerRegistryGroupsAssociationNotFound,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry import (
+    ContainerRegistryRow,
+    ContainerRegistryValidator,
+    ContainerRegistryValidatorArgs,
+)
 from ai.backend.manager.models.gql_models.fields import ScopeField
 from ai.backend.manager.models.rbac import (
     ContainerRegistryScope,
@@ -341,6 +345,15 @@ class CreateContainerRegistryNode(graphene.Mutation):
         extra: dict | UndefinedType = Undefined,
     ) -> CreateContainerRegistryNode:
         ctx: GraphQueryContext = info.context
+        validator = ContainerRegistryValidator(
+            ContainerRegistryValidatorArgs(
+                url=cast(Optional[str], url if url is not Undefined else None),
+                type=cast(Optional[ContainerRegistryType], type if type is not Undefined else None),
+                project=cast(Optional[str], project if project is not Undefined else None),
+            )
+        )
+
+        validator.validate()
 
         input_config: dict[str, Any] = {
             "registry_name": registry_name,
@@ -440,6 +453,16 @@ class ModifyContainerRegistryNode(graphene.Mutation):
             reg_row = await session.scalar(stmt)
             if reg_row is None:
                 raise ValueError(f"ContainerRegistry not found (id: {reg_id})")
+
+            validator = ContainerRegistryValidator(
+                ContainerRegistryValidatorArgs(
+                    type=type if type is not Undefined else reg_row.type,
+                    url=url if url is not Undefined else None,
+                    project=project if project is not Undefined else None,
+                )
+            )
+
+            validator.validate()
             for field, val in input_config.items():
                 setattr(reg_row, field, val)
 

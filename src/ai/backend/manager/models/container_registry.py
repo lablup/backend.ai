@@ -50,7 +50,7 @@ __all__: Sequence[str] = (
 
 @dataclass
 class ContainerRegistryValidatorArgs:
-    url: str
+    url: Optional[str]
     type: Optional[ContainerRegistryType]
     project: Optional[str]
 
@@ -61,7 +61,7 @@ class ContainerRegistryValidator:
     Validator for container registry configuration.
     """
 
-    _url: str
+    _url: Optional[str]
     _type: Optional[ContainerRegistryType]
     _project: Optional[str]
 
@@ -85,8 +85,9 @@ class ContainerRegistryValidator:
         Validate container registry configuration.
         """
         # Validate URL format
-        if not self._is_valid_url(self._url):
-            raise InvalidContainerRegistryURL(f"Invalid URL format: {self._url}")
+        if self._url is not None:
+            if not self._is_valid_url(self._url):
+                raise InvalidContainerRegistryURL(f"Invalid URL format: {self._url}")
 
         # Validate project name for Harbor
         if self._type is not None:
