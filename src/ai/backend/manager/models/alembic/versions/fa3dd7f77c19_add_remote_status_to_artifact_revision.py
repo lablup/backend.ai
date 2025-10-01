@@ -1,7 +1,7 @@
 """Add `remote_status` to `artifact_revision`
 
 Revision ID: fa3dd7f77c19
-Revises: 1f76b4c0f399
+Revises: 82f4d3dea750
 Create Date: 2025-09-30 10:49:45.228649
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "fa3dd7f77c19"
-down_revision = "1f76b4c0f399"
+down_revision = "82f4d3dea750"
 branch_labels = None
 depends_on = None
 
