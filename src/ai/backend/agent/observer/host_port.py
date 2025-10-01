@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-PORT_USAGE_THRESHOLD = 2
+PORT_USAGE_THRESHOLD = 4
 
 
 class HostPortObserver(AbstractObserver):
@@ -41,8 +41,11 @@ class HostPortObserver(AbstractObserver):
         for _, container in containers:
             for container_port in container.ports:
                 occupied_host_ports.add(container_port.host_port)
-
         unused_ports = self._agent.current_used_port_set() - occupied_host_ports
+        for prevoius_unused_port in list(self._port_unused_counts.keys()):
+            if prevoius_unused_port not in unused_ports:
+                del self._port_unused_counts[prevoius_unused_port]
+
         ports_to_remove = set()
         for unused_port in unused_ports:
             self._port_unused_counts[unused_port] += 1
