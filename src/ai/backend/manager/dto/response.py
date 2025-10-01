@@ -1,12 +1,15 @@
+import uuid
 from typing import Optional
 
 from pydantic import BaseModel
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
     ArtifactDataWithRevisionsResponse,
+    ArtifactRevisionReadme,
     ArtifactRevisionResponseData,
 )
 
@@ -25,6 +28,18 @@ class SearchArtifactsResponse(BaseResponseModel):
 
 class ScanArtifactsResponse(BaseResponseModel):
     artifacts: list[ArtifactDataWithRevisionsResponse]
+
+
+class ScanArtifactsSyncResponse(BaseResponseModel):
+    artifacts: list[ArtifactDataWithRevisionsResponse]
+    readme_data: dict[uuid.UUID, ArtifactRevisionReadme]
+
+
+class DelegateScanArtifactsResponse(BaseResponseModel):
+    artifacts: list[ArtifactDataWithRevisionsResponse]
+    source_registry_id: uuid.UUID
+    source_registry_type: ArtifactRegistryType
+    readme_data: dict[uuid.UUID, ArtifactRevisionReadme]
 
 
 class ScanArtifactModelsResponse(BaseResponseModel):

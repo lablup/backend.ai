@@ -312,11 +312,59 @@ type ArtifactRegistry
   type: ArtifactRegistryType!
 }
 
+"""
+Added in 25.15.0.
+
+Represents common metadata for an artifact registry.
+All artifact registry nodes expose that information regardless of type.
+"""
+type ArtifactRegistryMeta implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  registryId: ID!
+  type: ArtifactRegistryType!
+  url: String!
+}
+
+"""Added in 25.15.0"""
+type ArtifactRegistryMetaConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ArtifactRegistryMetaEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ArtifactRegistryMetaEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ArtifactRegistryMeta!
+}
+
 enum ArtifactRegistryType
   @join__type(graph: STRAWBERRY)
 {
   HUGGINGFACE @join__enumValue(graph: STRAWBERRY)
   RESERVOIR @join__enumValue(graph: STRAWBERRY)
+}
+
+enum ArtifactRemoteStatus
+  @join__type(graph: STRAWBERRY)
+{
+  SCANNED @join__enumValue(graph: STRAWBERRY)
+  AVAILABLE @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.14.0"""
@@ -327,6 +375,9 @@ type ArtifactRevision implements Node
   """The Globally Unique ID of this object"""
   id: ID!
   status: ArtifactStatus!
+
+  """Added in 25.15.0"""
+  remoteStatus: ArtifactRemoteStatus
   version: String!
   readme: String
   size: ByteSize
@@ -1470,6 +1521,87 @@ type DealiasImage
 {
   ok: Boolean
   msg: String
+}
+
+"""Added in 25.15.0"""
+input DelegateeTarget
+  @join__type(graph: STRAWBERRY)
+{
+  delegateeReservoirId: ID!
+  targetRegistryId: ID!
+}
+
+"""
+Added in 25.15.0.
+
+Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
+Used to specify which artifact revisions should be imported from the remote registry source
+into the local reservoir registry storage.
+"""
+input DelegateImportArtifactsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """List of artifact revision IDs of delegatee artifact registry"""
+  artifactRevisionIds: [ID!]!
+}
+
+"""
+Added in 25.15.0.
+
+Response payload for delegated artifact import operation.
+Contains the imported artifact revisions and associated background tasks.
+The tasks can be monitored to track the progress of the import operation.
+"""
+type DelegateImportArtifactsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Connection of artifact revisions that were imported from the reservoir registry's remote registry
+  """
+  artifactRevisions: ArtifactRevisionConnection!
+
+  """List of background tasks created for importing the artifact revisions"""
+  tasks: [ArtifactRevisionImportTask!]!
+}
+
+"""
+Added in 25.15.0.
+
+Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
+"""
+input DelegateScanArtifactsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the reservoir registry to delegate the scan request to"""
+  delegatorReservoirId: ID = null
+
+  """Target delegatee reservoir registry and its remote registry to scan"""
+  delegateeTarget: DelegateeTarget = null
+
+  """Maximum number of artifacts to scan (max: 500)"""
+  limit: Int!
+
+  """Filter artifacts by type (e.g., model, image, package)"""
+  artifactType: ArtifactType = null
+
+  """Search term to filter artifacts by name or description"""
+  search: String = null
+}
+
+"""
+Added in 25.15.0.
+
+Response payload for delegated artifact scanning operation.
+Contains the list of artifacts discovered during the scan of a reservoir registry's remote registry.
+These artifacts are now available for import or direct use.
+"""
+type DelegateScanArtifactsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  List of artifacts discovered during the delegated scan from the reservoir registry's remote registry
+  """
+  artifacts: [Artifact!]!
 }
 
 """Added in 25.15.0"""
@@ -3793,6 +3925,37 @@ type Mutation
   """Added in 25.14.0"""
   importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 25.15.0.
+  
+  Triggers artifact scanning on a remote reservoir registry.
+  
+  This mutation instructs a reservoir-type registry to initiate a scan of artifacts
+  from its associated remote reservoir registry source. The scan process will discover and
+  catalog artifacts available in the remote reservoir, making them accessible
+  through the local reservoir registry.
+  
+  Requirements:
+  - The delegator registry must be of type 'reservoir'
+  - The delegator reservoir registry must have a valid remote registry configuration
+  """
+  delegateScanArtifacts(input: DelegateScanArtifactsInput!): DelegateScanArtifactsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 25.15.0.
+  
+  Trigger import of artifact revisions from a remote reservoir registry.
+  
+  This mutation instructs a reservoir-type registry to import specific artifact revisions
+  that were previously discovered during a scan from its remote registry.
+  Note that this operation does not import the artifacts directly into the local registry, but only into the delegator reservoir's storage.
+  
+  Requirements:
+  - The delegator registry must be of type 'reservoir'
+  - The delegator registry must have a valid remote registry configuration
+  """
+  delegateImportArtifacts(input: DelegateImportArtifactsInput!): DelegateImportArtifactsPayload! @join__field(graph: STRAWBERRY)
+
   """Added in 25.14.0"""
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload! @join__field(graph: STRAWBERRY)
 
@@ -4693,6 +4856,7 @@ type ReservoirRegistry implements Node
   accessKey: String!
   secretKey: String!
   apiVersion: String!
+  remoteArtifactRegistries: ArtifactRegistryMetaConnection!
 }
 
 """Added in 25.14.0"""

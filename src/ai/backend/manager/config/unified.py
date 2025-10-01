@@ -1784,6 +1784,16 @@ class ReservoirConfig(BaseConfigSchema):
         validation_alias=AliasChoices("enable-approve-process", "enable_approve_process"),
         serialization_alias="enable-approve-process",
     )
+    is_delegation_leaf: bool = Field(
+        default=False,
+        description="""
+        Whether this reservoir is a leaf in a delegation hierarchy.
+        If true, it cannot delegate to other reservoirs.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices("is-delegation-leaf", "is_delegation_leaf"),
+        serialization_alias="is-delegation-leaf",
+    )
     storage_name: str = Field(
         default="RESERVOIR_STORAGE_NAME",
         description="""

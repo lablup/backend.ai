@@ -15,6 +15,8 @@ from .artifact import (
     artifacts,
     cancel_import_artifact,
     cleanup_artifact_revisions,
+    delegate_import_artifacts,
+    delegate_scan_artifacts,
     delete_artifacts,
     import_artifacts,
     reject_artifact_revision,
@@ -94,6 +96,8 @@ class Mutation:
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
+    delegate_scan_artifacts = delegate_scan_artifacts
+    delegate_import_artifacts = delegate_import_artifacts
     update_artifact = update_artifact
     delete_artifacts = delete_artifacts
     restore_artifacts = restore_artifacts

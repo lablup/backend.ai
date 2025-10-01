@@ -59,3 +59,16 @@ class ReservoirConnectionError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class RemoteReservoirScanError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/remote-reservoir-scan-error"
+    error_title = "Remote Reservoir Scan Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT_REGISTRY,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

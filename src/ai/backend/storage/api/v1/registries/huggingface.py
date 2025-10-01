@@ -130,6 +130,33 @@ class HuggingFaceRegistryAPIHandler:
         )
 
     @api_handler
+    async def scan_models_sync(
+        self,
+        body: BodyParam[HuggingFaceScanModelsReq],
+    ) -> APIResponse:
+        """
+        Scan HuggingFace registry and return metadata including README content synchronously.
+        This endpoint waits for all metadata (including README) to be fully downloaded before responding.
+        """
+        await log_client_api_entry(log, "scan_models_sync", body.parsed)
+
+        models = await self._huggingface_service.scan_models_sync(
+            registry_name=body.parsed.registry_name,
+            limit=body.parsed.limit,
+            search=body.parsed.search,
+            sort=body.parsed.order,
+        )
+
+        response = HuggingFaceScanModelsResponse(
+            models=models,
+        )
+
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=response,
+        )
+
+    @api_handler
     async def import_models(
         self,
         body: BodyParam[HuggingFaceImportModelsReq],
@@ -183,6 +210,7 @@ def create_app(ctx: RootContext) -> web.Application:
     huggingface_api_handler = HuggingFaceRegistryAPIHandler(huggingface_service=huggingface_service)
 
     app.router.add_route("POST", "/scan", huggingface_api_handler.scan_models)
+    app.router.add_route("POST", "/scan/sync", huggingface_api_handler.scan_models_sync)
     app.router.add_route("POST", "/import", huggingface_api_handler.import_models)
 
     app.router.add_route("GET", "/model/{model_id}", huggingface_api_handler.retrieve_model)
