@@ -6,7 +6,6 @@ from typing import Any
 import aiohttp
 import yarl
 from dateutil.tz import tzutc
-from pydantic import TypeAdapter
 
 from ai.backend.common.auth.utils import generate_signature
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
@@ -80,19 +79,16 @@ class ReservoirRegistryClient:
         resp = await self._request(
             "POST", "/artifact-registries/delegation/scan", json=req.model_dump(mode="json")
         )
-        RespTypeAdapter = TypeAdapter(DelegateScanArtifactsResponse)
-        return RespTypeAdapter.validate_python(resp)
+        return DelegateScanArtifactsResponse.model_validate(resp)
 
     async def search_artifacts(self, req: SearchArtifactsReq) -> SearchArtifactsResponse:
         resp = await self._request(
             "POST", "/artifact-registries/search", json=req.model_dump(mode="json")
         )
-        RespTypeAdapter = TypeAdapter(SearchArtifactsResponse)
-        return RespTypeAdapter.validate_python(resp)
+        return SearchArtifactsResponse.model_validate(resp)
 
     async def get_readme(
         self, artifact_revision_id: uuid.UUID
     ) -> GetArtifactRevisionReadmeResponse:
         resp = await self._request("GET", f"/artifacts/revisions/{artifact_revision_id}/readme")
-        RespTypeAdapter = TypeAdapter(GetArtifactRevisionReadmeResponse)
-        return RespTypeAdapter.validate_python(resp)
+        return GetArtifactRevisionReadmeResponse.model_validate(resp)

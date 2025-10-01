@@ -481,8 +481,6 @@ class HuggingFaceScanner:
                     model_data.size = total_size
                 except Exception as e:
                     log.warning(f"Failed to download metadata for {model_data.id}: {str(e)}")
-                    # Set empty readme if download fails
-                    model_data.readme = None
 
         # Download metadata concurrently with semaphore limit
         tasks = [download_and_update_metadata(model) for model in models]
