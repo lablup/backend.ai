@@ -25,7 +25,6 @@ class HostPortObserver(AbstractObserver):
         agent: "AbstractAgent",
     ) -> None:
         self._agent = agent
-        self._port_usage_counts: defaultdict[int, int] = defaultdict(int)
         self._port_unused_counts: defaultdict[int, int] = defaultdict(int)
 
     @property
@@ -36,23 +35,23 @@ class HostPortObserver(AbstractObserver):
     @override
     async def observe(self) -> None:
         containers = await self._agent.enumerate_containers(ContainerStatus.active_set())
-
         occupied_host_ports: set[int] = set()
         for _, container in containers:
             for container_port in container.ports:
                 occupied_host_ports.add(container_port.host_port)
-        unused_ports = self._agent.current_used_port_set() - occupied_host_ports
-        for prevoius_unused_port in list(self._port_unused_counts.keys()):
-            if prevoius_unused_port not in unused_ports:
-                del self._port_unused_counts[prevoius_unused_port]
 
-        ports_to_remove = set()
+        unused_ports = self._agent.current_used_port_set() - occupied_host_ports
+        for previous_unused_port in list(self._port_unused_counts.keys()):
+            if previous_unused_port not in unused_ports:
+                del self._port_unused_counts[previous_unused_port]
+
+        ports_to_release = set()
         for unused_port in unused_ports:
             self._port_unused_counts[unused_port] += 1
             if self._port_unused_counts[unused_port] >= PORT_USAGE_THRESHOLD:
-                ports_to_remove.add(unused_port)
+                ports_to_release.add(unused_port)
                 del self._port_unused_counts[unused_port]
-        self._agent.release_unused_ports(ports_to_remove)
+        self._agent.release_unused_ports(ports_to_release)
 
     @override
     def observe_interval(self) -> float:
