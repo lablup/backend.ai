@@ -187,14 +187,7 @@ class Context(metaclass=ABCMeta):
         return await self.run_exec(["sh", "-c", script], **kwargs)
 
     def copy_config(self, template_name: str) -> Path:
-        with self.resource_path("ai.backend.install.configs", template_name) as src_path:
-            dst_path = self.dist_info.target_path / template_name
-            dst_path.parent.mkdir(parents=True, exist_ok=True)
-            if src_path.is_dir():
-                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
-            else:
-                shutil.copy(src_path, dst_path)
-        return dst_path
+        raise NotImplementedError
 
     @staticmethod
     def sed_in_place(path: Path, pattern: str | re.Pattern, replacement: str) -> None:
@@ -218,11 +211,18 @@ class Context(metaclass=ABCMeta):
         path.write_text(content)
 
     async def run_manager_cli(self, cmdargs: Sequence[str]) -> None:
-        executable = Path(self.install_info.base_path) / "backendai-manager"
-        await self.run_exec(
-            [str(executable), *cmdargs],
-            cwd=self.install_info.base_path,
-        )
+        if self.install_info.type == InstallType.SOURCE:
+            # Develop mode: use ./backend.ai from current directory
+            cmd_str = " ".join(cmdargs)
+            await self.run_shell(f"./backend.ai {cmd_str}")
+
+        elif self.install_info.type == InstallType.PACKAGE:
+            # Package mode: use backendai-manager from base_path
+            executable = Path(self.install_info.base_path) / "backendai-manager"
+            await self.run_exec(
+                [str(executable), *cmdargs],
+                cwd=self.install_info.base_path,
+            )
 
     @actxmgr
     async def etcd_ctx(self) -> AsyncIterator[AsyncEtcd]:
@@ -257,6 +257,7 @@ class Context(metaclass=ABCMeta):
             return await etcd.get_prefix(key, scope=ConfigScopes.GLOBAL)
 
     async def install_halfstack(self) -> None:
+        self.log_header("Installing halfstack...")
         dst_compose_path = self.copy_config("docker-compose.yml")
         self.copy_config("prometheus.yaml")
         self.copy_config("grafana-dashboards")
@@ -864,12 +865,22 @@ class DevContext(Context):
         )
         return InstallInfo(
             version=self.dist_info.version,
-            base_path=self.dist_info.target_path,
+            base_path=Path.cwd(),
             type=InstallType.SOURCE,
             last_updated=datetime.now(tzutc()),
             halfstack_config=halfstack_config,
             service_config=service_config,
         )
+
+    def copy_config(self, template_name: str) -> Path:
+        with self.resource_path("ai.backend.install.configs", template_name) as src_path:
+            dst_path = Path.cwd() / template_name
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            if src_path.is_dir():
+                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+            else:
+                shutil.copy(src_path, dst_path)
+        return dst_path
 
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
@@ -976,6 +987,16 @@ class PackageContext(Context):
             halfstack_config=halfstack_config,
             service_config=service_config,
         )
+
+    def copy_config(self, template_name: str) -> Path:
+        with self.resource_path("ai.backend.install.configs", template_name) as src_path:
+            dst_path = self.dist_info.target_path / template_name
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            if src_path.is_dir():
+                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+            else:
+                shutil.copy(src_path, dst_path)
+        return dst_path
 
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
