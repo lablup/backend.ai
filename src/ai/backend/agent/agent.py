@@ -1479,11 +1479,17 @@ class AbstractAgent(
         ]
         self.port_pool.update(restored_ports)
 
-    def current_port_pool(self) -> set[int]:
+    def current_used_port_set(self) -> set[int]:
         """
         Get the current port pool.
         """
-        return self.port_pool.copy()
+        total_port_set = set(
+            range(
+                self.local_config.container.port_range[0],
+                self.local_config.container.port_range[1] + 1,
+            )
+        )
+        return total_port_set - self.port_pool
 
     def release_unused_ports(self, unused_ports: set[int]) -> None:
         """

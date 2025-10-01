@@ -42,13 +42,13 @@ class HostPortObserver(AbstractObserver):
             for container_port in container.ports:
                 occupied_host_ports.add(container_port.host_port)
 
-        unused_ports = self._agent.current_port_pool() - occupied_host_ports
+        unused_ports = self._agent.current_used_port_set() - occupied_host_ports
         ports_to_remove = set()
-        for port in unused_ports:
-            self._port_unused_counts[port] += 1
-            if self._port_unused_counts[port] >= PORT_USAGE_THRESHOLD:
-                ports_to_remove.add(port)
-                del self._port_unused_counts[port]
+        for unused_port in unused_ports:
+            self._port_unused_counts[unused_port] += 1
+            if self._port_unused_counts[unused_port] >= PORT_USAGE_THRESHOLD:
+                ports_to_remove.add(unused_port)
+                del self._port_unused_counts[unused_port]
         self._agent.release_unused_ports(ports_to_remove)
 
     @override
