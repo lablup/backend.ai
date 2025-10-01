@@ -95,3 +95,13 @@ class AgentRepository:
     @repository_decorator()
     async def update_agent_status(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
         await self._db_source.update_agent_status(agent_id, modifier)
+
+    @repository_decorator()
+    async def remove_agent_from_images(
+        self, agent_id: AgentId, image_canonicals: list[str]
+    ) -> None:
+        with suppress_with_log(
+            [Exception],
+            message=f"Failed to remove agent: {agent_id} from images: {image_canonicals}",
+        ):
+            await self._cache_source.remove_agent_from_images(agent_id, image_canonicals)
