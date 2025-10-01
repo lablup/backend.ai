@@ -16,6 +16,63 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.0rc1 (2025-10-01)
+
+### Features
+* Add Action Processors to handle various types of actions ([#5744](https://github.com/lablup/backend.ai/issues/5744))
+* Abstract artifact registry storage types in `storage-proxy` ([#5750](https://github.com/lablup/backend.ai/issues/5750))
+* Add RBAC validators for Action Processors ([#5758](https://github.com/lablup/backend.ai/issues/5758))
+* Add vfolder RBAC validation ([#5759](https://github.com/lablup/backend.ai/issues/5759))
+* Add VFS Storage for Artifact Registry ([#5887](https://github.com/lablup/backend.ai/issues/5887))
+* Add `scan`, `import` trigger API schemas on remote reservoir registry ([#6027](https://github.com/lablup/backend.ai/issues/6027))
+* Add keypairs field to User GQL type and return the created keypairs when creating users ([#6040](https://github.com/lablup/backend.ai/issues/6040))
+* Implement `delegate_scan` GQL mutation on remote reservoir registry ([#6053](https://github.com/lablup/backend.ai/issues/6053))
+* Add the `enable_reservoir` webserver option to enable reservoir-related features in the webui ([#6055](https://github.com/lablup/backend.ai/issues/6055))
+* Implement flexible execution modes (single/batch/parallel) for background task system ([#6058](https://github.com/lablup/backend.ai/issues/6058))
+* Prevent the kernel runner (and the user container) being accidentally terminated by user's `pkill -f python` command ([#6085](https://github.com/lablup/backend.ai/issues/6085))
+* Implement node resolver(`get_node`) in `ComputeSessionNode` enabling clients to query nodes via global ID ([#6108](https://github.com/lablup/backend.ai/issues/6108))
+* Implement node resolver(`get_node`) in `AgentNode` enabling clients to query nodes via global ID ([#6109](https://github.com/lablup/backend.ai/issues/6109))
+* Add `AgentStats` GQL type and resolver to get agents' total and used resource slots ([#6116](https://github.com/lablup/backend.ai/issues/6116))
+* Implement simple health check endpoints returning component status, version, and name ([#6124](https://github.com/lablup/backend.ai/issues/6124))
+* Implements periodic monitoring of container host ports to automatically release unused ports back to the port pool, preventing port exhaustion in long-running agents. ([#6125](https://github.com/lablup/backend.ai/issues/6125))
+
+### Improvements
+* Introduce Service, Repository layer pattern when handling Agent Heartbeat ([#5794](https://github.com/lablup/backend.ai/issues/5794))
+* Introduce Service, Repository layer pattern in Agent Image remove event handler ([#5898](https://github.com/lablup/backend.ai/issues/5898))
+* Introduce service, repository layer when handling agent status change event ([#5921](https://github.com/lablup/backend.ai/issues/5921))
+* Remove duplicated exception handling in ResourcePresetCacheSource ([#5976](https://github.com/lablup/backend.ai/issues/5976))
+* Refactor GQL Agent resolver functions by applying repository pattern ([#6079](https://github.com/lablup/backend.ai/issues/6079))
+* Raise `AgentNotFound` error explicitly when agent not found by id instead of returning none ([#6103](https://github.com/lablup/backend.ai/issues/6103))
+
+### Fixes
+* Rename `object_storage_namespace` table, and GQL schema to `storage_namespace` ([#6001](https://github.com/lablup/backend.ai/issues/6001))
+* Fix `storage-proxy` unified config not pretty printed at bootstrap ([#6008](https://github.com/lablup/backend.ai/issues/6008))
+* Fix silent config validation failure of `storage-proxy` ([#6009](https://github.com/lablup/backend.ai/issues/6009))
+* Change unique constraint index of `association_scopes_entities` table and handle unique constraint violation in repository layer ([#6014](https://github.com/lablup/backend.ai/issues/6014))
+* Fix mount permission check during session creation ([#6021](https://github.com/lablup/backend.ai/issues/6021))
+* Add missing null check for batch operation result in `ValkeyStatClient.get_image_distro()` ([#6028](https://github.com/lablup/backend.ai/issues/6028))
+* Remove obsolete max slot limit validation from resource calculator ([#6034](https://github.com/lablup/backend.ai/issues/6034))
+* Wrong error code of `mgr fixture populate` command ([#6049](https://github.com/lablup/backend.ai/issues/6049))
+* Add missing `kernel_host` field in `KernelCreationInfo` ([#6050](https://github.com/lablup/backend.ai/issues/6050))
+* Update GQL Agent type `occupied_slots` field resolver ([#6061](https://github.com/lablup/backend.ai/issues/6061))
+* Introduce `BaseConfigSchema` to the webserver to easily manage common parts of all configuration objects ([#6078](https://github.com/lablup/backend.ai/issues/6078))
+* Add missing resolver of GQL Compute session node `resource_opts` field ([#6081](https://github.com/lablup/backend.ai/issues/6081))
+* Improve error handling in the traefik frontend of App Proxy worker ([#6091](https://github.com/lablup/backend.ai/issues/6091))
+* Temporarily revert traefik configuration update delta calculation logic ([#6094](https://github.com/lablup/backend.ai/issues/6094))
+* Fix worker and all related entities removed from database when leaving the AppProxy cluster ([#6095](https://github.com/lablup/backend.ai/issues/6095))
+* Introduce `BaseConfigSchema` to the manager to easily manage common parts of all configuration objects ([#6096](https://github.com/lablup/backend.ai/issues/6096))
+* Introduce `BaseConfigSchema` to the agent to easily manage common parts of all configuration objects ([#6097](https://github.com/lablup/backend.ai/issues/6097))
+* Introduce `BaseConfigSchema` to the storage-proxy to easily manage common parts of all configuration objects ([#6098](https://github.com/lablup/backend.ai/issues/6098))
+* Restore the wildcard subscription functionality of the session events ([#6111](https://github.com/lablup/backend.ai/issues/6111))
+* Handle scaling group deletion errors by logging details and raising proper exceptions ([#6122](https://github.com/lablup/backend.ai/issues/6122))
+* Change the installation path to the current location for the installer to operate in development mode. ([#6127](https://github.com/lablup/backend.ai/issues/6127))
+* Add Harbor registry creation argument validation ([#6128](https://github.com/lablup/backend.ai/issues/6128))
+
+### External Dependency Updates
+* Added Rover CLI installation to install-dev script for supergraph generation in dev environment ([#5664](https://github.com/lablup/backend.ai/issues/5664))
+* Build missing agent watcher wheel ([#6115](https://github.com/lablup/backend.ai/issues/6115))
+
+
 ## 25.14.5 (2025-09-22)
 
 ### Features

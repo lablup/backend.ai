@@ -6,10 +6,14 @@
 #
 # Generated automatically from the StorageProxyUnifiedConfig schema.
 
+# Deprecated, use `artifact_storages` instead.
+#
 # List of object storage configurations.
 # Each configuration defines how to connect to and use an object storage
 # service.
 storages = []
+# Deprecated, use `artifact_registries` instead.
+#
 # List of artifact registry configurations.
 # Each configuration defines how to connect to and use an artifact registry
 # service.
@@ -209,3 +213,13 @@ registries = []
   # Optional if etcd doesn't require authentication.
   # Can be a direct password or environment variable reference.
   ## password = "develove"
+
+# Dictionary of artifact storage configurations keyed by name.
+# Each configuration defines how to connect to and use an artifact storage
+# service.
+[artifact-storages]
+
+# Dictionary of artifact registry configurations keyed by name.
+# Each configuration defines how to connect to and use an artifact registry
+# service.
+[artifact-registries]
