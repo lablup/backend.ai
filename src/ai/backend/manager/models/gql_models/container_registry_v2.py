@@ -12,6 +12,8 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ..container_registry import (
     ContainerRegistryRow,
+    ContainerRegistryValidator,
+    ContainerRegistryValidatorArgs,
 )
 from ..gql_relay import AsyncNode
 from ..user import UserRole
@@ -69,6 +71,15 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
         props: CreateContainerRegistryNodeInputV2,
     ) -> CreateContainerRegistryNodeV2:
         ctx: GraphQueryContext = info.context
+        validator = ContainerRegistryValidator(
+            ContainerRegistryValidatorArgs(
+                url=props.url,
+                type=props.type,
+                project=props.project,
+            )
+        )
+
+        validator.validate()
 
         input_config: dict[str, Any] = {
             "registry_name": props.registry_name,
