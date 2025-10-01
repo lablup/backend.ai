@@ -19,10 +19,6 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.exception import UnknownImageRegistry
 from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.errors.container_registry import (
-    InvalidContainerRegistryProject,
-    InvalidContainerRegistryURL,
-)
 
 from ..defs import PASSWORD_PLACEHOLDER
 from .base import (
@@ -86,21 +82,19 @@ class ContainerRegistryValidator:
         """
         # Validate URL format
         if not self._is_valid_url(self._url):
-            raise InvalidContainerRegistryURL(f"Invalid URL format: {self._url}")
+            raise RuntimeError(f"Invalid URL format: {self._url}")
 
         # Validate project name for Harbor
         if self._type is not None:
             match self._type:
                 case ContainerRegistryType.HARBOR | ContainerRegistryType.HARBOR2:
                     if self._project is None:
-                        raise InvalidContainerRegistryProject(
-                            "Project name is required for Harbor."
-                        )
+                        raise RuntimeError("Project name is required for Harbor.")
                     if not (1 <= len(self._project) <= 255):
-                        raise InvalidContainerRegistryProject("Invalid project name length.")
+                        raise RuntimeError("Invalid project name length.")
                     pattern = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
                     if not pattern.match(self._project):
-                        raise InvalidContainerRegistryProject("Invalid project name format.")
+                        raise RuntimeError("Invalid project name format.")
                 case _:
                     pass
 
