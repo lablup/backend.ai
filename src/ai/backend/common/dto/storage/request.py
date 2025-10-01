@@ -117,6 +117,41 @@ class HuggingFaceScanModelsReq(BaseRequestModel):
     )
 
 
+class HuggingFaceScanModelsSyncReq(BaseRequestModel):
+    """Request for scanning HuggingFace models."""
+
+    registry_name: str = Field(
+        description="""
+        Name of the HuggingFace registry to scan.
+        This should match the configured registry name in the system.
+        """,
+        examples=["huggingface", "my-huggingface-registry"],
+    )
+    limit: int = Field(
+        ge=1,
+        description="""
+        Maximum number of models to retrieve.
+        Controls the number of models returned in a single request.
+        """,
+        examples=[10, 50, 100],
+    )
+    order: ModelSortKey = Field(
+        description="""
+        Sort criteria for ordering the results.
+        Available options: 'downloads', 'likes', 'created', 'modified'.
+        """,
+        examples=["downloads", "likes", "created", "modified"],
+    )
+    search: Optional[str] = Field(
+        default=None,
+        description="""
+        Search query to filter models by name, description, or tags.
+        Leave empty to retrieve all models without filtering.
+        """,
+        examples=[None, "GPT", "microsoft", "text-generation"],
+    )
+
+
 class HuggingFaceRetrieveModelsReq(BaseRequestModel):
     """Request for retrieve HuggingFace models."""
 

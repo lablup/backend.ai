@@ -27,11 +27,13 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
     ArtifactOrderField,
+    ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionOrderField,
     ArtifactStatus,
     ArtifactType,
 )
+from ai.backend.manager.data.artifact.types import DelegateeTarget as DelegateeTargetData
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
 from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.artifact import ArtifactScanLimitExceededError
@@ -43,6 +45,7 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactStatusFilter,
     ArtifactStatusFilterType,
 )
+from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.delete_multi import DeleteArtifactsAction
 from ai.backend.manager.services.artifact.actions.get import GetArtifactAction
 from ai.backend.manager.services.artifact.actions.list import ListArtifactsAction
@@ -186,6 +189,12 @@ class ImportArtifactsInput:
 class DelegateeTarget:
     delegatee_reservoir_id: ID
     target_registry_id: ID
+
+    def to_dataclass(self) -> DelegateeTargetData:
+        return DelegateeTargetData(
+            delegatee_reservoir_id=uuid.UUID(self.delegatee_reservoir_id),
+            target_registry_id=uuid.UUID(self.target_registry_id),
+        )
 
 
 @strawberry.input(
@@ -355,6 +364,7 @@ class Artifact(Node):
 class ArtifactRevision(Node):
     id: NodeID[str]
     status: ArtifactStatus
+    remote_status: Optional[ArtifactRemoteStatus] = strawberry.field(description="Added in 25.15.0")
     version: str
     readme: Optional[str]
     size: Optional[ByteSize]
@@ -366,6 +376,7 @@ class ArtifactRevision(Node):
         return cls(
             id=ID(str(data.id)),
             status=ArtifactStatus(data.status),
+            remote_status=ArtifactRemoteStatus(data.remote_status) if data.remote_status else None,
             readme=data.readme,
             version=data.version,
             size=ByteSize(data.size) if data.size is not None else None,
@@ -949,7 +960,36 @@ async def import_artifacts(
 async def delegate_scan_artifacts(
     input: DelegateScanArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DelegateScanArtifactsPayload:
-    raise NotImplementedAPI("This mutation is not implemented yet.")
+    if input.limit > ARTIFACT_MAX_SCAN_LIMIT:
+        raise ArtifactScanLimitExceededError(f"Limit cannot exceed {ARTIFACT_MAX_SCAN_LIMIT}")
+
+    delegator_reservoir_id = (
+        uuid.UUID(input.delegator_reservoir_id) if input.delegator_reservoir_id else None
+    )
+
+    action_result = await info.context.processors.artifact.delegate_scan.wait_for_complete(
+        DelegateScanArtifactsAction(
+            delegator_reservoir_id=delegator_reservoir_id,
+            delegatee_target=input.delegatee_target.to_dataclass()
+            if input.delegatee_target
+            else None,
+            artifact_type=input.artifact_type,
+            limit=input.limit,
+            order=ModelSortKey.DOWNLOADS,
+            search=input.search,
+        )
+    )
+
+    registry_meta_loader = DataLoader(
+        apartial(ArtifactRegistryMeta.load_by_id, info.context),
+    )
+
+    artifacts = []
+    for item in action_result.result:
+        registry_data = await registry_meta_loader.load(item.registry_id)
+        source_registry_data = await registry_meta_loader.load(item.source_registry_id)
+        artifacts.append(Artifact.from_dataclass(item, registry_data.url, source_registry_data.url))
+    return DelegateScanArtifactsPayload(artifacts=artifacts)
 
 
 @strawberry.mutation(

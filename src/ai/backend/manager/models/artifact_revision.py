@@ -9,6 +9,7 @@ from sqlalchemy.orm import foreign, relationship
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
+    ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactStatus,
 )
@@ -50,6 +51,9 @@ class ArtifactRevisionRow(Base):
 
     # It's unnatural to include "status" in the revision, but let's put it here for now instead of creating separate table.
     status = sa.Column(sa.String, index=True, nullable=False, default=ArtifactStatus.SCANNED.value)
+    remote_status = sa.Column(
+        sa.String, index=True, nullable=True, default=None, server_default=sa.null()
+    )
 
     created_at = sa.Column(
         "created_at",
@@ -101,6 +105,7 @@ class ArtifactRevisionRow(Base):
             readme=self.readme,
             size=self.size,
             status=ArtifactStatus(self.status),
+            remote_status=ArtifactRemoteStatus(self.remote_status) if self.remote_status else None,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )
