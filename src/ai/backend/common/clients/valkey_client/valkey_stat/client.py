@@ -1434,7 +1434,7 @@ class ValkeyStatClient:
         and keypair concurrencies for the given access keys.
         """
 
-        # There is no batch `scan`` operation, so we need to get all keys first
+        # There is no batch `scan` operation, so we need to get all keys first
         pattern = "resource_preset:check:*"
         resource_preset_keys = await self._keys(pattern)
 

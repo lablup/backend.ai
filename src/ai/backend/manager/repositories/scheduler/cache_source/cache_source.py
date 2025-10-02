@@ -93,4 +93,4 @@ class ScheduleCacheSource:
         try:
             await self._valkey_stat.invalidate_kernel_related_cache(access_keys)
         except Exception as e:
-            log.warning("Failed to invalidate kernel related cache: {}", e)
+            log.warning("Failed to invalidate kernel-related cache: {}", e)
