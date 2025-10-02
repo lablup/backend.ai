@@ -65,10 +65,8 @@ class ScheduleSessionsHandler(SchedulerHandler):
         affected_keys: set[AccessKey] = {
             session.access_key for session in result.scheduled_sessions
         }
-        await self._repository.invalidate_keypair_concurrency_cache(list(affected_keys))
-        await self._repository.invalidate_total_resource_slots_cache()
-        await self._repository.invalidate_resource_presets_cache()
-        log.debug("Invalidated concurrency cache for {} access keys", len(affected_keys))
+        await self._repository.invalidate_kernel_related_cache(list(affected_keys))
+        log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))
 
         # Broadcast batch event for scheduled sessions
         events: list[AbstractBroadcastEvent] = [

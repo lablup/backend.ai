@@ -61,19 +61,6 @@ class ScheduleCacheSource:
             sftp_concurrency=sftp_concurrency,
         )
 
-    async def invalidate_keypair_concurrencies(self, access_keys: list[AccessKey]) -> None:
-        """
-        Invalidate cache for multiple access keys by deleting their entries.
-        Removes both regular and SFTP concurrency values.
-
-        :param access_keys: List of access keys to invalidate cache for
-        """
-        if not access_keys:
-            return
-
-        # Convert AccessKey objects to strings and delete
-        await self._valkey_stat.delete_keypair_concurrencies([str(ak) for ak in access_keys])
-
     async def get_total_resource_slots(self) -> Optional[TotalResourceData]:
         """
         Get total resource slots data from cache.
@@ -99,22 +86,11 @@ class ScheduleCacheSource:
             log.warning("Failed to set total resource slots in cache: {}", e)
             raise
 
-    async def invalidate_total_resource_slots(self) -> None:
+    async def invalidate_kernel_related_cache(self, access_keys: list[AccessKey]) -> None:
         """
-        Invalidate (delete) the total resource slots cache.
-        Called when kernel states change that affect resource calculations.
-        """
-        try:
-            await self._valkey_stat.invalidate_total_resource_slots()
-        except Exception as e:
-            log.warning("Failed to invalidate total resource slots cache: {}", e)
-
-    async def invalidate_resource_presets(self) -> None:
-        """
-        Invalidate the check presets cache.
-        Should be called when kernel states change that affect resource calculations.
+        Invalidate caches related to kernel state changes affecting resource calculations.
         """
         try:
-            await self._valkey_stat.invalidate_resource_presets()
+            await self._valkey_stat.invalidate_kernel_related_cache(access_keys)
         except Exception as e:
-            log.warning("Failed to invalidate check presets cache: {}", e)
+            log.warning("Failed to invalidate kernel related cache: {}", e)
