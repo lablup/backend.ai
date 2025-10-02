@@ -372,7 +372,10 @@ class VFolderService:
                 result = await conn.execute(query)
 
                 # Here we grant creator the permission to alter VFolder contents
-                if group_type == ProjectType.MODEL_STORE:
+                if (
+                    group_type == ProjectType.MODEL_STORE
+                    and ownership_type == VFolderOwnershipType.USER
+                ):
                     query = sa.insert(VFolderPermissionRow).values({
                         "user": user_uuid,
                         "vfolder": vfid.folder_id.hex,
