@@ -1,5 +1,4 @@
 import asyncio
-import enum
 import functools
 import uuid
 from collections.abc import Iterable
