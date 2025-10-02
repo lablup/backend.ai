@@ -454,20 +454,18 @@ class ModifyContainerRegistryNode(graphene.Mutation):
             if reg_row is None:
                 raise ValueError(f"ContainerRegistry not found (id: {reg_id})")
 
+            for field, val in input_config.items():
+                setattr(reg_row, field, val)
+
             validator = ContainerRegistryValidator(
                 ContainerRegistryValidatorArgs(
-                    type=cast(
-                        Optional[ContainerRegistryType],
-                        type if type is not Undefined else reg_row.type,
-                    ),
-                    url=cast(Optional[str], url if url is not Undefined else None),
-                    project=cast(Optional[str], project if project is not Undefined else None),
+                    type=reg_row.type,
+                    project=reg_row.project,
+                    url=reg_row.url,
                 )
             )
 
             validator.validate()
-            for field, val in input_config.items():
-                setattr(reg_row, field, val)
 
             return cls(container_registry=ContainerRegistryNode.from_row(ctx, reg_row))
 

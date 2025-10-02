@@ -181,20 +181,20 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):
                 stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
                 reg_row = await session.scalar(stmt)
 
-                validator = ContainerRegistryValidator(
-                    ContainerRegistryValidatorArgs(
-                        type=props.type if props.type is not Undefined else reg_row.type,
-                        url=props.url if props.url is not Undefined else None,
-                        project=props.project if props.project is not Undefined else None,
-                    )
-                )
-
-                validator.validate()
-
                 if reg_row is None:
                     raise ValueError(f"ContainerRegistry not found (id: {reg_id})")
                 for field, val in input_config.items():
                     setattr(reg_row, field, val)
+
+                validator = ContainerRegistryValidator(
+                    ContainerRegistryValidatorArgs(
+                        type=reg_row.type,
+                        project=reg_row.project,
+                        url=reg_row.url,
+                    )
+                )
+
+                validator.validate()
 
             if props.allowed_groups:
                 await handle_allowed_groups_update(ctx.db, reg_row.id, props.allowed_groups)
