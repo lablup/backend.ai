@@ -1,18 +1,26 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Optional
 
 import aiohttp
 
 from ai.backend.common.clients.http_client import ClientKey, ClientPool, tcp_client_session_factory
+from ai.backend.logging import BraceStyleAdapter
 
-from .schema import CreateShareParams, Objective, Share
+from .errors import (
+    HammerspaceAuthenticationError,
+)
+from .schema import CreateShareParams, Objective, Share, StorageVolume
 from .types import ConnectionInfo
 
 DOMAIN_FOR_SESSION = "hammerspace"
 
-SINGLETON_OBJECTIVE_NAME = "single-volume-objective"
+SINGLETON_OBJECTIVE_NAME = "bai-single-volume-objective"
+
+
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class HammerspaceAPIClient:
@@ -36,7 +44,15 @@ class HammerspaceAPIClient:
                 "password": self._connection_info.password,
             },
         ) as resp:
-            resp.raise_for_status()
+            try:
+                resp.raise_for_status()
+            except aiohttp.ClientResponseError as e:
+                if resp.status // 100 == 4:
+                    err_msg = repr(e)
+                    raise HammerspaceAuthenticationError(
+                        f"Hammerspace authentication failed. err: {err_msg}"
+                    ) from e
+                raise
         return session
 
     async def create_share(
@@ -85,9 +101,24 @@ class HammerspaceAPIClient:
                     return obj
             return None
 
+    async def get_storage_volume(self, mount_path: Path) -> Optional[StorageVolume]:
+        name = str(mount_path)
+        session = await self._create_login_session()
+        query = {"spec": f"name=eq={name}"}
+        async with session.get(
+            f"{self._connection_info.address}/storage-volumes", params=query
+        ) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+            volumes = [StorageVolume.model_validate(vol) for vol in data]
+            for vol in volumes:
+                if vol.name == name:
+                    return vol
+            return None
+
     async def create_singleton_objective(
         self,
-        mount_path: Path,
+        volume_to_include: StorageVolume,
     ) -> Objective:
         session = await self._create_login_session()
         body = {
@@ -95,7 +126,14 @@ class HammerspaceAPIClient:
             "placementObjective": {
                 "placeOnLocations": [
                     {
-                        "placeOn": [str(mount_path)],
+                        "placeOn": [
+                            {
+                                "_type": "StorageVolumeLocationView",
+                                "storageVolume": {
+                                    "uuid": volume_to_include.uoid.uuid,
+                                },
+                            }
+                        ],
                     }
                 ],
             },
@@ -111,7 +149,7 @@ class HammerspaceAPIClient:
 
     async def set_objective_to_share(
         self,
-        share_id: str,
+        share: Share,
         objective: Objective,
     ) -> None:
         session = await self._create_login_session()
@@ -119,7 +157,7 @@ class HammerspaceAPIClient:
             "objective-identifier": objective.uoid.uuid,
         }
         async with session.put(
-            f"{self._connection_info.address}/shares/{share_id}/objective-set",
+            f"{self._connection_info.address}/shares/{share.uoid.uuid}/objective-set",
             json=body,
         ) as resp:
             resp.raise_for_status()

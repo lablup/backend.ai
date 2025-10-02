@@ -63,6 +63,52 @@ class PlacementObjective(BaseModel):
     capacityOptimize: bool
 
 
+class Capacity(BaseModel):
+    total: int
+    used: int
+    free: int
+
+
+class IPAddress(BaseModel):
+    address: str
+    prefixLength: int
+
+
+class QualifiedAddress(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: UOID
+    ip: IPAddress
+    port: int
+    netId: str
+    nodeNum: int
+    stripeClass: int
+    failoverClass: int
+
+
+class LogicalVolume(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    uoid: UOID
+    name: str
+    serviceState: str
+    addresses: list[QualifiedAddress]
+    exportPath: str
+    aliases: list[str]
+    fsType: str
+    capacity: Capacity
+
+
+class StorageVolume(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    uoid: UOID
+    name: str
+    logicalVolume: LogicalVolume
+    storageVolumeState: str
+    uri: str
+
+
 class Objective(BaseModel):
     model_config = ConfigDict(extra="allow")
 
