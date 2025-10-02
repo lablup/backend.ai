@@ -502,8 +502,10 @@ class ComputeSessionNode(graphene.ObjectType):
     async def resolve_resource_opts(self, info: graphene.ResolveInfo) -> dict[str, Any]:
         ctx: GraphQueryContext = info.context
         loader = ctx.dataloader_manager.get_loader(ctx, "KernelNode.by_session_id")
-        kernels: list[list[KernelNode]] = await loader.load(self.row_id)
-        kernel_nodes = ConnectionResolverResult(kernels, None, None, None, total_count=len(kernels))
+        kernels = await loader.load(self.row_id)
+        kernel_nodes = ConnectionResolverResult[KernelConnection](
+            kernels, None, None, None, total_count=len(kernels)
+        )
         return {kernel.cluster_hostname: kernel.resource_opts for kernel in kernel_nodes.node_list}
 
     async def resolve_dependees(
