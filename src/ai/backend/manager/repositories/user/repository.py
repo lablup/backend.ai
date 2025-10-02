@@ -291,7 +291,7 @@ class UserRepository:
                 group_insert_query = sa.insert(association_groups_users).values(group_data)
                 await db_session.execute(group_insert_query)
             else:
-                log.debug(
+                log.warning(
                     "No valid groups found to add user {0} in domain {1}", user_uuid, domain_name
                 )
 
