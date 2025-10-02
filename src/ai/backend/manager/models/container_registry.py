@@ -51,7 +51,7 @@ __all__: Sequence[str] = (
 @dataclass
 class ContainerRegistryValidatorArgs:
     url: str
-    type: Optional[ContainerRegistryType]
+    type: ContainerRegistryType
     project: Optional[str]
 
 
@@ -62,7 +62,7 @@ class ContainerRegistryValidator:
     """
 
     _url: str
-    _type: Optional[ContainerRegistryType]
+    _type: ContainerRegistryType
     _project: Optional[str]
 
     def __init__(self, args: ContainerRegistryValidatorArgs) -> None:
@@ -89,20 +89,17 @@ class ContainerRegistryValidator:
             raise InvalidContainerRegistryURL(f"Invalid URL format: {self._url}")
 
         # Validate project name for Harbor
-        if self._type is not None:
-            match self._type:
-                case ContainerRegistryType.HARBOR | ContainerRegistryType.HARBOR2:
-                    if self._project is None:
-                        raise InvalidContainerRegistryProject(
-                            "Project name is required for Harbor."
-                        )
-                    if not (1 <= len(self._project) <= 255):
-                        raise InvalidContainerRegistryProject("Invalid project name length.")
-                    pattern = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
-                    if not pattern.match(self._project):
-                        raise InvalidContainerRegistryProject("Invalid project name format.")
-                case _:
-                    pass
+        match self._type:
+            case ContainerRegistryType.HARBOR | ContainerRegistryType.HARBOR2:
+                if self._project is None:
+                    raise InvalidContainerRegistryProject("Project name is required for Harbor.")
+                if not (1 <= len(self._project) <= 255):
+                    raise InvalidContainerRegistryProject("Invalid project name length.")
+                pattern = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
+                if not pattern.match(self._project):
+                    raise InvalidContainerRegistryProject("Invalid project name format.")
+            case _:
+                pass
 
 
 class ContainerRegistryRow(Base):

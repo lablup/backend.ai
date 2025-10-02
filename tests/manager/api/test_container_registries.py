@@ -203,7 +203,9 @@ class TestContainerRegistryValidator:
         ]
 
         for url in valid_urls:
-            args = ContainerRegistryValidatorArgs(url=url, type=None, project=None)
+            args = ContainerRegistryValidatorArgs(
+                url=url, type=ContainerRegistryType.DOCKER, project=None
+            )
             validator = ContainerRegistryValidator(args)
             # Should not raise any exception
             validator.validate()
@@ -220,7 +222,9 @@ class TestContainerRegistryValidator:
         ]
 
         for url in invalid_urls:
-            args = ContainerRegistryValidatorArgs(url=url, type=None, project=None)
+            args = ContainerRegistryValidatorArgs(
+                url=url, type=ContainerRegistryType.DOCKER, project=None
+            )
             validator = ContainerRegistryValidator(args)
             with pytest.raises(InvalidContainerRegistryURL, match=f"Invalid URL format: {url}"):
                 validator.validate()
