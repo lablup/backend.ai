@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Mapping, Optional, cast
@@ -12,6 +13,7 @@ from sqlalchemy.orm import joinedload, load_only, noload
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.utils import nmget
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
@@ -42,6 +44,8 @@ from ..permission_controller.role_manager import RoleManager
 
 # Layer-specific decorator for user repository
 repository_decorator = create_layer_aware_repository_decorator(LayerType.USER)
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class UserRepository:
@@ -286,6 +290,12 @@ class UserRepository:
                 group_data = [{"user_id": user_uuid, "group_id": grp.id} for grp in grps]
                 group_insert_query = sa.insert(association_groups_users).values(group_data)
                 await db_session.execute(group_insert_query)
+            else:
+                log.warning(
+                    "No valid groups found to add user {0} in domain {1}", user_uuid, domain_name
+                )
+        else:
+            log.info("Adding new user {0} with no groups in domain {1}", user_uuid, domain_name)
 
     async def _validate_and_update_main_access_key(
         self, conn, email: str, main_access_key: str
