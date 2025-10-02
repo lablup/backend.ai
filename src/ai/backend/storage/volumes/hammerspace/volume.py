@@ -11,6 +11,7 @@ from typing import (
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.events.event_types.volume.broadcast import DoVolumeMountEvent
 from ai.backend.common.types import QuotaConfig, QuotaScopeID
 from ai.backend.storage.watcher import WatcherClient
 
@@ -27,14 +28,24 @@ from .errors import (
     HammerspaceConfigError,
 )
 from .request import CreateShareParams, GetShareParams
-from .types import ConnectionInfo, SSLConfig
+from .schema.share import Share
+from .types import APIConnectionInfo, SSLConfig
 
 
 class HammerspaceQuotaModelCreator:
     _client: HammerspaceAPIClient
 
-    def __init__(self, connection_info: ConnectionInfo) -> None:
+    def __init__(
+        self,
+        connection_info: APIConnectionInfo,
+        event_producer: EventProducer,
+        mount_source: str,
+        mount_target_path: Path,
+    ) -> None:
         self._client = HammerspaceAPIClient(connection_info)
+        self._event_producer = event_producer
+        self._mount_source = mount_source
+        self._mount_target_path = mount_target_path
 
     async def create_quota_model(self) -> HammerspaceQuotaModel:
         try:
@@ -46,20 +57,36 @@ class HammerspaceQuotaModelCreator:
             ) from e
         return HammerspaceQuotaModel(
             self._client,
+            self._event_producer,
+            self._mount_source,
+            self._mount_target_path,
         )
 
 
 class HammerspaceQuotaModel(BaseQuotaModel):
     _client: HammerspaceAPIClient
+    _event_producer: EventProducer
 
     def __init__(
         self,
         client: HammerspaceAPIClient,
+        event_producer: EventProducer,
+        mount_source: str,
+        mount_target_path: Path,
     ) -> None:
         self._client = client
+        self._event_producer = event_producer
+        self._mount_source = mount_source
+        self._mount_target_path = mount_target_path
 
     def _get_share_name(self, quota_scope_id: QuotaScopeID) -> str:
         return str(quota_scope_id)
+
+    def _get_share_path(self, quota_scope_id: QuotaScopeID) -> Path:
+        return Path("/", quota_scope_id.pathname)
+
+    def _get_mount_source(self, share: Share) -> str:
+        return f"{self._mount_source}:{share.path}"
 
     @override
     async def create_quota_scope(
@@ -69,19 +96,27 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
         name = self._get_share_name(quota_scope_id)
-        qspath = self.mangle_qspath(quota_scope_id)
-        share_size_limit: Optional[int] = None
-        if options is not None:
-            share_size_limit = options.limit_bytes
+        path = self._get_share_path(quota_scope_id)
+        share_size_limit = options.limit_bytes if options is not None else None
 
-        await self._client.create_share(
+        share = await self._client.create_share(
             CreateShareParams(
                 name=name,
-                path=qspath,
+                path=path,
                 share_size_limit=share_size_limit,
                 create_path=True,
                 validate_only=False,
             )
+        )
+        await self._event_producer.broadcast_event(
+            DoVolumeMountEvent(
+                dir_name=str(self._mount_target_path / path),
+                volume_backend_name="hammerspace",
+                fs_location=self._get_mount_source(share),
+                quota_scope_id=quota_scope_id,
+                edit_fstab=True,
+            ),
+            None,
         )
 
     @override
@@ -148,6 +183,11 @@ class HammerspaceVolume(BaseVolume):
         if password is None:
             raise HammerspaceConfigError("Hammerspace volume requires 'password' in options")
 
+        mount_source = self.config.get("mount_source")
+        if mount_source is None:
+            raise HammerspaceConfigError("Hammerspace volume requires 'mount_source' in options")
+        self._mount_source = mount_source
+
         ssl_enabled = self.config.get("ssl_enabled", False)
         raw_ssl_config = self.config.get("ssl_config", None)
         ssl_config: Optional[SSLConfig] = None
@@ -156,7 +196,7 @@ class HammerspaceVolume(BaseVolume):
                 cert_file=raw_ssl_config.get("cert_file"),
                 key_file=raw_ssl_config.get("key_file"),
             )
-        self._connection_info = ConnectionInfo(
+        self._connection_info = APIConnectionInfo(
             address=address,
             username=username,
             password=password,
@@ -166,6 +206,11 @@ class HammerspaceVolume(BaseVolume):
 
     @override
     async def create_quota_model(self) -> AbstractQuotaModel:
-        creator = HammerspaceQuotaModelCreator(self._connection_info)
+        creator = HammerspaceQuotaModelCreator(
+            self._connection_info,
+            self.event_producer,
+            self._mount_source,
+            self.mount_path,
+        )
         quota_model = await creator.create_quota_model()
         return quota_model

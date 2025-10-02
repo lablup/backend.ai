@@ -16,7 +16,7 @@ from .errors import (
 from .request import CreateShareParams, GetShareParams
 from .schema.objective import Objective
 from .schema.share import Share
-from .types import ConnectionInfo
+from .types import APIConnectionInfo
 
 DOMAIN_FOR_HTTP_SESSION = "hammerspace"
 
@@ -29,7 +29,7 @@ log = BraceStyleAdapter(logging.getLogger(__name__))
 class HammerspaceAPIClient:
     def __init__(
         self,
-        connection_info: ConnectionInfo,
+        connection_info: APIConnectionInfo,
     ) -> None:
         custom_session_factory = partial(
             tcp_client_session_factory,

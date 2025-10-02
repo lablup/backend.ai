@@ -11,7 +11,7 @@ class SSLConfig:
 
 
 @dataclass
-class ConnectionInfo:
+class APIConnectionInfo:
     address: URL
     username: str
     password: str
