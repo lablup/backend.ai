@@ -11,7 +11,7 @@ import ssl
 import sys
 import time
 from collections import OrderedDict, defaultdict
-from ipaddress import IPv4Address, IPv6Address, ip_network
+from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
 from typing import (
@@ -42,12 +42,12 @@ from callosum.lower.zeromq import ZeroMQAddress, ZeroMQRPCTransport
 from callosum.ordering import ExitOrderedAsyncScheduler
 from callosum.rpc import Peer, RPCMessage
 from etcd_client import WatchEventType
+from pydantic import ValidationError
 from setproctitle import setproctitle
 from zmq.auth.certs import load_certificate
 
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.resources import scan_gpu_alloc_map
-from ai.backend.agent.stats import StatModes
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
@@ -117,22 +117,18 @@ from .config.unified import (
     AgentUnifiedConfig,
     APIConfig,
     ContainerLogsConfig,
-    ContainerSandboxType,
-    DockerExtraConfig,
     EventLoopType,
     KernelLifecyclesConfig,
-    ScratchType,
 )
 from .exception import ResourceError
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import (
-    AgentBackend,
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
     VolumeInfo,
 )
-from .utils import get_arch_name, get_subnet_ip
+from .utils import get_subnet_ip
 
 if TYPE_CHECKING:
     from .agent import AbstractAgent
@@ -1412,6 +1408,9 @@ def main(
     debug: bool = False,
 ) -> int:
     """Start the agent service as a foreground process."""
+    if debug:
+        log_level = LogLevel.DEBUG
+
     # Determine where to read configuration.
     try:
         raw_cfg, cfg_src_path = config.read_from_file(config_path, "agent")
@@ -1441,85 +1440,35 @@ def main(
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
     try:
-        server_config = AgentUnifiedConfig.model_validate(raw_cfg)
-        if debug:
-            log_level = LogLevel.DEBUG
-        server_config.debug.enabled = log_level == LogLevel.DEBUG
-        if log_level != LogLevel.NOTSET:
-            server_config.logging.level = log_level
-            server_config.logging.pkg_ns["ai.backend"] = log_level
-        if server_config.agent.backend == AgentBackend.KUBERNETES:
-            if server_config.container.scratch_type == "k8s-nfs" and (
-                server_config.container.scratch_nfs_address is None
-                or server_config.container.scratch_nfs_options is None
-            ):
-                raise ValueError(
-                    "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
-                )
-        elif server_config.agent.backend == AgentBackend.DOCKER:
-            DockerExtraConfig.model_validate(raw_cfg.get("container", {}))
+        is_not_invoked_subcommand = cli_ctx.invoked_subcommand is None
+        server_config = AgentUnifiedConfig.model_validate(
+            raw_cfg,
+            context={
+                "debug": debug,
+                "log_level": log_level,
+                "is_not_invoked_subcommand": is_not_invoked_subcommand,
+            },
+        )
 
         if server_config.debug.enabled:
             print("== Agent configuration ==")
             pprint(server_config.model_dump(by_alias=True))
+    except ValidationError as e:
+        print(
+            "ConfigurationError: Agent local config failed validation checks:",
+            file=sys.stderr,
+        )
+        print(e, file=sys.stderr)
+        raise click.Abort()
     except Exception as e:
-        print("ConfigurationError: Validation of agent local config has failed:", file=sys.stderr)
+        print(
+            "ConfigurationError: Parsing agent local config failed for an unknown reason:",
+            file=sys.stderr,
+        )
         print(str(e), file=sys.stderr)
         raise click.Abort()
 
-    # FIXME: Remove this after ARM64 support lands on Jail
-    current_arch = get_arch_name()
-    if (
-        server_config.container.sandbox_type == ContainerSandboxType.JAIL
-        and current_arch != "x86_64"
-    ):
-        print(f"ConfigurationError: Jail sandbox is not supported on architecture {current_arch}")
-        raise click.Abort()
-
-    rpc_host = server_config.agent.rpc_listen_addr.host
-    if isinstance(rpc_host, (IPv4Address, IPv6Address)) and (
-        rpc_host.is_unspecified or rpc_host.is_link_local
-    ):
-        print(
-            "ConfigurationError: "
-            "Cannot use link-local or unspecified IP address as the RPC listening host.",
-            file=sys.stderr,
-        )
-        raise click.Abort()
-
-    if os.getuid() != 0 and server_config.container.stats_type == StatModes.CGROUP:
-        print(
-            "Cannot use cgroup statistics collection mode unless the agent runs as root.",
-            file=sys.stderr,
-        )
-        raise click.Abort()
-
-    if os.getuid() != 0 and server_config.container.scratch_type == ScratchType.HOSTFILE:
-        print(
-            "Cannot use hostfile scratch type unless the agent runs as root.",
-            file=sys.stderr,
-        )
-        raise click.Abort()
-
-    if cli_ctx.invoked_subcommand is None:
-        if server_config.debug.coredump.enabled:
-            if not sys.platform.startswith("linux"):
-                print(
-                    "ConfigurationError: Storing container coredumps is only supported in Linux.",
-                    file=sys.stderr,
-                )
-                raise click.Abort()
-            core_pattern = Path("/proc/sys/kernel/core_pattern").read_text().strip()
-            if core_pattern.startswith("|") or not core_pattern.startswith("/"):
-                print(
-                    "ConfigurationError: "
-                    "/proc/sys/kernel/core_pattern must be an absolute path "
-                    "to enable container coredumps.",
-                    file=sys.stderr,
-                )
-                raise click.Abort()
-            server_config.debug.coredump.set_core_path(Path(core_pattern).parent)
-
+    if is_not_invoked_subcommand:
         server_config.agent.pid_file.write_text(str(os.getpid()))
         image_commit_path = server_config.agent.image_commit_path
         image_commit_path.mkdir(parents=True, exist_ok=True)
@@ -1544,7 +1493,7 @@ def main(
                 log.info("runtime: {0}", utils.env_info())
 
                 log_config = logging.getLogger("ai.backend.agent.config")
-                if log_level == "DEBUG":
+                if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
                 if server_config.agent.event_loop == EventLoopType.UVLOOP:
                     import uvloop
