@@ -546,21 +546,13 @@ class SchedulerRepository:
         # Return the requested value
         return concurrency_data.sftp_count if is_sftp else concurrency_data.regular_count
 
-    async def invalidate_keypair_concurrency_cache(self, access_keys: list[AccessKey]) -> None:
+    async def invalidate_kernel_related_cache(self, access_keys: list[AccessKey]) -> None:
         """
-        Invalidate concurrency cache for multiple access keys.
-        This removes cached values, forcing the next read to fetch from database.
+        Invalidate caches related to kernel state changes affecting resource calculations.
 
-        :param access_keys: List of access keys to invalidate cache for
+        :param access_keys: List of access keys whose related caches should be invalidated
         """
-        await self._cache_source.invalidate_keypair_concurrencies(access_keys)
-
-    async def invalidate_total_resource_slots_cache(self) -> None:
-        """
-        Invalidate the total resource slots cache.
-        Should be called when kernel states change that affect resource calculations.
-        """
-        await self._cache_source.invalidate_total_resource_slots()
+        await self._cache_source.invalidate_kernel_related_cache(access_keys)
 
     async def update_session_network_id(
         self,

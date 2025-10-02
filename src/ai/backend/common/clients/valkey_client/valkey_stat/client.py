@@ -27,7 +27,7 @@ from ai.backend.common.clients.valkey_client.client import (
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.metrics.metric import LayerType
 from ai.backend.common.resource.types import TotalResourceData
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import AccessKey, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -985,28 +985,6 @@ class ValkeyStatClient:
         await self._client.client.exec(batch, raise_on_error=True)
 
     @valkey_decorator()
-    async def delete_keypair_concurrencies(self, access_keys: list[str]) -> None:
-        """
-        Delete concurrency counters for multiple access keys in a batch.
-        Removes both regular and SFTP concurrency values for all provided keys.
-
-        :param access_keys: List of access keys to delete concurrency for.
-        """
-        if not access_keys:
-            return
-
-        # Prepare all keys for deletion
-        keys_to_delete = []
-        for access_key in access_keys:
-            regular_key = self._get_keypair_concurrency_key(access_key, is_private=False)
-            sftp_key = self._get_keypair_concurrency_key(access_key, is_private=True)
-            keys_to_delete.extend([regular_key, sftp_key])
-
-        # Delete all keys in a single operation
-        if keys_to_delete:
-            await self._client.client.delete(cast(list[str | bytes], keys_to_delete))
-
-    @valkey_decorator()
     async def _get_multiple_keys(self, keys: list[str]) -> list[Optional[bytes]]:
         """
         Get multiple keys efficiently using batch operations.
@@ -1412,8 +1390,57 @@ class ValkeyStatClient:
             log.warning("Failed to serialize TotalResourceData to cache: {}", e)
             raise
 
-    async def invalidate_total_resource_slots(self) -> None:
+    def _invalidate_keypair_concurrencies(
+        self, batch: Batch, access_keys: list[AccessKey]
+    ) -> Batch:
+        """
+        Delete concurrency counters for multiple access keys in a batch.
+        Removes both regular and SFTP concurrency values for all provided keys.
+
+        :param access_keys: List of access keys to delete concurrency for.
+        """
+        if not access_keys:
+            return batch
+
+        # Prepare all keys for deletion
+        keys_to_delete = []
+        for access_key in access_keys:
+            regular_key = self._get_keypair_concurrency_key(access_key, is_private=False)
+            sftp_key = self._get_keypair_concurrency_key(access_key, is_private=True)
+            keys_to_delete.extend([regular_key, sftp_key])
+
+        # Delete all keys in a single operation
+        if keys_to_delete:
+            batch.delete(cast(list[str | bytes], keys_to_delete))
+        return batch
+
+    def _invalidate_total_resource_slots(self, batch: Batch) -> Batch:
         """
         Invalidate (delete) the total resource slots cache.
         """
-        await self._client.client.delete([_TOTAL_RESOURCE_SLOTS_KEY])
+        return batch.delete([_TOTAL_RESOURCE_SLOTS_KEY])
+
+    def _invalidate_resource_presets(self, batch: Batch, keys: list[bytes]) -> Batch:
+        """
+        Invalidate (delete) all resource preset check caches.
+        """
+        if keys:
+            return batch.delete(cast(list[str | bytes], keys))
+        return batch
+
+    async def invalidate_kernel_related_cache(self, access_keys: list[AccessKey]) -> None:
+        """
+        Invalidate all kernel-related caches including resource presets, total resource slots,
+        and keypair concurrencies for the given access keys.
+        """
+
+        # There is no batch `scan` operation, so we need to get all keys first
+        pattern = "resource_preset:check:*"
+        resource_preset_keys = await self._keys(pattern)
+
+        batch = self._create_batch()
+        batch = self._invalidate_resource_presets(batch, resource_preset_keys)
+        batch = self._invalidate_total_resource_slots(batch)
+        batch = self._invalidate_keypair_concurrencies(batch, access_keys)
+
+        await self._client.client.exec(batch, raise_on_error=True)
