@@ -1414,6 +1414,7 @@ class AbstractAgent(
             # let the destruction task finish first
             await destruction_task
             del destruction_task
+        await self.stat_ctx.remove_kernel_metric(ev.kernel_id)
         async with self.registry_lock:
             try:
                 kernel_obj = self.kernel_registry.get(ev.kernel_id)
@@ -1546,6 +1547,7 @@ class AbstractAgent(
             )
             raise
 
+        await self.stat_ctx.remove_kernel_metric(kernel_id)
         try:
             await self.clean_kernel(kernel_id, container_id, restarting=False)
         except Exception as e:
