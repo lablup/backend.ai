@@ -67,6 +67,7 @@ class ScheduleSessionsHandler(SchedulerHandler):
         }
         await self._repository.invalidate_keypair_concurrency_cache(list(affected_keys))
         await self._repository.invalidate_total_resource_slots_cache()
+        await self._repository.invalidate_resource_presets_cache()
         log.debug("Invalidated concurrency cache for {} access keys", len(affected_keys))
 
         # Broadcast batch event for scheduled sessions

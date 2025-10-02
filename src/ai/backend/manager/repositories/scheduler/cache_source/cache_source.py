@@ -108,3 +108,13 @@ class ScheduleCacheSource:
             await self._valkey_stat.invalidate_total_resource_slots()
         except Exception as e:
             log.warning("Failed to invalidate total resource slots cache: {}", e)
+
+    async def invalidate_resource_presets(self) -> None:
+        """
+        Invalidate the check presets cache.
+        Should be called when kernel states change that affect resource calculations.
+        """
+        try:
+            await self._valkey_stat.invalidate_resource_presets()
+        except Exception as e:
+            log.warning("Failed to invalidate check presets cache: {}", e)

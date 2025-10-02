@@ -1417,3 +1417,12 @@ class ValkeyStatClient:
         Invalidate (delete) the total resource slots cache.
         """
         await self._client.client.delete([_TOTAL_RESOURCE_SLOTS_KEY])
+
+    async def invalidate_resource_presets(self) -> None:
+        """
+        Invalidate (delete) all resource preset check caches.
+        """
+        pattern = "resource_preset:check:*"
+        keys = await self._keys(pattern)
+        if keys:
+            await self._client.client.delete(cast(list[str | bytes], keys))

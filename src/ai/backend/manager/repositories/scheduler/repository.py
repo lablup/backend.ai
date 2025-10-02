@@ -562,6 +562,13 @@ class SchedulerRepository:
         """
         await self._cache_source.invalidate_total_resource_slots()
 
+    async def invalidate_resource_presets_cache(self) -> None:
+        """
+        Invalidate the check presets cache.
+        Should be called when kernel states change that affect resource calculations.
+        """
+        await self._cache_source.invalidate_resource_presets()
+
     async def update_session_network_id(
         self,
         session_id: SessionId,
