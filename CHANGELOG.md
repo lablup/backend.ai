@@ -16,6 +16,18 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.0 (2025-10-02)
+
+### Fixes
+* Fix an issue where utilization metrics for destroyed kernels were not properly cleared from Prometheus, preventing users from seeing accumulated metrics from kernels that no longer exist ([#6139](https://github.com/lablup/backend.ai/issues/6139))
+* Explicitly load kernel `resource_opts` data in `ComputeSessionNode` using dataloader instead of accessing `self.resource_opts` directly ([#6156](https://github.com/lablup/backend.ai/issues/6156))
+* Validate container registry input in `create`, `update` mutations ([#6160](https://github.com/lablup/backend.ai/issues/6160))
+* Invalidate resource preset cache properly ([#6161](https://github.com/lablup/backend.ai/issues/6161))
+
+### Miscellaneous
+* Add warning log when adding new user with no groups ([#6159](https://github.com/lablup/backend.ai/issues/6159))
+
+
 ## 25.15.0rc1 (2025-10-01)
 
 ### Features
