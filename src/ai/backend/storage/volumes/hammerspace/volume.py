@@ -77,6 +77,8 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         self._client = client
         self._event_producer = event_producer
         self._mount_source = mount_source
+        # `_mount_target_path` is not used becase:
+        # Agents has `mount_path` config which is the base path for all mounts
         self._mount_target_path = mount_target_path
 
     def _get_share_name(self, quota_scope_id: QuotaScopeID) -> str:
@@ -110,7 +112,7 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         )
         await self._event_producer.broadcast_event(
             DoVolumeMountEvent(
-                dir_name=str(self._mount_target_path / path),
+                dir_name=str(path),
                 volume_backend_name="hammerspace",
                 fs_location=self._get_mount_source(share),
                 quota_scope_id=quota_scope_id,
