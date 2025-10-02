@@ -39,6 +39,19 @@ class HammerspaceAuthenticationError(HammerspaceError, web.HTTPUnauthorized):
         )
 
 
+class HammerspaceObjectiveNotFound(HammerspaceError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/hammerspace-objective-not-found"
+    error_title = "Hammerspace has no objective."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class HammerspaceVolumeNotFound(HammerspaceError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/hammerspace-volume-not-found"
     error_title = "Hammerspace has no volume."

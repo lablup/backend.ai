@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
+import uuid
+from functools import partial
 from typing import Optional
 
 import aiohttp
@@ -12,10 +13,12 @@ from ai.backend.logging import BraceStyleAdapter
 from .errors import (
     HammerspaceAuthenticationError,
 )
-from .schema import CreateShareParams, Objective, Share, StorageVolume
+from .request import CreateShareParams
+from .schema.objective import Objective
+from .schema.share import Share
 from .types import ConnectionInfo
 
-DOMAIN_FOR_SESSION = "hammerspace"
+DOMAIN_FOR_HTTP_SESSION = "hammerspace"
 
 SINGLETON_OBJECTIVE_NAME = "bai-single-volume-objective"
 
@@ -28,7 +31,12 @@ class HammerspaceAPIClient:
         self,
         connection_info: ConnectionInfo,
     ) -> None:
-        self._client_pool = ClientPool(tcp_client_session_factory)
+        custom_session_factory = partial(
+            tcp_client_session_factory,
+            cookie_jar=aiohttp.CookieJar(unsafe=True),
+            ssl=connection_info.ssl_enabled,
+        )
+        self._client_pool = ClientPool(custom_session_factory)
         self._connection_info = connection_info
 
     def _create_session(self, key: ClientKey) -> aiohttp.ClientSession:
@@ -36,13 +44,16 @@ class HammerspaceAPIClient:
         return session
 
     async def _create_login_session(self) -> aiohttp.ClientSession:
-        session = self._create_session(ClientKey(self._connection_info.address, DOMAIN_FOR_SESSION))
+        session = self._create_session(
+            ClientKey(str(self._connection_info.address), DOMAIN_FOR_HTTP_SESSION)
+        )
         async with session.post(
-            f"{self._connection_info.address}/login",
-            json={
+            self._connection_info.address / "login",
+            data={
                 "username": self._connection_info.username,
                 "password": self._connection_info.password,
             },
+            ssl=self._connection_info.ssl_enabled,
         ) as resp:
             try:
                 resp.raise_for_status()
@@ -50,7 +61,8 @@ class HammerspaceAPIClient:
                 if resp.status // 100 == 4:
                     err_msg = repr(e)
                     raise HammerspaceAuthenticationError(
-                        f"Hammerspace authentication failed. err: {err_msg}"
+                        "Hammerspace authentication failed. "
+                        f"username: {self._connection_info.username}, err: {err_msg}"
                     ) from e
                 raise
         return session
@@ -61,103 +73,24 @@ class HammerspaceAPIClient:
     ) -> Share:
         session = await self._create_login_session()
         async with session.post(
-            f"{self._connection_info.address}/shares",
+            self._connection_info.address / "shares",
             params=params.query(),
             json=params.body(),
+            ssl=self._connection_info.ssl_enabled,
         ) as resp:
             resp.raise_for_status()
             data = await resp.json()
             share = Share.model_validate(data)
             return share
 
-    async def create_share_with_objective(
-        self,
-        params: CreateShareParams,
-        objective: Objective,
-    ) -> Share:
+    async def get_objective(self, id: uuid.UUID) -> Optional[Objective]:
         session = await self._create_login_session()
-        async with session.post(
-            f"{self._connection_info.address}/shares",
-            params=params.query(),
-            json={
-                **params.body(),
-                "objectives": {"uoid": {"uuid": objective.uoid.uuid, "objectType": "OBJECTIVE"}},
-            },
-        ) as resp:
-            resp.raise_for_status()
-            data = await resp.json()
-            share = Share.model_validate(data)
-            return share
-
-    async def get_singleton_objectives(self) -> Optional[Objective]:
-        session = await self._create_login_session()
-        query = {"spec": f"name=eq={SINGLETON_OBJECTIVE_NAME}"}
-        async with session.get(f"{self._connection_info.address}/objectives", params=query) as resp:
+        query = {"spec": f"uoid.uuid=eq={id}"}
+        async with session.get(self._connection_info.address / "objectives", params=query) as resp:
             resp.raise_for_status()
             data = await resp.json()
             objectives = [Objective.model_validate(obj) for obj in data]
             for obj in objectives:
-                if obj.name == SINGLETON_OBJECTIVE_NAME:
+                if obj.uoid.uuid == id:
                     return obj
             return None
-
-    async def get_storage_volume(self, mount_path: Path) -> Optional[StorageVolume]:
-        name = str(mount_path)
-        session = await self._create_login_session()
-        query = {"spec": f"name=eq={name}"}
-        async with session.get(
-            f"{self._connection_info.address}/storage-volumes", params=query
-        ) as resp:
-            resp.raise_for_status()
-            data = await resp.json()
-            volumes = [StorageVolume.model_validate(vol) for vol in data]
-            for vol in volumes:
-                if vol.name == name:
-                    return vol
-            return None
-
-    async def create_singleton_objective(
-        self,
-        volume_to_include: StorageVolume,
-    ) -> Objective:
-        session = await self._create_login_session()
-        body = {
-            "name": SINGLETON_OBJECTIVE_NAME,
-            "placementObjective": {
-                "placeOnLocations": [
-                    {
-                        "placeOn": [
-                            {
-                                "_type": "StorageVolumeLocationView",
-                                "storageVolume": {
-                                    "uuid": volume_to_include.uoid.uuid,
-                                },
-                            }
-                        ],
-                    }
-                ],
-            },
-        }
-        async with session.post(
-            f"{self._connection_info.address}/objectives",
-            json=body,
-        ) as resp:
-            resp.raise_for_status()
-            data = await resp.json()
-            obj = Objective.model_validate(data)
-            return obj
-
-    async def set_objective_to_share(
-        self,
-        share: Share,
-        objective: Objective,
-    ) -> None:
-        session = await self._create_login_session()
-        body = {
-            "objective-identifier": objective.uoid.uuid,
-        }
-        async with session.put(
-            f"{self._connection_info.address}/shares/{share.uoid.uuid}/objective-set",
-            json=body,
-        ) as resp:
-            resp.raise_for_status()

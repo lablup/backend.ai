@@ -8,6 +8,7 @@ from typing import (
     Optional,
     override,
 )
+from uuid import UUID
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -21,34 +22,29 @@ from ..abc import (
     AbstractQuotaModel,
 )
 from ..vfs import BaseQuotaModel, BaseVolume
-from .client import CreateShareParams, HammerspaceAPIClient
+from .client import HammerspaceAPIClient
 from .errors import (
     HammerspaceConfigError,
-    HammerspaceVolumeNotFound,
+    HammerspaceObjectiveNotFound,
 )
-from .schema import Objective
-from .types import ConnectionInfo
+from .request import CreateShareParams
+from .schema.objective import Objective
+from .types import ConnectionInfo, SSLConfig
 
 
 class HammerspaceQuotaModelCreator:
     _client: HammerspaceAPIClient
 
-    def __init__(self, mount_path: Path, connection_info: ConnectionInfo) -> None:
-        self._mount_path = mount_path
+    def __init__(self, objective_id: UUID, connection_info: ConnectionInfo) -> None:
+        self._objective_id = objective_id
         self._client = HammerspaceAPIClient(connection_info)
 
-        self._objective: Optional[Objective] = None
-
     async def create_quota_model(self) -> HammerspaceQuotaModel:
-        objective = await self._client.get_singleton_objectives()
+        objective = await self._client.get_objective(self._objective_id)
         if objective is None:
-            volume = await self._client.get_storage_volume(self._mount_path)
-            if volume is None:
-                raise HammerspaceVolumeNotFound(
-                    f"No storage volume found for mount path: {self._mount_path}, "
-                    "please create storage volume with the name matching the mount path.",
-                )
-            objective = await self._client.create_singleton_objective(volume)
+            raise HammerspaceObjectiveNotFound(
+                f"No Hammerspace Objective found with ID {self._objective_id}."
+            )
         return HammerspaceQuotaModel(
             objective,
             self._client,
@@ -76,17 +72,13 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         name = str(quota_scope_id)
         qspath = self.mangle_qspath(quota_scope_id)
 
-        share = await self._client.create_share(
+        await self._client.create_share(
             CreateShareParams(
                 name=name,
                 path=str(qspath),
                 create_path=True,
                 validate_only=False,
             )
-        )
-        await self._client.set_objective_to_share(
-            objective=self._objective,
-            share=share,
         )
 
     @override
@@ -128,14 +120,29 @@ class HammerspaceVolume(BaseVolume):
         password = self.config.get("password")
         if password is None:
             raise HammerspaceConfigError("Hammerspace volume requires 'password' in options")
+        objective_id = self.config.get("objective_id")
+        if objective_id is None:
+            raise HammerspaceConfigError("Hammerspace volume requires 'objective_id' in options")
+        self._objective_id = UUID(objective_id)
+
+        ssl_enabled = self.config.get("ssl_enabled", False)
+        raw_ssl_config = self.config.get("ssl_config", None)
+        ssl_config: Optional[SSLConfig] = None
+        if raw_ssl_config is not None:
+            ssl_config = SSLConfig(
+                cert_file=raw_ssl_config.get("cert_file"),
+                key_file=raw_ssl_config.get("key_file"),
+            )
         self._connection_info = ConnectionInfo(
             address=address,
             username=username,
             password=password,
+            ssl_enabled=ssl_enabled,
+            ssl_config=ssl_config,
         )
 
     @override
     async def create_quota_model(self) -> AbstractQuotaModel:
-        creator = HammerspaceQuotaModelCreator(self.mount_path, self._connection_info)
+        creator = HammerspaceQuotaModelCreator(self._objective_id, self._connection_info)
         quota_model = await creator.create_quota_model()
         return quota_model
