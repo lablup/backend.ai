@@ -13,7 +13,7 @@ from ai.backend.logging import BraceStyleAdapter
 from .errors import (
     HammerspaceAuthenticationError,
 )
-from .request import CreateShareParams
+from .request import CreateShareParams, GetShareParams
 from .schema.objective import Objective
 from .schema.share import Share
 from .types import ConnectionInfo
@@ -43,7 +43,7 @@ class HammerspaceAPIClient:
         session = self._client_pool.load_client_session(key)
         return session
 
-    async def _create_login_session(self) -> aiohttp.ClientSession:
+    async def _login(self) -> aiohttp.ClientSession:
         session = self._create_session(
             ClientKey(str(self._connection_info.address), DOMAIN_FOR_HTTP_SESSION)
         )
@@ -67,6 +67,13 @@ class HammerspaceAPIClient:
                 raise
         return session
 
+    async def try_login(self) -> None:
+        await self._login()
+
+    async def _create_login_session(self) -> aiohttp.ClientSession:
+        session = await self._login()
+        return session
+
     async def create_share(
         self,
         params: CreateShareParams,
@@ -82,6 +89,21 @@ class HammerspaceAPIClient:
             data = await resp.json()
             share = Share.model_validate(data)
             return share
+
+    async def get_share(self, params: GetShareParams) -> Optional[Share]:
+        session = await self._create_login_session()
+        async with session.get(
+            self._connection_info.address / "shares",
+            params=params.query(),
+            ssl=self._connection_info.ssl_enabled,
+        ) as resp:
+            resp.raise_for_status()
+            data = await resp.json()
+            shares = [Share.model_validate(share) for share in data]
+            for share in shares:
+                if share.name == params.name:
+                    return share
+            return None
 
     async def get_objective(self, id: uuid.UUID) -> Optional[Objective]:
         session = await self._create_login_session()

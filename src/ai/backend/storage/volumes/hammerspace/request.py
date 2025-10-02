@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Optional
 
 
 @dataclass
 class CreateShareParams:
     name: str
-    path: str
+    path: Path
+    share_size_limit: Optional[int] = None
     create_path: bool = True
     validate_only: bool = False
 
@@ -16,8 +19,19 @@ class CreateShareParams:
             "validate-only": "true" if self.validate_only else "false",
         }
 
-    def body(self) -> dict[str, str]:
-        return {
+    def body(self) -> dict[str, Any]:
+        data: dict[str, Any] = {
             "name": self.name,
-            "path": self.path,
+            "path": str(self.path),
         }
+        if self.share_size_limit is not None:
+            data["share-size-limit"] = self.share_size_limit
+        return data
+
+
+@dataclass
+class GetShareParams:
+    name: str
+
+    def query(self) -> dict[str, str]:
+        return {"spec": f"name=eq={self.name}"}

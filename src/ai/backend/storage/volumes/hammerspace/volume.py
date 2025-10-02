@@ -8,15 +8,14 @@ from typing import (
     Optional,
     override,
 )
-from uuid import UUID
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.types import QuotaScopeID
+from ai.backend.common.types import QuotaConfig, QuotaScopeID
 from ai.backend.storage.watcher import WatcherClient
 
 from ...types import (
-    QuotaConfig,
+    QuotaUsage,
 )
 from ..abc import (
     AbstractQuotaModel,
@@ -24,29 +23,28 @@ from ..abc import (
 from ..vfs import BaseQuotaModel, BaseVolume
 from .client import HammerspaceAPIClient
 from .errors import (
+    HammerspaceAuthenticationError,
     HammerspaceConfigError,
-    HammerspaceObjectiveNotFound,
 )
-from .request import CreateShareParams
-from .schema.objective import Objective
+from .request import CreateShareParams, GetShareParams
 from .types import ConnectionInfo, SSLConfig
 
 
 class HammerspaceQuotaModelCreator:
     _client: HammerspaceAPIClient
 
-    def __init__(self, objective_id: UUID, connection_info: ConnectionInfo) -> None:
-        self._objective_id = objective_id
+    def __init__(self, connection_info: ConnectionInfo) -> None:
         self._client = HammerspaceAPIClient(connection_info)
 
     async def create_quota_model(self) -> HammerspaceQuotaModel:
-        objective = await self._client.get_objective(self._objective_id)
-        if objective is None:
-            raise HammerspaceObjectiveNotFound(
-                f"No Hammerspace Objective found with ID {self._objective_id}."
-            )
+        try:
+            await self._client.try_login()
+        except HammerspaceAuthenticationError as e:
+            raise HammerspaceConfigError(
+                "Failed to authenticate to Hammerspace. "
+                f"Please check your user account. (username: {self._client._connection_info.username})"
+            ) from e
         return HammerspaceQuotaModel(
-            objective,
             self._client,
         )
 
@@ -56,11 +54,12 @@ class HammerspaceQuotaModel(BaseQuotaModel):
 
     def __init__(
         self,
-        objective: Objective,
         client: HammerspaceAPIClient,
     ) -> None:
-        self._objective = objective
         self._client = client
+
+    def _get_share_name(self, quota_scope_id: QuotaScopeID) -> str:
+        return str(quota_scope_id)
 
     @override
     async def create_quota_scope(
@@ -69,17 +68,45 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         options: Optional[QuotaConfig] = None,
         extra_args: Optional[dict[str, Any]] = None,
     ) -> None:
-        name = str(quota_scope_id)
+        name = self._get_share_name(quota_scope_id)
         qspath = self.mangle_qspath(quota_scope_id)
+        share_size_limit: Optional[int] = None
+        if options is not None:
+            share_size_limit = options.limit_bytes
 
         await self._client.create_share(
             CreateShareParams(
                 name=name,
-                path=str(qspath),
+                path=qspath,
+                share_size_limit=share_size_limit,
                 create_path=True,
                 validate_only=False,
             )
         )
+
+    @override
+    async def describe_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+    ) -> Optional[QuotaUsage]:
+        name = self._get_share_name(quota_scope_id)
+        share = await self._client.get_share(GetShareParams(name=name))
+        if share is None:
+            return None
+        return QuotaUsage(
+            used_bytes=share.space.used,
+            limit_bytes=share.space.total,
+        )
+
+    @override
+    async def update_quota_scope(
+        self,
+        quota_scope_id: QuotaScopeID,
+        config: QuotaConfig,
+    ) -> None:
+        # Hammerspace does not support updating shares.
+        # TODO: Raise not implemented error and handle it in Manager
+        pass
 
     @override
     async def delete_quota_scope(
@@ -120,10 +147,6 @@ class HammerspaceVolume(BaseVolume):
         password = self.config.get("password")
         if password is None:
             raise HammerspaceConfigError("Hammerspace volume requires 'password' in options")
-        objective_id = self.config.get("objective_id")
-        if objective_id is None:
-            raise HammerspaceConfigError("Hammerspace volume requires 'objective_id' in options")
-        self._objective_id = UUID(objective_id)
 
         ssl_enabled = self.config.get("ssl_enabled", False)
         raw_ssl_config = self.config.get("ssl_config", None)
@@ -143,6 +166,6 @@ class HammerspaceVolume(BaseVolume):
 
     @override
     async def create_quota_model(self) -> AbstractQuotaModel:
-        creator = HammerspaceQuotaModelCreator(self._objective_id, self._connection_info)
+        creator = HammerspaceQuotaModelCreator(self._connection_info)
         quota_model = await creator.create_quota_model()
         return quota_model

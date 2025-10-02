@@ -41,7 +41,20 @@ class HammerspaceAuthenticationError(HammerspaceError, web.HTTPUnauthorized):
 
 class HammerspaceObjectiveNotFound(HammerspaceError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/hammerspace-objective-not-found"
-    error_title = "Hammerspace has no objective."
+    error_title = "Hammerspace has no such objective."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class HammerspaceShareNotFound(HammerspaceError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/hammerspace-share-not-found"
+    error_title = "Hammerspace has no such share."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -54,7 +67,7 @@ class HammerspaceObjectiveNotFound(HammerspaceError, web.HTTPNotFound):
 
 class HammerspaceVolumeNotFound(HammerspaceError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/hammerspace-volume-not-found"
-    error_title = "Hammerspace has no volume."
+    error_title = "Hammerspace has no such volume."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
