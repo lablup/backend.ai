@@ -16,6 +16,24 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.15 (2025-10-02)
+
+### Features
+* Remove obsolete max slot limit validation during session creation ([#5807](https://github.com/lablup/backend.ai/issues/5807))
+* Prevent the kernel runner (and the user container) being accidentally terminated by user's `pkill -f python` command ([#6085](https://github.com/lablup/backend.ai/issues/6085))
+
+### Fixes
+* Insert model-store vfolder data in `VFolderPermissionRow` only when vfolder ownership type is user ([#2599](https://github.com/lablup/backend.ai/issues/2599))
+* Fix the required state output logic in the openopi reference documentation correctly ([#3460](https://github.com/lablup/backend.ai/issues/3460))
+* Fix Endpoint mutation by querying endpoint records with image objects ([#5907](https://github.com/lablup/backend.ai/issues/5907))
+* Wrong error code of `mgr fixture populate` command ([#6049](https://github.com/lablup/backend.ai/issues/6049))
+* Add Harbor registry creation argument validation ([#6128](https://github.com/lablup/backend.ai/issues/6128))
+* Fix an issue where utilization metrics for destroyed kernels were not properly cleared from Prometheus, preventing users from seeing accumulated metrics from kernels that no longer exist ([#6139](https://github.com/lablup/backend.ai/issues/6139))
+
+### External Dependency Updates
+* Build missing agent watcher wheel ([#6115](https://github.com/lablup/backend.ai/issues/6115))
+
+
 ## 25.6.14 (2025-09-16)
 
 ### Fixes
