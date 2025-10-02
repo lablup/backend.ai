@@ -387,6 +387,24 @@ class StatContext:
             )
         )
 
+    async def remove_kernel_metric(self, kernel_id: KernelId) -> None:
+        log.info("Removing metrics for kernel {}", kernel_id)
+        known_metrics = self.kernel_metrics.get(kernel_id)
+        log.debug("Known metrics for kernel {}: {}", kernel_id, known_metrics)
+        if known_metrics is None:
+            return
+        metric_keys = list(known_metrics.keys())
+        agent_id = self.agent.id
+        session_id, owner_user_id, project_id = self._get_ownership_info_from_kernel(kernel_id)
+        await self._utilization_metric_observer.lazy_remove_container_metric(
+            agent_id=agent_id,
+            kernel_id=kernel_id,
+            session_id=session_id,
+            owner_user_id=owner_user_id,
+            project_id=project_id,
+            keys=metric_keys,
+        )
+
     async def collect_node_stat(self) -> None:
         """
         Collect the per-node, per-device, and per-container statistics.
