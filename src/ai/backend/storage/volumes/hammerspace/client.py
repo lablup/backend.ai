@@ -1,21 +1,24 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from functools import partial
-from typing import Optional
+from typing import Any, Optional
 
 import aiohttp
+from pydantic_core._pydantic_core import ValidationError
 
 from ai.backend.common.clients.http_client import ClientKey, ClientPool, tcp_client_session_factory
 from ai.backend.logging import BraceStyleAdapter
 
 from .errors import (
-    HammerspaceAuthenticationError,
+    AuthenticationError,
+    ShareNotFound,
 )
 from .request import CreateShareParams, GetShareParams
 from .schema.objective import Objective
-from .schema.share import Share
+from .schema.share import Share, SimpleShare
 from .types import APIConnectionInfo
 
 DOMAIN_FOR_HTTP_SESSION = "hammerspace"
@@ -60,7 +63,7 @@ class HammerspaceAPIClient:
             except aiohttp.ClientResponseError as e:
                 if resp.status // 100 == 4:
                     err_msg = repr(e)
-                    raise HammerspaceAuthenticationError(
+                    raise AuthenticationError(
                         "Hammerspace authentication failed. "
                         f"username: {self._connection_info.username}, err: {err_msg}"
                     ) from e
@@ -77,7 +80,9 @@ class HammerspaceAPIClient:
     async def create_share(
         self,
         params: CreateShareParams,
-    ) -> Share:
+        retry: int,
+        wait_sec: int,
+    ) -> SimpleShare:
         session = await self._create_login_session()
         async with session.post(
             self._connection_info.address / "shares",
@@ -86,11 +91,26 @@ class HammerspaceAPIClient:
             ssl=self._connection_info.ssl_enabled,
         ) as resp:
             resp.raise_for_status()
-            data = await resp.json()
-            share = Share.model_validate(data)
-            return share
 
-    async def get_share(self, params: GetShareParams) -> Optional[Share]:
+        while retry > 0:
+            log.debug(
+                "Retrying to get the created share: {}, remaining retries: {}", params.name, retry
+            )
+            raw_shares = await self._get_shares(session, GetShareParams(name=params.name))
+            for raw_share in raw_shares:
+                try:
+                    share = SimpleShare.model_validate(raw_share)
+                    if share.name == params.name:
+                        return share
+                except ValidationError:
+                    continue
+            retry -= 1
+            await asyncio.sleep(wait_sec)  # wait for a moment and try again
+        raise ShareNotFound(f"Failed to get the created share: {params.name}")
+
+    async def _get_shares(
+        self, session: aiohttp.ClientSession, params: GetShareParams
+    ) -> list[dict[str, Any]]:
         session = await self._create_login_session()
         async with session.get(
             self._connection_info.address / "shares",
@@ -99,11 +119,42 @@ class HammerspaceAPIClient:
         ) as resp:
             resp.raise_for_status()
             data = await resp.json()
-            shares = [Share.model_validate(share) for share in data]
-            for share in shares:
+            return data
+
+    async def get_share(
+        self,
+        params: GetShareParams,
+    ) -> Optional[Share]:
+        session = await self._create_login_session()
+        data = await self._get_shares(session, params)
+        for raw_share in data:
+            try:
+                share = Share.model_validate(raw_share)
                 if share.name == params.name:
                     return share
-            return None
+            except ValidationError:
+                continue
+        return None
+
+    async def poll_share(
+        self,
+        params: GetShareParams,
+        retry: int,
+        wait_sec: int,
+    ) -> Optional[Share]:
+        session = await self._create_login_session()
+        while retry > 0:
+            data = await self._get_shares(session, params)
+            for raw_share in data:
+                try:
+                    share = Share.model_validate(raw_share)
+                except ValidationError:
+                    continue
+                if share.name == params.name:
+                    return share
+            retry -= 1
+            await asyncio.sleep(wait_sec)  # wait for a moment and try again
+        return None
 
     async def get_objective(self, id: uuid.UUID) -> Optional[Objective]:
         session = await self._create_login_session()

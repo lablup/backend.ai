@@ -9,6 +9,8 @@ from typing import (
     override,
 )
 
+from yarl import URL
+
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.volume.broadcast import DoVolumeMountEvent
@@ -19,16 +21,18 @@ from ...types import (
     QuotaUsage,
 )
 from ..abc import (
+    CAP_QUOTA,
+    CAP_VFOLDER,
     AbstractQuotaModel,
 )
 from ..vfs import BaseQuotaModel, BaseVolume
 from .client import HammerspaceAPIClient
 from .errors import (
-    HammerspaceAuthenticationError,
-    HammerspaceConfigError,
+    AuthenticationError,
+    ConfigurationError,
 )
 from .request import CreateShareParams, GetShareParams
-from .schema.share import Share
+from .schema.share import Share, SimpleShare
 from .types import APIConnectionInfo, SSLConfig
 
 
@@ -41,17 +45,21 @@ class HammerspaceQuotaModelCreator:
         event_producer: EventProducer,
         mount_source: str,
         mount_target_path: Path,
+        share_query_retry: int,
+        share_query_wait_sec: int,
     ) -> None:
         self._client = HammerspaceAPIClient(connection_info)
         self._event_producer = event_producer
         self._mount_source = mount_source
         self._mount_target_path = mount_target_path
+        self._share_query_retry = share_query_retry
+        self._share_query_wait_sec = share_query_wait_sec
 
     async def create_quota_model(self) -> HammerspaceQuotaModel:
         try:
             await self._client.try_login()
-        except HammerspaceAuthenticationError as e:
-            raise HammerspaceConfigError(
+        except AuthenticationError as e:
+            raise ConfigurationError(
                 "Failed to authenticate to Hammerspace. "
                 f"Please check your user account. (username: {self._client._connection_info.username})"
             ) from e
@@ -60,6 +68,8 @@ class HammerspaceQuotaModelCreator:
             self._event_producer,
             self._mount_source,
             self._mount_target_path,
+            self._share_query_retry,
+            self._share_query_wait_sec,
         )
 
 
@@ -73,6 +83,8 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         event_producer: EventProducer,
         mount_source: str,
         mount_target_path: Path,
+        share_query_retry: int,
+        share_query_wait_sec: int,
     ) -> None:
         self._client = client
         self._event_producer = event_producer
@@ -80,14 +92,23 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         # `_mount_target_path` is not used becase:
         # Agents has `mount_path` config which is the base path for all mounts
         self._mount_target_path = mount_target_path
+        self.mount_path = mount_target_path  # for BaseQuotaModel
+
+        self._share_query_retry = share_query_retry
+        self._share_query_wait_sec = share_query_wait_sec
 
     def _get_share_name(self, quota_scope_id: QuotaScopeID) -> str:
-        return str(quota_scope_id)
+        # Not allowed to name Share with the following characters:
+        # \"/\\[]:|<>+;,?*=
+        return quota_scope_id.pathname
 
     def _get_share_path(self, quota_scope_id: QuotaScopeID) -> Path:
         return Path("/", quota_scope_id.pathname)
 
-    def _get_mount_source(self, share: Share) -> str:
+    def _get_share_relative_path_to_mount(self, quota_scope_id: QuotaScopeID) -> Path:
+        return Path(quota_scope_id.pathname)
+
+    def _get_mount_source(self, share: Share | SimpleShare) -> str:
         return f"{self._mount_source}:{share.path}"
 
     @override
@@ -108,11 +129,14 @@ class HammerspaceQuotaModel(BaseQuotaModel):
                 share_size_limit=share_size_limit,
                 create_path=True,
                 validate_only=False,
-            )
+            ),
+            retry=self._share_query_retry,
+            wait_sec=self._share_query_wait_sec,
         )
+        dir_name = str(self._get_share_relative_path_to_mount(quota_scope_id))
         await self._event_producer.broadcast_event(
             DoVolumeMountEvent(
-                dir_name=str(path),
+                dir_name=dir_name,
                 volume_backend_name="hammerspace",
                 fs_location=self._get_mount_source(share),
                 quota_scope_id=quota_scope_id,
@@ -127,7 +151,9 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         quota_scope_id: QuotaScopeID,
     ) -> Optional[QuotaUsage]:
         name = self._get_share_name(quota_scope_id)
-        share = await self._client.get_share(GetShareParams(name=name))
+        share = await self._client.get_share(
+            GetShareParams(name=name),
+        )
         if share is None:
             return None
         return QuotaUsage(
@@ -177,18 +203,23 @@ class HammerspaceVolume(BaseVolume):
 
         address = self.config.get("address")
         if address is None:
-            raise HammerspaceConfigError("Hammerspace volume requires 'address' in options")
+            raise ConfigurationError("Hammerspace volume requires 'address' in options")
         username = self.config.get("username")
         if username is None:
-            raise HammerspaceConfigError("Hammerspace volume requires 'username' in options")
+            raise ConfigurationError("Hammerspace volume requires 'username' in options")
         password = self.config.get("password")
         if password is None:
-            raise HammerspaceConfigError("Hammerspace volume requires 'password' in options")
+            raise ConfigurationError("Hammerspace volume requires 'password' in options")
 
         mount_source = self.config.get("mount_source")
         if mount_source is None:
-            raise HammerspaceConfigError("Hammerspace volume requires 'mount_source' in options")
+            raise ConfigurationError("Hammerspace volume requires 'mount_source' in options")
         self._mount_source = mount_source
+
+        share_query_retry = self.config.get("share_query_retry", 5)
+        share_query_wait_sec = self.config.get("share_query_wait_sec", 1)
+        self._share_query_retry = int(share_query_retry)
+        self._share_query_wait_sec = int(share_query_wait_sec)
 
         ssl_enabled = self.config.get("ssl_enabled", False)
         raw_ssl_config = self.config.get("ssl_config", None)
@@ -199,7 +230,7 @@ class HammerspaceVolume(BaseVolume):
                 key_file=raw_ssl_config.get("key_file"),
             )
         self._connection_info = APIConnectionInfo(
-            address=address,
+            address=URL(address),
             username=username,
             password=password,
             ssl_enabled=ssl_enabled,
@@ -213,6 +244,12 @@ class HammerspaceVolume(BaseVolume):
             self.event_producer,
             self._mount_source,
             self.mount_path,
+            self._share_query_retry,
+            self._share_query_wait_sec,
         )
         quota_model = await creator.create_quota_model()
         return quota_model
+
+    @override
+    async def get_capabilities(self) -> frozenset[str]:
+        return frozenset([CAP_VFOLDER, CAP_QUOTA])

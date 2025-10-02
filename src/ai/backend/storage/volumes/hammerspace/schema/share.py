@@ -1,8 +1,8 @@
 import enum
 
-from df_entry import DFEntry
 from pydantic import BaseModel, ConfigDict
 
+from .df_entry import DFEntry
 from .objective import SimpleObjective
 from .uoid import UOID
 
@@ -35,6 +35,14 @@ class ShareObjective(BaseModel):
     objective: SimpleObjective
     applicability: str
     removable: bool
+
+
+class SimpleShare(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    uoid: UOID
+    name: str
+    path: str
 
 
 class Share(BaseModel):

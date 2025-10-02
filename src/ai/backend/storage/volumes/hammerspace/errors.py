@@ -13,8 +13,8 @@ class HammerspaceError(BackendAIError):
     """Base error for Hammerspace-related errors."""
 
 
-class HammerspaceConfigError(HammerspaceError):
-    error_type = "https://api.backend.ai/probs/hammerspace-invalid-config"
+class ConfigurationError(HammerspaceError):
+    error_type = "https://api.backend.ai/probs/hammerspace-invalid-configuration"
     error_title = "Hammerspace configuration is invalid."
 
     @classmethod
@@ -26,9 +26,9 @@ class HammerspaceConfigError(HammerspaceError):
         )
 
 
-class HammerspaceAuthenticationError(HammerspaceError, web.HTTPUnauthorized):
+class AuthenticationError(HammerspaceError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/hammerspace-authentication-failure"
-    error_title = "Hammerspace authentication failed."
+    error_title = "Hammerspace API authentication failed."
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -39,7 +39,7 @@ class HammerspaceAuthenticationError(HammerspaceError, web.HTTPUnauthorized):
         )
 
 
-class HammerspaceObjectiveNotFound(HammerspaceError, web.HTTPNotFound):
+class ObjectiveNotFound(HammerspaceError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/hammerspace-objective-not-found"
     error_title = "Hammerspace has no such objective."
 
@@ -52,7 +52,7 @@ class HammerspaceObjectiveNotFound(HammerspaceError, web.HTTPNotFound):
         )
 
 
-class HammerspaceShareNotFound(HammerspaceError, web.HTTPNotFound):
+class ShareNotFound(HammerspaceError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/hammerspace-share-not-found"
     error_title = "Hammerspace has no such share."
 
@@ -65,8 +65,8 @@ class HammerspaceShareNotFound(HammerspaceError, web.HTTPNotFound):
         )
 
 
-class HammerspaceVolumeNotFound(HammerspaceError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/hammerspace-volume-not-found"
+class VolumeNotFound(HammerspaceError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/-volume-not-found"
     error_title = "Hammerspace has no such volume."
 
     @classmethod

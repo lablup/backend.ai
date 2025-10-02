@@ -25,7 +25,7 @@ class CreateShareParams:
             "path": str(self.path),
         }
         if self.share_size_limit is not None:
-            data["share-size-limit"] = self.share_size_limit
+            data["shareSizeLimit"] = self.share_size_limit
         return data
 
 
