@@ -294,6 +294,8 @@ class UserRepository:
                 log.warning(
                     "No valid groups found to add user {0} in domain {1}", user_uuid, domain_name
                 )
+        else:
+            log.info("Adding new user {0} with no groups in domain {1}", user_uuid, domain_name)
 
     async def _validate_and_update_main_access_key(
         self, conn, email: str, main_access_key: str
