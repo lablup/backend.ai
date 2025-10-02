@@ -347,8 +347,8 @@ class CreateContainerRegistryNode(graphene.Mutation):
         ctx: GraphQueryContext = info.context
         validator = ContainerRegistryValidator(
             ContainerRegistryValidatorArgs(
-                url=cast(Optional[str], url if url is not Undefined else None),
-                type=cast(Optional[ContainerRegistryType], type if type is not Undefined else None),
+                url=url,
+                type=type,
                 project=cast(Optional[str], project if project is not Undefined else None),
             )
         )
@@ -456,9 +456,12 @@ class ModifyContainerRegistryNode(graphene.Mutation):
 
             validator = ContainerRegistryValidator(
                 ContainerRegistryValidatorArgs(
-                    type=type if type is not Undefined else reg_row.type,
-                    url=url if url is not Undefined else None,
-                    project=project if project is not Undefined else None,
+                    type=cast(
+                        Optional[ContainerRegistryType],
+                        type if type is not Undefined else reg_row.type,
+                    ),
+                    url=cast(Optional[str], url if url is not Undefined else None),
+                    project=cast(Optional[str], project if project is not Undefined else None),
                 )
             )
 
