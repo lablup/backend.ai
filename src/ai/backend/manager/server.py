@@ -963,7 +963,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             network_plugin_ctx=root_ctx.network_plugin_ctx,
         )
     )
-    # Create deployment controller if Sokovan is enabled
+    # Create deployment controller
     root_ctx.deployment_controller = DeploymentController(
         DeploymentControllerArgs(
             scheduling_controller=root_ctx.scheduling_controller,
