@@ -344,8 +344,8 @@ async def check_worker_lost(
             workers = await Worker.list_workers(sess)
             worker_map = {w.authority: w for w in workers}
 
-        for worker_id_str, prev in msg_data.items():
-            prev = datetime.fromtimestamp(float(prev), tzutc())
+        for worker_id_str, prev_str in msg_data.items():
+            prev = datetime.fromtimestamp(float(prev_str), tzutc())
             if (
                 (now - prev) > timeout
                 and worker_id_str in worker_map

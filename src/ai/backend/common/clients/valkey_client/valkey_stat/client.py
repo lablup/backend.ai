@@ -10,6 +10,7 @@ from typing import (
     Union,
     cast,
 )
+from uuid import UUID
 
 from glide import (
     Batch,
@@ -35,7 +36,7 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resource.types import TotalResourceData
-from ai.backend.common.types import AccessKey, ValkeyTarget
+from ai.backend.common.types import AccessKey, MetricKey, MetricValue, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -1344,8 +1345,10 @@ class ValkeyStatClient:
     @valkey_stat_resilience.apply()
     async def store_inference_metrics(
         self,
-        app_metrics_updates: dict[Any, dict[str, Any]],
-        replica_metrics_updates: dict[tuple[Any, Any], dict[str, Any]],
+        app_metrics_updates: dict[UUID, dict[MetricKey, MetricValue | Mapping[str, Any]]],
+        replica_metrics_updates: dict[
+            tuple[UUID, UUID], dict[MetricKey, MetricValue | Mapping[str, Any]]
+        ],
         cache_lifespan: int = 120,
     ) -> None:
         """
