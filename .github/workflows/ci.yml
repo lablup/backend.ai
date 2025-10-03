@@ -322,7 +322,7 @@ jobs:
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
         cache-lmdb-store: 'true'
     - name: Test
-      timeout-minutes: 15
+      timeout-minutes: 25
       run: |
         # configure redis sentinel cluster hostnames for testing
         grep -q "127.0.0.1 node01" /etc/hosts || echo "127.0.0.1 node01" | sudo tee -a /etc/hosts
