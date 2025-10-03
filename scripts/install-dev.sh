@@ -27,11 +27,11 @@ NC="\033[0m"
 REWRITELN="\033[A\r\033[K"
 
 readlinkf() {
-  $bpython -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
+  scripts/python.sh -c "import os,sys; print(os.path.realpath(os.path.expanduser(sys.argv[1])))" "${1}"
 }
 
 relpath() {
-  $bpython -c "import os.path; print(os.path.relpath('$1','${2:-$PWD}'))"
+  scripts/python.sh -c "import os.path; print(os.path.relpath('$1','${2:-$PWD}'))"
 }
 
 sed_inplace() {
@@ -228,19 +228,29 @@ show_guide() {
   fi
 }
 
+# Prepare sudo command options
+ORIG_USER=${USER:-$(logname)}
 if [[ "$OSTYPE" == "linux-gnu" ]]; then
+  ORIG_HOME=$(getent passwd "$ORIG_USER" | cut -d: -f6)
   if [ $(id -u) = "0" ]; then
     docker_sudo=''
+    sudo=''
   else
-    docker_sudo='sudo -E'
+    docker_sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
+  fi
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+  ORIG_HOME=$(id -P "$ORIG_USER" | cut -d: -f9)
+  if [ $(id -u) = "0" ]; then
+    docker_sudo=''
+    sudo=''
+  else
+    docker_sudo=''  # not required for docker commands (Docker Desktop, OrbStack, etc.)
+    sudo="sudo HOME=${ORIG_HOME} PATH=${ORIG_HOME}/.local/bin:${PATH} -E --"
   fi
 else
-  docker_sudo=''
-fi
-if [ $(id -u) = "0" ]; then
-  sudo=''
-else
-  sudo='sudo -E'
+  echo "Unsupported OSTYPE: $OSTYPE"
+  exit 1
 fi
 
 # Detect distribution
@@ -269,8 +279,7 @@ else
 fi
 
 show_info "Checking the bootstrapper Python version..."
-source scripts/bootstrap-static-python.sh
-$bpython -c 'import sys;print(sys.version_info)'
+scripts/python.sh -c 'import sys; print(sys.version_info)'
 
 ROOT_PATH="$(pwd)"
 if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
@@ -281,8 +290,8 @@ if [ ! -f "${ROOT_PATH}/BUILD_ROOT" ]; then
 fi
 PLUGIN_PATH=$(relpath "${ROOT_PATH}/plugins")
 HALFSTACK_VOLUME_PATH=$(relpath "${ROOT_PATH}/volumes")
-PANTS_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'GLOBAL.pants_version')
-PYTHON_VERSION=$($bpython scripts/tomltool.py -f pants.toml get 'python.interpreter_constraints[0]' | awk -F '==' '{print $2}')
+PANTS_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'GLOBAL.pants_version')
+PYTHON_VERSION=$(scripts/pyscript.sh scripts/tomltool.py -f pants.toml get 'python.interpreter_constraints[0]' | awk -F '==' '{print $2}')
 NODE_VERSION=$(curl -sL https://raw.githubusercontent.com/lablup/backend.ai-webui/main/.nvmrc)
 
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
@@ -564,9 +573,9 @@ check_python() {
 }
 
 bootstrap_pants() {
-  pants_local_exec_root=$($docker_sudo $bpython scripts/check-docker.py --get-preferred-pants-local-exec-root)
+  pants_local_exec_root=$($docker_sudo scripts/pyscript.sh scripts/check-docker.py --get-preferred-pants-local-exec-root)
   mkdir -p "$pants_local_exec_root"
-  $bpython scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
+  scripts/pyscript.sh scripts/tomltool.py -f .pants.rc set 'GLOBAL.local_execution_root_dir' "$pants_local_exec_root"
   set +e
   if command -v pants &> /dev/null ; then
     echo "Pants system command is already installed."
@@ -645,11 +654,8 @@ fi
 # Check prerequisites
 show_info "Checking prerequisites and script dependencies..."
 install_script_deps
-$bpython -m ensurepip --upgrade
-# FIXME: Remove urllib3<2.0 requirement after docker/docker-py#3113 is resolved
-$bpython -m pip --disable-pip-version-check install -q -U 'urllib3<2.0' aiohttp
 if [ $CODESPACES != "true" ] || [ $CODESPACES_ON_CREATE -eq 1 ]; then
-  $docker_sudo $bpython scripts/check-docker.py
+  $docker_sudo scripts/pyscript.sh scripts/check-docker.py
   if [ $? -ne 0 ]; then
     exit 1
   fi
