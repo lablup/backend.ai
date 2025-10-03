@@ -105,9 +105,6 @@ class HammerspaceQuotaModel(BaseQuotaModel):
     def _get_share_path(self, quota_scope_id: QuotaScopeID) -> Path:
         return Path("/", quota_scope_id.pathname)
 
-    def _get_share_relative_path_to_mount(self, quota_scope_id: QuotaScopeID) -> Path:
-        return Path(quota_scope_id.pathname)
-
     def _get_mount_source(self, share: Share | SimpleShare) -> str:
         return f"{self._mount_source}:{share.path}"
 
@@ -133,7 +130,7 @@ class HammerspaceQuotaModel(BaseQuotaModel):
             retry=self._share_query_retry,
             wait_sec=self._share_query_wait_sec,
         )
-        dir_name = str(self._get_share_relative_path_to_mount(quota_scope_id))
+        dir_name = str(self.mangle_qspath(quota_scope_id))
         await self._event_producer.broadcast_event(
             DoVolumeMountEvent(
                 dir_name=dir_name,

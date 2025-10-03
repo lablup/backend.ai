@@ -23,8 +23,6 @@ from .types import APIConnectionInfo
 
 DOMAIN_FOR_HTTP_SESSION = "hammerspace"
 
-SINGLETON_OBJECTIVE_NAME = "bai-single-volume-objective"
-
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
