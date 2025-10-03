@@ -8,7 +8,6 @@ from dataclasses import dataclass
 
 from tenacity import (
     AsyncRetrying,
-    retry_if_exception_type,
     stop_after_attempt,
     wait_exponential,
     wait_fixed,
@@ -36,7 +35,7 @@ class RetryArgs:
     retry_delay: float = 0.1
     backoff_strategy: BackoffStrategy = BackoffStrategy.FIXED
     max_delay: float = 10.0
-    retryable_exceptions: tuple[type[Exception], ...] = (Exception,)
+    non_retryable_exceptions: tuple[type[Exception], ...] = ()
 
 
 class RetryPolicy(Policy):
@@ -46,8 +45,8 @@ class RetryPolicy(Policy):
     Built on top of tenacity library, providing async context manager interface
     for consistent policy composition.
 
-    Only retries exceptions that match the specified retryable exception types.
-    All other exceptions propagate immediately without retry.
+    Retries all exceptions except those specified in non_retryable_exceptions.
+    Non-retryable exceptions (e.g., BackendAIError) propagate immediately without retry.
 
     Supports both fixed delay and exponential backoff strategies.
     """
@@ -56,7 +55,7 @@ class RetryPolicy(Policy):
     _retry_delay: float
     _backoff_strategy: BackoffStrategy
     _max_delay: float
-    _retryable_exceptions: tuple[type[Exception], ...]
+    _non_retryable_exceptions: tuple[type[Exception], ...]
 
     def __init__(self, args: RetryArgs) -> None:
         """
@@ -69,15 +68,15 @@ class RetryPolicy(Policy):
         self._retry_delay = args.retry_delay
         self._backoff_strategy = args.backoff_strategy
         self._max_delay = args.max_delay
-        self._retryable_exceptions = args.retryable_exceptions
+        self._non_retryable_exceptions = args.non_retryable_exceptions
 
     @asynccontextmanager
     async def execute(self) -> AsyncIterator[None]:
         """
         Execute with retry logic using tenacity.
 
-        Automatically retries on retryable exceptions up to max_retries times.
-        Non-retryable exceptions propagate immediately.
+        Automatically retries all exceptions except non-retryable ones.
+        Non-retryable exceptions propagate immediately without retry.
         """
         # Build tenacity retry configuration
         if self._backoff_strategy == BackoffStrategy.EXPONENTIAL:
@@ -90,13 +89,16 @@ class RetryPolicy(Policy):
             wait_strategy = wait_fixed(self._retry_delay)
 
         stop_strategy = stop_after_attempt(self._max_retries)
-        retry_strategy = retry_if_exception_type(self._retryable_exceptions)
+
+        # Retry all exceptions except non-retryable ones
+        def should_retry(exception: BaseException) -> bool:
+            return not isinstance(exception, self._non_retryable_exceptions)
 
         # Use tenacity's AsyncRetrying
         async for attempt in AsyncRetrying(
             wait=wait_strategy,
             stop=stop_strategy,
-            retry=retry_strategy,
+            retry=should_retry,
             reraise=True,
         ):
             with attempt:
