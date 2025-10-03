@@ -16,19 +16,39 @@ from glide.exceptions import TimeoutError as GlideTimeoutError
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
-    create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json, load_json
 from ai.backend.common.message_queue.types import BroadcastPayload
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience import (
+    BackoffStrategy,
+    MetricArgs,
+    MetricPolicy,
+    Resilience,
+    RetryArgs,
+    RetryPolicy,
+)
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Layer-specific decorator for valkey_stream client
-valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_STREAM)
+# Resilience instance for valkey_stream layer
+valkey_stream_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_STREAM)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 _MAX_STREAM_LENGTH = 128
 _DEFAULT_CACHE_EXPIRATION = 300  # 5 minutes
@@ -91,7 +111,7 @@ class ValkeyStreamClient:
         await client.connect()
         return cls(client=client)
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def close(self) -> None:
         """
         Close the ValkeyStreamClient connection.
@@ -102,6 +122,7 @@ class ValkeyStreamClient:
         self._closed = True
         await self._client.disconnect()
 
+    @valkey_stream_resilience.apply()
     async def make_consumer_group(
         self,
         stream_key: str,
@@ -119,7 +140,7 @@ class ValkeyStreamClient:
             stream_key, group_name, "$", StreamGroupOptions(make_stream=True)
         )
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def read_consumer_group(
         self,
         stream_key: str,
@@ -160,7 +181,7 @@ class ValkeyStreamClient:
                 messages.append(StreamMessage.from_list(msg_id, msg_data))
         return messages
 
-    @valkey_decorator(retry_count=3, retry_delay=0.1)
+    @valkey_stream_resilience.apply()
     async def done_stream_message(
         self,
         stream_key: str,
@@ -177,7 +198,7 @@ class ValkeyStreamClient:
         """
         await self._client.client.xack(stream_key, group_name, [message_id])
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def enqueue_stream_message(
         self,
         stream_key: str,
@@ -199,7 +220,7 @@ class ValkeyStreamClient:
             ),
         )
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def reque_stream_message(
         self,
         stream_key: str,
@@ -228,7 +249,7 @@ class ValkeyStreamClient:
         )
         await self._client.client.exec(tx, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def auto_claim_stream_message(
         self,
         stream_key: str,
@@ -270,7 +291,7 @@ class ValkeyStreamClient:
             messages=messages,
         )
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def broadcast(
         self,
         channel: str,
@@ -286,7 +307,7 @@ class ValkeyStreamClient:
         message = dump_json(payload)
         await self._client.client.publish(message=message, channel=channel)
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def broadcast_with_cache(
         self,
         channel: str,
@@ -312,7 +333,7 @@ class ValkeyStreamClient:
         )
         await self._client.client.exec(tx, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def fetch_cached_broadcast_message(
         self,
         cache_id: str,
@@ -329,7 +350,7 @@ class ValkeyStreamClient:
         payload = load_json(result)
         return cast(Mapping[str, str], payload)
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def broadcast_batch(
         self,
         channel: str,
@@ -359,7 +380,7 @@ class ValkeyStreamClient:
             )
         await self._client.client.exec(tx, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_stream_resilience.apply()
     async def receive_broadcast_message(
         self,
     ) -> Mapping[str, str]:
