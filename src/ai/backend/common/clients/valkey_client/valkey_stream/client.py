@@ -44,7 +44,7 @@ valkey_stream_resilience = Resilience(
                 max_retries=3,
                 retry_delay=0.1,
                 backoff_strategy=BackoffStrategy.FIXED,
-                non_retryable_exceptions=(BackendAIError, GlideTimeoutError),
+                non_retryable_exceptions=(BackendAIError,),
             )
         ),
     ]
@@ -122,7 +122,6 @@ class ValkeyStreamClient:
         self._closed = True
         await self._client.disconnect()
 
-    @valkey_stream_resilience.apply()
     async def make_consumer_group(
         self,
         stream_key: str,
