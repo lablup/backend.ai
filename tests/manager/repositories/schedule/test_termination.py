@@ -67,7 +67,10 @@ async def sample_domain_and_policies(
         # Create domain
         domain = DomainRow(
             name="test-termination-domain",
-            total_resource_slots=ResourceSlot({"cpu": Decimal("1000"), "mem": Decimal("1048576")}),
+            total_resource_slots=ResourceSlot({
+                "cpu": Decimal("1000"),
+                "mem": Decimal("1048576"),
+            }),
         )
         db_sess.add(domain)
         data["domain"] = domain
@@ -94,7 +97,10 @@ async def sample_domain_and_policies(
 
         kp_policy = KeyPairResourcePolicyRow(
             name="test-termination-policy",
-            total_resource_slots=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("102400")}),
+            total_resource_slots=ResourceSlot({
+                "cpu": Decimal("100"),
+                "mem": Decimal("102400"),
+            }),
             max_concurrent_sessions=10,
             max_concurrent_sftp_sessions=2,
             max_pending_session_count=5,
@@ -154,8 +160,14 @@ async def sample_scaling_group_and_agent(
             region="test-region",
             scaling_group=sg.name,
             schedulable=True,
-            available_slots=ResourceSlot({"cpu": Decimal("16.0"), "mem": Decimal("32768")}),
-            occupied_slots=ResourceSlot({"cpu": Decimal("4.0"), "mem": Decimal("8192")}),
+            available_slots=ResourceSlot({
+                "cpu": Decimal("16.0"),
+                "mem": Decimal("32768"),
+            }),
+            occupied_slots=ResourceSlot({
+                "cpu": Decimal("4.0"),
+                "mem": Decimal("8192"),
+            }),
             addr="10.0.0.1:2001",
             architecture="x86_64",
             version="24.03.0",
@@ -189,7 +201,10 @@ async def sample_user_and_keypair(
             id=uuid.uuid4(),
             name="test-termination-group",
             domain_name=domain.name,
-            total_resource_slots=ResourceSlot({"cpu": Decimal("500"), "mem": Decimal("524288")}),
+            total_resource_slots=ResourceSlot({
+                "cpu": Decimal("500"),
+                "mem": Decimal("524288"),
+            }),
             resource_policy="test-termination-policy",
         )
         db_sess.add(group)
@@ -292,7 +307,10 @@ async def sample_sessions_for_termination(
                 status=status,
                 status_info="",  # Will be updated when marked for termination
                 cluster_mode=ClusterMode.SINGLE_NODE,
-                requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
+                requested_slots=ResourceSlot({
+                    "cpu": Decimal("2"),
+                    "mem": Decimal("4096"),
+                }),
                 created_at=datetime.now(tzutc()),
                 images=["python:3.8"],
                 vfolder_mounts=[],
@@ -327,8 +345,14 @@ async def sample_sessions_for_termination(
                 container_id=container_id,
                 status=kernel_status,
                 status_changed=datetime.now(tzutc()),
-                occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
-                requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("2"),
+                    "mem": Decimal("4096"),
+                }),
+                requested_slots=ResourceSlot({
+                    "cpu": Decimal("2"),
+                    "mem": Decimal("4096"),
+                }),
                 domain_name=domain.name,
                 group_id=group.id,
                 user_uuid=user.uuid,

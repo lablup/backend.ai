@@ -5,7 +5,14 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+    SlotName,
+)
 from ai.backend.manager.sokovan.scheduler.selectors.roundrobin import RoundRobinAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
@@ -46,7 +53,10 @@ class TestRoundRobinAgentSelector:
     def resource_req(self) -> ResourceRequirements:
         """Create basic resource requirements."""
         return ResourceRequirements(
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                SlotName("cpu"): Decimal("1"),
+                SlotName("mem"): Decimal("2048"),
+            }),
             required_architecture="x86_64",
             kernel_ids=[uuid.uuid4()],
         )
@@ -200,13 +210,25 @@ class TestRoundRobinAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="agent-empty",
-                available_slots={"cpu": Decimal("1"), "mem": Decimal("1024")},
-                occupied_slots={"cpu": Decimal("0.9"), "mem": Decimal("1000")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("1"),
+                    "mem": Decimal("1024"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("0.9"),
+                    "mem": Decimal("1000"),
+                }),
             ),
             create_agent_info(
                 agent_id="agent-full",
-                available_slots={"cpu": Decimal("100"), "mem": Decimal("204800")},
-                occupied_slots={"cpu": Decimal("1"), "mem": Decimal("2048")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("100"),
+                    "mem": Decimal("204800"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("1"),
+                    "mem": Decimal("2048"),
+                }),
             ),
         ]
 

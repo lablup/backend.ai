@@ -32,14 +32,20 @@ class TestDependenciesValidator:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal("1"),
+            }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
         )
         snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
@@ -61,14 +67,20 @@ class TestDependenciesValidator:
         workload = SessionWorkload(
             session_id=session_id,
             access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal("1"),
+            }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
         )
         snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
@@ -100,14 +112,20 @@ class TestDependenciesValidator:
         workload = SessionWorkload(
             session_id=session_id,
             access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal("1"),
+            }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
         )
         snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),
@@ -144,14 +162,20 @@ class TestDependenciesValidator:
         workload = SessionWorkload(
             session_id=session_id,
             access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("1"), mem=Decimal("1")),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal("1"),
+            }),
             user_uuid=uuid.uuid4(),
             group_id=uuid.uuid4(),
             domain_name="default",
             scaling_group="default",
         )
         snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
             ),

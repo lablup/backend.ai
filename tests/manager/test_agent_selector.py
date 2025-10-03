@@ -49,7 +49,10 @@ async def test_agent_selection_strategy_rr() -> None:
     example_homogeneous_pending_sessions = [
         create_mock_session(
             SessionId(uuid4()),
-            requested_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("1024")}),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("2"),
+                "mem": Decimal("1024"),
+            }),
         )
         for _ in range(20)
     ]
@@ -71,7 +74,9 @@ async def test_agent_selection_strategy_rr() -> None:
     )
 
     num_agents = len(example_homogeneous_agents)
-    total_capacity = sum((ag.available_slots for ag in example_homogeneous_agents), ResourceSlot())
+    total_capacity = sum(
+        (ag.available_slots for ag in example_homogeneous_agents), ResourceSlot({})
+    )
     agent_ids = []
     # Repeat the allocation for two iterations
     for _ in range(num_agents * 2):
@@ -99,19 +104,31 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents() -> None:
     agents: Sequence[AgentRow] = [
         create_mock_agent(
             AgentId("i-001"),
-            available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("4096")}),
+            available_slots=ResourceSlot({
+                "cpu": Decimal("8"),
+                "mem": Decimal("4096"),
+            }),
         ),
         create_mock_agent(
             AgentId("i-002"),
-            available_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("2048")}),
+            available_slots=ResourceSlot({
+                "cpu": Decimal("4"),
+                "mem": Decimal("2048"),
+            }),
         ),
         create_mock_agent(
             AgentId("i-003"),
-            available_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("1024")}),
+            available_slots=ResourceSlot({
+                "cpu": Decimal("2"),
+                "mem": Decimal("1024"),
+            }),
         ),
         create_mock_agent(
             AgentId("i-004"),
-            available_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("512")}),
+            available_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal("512"),
+            }),
         ),
     ]
     pending_sessions = [
@@ -143,7 +160,7 @@ async def test_agent_selection_strategy_rr_skip_unacceptable_agents() -> None:
         state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
 
-    total_capacity = sum((ag.available_slots for ag in agents), ResourceSlot())
+    total_capacity = sum((ag.available_slots for ag in agents), ResourceSlot({}))
 
     results: list[tuple[AgentId | None, SessionId]] = []
     scheduled_sessions: list[SessionRow] = []

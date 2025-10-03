@@ -214,14 +214,14 @@ class AbstractAgentSelector(Generic[T_ResourceGroupState], ABC):
     config: Mapping[
         str, Any
     ]  # agent-selector-specific config, Do not use this. this will be removed after refactoring.
-    agent_selection_resource_priority: list[str]
+    agent_selection_resource_priority: Sequence[str | SlotName]
     state_store: AbstractResourceGroupStateStore[T_ResourceGroupState]
 
     def __init__(
         self,
         sgroup_opts: ScalingGroupOpts,
         config: Mapping[str, Any],
-        agent_selection_resource_priority: list[str],
+        agent_selection_resource_priority: Sequence[str | SlotName],
         *,
         state_store: AbstractResourceGroupStateStore[T_ResourceGroupState],
     ) -> None:

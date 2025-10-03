@@ -36,25 +36,41 @@ class TestGroupResourceLimitValidator:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("2"), mem=Decimal("2")),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("2"),
+                "mem": Decimal("2"),
+            }),
             user_uuid=uuid.uuid4(),
             group_id=group_id,
             domain_name="default",
             scaling_group="default",
         )
         snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={},
-                by_group={group_id: ResourceSlot(cpu=Decimal("3"), mem=Decimal("3"))},
+                by_group={
+                    group_id: ResourceSlot({
+                        "cpu": Decimal("3"),
+                        "mem": Decimal("3"),
+                    })
+                },
                 by_domain={},
                 by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
                 user_policies={},
-                group_limits={group_id: ResourceSlot(cpu=Decimal("10"), mem=Decimal("10"))},
+                group_limits={
+                    group_id: ResourceSlot({
+                        "cpu": Decimal("10"),
+                        "mem": Decimal("10"),
+                    })
+                },
                 domain_limits={},
             ),
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
@@ -72,25 +88,41 @@ class TestGroupResourceLimitValidator:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("5"), mem=Decimal("5")),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("5"),
+                "mem": Decimal("5"),
+            }),
             user_uuid=uuid.uuid4(),
             group_id=group_id,
             domain_name="default",
             scaling_group="default",
         )
         snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={},
-                by_group={group_id: ResourceSlot(cpu=Decimal("8"), mem=Decimal("8"))},
+                by_group={
+                    group_id: ResourceSlot({
+                        "cpu": Decimal("8"),
+                        "mem": Decimal("8"),
+                    })
+                },
                 by_domain={},
                 by_agent={},
             ),
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
                 user_policies={},
-                group_limits={group_id: ResourceSlot(cpu=Decimal("10"), mem=Decimal("10"))},
+                group_limits={
+                    group_id: ResourceSlot({
+                        "cpu": Decimal("10"),
+                        "mem": Decimal("10"),
+                    })
+                },
                 domain_limits={},
             ),
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),
@@ -109,18 +141,29 @@ class TestGroupResourceLimitValidator:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
+            }),
             user_uuid=uuid.uuid4(),
             group_id=group_id,
             domain_name="default",
             scaling_group="default",
         )
         snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={},
-                by_group={group_id: ResourceSlot(cpu=Decimal("50"), mem=Decimal("50"))},
+                by_group={
+                    group_id: ResourceSlot({
+                        "cpu": Decimal("50"),
+                        "mem": Decimal("50"),
+                    })
+                },
                 by_domain={},
                 by_agent={},
             ),
@@ -145,14 +188,20 @@ class TestGroupResourceLimitValidator:
         workload = SessionWorkload(
             session_id=SessionId(uuid.uuid4()),
             access_key=AccessKey("user1"),
-            requested_slots=ResourceSlot(cpu=Decimal("5"), mem=Decimal("5")),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("5"),
+                "mem": Decimal("5"),
+            }),
             user_uuid=uuid.uuid4(),
             group_id=group_id,
             domain_name="default",
             scaling_group="default",
         )
         snapshot = SystemSnapshot(
-            total_capacity=ResourceSlot(cpu=Decimal("100"), mem=Decimal("100")),
+            total_capacity=ResourceSlot({
+                "cpu": Decimal("100"),
+                "mem": Decimal("100"),
+            }),
             resource_occupancy=ResourceOccupancySnapshot(
                 by_keypair={},
                 by_user={},
@@ -163,7 +212,12 @@ class TestGroupResourceLimitValidator:
             resource_policy=ResourcePolicySnapshot(
                 keypair_policies={},
                 user_policies={},
-                group_limits={group_id: ResourceSlot(cpu=Decimal("10"), mem=Decimal("10"))},
+                group_limits={
+                    group_id: ResourceSlot({
+                        "cpu": Decimal("10"),
+                        "mem": Decimal("10"),
+                    })
+                },
                 domain_limits={},
             ),
             concurrency=ConcurrencySnapshot(sessions_by_keypair={}, sftp_sessions_by_keypair={}),

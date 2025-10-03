@@ -103,7 +103,10 @@ class TestResourcePresetServiceCompatibility:
         mock_preset_data = ResourcePresetData(
             id=uuid.uuid4(),
             name="cpu-small",
-            resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
+            resource_slots=ResourceSlot({
+                "cpu": Decimal("2"),
+                "mem": Decimal("4294967296"),
+            }),
             shared_memory=BinarySize(BinarySize.from_str("1G")),
             scaling_group_name=None,
         )
@@ -155,10 +158,10 @@ class TestResourcePresetServiceCompatibility:
             creator=ResourcePresetCreator(
                 name="gpu-standard",
                 resource_slots=ResourceSlot({
-                    "cpu": "4",
-                    "mem": "16G",
-                    "gpu": "1",
-                    "gpu_memory": "8G",
+                    "cpu": Decimal("4"),
+                    "mem": Decimal("17179869184"),
+                    "gpu": Decimal("1"),
+                    "gpu_memory": Decimal("8589934592"),
                 }),
                 shared_memory=str(BinarySize.from_str("2G")),
                 scaling_group_name="gpu-cluster",
@@ -215,7 +218,10 @@ class TestResourcePresetServiceCompatibility:
         mock_preset_data = ResourcePresetData(
             id=uuid.uuid4(),
             name="cpu-small",
-            resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
+            resource_slots=ResourceSlot({
+                "cpu": Decimal("4"),
+                "mem": Decimal("8589934592"),
+            }),
             shared_memory=BinarySize(BinarySize.from_str("1G")),
             scaling_group_name=None,
         )
@@ -248,7 +254,10 @@ class TestResourcePresetServiceCompatibility:
         mock_preset_data = ResourcePresetData(
             id=preset_id,
             name="cpu-medium",
-            resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
+            resource_slots=ResourceSlot({
+                "cpu": Decimal("2"),
+                "mem": Decimal("4294967296"),
+            }),
             shared_memory=BinarySize(BinarySize.from_str("1G")),
             scaling_group_name=None,
         )
@@ -287,7 +296,10 @@ class TestResourcePresetServiceCompatibility:
         mock_preset_data = ResourcePresetData(
             id=uuid.uuid4(),
             name="unused-preset",
-            resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
+            resource_slots=ResourceSlot({
+                "cpu": Decimal("2"),
+                "mem": Decimal("4294967296"),
+            }),
             shared_memory=None,
             scaling_group_name=None,
         )
@@ -327,7 +339,10 @@ class TestResourcePresetServiceCompatibility:
             ResourcePresetData(
                 id=uuid.uuid4(),
                 name="cpu-small",
-                resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
+                resource_slots=ResourceSlot({
+                    "cpu": Decimal("2"),
+                    "mem": Decimal("4294967296"),
+                }),
                 shared_memory=BinarySize(BinarySize.from_str("1G")),
                 scaling_group_name=None,
             ),
@@ -372,7 +387,11 @@ class TestResourcePresetServiceCompatibility:
         action = CheckResourcePresetsAction(
             access_key=AccessKey("test-key"),
             resource_policy={
-                "total_resource_slots": {"cpu": "100", "mem": "100G", "gpu": "10"},
+                "total_resource_slots": {
+                    "cpu": "100",
+                    "mem": "100G",
+                    "gpu": "10",
+                },
                 "default_for_unspecified": "UNLIMITED",
             },
             domain_name="default",
@@ -423,7 +442,10 @@ class TestResourcePresetServiceCompatibility:
         preset_data = ResourcePresetData(
             id=uuid.uuid4(),
             name="test-preset",
-            resource_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4294967296")}),
+            resource_slots=ResourceSlot({
+                "cpu": Decimal("2"),
+                "mem": Decimal("4294967296"),
+            }),
             shared_memory=None,
             scaling_group_name=None,
         )
@@ -431,13 +453,37 @@ class TestResourcePresetServiceCompatibility:
         # Create mock result that the repository would return
         mock_check_result = CheckPresetsResult(
             presets=[PresetAllocatabilityData(preset=preset_data, allocatable=True)],
-            keypair_limits=ResourceSlot({"cpu": "100", "mem": "100G", "gpu": "10"}),
-            keypair_using=ResourceSlot({"cpu": "10", "mem": "10G", "gpu": "1"}),
-            keypair_remaining=ResourceSlot({"cpu": "90", "mem": "90G", "gpu": "9"}),
-            group_limits=ResourceSlot({"cpu": "100", "mem": "100G", "gpu": "10"}),
+            keypair_limits=ResourceSlot({
+                "cpu": "100",
+                "mem": "100G",
+                "gpu": "10",
+            }),
+            keypair_using=ResourceSlot({
+                "cpu": "10",
+                "mem": "10G",
+                "gpu": "1",
+            }),
+            keypair_remaining=ResourceSlot({
+                "cpu": "90",
+                "mem": "90G",
+                "gpu": "9",
+            }),
+            group_limits=ResourceSlot({
+                "cpu": "100",
+                "mem": "100G",
+                "gpu": "10",
+            }),
             group_using=ResourceSlot({"cpu": "5", "mem": "5G"}),
-            group_remaining=ResourceSlot({"cpu": "95", "mem": "95G", "gpu": "10"}),
-            scaling_group_remaining=ResourceSlot({"cpu": "1000", "mem": "1000G", "gpu": "100"}),
+            group_remaining=ResourceSlot({
+                "cpu": "95",
+                "mem": "95G",
+                "gpu": "10",
+            }),
+            scaling_group_remaining=ResourceSlot({
+                "cpu": "1000",
+                "mem": "1000G",
+                "gpu": "100",
+            }),
             scaling_groups={},
         )
 
@@ -469,7 +515,12 @@ class TestResourcePresetServiceCompatibility:
         action = CreateResourcePresetAction(
             creator=ResourcePresetCreator(
                 name="custom-preset",
-                resource_slots=ResourceSlot({"cpu": "4", "mem": "8G", "npu": "2", "tpu": "1"}),
+                resource_slots=ResourceSlot({
+                    "cpu": "4",
+                    "mem": "8G",
+                    "npu": "2",
+                    "tpu": "1",
+                }),
                 shared_memory=None,
                 scaling_group_name=None,
             )

@@ -1,5 +1,6 @@
 """Test utilities for sokovan scheduler tests."""
 
+from decimal import Decimal
 from uuid import uuid4
 
 from ai.backend.common.types import (
@@ -17,7 +18,10 @@ def create_session_workload(**kwargs):
     defaults = {
         "session_id": SessionId(uuid4()),
         "access_key": AccessKey("test-key"),
-        "requested_slots": ResourceSlot({"cpu": 1, "memory": 1}),
+        "requested_slots": ResourceSlot({
+            "cpu": Decimal("1"),
+            "memory": Decimal("1"),
+        }),
         "user_uuid": uuid4(),
         "group_id": uuid4(),
         "domain_name": "default",

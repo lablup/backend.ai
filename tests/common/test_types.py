@@ -83,7 +83,7 @@ def test_check_typed_dict():
     assert isinstance(a, dict)
 
 
-def test_binary_size():
+def test_binary_size_str_conversion():
     assert 1 == BinarySize.from_str("1 byte")
     assert 19291991 == BinarySize.from_str(19291991)
     with pytest.raises(ValueError):
@@ -139,28 +139,65 @@ def test_binary_size():
     assert "{:s}".format(BinarySize(2**30)) == "1g"
 
 
+def test_binary_size_decimal_conversion():
+    assert Decimal(BinarySize(1)) == 1
+    assert Decimal(BinarySize(2)) == 2
+    assert Decimal(BinarySize(1024)) == 1024
+    assert Decimal(BinarySize(2048)) == 2048
+    assert Decimal(BinarySize(105935)) == 105935
+    assert Decimal(BinarySize(127303)) == 127303
+
+
+def test_slot_name_parsing() -> None:
+    s = SlotName("cuda.shares")
+    assert s.is_accelerator()
+    assert s.device_name == "cuda"
+    assert s.major_type == "shares"
+    assert s.minor_type == ""
+    s = SlotName("cuda.device")
+    assert s.is_accelerator()
+    assert s.device_name == "cuda"
+    assert s.major_type == "device"
+    assert s.minor_type == ""
+    s = SlotName("cpu")
+    assert not s.is_accelerator()
+    assert s.device_name == "cpu"
+    assert s.major_type == ""
+    assert s.minor_type == ""
+    s = SlotName("mem")
+    assert not s.is_accelerator()
+    assert s.device_name == "mem"
+    assert s.major_type == ""
+    assert s.minor_type == ""
+    s = SlotName("cuda.device:mig-10g")
+    assert s.is_accelerator()
+    assert s.device_name == "cuda"
+    assert s.major_type == "device"
+    assert s.minor_type == "mig-10g"
+
+
 def test_resource_slot_serialization():
     # from_user_input() and from_policy() takes the explicit slot type information to
     # convert human-readable values to raw decimal values,
     # while from_json() treats those values as stringified decimal expressions "as-is".
 
-    st = {"a": "count", "b": "bytes"}
+    st = {SlotName("a"): SlotTypes.COUNT, SlotName("b"): SlotTypes.BYTES}
     r1 = ResourceSlot.from_user_input({"a": "1", "b": "2g"}, st)
     r2 = ResourceSlot.from_user_input({"a": "2", "b": "1g"}, st)
     r3 = ResourceSlot.from_user_input({"a": "1"}, st)
     with pytest.raises(ValueError):
         ResourceSlot.from_user_input({"x": "1"}, st)
 
-    assert r1["a"] == Decimal(1)
-    assert r2["a"] == Decimal(2)
-    assert r3["a"] == Decimal(1)
-    assert r1["b"] == Decimal(2 * (2**30))
-    assert r2["b"] == Decimal(1 * (2**30))
-    assert r3["b"] == Decimal(0)
+    assert r1[SlotName("a")] == Decimal(1)
+    assert r2[SlotName("a")] == Decimal(2)
+    assert r3[SlotName("a")] == Decimal(1)
+    assert r1[SlotName("b")] == Decimal(2 * (2**30))
+    assert r2[SlotName("b")] == Decimal(1 * (2**30))
+    assert r3[SlotName("b")] == Decimal(0)
 
     x = r2 - r3
-    assert x["a"] == Decimal(1)
-    assert x["b"] == Decimal(1 * (2**30))
+    assert x[SlotName("a")] == Decimal(1)
+    assert x[SlotName("b")] == Decimal(1 * (2**30))
 
     # Conversely, to_json() stringifies the decimal values as-is,
     # while to_humanized() takes the explicit slot type information
@@ -177,10 +214,10 @@ def test_resource_slot_serialization():
     assert r3 == ResourceSlot.from_json({"a": "1", "b": "0"})
 
     r4 = ResourceSlot.from_user_input({"a": Decimal("Infinity"), "b": Decimal("-Infinity")}, st)
-    assert not r4["a"].is_finite()
-    assert not r4["b"].is_finite()
-    assert r4["a"] > 0
-    assert r4["b"] < 0
+    assert not r4[SlotName("a")].is_finite()
+    assert not r4[SlotName("b")].is_finite()
+    assert r4[SlotName("a")] > 0
+    assert r4[SlotName("b")] < 0
     assert r4.to_humanized(st) == {"a": "Infinity", "b": "-Infinity"}
 
     # The result for "unspecified" fields may be different
@@ -193,8 +230,8 @@ def test_resource_slot_serialization():
         },
         st,
     )
-    assert r1["a"] == Decimal(10)
-    assert r1["b"] == Decimal("Infinity")
+    assert r1[SlotName("a")] == Decimal(10)
+    assert r1[SlotName("b")] == Decimal("Infinity")
     r2 = ResourceSlot.from_policy(
         {
             "total_resource_slots": {"a": "10"},
@@ -202,45 +239,45 @@ def test_resource_slot_serialization():
         },
         st,
     )
-    assert r2["a"] == Decimal(10)
-    assert r2["b"] == Decimal(0)
+    assert r2[SlotName("a")] == Decimal(10)
+    assert r2[SlotName("b")] == Decimal(0)
 
 
 def test_resource_slot_serialization_prevent_scientific_notation():
-    r1 = ResourceSlot({"a": "2E+1", "b": "200"})
+    r1 = ResourceSlot({SlotName("a"): "2E+1", SlotName("b"): "200"})
     assert r1.to_json()["a"] == "20"
     assert r1.to_json()["b"] == "200"
 
 
 def test_resource_slot_serialization_filter_null():
-    r1 = ResourceSlot({"a": "1", "x": None})
+    r1 = ResourceSlot({SlotName("a"): "1", SlotName("x"): None})
     assert r1.to_json()["a"] == "1"
-    assert "x" not in r1.to_json()
+    assert SlotName("x") not in r1.to_json()
 
 
 def test_resource_slot_parsing_typeless_user_input():
     # slot names containing "mem" are assumed as BinarySize if no explicit type table is given
     r1 = ResourceSlot.from_user_input({"a": "1", "cuda.mem": "2g"}, None)
-    assert r1["a"] == Decimal(1)
-    assert r1["cuda.mem"] == Decimal(2 * (2**30))
+    assert r1[SlotName("a")] == Decimal(1)
+    assert r1[SlotName("cuda.mem")] == Decimal(2 * (2**30))
 
     r1 = ResourceSlot.from_user_input({"a": "inf", "cuda.mem": "inf"}, None)
-    assert r1["a"].is_infinite()
-    assert r1["cuda.mem"].is_infinite()
+    assert r1[SlotName("a")].is_infinite()
+    assert r1[SlotName("cuda.mem")].is_infinite()
 
     with pytest.raises(ValueError, match="Cannot convert"):
         r1 = ResourceSlot.from_user_input({"a": "1", "cuda.smp": "2g"}, None)
 
     r1 = ResourceSlot.from_user_input({"a": "inf", "cuda.smp": "inf"}, None)
-    assert r1["a"].is_infinite()
-    assert r1["cuda.smp"].is_infinite()
+    assert r1[SlotName("a")].is_infinite()
+    assert r1[SlotName("cuda.smp")].is_infinite()
 
 
 def test_resource_slot_parsing_typeless_user_input_serialize_again():
     # slot names containing "mem" are assumed as BinarySize if no explicit type table is given
     r1 = ResourceSlot.from_user_input({"a": "1", "cuda.mem": "2g"}, None)
-    assert r1["a"] == Decimal(1)
-    assert r1["cuda.mem"] == Decimal(2 * (2**30))
+    assert r1[SlotName("a")] == Decimal(1)
+    assert r1[SlotName("cuda.mem")] == Decimal(2 * (2**30))
 
     s1 = r1.to_json()
     # when serialized again, now the "cuda.mem" is an expanded integer
@@ -287,10 +324,10 @@ def test_resource_slot_comparison_ordering():
     assert not r2 <= r1
     assert r4 < r1
     assert r4 <= r1
-    assert r4["b"] == 0  # auto-sync of slots
+    assert r4[SlotName("b")] == 0  # auto-sync of slots
     assert r3 < r1
     assert r3 <= r1
-    assert r3["b"] == 0  # auto-sync of slots
+    assert r3[SlotName("b")] == 0  # auto-sync of slots
 
 
 def test_resource_slot_comparison_ordering_reverse():
@@ -302,10 +339,10 @@ def test_resource_slot_comparison_ordering_reverse():
     assert not r2 >= r1
     assert r1 > r3
     assert r1 >= r3
-    assert r3["b"] == 0  # auto-sync of slots
+    assert r3[SlotName("b")] == 0  # auto-sync of slots
     assert r1 > r4
     assert r1 >= r4
-    assert r4["b"] == 0  # auto-sync of slots
+    assert r4[SlotName("b")] == 0  # auto-sync of slots
 
 
 def test_resource_slot_comparison_subset():
@@ -321,14 +358,14 @@ def test_resource_slot_calc_with_infinity():
     r1 = ResourceSlot.from_json({"a": "Infinity"})
     r2 = ResourceSlot.from_json({"a": "3"})
     r3 = r1 - r2
-    assert r3["a"] == Decimal("Infinity")
+    assert r3[SlotName("a")] == Decimal("Infinity")
     r3 = r1 + r2
-    assert r3["a"] == Decimal("Infinity")
+    assert r3[SlotName("a")] == Decimal("Infinity")
 
     r4 = ResourceSlot.from_json({"b": "5"})
     r5 = r1 - r4
-    assert r5["a"] == Decimal("Infinity")
-    assert r5["b"] == -5
+    assert r5[SlotName("a")] == Decimal("Infinity")
+    assert r5[SlotName("b")] == -5
     r5 = r1 + r4
-    assert r5["a"] == Decimal("Infinity")
-    assert r5["b"] == 5
+    assert r5[SlotName("a")] == Decimal("Infinity")
+    assert r5[SlotName("b")] == 5

@@ -166,7 +166,10 @@ def create_example_pending_sessions() -> Sequence[SessionRow]:
         create_mock_session(  # cpu-only, single-node cluster
             SessionId(uuid4()),
             access_key=AccessKey("user03"),
-            requested_slots=ResourceSlot({"cpu": Decimal("1.0"), "mem": Decimal(1024)}),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("1.0"),
+                "mem": Decimal(1024),
+            }),
             kernel_opts=[
                 KernelOpt(ResourceSlot({"cpu": Decimal("0.4"), "mem": Decimal(512)})),
                 KernelOpt(ResourceSlot({"cpu": Decimal("0.3"), "mem": Decimal(256)})),
@@ -246,7 +249,7 @@ async def test_fifo_scheduler() -> None:
         state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
     picked_session_id = scheduler.pick_session(
-        sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
+        sum((ag.available_slots for ag in example_agents), start=ResourceSlot({})),
         example_pending_sessions,
         example_existing_sessions,
     )
@@ -276,7 +279,7 @@ async def test_lifo_scheduler() -> None:
         state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
     picked_session_id = scheduler.pick_session(
-        sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
+        sum((ag.available_slots for ag in example_agents), start=ResourceSlot({})),
         example_pending_sessions,
         example_existing_sessions,
     )
@@ -304,7 +307,9 @@ async def test_fifo_scheduler_favor_cpu_for_requests_without_accelerators() -> N
         agent_selection_resource_priority,
         state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
-    total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
+    total_capacity = sum(
+        (ag.available_slots for ag in example_mixed_agents), start=ResourceSlot({})
+    )
     for idx in range(3):
         picked_session_id = scheduler.pick_session(
             total_capacity,
@@ -458,7 +463,9 @@ async def test_lifo_scheduler_favor_cpu_for_requests_without_accelerators() -> N
         agent_selection_resource_priority,
         state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
-    total_capacity = sum((ag.available_slots for ag in example_mixed_agents), start=ResourceSlot())
+    total_capacity = sum(
+        (ag.available_slots for ag in example_mixed_agents), start=ResourceSlot({})
+    )
     for idx in range(3):
         picked_session_id = scheduler.pick_session(total_capacity, example_pending_sessions, [])
         assert picked_session_id == example_pending_sessions[-1].id
@@ -493,7 +500,7 @@ async def test_drf_scheduler() -> None:
         state_store=InMemoryResourceGroupStateStore(agstate_cls),
     )
     picked_session_id = scheduler.pick_session(
-        sum((ag.available_slots for ag in example_agents), start=ResourceSlot()),
+        sum((ag.available_slots for ag in example_agents), start=ResourceSlot({})),
         example_pending_sessions,
         example_existing_sessions,
     )

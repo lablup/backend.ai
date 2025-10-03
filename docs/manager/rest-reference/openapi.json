@@ -884,20 +884,11 @@
             "type": "string"
           },
           "resources": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
+            "additionalProperties": true,
             "examples": [
               {
                 "cpu": 4,
-                "cuda.shares": 2.5,
+                "cuda.shares": "2.5",
                 "mem": "32g"
               }
             ],

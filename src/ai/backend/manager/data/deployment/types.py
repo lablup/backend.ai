@@ -8,7 +8,13 @@ from uuid import UUID
 
 import yarl
 
-from ai.backend.common.types import ClusterMode, RuntimeVariant, SessionId, VFolderMount
+from ai.backend.common.types import (
+    ClusterMode,
+    ResourceSlot,
+    RuntimeVariant,
+    SessionId,
+    VFolderMount,
+)
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.image.types import ImageIdentifier
 
@@ -131,7 +137,7 @@ class ReplicaSpec:
 class ResourceSpec:
     cluster_mode: ClusterMode
     cluster_size: int
-    resource_slots: Mapping[str, Any]
+    resource_slots: ResourceSlot
     resource_opts: Optional[Mapping[str, Any]] = None
 
 

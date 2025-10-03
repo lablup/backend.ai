@@ -14,6 +14,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionTypes,
+    SlotName,
 )
 from ai.backend.manager.repositories.schedule.repository import ScheduleRepository
 from ai.backend.manager.sokovan.scheduler.scheduler import (
@@ -48,7 +49,8 @@ def create_session_workload(
     session_id = session_id or SessionId(uuid.uuid4())
     access_key = kwargs.get("access_key", AccessKey("test-key"))
     requested_slots = kwargs.get(
-        "requested_slots", ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")})
+        "requested_slots",
+        ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("1024")}),
     )
     user_uuid = kwargs.get("user_uuid", uuid.uuid4())
     group_id = kwargs.get("group_id", uuid.uuid4())
@@ -108,7 +110,10 @@ def create_agent_info(
         agent_id=AgentId(agent_id),
         agent_addr=f"{agent_id}:6001",
         architecture="x86_64",
-        available_slots=ResourceSlot({"cpu": available_cpu, "mem": available_mem}),
+        available_slots=ResourceSlot({
+            "cpu": available_cpu,
+            "mem": available_mem,
+        }),
         occupied_slots=ResourceSlot({"cpu": occupied_cpu, "mem": occupied_mem}),
         scaling_group="default",
         container_count=container_count,
@@ -180,8 +185,8 @@ class TestSchedulerAllocation:
             max_available = Decimal("-1")
             for agent in agents:
                 available_slots = agent.available_slots - agent.occupied_slots
-                available_cpu = available_slots.get("cpu", Decimal("0"))
-                requested_cpu = resource_req.requested_slots.get("cpu", Decimal("0"))
+                available_cpu = Decimal(available_slots.get(SlotName("cpu"), 0))
+                requested_cpu = Decimal(resource_req.requested_slots.get(SlotName("cpu"), 0))
                 if available_cpu >= requested_cpu and available_cpu > max_available:
                     best_agent = agent
                     max_available = available_cpu
@@ -636,11 +641,11 @@ class TestSchedulerAllocation:
         assert result1 is not None
 
         # Verify session 1 agents were modified
-        assert agents_session1[0].occupied_slots["cpu"] == Decimal("2")
+        assert agents_session1[0].occupied_slots[SlotName("cpu")] == Decimal("2")
         assert agents_session1[0].container_count == 1
 
         # Verify session 2 agents remain unchanged
-        assert agents_session2[0].occupied_slots["cpu"] == Decimal("0")
+        assert agents_session2[0].occupied_slots[SlotName("cpu")] == Decimal("0")
         assert agents_session2[0].container_count == 0
 
     async def test_empty_kernel_allocations_returns_proper_result(

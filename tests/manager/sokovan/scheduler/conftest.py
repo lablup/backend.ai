@@ -162,7 +162,10 @@ def large_resource_workload() -> SessionWorkload:
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
-        requested_slots=ResourceSlot({"cpu": Decimal(100), "mem": Decimal(100)}),
+        requested_slots=ResourceSlot({
+            "cpu": Decimal(100),
+            "mem": Decimal(100),
+        }),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name="default",
@@ -234,7 +237,10 @@ def test_domain_large_resource_workload(test_domain_name: str) -> SessionWorkloa
     return SessionWorkload(
         session_id=SessionId(uuid4()),
         access_key=AccessKey("user1"),
-        requested_slots=ResourceSlot({"cpu": Decimal(100), "mem": Decimal(100)}),
+        requested_slots=ResourceSlot({
+            "cpu": Decimal(100),
+            "mem": Decimal(100),
+        }),
         user_uuid=uuid4(),
         group_id=uuid4(),
         domain_name=test_domain_name,
@@ -402,7 +408,10 @@ def batch_session_future_start_time() -> SessionWorkload:
 def empty_system_snapshot() -> SystemSnapshot:
     """Create an empty system snapshot for testing."""
     return SystemSnapshot(
-        total_capacity=ResourceSlot({"cpu": Decimal("100"), "mem": Decimal("100")}),
+        total_capacity=ResourceSlot({
+            "cpu": Decimal("100"),
+            "mem": Decimal("100"),
+        }),
         resource_occupancy=ResourceOccupancySnapshot(
             by_keypair={}, by_user={}, by_group={}, by_domain={}, by_agent={}
         ),

@@ -9,6 +9,8 @@ import sys
 from decimal import Decimal
 from typing import Sequence, Union
 
+from ai.backend.common.types import SlotName
+
 from .selector import (
     AbstractAgentSelector,
     AgentSelectionConfig,
@@ -28,7 +30,7 @@ class LegacyAgentSelector(AbstractAgentSelector):
     2. More available resources in priority order
     """
 
-    def __init__(self, agent_selection_resource_priority: list[str]) -> None:
+    def __init__(self, agent_selection_resource_priority: Sequence[str | SlotName]) -> None:
         self.agent_selection_resource_priority = agent_selection_resource_priority
 
     def name(self) -> str:
@@ -68,7 +70,11 @@ class LegacyAgentSelector(AbstractAgentSelector):
                     tracker.original_agent, resource_req.requested_slots
                 ),
                 *[
-                    (tracker.original_agent.available_slots - occupied_slots).get(key, -sys.maxsize)
+                    Decimal(
+                        (tracker.original_agent.available_slots - occupied_slots).get(
+                            key, -sys.maxsize
+                        )
+                    )
                     for key in resource_priorities
                 ],
             ]

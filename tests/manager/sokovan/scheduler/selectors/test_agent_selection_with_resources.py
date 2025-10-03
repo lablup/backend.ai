@@ -29,38 +29,38 @@ class TestAgentSelectionWithResources:
         return [
             create_agent_info(
                 agent_id="agent-low",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("4"),
                     "mem": Decimal("8192"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("3"),
                     "mem": Decimal("6144"),
-                },
+                }),
                 container_count=3,
             ),
             create_agent_info(
                 agent_id="agent-medium",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("8"),
                     "mem": Decimal("16384"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("4"),
                     "mem": Decimal("8192"),
-                },
+                }),
                 container_count=2,
             ),
             create_agent_info(
                 agent_id="agent-high",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("16"),
                     "mem": Decimal("32768"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("2"),
                     "mem": Decimal("4096"),
-                },
+                }),
                 container_count=1,
             ),
         ]
@@ -197,13 +197,13 @@ class TestAgentSelectionWithResources:
         agents = [
             create_agent_info(
                 agent_id="designated",
-                available_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
-                occupied_slots={"cpu": Decimal("0"), "mem": Decimal("0")},
+                available_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
             ),
             create_agent_info(
                 agent_id="other",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("0"), "mem": Decimal("0")},
+                available_slots=ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
             ),
         ]
 
@@ -255,14 +255,14 @@ class TestAgentSelectionWithResources:
         agents = [
             create_agent_info(
                 agent_id="busy",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
-                occupied_slots={"cpu": Decimal("0"), "mem": Decimal("0")},
+                available_slots=ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
                 container_count=10,  # At limit
             ),
             create_agent_info(
                 agent_id="available",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("0"), "mem": Decimal("0")},
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("0"), "mem": Decimal("0")}),
                 container_count=5,
             ),
         ]
@@ -314,12 +314,12 @@ class TestAgentSelectionWithResources:
             create_agent_info(
                 agent_id="x86",
                 architecture="x86_64",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
+                available_slots=ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")}),
             ),
             create_agent_info(
                 agent_id="arm",
                 architecture="aarch64",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("32768")},
+                available_slots=ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("32768")}),
             ),
         ]
 

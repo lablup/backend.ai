@@ -1357,7 +1357,7 @@ class AgentRegistry:
             )
             resource_opts["shmem"] = shmem
             image_min_slots = copy.deepcopy(image_min_slots)
-            image_min_slots["mem"] += shmem
+            image_min_slots[SlotName("mem")] += shmem
 
             # Sanitize user input: does it have resource config?
             if (resources := creation_config.get("resources")) is not None:
@@ -1389,10 +1389,10 @@ class AgentRegistry:
                 # by the accelerator plugins.
                 cpu = creation_config.get("instanceCores")
                 if cpu is None:  # the key is there but may be null.
-                    cpu = image_min_slots["cpu"]
+                    cpu = image_min_slots[SlotName("cpu")]
                 mem = creation_config.get("instanceMemory")
                 if mem is None:  # the key is there but may be null.
-                    mem = image_min_slots["mem"]
+                    mem = image_min_slots[SlotName("mem")]
                 else:
                     # In legacy clients, memory is normalized to GiB.
                     mem = str(mem) + "g"
@@ -1430,10 +1430,10 @@ class AgentRegistry:
                 )
 
             # Check if: shmem < memory
-            if shmem >= requested_slots["mem"]:
+            if shmem >= requested_slots[SlotName("mem")]:
                 raise InvalidAPIParameters(
                     "Shared memory should be less than the main memory. (s:{}, m:{})".format(
-                        str(shmem), str(BinarySize(requested_slots["mem"]))
+                        str(shmem), str(BinarySize(requested_slots[SlotName("mem")]))
                     ),
                 )
 
@@ -1911,7 +1911,7 @@ class AgentRegistry:
                         total_allocs.append(Decimal(BinarySize.from_str(allocation)))
                     else:  # maybe Decimal("Infinity"), etc.
                         total_allocs.append(Decimal(allocation))
-                slots[slot_name] = str(sum(total_allocs))
+                slots[slot_name] = sum(total_allocs, Decimal(0))
         return slots
 
     async def _create_kernels_in_one_agent(
@@ -2198,7 +2198,7 @@ class AgentRegistry:
                 )
                 requested_slots += kernel_agent_binding.kernel.requested_slots
                 if actual_allocated_slot is not None:
-                    actual_allocated_slots += ResourceSlot.from_json(actual_allocated_slot)
+                    actual_allocated_slots += actual_allocated_slot
                     del self._kernel_actual_allocated_resources[kernel_agent_binding.kernel.id]
                 else:  # something's wrong; just fall back to requested slot value
                     actual_allocated_slots += kernel_agent_binding.kernel.requested_slots
@@ -2218,7 +2218,7 @@ class AgentRegistry:
                         update_query = (
                             sa.update(AgentRow)
                             .values(
-                                occupied_slots=ResourceSlot.from_json(occupied_slots) + diff,
+                                occupied_slots=occupied_slots + diff,
                             )
                             .where(AgentRow.id == agent_id)
                         )

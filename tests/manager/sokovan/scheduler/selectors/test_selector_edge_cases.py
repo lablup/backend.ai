@@ -6,7 +6,13 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
 from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.dispersed import DispersedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.legacy import LegacyAgentSelector
@@ -46,18 +52,18 @@ class TestSelectorEdgeCases:
             enforce_spreading_endpoint_replica=False,
         )
 
-    def test_empty_resource_requirements(self, criteria, config):
+    def test_empty_resource_requirements(self, criteria, config) -> None:
         """Test handling of empty resource requirements."""
         agents = [
             create_agent_info(
                 agent_id="agent-1",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             ),
             create_agent_info(
                 agent_id="agent-2",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
             ),
         ]
 
@@ -83,12 +89,12 @@ class TestSelectorEdgeCases:
             assert result is not None
             assert result.original_agent.agent_id in [AgentId("agent-1"), AgentId("agent-2")]
 
-    def test_zero_resource_values(self, criteria, config):
+    def test_zero_resource_values(self, criteria, config) -> None:
         """Test handling of zero resource values in requests."""
         agents = [
             create_agent_info(
                 agent_id="agent-1",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
             )
         ]
 
@@ -111,20 +117,20 @@ class TestSelectorEdgeCases:
         # Should still select an agent
         assert result.original_agent.agent_id == AgentId("agent-1")
 
-    def test_missing_resource_types_in_request(self, criteria, config):
+    def test_missing_resource_types_in_request(self, criteria, config) -> None:
         """Test when requested resource type doesn't exist on any agent."""
         agents = [
             create_agent_info(
                 agent_id="cpu-only",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
             ),
             create_agent_info(
                 agent_id="gpu-agent",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("8"),
                     "mem": Decimal("16384"),
                     "cuda.shares": Decimal("4"),
-                },
+                }),
             ),
         ]
 
@@ -149,36 +155,39 @@ class TestSelectorEdgeCases:
         result = selector.select_tracker_by_strategy(trackers, resource_req, criteria, config)
         assert result is not None
 
-    def test_extremely_large_resource_values(self, criteria, config):
+    def test_extremely_large_resource_values(self, criteria, config) -> None:
         """Test handling of very large resource values."""
         agents = [
             create_agent_info(
                 agent_id="normal",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("16"),
                     "mem": Decimal("32768"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("8"),
                     "mem": Decimal("16384"),
-                },
+                }),
             ),
             create_agent_info(
                 agent_id="huge",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal(str(sys.maxsize)),
                     "mem": Decimal(str(sys.maxsize)),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("0"),
                     "mem": Decimal("0"),
-                },
+                }),
             ),
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -200,30 +209,30 @@ class TestSelectorEdgeCases:
         # Dispersed should pick huge (more available)
         assert dispersed_choice.original_agent.agent_id == AgentId("huge")
 
-    def test_decimal_precision_edge_cases(self, criteria, config):
+    def test_decimal_precision_edge_cases(self, criteria, config) -> None:
         """Test handling of decimal precision edge cases."""
         agents = [
             create_agent_info(
                 agent_id="agent-1",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("8.123456789012345678901234567890"),
                     "mem": Decimal("16384.99999999999999999999"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("4.000000000000000000000001"),
                     "mem": Decimal("8192.000000000000000000001"),
-                },
+                }),
             ),
             create_agent_info(
                 agent_id="agent-2",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("8.123456789012345678901234567891"),  # Slightly different
                     "mem": Decimal("16385.00000000000000000001"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("4.0"),
                     "mem": Decimal("8192.0"),
-                },
+                }),
             ),
         ]
 
@@ -244,17 +253,20 @@ class TestSelectorEdgeCases:
         # Should handle decimal precision correctly
         assert result.original_agent.agent_id in [AgentId("agent-1"), AgentId("agent-2")]
 
-    def test_single_agent_all_strategies(self, criteria, config):
+    def test_single_agent_all_strategies(self, criteria, config) -> None:
         """Test all strategies with only one agent available."""
         agent = create_agent_info(
             agent_id="lonely",
-            available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+            available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
         )
         agents = [agent]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -272,20 +284,23 @@ class TestSelectorEdgeCases:
             result = selector.select_tracker_by_strategy(trackers, resource_req, criteria, config)
             assert result.original_agent.agent_id == AgentId("lonely")
 
-    def test_all_agents_fully_occupied(self, criteria, config):
+    def test_all_agents_fully_occupied(self, criteria, config) -> None:
         """Test when all agents have zero available resources."""
         agents = [
             create_agent_info(
                 agent_id=f"full-{i}",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
             )
             for i in range(3)
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -298,24 +313,27 @@ class TestSelectorEdgeCases:
         # Should still return an agent (they're all equal)
         assert result.original_agent.agent_id in [AgentId(f"full-{i}") for i in range(3)]
 
-    def test_priority_with_nonexistent_resources(self, criteria, config):
+    def test_priority_with_nonexistent_resources(self, criteria, config) -> None:
         """Test resource priority list containing non-existent resource types."""
         agents = [
             create_agent_info(
                 agent_id="agent-1",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("6"), "mem": Decimal("12288")},
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("6"), "mem": Decimal("12288")}),
             ),
             create_agent_info(
                 agent_id="agent-2",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("4096")}),
             ),
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -335,23 +353,23 @@ class TestSelectorEdgeCases:
     #     # The select_agent_for_resource_requirements method no longer exists
     #     pass
 
-    def test_special_resource_names(self, criteria, config):
+    def test_special_resource_names(self, criteria, config) -> None:
         """Test handling of special characters in resource names."""
         agents = [
             create_agent_info(
                 agent_id="special",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("8"),
                     "mem": Decimal("16384"),
                     "custom.resource-name_123": Decimal("100"),
                     "another/special@resource": Decimal("50"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("4"),
                     "mem": Decimal("8192"),
                     "custom.resource-name_123": Decimal("20"),
                     "another/special@resource": Decimal("10"),
-                },
+                }),
             )
         ]
 

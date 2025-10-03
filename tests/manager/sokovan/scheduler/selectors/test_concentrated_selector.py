@@ -5,7 +5,13 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import (
+    AgentId,
+    ClusterMode,
+    ResourceSlot,
+    SessionId,
+    SessionTypes,
+)
 from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionConfig,
@@ -57,24 +63,45 @@ class TestConcentratedAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="agent-low",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("6"), "mem": Decimal("12288")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("8"),
+                    "mem": Decimal("16384"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("6"),
+                    "mem": Decimal("12288"),
+                }),
             ),
             create_agent_info(
                 agent_id="agent-medium",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("8"),
+                    "mem": Decimal("16384"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("4"),
+                    "mem": Decimal("8192"),
+                }),
             ),
             create_agent_info(
                 agent_id="agent-high",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("2"), "mem": Decimal("4096")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("8"),
+                    "mem": Decimal("16384"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("2"),
+                    "mem": Decimal("4096"),
+                }),
             ),
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -103,21 +130,21 @@ class TestConcentratedAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="agent-gpu",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("8"),
                     "mem": Decimal("16384"),
                     "cuda.shares": Decimal("4"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("4"),
                     "mem": Decimal("8192"),
                     "cuda.shares": Decimal("0"),
-                },
+                }),
             ),
             create_agent_info(
                 agent_id="agent-cpu-only",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8192")}),
             ),
         ]
 
@@ -152,13 +179,13 @@ class TestConcentratedAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="low-mem-high-cpu",
-                available_slots={"cpu": Decimal("16"), "mem": Decimal("8192")},
-                occupied_slots={"cpu": Decimal("2"), "mem": Decimal("6144")},
+                available_slots=ResourceSlot({"cpu": Decimal("16"), "mem": Decimal("8192")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("2"), "mem": Decimal("6144")}),
             ),
             create_agent_info(
                 agent_id="high-mem-low-cpu",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("6"), "mem": Decimal("4096")},
+                available_slots=ResourceSlot({"cpu": Decimal("8"), "mem": Decimal("16384")}),
+                occupied_slots=ResourceSlot({"cpu": Decimal("6"), "mem": Decimal("4096")}),
             ),
         ]
 
@@ -208,18 +235,36 @@ class TestConcentratedAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="agent-1",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("8"),
+                    "mem": Decimal("16384"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("4"),
+                    "mem": Decimal("8192"),
+                }),
             ),
             create_agent_info(
                 agent_id="agent-2",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("8"),
+                    "mem": Decimal("16384"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("4"),
+                    "mem": Decimal("8192"),
+                }),
             ),
             create_agent_info(
                 agent_id="agent-3",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("8"),
+                    "mem": Decimal("16384"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("4"),
+                    "mem": Decimal("8192"),
+                }),
             ),
         ]
 
@@ -242,24 +287,45 @@ class TestConcentratedAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="agent-b",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("8"),
+                    "mem": Decimal("16384"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("4"),
+                    "mem": Decimal("8192"),
+                }),
             ),
             create_agent_info(
                 agent_id="agent-a",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("8"),
+                    "mem": Decimal("16384"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("4"),
+                    "mem": Decimal("8192"),
+                }),
             ),
             create_agent_info(
                 agent_id="agent-c",
-                available_slots={"cpu": Decimal("8"), "mem": Decimal("16384")},
-                occupied_slots={"cpu": Decimal("4"), "mem": Decimal("8192")},
+                available_slots=ResourceSlot({
+                    "cpu": Decimal("8"),
+                    "mem": Decimal("16384"),
+                }),
+                occupied_slots=ResourceSlot({
+                    "cpu": Decimal("4"),
+                    "mem": Decimal("8192"),
+                }),
             ),
         ]
 
         resource_req = ResourceRequirements(
             kernel_ids=[uuid.uuid4()],
-            requested_slots=ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("2048")}),
+            requested_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal("2048"),
+            }),
             required_architecture="x86_64",
         )
 
@@ -290,29 +356,29 @@ class TestConcentratedAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="gpu-busy",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("16"),
                     "mem": Decimal("32768"),
                     "cuda.shares": Decimal("8"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("8"),
                     "mem": Decimal("16384"),
                     "cuda.shares": Decimal("6"),
-                },
+                }),
             ),
             create_agent_info(
                 agent_id="gpu-free",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("16"),
                     "mem": Decimal("32768"),
                     "cuda.shares": Decimal("8"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("4"),
                     "mem": Decimal("8192"),
                     "cuda.shares": Decimal("2"),
-                },
+                }),
             ),
         ]
 
@@ -349,29 +415,29 @@ class TestConcentratedAgentSelector:
         agents = [
             create_agent_info(
                 agent_id="low-gpu",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("16"),
                     "mem": Decimal("32768"),
                     "cuda.shares": Decimal("4"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("2"),
                     "mem": Decimal("4096"),
                     "cuda.shares": Decimal("3"),
-                },
+                }),
             ),
             create_agent_info(
                 agent_id="high-gpu",
-                available_slots={
+                available_slots=ResourceSlot({
                     "cpu": Decimal("8"),
                     "mem": Decimal("16384"),
                     "cuda.shares": Decimal("4"),
-                },
-                occupied_slots={
+                }),
+                occupied_slots=ResourceSlot({
                     "cpu": Decimal("6"),
                     "mem": Decimal("12288"),
                     "cuda.shares": Decimal("1"),
-                },
+                }),
             ),
         ]
 

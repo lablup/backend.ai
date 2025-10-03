@@ -750,10 +750,7 @@ class ImageRow(Base):
             if slot_unit == "bytes":
                 if not isinstance(min_value, Decimal):
                     min_value = BinarySize.from_str(min_value)
-            else:
-                if not isinstance(min_value, Decimal):
-                    min_value = Decimal(min_value)
-            min_slot[slot_key] = min_value
+            min_slot[slot_key] = Decimal(min_value)
 
         # fill missing
         for slot_key in slot_units.keys():

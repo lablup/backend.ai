@@ -188,7 +188,7 @@ def create_mock_session(
         occupying_slots=(
             requested_slots
             if status not in (SessionStatus.PENDING, SessionStatus.SCHEDULED)
-            else ResourceSlot()
+            else ResourceSlot({})
         ),
         target_sgroup_names=[],
         **_common_dummy_for_pending_session,
@@ -201,7 +201,7 @@ def create_mock_agent(
     *,
     scaling_group: str = example_sgroup_name1,
     available_slots: ResourceSlot,
-    occupied_slots: ResourceSlot = ResourceSlot(),
+    occupied_slots: ResourceSlot = ResourceSlot({}),
 ) -> AgentRow:
     return AgentRow(
         id=id,

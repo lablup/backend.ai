@@ -1674,9 +1674,7 @@ class SessionLifecycleManager:
                     kernel_allocs = kernel_row.occupied_slots
                     session_occupying_slots.sync_keys(kernel_allocs)
                     for key, val in session_occupying_slots.items():
-                        session_occupying_slots[key] = str(
-                            Decimal(val) + Decimal(kernel_allocs[key])
-                        )
+                        session_occupying_slots[key] = Decimal(val) + Decimal(kernel_allocs[key])
                 session_row.occupying_slots = session_occupying_slots
 
             match session_row.status:

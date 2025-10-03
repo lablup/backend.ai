@@ -30,6 +30,7 @@ from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AccessKey,
     ClusterMode,
+    ResourceSlot,
     RuntimeVariant,
     VFolderID,
     VFolderMount,
@@ -370,7 +371,15 @@ class ServiceConfigModel(LegacyBaseRequestModel):
         examples=["nvidia-H100"],
         alias="scalingGroup",
     )
-    resources: dict[str, str | int] = Field(examples=[{"cpu": 4, "mem": "32g", "cuda.shares": 2.5}])
+    resources: ResourceSlot = Field(
+        examples=[
+            {
+                "cpu": 4,
+                "mem": "32g",
+                "cuda.shares": "2.5",
+            }
+        ]
+    )
     resource_opts: dict[str, str | int | bool] = Field(examples=[{"shmem": "2g"}], default={})
 
     def to_dataclass(self) -> ServiceConfig:

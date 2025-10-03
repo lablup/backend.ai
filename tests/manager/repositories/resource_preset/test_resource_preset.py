@@ -81,7 +81,10 @@ class TestResourcePresetRepository:
         preset_data = ResourcePresetData(
             id=uuid.uuid4(),
             name="test-preset",
-            resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
+            resource_slots=ResourceSlot({
+                "cpu": "4",
+                "mem": "8G",
+            }),
             shared_memory=BinarySize(BinarySize.from_str("2G")),
             scaling_group_name=None,
         )
@@ -476,7 +479,10 @@ class TestResourcePresetDataModels:
         preset_data = ResourcePresetData(
             id=uuid.uuid4(),
             name="test-preset",
-            resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
+            resource_slots=ResourceSlot({
+                "cpu": Decimal("4"),
+                "mem": Decimal("8589934592"),
+            }),
             shared_memory=BinarySize(1073741824),  # 1 GiB
             scaling_group_name="default",
         )

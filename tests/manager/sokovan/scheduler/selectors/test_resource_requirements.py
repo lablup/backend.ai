@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId, SessionTypes
+from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId, SessionTypes, SlotName
 from ai.backend.manager.sokovan.scheduler.selectors.selector import (
     AgentSelectionCriteria,
     KernelResourceSpec,
@@ -30,22 +30,22 @@ class TestResourceRequirements:
         kernel_reqs = {
             uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
+                    SlotName("cpu"): Decimal("2"),
+                    SlotName("mem"): Decimal("4096"),
                 }),
                 required_architecture="x86_64",
             ),
             uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
-                    "cpu": Decimal("1"),
-                    "mem": Decimal("2048"),
+                    SlotName("cpu"): Decimal("1"),
+                    SlotName("mem"): Decimal("2048"),
                 }),
                 required_architecture="x86_64",
             ),
             uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
-                    "cpu": Decimal("3"),
-                    "mem": Decimal("8192"),
+                    SlotName("cpu"): Decimal("3"),
+                    SlotName("mem"): Decimal("8192"),
                 }),
                 required_architecture="x86_64",
             ),
@@ -66,8 +66,8 @@ class TestResourceRequirements:
         agg_req = resource_reqs[0]
         # For single-node, kernel_ids should include all kernels
         assert len(agg_req.kernel_ids) == 3
-        assert agg_req.requested_slots["cpu"] == Decimal("6")  # 2+1+3
-        assert agg_req.requested_slots["mem"] == Decimal("14336")  # 4096+2048+8192
+        assert agg_req.requested_slots[SlotName("cpu")] == Decimal("6")  # 2+1+3
+        assert agg_req.requested_slots[SlotName("mem")] == Decimal("14336")  # 4096+2048+8192
         assert agg_req.required_architecture == "x86_64"
 
     def test_single_node_mixed_architecture_error(self) -> None:
@@ -83,15 +83,15 @@ class TestResourceRequirements:
         kernel_reqs = {
             uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
+                    SlotName("cpu"): Decimal("2"),
+                    SlotName("mem"): Decimal("4096"),
                 }),
                 required_architecture="x86_64",
             ),
             uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
-                    "cpu": Decimal("1"),
-                    "mem": Decimal("2048"),
+                    SlotName("cpu"): Decimal("1"),
+                    SlotName("mem"): Decimal("2048"),
                 }),
                 required_architecture="aarch64",  # Different architecture
             ),
@@ -122,22 +122,22 @@ class TestResourceRequirements:
         kernel_reqs = {
             kernel_ids[0]: KernelResourceSpec(
                 requested_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("4096"),
+                    SlotName("cpu"): Decimal("2"),
+                    SlotName("mem"): Decimal("4096"),
                 }),
                 required_architecture="x86_64",
             ),
             kernel_ids[1]: KernelResourceSpec(
                 requested_slots=ResourceSlot({
-                    "cpu": Decimal("1"),
-                    "mem": Decimal("2048"),
+                    SlotName("cpu"): Decimal("1"),
+                    SlotName("mem"): Decimal("2048"),
                 }),
                 required_architecture="x86_64",
             ),
             kernel_ids[2]: KernelResourceSpec(
                 requested_slots=ResourceSlot({
-                    "cpu": Decimal("3"),
-                    "mem": Decimal("8192"),
+                    SlotName("cpu"): Decimal("3"),
+                    SlotName("mem"): Decimal("8192"),
                 }),
                 required_architecture="aarch64",  # Different architecture is OK for multi-node
             ),
@@ -195,17 +195,17 @@ class TestResourceRequirements:
         kernel_reqs = {
             uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
-                    "cpu": Decimal("4"),
-                    "mem": Decimal("16384"),
-                    "cuda.shares": Decimal("1"),
+                    SlotName("cpu"): Decimal("4"),
+                    SlotName("mem"): Decimal("16384"),
+                    SlotName("cuda.shares"): Decimal("1"),
                 }),
                 required_architecture="x86_64",
             ),
             uuid.uuid4(): KernelResourceSpec(
                 requested_slots=ResourceSlot({
-                    "cpu": Decimal("2"),
-                    "mem": Decimal("8192"),
-                    "cuda.shares": Decimal("0.5"),
+                    SlotName("cpu"): Decimal("2"),
+                    SlotName("mem"): Decimal("8192"),
+                    SlotName("cuda.shares"): Decimal("0.5"),
                 }),
                 required_architecture="x86_64",
             ),
@@ -223,30 +223,30 @@ class TestResourceRequirements:
         assert len(resource_reqs) == 1
         agg_req = resource_reqs[0]
         assert len(agg_req.kernel_ids) == 2
-        assert agg_req.requested_slots["cpu"] == Decimal("6")
-        assert agg_req.requested_slots["mem"] == Decimal("24576")
-        assert agg_req.requested_slots["cuda.shares"] == Decimal("1.5")
+        assert agg_req.requested_slots[SlotName("cpu")] == Decimal("6")
+        assert agg_req.requested_slots[SlotName("mem")] == Decimal("24576")
+        assert agg_req.requested_slots[SlotName("cuda.shares")] == Decimal("1.5")
 
     def test_resource_slot_addition(self) -> None:
         """Test that ResourceSlot addition works correctly."""
         slot1 = ResourceSlot({
-            "cpu": Decimal("2"),
-            "mem": Decimal("4096"),
-            "cuda.shares": Decimal("1"),
+            SlotName("cpu"): Decimal("2"),
+            SlotName("mem"): Decimal("4096"),
+            SlotName("cuda.shares"): Decimal("1"),
         })
 
         slot2 = ResourceSlot({
-            "cpu": Decimal("3"),
-            "mem": Decimal("8192"),
-            "cuda.shares": Decimal("2"),
-            "special": Decimal("5"),  # Additional resource type
+            SlotName("cpu"): Decimal("3"),
+            SlotName("mem"): Decimal("8192"),
+            SlotName("cuda.shares"): Decimal("2"),
+            SlotName("special"): Decimal("5"),  # Additional resource type
         })
 
         # Add slots
         result = slot1 + slot2
 
         # Check result
-        assert result["cpu"] == Decimal("5")
-        assert result["mem"] == Decimal("12288")
-        assert result["cuda.shares"] == Decimal("3")
-        assert result["special"] == Decimal("5")  # New resource type included
+        assert result[SlotName("cpu")] == Decimal("5")
+        assert result[SlotName("mem")] == Decimal("12288")
+        assert result[SlotName("cuda.shares")] == Decimal("3")
+        assert result[SlotName("special")] == Decimal("5")  # New resource type included

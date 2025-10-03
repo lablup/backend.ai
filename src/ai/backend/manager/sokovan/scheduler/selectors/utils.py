@@ -2,10 +2,12 @@
 Utility functions for agent selectors.
 """
 
+import sys
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Set
 
-from ai.backend.common.types import ResourceSlot
+from ai.backend.common.types import ResourceSlot, SlotName
 
 from .selector import AgentInfo
 
@@ -26,7 +28,7 @@ def count_unutilized_capabilities(agent_info: AgentInfo, requested_slots: Resour
         Number of unutilized capabilities (resource types with zero request but available on agent)
     """
     # Find slots that are requested as zero (not needed)
-    zero_requested_slots: Set[str] = set()
+    zero_requested_slots: Set[SlotName] = set()
     for slot_name, amount in requested_slots.items():
         if amount == Decimal(0):
             zero_requested_slots.add(slot_name)
@@ -35,7 +37,7 @@ def count_unutilized_capabilities(agent_info: AgentInfo, requested_slots: Resour
     unutilized_count = 0
     available_slots = agent_info.available_slots - agent_info.occupied_slots
     for slot_name, amount in available_slots.items():
-        if slot_name in zero_requested_slots and amount > Decimal(0):
+        if slot_name in zero_requested_slots and Decimal(amount) > Decimal(0):
             unutilized_count += 1
 
     return unutilized_count
@@ -43,29 +45,42 @@ def count_unutilized_capabilities(agent_info: AgentInfo, requested_slots: Resour
 
 def order_slots_by_priority(
     requested_slots: ResourceSlot,
-    priority_order: list[str],
-) -> list[str]:
+    priority_order: Sequence[str | SlotName],
+) -> list[SlotName]:
     """
     Order resource slot names according to the given priority list.
 
-    Slots in the priority list come first in order, followed by
-    any remaining slots in alphabetical order.
+    The priority order list is declared using device names like "cpu", "cuda", etc.,
+    so this function first fills it with concrete resource slot names like "cuda.device"
+    by inserting them after corresponding device names like "cuda".
 
     Args:
-        requested_slots: Resource slots to order
-        priority_order: List of slot names in priority order
+        requested_slots: Resource slot instance to get the allocation ordering
+        priority_order: A reference list of device names and slot names representing the allocation order
 
     Returns:
-        Ordered list of slot names
+        An ordered list of slot names
     """
-    requested_slot_names = set(requested_slots.keys())
 
-    # First, include slots that are in the priority list
-    prioritized_slots = [
-        slot_name for slot_name in priority_order if slot_name in requested_slot_names
-    ]
+    def get_slot_index(
+        slot_name: str | SlotName, order_reference: list[str | SlotName]
+    ) -> tuple[int, str]:
+        try:
+            return (order_reference.index(slot_name), str(slot_name))
+        except ValueError:
+            # Slots missing in the priority order will be pushed back and sorted alphabetically there.
+            return (sys.maxsize, str(slot_name))
 
-    # Then, add remaining slots in sorted order
-    remaining_slots = sorted(requested_slot_names - set(prioritized_slots))
+    # Fill missing concrete slot names, by inserting slot names after corresponding device names.
+    priority_order_including_slot_names = [*priority_order]
+    for requested_slot_key in sorted(requested_slots.data.keys(), reverse=True):
+        device_name = requested_slot_key.device_name
+        if requested_slot_key not in priority_order and device_name in priority_order:
+            priority_order_including_slot_names.insert(
+                priority_order_including_slot_names.index(device_name) + 1, requested_slot_key
+            )
 
-    return prioritized_slots + remaining_slots
+    return sorted(
+        requested_slots.data.keys(),
+        key=lambda item: get_slot_index(item, priority_order_including_slot_names),
+    )
