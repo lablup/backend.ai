@@ -22,6 +22,7 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.kernel import MainKernelNotFound, TooManyKernelsFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.kernel import KernelStatus
 from ai.backend.manager.models.network import NetworkType
@@ -807,9 +808,9 @@ class SessionTransitionData:
         """Get the main kernel (kernel with DEFAULT_ROLE as cluster_role)."""
         main_kernels = [k for k in self.kernels if k.cluster_role == DEFAULT_ROLE]
         if len(main_kernels) > 1:
-            raise ValueError(f"Session {self.session_id} has more than 1 main kernel")
+            raise TooManyKernelsFound(f"Session {self.session_id} has more than 1 main kernel")
         if len(main_kernels) == 0:
-            raise ValueError(f"Session {self.session_id} has no main kernel")
+            raise MainKernelNotFound(f"Session {self.session_id} has no main kernel")
         return main_kernels[0]
 
 
