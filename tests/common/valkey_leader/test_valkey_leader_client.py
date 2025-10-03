@@ -10,6 +10,7 @@ from glide import Script
 from ai.backend.common.clients.valkey_client.valkey_leader.client import (
     ValkeyLeaderClient,
 )
+from ai.backend.common.exception import BackendAIError, ErrorCode
 
 
 @pytest.fixture
@@ -92,9 +93,15 @@ class TestValkeyLeaderClient:
 
     async def test_handle_exception_during_acquire(self, leader_client, mock_valkey_client):
         """Test that exceptions are propagated during acquire_or_renew_leadership."""
+
         # Mock the Lua script to raise an exception
+        class MockBackendAIError(BackendAIError):
+            @classmethod
+            def error_code(cls) -> ErrorCode:
+                return ErrorCode.default()
+
         mock_valkey_client.client.invoke_script = AsyncMock(
-            side_effect=Exception("Connection error")
+            side_effect=MockBackendAIError("Connection error")
         )
 
         with pytest.raises(Exception, match="Connection error"):

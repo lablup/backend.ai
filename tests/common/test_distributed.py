@@ -82,7 +82,7 @@ class NoopAnycastEvent(AbstractAnycastEvent):
         return cls(value[0])
 
     @classmethod
-    def event_domain(self) -> EventDomain:
+    def event_domain(cls) -> EventDomain:
         return EventDomain.AGENT
 
     def domain_id(self) -> Optional[str]:
@@ -372,7 +372,7 @@ async def test_global_timer_filelock(
 
 
 @pytest.mark.asyncio
-async def test_gloal_timer_redlock(
+async def test_global_timer_redlock(
     test_case_ns,
     redis_container,
 ) -> None:

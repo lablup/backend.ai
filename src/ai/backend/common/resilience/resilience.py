@@ -2,12 +2,29 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Awaitable, Callable, Iterable
-from typing import ParamSpec, TypeVar
+from contextvars import ContextVar
+from typing import Optional, ParamSpec, TypeVar
 
 from .policy import Policy
 
 P = ParamSpec("P")
 R = TypeVar("R")
+
+# Context variable to store the current operation name
+_current_operation: ContextVar[Optional[str]] = ContextVar("resilience_operation", default=None)
+
+
+def get_current_operation() -> Optional[str]:
+    """
+    Get the current operation name from context.
+
+    This is used by policies (like MetricPolicy) to access the operation name
+    without requiring it to be passed through the constructor.
+
+    Returns:
+        The current operation name, or None if not set
+    """
+    return _current_operation.get()
 
 
 class Resilience:
@@ -43,6 +60,9 @@ class Resilience:
         """
         Create a decorator that applies all policies to an async function.
 
+        The decorator sets the operation name in context before executing policies,
+        allowing policies to access it via get_current_operation().
+
         Returns:
             A decorator function that wraps the target function with all policies
         """
@@ -50,25 +70,33 @@ class Resilience:
         def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
             @functools.wraps(func)
             async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-                # Build middleware chain from policies
-                next_call: Callable[P, Awaitable[R]] = func
+                # Set the current operation name in context
+                token = _current_operation.set(func.__name__)
+                try:
+                    # Build middleware chain from policies
+                    next_call: Callable[P, Awaitable[R]] = func
 
-                # Wrap function with policies in reverse order
-                # so that first policy in list becomes outermost wrapper
-                for policy in reversed(list(self._policies)):
+                    # Wrap function with policies in reverse order
+                    # so that first policy in list becomes outermost wrapper
+                    for policy in reversed(list(self._policies)):
 
-                    def make_wrapper(
-                        p: Policy, next_fn: Callable[P, Awaitable[R]]
-                    ) -> Callable[P, Awaitable[R]]:
-                        async def policy_call(*inner_args: P.args, **inner_kwargs: P.kwargs) -> R:
-                            return await p.execute(next_fn, *inner_args, **inner_kwargs)
+                        def make_wrapper(
+                            p: Policy, next_fn: Callable[P, Awaitable[R]]
+                        ) -> Callable[P, Awaitable[R]]:
+                            async def policy_call(
+                                *inner_args: P.args, **inner_kwargs: P.kwargs
+                            ) -> R:
+                                return await p.execute(next_fn, *inner_args, **inner_kwargs)
 
-                        return policy_call
+                            return policy_call
 
-                    next_call = make_wrapper(policy, next_call)
+                        next_call = make_wrapper(policy, next_call)
 
-                # Execute the chain
-                return await next_call(*args, **kwargs)
+                    # Execute the chain
+                    return await next_call(*args, **kwargs)
+                finally:
+                    # Reset context variable
+                    _current_operation.reset(token)
 
             return wrapper
 

@@ -25,7 +25,6 @@ from ai.backend.common.bgtask.types import (
 )
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
-    create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
 from ai.backend.common.data.bgtask.defs import (
@@ -34,14 +33,35 @@ from ai.backend.common.data.bgtask.defs import (
     TASK_TTL_THRESHOLD,
 )
 from ai.backend.common.defs import REDIS_BGTASK_DB
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience import (
+    BackoffStrategy,
+    MetricArgs,
+    MetricPolicy,
+    Resilience,
+    RetryArgs,
+    RetryPolicy,
+)
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Layer-specific decorator for valkey_bgtask client
-valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_BGTASK)
+# Resilience instance for valkey_bgtask layer
+valkey_bgtask_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_BGTASK)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 _KEY_PREFIX = "bgtask"
 _TASK_KEY_PREFIX = f"{_KEY_PREFIX}:meta"  # bgtask:meta:{task_id}
@@ -102,6 +122,7 @@ class ValkeyBgtaskClient:
         await client.connect()
         return cls(client)
 
+    @valkey_bgtask_resilience.apply()
     async def close(self) -> None:
         """Close the client connection."""
         if not self._closed:
@@ -124,7 +145,7 @@ class ValkeyBgtaskClient:
         return f"{_TASK_SUBTASK_KEY_PREFIX}:{task_id}:{subkey}"
 
     # Task metadata operations
-    @valkey_decorator()
+    @valkey_bgtask_resilience.apply()
     async def register_task(self, task_total_info: TaskTotalInfo, task_set_key: TaskSetKey) -> None:
         """
         Register a background task with 24-hour TTL and index it by tags and server ID.
@@ -152,7 +173,7 @@ class ValkeyBgtaskClient:
         batch = await self._build_claim_task(batch, task_info.task_id, task_set_key)
         await self._client.client.exec(batch, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_bgtask_resilience.apply()
     async def claim_task(self, task_id: TaskID, task_set_key: TaskSetKey) -> None:
         """
         Claim an existing task by adding index references. Idempotent operation.
@@ -174,7 +195,7 @@ class ValkeyBgtaskClient:
         batch.expire(server_key, TASK_METADATA_TTL)
         return batch
 
-    @valkey_decorator()
+    @valkey_bgtask_resilience.apply()
     async def heartbeat(
         self,
         all_total_info: Sequence[TaskTotalInfo],
@@ -210,7 +231,7 @@ class ValkeyBgtaskClient:
             batch.expire(key, TASK_METADATA_TTL)
         await self._client.client.exec(batch, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_bgtask_resilience.apply()
     async def finish_subtask(
         self, task_id: TaskID, subkey: str, status: TaskStatus, last_message: str
     ) -> bool:
@@ -254,7 +275,7 @@ class ValkeyBgtaskClient:
         ongoing_count = cast(int, results[-1])
         return ongoing_count == 0
 
-    @valkey_decorator()
+    @valkey_bgtask_resilience.apply()
     async def unregister_task(self, task_id: TaskID, task_set_key: TaskSetKey) -> None:
         """
         Mark task as finished by setting short TTL for query purposes.
@@ -290,7 +311,7 @@ class ValkeyBgtaskClient:
 
         await self._client.client.exec(batch, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_bgtask_resilience.apply()
     async def fetch_unmanaged_tasks(self, task_set_key: TaskSetKey) -> list[TaskTotalInfo]:
         """
         Fetch unmanaged tasks with insufficient TTL for a specific TaskSetKey.

@@ -1,19 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import enum
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import ParamSpec, TypeVar
-
-from tenacity import (
-    retry,
-    retry_if_not_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-    wait_fixed,
-)
-from tenacity.wait import wait_base
+from typing import Optional, ParamSpec, TypeVar
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -21,6 +13,7 @@ from ai.backend.common.exception import (
     ErrorDetail,
     ErrorDomain,
     ErrorOperation,
+    UnreachableError,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -104,34 +97,44 @@ class RetryPolicy(Policy):
         **kwargs: P.kwargs,
     ) -> R:
         """
-        Execute with retry logic using tenacity.
+        Execute with retry logic.
 
         Automatically retries all exceptions except non-retryable ones.
         Non-retryable exceptions propagate immediately without retry.
         """
-        # Build tenacity retry configuration
-        wait_strategy = self._build_wait_strategy()
-        stop_strategy = stop_after_attempt(self._max_retries)
-        retry_strategy = retry_if_not_exception_type(self._non_retryable_exceptions)
+        last_exception: Optional[Exception] = None
 
-        # Apply retry decorator to next_call
-        retrying_call = retry(
-            wait=wait_strategy,
-            stop=stop_strategy,
-            retry=retry_strategy,
-            reraise=True,
-        )(next_call)
+        for attempt in range(1, self._max_retries + 1):
+            try:
+                return await next_call(*args, **kwargs)
+            except self._non_retryable_exceptions as e:
+                log.debug("non-retryable exception encountered: {}", e)
+                raise
+            except Exception as e:
+                last_exception = e
+                log.debug(
+                    "retryable exception encountered: {}, attempt {}/{}",
+                    e,
+                    attempt,
+                    self._max_retries,
+                )
 
-        return await retrying_call(*args, **kwargs)
+                # Wait before next retry (but not after the last attempt)
+                if attempt < self._max_retries:
+                    delay = self._calculate_delay(attempt)
+                    await asyncio.sleep(delay)
 
-    def _build_wait_strategy(self) -> wait_base:
-        """Build tenacity wait strategy based on backoff configuration."""
+        if last_exception is not None:
+            raise last_exception
+        raise UnreachableError("RetryPolicy failed without capturing an exception.")
+
+    def _calculate_delay(self, attempt: int) -> float:
+        """Calculate delay based on backoff strategy."""
         match self._backoff_strategy:
             case BackoffStrategy.EXPONENTIAL:
-                return wait_exponential(
-                    multiplier=self._retry_delay,
-                    min=self._retry_delay,
-                    max=self._max_delay,
-                )
-            case BackoffStrategy.FIXED:
-                return wait_fixed(self._retry_delay)
+                # Exponential backoff: delay * (2 ^ (attempt - 1))
+                delay = self._retry_delay * (2 ** (attempt - 1))
+                return min(delay, self._max_delay)
+            case _:
+                # Fixed delay
+                return self._retry_delay
