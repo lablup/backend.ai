@@ -1,16 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import enum
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Optional, ParamSpec, TypeVar
-
-from tenacity import (
-    wait_exponential,
-    wait_fixed,
-)
-from tenacity.wait import wait_base
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -102,13 +97,14 @@ class RetryPolicy(Policy):
         **kwargs: P.kwargs,
     ) -> R:
         """
-        Execute with retry logic using tenacity.
+        Execute with retry logic.
 
         Automatically retries all exceptions except non-retryable ones.
         Non-retryable exceptions propagate immediately without retry.
         """
         last_exception: Optional[Exception] = None
-        for i in range(1, self._max_retries + 1):
+
+        for attempt in range(1, self._max_retries + 1):
             try:
                 return await next_call(*args, **kwargs)
             except self._non_retryable_exceptions as e:
@@ -117,20 +113,28 @@ class RetryPolicy(Policy):
             except Exception as e:
                 last_exception = e
                 log.debug(
-                    "retryable exception encountered: {}, attempt {}/{}", e, i, self._max_retries
+                    "retryable exception encountered: {}, attempt {}/{}",
+                    e,
+                    attempt,
+                    self._max_retries,
                 )
+
+                # Wait before next retry (but not after the last attempt)
+                if attempt < self._max_retries:
+                    delay = self._calculate_delay(attempt)
+                    await asyncio.sleep(delay)
+
         if last_exception is not None:
             raise last_exception
         raise UnreachableError("RetryPolicy failed without capturing an exception.")
 
-    def _build_wait_strategy(self) -> wait_base:
-        """Build tenacity wait strategy based on backoff configuration."""
+    def _calculate_delay(self, attempt: int) -> float:
+        """Calculate delay based on backoff strategy."""
         match self._backoff_strategy:
             case BackoffStrategy.EXPONENTIAL:
-                return wait_exponential(
-                    multiplier=self._retry_delay,
-                    min=self._retry_delay,
-                    max=self._max_delay,
-                )
+                # Exponential backoff: delay * (2 ^ (attempt - 1))
+                delay = self._retry_delay * (2 ** (attempt - 1))
+                return min(delay, self._max_delay)
             case _:
-                return wait_fixed(self._retry_delay)
+                # Fixed delay
+                return self._retry_delay
