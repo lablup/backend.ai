@@ -5,17 +5,37 @@ from glide import Batch
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
-    create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience import (
+    BackoffStrategy,
+    MetricArgs,
+    MetricPolicy,
+    Resilience,
+    RetryArgs,
+    RetryPolicy,
+)
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Layer-specific decorator for valkey_image client
-valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_IMAGE)
+# Resilience instance for valkey_image layer
+valkey_image_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_IMAGE)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -57,7 +77,7 @@ class ValkeyImageClient:
         await client.connect()
         return cls(client=client)
 
-    @valkey_decorator()
+    @valkey_image_resilience.apply()
     async def close(self) -> None:
         """
         Close the ValkeyImageClient connection.
@@ -68,7 +88,7 @@ class ValkeyImageClient:
         self._closed = True
         await self._client.disconnect()
 
-    @valkey_decorator()
+    @valkey_image_resilience.apply()
     async def add_agent_to_images(
         self,
         agent_id: str,
@@ -88,7 +108,7 @@ class ValkeyImageClient:
             tx.sadd(image_canonical, [agent_id])
         await self._client.client.exec(tx, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_image_resilience.apply()
     async def remove_agent_from_images(
         self,
         agent_id: str,
@@ -108,7 +128,7 @@ class ValkeyImageClient:
             tx.srem(image_canonical, [agent_id])
         await self._client.client.exec(tx, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_image_resilience.apply()
     async def remove_agent_from_all_images(
         self,
         agent_id: str,
@@ -137,7 +157,7 @@ class ValkeyImageClient:
                 tx.srem(key, [agent_id])
             await self._client.client.exec(tx, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_image_resilience.apply()
     async def get_agents_for_image(
         self,
         image_canonical: str,
@@ -151,7 +171,7 @@ class ValkeyImageClient:
         result = await self._client.client.smembers(image_canonical)
         return {member.decode() for member in result}
 
-    @valkey_decorator()
+    @valkey_image_resilience.apply()
     async def get_agents_for_images(
         self,
         image_canonicals: list[str],
@@ -178,7 +198,7 @@ class ValkeyImageClient:
             final_results.append({member.decode() for member in result})
         return final_results
 
-    @valkey_decorator()
+    @valkey_image_resilience.apply()
     async def get_agent_counts_for_images(
         self,
         image_canonicals: list[str],
