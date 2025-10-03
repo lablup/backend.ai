@@ -26,23 +26,6 @@ PORT_POOL_BASE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_BASE", "10000
 PORT_POOL_SIZE: Final = int(os.environ.get("BACKEND_TEST_PORT_POOL_SIZE", "1000"))
 
 
-def get_next_tcp_port(num_alloc: int = 1) -> tuple[int, ...]:
-    lock_path = Path("~/.cache/bai/testing/port.lock").expanduser()
-    port_path = Path("~/.cache/bai/testing/port.txt").expanduser()
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with sync_file_lock(lock_path):
-        if port_path.exists():
-            port_no = int(port_path.read_text())
-        else:
-            port_no = PORT_POOL_BASE
-        allocated_ports = tuple(
-            PORT_POOL_BASE + (port_no + i) % PORT_POOL_SIZE for i in range(num_alloc)
-        )
-        port_no = PORT_POOL_BASE + (port_no + num_alloc) % PORT_POOL_SIZE
-        port_path.write_text(str(port_no))
-    return allocated_ports
-
-
 @contextlib.contextmanager
 def sync_file_lock(path: Path, max_retries: int = 60, retry_interval: int = 2):
     if not path.exists():
@@ -90,12 +73,11 @@ def _wait_redis_health_check(host: str, port: int) -> None:
 def etcd_container() -> Iterator[tuple[str, HostPortPairModel]]:
     # Spawn a single-node etcd container for a testing session.
     random_id = secrets.token_hex(8)
-    published_port = get_next_tcp_port()[0]
 
     container = (
         DockerContainer("quay.io/coreos/etcd:v3.5.4")
         .with_name(f"test--etcd-slot-{get_parallel_slot()}-{random_id}")
-        .with_bind_ports(2379, published_port)
+        .with_exposed_ports(2379)
         .with_kwargs(tmpfs={"/etcd-data": ""})
         .with_command(
             "/usr/local/bin/etcd "
@@ -106,6 +88,7 @@ def etcd_container() -> Iterator[tuple[str, HostPortPairModel]]:
 
     log.info("spawning etcd container (parallel slot: %d)", get_parallel_slot())
     container.start()
+    published_port = int(container.get_exposed_port(2379))
 
     try:
         # Wait for etcd to be ready using log message
@@ -125,19 +108,18 @@ def etcd_container() -> Iterator[tuple[str, HostPortPairModel]]:
 def redis_container() -> Iterator[tuple[str, HostPortPairModel]]:
     # Spawn a single-node redis container for a testing session.
     random_id = secrets.token_hex(8)
-    published_port = get_next_tcp_port()[0]
-
     # IMPORTANT: We intentionally use custom health check instead of Docker's
     # built-in health check to avoid intermittent failures when pausing/unpausing containers.
     container = (
         RedisContainer("redis:7-alpine")
         .with_name(f"test--redis-slot-{get_parallel_slot()}-{random_id}")
-        .with_bind_ports(6379, published_port)
+        .with_exposed_ports(6379)
         .with_kwargs(tmpfs={"/data": ""}, user=f"{os.getuid()}:{os.getgid()}")
     )
 
     log.info("spawning redis container (parallel slot: %d)", get_parallel_slot())
     container.start()
+    published_port = int(container.get_exposed_port(6379))
 
     try:
         # Use custom PING health check (matches original implementation)
@@ -155,19 +137,18 @@ def redis_container() -> Iterator[tuple[str, HostPortPairModel]]:
 def postgres_container() -> Iterator[tuple[str, HostPortPairModel]]:
     # Spawn a single-node PostgreSQL container for a testing session.
     random_id = secrets.token_hex(8)
-    published_port = get_next_tcp_port()[0]
-
     container = (
         PostgresContainer(
             "postgres:13.6-alpine", username="postgres", password="develove", dbname="testing"
         )
         .with_name(f"test--postgres-slot-{get_parallel_slot()}-{random_id}")
-        .with_bind_ports(5432, published_port)
+        .with_exposed_ports(5432)
         .with_kwargs(tmpfs={"/var/lib/postgresql/data": ""})
     )
 
     log.info("spawning postgres container (parallel slot: %d)", get_parallel_slot())
     container.start()
+    published_port = int(container.get_exposed_port(5432))
 
     try:
         # PostgresContainer automatically waits for pg_isready, but add grace period
@@ -185,19 +166,20 @@ def postgres_container() -> Iterator[tuple[str, HostPortPairModel]]:
 def minio_container() -> Iterator[tuple[str, HostPortPairModel]]:
     # Spawn a single-node MinIO container for a testing session.
     random_id = secrets.token_hex(8)
-    api_port, console_port = get_next_tcp_port(2)
 
     container = (
         MinioContainer("minio/minio:latest", access_key="minioadmin", secret_key="minioadmin")
         .with_name(f"test--minio-slot-{get_parallel_slot()}-{random_id}")
-        .with_bind_ports(9000, api_port)
-        .with_bind_ports(9090, console_port)
+        .with_exposed_ports(9000)
+        .with_exposed_ports(9090)
         .with_kwargs(tmpfs={"/data": ""})
         .with_command("server /data --console-address :9090")
     )
 
     log.info("spawning minio container (parallel slot: %d)", get_parallel_slot())
     container.start()
+    api_port = int(container.get_exposed_port(9000))
+    _ = int(container.get_exposed_port(9090))
 
     try:
         # MinioContainer automatically waits for MinIO to be ready, but add grace period

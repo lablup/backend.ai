@@ -13,11 +13,28 @@ import pytest
 from packaging.version import Version
 from packaging.version import parse as parse_version
 
-from ai.backend.testutils.bootstrap import get_next_tcp_port
+from ai.backend.testutils.bootstrap import PORT_POOL_BASE, PORT_POOL_SIZE, sync_file_lock
 from ai.backend.testutils.pants import get_parallel_slot
 
 from .types import AbstractRedisNode, AbstractRedisSentinelCluster, RedisClusterInfo
 from .utils import simple_run_cmd
+
+
+def get_next_tcp_port(num_alloc: int = 1) -> tuple[int, ...]:
+    lock_path = Path("~/.cache/bai/testing/port.lock").expanduser()
+    port_path = Path("~/.cache/bai/testing/port.txt").expanduser()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with sync_file_lock(lock_path):
+        if port_path.exists():
+            port_no = int(port_path.read_text())
+        else:
+            port_no = PORT_POOL_BASE
+        allocated_ports = tuple(
+            PORT_POOL_BASE + (port_no + i) % PORT_POOL_SIZE for i in range(num_alloc)
+        )
+        port_no = PORT_POOL_BASE + (port_no + num_alloc) % PORT_POOL_SIZE
+        port_path.write_text(str(port_no))
+    return allocated_ports
 
 
 async def check_if_port_is_clear(host, port):
