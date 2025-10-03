@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import ParamSpec, TypeVar
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -18,6 +18,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ..policy import Policy
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 class ResilienceTimeoutError(BackendAIError):
@@ -60,8 +63,12 @@ class TimeoutPolicy(Policy):
         """
         self._timeout = args.timeout
 
-    @asynccontextmanager
-    async def execute(self) -> AsyncIterator[None]:
+    async def execute(
+        self,
+        next_call: Callable[P, Awaitable[R]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
         """
         Execute with timeout enforcement.
 
@@ -70,7 +77,7 @@ class TimeoutPolicy(Policy):
         """
         try:
             async with asyncio.timeout(self._timeout):
-                yield
+                return await next_call(*args, **kwargs)
         except TimeoutError as e:
             log.warning("Operation exceeded timeout of {:.3f}s", self._timeout)
             raise ResilienceTimeoutError(f"Operation exceeded timeout of {self._timeout}s") from e

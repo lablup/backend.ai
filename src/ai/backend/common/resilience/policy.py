@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import Awaitable, Callable
+from typing import ParamSpec, TypeVar
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 class Policy(ABC):
@@ -13,25 +16,38 @@ class Policy(ABC):
     retry, circuit breaking, timeout, or metrics collection.
 
     Each policy instance maintains its own state (e.g., circuit breaker state,
-    failure counts, metrics) and provides an async context manager for execution.
+    failure counts, metrics) and provides middleware-style function wrapping.
 
-    Policies can be chained together to compose multiple resilience patterns.
+    Policies can be chained together to compose multiple resilience patterns
+    using the middleware pattern where each policy wraps the next one.
     """
 
     @abstractmethod
-    @asynccontextmanager
-    async def execute(self) -> AsyncIterator[None]:
+    async def execute(
+        self,
+        next_call: Callable[P, Awaitable[R]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
         """
-        Execute within this policy's context.
+        Execute the next callable with this policy's behavior.
 
-        This is an async context manager that wraps the execution.
-        Policies can perform setup before yield and cleanup/error handling after.
+        This method implements the middleware pattern, where each policy
+        can perform actions before/after calling the next policy or the final function.
 
-        Yields:
-            None (context manager protocol)
+        Args:
+            next_call: The next callable in the chain (policy or final function)
+            *args: Positional arguments to pass to next_call
+            **kwargs: Keyword arguments to pass to next_call
+
+        Returns:
+            Result from next_call
 
         Example:
-            >>> async with policy.execute():
-            ...     result = await some_function()
+            >>> async def execute(self, next_call, *args, **kwargs):
+            ...     # Before logic
+            ...     result = await next_call(*args, **kwargs)
+            ...     # After logic
+            ...     return result
         """
-        yield
+        raise NotImplementedError

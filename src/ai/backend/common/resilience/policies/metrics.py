@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 import time
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import ParamSpec, TypeVar
 
 from ai.backend.common.metrics.metric import DomainType, LayerMetricObserver, LayerType
 from ai.backend.logging import BraceStyleAdapter
@@ -12,6 +12,9 @@ from ai.backend.logging import BraceStyleAdapter
 from ..policy import Policy
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 @dataclass
@@ -50,8 +53,12 @@ class MetricPolicy(Policy):
         self._operation = args.operation
         self._observer = LayerMetricObserver.instance()
 
-    @asynccontextmanager
-    async def execute(self) -> AsyncIterator[None]:
+    async def execute(
+        self,
+        next_call: Callable[P, Awaitable[R]],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
         """
         Execute with metric collection.
 
@@ -68,7 +75,7 @@ class MetricPolicy(Policy):
         )
 
         try:
-            yield
+            result = await next_call(*args, **kwargs)
             # Record success
             self._observer.observe_layer_operation(
                 domain=self._domain,
@@ -77,6 +84,7 @@ class MetricPolicy(Policy):
                 success=True,
                 duration=time.perf_counter() - start,
             )
+            return result
         except Exception:
             # Record failure
             self._observer.observe_layer_operation(

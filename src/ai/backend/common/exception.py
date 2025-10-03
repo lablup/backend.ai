@@ -247,6 +247,8 @@ class ErrorDetail(enum.StrEnum):
     # MISMATCH means the current state of the server does not match the expected state.
     # MISMATCH is used when the server is in a state that is not expected.
     MISMATCH = "mismatch"
+    # TIMEOUT
+    TIMEOUT = "timeout"
 
 
 @dataclass

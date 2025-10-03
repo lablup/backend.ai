@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Awaitable, Callable, Iterable
-from contextlib import AsyncExitStack
 from typing import ParamSpec, TypeVar
 
 from .policy import Policy
@@ -16,7 +15,7 @@ class Resilience:
     Main executor that chains multiple resilience policies and applies them as a decorator.
 
     Policies are executed in the order they are provided, with each policy
-    wrapping the next one in the chain using async context managers.
+    wrapping the next one in the chain using the middleware pattern.
 
     Example:
         >>> resilience = Resilience(policies=[
@@ -51,14 +50,25 @@ class Resilience:
         def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
             @functools.wraps(func)
             async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
-                # Use AsyncExitStack to manage nested async context managers
-                async with AsyncExitStack() as stack:
-                    # Enter all policy contexts in order
-                    for policy in self._policies:
-                        await stack.enter_async_context(policy.execute())
+                # Build middleware chain from policies
+                next_call: Callable[P, Awaitable[R]] = func
 
-                    # Execute the actual function within all policy contexts
-                    return await func(*args, **kwargs)
+                # Wrap function with policies in reverse order
+                # so that first policy in list becomes outermost wrapper
+                for policy in reversed(list(self._policies)):
+
+                    def make_wrapper(
+                        p: Policy, next_fn: Callable[P, Awaitable[R]]
+                    ) -> Callable[P, Awaitable[R]]:
+                        async def policy_call(*inner_args: P.args, **inner_kwargs: P.kwargs) -> R:
+                            return await p.execute(next_fn, *inner_args, **inner_kwargs)
+
+                        return policy_call
+
+                    next_call = make_wrapper(policy, next_call)
+
+                # Execute the chain
+                return await next_call(*args, **kwargs)
 
             return wrapper
 
