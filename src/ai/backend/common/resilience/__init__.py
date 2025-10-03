@@ -9,7 +9,7 @@ from .policies import (
     TimeoutPolicy,
 )
 from .policy import Policy
-from .resilience import Resilience
+from .resilience import Resilience, get_current_operation
 
 __all__ = [
     "BackoffStrategy",
@@ -22,4 +22,5 @@ __all__ = [
     "RetryPolicy",
     "TimeoutArgs",
     "TimeoutPolicy",
+    "get_current_operation",
 ]
