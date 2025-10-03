@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from tenacity import (
     AsyncRetrying,
+    retry_if_not_exception_type,
     stop_after_attempt,
     wait_exponential,
     wait_fixed,
@@ -91,14 +92,13 @@ class RetryPolicy(Policy):
         stop_strategy = stop_after_attempt(self._max_retries)
 
         # Retry all exceptions except non-retryable ones
-        def should_retry(exception: BaseException) -> bool:
-            return not isinstance(exception, self._non_retryable_exceptions)
+        retry_strategy = retry_if_not_exception_type(self._non_retryable_exceptions)
 
         # Use tenacity's AsyncRetrying
         async for attempt in AsyncRetrying(
             wait=wait_strategy,
             stop=stop_strategy,
-            retry=should_retry,
+            retry=retry_strategy,
             reraise=True,
         ):
             with attempt:
