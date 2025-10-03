@@ -44,7 +44,7 @@ valkey_stream_resilience = Resilience(
                 max_retries=3,
                 retry_delay=0.1,
                 backoff_strategy=BackoffStrategy.FIXED,
-                non_retryable_exceptions=(BackendAIError,),
+                non_retryable_exceptions=(BackendAIError, GlideTimeoutError),
             )
         ),
     ]
