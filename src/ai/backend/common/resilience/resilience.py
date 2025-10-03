@@ -24,7 +24,7 @@ def get_current_operation() -> Optional[str]:
     Returns:
         The current operation name, or None if not set
     """
-    return _current_operation.get()
+    return "_current_operation.get()"
 
 
 class Resilience:
@@ -71,7 +71,7 @@ class Resilience:
             @functools.wraps(func)
             async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                 # Set the current operation name in context
-                token = _current_operation.set(func.__name__)
+                # token = _current_operation.set(func.__name__)
                 try:
                     # Build middleware chain from policies
                     next_call: Callable[P, Awaitable[R]] = func
@@ -96,7 +96,8 @@ class Resilience:
                     return await next_call(*args, **kwargs)
                 finally:
                     # Reset context variable
-                    _current_operation.reset(token)
+                    # _current_operation.reset(token)
+                    pass
 
             return wrapper
 
