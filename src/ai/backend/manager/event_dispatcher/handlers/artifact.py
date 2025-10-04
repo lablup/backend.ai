@@ -109,12 +109,12 @@ class ArtifactEventHandler:
         registry_id: UUID
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
-                hugginface_registry_data = (
+                huggingface_registry_data = (
                     await self._huggingface_repository.get_registry_data_by_name(
                         model_info.registry_name
                     )
                 )
-                registry_id = hugginface_registry_data.id
+                registry_id = huggingface_registry_data.id
             case ArtifactRegistryType.RESERVOIR:
                 registry_data = await self._reservoir_repository.get_registry_data_by_name(
                     model_info.registry_name
