@@ -3,12 +3,27 @@ from uuid import UUID
 
 import aiohttp
 
-from ai.backend.common.metrics.metric import LayerType
-from ai.backend.manager.decorators.client_decorator import create_layer_aware_client_decorator
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 
 from .types import CreateEndpointRequestBody
 
-client_decorator = create_layer_aware_client_decorator(LayerType.WSPROXY_CLIENT)
+appproxy_client_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.CLIENT, layer=LayerType.WSPROXY_CLIENT)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class AppProxyClient:
@@ -21,7 +36,7 @@ class AppProxyClient:
         self._address = address
         self._token = token
 
-    @client_decorator()
+    @appproxy_client_resilience.apply()
     async def create_endpoint(
         self,
         endpoint_id: UUID,
@@ -37,7 +52,7 @@ class AppProxyClient:
             resp.raise_for_status()
             return await resp.json()
 
-    @client_decorator()
+    @appproxy_client_resilience.apply()
     async def delete_endpoint(
         self,
         endpoint_id: UUID,

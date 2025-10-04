@@ -16,8 +16,8 @@ from ai.backend.common.types import (
     RuntimeVariant,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.wsproxy.client import AppProxyClient
-from ai.backend.manager.clients.wsproxy.types import (
+from ai.backend.manager.clients.appproxy.client import AppProxyClient
+from ai.backend.manager.clients.appproxy.types import (
     CreateEndpointRequestBody,
     EndpointTagsModel,
     SessionTagsModel,

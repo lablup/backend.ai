@@ -149,7 +149,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import str_to_timedelta
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.wsproxy.types import (
+from ai.backend.manager.clients.appproxy.types import (
     CreateEndpointRequestBody,
     EndpointTagsModel,
     SessionTagsModel,
@@ -169,7 +169,7 @@ from ai.backend.manager.utils import query_userinfo
 
 from .agent_cache import AgentRPCCache
 from .clients.agent.client import AgentClient
-from .clients.wsproxy.client import AppProxyClient
+from .clients.appproxy.client import AppProxyClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE, DEFAULT_SHARED_MEMORY_SIZE, INTRINSIC_SLOTS
 from .errors.api import InvalidAPIParameters
 from .errors.common import GenericForbidden, RejectedByHook
