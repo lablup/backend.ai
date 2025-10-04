@@ -5,7 +5,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import groupby
-from typing import Any, Awaitable, Coroutine, Optional
+from typing import Any, Awaitable, Optional
 from uuid import UUID
 
 import aiotools
@@ -953,7 +953,7 @@ class Scheduler:
                         agent_image_configs[agent_id][canonical] = image_config
 
         # Trigger image checking and pulling on each agent
-        pull_tasks: list[Coroutine[Any, Any, Mapping[str, str]]] = []
+        pull_tasks: list[Awaitable[Mapping[str, str]]] = []
         for agent_id, agent_images in agent_image_configs.items():
             agent_client = self._agent_pool.get_agent_client(agent_id)
             pull_tasks.append(agent_client.check_and_pull(agent_images))
