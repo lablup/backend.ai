@@ -15,6 +15,7 @@ from ai.backend.manager.data.domain.types import (
     DomainNodeModifier,
     UserInfo,
 )
+from ai.backend.manager.errors.resource import DomainUpdateNotAllowed
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
@@ -255,7 +256,7 @@ async def test_create_domain_node(
                     description=TriState.update("Domain Description Modified"),
                 ),
             ),
-            ValueError,
+            DomainUpdateNotAllowed,
         ),
     ],
 )
@@ -1007,12 +1008,8 @@ async def test_modify_domain_node_dotfiles_update(
             result = await processors.modify_domain_node.wait_for_complete(action)
             if result.success:
                 assert result.domain_data is not None
-        except ValueError as e:
-            if "Not allowed to update domain" in str(e):
-                # Expected behavior - domain updates may be restricted in test environment
-                pass
-            else:
-                raise
+        except DomainUpdateNotAllowed:
+            pass
 
 
 @pytest.mark.asyncio

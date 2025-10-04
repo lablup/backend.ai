@@ -15,7 +15,14 @@ from ai.backend.manager.data.domain.types import (
     DomainModifier,
     UserInfo,
 )
-from ai.backend.manager.errors.resource import DomainDataProcessingError
+from ai.backend.manager.errors.resource import (
+    DomainDataProcessingError,
+    DomainHasActiveKernels,
+    DomainHasGroups,
+    DomainHasUsers,
+    DomainUpdateNotAllowed,
+    InvalidDomainConfiguration,
+)
 from ai.backend.manager.models import groups, users
 from ai.backend.manager.models.domain import DomainRow, domains, get_domains
 from ai.backend.manager.models.group import ProjectType
@@ -122,15 +129,17 @@ class DomainRepository:
         async with self._db.begin() as conn:
             # Validate prerequisites
             if await self._domain_has_active_kernels(conn, domain_name):
-                raise RuntimeError("Domain has some active kernels. Terminate them first.")
+                raise DomainHasActiveKernels(
+                    "Domain has some active kernels. Terminate them first."
+                )
 
             user_count = await self._get_domain_user_count(conn, domain_name)
             if user_count > 0:
-                raise RuntimeError("There are users bound to the domain. Remove users first.")
+                raise DomainHasUsers("There are users bound to the domain. Remove users first.")
 
             group_count = await self._get_domain_group_count(conn, domain_name)
             if group_count > 0:
-                raise RuntimeError("There are groups bound to the domain. Remove groups first.")
+                raise DomainHasGroups("There are groups bound to the domain. Remove groups first.")
 
             # Clean up kernels
             await self._delete_kernels(conn, domain_name)
@@ -320,7 +329,7 @@ class DomainRepository:
                 db_session=db_session,
             )
             if not domain_models:
-                raise ValueError(f"Not allowed to update domain (id:{domain_name})")
+                raise DomainUpdateNotAllowed(f"Not allowed to update domain (id:{domain_name})")
 
             if sgroups_to_add is not None:
                 await self._ensure_sgroup_permission(
@@ -354,6 +363,6 @@ class DomainRepository:
         )
         not_allowed_sgroups = set(sgroup_names) - set([sg.name for sg in sgroup_models])
         if not_allowed_sgroups:
-            raise ValueError(
+            raise InvalidDomainConfiguration(
                 f"Not allowed to associate the domain with given scaling groups(s:{not_allowed_sgroups})"
             )

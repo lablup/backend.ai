@@ -39,6 +39,8 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.errors.kernel import KernelNotFound, SessionNotFound
+from ai.backend.manager.errors.resource import AgentNotFound, AllocationFailed, ScalingGroupNotFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models import (
     PRIVATE_SESSION_TYPES,
@@ -117,7 +119,7 @@ schedule_repository_resilience = Resilience(
             RetryArgs(
                 max_retries=10,
                 retry_delay=0.1,
-                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                backoff_strategy=BackoffStrategy.FIXED,
                 non_retryable_exceptions=(BackendAIError,),
             )
         ),
@@ -427,7 +429,7 @@ class ScheduleRepository:
             query = query.where(extra_conds)
         current_occupied_slots = (await session.execute(query)).scalar()
         if current_occupied_slots is None:
-            raise RuntimeError(f"No agent matching condition: {extra_conds}")
+            raise AgentNotFound(f"No agent matching condition: {extra_conds}")
         update_query = (
             sa.update(AgentRow)
             .values(
@@ -776,7 +778,7 @@ class ScheduleRepository:
             )
             row = result.first()
             if row is None:
-                raise ValueError(f'Scaling group "{sgroup_name}" not found!')
+                raise ScalingGroupNotFound(f'Scaling group "{sgroup_name}" not found!')
             return row.scheduler, row.scheduler_opts
 
     @schedule_repository_resilience.apply()
@@ -968,7 +970,7 @@ class ScheduleRepository:
                 )
             ).fetchall()[0]
             if result is None:
-                raise RuntimeError(f"No such agent exist in DB: {agent_id}")
+                raise AgentNotFound(f"No such agent exist in DB: {agent_id}")
             return result
 
     @schedule_repository_resilience.apply()
@@ -1112,7 +1114,7 @@ class ScheduleRepository:
             session_row = await db_session.scalar(stmt)
             session_row = cast(SessionRow, session_row)
             if session_row is None:
-                raise RuntimeError(f"Session {session_id} not found")
+                raise SessionNotFound(f"Session {session_id} not found")
 
             for kernel in session_row.kernels:
                 kernel.set_status(
@@ -1668,7 +1670,7 @@ class ScheduleRepository:
         agent_row = result.scalar_one_or_none()
 
         if agent_row is None:
-            raise RuntimeError(f"Agent {agent_id} not found")
+            raise AgentNotFound(f"Agent {agent_id} not found")
 
         # Cache it for future use
         agent_row_map[agent_id] = agent_row
@@ -1692,7 +1694,7 @@ class ScheduleRepository:
         session_row = result.scalar_one_or_none()
 
         if session_row is None:
-            raise RuntimeError(f"Session {session_id} not found")
+            raise SessionNotFound(f"Session {session_id} not found")
 
         # Cache it for future use
         session_row_map[session_id] = session_row
@@ -1716,7 +1718,7 @@ class ScheduleRepository:
         kernel_row = result.scalar_one_or_none()
 
         if kernel_row is None:
-            raise RuntimeError(f"Kernel {kernel_id} not found")
+            raise KernelNotFound(f"Kernel {kernel_id} not found")
 
         # Cache it for future use
         kernel_row_map[kernel_id] = kernel_row
@@ -1777,7 +1779,7 @@ class ScheduleRepository:
                 remaining = available_amount - occupied_amount
 
                 if remaining < requested_amount:
-                    raise RuntimeError(
+                    raise AllocationFailed(
                         f"Agent {agent_id} has insufficient resources for {key}: "
                         f"requested={requested_amount}, remaining={remaining}"
                     )

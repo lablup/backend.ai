@@ -60,7 +60,7 @@ vfolder_repository_resilience = Resilience(
             RetryArgs(
                 max_retries=10,
                 retry_delay=0.1,
-                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                backoff_strategy=BackoffStrategy.FIXED,
                 non_retryable_exceptions=(BackendAIError,),
             )
         ),

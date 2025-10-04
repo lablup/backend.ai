@@ -8,6 +8,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import SessionId
+from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.session import (
     KernelLoadingStrategy,
     SessionRow,
@@ -21,7 +22,7 @@ session_repository_resilience = Resilience(
             RetryArgs(
                 max_retries=10,
                 retry_delay=0.1,
-                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                backoff_strategy=BackoffStrategy.FIXED,
                 non_retryable_exceptions=(BackendAIError,),
             )
         ),
@@ -57,7 +58,7 @@ class AdminSessionRepository:
 
             session_row = await db_sess.scalar(query_stmt)
             if session_row is None:
-                raise ValueError(f"Session not found (id:{session_id})")
+                raise SessionNotFound(f"Session not found (id:{session_id})")
 
             return session_row
 
@@ -71,5 +72,5 @@ class AdminSessionRepository:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
             session_row = await db_sess.scalar(query_stmt)
             if session_row is None:
-                raise ValueError(f"Session not found (id:{session_id})")
+                raise SessionNotFound(f"Session not found (id:{session_id})")
             return session_row

@@ -14,6 +14,7 @@ from ai.backend.manager.data.domain.types import (
     DomainModifier,
     UserInfo,
 )
+from ai.backend.manager.errors.resource import DomainCreationFailed, DomainNodeCreationFailed
 from ai.backend.manager.models import groups
 from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
 from ai.backend.manager.models.group import ProjectType
@@ -28,7 +29,7 @@ domain_repository_resilience = Resilience(
             RetryArgs(
                 max_retries=10,
                 retry_delay=0.1,
-                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                backoff_strategy=BackoffStrategy.FIXED,
                 non_retryable_exceptions=(BackendAIError,),
             )
         ),
@@ -63,7 +64,9 @@ class AdminDomainRepository:
             await self._create_model_store_group(conn, creator.name)
 
             if result.rowcount != 1 or row is None:
-                raise RuntimeError(f"No domain created. rowcount: {result.rowcount}, data: {data}")
+                raise DomainCreationFailed(
+                    f"No domain created. rowcount: {result.rowcount}, data: {data}"
+                )
 
         assert row is not None
         result = row_to_data(row)
@@ -148,7 +151,7 @@ class AdminDomainRepository:
 
             await session.commit()
             if domain_row is None:
-                raise RuntimeError(f"Failed to create domain node: {creator.name}")
+                raise DomainNodeCreationFailed(f"Failed to create domain node: {creator.name}")
             assert domain_row is not None
             result = row_to_data(domain_row)
             assert result is not None

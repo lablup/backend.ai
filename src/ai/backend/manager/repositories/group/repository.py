@@ -18,7 +18,7 @@ from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
-from ai.backend.manager.errors.resource import GroupNotFound
+from ai.backend.manager.errors.resource import GroupNotFound, InvalidUserUpdateMode
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
 from ai.backend.manager.models.kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, kernels
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
@@ -37,7 +37,7 @@ group_repository_resilience = Resilience(
             RetryArgs(
                 max_retries=10,
                 retry_delay=0.1,
-                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                backoff_strategy=BackoffStrategy.FIXED,
                 non_retryable_exceptions=(BackendAIError,),
             )
         ),
@@ -95,7 +95,7 @@ class GroupRepository:
         data = modifier.fields_to_update()
 
         if user_update_mode not in (None, "add", "remove"):
-            raise ValueError("invalid user_update_mode")
+            raise InvalidUserUpdateMode("invalid user_update_mode")
 
         if not data and user_update_mode is None:
             return None

@@ -20,6 +20,7 @@ from ai.backend.manager.errors.image import (
     ForgetImageNotFoundError,
     ImageAliasNotFound,
     ModifyImageActionValueError,
+    RegistryNotFoundForImage,
 )
 from ai.backend.manager.models.image import (
     ImageAliasRow,
@@ -36,7 +37,7 @@ image_repository_resilience = Resilience(
             RetryArgs(
                 max_retries=10,
                 retry_delay=0.1,
-                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                backoff_strategy=BackoffStrategy.FIXED,
                 non_retryable_exceptions=(BackendAIError,),
             )
         ),
@@ -248,7 +249,7 @@ class ImageRepository:
             # Get the registry row
             registry_row = await session.get(ContainerRegistryRow, image_row.registry_id)
             if not registry_row:
-                raise ValueError(f"Registry not found for image {image_canonical}")
+                raise RegistryNotFoundForImage(f"Registry not found for image {image_canonical}")
 
             # Call the original scan function
             result = await scan_single_image(self._db, registry_key, registry_row, image_canonical)

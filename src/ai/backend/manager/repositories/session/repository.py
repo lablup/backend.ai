@@ -15,7 +15,8 @@ from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.api.session import find_dependency_sessions
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.errors.common import GenericBadRequest
+from ai.backend.manager.errors.kernel import SessionAlreadyExists, SessionNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow, rescan_images
@@ -38,7 +39,7 @@ session_repository_resilience = Resilience(
             RetryArgs(
                 max_retries=10,
                 retry_delay=0.1,
-                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                backoff_strategy=BackoffStrategy.FIXED,
                 non_retryable_exceptions=(BackendAIError,),
             )
         ),
@@ -153,7 +154,7 @@ class SessionRepository:
                     owner_access_key,
                     kernel_loading_strategy=KernelLoadingStrategy.NONE,
                 )
-                raise ValueError(f"Session with name '{new_name}' already exists")
+                raise SessionAlreadyExists(f"Session with name '{new_name}' already exists")
             except SessionNotFound:
                 pass  # Session not found, which is good
 
@@ -315,7 +316,7 @@ class SessionRepository:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
             session_row = await db_session.scalar(query_stmt)
             if session_row is None:
-                raise ValueError(f"Session not found (id:{session_id})")
+                raise SessionNotFound(f"Session not found (id:{session_id})")
             session_row = cast(SessionRow, session_row)
 
             if session_name:
@@ -329,7 +330,7 @@ class SessionRepository:
                 except SessionNotFound:
                     pass
                 else:
-                    raise ValueError(
+                    raise SessionAlreadyExists(
                         f"Duplicate session name. Session(id:{sess.id}) already has the name"
                     )
 
@@ -379,7 +380,7 @@ class SessionRepository:
         query_on_behalf_of: Optional[AccessKey] = None,
     ):
         if group_name is None:
-            raise ValueError("group_name cannot be None")
+            raise GenericBadRequest("group_name cannot be None")
         async with self._db.begin_readonly() as conn:
             return await query_userinfo(
                 conn,
