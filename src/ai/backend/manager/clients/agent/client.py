@@ -5,7 +5,11 @@ from contextlib import asynccontextmanager as actxmgr
 from typing import Any, AsyncIterator, Mapping, Optional
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AgentId,
     ClusterInfo,
@@ -15,10 +19,22 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.agent_cache import AgentRPCCache, PeerInvoker
-from ai.backend.manager.decorators.client_decorator import create_layer_aware_client_decorator
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-client_decorator = create_layer_aware_client_decorator(LayerType.AGENT_CLIENT)
+
+agent_client_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.CLIENT, layer=LayerType.AGENT_CLIENT)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class AgentClient:
@@ -63,26 +79,26 @@ class AgentClient:
             yield rpc
 
     # Hardware information methods
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def gather_hwinfo(self) -> Mapping[str, Any]:
         """Gather hardware information from the agent."""
         async with self._with_connection() as rpc:
             return await rpc.call.gather_hwinfo()
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def scan_gpu_alloc_map(self) -> Mapping[str, Any]:
         """Scan GPU allocation map from the agent."""
         async with self._with_connection() as rpc:
             return await rpc.call.scan_gpu_alloc_map()
 
     # Image management methods
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def check_and_pull(self, image_configs: Mapping[str, ImageConfig]) -> Mapping[str, str]:
         """Check and pull images on the agent."""
         async with self._with_connection() as rpc:
             return await rpc.call.check_and_pull(image_configs)
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def purge_images(
         self, images: list[str], force: bool, noprune: bool
     ) -> Mapping[str, Any]:
@@ -91,26 +107,26 @@ class AgentClient:
             return await rpc.call.purge_images(images, force, noprune)
 
     # Network management methods
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def create_local_network(self, network_name: str) -> None:
         """Create a local network on the agent."""
         async with self._with_connection() as rpc:
             await rpc.call.create_local_network(network_name)
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def destroy_local_network(self, network_ref_name: str) -> None:
         """Destroy a local network on the agent."""
         async with self._with_connection() as rpc:
             await rpc.call.destroy_local_network(network_ref_name)
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def assign_port(self) -> int:
         """Assign a host port on the agent."""
         async with self._with_connection() as rpc:
             return await rpc.call.assign_port()
 
     # Kernel management methods
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def create_kernels(
         self,
         session_id: str,
@@ -129,7 +145,7 @@ class AgentClient:
                 kernel_image_refs,
             )
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def destroy_kernel(
         self,
         kernel_id: str,
@@ -146,7 +162,7 @@ class AgentClient:
                 suppress_events=suppress_events,
             )
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def restart_kernel(
         self,
         session_id: str,
@@ -163,46 +179,46 @@ class AgentClient:
                 update_config,
             )
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def sync_kernel_registry(self, kernel_tuples: list[tuple[str, str]]) -> None:
         """Sync kernel registry on the agent."""
         async with self._with_connection() as rpc:
             return await rpc.call.sync_kernel_registry(kernel_tuples)
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def drop_kernel_registry(self, kernel_id_list: list[KernelId]) -> None:
         """Drop kernel registry entries on the agent."""
         async with self._with_connection() as rpc:
             await rpc.call.drop_kernel_registry(kernel_id_list)
 
     # Health monitoring methods
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def check_pulling(self, image_name: str) -> bool:
         """Check if an image is being pulled."""
         async with self._with_connection() as rpc:
             return await rpc.call.check_pulling(image_name)
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def check_creating(self, kernel_id: str) -> bool:
         """Check if a kernel is being created."""
         async with self._with_connection() as rpc:
             return await rpc.call.check_creating(str(kernel_id))
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def check_running(self, kernel_id: str) -> bool:
         """Check if a kernel is running."""
         async with self._with_connection() as rpc:
             return await rpc.call.check_running(str(kernel_id))
 
     # Container management methods
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def purge_containers(self, serialized_data: list[tuple[str, str]]) -> None:
         """Purge containers on the agent."""
         async with self._with_connection() as rpc:
             await rpc.call.purge_containers(serialized_data)
 
     # Code execution methods
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def execute(
         self,
         session_id: str,
@@ -227,13 +243,13 @@ class AgentClient:
                 flush_timeout,
             )
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def interrupt_kernel(self, kernel_id: str) -> Mapping[str, Any]:
         """Interrupt a kernel on the agent."""
         async with self._with_connection() as rpc:
             return await rpc.call.interrupt_kernel(kernel_id)
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def trigger_batch_execution(
         self,
         session_id: str,
@@ -250,7 +266,7 @@ class AgentClient:
                 batch_timeout,
             )
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def get_completions(
         self,
         kernel_id: str,
@@ -262,7 +278,7 @@ class AgentClient:
             return await rpc.call.get_completions(kernel_id, text, opts)
 
     # Service management methods
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def start_service(
         self,
         kernel_id: str,
@@ -273,7 +289,7 @@ class AgentClient:
         async with self._with_connection() as rpc:
             return await rpc.call.start_service(kernel_id, service, opts)
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def shutdown_service(
         self,
         kernel_id: str,
@@ -284,7 +300,7 @@ class AgentClient:
             await rpc.call.shutdown_service(kernel_id, service)
 
     # File management methods
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def upload_file(
         self,
         kernel_id: str,
@@ -295,7 +311,7 @@ class AgentClient:
         async with self._with_connection() as rpc:
             return await rpc.call.upload_file(kernel_id, filename, payload)
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def download_file(
         self,
         kernel_id: str,
@@ -305,7 +321,7 @@ class AgentClient:
         async with self._with_connection() as rpc:
             return await rpc.call.download_file(kernel_id, filepath)
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def download_single(
         self,
         kernel_id: str,
@@ -315,7 +331,7 @@ class AgentClient:
         async with self._with_connection() as rpc:
             return await rpc.call.download_single(kernel_id, filepath)
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def list_files(
         self,
         kernel_id: str,
@@ -326,14 +342,14 @@ class AgentClient:
             return await rpc.call.list_files(kernel_id, path)
 
     # Log management methods
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def get_logs(self, kernel_id: str) -> Mapping[str, str]:
         """Get logs from the agent."""
         async with self._with_connection() as rpc:
             return await rpc.call.get_logs(kernel_id)
 
     # Image commit methods
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def commit(
         self,
         kernel_id: str,
@@ -354,7 +370,7 @@ class AgentClient:
 
             return await rpc.call.commit(kernel_id, email, **kwargs)
 
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def push_image(
         self,
         image_ref: ImageRef,
@@ -365,14 +381,14 @@ class AgentClient:
             return await rpc.call.push_image(image_ref, registry)
 
     # Scaling group management
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def update_scaling_group(self, scaling_group: str) -> None:
         """Update scaling group on the agent."""
         async with self._with_connection() as rpc:
             await rpc.call.update_scaling_group(scaling_group)
 
     # Local configuration management
-    @client_decorator()
+    @agent_client_resilience.apply()
     async def get_local_config(self) -> Mapping[str, str]:
         """Get local configuration from the agent."""
         async with self._with_connection() as rpc:
