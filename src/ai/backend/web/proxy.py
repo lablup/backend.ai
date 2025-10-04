@@ -419,7 +419,19 @@ async def websocket_handler(
                 override_api_version=request_api_version,
             )
             async with api_request.connect_websocket() as up_conn:
-                down_conn = web.WebSocketResponse()
+                # Support GraphQL WebSocket protocols
+                protocols = []
+                if "sec-websocket-protocol" in request.headers:
+                    client_protocols = [
+                        p.strip() for p in request.headers["sec-websocket-protocol"].split(",")
+                    ]
+                    supported_protocols = ["graphql-transport-ws", "graphql-ws"]
+                    protocols = [p for p in client_protocols if p in supported_protocols]
+                    print(
+                        f"=== GraphQL WebSocket protocols: client={client_protocols}, supported={protocols} ==="
+                    )
+
+                down_conn = web.WebSocketResponse(protocols=protocols or [])
                 await down_conn.prepare(request)
                 web_socket_proxy = WebSocketProxy(up_conn.raw_websocket, down_conn)
                 await web_socket_proxy.proxy()

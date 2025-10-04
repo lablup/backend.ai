@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import json
 import logging
 import traceback
+from enum import Enum
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Self, Tuple, cast
+from typing import TYPE_CHECKING, Any, AsyncIterator, Iterable, Optional, Self, Tuple, cast
 
 import aiohttp_cors
 import attrs
@@ -15,7 +17,7 @@ from graphene.validation import depth_limit_validator
 from graphql import ValidationRule, parse, validate
 from graphql.error import GraphQLError  # pants: no-infer-dep
 from graphql.execution import ExecutionResult  # pants: no-infer-dep
-from pydantic import ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ai.backend.common import validators as tx
 from ai.backend.common.api_handlers import APIResponse, BodyParam, MiddlewareParam, api_handler
@@ -48,6 +50,54 @@ if TYPE_CHECKING:
     from .context import RootContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+# WebSocket message type enum
+class GraphQLWSMessageType(str, Enum):
+    CONNECTION_INIT = "connection_init"
+    SUBSCRIBE = "subscribe"
+    COMPLETE = "complete"
+
+
+# Payload types for WebSocket messages
+class GraphQLWSSubscribePayload(BaseModel):
+    query: str
+    variables: dict[str, Any] | None = None
+    operationName: str | None = None
+
+
+# Union type for all WebSocket messages
+class GraphQLWSMessage(BaseModel):
+    type: GraphQLWSMessageType
+    id: str | None = None
+    payload: dict[str, Any] | None = None  # Will be validated in specific message types
+
+
+# Type for schema.subscribe return value - it returns either an AsyncIterator of ExecutionResult
+# or a single ExecutionResult for non-subscription operations
+SubscriptionResult = AsyncIterator[ExecutionResult]
+
+
+# WebSocket response message types
+class GraphQLWSConnectionAck(BaseModel):
+    type: str = "connection_ack"
+
+
+class GraphQLWSNext(BaseModel):
+    type: str = "next"
+    id: str
+    payload: dict[str, Any]
+
+
+class GraphQLWSError(BaseModel):
+    type: str = "error"
+    id: str | None = None
+    payload: list[dict[str, str]]
+
+
+class GraphQLWSCompleteResponse(BaseModel):
+    type: str = "complete"
+    id: str
 
 
 class GQLLoggingMiddleware:
@@ -233,6 +283,9 @@ class GQLAPIHandler:
         strawberry_ctx = StrawberryGQLContext(
             processors=processors_ctx.processors,
             config_provider=config_provider_ctx.config_provider,
+            event_hub=processors_ctx.event_hub,
+            event_fetcher=processors_ctx.event_fetcher,
+            valkey_bgtask=processors_ctx.valkey_bgtask,
         )
 
         query, variables, operation_name = (
@@ -303,6 +356,7 @@ async def init(app: web.Application) -> None:
         auto_camelcase=False,
     )
     app_ctx.gql_v2_schema = strawberry_schema
+
     root_ctx: RootContext = app["_root.context"]
     if root_ctx.config_provider.config.api.allow_graphql_schema_introspection:
         log.warning(
@@ -313,6 +367,117 @@ async def init(app: web.Application) -> None:
 
 async def shutdown(app: web.Application) -> None:
     pass
+
+
+@auth_required
+async def handle_gql_strawberry_ws(request: web.Request) -> web.WebSocketResponse:
+    ws = web.WebSocketResponse(protocols=["graphql-transport-ws", "graphql-ws"])
+    await ws.prepare(request)
+
+    root_ctx: RootContext = request.app["_root.context"]
+    processors_ctx = await ProcessorsCtx.from_request(request)
+    context = StrawberryGQLContext(
+        processors=processors_ctx.processors,
+        config_provider=root_ctx.config_provider,
+        event_hub=processors_ctx.event_hub,
+        event_fetcher=processors_ctx.event_fetcher,
+        valkey_bgtask=processors_ctx.valkey_bgtask,
+    )
+
+    schema = request.app["admin.context"].gql_v2_schema
+
+    async for msg in ws:
+        if msg.type == web.WSMsgType.TEXT:
+            try:
+                # Parse and validate WebSocket message using Pydantic
+                raw_data = msg.json()
+                ws_message = GraphQLWSMessage.model_validate(raw_data)
+
+                if ws_message.type == GraphQLWSMessageType.CONNECTION_INIT:
+                    response = GraphQLWSConnectionAck()
+                    await ws.send_str(json.dumps(response.model_dump()))
+
+                elif ws_message.type == GraphQLWSMessageType.SUBSCRIBE:
+                    if not ws_message.id or not ws_message.payload:
+                        raise ValueError("Subscribe message requires id and payload")
+
+                    # Validate and parse subscription payload
+                    subscribe_payload = GraphQLWSSubscribePayload.model_validate(ws_message.payload)
+                    query = subscribe_payload.query
+                    variables = subscribe_payload.variables or {}
+
+                    log.info(
+                        "Processing subscription: {}, query: {}, variables: {}",
+                        ws_message.id,
+                        query[:30],
+                        variables,
+                    )
+
+                    try:
+                        # Execute subscription using Strawberry's subscribe method
+                        async_result: SubscriptionResult = await schema.subscribe(
+                            query,
+                            variable_values=variables,
+                            context_value=context,
+                        )
+
+                        log.info("Subscription subscribe result: {}", type(async_result))
+
+                        if not hasattr(async_result, "__aiter__"):
+                            # TODO: Add exception
+                            raise ValueError("Expected an async iterator for subscription")
+
+                        log.info("Processing subscription async generator")
+
+                        async for result in async_result:
+                            log.info(
+                                "Subscription result: errors={}, data={}",
+                                result.errors,
+                                result.data,
+                            )
+
+                            if result.errors:
+                                log.error("Subscription errors: {}", result.errors)
+                                error_response = GraphQLWSError(
+                                    id=ws_message.id,
+                                    payload=[{"message": str(e)} for e in result.errors],
+                                )
+                                await ws.send_str(json.dumps(error_response.model_dump()))
+                                break
+                            elif result.data:
+                                log.info("Sending subscription data: {}", result.data)
+                                next_response = GraphQLWSNext(
+                                    id=ws_message.id, payload={"data": result.data}
+                                )
+                                await ws.send_str(json.dumps(next_response.model_dump()))
+
+                        # Send completion after async iterator is exhausted
+                        log.info("Subscription completed, sending complete message")
+                        complete_response = GraphQLWSCompleteResponse(id=ws_message.id)
+                        await ws.send_str(json.dumps(complete_response.model_dump()))
+
+                    except Exception as e:
+                        log.error("Subscription execution error: {}", e)
+                        log.exception("Full traceback:")
+                        error_response = GraphQLWSError(
+                            id=ws_message.id, payload=[{"message": str(e)}]
+                        )
+                        await ws.send_str(json.dumps(error_response.model_dump()))
+
+                elif ws_message.type == GraphQLWSMessageType.COMPLETE:
+                    if not ws_message.id:
+                        raise ValueError("Complete message requires id")
+                    log.info("Received complete message for subscription: {}", ws_message.id)
+
+            except Exception as e:
+                # Handle message parsing and validation errors
+                log.error("WebSocket message validation error: {}", e)
+                error_response = GraphQLWSError(
+                    payload=[{"message": f"Invalid message format: {str(e)}"}]
+                )
+                await ws.send_str(json.dumps(error_response.model_dump()))
+
+    return ws
 
 
 def create_app(
@@ -330,4 +495,6 @@ def create_app(
     cors.add(
         app.router.add_route("POST", r"/gql/strawberry", gql_api_handler.handle_gql_strawberry)
     )
+    cors.add(app.router.add_get(r"/gql/strawberry/ws", handle_gql_strawberry_ws))
+
     return app, []
