@@ -103,7 +103,7 @@ jobs:
           done
           echo "Milestones with the corresponding release branch: ${milestones[@]}"
 
-          sort_milestones=($(printf "%s\n" "${milestones[@]}" | sort -r))
+          sort_milestones=($(printf "%s\n" "${milestones[@]}" | sort -V -r))
           for i in "${!sort_milestones[@]}"; do
             if [[ "${sort_milestones[$i]}" == "$target_milestone" ]]; then
               target_milestones=("${sort_milestones[@]:0:$((i+1))}")
