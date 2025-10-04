@@ -2,7 +2,6 @@ from typing import Optional
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -20,7 +19,7 @@ from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
 from ai.backend.manager.models.group import ProjectType
 from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 domain_repository_resilience = Resilience(
     policies=[
@@ -237,11 +236,7 @@ class AdminDomainRepository:
         For superadmin use only.
         """
 
-        async def _insert(db_session: SASession) -> DomainData:
-            return await self.create_domain_node_force(creator, scaling_groups)
-
-        async with self._db.connect() as db_conn:
-            return await execute_with_txn_retry(_insert, self._db.begin_session, db_conn)
+        return await self.create_domain_node_force(creator, scaling_groups)
 
     @domain_repository_resilience.apply()
     async def modify_domain_node_with_permissions_force(
@@ -256,14 +251,9 @@ class AdminDomainRepository:
         Modifies a domain node with scaling group changes without permission checks.
         For superadmin use only.
         """
-
-        async def _update(db_session: SASession) -> Optional[DomainData]:
-            return await self.modify_domain_node_force(
-                domain_name,
-                modifier_fields,
-                sgroups_to_add,
-                sgroups_to_remove,
-            )
-
-        async with self._db.connect() as db_conn:
-            return await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
+        return await self.modify_domain_node_force(
+            domain_name,
+            modifier_fields,
+            sgroups_to_add,
+            sgroups_to_remove,
+        )

@@ -27,7 +27,7 @@ from ai.backend.manager.models.rbac import SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ..permission_controller.role_manager import RoleManager
 
@@ -38,7 +38,7 @@ domain_repository_resilience = Resilience(
             RetryArgs(
                 max_retries=10,
                 retry_delay=0.1,
-                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                backoff_strategy=BackoffStrategy.FIXED,
                 non_retryable_exceptions=(BackendAIError,),
             )
         ),
@@ -287,15 +287,12 @@ class DomainRepository:
         Validates scaling group permissions before creating.
         """
 
-        async def _insert(db_session: SASession) -> DomainData:
+        async with self._db.begin_session() as db_session:
             if scaling_groups is not None:
                 await self._ensure_sgroup_permission(
                     user_info, scaling_groups, db_session=db_session
                 )
             return await self.create_domain_node_validated(creator, scaling_groups)
-
-        async with self._db.connect() as db_conn:
-            return await execute_with_txn_retry(_insert, self._db.begin_session, db_conn)
 
     @domain_repository_resilience.apply()
     async def modify_domain_node_with_permissions(
@@ -311,7 +308,7 @@ class DomainRepository:
         Validates domain and scaling group permissions.
         """
 
-        async def _update(db_session: SASession) -> Optional[DomainData]:
+        async with self._db.begin_session() as db_session:
             client_ctx = ClientContext(
                 self._db, user_info.domain_name, user_info.id, user_info.role
             )
@@ -340,9 +337,6 @@ class DomainRepository:
                 sgroups_to_add,
                 sgroups_to_remove,
             )
-
-        async with self._db.connect() as db_conn:
-            return await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
 
     async def _ensure_sgroup_permission(
         self, user_info: UserInfo, sgroup_names: Iterable[str], *, db_session: SASession

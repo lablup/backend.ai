@@ -28,7 +28,7 @@ from ai.backend.manager.models.session import (
 )
 from ai.backend.manager.models.session_template import session_templates
 from ai.backend.manager.models.user import UserRole, UserRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.utils import query_userinfo
 
 session_repository_resilience = Resilience(
@@ -311,7 +311,7 @@ class SessionRepository:
         modifier_fields: dict,
         session_name: Optional[str] = None,
     ) -> Optional[SessionRow]:
-        async def _update(db_session: AsyncSession) -> Optional[SessionRow]:
+        async with self._db.begin_session() as db_session:
             query_stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
             session_row = await db_session.scalar(query_stmt)
             if session_row is None:
@@ -351,9 +351,6 @@ class SessionRepository:
                     .where(KernelRow.session_id == session_id)
                 )
             return session_row
-
-        async with self._db.connect() as db_conn:
-            return await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
 
     @session_repository_resilience.apply()
     async def rescan_images(
