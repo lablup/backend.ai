@@ -8,18 +8,23 @@ from __future__ import annotations
 import enum
 import logging
 import os
+import sys
 import textwrap
+from ipaddress import IPv4Address, IPv6Address
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, Self
 
 from pydantic import (
     AliasChoices,
     ConfigDict,
     Field,
     FilePath,
+    ValidationInfo,
     field_validator,
+    model_validator,
 )
 
+from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
@@ -35,7 +40,7 @@ from ai.backend.common.types import (
     ResourceGroupType,
     ServiceDiscoveryType,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter, LogLevel
 from ai.backend.logging.config import LoggingConfig
 
 from ..affinity_map import AffinityPolicy
@@ -60,6 +65,15 @@ class ScratchType(enum.StrEnum):
     HOSTFILE = "hostfile"
     MEMORY = "memory"
     K8S_NFS = "k8s-nfs"
+
+
+def _get_model_validation_context(info: ValidationInfo) -> dict[str, Any] | None:
+    context = info.context
+    if context is None:
+        return None
+    if not isinstance(context, dict):
+        raise ValueError("context must be provided as a dictionary")
+    return context
 
 
 class SyncContainerLifecyclesConfig(BaseConfigSchema):
@@ -187,6 +201,24 @@ class CoreDumpConfig(BaseConfigSchema):
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
     )
+
+    @model_validator(mode="after")
+    def _validate_coredump(self, info: ValidationInfo) -> Self:
+        if self.enabled:
+            context = _get_model_validation_context(info)
+            if context is None:
+                raise ValueError("context must be specified in model_validate()")
+            is_not_invoked_subcommand: bool = context["is_not_invoked_subcommand"]
+            if is_not_invoked_subcommand and not sys.platform.startswith("linux"):
+                raise ValueError("Storing container coredumps is only supported in Linux.")
+
+            core_pattern = Path("/proc/sys/kernel/core_pattern").read_text().strip()
+            if core_pattern.startswith("|") or not core_pattern.startswith("/"):
+                raise ValueError(
+                    "/proc/sys/kernel/core_pattern must be an absolute path to enable container coredumps.",
+                )
+            self.set_core_path(Path(core_pattern).parent)
+        return self
 
 
 class DebugConfig(BaseConfigSchema):
@@ -584,6 +616,17 @@ class AgentConfig(BaseConfigSchema):
         extra="allow",
     )
 
+    @field_validator("rpc_listen_addr", mode="after")
+    @classmethod
+    def _validate_rpc_listen_addr(cls, rpc_listen_addr: HostPortPair) -> HostPortPair:
+        rpc_host = rpc_listen_addr.host
+        if isinstance(rpc_host, (IPv4Address, IPv6Address)):
+            if rpc_host.is_unspecified or rpc_host.is_link_local:
+                raise ValueError(
+                    "Cannot use link-local or unspecified IP address as the RPC listening host."
+                )
+        return rpc_listen_addr
+
 
 class ContainerConfig(BaseConfigSchema):
     kernel_uid: UserID = Field(
@@ -723,6 +766,34 @@ class ContainerConfig(BaseConfigSchema):
         if isinstance(v, (list, tuple)) and len(v) == 2:
             return (int(v[0]), int(v[1]))
         raise ValueError("port_range must be a tuple of two integers")
+
+    @field_validator("sandbox_type", mode="after")
+    @classmethod
+    def _validate_sandbox_type(cls, sandbox_type: ContainerSandboxType) -> ContainerSandboxType:
+        # FIXME: Remove this after ARM64 support lands on Jail
+        if sandbox_type == ContainerSandboxType.JAIL:
+            current_arch = get_arch_name()
+            if current_arch != "x86_64":
+                raise ValueError(f"Jail sandbox is not supported on architecture {current_arch}")
+        return sandbox_type
+
+    @field_validator("stats_type", mode="after")
+    @classmethod
+    def _validate_stats_type(cls, stats_type: StatModes) -> StatModes:
+        if stats_type == StatModes.CGROUP:
+            if os.getuid() != 0:
+                raise ValueError(
+                    "Cannot use cgroup statistics collection mode unless the agent runs as root."
+                )
+        return stats_type
+
+    @field_validator("scratch_type", mode="after")
+    @classmethod
+    def _validate_scratch_type(cls, scratch_type: ScratchType) -> ScratchType:
+        if scratch_type == ScratchType.HOSTFILE:
+            if os.getuid() != 0:
+                raise ValueError("Cannot use hostfile scratch type unless the agent runs as root.")
+        return scratch_type
 
 
 class ResourceConfig(BaseConfigSchema):
@@ -987,3 +1058,40 @@ class AgentUnifiedConfig(BaseConfigSchema):
     model_config = ConfigDict(
         extra="allow",
     )
+
+    @property
+    def agent_backend(self) -> AgentBackend:
+        return self.agent.backend
+
+    @model_validator(mode="after")
+    def _validate_kubernetes_config(self) -> Self:
+        if self.agent_backend == AgentBackend.KUBERNETES:
+            if self.container.scratch_type == "k8s-nfs" and (
+                self.container.scratch_nfs_address is None
+                or self.container.scratch_nfs_options is None
+            ):
+                raise ValueError(
+                    "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _validate_docker_config(self) -> Self:
+        if self.agent_backend == AgentBackend.DOCKER:
+            DockerExtraConfig.model_validate(self.container.model_dump())
+        return self
+
+    @model_validator(mode="after")
+    def _set_command_line_args(self, info: ValidationInfo) -> Self:
+        context = _get_model_validation_context(info)
+        if context is None:
+            # Likely in tests, command line args do not need to be set.
+            return self
+        debug: bool = context["debug"]
+        log_level: LogLevel = context["log_level"]
+
+        self.debug.enabled = debug
+        if log_level != LogLevel.NOTSET:
+            self.logging.level = log_level
+            self.logging.pkg_ns["ai.backend"] = log_level
+        return self
