@@ -1,0 +1,11 @@
+# Hammerspace
+
+## Configuration
+[volume.hammerspace]
+backend = "hammerspace"
+path = "/vfroot/hammerspace"
+
+[volume.hammerspace.options]
+address = "HAMMERSPACE API ADDRESS"
+username = "HAMMERSPACE USERNAME"
+password = "HAMMERSPACE PASSWORD"
