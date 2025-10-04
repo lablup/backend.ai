@@ -4,19 +4,33 @@ from typing import Dict, List
 import sqlalchemy as sa
 
 from ai.backend.common.exception import (
+    BackendAIError,
     StorageNamespaceNotFoundError,
 )
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.object_storage_namespace.creator import StorageNamespaceCreator
 from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-# Layer-specific decorator for storage namespace repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.OBJECT_STORAGE)
+storage_namespace_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.STORAGE_NAMESPACE_REPOSITORY)
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class StorageNamespaceRepository:
@@ -25,7 +39,7 @@ class StorageNamespaceRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    @repository_decorator()
+    @storage_namespace_repository_resilience.apply()
     async def get_by_storage_and_namespace(
         self, storage_id: uuid.UUID, namespace: str
     ) -> StorageNamespaceData:
@@ -45,7 +59,7 @@ class StorageNamespaceRepository:
                 )
             return row.to_dataclass()
 
-    @repository_decorator()
+    @storage_namespace_repository_resilience.apply()
     async def get_by_id(self, storage_namespace_id: uuid.UUID) -> StorageNamespaceData:
         """
         Get an existing storage namespace from the database by ID.
@@ -62,7 +76,7 @@ class StorageNamespaceRepository:
                 )
             return row.to_dataclass()
 
-    @repository_decorator()
+    @storage_namespace_repository_resilience.apply()
     async def register(self, creator: StorageNamespaceCreator) -> StorageNamespaceData:
         """
         Register a new namespace for the specified storage.
@@ -75,7 +89,7 @@ class StorageNamespaceRepository:
             await db_session.refresh(storage_namespace_row)
             return storage_namespace_row.to_dataclass()
 
-    @repository_decorator()
+    @storage_namespace_repository_resilience.apply()
     async def unregister(self, storage_id: uuid.UUID, namespace: str) -> uuid.UUID:
         """
         Unregister a namespace from the specified storage.
@@ -95,7 +109,7 @@ class StorageNamespaceRepository:
                 raise StorageNamespaceNotFoundError()
             return deleted_storage_id
 
-    @repository_decorator()
+    @storage_namespace_repository_resilience.apply()
     async def get_namespaces(self, storage_id: uuid.UUID) -> list[StorageNamespaceData]:
         """
         Get all namespaces for the specified storage.
@@ -108,7 +122,7 @@ class StorageNamespaceRepository:
             rows: list[StorageNamespaceRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
-    @repository_decorator()
+    @storage_namespace_repository_resilience.apply()
     async def get_all_namespaces_by_storage(self) -> Dict[uuid.UUID, List[str]]:
         """
         Get all namespaces grouped by storage ID.

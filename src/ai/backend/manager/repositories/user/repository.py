@@ -11,16 +11,17 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, noload
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
 from ai.backend.manager.data.user.types import UserCreateResultData, UserCreator, UserData
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
@@ -42,10 +43,22 @@ from ai.backend.manager.services.user.actions.modify_user import UserModifier
 
 from ..permission_controller.role_manager import RoleManager
 
-# Layer-specific decorator for user repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.USER)
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+user_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.USER_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class UserRepository:
@@ -56,7 +69,7 @@ class UserRepository:
         self._db = db
         self._role_manager = RoleManager()
 
-    @repository_decorator()
+    @user_repository_resilience.apply()
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
         """
         Get user by UUID without ownership validation.
@@ -66,7 +79,7 @@ class UserRepository:
             user_row = await self._get_user_by_uuid(db_session, user_uuid)
             return user_row.to_data()
 
-    @repository_decorator()
+    @user_repository_resilience.apply()
     async def get_by_email_validated(
         self,
         email: str,
@@ -79,7 +92,7 @@ class UserRepository:
             user_row = await self._get_user_by_email(session, email)
             return UserData.from_row(user_row)
 
-    @repository_decorator()
+    @user_repository_resilience.apply()
     async def create_user_validated(
         self, user_creator: UserCreator, group_ids: Optional[list[str]]
     ) -> UserCreateResultData:
@@ -154,7 +167,7 @@ class UserRepository:
 
         return UserCreateResultData(created_user, kp_data)
 
-    @repository_decorator()
+    @user_repository_resilience.apply()
     async def update_user_validated(
         self,
         email: str,
@@ -206,7 +219,7 @@ class UserRepository:
             res = UserData.from_row(updated_user)
         return res
 
-    @repository_decorator()
+    @user_repository_resilience.apply()
     async def soft_delete_user_validated(self, email: str, requester_uuid: Optional[UUID]) -> None:
         """
         Soft delete user by setting status to DELETED and deactivating keypairs.
@@ -405,7 +418,7 @@ class UserRepository:
             values = [{"user_id": user_uuid, "group_id": grp.id} for grp in grps]
             await conn.execute(sa.insert(association_groups_users).values(values))
 
-    @repository_decorator()
+    @user_repository_resilience.apply()
     async def get_user_time_binned_monthly_stats(
         self,
         user_uuid: UUID,

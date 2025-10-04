@@ -4,6 +4,11 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.domain.types import (
     DomainCreator,
     DomainData,
@@ -17,6 +22,20 @@ from ai.backend.manager.models.kernel import kernels
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
+domain_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.DOMAIN_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
+
 
 class AdminDomainRepository:
     """
@@ -29,6 +48,7 @@ class AdminDomainRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @domain_repository_resilience.apply()
     async def create_domain_force(self, creator: DomainCreator) -> DomainData:
         """
         Creates a new domain with model-store group without permission checks.
@@ -51,6 +71,7 @@ class AdminDomainRepository:
         assert result is not None
         return result
 
+    @domain_repository_resilience.apply()
     async def modify_domain_force(
         self, domain_name: str, modifier: DomainModifier
     ) -> Optional[DomainData]:
@@ -74,6 +95,7 @@ class AdminDomainRepository:
 
         return row_to_data(row)
 
+    @domain_repository_resilience.apply()
     async def soft_delete_domain_force(self, domain_name: str) -> bool:
         """
         Soft deletes a domain by setting is_active to False without permission checks.
@@ -86,6 +108,7 @@ class AdminDomainRepository:
             result = await conn.execute(update_query)
             return result.rowcount > 0
 
+    @domain_repository_resilience.apply()
     async def purge_domain_force(self, domain_name: str) -> bool:
         """
         Permanently deletes a domain without validation checks.
@@ -100,6 +123,7 @@ class AdminDomainRepository:
             result = await conn.execute(delete_query)
             return result.rowcount > 0
 
+    @domain_repository_resilience.apply()
     async def create_domain_node_force(
         self, creator: DomainCreator, scaling_groups: Optional[list[str]] = None
     ) -> DomainData:
@@ -131,6 +155,7 @@ class AdminDomainRepository:
             assert result is not None
             return result
 
+    @domain_repository_resilience.apply()
     async def modify_domain_node_force(
         self,
         domain_name: str,
@@ -200,6 +225,7 @@ class AdminDomainRepository:
         result = await conn.execute(delete_query)
         return result.rowcount
 
+    @domain_repository_resilience.apply()
     async def create_domain_node_with_permissions_force(
         self,
         creator: DomainCreator,
@@ -217,6 +243,7 @@ class AdminDomainRepository:
         async with self._db.connect() as db_conn:
             return await execute_with_txn_retry(_insert, self._db.begin_session, db_conn)
 
+    @domain_repository_resilience.apply()
     async def modify_domain_node_with_permissions_force(
         self,
         domain_name: str,

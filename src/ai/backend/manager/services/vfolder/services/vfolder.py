@@ -576,13 +576,15 @@ class VFolderService:
                     raise VFolderAlreadyExists
 
         # Get target host
-        target_folder_host = action.target_host or source_vfolder_data.host
+        target_folder_host = (
+            action.target_host
+            or source_vfolder_data.host
+            or self._config_provider.config.volumes.default_host
+        )
         if not target_folder_host:
-            target_folder_host = self._config_provider.config.volumes.default_host
-            if not target_folder_host:
-                raise VFolderInvalidParameter(
-                    "You must specify the vfolder host because the default host is not configured."
-                )
+            raise VFolderInvalidParameter(
+                "You must specify the vfolder host because the default host is not configured."
+            )
 
         # Verify target vfolder name
         if not verify_vfolder_name(action.target_name):

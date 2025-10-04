@@ -172,7 +172,7 @@ class ArtifactRevisionService:
 
         match artifact.registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
-                registry_data = (
+                huggingface_registry_data = (
                     await self._huggingface_registry_repository.get_registry_data_by_artifact_id(
                         artifact.id
                     )
@@ -183,7 +183,7 @@ class ArtifactRevisionService:
                         models=[
                             ModelTarget(model_id=artifact.name, revision=revision_data.version)
                         ],
-                        registry_name=registry_data.name,
+                        registry_name=huggingface_registry_data.name,
                         storage_name=storage_data.name,
                     )
                 )

@@ -43,7 +43,7 @@ class InviteVFolderAction(VFolderInvitationAction):
 @dataclass
 class InviteVFolderActionResult(BaseActionResult):
     vfolder_uuid: uuid.UUID
-    invitation_ids: list[uuid.UUID]
+    invitation_ids: list[str]
 
     @override
     def entity_id(self) -> Optional[str]:

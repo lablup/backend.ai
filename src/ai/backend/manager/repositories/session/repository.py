@@ -6,14 +6,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only, noload, selectinload
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, ImageAlias, SessionId
 from ai.backend.manager.api.session import find_dependency_sessions
 from ai.backend.manager.data.image.types import ImageIdentifier, ImageStatus
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.group import groups
@@ -30,8 +31,19 @@ from ai.backend.manager.models.user import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 from ai.backend.manager.utils import query_userinfo
 
-# Layer-specific decorator for session repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.SESSION)
+session_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.SESSION_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class SessionRepository:
@@ -40,7 +52,7 @@ class SessionRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_session_owner(self, session_id: str | SessionId) -> Optional[UserData]:
         async with self._db.begin_readonly_session() as db_sess:
             query = (
@@ -53,7 +65,7 @@ class SessionRepository:
                 raise SessionNotFound(f"Session with id {session_id} not found")
             return UserData.from_row(user)
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_session_validated(
         self,
         session_name_or_id: str | SessionId,
@@ -72,7 +84,7 @@ class SessionRepository:
                 eager_loading_op=eager_loading_op,
             )
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def match_sessions(
         self,
         id_or_name_prefix: str,
@@ -85,7 +97,7 @@ class SessionRepository:
                 owner_access_key,
             )
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_session_to_determine_status(
         self,
         session_id: SessionId,
@@ -93,7 +105,7 @@ class SessionRepository:
         async with self._db.begin_readonly_session() as db_sess:
             return await SessionRow.get_session_to_determine_status(db_sess, session_id)
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_template_by_id(
         self,
         template_id: uuid.UUID,
@@ -108,7 +120,7 @@ class SessionRepository:
             )
             return await conn.scalar(query)
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_template_info_by_id(
         self,
         template_id: uuid.UUID,
@@ -125,7 +137,7 @@ class SessionRepository:
             template_info = result.fetchone()
             return dict(template_info) if template_info else None
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def update_session_name(
         self,
         session_name_or_id: str | SessionId,
@@ -163,7 +175,7 @@ class SessionRepository:
         async with self._db.begin_session() as db_sess:
             return await _update(db_sess)
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_session_with_eager_loading(
         self,
         session_name_or_id: str | SessionId,
@@ -179,7 +191,7 @@ class SessionRepository:
                 eager_loading_op=eager_loading_op,
             )
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_container_registry(
         self,
         registry_hostname: str,
@@ -203,7 +215,7 @@ class SessionRepository:
             )
             return cast(ContainerRegistryRow | None, await db_session.scalar(query))
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def resolve_image(
         self,
         image_identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
@@ -211,7 +223,7 @@ class SessionRepository:
         async with self._db.begin_readonly_session() as db_sess:
             return await ImageRow.resolve(db_sess, image_identifiers)
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_customized_image_count(
         self,
         image_visibility: str,
@@ -232,7 +244,7 @@ class SessionRepository:
             result = await sess.scalar(query)
             return result or 0
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_existing_customized_image(
         self,
         new_canonical: str,
@@ -252,7 +264,7 @@ class SessionRepository:
             )
             return await sess.scalar(query)
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_group_name_by_domain_and_id(
         self,
         domain_name: str,
@@ -268,7 +280,7 @@ class SessionRepository:
             )
             return await conn.scalar(query)
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_scaling_group_wsproxy_addr(
         self,
         scaling_group_name: str,
@@ -283,7 +295,7 @@ class SessionRepository:
             sgroup = result.first()
             return sgroup["wsproxy_addr"] if sgroup else None
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_session_by_id(
         self,
         session_id: str | SessionId,
@@ -292,7 +304,7 @@ class SessionRepository:
             stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
             return await db_session.scalar(stmt)
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def modify_session(
         self,
         session_id: str | SessionId,
@@ -343,7 +355,7 @@ class SessionRepository:
         async with self._db.connect() as db_conn:
             return await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def rescan_images(
         self,
         image_canonical: str,
@@ -357,7 +369,7 @@ class SessionRepository:
             reporter=reporter,
         )
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def query_userinfo(
         self,
         user_id: uuid.UUID,
@@ -426,7 +438,7 @@ class SessionRepository:
 
         return root_session_id, dependent_ids
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_target_session_ids(
         self,
         session_name_or_id: str | uuid.UUID,
@@ -469,7 +481,7 @@ class SessionRepository:
             except SessionNotFound:
                 raise
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def find_dependent_sessions(
         self,
         root_session_name_or_id: str | uuid.UUID,
@@ -489,7 +501,7 @@ class SessionRepository:
             )
             return list(dependent_ids)
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def find_dependency_sessions(
         self,
         session_name_or_id: uuid.UUID | str,
@@ -502,7 +514,7 @@ class SessionRepository:
                 access_key,
             )
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_session_with_group(
         self,
         session_name_or_id: str | SessionId,
@@ -521,7 +533,7 @@ class SessionRepository:
                 eager_loading_op=[selectinload(SessionRow.group)],
             )
 
-    @repository_decorator()
+    @session_repository_resilience.apply()
     async def get_session_with_routing_minimal(
         self,
         session_name_or_id: str | SessionId,

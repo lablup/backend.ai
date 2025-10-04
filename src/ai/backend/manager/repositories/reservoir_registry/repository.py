@@ -4,7 +4,11 @@ import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
@@ -12,9 +16,6 @@ from ai.backend.manager.data.artifact_registries.types import (
 from ai.backend.manager.data.reservoir_registry.creator import ReservoirRegistryCreator
 from ai.backend.manager.data.reservoir_registry.modifier import ReservoirRegistryModifier
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact import ArtifactRow
@@ -22,8 +23,21 @@ from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-# Layer-specific decorator for reservoir repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.ARTIFACT_REGISTRY)
+reservoir_registry_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.RESERVOIR_REGISTRY_REPOSITORY)
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class ReservoirRegistryRepository:
@@ -32,7 +46,7 @@ class ReservoirRegistryRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    @repository_decorator()
+    @reservoir_registry_repository_resilience.apply()
     async def get_reservoir_registry_data_by_id(
         self, reservoir_id: uuid.UUID
     ) -> ReservoirRegistryData:
@@ -47,7 +61,7 @@ class ReservoirRegistryRepository:
                 raise ArtifactRegistryNotFoundError(f"Reservoir with ID {reservoir_id} not found")
             return row.to_dataclass()
 
-    @repository_decorator()
+    @reservoir_registry_repository_resilience.apply()
     async def get_registries_by_ids(
         self, reservoir_ids: list[uuid.UUID]
     ) -> list[ReservoirRegistryData]:
@@ -63,7 +77,7 @@ class ReservoirRegistryRepository:
             rows: list[ReservoirRegistryRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
-    @repository_decorator()
+    @reservoir_registry_repository_resilience.apply()
     async def get_registry_data_by_name(self, name: str) -> ReservoirRegistryData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -80,7 +94,7 @@ class ReservoirRegistryRepository:
                 raise ArtifactRegistryNotFoundError(f"Registry with name {name} not found")
             return row.reservoir_registries.to_dataclass()
 
-    @repository_decorator()
+    @reservoir_registry_repository_resilience.apply()
     async def get_registry_data_by_artifact_id(
         self, artifact_id: uuid.UUID
     ) -> ReservoirRegistryData:
@@ -99,7 +113,7 @@ class ReservoirRegistryRepository:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             return row.reservoir_registry.to_dataclass()
 
-    @repository_decorator()
+    @reservoir_registry_repository_resilience.apply()
     async def create(
         self, creator: ReservoirRegistryCreator, meta: ArtifactRegistryCreatorMeta
     ) -> ReservoirRegistryData:
@@ -133,7 +147,7 @@ class ReservoirRegistryRepository:
 
             return row.to_dataclass()
 
-    @repository_decorator()
+    @reservoir_registry_repository_resilience.apply()
     async def update(
         self,
         reservoir_id: uuid.UUID,
@@ -173,7 +187,7 @@ class ReservoirRegistryRepository:
 
             return row.to_dataclass()
 
-    @repository_decorator()
+    @reservoir_registry_repository_resilience.apply()
     async def delete(self, reservoir_id: uuid.UUID) -> uuid.UUID:
         """
         Delete an existing Reservoir entry from the database.
@@ -193,7 +207,7 @@ class ReservoirRegistryRepository:
             await db_session.execute(delete_meta_query)
             return deleted_id
 
-    @repository_decorator()
+    @reservoir_registry_repository_resilience.apply()
     async def list_reservoir_registries(self) -> list[ReservoirRegistryData]:
         """
         List all Reservoir entries from the database.

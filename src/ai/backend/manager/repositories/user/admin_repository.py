@@ -5,6 +5,11 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.errors.auth import UserNotFound
 from ai.backend.manager.errors.storage import VFolderOperationFailed
@@ -36,6 +41,20 @@ from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection
 from ai.backend.manager.models.vfolder import vfolder_permissions, vfolders
 
+user_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.USER_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
+
 
 class AdminUserRepository:
     """
@@ -48,6 +67,7 @@ class AdminUserRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    @user_repository_resilience.apply()
     async def purge_user_force(self, email: str) -> None:
         """
         Completely purge user and all associated data.
@@ -67,6 +87,7 @@ class AdminUserRepository:
             # Finally delete the user
             await conn.execute(sa.delete(users).where(users.c.email == email))
 
+    @user_repository_resilience.apply()
     async def check_user_vfolder_mounted_to_active_kernels_force(self, user_uuid: UUID) -> bool:
         """
         Check if user's vfolders are mounted to active kernels.
@@ -75,6 +96,7 @@ class AdminUserRepository:
         async with self._db.begin() as conn:
             return await self._user_vfolder_mounted_to_active_kernels(conn, user_uuid)
 
+    @user_repository_resilience.apply()
     async def migrate_shared_vfolders_force(
         self,
         deleted_user_uuid: UUID,
@@ -90,6 +112,7 @@ class AdminUserRepository:
                 conn, deleted_user_uuid, target_user_uuid, target_user_email
             )
 
+    @user_repository_resilience.apply()
     async def delete_user_vfolders_force(
         self,
         user_uuid: UUID,
@@ -101,6 +124,7 @@ class AdminUserRepository:
         """
         return await self._delete_vfolders(user_uuid, storage_manager)
 
+    @user_repository_resilience.apply()
     async def retrieve_active_sessions_force(self, user_uuid: UUID) -> list[SessionRow]:
         """
         Retrieve active sessions for a user.
@@ -119,6 +143,7 @@ class AdminUserRepository:
             query_conditions, query_options, db=self._db
         )
 
+    @user_repository_resilience.apply()
     async def delete_user_keypairs_with_valkey_force(
         self,
         user_uuid: UUID,
@@ -131,6 +156,7 @@ class AdminUserRepository:
         async with self._db.begin() as conn:
             return await self._delete_keypairs_with_valkey(conn, valkey_stat_client, user_uuid)
 
+    @user_repository_resilience.apply()
     async def delegate_endpoint_ownership_force(
         self,
         user_uuid: UUID,
@@ -146,6 +172,7 @@ class AdminUserRepository:
                 session, user_uuid, target_user_uuid, target_main_access_key
             )
 
+    @user_repository_resilience.apply()
     async def delete_endpoints_force(
         self,
         user_uuid: UUID,
@@ -158,6 +185,7 @@ class AdminUserRepository:
         async with self._db.begin_session() as session:
             await self._delete_endpoints(session, user_uuid, delete_destroyed_only)
 
+    @user_repository_resilience.apply()
     async def get_admin_time_binned_monthly_stats_force(
         self,
         valkey_stat_client: ValkeyStatClient,

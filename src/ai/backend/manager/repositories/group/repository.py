@@ -9,14 +9,15 @@ import msgpack
 import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
 from ai.backend.manager.errors.resource import GroupNotFound
 from ai.backend.manager.models.group import GroupRow, association_groups_users, groups
 from ai.backend.manager.models.kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, kernels
@@ -26,10 +27,22 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
 
 from ..permission_controller.role_manager import RoleManager
 
-# Layer-specific decorator for group repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.GROUP)
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+group_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.GROUP_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class GroupRepository:
@@ -54,7 +67,7 @@ class GroupRepository:
         result = await session.execute(sa.select(GroupRow).where(groups.c.id == group_id))
         return result.scalar_one_or_none()
 
-    @repository_decorator()
+    @group_repository_resilience.apply()
     async def create(self, creator: GroupCreator) -> GroupData:
         """Create a new group."""
         async with self._db.begin_session() as db_session:
@@ -69,7 +82,7 @@ class GroupRepository:
 
             return data
 
-    @repository_decorator()
+    @group_repository_resilience.apply()
     async def modify_validated(
         self,
         group_id: uuid.UUID,
@@ -125,7 +138,7 @@ class GroupRepository:
             # If only user updates were performed, return None
             return None
 
-    @repository_decorator()
+    @group_repository_resilience.apply()
     async def mark_inactive(self, group_id: uuid.UUID) -> bool:
         """Mark a group as inactive (soft delete)."""
         async with self._db.begin_session() as session:
@@ -141,7 +154,7 @@ class GroupRepository:
                 return True
             raise GroupNotFound()
 
-    @repository_decorator()
+    @group_repository_resilience.apply()
     async def get_container_stats_for_period(
         self,
         start_date: datetime,
@@ -323,7 +336,7 @@ class GroupRepository:
                 objs_per_group[group_id]["c_infos"].append(c_info)
         return list(objs_per_group.values())
 
-    @repository_decorator()
+    @group_repository_resilience.apply()
     async def fetch_project_resource_usage(
         self,
         start_date: datetime,

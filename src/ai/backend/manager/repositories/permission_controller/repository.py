@@ -1,7 +1,11 @@
 import uuid
 from typing import Optional
 
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 
 from ...data.permission.role import (
     RoleCreateInput,
@@ -12,14 +16,26 @@ from ...data.permission.role import (
     SingleEntityPermissionCheckInput,
     UserRoleAssignmentInput,
 )
-from ...decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
 from ...models.utils import ExtendedAsyncSAEngine
 from .db_source import PermissionDBSource
 
-# Layer-specific decorator for user repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.PERMISSION_CONTROL)
+permission_controller_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(
+                domain=DomainType.REPOSITORY, layer=LayerType.PERMISSION_CONTROLLER_REPOSITORY
+            )
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class PermissionControllerRepository:
@@ -28,7 +44,7 @@ class PermissionControllerRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = PermissionDBSource(db)
 
-    @repository_decorator()
+    @permission_controller_repository_resilience.apply()
     async def create_role(self, data: RoleCreateInput) -> RoleData:
         """
         Create a new role in the database.
@@ -38,27 +54,27 @@ class PermissionControllerRepository:
         role_row = await self._db_source.create_role(data)
         return role_row.to_data()
 
-    @repository_decorator()
+    @permission_controller_repository_resilience.apply()
     async def update_role(self, data: RoleUpdateInput) -> RoleData:
         result = await self._db_source.update_role(data)
         return result.to_data()
 
-    @repository_decorator()
+    @permission_controller_repository_resilience.apply()
     async def delete_role(self, data: RoleDeleteInput) -> RoleData:
         result = await self._db_source.delete_role(data)
         return result.to_data()
 
-    @repository_decorator()
+    @permission_controller_repository_resilience.apply()
     async def assign_role(self, data: UserRoleAssignmentInput):
         result = await self._db_source.assign_role(data)
         return result.to_data()
 
-    @repository_decorator()
+    @permission_controller_repository_resilience.apply()
     async def get_role(self, role_id: uuid.UUID) -> Optional[RoleData]:
         result = await self._db_source.get_role(role_id)
         return result.to_data() if result else None
 
-    @repository_decorator()
+    @permission_controller_repository_resilience.apply()
     async def check_permission_of_entity(self, data: SingleEntityPermissionCheckInput) -> bool:
         target_object_id = data.target_object_id
         roles = await self._db_source.get_user_roles(data.user_id)
@@ -79,7 +95,7 @@ class PermissionControllerRepository:
                         return True
         return False
 
-    @repository_decorator()
+    @permission_controller_repository_resilience.apply()
     async def check_permission_in_scope(self, data: ScopePermissionCheckInput) -> bool:
         target_scope_id = data.target_scope_id
         role_rows = await self._db_source.get_user_roles(data.user_id)
