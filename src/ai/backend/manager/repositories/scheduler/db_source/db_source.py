@@ -1183,7 +1183,7 @@ class ScheduleDBSource:
         row = result.one_or_none()
 
         if not row:
-            raise ValueError(f"Scaling group {scaling_group_name} not found")
+            raise ScalingGroupNotFound(f"Scaling group {scaling_group_name} not found")
 
         return ScalingGroupNetworkInfo(
             use_host_network=row.use_host_network,

@@ -148,8 +148,8 @@ class ArtifactService:
 
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
-                registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
-                    registry_id
+                huggingface_registry_data = (
+                    await self._huggingface_registry_repository.get_registry_data_by_id(registry_id)
                 )
                 storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
 
@@ -160,7 +160,7 @@ class ArtifactService:
 
                 scan_result = await storage_proxy_client.scan_huggingface_models(
                     HuggingFaceScanModelsReq(
-                        registry_name=registry_data.name,
+                        registry_name=huggingface_registry_data.name,
                         limit=action.limit,
                         order=action.order,
                         search=action.search,
@@ -170,7 +170,7 @@ class ArtifactService:
                 # TODO: Mark artifacts which should be re-imported (updated from remote registry)?
                 scanned_models = await self._artifact_repository.upsert_huggingface_model_artifacts(
                     scan_result.models,
-                    registry_id=registry_data.id,
+                    registry_id=huggingface_registry_data.id,
                 )
             case ArtifactRegistryType.RESERVOIR:
                 registry_data = (
@@ -316,8 +316,8 @@ class ArtifactService:
 
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
-                registry_data = await self._huggingface_registry_repository.get_registry_data_by_id(
-                    registry_id
+                huggingface_registry_data = (
+                    await self._huggingface_registry_repository.get_registry_data_by_id(registry_id)
                 )
                 storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
 
@@ -328,7 +328,7 @@ class ArtifactService:
 
                 scan_result = await storage_proxy_client.scan_huggingface_models_sync(
                     HuggingFaceScanModelsSyncReq(
-                        registry_name=registry_data.name,
+                        registry_name=huggingface_registry_data.name,
                         limit=action.limit,
                         order=action.order,
                         search=action.search,
@@ -338,7 +338,7 @@ class ArtifactService:
                 # TODO: Mark artifacts which should be re-imported (updated from remote registry)?
                 scanned_models = await self._artifact_repository.upsert_huggingface_model_artifacts(
                     scan_result.models,
-                    registry_id=registry_data.id,
+                    registry_id=huggingface_registry_data.id,
                 )
             case ArtifactRegistryType.RESERVOIR:
                 registry_data = (

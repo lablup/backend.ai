@@ -22,6 +22,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
+    InvalidPresetQuery,
     ProjectNotFound,
     ResourcePresetNotFound,
     ScalingGroupNotFound,
@@ -127,7 +128,7 @@ class ResourcePresetDBSource:
         elif name is not None:
             preset_row = await self._get_preset_by_name(db_sess, name)
         else:
-            raise ValueError("Either preset_id or name must be provided")
+            raise InvalidPresetQuery("Either preset_id or name must be provided")
 
         if preset_row is None:
             raise ResourcePresetNotFound()

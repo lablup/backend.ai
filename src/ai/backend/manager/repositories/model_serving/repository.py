@@ -10,7 +10,11 @@ from sqlalchemy.orm.exc import NoResultFound
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     ClusterMode,
     MountPermission,
@@ -28,9 +32,6 @@ from ai.backend.manager.data.model_serving.types import (
     RoutingData,
     ScalingGroupData,
     UserData,
-)
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
 )
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -59,8 +60,21 @@ from ai.backend.manager.services.model_serving.actions.modify_endpoint import Mo
 from ai.backend.manager.services.model_serving.exceptions import InvalidAPIParameters
 from ai.backend.manager.types import MountOptionModel, UserScope
 
-# Layer-specific decorator for model_serving repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.MODEL_SERVING)
+model_serving_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.MODEL_SERVING_REPOSITORY)
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class ModelServingRepository:
@@ -69,7 +83,7 @@ class ModelServingRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def get_endpoint_by_id_validated(
         self, endpoint_id: uuid.UUID, user_id: uuid.UUID, user_role: UserRole, domain_name: str
     ) -> Optional[EndpointData]:
@@ -96,7 +110,7 @@ class ModelServingRepository:
 
             return endpoint.to_data()
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def get_endpoint_by_name_validated(
         self, name: str, user_id: uuid.UUID
     ) -> Optional[EndpointData]:
@@ -110,7 +124,7 @@ class ModelServingRepository:
                 return None
             return endpoint.to_data()
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def list_endpoints_by_owner_validated(
         self, session_owner_id: uuid.UUID, name: Optional[str] = None
     ) -> list[EndpointData]:
@@ -135,7 +149,7 @@ class ModelServingRepository:
 
             return data_list
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def check_endpoint_name_uniqueness(self, name: str) -> bool:
         """
         Check if endpoint name is unique (not already taken by non-destroyed endpoints).
@@ -151,7 +165,7 @@ class ModelServingRepository:
 
             return existing_endpoint is None
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def create_endpoint_validated(
         self, endpoint_creator: EndpointCreator, registry: AgentRegistry
     ) -> EndpointData:
@@ -178,7 +192,7 @@ class ModelServingRepository:
 
         return data
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def update_endpoint_lifecycle_validated(
         self,
         endpoint_id: uuid.UUID,
@@ -215,7 +229,7 @@ class ModelServingRepository:
 
         return True
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def clear_endpoint_errors_validated(
         self, endpoint_id: uuid.UUID, user_id: uuid.UUID, user_role: UserRole, domain_name: str
     ) -> bool:
@@ -248,7 +262,7 @@ class ModelServingRepository:
 
         return True
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def get_route_by_id_validated(
         self,
         route_id: uuid.UUID,
@@ -273,7 +287,7 @@ class ModelServingRepository:
 
             return route.to_data()
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def update_route_traffic_validated(
         self,
         valkey_live: ValkeyLiveClient,
@@ -315,7 +329,7 @@ class ModelServingRepository:
             )
             return endpoint.to_data()
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def decrease_endpoint_replicas_validated(
         self, service_id: uuid.UUID, user_id: uuid.UUID, user_role: UserRole, domain_name: str
     ) -> bool:
@@ -342,7 +356,7 @@ class ModelServingRepository:
 
         return True
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def create_endpoint_token_validated(
         self, token_row: EndpointTokenRow, user_id: uuid.UUID, user_role: UserRole, domain_name: str
     ) -> Optional[EndpointTokenData]:
@@ -366,7 +380,7 @@ class ModelServingRepository:
 
             return token_row.to_dataclass()
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def get_scaling_group_info(self, scaling_group_name: str) -> Optional[ScalingGroupData]:
         """
         Get scaling group information (wsproxy details).
@@ -386,7 +400,7 @@ class ModelServingRepository:
                 wsproxy_addr=row["wsproxy_addr"], wsproxy_api_token=row["wsproxy_api_token"]
             )
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def get_user_by_id(self, user_id: uuid.UUID) -> Optional[UserData]:
         """
         Get user information by ID.
@@ -482,7 +496,7 @@ class ModelServingRepository:
             case _:
                 return owner.uuid == user_id
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def get_vfolder_by_id(self, vfolder_id: uuid.UUID) -> Optional[VFolderRow]:
         """
         Get VFolder by ID.
@@ -490,7 +504,7 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session() as session:
             return await VFolderRow.get(session, vfolder_id)
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def get_user_with_keypair(self, user_id: uuid.UUID) -> Optional[Any]:
         """
         Get user with their main access key.
@@ -502,7 +516,7 @@ class ModelServingRepository:
             result = await session.execute(query)
             return result.fetchone()
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def get_keypair_resource_policy(self, policy_name: str) -> Optional[Any]:
         """
         Get keypair resource policy by name.
@@ -516,7 +530,7 @@ class ModelServingRepository:
             result = await session.execute(query)
             return result.first()
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def get_endpoint_for_appproxy_update(
         self, service_id: uuid.UUID
     ) -> Optional[EndpointRow]:
@@ -526,7 +540,7 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session() as session:
             return await self._get_endpoint_by_id(session, service_id, load_routes=True)
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def get_route_with_session(self, route_id: uuid.UUID) -> Optional[RoutingRow]:
         """
         Get route with endpoint and session data loaded.
@@ -536,7 +550,7 @@ class ModelServingRepository:
                 session, route_id, load_endpoint=True, load_session=True
             )
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def update_endpoint_replicas_validated(
         self,
         endpoint_id: uuid.UUID,
@@ -567,7 +581,7 @@ class ModelServingRepository:
             await session.execute(query)
         return True
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def get_auto_scaling_rule_by_id_validated(
         self,
         rule_id: uuid.UUID,
@@ -594,7 +608,7 @@ class ModelServingRepository:
             except ObjectNotFound:
                 return None
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def create_auto_scaling_rule_validated(
         self,
         user_id: uuid.UUID,
@@ -640,7 +654,7 @@ class ModelServingRepository:
             )
             return rule.to_data()
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def update_auto_scaling_rule_validated(
         self,
         rule_id: uuid.UUID,
@@ -674,7 +688,7 @@ class ModelServingRepository:
             except ObjectNotFound:
                 return None
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def delete_auto_scaling_rule_validated(
         self,
         rule_id: uuid.UUID,
@@ -702,7 +716,7 @@ class ModelServingRepository:
             except NoResultFound:
                 return False
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def resolve_group_id(
         self, domain_name: str, group_name_or_id: str | uuid.UUID
     ) -> Optional[uuid.UUID]:
@@ -714,7 +728,7 @@ class ModelServingRepository:
             assert conn is not None
             return await resolve_group_name_or_id(conn, domain_name, group_name_or_id)
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def get_session_by_id(
         self, session_id: uuid.UUID, kernel_loading_strategy: KernelLoadingStrategy
     ) -> Optional[SessionRow]:
@@ -729,7 +743,7 @@ class ModelServingRepository:
             except NoResultFound:
                 return None
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def resolve_image_for_endpoint_creation(
         self, identifiers: list[ImageIdentifier | ImageAlias | ImageRef]
     ) -> ImageRow:
@@ -741,7 +755,7 @@ class ModelServingRepository:
         async with self._db.begin_readonly_session() as session:
             return await ImageRow.resolve(session, identifiers)
 
-    @repository_decorator()
+    @model_serving_repository_resilience.apply()
     async def modify_endpoint(
         self,
         action: ModifyEndpointAction,

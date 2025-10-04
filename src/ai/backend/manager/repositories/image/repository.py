@@ -6,12 +6,13 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.docker import ImageRef
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import ImageAlias
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, RescanImagesResult
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
 from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
     AliasImageActionValueError,
@@ -19,6 +20,7 @@ from ai.backend.manager.errors.image import (
     ForgetImageNotFoundError,
     ImageAliasNotFound,
     ModifyImageActionValueError,
+    RegistryNotFoundForImage,
 )
 from ai.backend.manager.models.image import (
     ImageAliasRow,
@@ -28,8 +30,19 @@ from ai.backend.manager.models.image import (
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-# Layer-specific decorator for image repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.IMAGE)
+image_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.IMAGE_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class ImageRepository:
@@ -38,7 +51,7 @@ class ImageRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def resolve_image(
         self, identifiers: list[ImageAlias | ImageRef | ImageIdentifier]
     ) -> ImageData:
@@ -53,7 +66,7 @@ class ImageRepository:
             data = row.to_dataclass()
         return data
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def resolve_images_batch(
         self, identifier_lists: list[list[ImageIdentifier]]
     ) -> list[ImageData]:
@@ -113,7 +126,7 @@ class ImageRepository:
             raise ImageAliasNotFound(f"Image alias '{alias}' not found.")
         return image_alias_row
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def get_image_by_id(
         self, image_id: UUID, load_aliases: bool = False
     ) -> Optional[ImageData]:
@@ -124,7 +137,7 @@ class ImageRepository:
             data = row.to_dataclass()
         return data
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def soft_delete_user_image(
         self,
         identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
@@ -142,7 +155,7 @@ class ImageRepository:
             data = row.to_dataclass()
         return data
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def soft_delete_image_by_id(
         self,
         image_id: UUID,
@@ -159,7 +172,7 @@ class ImageRepository:
             data = image_row.to_dataclass()
         return data
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def get_and_validate_image_ownership(
         self, image_id: UUID, user_id: UUID, load_aliases: bool = False
     ) -> ImageData:
@@ -174,7 +187,7 @@ class ImageRepository:
             data = image_row.to_dataclass()
         return data
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def add_image_alias(
         self, alias: str, image_canonical: str, architecture: str
     ) -> tuple[UUID, ImageAliasData]:
@@ -193,14 +206,14 @@ class ImageRepository:
         except DBAPIError as e:
             raise AliasImageActionDBError(str(e))
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def get_image_alias(self, alias: str) -> ImageAliasData:
         async with self._db.begin_session() as session:
             row = await self._get_image_alias_by_name(session, alias)
             data = ImageAliasData(id=row.id, alias=row.alias)
         return data
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def delete_image_alias(self, alias: str) -> tuple[UUID, ImageAliasData]:
         async with self._db.begin_session() as session:
             existing_alias = await self._get_image_alias_by_name(session, alias)
@@ -209,7 +222,7 @@ class ImageRepository:
             await session.delete(existing_alias)
         return image_id, alias_data
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def scan_image_by_identifier(
         self, image_canonical: str, architecture: str
     ) -> RescanImagesResult:
@@ -236,14 +249,14 @@ class ImageRepository:
             # Get the registry row
             registry_row = await session.get(ContainerRegistryRow, image_row.registry_id)
             if not registry_row:
-                raise ValueError(f"Registry not found for image {image_canonical}")
+                raise RegistryNotFoundForImage(f"Registry not found for image {image_canonical}")
 
             # Call the original scan function
             result = await scan_single_image(self._db, registry_key, registry_row, image_canonical)
 
         return result
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def untag_image_from_registry(self, image_id: UUID) -> Optional[ImageData]:
         async with self._db.begin_readonly_session() as session:
             image_row = await self._get_image_by_id(session, image_id, load_aliases=True)
@@ -253,7 +266,7 @@ class ImageRepository:
             data = image_row.to_dataclass()
         return data
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def update_image_properties(
         self, target: str, architecture: str, properties_to_update: dict
     ) -> ImageData:
@@ -273,7 +286,7 @@ class ImageRepository:
         except (ValueError, DBAPIError):
             raise ModifyImageActionValueError
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def clear_image_custom_resource_limit(
         self, image_canonical: str, architecture: str
     ) -> ImageData:
@@ -285,7 +298,7 @@ class ImageRepository:
             data = image_row.to_dataclass()
         return data
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def untag_image_from_registry_validated(self, image_id: UUID, user_id: UUID) -> ImageData:
         """
         Validates ownership and untags an image from registry in a single operation.
@@ -299,7 +312,7 @@ class ImageRepository:
             data = image_row.to_dataclass()
         return data
 
-    @repository_decorator()
+    @image_repository_resilience.apply()
     async def delete_image_with_aliases_validated(self, image_id: UUID, user_id: UUID) -> ImageData:
         """
         Deletes an image and all its aliases after validating ownership.

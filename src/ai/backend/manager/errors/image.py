@@ -187,3 +187,15 @@ class PurgeImageActionByIdObjectDBError(BackendAIError, web.HTTPInternalServerEr
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class RegistryNotFoundForImage(ObjectNotFound):
+    object_name = "registry for image"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.CONTAINER_REGISTRY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )

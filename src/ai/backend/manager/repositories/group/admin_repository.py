@@ -3,6 +3,11 @@ import uuid
 import aiotools
 import sqlalchemy as sa
 
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import VFolderID
 from ai.backend.manager.errors.resource import (
     GroupHasActiveEndpointsError,
@@ -17,6 +22,20 @@ from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.session import SessionRow
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
+
+group_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.GROUP_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class AdminGroupRepository:
@@ -184,6 +203,7 @@ class AdminGroupRepository:
         await session.execute(sa.delete(RoutingRow).where(RoutingRow.endpoint.in_(endpoint_ids)))
         await session.execute(sa.delete(EndpointRow).where(EndpointRow.id.in_(endpoint_ids)))
 
+    @group_repository_resilience.apply()
     async def purge_group_force(self, group_id: uuid.UUID) -> bool:
         """Completely remove a group and all its associated data."""
         async with self._db.begin_session() as session:

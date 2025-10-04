@@ -2,19 +2,33 @@ from typing import Optional
 
 import sqlalchemy as sa
 
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SASession
 
-# Layer-specific decorator for container_registry repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.CONTAINER_REGISTRY)
+container_registry_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.CONTAINER_REGISTRY_REPOSITORY)
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class ContainerRegistryRepository:
@@ -23,7 +37,7 @@ class ContainerRegistryRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    @repository_decorator()
+    @container_registry_repository_resilience.apply()
     async def get_by_registry_and_project(
         self,
         registry_name: str,
@@ -35,17 +49,17 @@ class ContainerRegistryRepository:
                 raise ContainerRegistryNotFound()
             return result
 
-    @repository_decorator()
+    @container_registry_repository_resilience.apply()
     async def get_by_registry_name(self, registry_name: str) -> list[ContainerRegistryData]:
         async with self._db.begin_readonly_session() as session:
             return await self._get_by_registry_name(session, registry_name)
 
-    @repository_decorator()
+    @container_registry_repository_resilience.apply()
     async def get_all(self) -> list[ContainerRegistryData]:
         async with self._db.begin_readonly_session() as session:
             return await self._get_all(session)
 
-    @repository_decorator()
+    @container_registry_repository_resilience.apply()
     async def clear_images(
         self,
         registry_name: str,
@@ -70,7 +84,7 @@ class ContainerRegistryRepository:
                 raise ContainerRegistryNotFound()
             return result
 
-    @repository_decorator()
+    @container_registry_repository_resilience.apply()
     async def get_known_registries(self) -> dict[str, str]:
         async with self._db.begin_readonly_session() as session:
             known_registries_map = await ContainerRegistryRow.get_known_container_registries(
@@ -85,7 +99,7 @@ class ContainerRegistryRepository:
 
             return known_registries
 
-    @repository_decorator()
+    @container_registry_repository_resilience.apply()
     async def get_registry_row_for_scanner(
         self,
         registry_name: str,

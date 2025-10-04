@@ -21,6 +21,7 @@ from ai.backend.common.types import (
     VFolderMount,
 )
 from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.errors.deployment import DeploymentHasNoTargetRevision
 from ai.backend.manager.models import NetworkRow
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
@@ -112,7 +113,9 @@ class SessionCreationSpec:
         session_creation_id = secrets.token_urlsafe(16)
         target_revision = deployment_info.target_revision()
         if target_revision is None:
-            raise ValueError("Deployment has no target revision for session creation")
+            raise DeploymentHasNoTargetRevision(
+                "Deployment has no target revision for session creation"
+            )
 
         # Prepare mount spec
         mount_spec = target_revision.mounts.to_mount_spec()

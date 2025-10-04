@@ -90,7 +90,7 @@ class VFolderInviteService:
             )
 
         # Create invitations
-        invited_ids = []
+        invited_ids: list[str] = []
 
         for _, user_email in invitee_users:
             # Check if invitation already exists

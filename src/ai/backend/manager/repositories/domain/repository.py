@@ -4,17 +4,25 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.domain.types import (
     DomainCreator,
     DomainData,
     DomainModifier,
     UserInfo,
 )
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
+from ai.backend.manager.errors.resource import (
+    DomainDataProcessingError,
+    DomainHasActiveKernels,
+    DomainHasGroups,
+    DomainHasUsers,
+    DomainUpdateNotAllowed,
+    InvalidDomainConfiguration,
 )
-from ai.backend.manager.errors.resource import DomainDataProcessingError
 from ai.backend.manager.models import groups, users
 from ai.backend.manager.models.domain import DomainRow, domains, get_domains
 from ai.backend.manager.models.group import ProjectType
@@ -26,12 +34,23 @@ from ai.backend.manager.models.rbac import SystemScope
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import DomainPermission, ScalingGroupPermission
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow, get_scaling_groups
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from ..permission_controller.role_manager import RoleManager
 
-# Layer-specific decorator for domain repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.DOMAIN)
+domain_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.DOMAIN_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class DomainRepository:
@@ -42,7 +61,7 @@ class DomainRepository:
         self._db = db
         self._role_manager = RoleManager()
 
-    @repository_decorator()
+    @domain_repository_resilience.apply()
     async def create_domain_validated(self, creator: DomainCreator) -> DomainData:
         """
         Creates a new domain with model-store group.
@@ -62,7 +81,7 @@ class DomainRepository:
 
         return result
 
-    @repository_decorator()
+    @domain_repository_resilience.apply()
     async def modify_domain_validated(
         self, domain_name: str, modifier: DomainModifier
     ) -> Optional[DomainData]:
@@ -88,7 +107,7 @@ class DomainRepository:
 
             return row.to_data() if row is not None else None
 
-    @repository_decorator()
+    @domain_repository_resilience.apply()
     async def soft_delete_domain_validated(self, domain_name: str) -> bool:
         """
         Soft deletes a domain by setting is_active to False.
@@ -101,7 +120,7 @@ class DomainRepository:
             result = await conn.execute(update_query)
             return result.rowcount > 0
 
-    @repository_decorator()
+    @domain_repository_resilience.apply()
     async def purge_domain_validated(self, domain_name: str) -> bool:
         """
         Permanently deletes a domain after validation checks.
@@ -110,15 +129,17 @@ class DomainRepository:
         async with self._db.begin() as conn:
             # Validate prerequisites
             if await self._domain_has_active_kernels(conn, domain_name):
-                raise RuntimeError("Domain has some active kernels. Terminate them first.")
+                raise DomainHasActiveKernels(
+                    "Domain has some active kernels. Terminate them first."
+                )
 
             user_count = await self._get_domain_user_count(conn, domain_name)
             if user_count > 0:
-                raise RuntimeError("There are users bound to the domain. Remove users first.")
+                raise DomainHasUsers("There are users bound to the domain. Remove users first.")
 
             group_count = await self._get_domain_group_count(conn, domain_name)
             if group_count > 0:
-                raise RuntimeError("There are groups bound to the domain. Remove groups first.")
+                raise DomainHasGroups("There are groups bound to the domain. Remove groups first.")
 
             # Clean up kernels
             await self._delete_kernels(conn, domain_name)
@@ -128,7 +149,7 @@ class DomainRepository:
             result = await conn.execute(delete_query)
             return result.rowcount > 0
 
-    @repository_decorator()
+    @domain_repository_resilience.apply()
     async def create_domain_node_validated(
         self, creator: DomainCreator, scaling_groups: Optional[list[str]] = None
     ) -> DomainData:
@@ -164,7 +185,7 @@ class DomainRepository:
                 )
             return result
 
-    @repository_decorator()
+    @domain_repository_resilience.apply()
     async def modify_domain_node_validated(
         self,
         domain_name: str,
@@ -263,7 +284,7 @@ class DomainRepository:
         query = sa.select([sa.func.count()]).where(groups.c.domain_name == domain_name)
         return await conn.scalar(query)
 
-    @repository_decorator()
+    @domain_repository_resilience.apply()
     async def create_domain_node_with_permissions(
         self,
         creator: DomainCreator,
@@ -275,17 +296,14 @@ class DomainRepository:
         Validates scaling group permissions before creating.
         """
 
-        async def _insert(db_session: SASession) -> DomainData:
+        async with self._db.begin_session() as db_session:
             if scaling_groups is not None:
                 await self._ensure_sgroup_permission(
                     user_info, scaling_groups, db_session=db_session
                 )
             return await self.create_domain_node_validated(creator, scaling_groups)
 
-        async with self._db.connect() as db_conn:
-            return await execute_with_txn_retry(_insert, self._db.begin_session, db_conn)
-
-    @repository_decorator()
+    @domain_repository_resilience.apply()
     async def modify_domain_node_with_permissions(
         self,
         domain_name: str,
@@ -299,7 +317,7 @@ class DomainRepository:
         Validates domain and scaling group permissions.
         """
 
-        async def _update(db_session: SASession) -> Optional[DomainData]:
+        async with self._db.begin_session() as db_session:
             client_ctx = ClientContext(
                 self._db, user_info.domain_name, user_info.id, user_info.role
             )
@@ -311,7 +329,7 @@ class DomainRepository:
                 db_session=db_session,
             )
             if not domain_models:
-                raise ValueError(f"Not allowed to update domain (id:{domain_name})")
+                raise DomainUpdateNotAllowed(f"Not allowed to update domain (id:{domain_name})")
 
             if sgroups_to_add is not None:
                 await self._ensure_sgroup_permission(
@@ -329,9 +347,6 @@ class DomainRepository:
                 sgroups_to_remove,
             )
 
-        async with self._db.connect() as db_conn:
-            return await execute_with_txn_retry(_update, self._db.begin_session, db_conn)
-
     async def _ensure_sgroup_permission(
         self, user_info: UserInfo, sgroup_names: Iterable[str], *, db_session: SASession
     ) -> None:
@@ -348,6 +363,6 @@ class DomainRepository:
         )
         not_allowed_sgroups = set(sgroup_names) - set([sg.name for sg in sgroup_models])
         if not_allowed_sgroups:
-            raise ValueError(
+            raise InvalidDomainConfiguration(
                 f"Not allowed to associate the domain with given scaling groups(s:{not_allowed_sgroups})"
             )

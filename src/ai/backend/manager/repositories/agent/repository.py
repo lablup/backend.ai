@@ -9,7 +9,11 @@ from sqlalchemy.orm import contains_eager
 from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AgentId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -21,9 +25,6 @@ from ai.backend.manager.data.agent.types import (
     UpsertResult,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -33,10 +34,22 @@ from ai.backend.manager.repositories.resource_preset.utils import suppress_with_
 
 from .query import QueryCondition, QueryOrder
 
-# Layer-specific decorator for agent repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.AGENT)
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+agent_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.AGENT_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class AgentRepository:
@@ -55,11 +68,11 @@ class AgentRepository:
         self._cache_source = AgentCacheSource(valkey_image, valkey_live)
         self._config_provider = config_provider
 
-    @repository_decorator()
+    @agent_repository_resilience.apply()
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
         return await self._db_source.get_by_id(agent_id)
 
-    @repository_decorator()
+    @agent_repository_resilience.apply()
     async def add_agent_to_images(self, agent_id: AgentId, images) -> None:
         images = msgpack.unpackb(zlib.decompress(images))
         image_canonicals = set(img_info[0] for img_info in images)
@@ -68,7 +81,7 @@ class AgentRepository:
         ):
             await self._cache_source.set_agent_to_images(agent_id, list(image_canonicals))
 
-    @repository_decorator()
+    @agent_repository_resilience.apply()
     async def sync_agent_heartbeat(
         self,
         agent_id: AgentId,
@@ -89,7 +102,7 @@ class AgentRepository:
 
         return upsert_result
 
-    @repository_decorator()
+    @agent_repository_resilience.apply()
     async def cleanup_agent_on_exit(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
         with suppress_with_log(
             [Exception], message=f"Failed to remove last seen for agent: {agent_id}"
@@ -103,11 +116,11 @@ class AgentRepository:
         ):
             await self._cache_source.remove_agent_from_all_images(agent_id)
 
-    @repository_decorator()
+    @agent_repository_resilience.apply()
     async def update_agent_status(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
         await self._db_source.update_agent_status(agent_id, modifier)
 
-    @repository_decorator()
+    @agent_repository_resilience.apply()
     async def remove_agent_from_images(
         self, agent_id: AgentId, image_canonicals: list[str]
     ) -> None:
@@ -117,7 +130,7 @@ class AgentRepository:
         ):
             await self._cache_source.remove_agent_from_images(agent_id, image_canonicals)
 
-    @repository_decorator()
+    @agent_repository_resilience.apply()
     async def list_data(
         self,
         conditions: Sequence[QueryCondition],
@@ -135,7 +148,7 @@ class AgentRepository:
             agent_rows = cast(list[AgentRow], result.all())
             return [agent_row.to_data() for agent_row in agent_rows]
 
-    @repository_decorator()
+    @agent_repository_resilience.apply()
     async def list_extended_data(
         self,
         conditions: Sequence[QueryCondition],

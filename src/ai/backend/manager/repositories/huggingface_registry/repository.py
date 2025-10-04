@@ -4,7 +4,11 @@ import sqlalchemy as sa
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.artifact_registries.types import (
     ArtifactRegistryCreatorMeta,
     ArtifactRegistryModifierMeta,
@@ -12,9 +16,6 @@ from ai.backend.manager.data.artifact_registries.types import (
 from ai.backend.manager.data.huggingface_registry.creator import HuggingFaceRegistryCreator
 from ai.backend.manager.data.huggingface_registry.modifier import HuggingFaceRegistryModifier
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
 from ai.backend.manager.models.artifact import ArtifactRow
@@ -22,8 +23,23 @@ from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
 from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-# Layer-specific decorator for artifact registry repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.ARTIFACT_REGISTRY)
+huggingface_registry_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(
+                domain=DomainType.REPOSITORY, layer=LayerType.HUGGINGFACE_REGISTRY_REPOSITORY
+            )
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class HuggingFaceRepository:
@@ -32,7 +48,7 @@ class HuggingFaceRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    @repository_decorator()
+    @huggingface_registry_repository_resilience.apply()
     async def get_registry_data_by_id(self, registry_id: uuid.UUID) -> HuggingFaceRegistryData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -45,7 +61,7 @@ class HuggingFaceRepository:
                 raise ArtifactRegistryNotFoundError(f"Registry with ID {registry_id} not found")
             return row.to_dataclass()
 
-    @repository_decorator()
+    @huggingface_registry_repository_resilience.apply()
     async def get_registry_data_by_name(self, name: str) -> HuggingFaceRegistryData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -62,7 +78,7 @@ class HuggingFaceRepository:
                 raise ArtifactRegistryNotFoundError(f"Registry with name {name} not found")
             return row.huggingface_registries.to_dataclass()
 
-    @repository_decorator()
+    @huggingface_registry_repository_resilience.apply()
     async def get_registry_data_by_artifact_id(
         self, artifact_id: uuid.UUID
     ) -> HuggingFaceRegistryData:
@@ -81,7 +97,7 @@ class HuggingFaceRepository:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             return row.huggingface_registry.to_dataclass()
 
-    @repository_decorator()
+    @huggingface_registry_repository_resilience.apply()
     async def create(
         self, creator: HuggingFaceRegistryCreator, meta: ArtifactRegistryCreatorMeta
     ) -> HuggingFaceRegistryData:
@@ -114,7 +130,7 @@ class HuggingFaceRepository:
 
             return row.to_dataclass()
 
-    @repository_decorator()
+    @huggingface_registry_repository_resilience.apply()
     async def update(
         self,
         registry_id: uuid.UUID,
@@ -155,7 +171,7 @@ class HuggingFaceRepository:
 
             return row.to_dataclass()
 
-    @repository_decorator()
+    @huggingface_registry_repository_resilience.apply()
     async def delete(self, registry_id: uuid.UUID) -> uuid.UUID:
         """
         Delete an existing Hugging Face registry entry from the database.
@@ -175,7 +191,7 @@ class HuggingFaceRepository:
             await db_session.execute(delete_meta_query)
             return deleted_id
 
-    @repository_decorator()
+    @huggingface_registry_repository_resilience.apply()
     async def get_registries_by_ids(
         self, registry_ids: list[uuid.UUID]
     ) -> list[HuggingFaceRegistryData]:
@@ -191,7 +207,7 @@ class HuggingFaceRepository:
             rows: list[HuggingFaceRegistryRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
-    @repository_decorator()
+    @huggingface_registry_repository_resilience.apply()
     async def list_registries(self) -> list[HuggingFaceRegistryData]:
         """
         List all Hugging Face registry entries from the database.

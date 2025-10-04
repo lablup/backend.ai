@@ -42,6 +42,7 @@ root_patterns = [
 [test]
 extra_env_vars = ["BACKEND_BUILD_ROOT=%(buildroot)s", "HOME"]
 attempts_default = 3
+timeout_default = 180
 
 [python]
 enable_resolves = true
