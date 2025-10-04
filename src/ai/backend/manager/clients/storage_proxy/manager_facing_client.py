@@ -31,13 +31,28 @@ from ai.backend.common.dto.storage.response import (
     ReservoirImportModelsResponse,
     VFolderCloneResponse,
 )
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.clients.storage_proxy.base import StorageProxyHTTPClient
-from ai.backend.manager.decorators.client_decorator import create_layer_aware_client_decorator
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
 from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
 
-client_decorator = create_layer_aware_client_decorator(LayerType.STORAGE_PROXY_CLIENT)
+storage_proxy_client_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.CLIENT, layer=LayerType.STORAGE_PROXY_CLIENT)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.EXPONENTIAL,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class StorageProxyManagerFacingClient:
@@ -52,7 +67,7 @@ class StorageProxyManagerFacingClient:
     def __init__(self, client: StorageProxyHTTPClient):
         self._client = client
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def get_volumes(self) -> Mapping[str, Any]:
         """
         Get all volumes from the storage proxy.
@@ -61,7 +76,7 @@ class StorageProxyManagerFacingClient:
         """
         return await self._client.request_with_response("GET", "volumes")
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def create_folder(
         self,
         volume: str,
@@ -89,7 +104,7 @@ class StorageProxyManagerFacingClient:
             body["mode"] = mode
         await self._client.request("POST", "folder/create", body=body)
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def delete_folder(
         self,
         volume: str,
@@ -110,7 +125,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def clone_folder(
         self,
         src_volume: str,
@@ -135,7 +150,7 @@ class StorageProxyManagerFacingClient:
         data = await self._client.request_with_response("POST", "folder/clone", body=body)
         return VFolderCloneResponse.model_validate(data)
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def get_mount_path(
         self,
         volume: str,
@@ -160,7 +175,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def get_volume_hwinfo(
         self,
         volume: str,
@@ -179,7 +194,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def get_volume_performance_metric(
         self,
         volume: str,
@@ -198,7 +213,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def get_fs_usage(
         self,
         volume: str,
@@ -217,7 +232,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def get_volume_quota(
         self,
         volume: str,
@@ -239,7 +254,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def update_volume_quota(
         self,
         volume: str,
@@ -261,7 +276,7 @@ class StorageProxyManagerFacingClient:
         }
         await self._client.request("PATCH", "volume/quota", body=body)
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def get_quota_scope(
         self,
         volume: str,
@@ -283,7 +298,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def update_quota_scope(
         self,
         volume: str,
@@ -306,7 +321,7 @@ class StorageProxyManagerFacingClient:
         }
         await self._client.request("PATCH", "quota-scope", body=body)
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def delete_quota_scope_quota(
         self,
         volume: str,
@@ -327,7 +342,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def mkdir(
         self,
         *,
@@ -361,7 +376,7 @@ class StorageProxyManagerFacingClient:
             body=body,
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def rename_file(
         self,
         volume: str,
@@ -388,7 +403,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def delete_files(
         self,
         volume: str,
@@ -416,7 +431,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def move_file(
         self,
         volume: str,
@@ -443,7 +458,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def upload_file(
         self,
         volume: str,
@@ -471,7 +486,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def download_file(
         self,
         *,
@@ -503,7 +518,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def list_files(
         self,
         volume: str,
@@ -613,7 +628,7 @@ class StorageProxyManagerFacingClient:
                     break
                 yield chunk
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def get_folder_usage(
         self,
         volume: str,
@@ -635,7 +650,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def get_used_bytes(
         self,
         volume: str,
@@ -657,7 +672,7 @@ class StorageProxyManagerFacingClient:
             },
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def scan_huggingface_models(
         self,
         req: HuggingFaceScanModelsReq,
@@ -672,7 +687,7 @@ class StorageProxyManagerFacingClient:
         )
         return HuggingFaceScanModelsResponse.model_validate(resp)
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def scan_huggingface_models_sync(
         self,
         req: HuggingFaceScanModelsSyncReq,
@@ -687,7 +702,7 @@ class StorageProxyManagerFacingClient:
         )
         return HuggingFaceScanModelsSyncResponse.model_validate(resp)
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def retrieve_huggingface_models(
         self,
         req: HuggingFaceRetrieveModelsReq,
@@ -702,7 +717,7 @@ class StorageProxyManagerFacingClient:
         )
         return HuggingFaceRetrieveModelsResponse.model_validate(resp)
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def retrieve_huggingface_model(
         self,
         path: HuggingFaceRetrieveModelReqPathParam,
@@ -723,7 +738,7 @@ class StorageProxyManagerFacingClient:
         )
         return HuggingFaceRetrieveModelResponse.model_validate(resp)
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def import_huggingface_models(
         self,
         req: HuggingFaceImportModelsReq,
@@ -738,7 +753,7 @@ class StorageProxyManagerFacingClient:
         )
         return HuggingFaceImportModelsResponse.model_validate(resp)
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def import_reservoir_models(
         self,
         req: ReservoirImportModelsReq,
@@ -753,7 +768,7 @@ class StorageProxyManagerFacingClient:
         )
         return ReservoirImportModelsResponse.model_validate(resp)
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def download_s3_file(
         self,
         storage_name: str,
@@ -769,7 +784,7 @@ class StorageProxyManagerFacingClient:
             body=req.model_dump(by_alias=True),
         )
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def get_s3_presigned_download_url(
         self,
         storage_name: str,
@@ -786,7 +801,7 @@ class StorageProxyManagerFacingClient:
         )
         return PresignedDownloadObjectResponse.model_validate(resp)
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def get_s3_presigned_upload_url(
         self,
         storage_name: str,
@@ -803,7 +818,7 @@ class StorageProxyManagerFacingClient:
         )
         return PresignedUploadObjectResponse.model_validate(resp)
 
-    @client_decorator()
+    @storage_proxy_client_resilience.apply()
     async def delete_s3_object(
         self,
         storage_name: str,
