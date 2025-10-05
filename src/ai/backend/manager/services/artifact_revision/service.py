@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageType
@@ -169,25 +171,25 @@ class ArtifactRevisionService:
             storage_data.id, bucket_name
         )
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
-
+        task_id: UUID
         match artifact.registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
-                registry_data = (
+                huggingface_registry_data = (
                     await self._huggingface_registry_repository.get_registry_data_by_artifact_id(
                         artifact.id
                     )
                 )
 
-                result = await storage_proxy_client.import_huggingface_models(
+                huggingface_result = await storage_proxy_client.import_huggingface_models(
                     HuggingFaceImportModelsReq(
                         models=[
                             ModelTarget(model_id=artifact.name, revision=revision_data.version)
                         ],
-                        registry_name=registry_data.name,
+                        registry_name=huggingface_registry_data.name,
                         storage_name=storage_data.name,
-                        bucket_name=storage_namespace.bucket,
                     )
                 )
+                task_id = huggingface_result.task_id
             case ArtifactRegistryType.RESERVOIR:
                 registry_data = (
                     await self._reservoir_registry_repository.get_registry_data_by_artifact_id(
@@ -202,9 +204,9 @@ class ArtifactRevisionService:
                         ],
                         registry_name=registry_data.name,
                         storage_name=storage_data.name,
-                        bucket_name=storage_namespace.bucket,
                     )
                 )
+                task_id = result.task_id
             case _:
                 raise InvalidArtifactRegistryTypeError(
                     f"Unsupported artifact registry type: {artifact.registry_type}"
@@ -216,7 +218,7 @@ class ArtifactRevisionService:
             )
         )
 
-        return ImportArtifactRevisionActionResult(result=revision_data, task_id=result.task_id)
+        return ImportArtifactRevisionActionResult(result=revision_data, task_id=task_id)
 
     async def cleanup(
         self, action: CleanupArtifactRevisionAction
@@ -251,7 +253,7 @@ class ArtifactRevisionService:
         try:
             await storage_proxy_client.delete_s3_object(
                 storage_name=storage_data.name,
-                bucket_name=storage_namespace.bucket,
+                bucket_name=storage_namespace.namespace,
                 req=DeleteObjectReq(
                     key=key,
                 ),

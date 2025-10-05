@@ -2,6 +2,9 @@ import strawberry
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 
+from .agent_stats import (
+    agent_stats,
+)
 from .artifact import (
     approve_artifact_revision,
     artifact,
@@ -12,6 +15,8 @@ from .artifact import (
     artifacts,
     cancel_import_artifact,
     cleanup_artifact_revisions,
+    delegate_import_artifacts,
+    delegate_scan_artifacts,
     delete_artifacts,
     import_artifacts,
     reject_artifact_revision,
@@ -50,8 +55,6 @@ from .object_storage import (
     get_presigned_upload_url,
     object_storage,
     object_storages,
-    register_object_storage_bucket,
-    unregister_object_storage_bucket,
     update_object_storage,
 )
 from .reservoir_registry import (
@@ -60,6 +63,10 @@ from .reservoir_registry import (
     reservoir_registries,
     reservoir_registry,
     update_reservoir_registry,
+)
+from .storage_namespace import (
+    register_storage_namespace,
+    unregister_storage_namespace,
 )
 
 
@@ -81,6 +88,7 @@ class Query:
     reservoir_registry = reservoir_registry
     reservoir_registries = reservoir_registries
     default_artifact_registry = default_artifact_registry
+    agent_stats = agent_stats
 
 
 @strawberry.type
@@ -88,6 +96,8 @@ class Mutation:
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
+    delegate_scan_artifacts = delegate_scan_artifacts
+    delegate_import_artifacts = delegate_import_artifacts
     update_artifact = update_artifact
     delete_artifacts = delete_artifacts
     restore_artifacts = restore_artifacts
@@ -100,8 +110,8 @@ class Mutation:
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     delete_object_storage = delete_object_storage
-    register_object_storage_bucket = register_object_storage_bucket
-    unregister_object_storage_bucket = unregister_object_storage_bucket
+    register_storage_namespace = register_storage_namespace
+    unregister_storage_namespace = unregister_storage_namespace
     create_huggingface_registry = create_huggingface_registry
     update_huggingface_registry = update_huggingface_registry
     delete_huggingface_registry = delete_huggingface_registry
@@ -128,6 +138,8 @@ class CustomizedSchema(Schema):
         sdl = sdl.replace("type PageInfo", "type PageInfo @shareable").replace(
             'import: ["@external", "@key"]', 'import: ["@external", "@key", "@shareable"]'
         )
+        # Convert escaped newlines to actual newlines for better description formatting
+        sdl = sdl.replace("\\n", "\n")
 
         return sdl
 

@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.manager.data.model_serving.types import ErrorInfo, RequesterCtx
 from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.list_errors import (
@@ -14,7 +15,6 @@ from ai.backend.manager.services.model_serving.actions.list_errors import (
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-from ai.backend.manager.services.model_serving.types import ErrorInfo, RequesterCtx
 
 from ...utils import ScenarioBase
 

@@ -31,6 +31,7 @@ from . import scaling_group as _sgroup
 from . import session as _session
 from . import session_template as _sessiontemplate
 from . import storage as _storage
+from . import storage_namespace as _storage_namespace
 from . import user as _user
 from . import vfolder as _vfolder
 from .base import metadata
@@ -72,6 +73,7 @@ __all__ = (
     *_session.__all__,
     *_sessiontemplate.__all__,
     *_storage.__all__,
+    *_storage_namespace.__all__,
     *_errorlogs.__all__,
     *_eventlog.__all__,
     *_relay_agent.__all__,
@@ -110,6 +112,7 @@ from .huggingface_registry import *  # noqa
 from .session import *  # noqa
 from .session_template import *  # noqa
 from .storage import *  # noqa
+from .storage_namespace import *  # noqa
 from .user import *  # noqa
 from .vfolder import *  # noqa
 from .rbac_models import *  # noqa

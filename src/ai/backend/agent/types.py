@@ -7,6 +7,7 @@ from typing import Any, Mapping, Optional, Sequence, TypeAlias
 
 import attrs
 from aiohttp.typedefs import Middleware
+from pydantic import BaseModel
 
 from ai.backend.common.docker import LabelName
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
@@ -168,3 +169,11 @@ class KernelOwnershipData:
 
 
 WebMiddleware: TypeAlias = Middleware
+
+
+class HealthResponse(BaseModel):
+    """Standard health check response"""
+
+    status: str
+    version: str
+    component: str

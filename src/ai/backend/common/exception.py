@@ -159,6 +159,7 @@ class ErrorDomain(enum.StrEnum):
     VFOLDER = "vfolder"
     VFOLDER_INVITATION = "vfolder-invitation"
     MODEL_SERVICE = "model-service"
+    MODEL_DEPLOYMENT = "model-deployment"
     RESOURCE_PRESET = "resource-preset"
     STORAGE = "storage"
     AGENT = "agent"
@@ -246,6 +247,8 @@ class ErrorDetail(enum.StrEnum):
     # MISMATCH means the current state of the server does not match the expected state.
     # MISMATCH is used when the server is in a state that is not expected.
     MISMATCH = "mismatch"
+    # TIMEOUT
+    TIMEOUT = "timeout"
 
 
 @dataclass
@@ -517,8 +520,8 @@ class SessionWithInvalidStateError(BackendAIError, web.HTTPConflict):
 
 
 class StorageNamespaceNotFoundError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/object-storage-not-found"
-    error_title = "Artifact Storage Not Found"
+    error_type = "https://api.backend.ai/probs/storage-namespace-not-found"
+    error_title = "Storage Namespace Not Found"
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -565,4 +568,72 @@ class ArtifactDefaultRevisionResolveError(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class RuntimeVariantNotSupportedError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/runtime-variant-not-supported"
+    error_title = "Runtime Variant Not Supported"
+
+    def __init__(self, runtime_variant: str) -> None:
+        super().__init__(extra_msg=f"Runtime variant '{runtime_variant}' is not supported.")
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class GenericNotImplementedError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/not-implemented"
+    error_title = "Not Implemented"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.NOT_IMPLEMENTED,
+        )
+
+
+class InvalidConfigError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-configuration"
+    error_title = "Invalid Configuration"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ProcessorNotReadyError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/processor-not-ready"
+    error_title = "Processor Not Ready"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class AgentNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/agent-not-found"
+    error_title = "Agent Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
         )

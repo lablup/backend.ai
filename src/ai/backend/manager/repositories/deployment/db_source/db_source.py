@@ -36,6 +36,10 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
+from ai.backend.manager.errors.deployment import (
+    DeploymentHasNoTargetRevision,
+    UserNotFoundInDeployment,
+)
 from ai.backend.manager.errors.resource import GroupNotFound, ScalingGroupProxyTargetNotFound
 from ai.backend.manager.errors.service import (
     AutoScalingRuleNotFound,
@@ -505,7 +509,7 @@ class DeploymentDBSource:
             endpoint = result.scalar_one_or_none()
 
             if not endpoint:
-                raise ValueError(f"Endpoint {endpoint_id} not found")
+                raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
 
             route = RoutingRow(
                 id=route_id,
@@ -1106,7 +1110,9 @@ class DeploymentDBSource:
             created_user_result = await db_sess.execute(created_user_query)
             created_user_row = created_user_result.first()
             if not created_user_row:
-                raise ValueError(f"Created user {deployment_info.metadata.created_user} not found")
+                raise UserNotFoundInDeployment(
+                    f"Created user {deployment_info.metadata.created_user} not found"
+                )
 
             # Fetch session owner info if different
             if deployment_info.metadata.session_owner != deployment_info.metadata.created_user:
@@ -1118,7 +1124,7 @@ class DeploymentDBSource:
                 session_owner_result = await db_sess.execute(session_owner_query)
                 session_owner_row = session_owner_result.first()
                 if not session_owner_row:
-                    raise ValueError(
+                    raise UserNotFoundInDeployment(
                         f"Session owner {deployment_info.metadata.session_owner} not found"
                     )
             else:
@@ -1143,7 +1149,7 @@ class DeploymentDBSource:
             # Resolve image
             target_revision = deployment_info.target_revision()
             if not target_revision:
-                raise ValueError("Deployment has no target revision")
+                raise DeploymentHasNoTargetRevision("Deployment has no target revision")
 
             image_row = await ImageRow.resolve(
                 db_sess,

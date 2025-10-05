@@ -10,9 +10,17 @@ from ..types import RootContext
 
 
 async def hello(request: web.Request) -> web.Response:
+    """Simple health check endpoint"""
+    from ai.backend.appproxy.common.types import HealthResponse
+
     request["do_not_print_access_log"] = True
 
-    return web.Response()
+    response = HealthResponse(
+        status="healthy",
+        version=__version__,
+        component="appproxy-worker",
+    )
+    return web.json_response(response.model_dump())
 
 
 async def status(request: web.Request) -> web.Response:

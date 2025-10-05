@@ -63,6 +63,7 @@ def get_graphquery_context(root_context: RootContext) -> GraphQueryContext:
         processors=None,  # type: ignore
         scheduler_repository=None,  # type: ignore
         user_repository=None,  # type: ignore
+        agent_repository=None,  # type: ignore
     )
 
 

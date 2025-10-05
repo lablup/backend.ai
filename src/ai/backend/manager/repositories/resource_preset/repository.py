@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from decimal import Decimal
 from typing import Mapping, Optional
@@ -6,14 +8,15 @@ from uuid import UUID
 import trafaret as t
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.resource_preset.types import (
     ResourcePresetCreator,
@@ -27,8 +30,22 @@ from .utils import suppress_with_log
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Layer-specific decorator for resource_preset repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.RESOURCE_PRESET)
+
+resource_preset_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.RESOURCE_PRESET_REPOSITORY)
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class ResourcePresetRepository:
@@ -48,7 +65,7 @@ class ResourcePresetRepository:
         self._cache_source = ResourcePresetCacheSource(valkey_stat)
         self._config_provider = config_provider
 
-    @repository_decorator()
+    @resource_preset_repository_resilience.apply()
     async def create_preset_validated(self, creator: ResourcePresetCreator) -> ResourcePresetData:
         """
         Creates a new resource preset.
@@ -61,7 +78,7 @@ class ResourcePresetRepository:
             await self._cache_source.invalidate_all_presets()
         return preset
 
-    @repository_decorator()
+    @resource_preset_repository_resilience.apply()
     async def get_preset_by_id(self, preset_id: UUID) -> ResourcePresetData:
         """
         Gets a resource preset by ID.
@@ -79,7 +96,7 @@ class ResourcePresetRepository:
             await self._cache_source.set_preset(preset)
         return preset
 
-    @repository_decorator()
+    @resource_preset_repository_resilience.apply()
     async def get_preset_by_name(self, name: str) -> ResourcePresetData:
         """
         Gets a resource preset by name.
@@ -97,7 +114,7 @@ class ResourcePresetRepository:
             await self._cache_source.set_preset(preset)
         return preset
 
-    @repository_decorator()
+    @resource_preset_repository_resilience.apply()
     async def get_preset_by_id_or_name(
         self, preset_id: Optional[UUID], name: Optional[str]
     ) -> ResourcePresetData:
@@ -108,7 +125,7 @@ class ResourcePresetRepository:
         """
         return await self._db_source.get_preset_by_id_or_name(preset_id, name)
 
-    @repository_decorator()
+    @resource_preset_repository_resilience.apply()
     async def modify_preset_validated(
         self, preset_id: Optional[UUID], name: Optional[str], modifier: ResourcePresetModifier
     ) -> ResourcePresetData:
@@ -123,7 +140,7 @@ class ResourcePresetRepository:
             await self._cache_source.invalidate_preset(preset_id, name)
         return preset
 
-    @repository_decorator()
+    @resource_preset_repository_resilience.apply()
     async def delete_preset_validated(
         self, preset_id: Optional[UUID], name: Optional[str]
     ) -> ResourcePresetData:
@@ -139,7 +156,7 @@ class ResourcePresetRepository:
             await self._cache_source.invalidate_preset(preset_id, name)
         return preset
 
-    @repository_decorator()
+    @resource_preset_repository_resilience.apply()
     async def list_presets(
         self, scaling_group_name: Optional[str] = None
     ) -> list[ResourcePresetData]:
@@ -163,7 +180,7 @@ class ResourcePresetRepository:
 
         return presets
 
-    @repository_decorator()
+    @resource_preset_repository_resilience.apply()
     async def check_presets(
         self,
         access_key: AccessKey,

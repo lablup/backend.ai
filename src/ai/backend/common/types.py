@@ -9,9 +9,9 @@ import math
 import numbers
 import textwrap
 import uuid
-from abc import ABCMeta, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -50,7 +50,7 @@ from pydantic import BaseModel, ConfigDict, Field, PlainValidator, TypeAdapter
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole
-from .exception import InvalidIpAddressValue
+from .exception import GenericNotImplementedError, InvalidIpAddressValue
 from .models.minilang.mount import MountPointParser
 
 __all__ = (
@@ -1909,3 +1909,13 @@ class SessionExecutionStatus(enum.StrEnum):
     FINISHED = "finished"
     CANCELED = "canceled"
     TIMEOUT = "timeout"
+
+
+class StreamReader(ABC):
+    @abstractmethod
+    def read(self) -> AsyncIterator[bytes]:
+        raise GenericNotImplementedError
+
+    @abstractmethod
+    def content_type(self) -> Optional[str]:
+        raise GenericNotImplementedError

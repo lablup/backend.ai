@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from pprint import pformat
 
 from ai.backend.common.config import ConfigurationError as BaseConfigError
 from ai.backend.common.config import override_key, override_with_env, read_from_file
@@ -38,10 +37,9 @@ def load_local_config(
         return local_config
     except Exception as e:
         print(
-            "ConfigurationError: Validation of storage-proxy local config has failed:",
+            f"ConfigurationError: Validation of storage-proxy local config has failed, {e}",
             file=sys.stderr,
         )
-        print(pformat(raw_cfg), file=sys.stderr)
         raise BaseConfigError(raw_cfg) from e
 
 

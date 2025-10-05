@@ -560,19 +560,23 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
                 last_access = await root_ctx.valkey_live.get_multiple_live_data([
                     f"circuit.{str(c.id)}.last_access" for c in non_inference_http_circuits
                 ])
-                unused_circuits = [
-                    non_inference_http_circuits[idx]
-                    for idx in range(len(last_access))
-                    if (
-                        time.time()
-                        - (
-                            float(last_access[idx].decode("utf-8"))
-                            if last_access[idx]
-                            else non_inference_http_circuits[idx].created_at.timestamp()
+                unused_circuits: list[Circuit] = []
+
+                for idx in range(len(last_access)):
+                    access = last_access[idx]
+                    last_access_time: float = 0
+                    current_time = time.time()
+                    if access:
+                        last_access_time = current_time - float(access.decode("utf-8"))
+                    else:
+                        last_access_time = (
+                            current_time - non_inference_http_circuits[idx].created_at.timestamp()
                         )
-                    )
-                    > root_ctx.local_config.proxy_coordinator.unused_circuit_collection_timeout
-                ]
+                    if (
+                        last_access_time
+                        > root_ctx.local_config.proxy_coordinator.unused_circuit_collection_timeout
+                    ):
+                        unused_circuits.append(non_inference_http_circuits[idx])
                 if len(unused_circuits) == 0:
                     return []
 

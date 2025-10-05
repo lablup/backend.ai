@@ -32,3 +32,9 @@ def run(
         **kwargs,
     )
     return p
+
+
+def decode(pexpect_capture: bytes | None) -> str:
+    if pexpect_capture is None:
+        return ""
+    return pexpect_capture.decode()

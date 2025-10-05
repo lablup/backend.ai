@@ -12,7 +12,7 @@ from ai.backend.common.bgtask.types import BgtaskStatus
 from ...compat import asyncio_run
 from ...session import AsyncSession
 from ..extensions import pass_ctx_obj
-from ..pretty import ProgressViewer, print_done, print_error, print_fail, print_warn
+from ..pretty import ProgressBarWithSpinner, print_done, print_error, print_fail, print_warn
 from ..types import CLIContext
 from . import admin
 
@@ -73,22 +73,19 @@ def rescan(registry: str, project: Optional[str] = None) -> None:
             print_done("Started updating the image metadata from the configured registries.")
             bgtask_id = result["task_id"]
             bgtask = session.BackgroundTask(bgtask_id)
+            completion_msg_func = lambda: print_done("Finished registry scanning.")
             try:
-                completion_msg_func = lambda: print_done("Finished registry scanning.")
                 async with (
                     bgtask.listen_events() as response,
-                    ProgressViewer("Scanning the registry...") as viewer,
+                    ProgressBarWithSpinner("Scanning the registry...", unit="images") as pbar,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
                         match ev.event:
                             case BgtaskStatus.UPDATED:
-                                if viewer.tqdm is None:
-                                    pbar = await viewer.to_tqdm(unit="images")
-                                else:
-                                    pbar.total = data["total_progress"]
-                                    pbar.write(data["message"])
-                                    pbar.update(data["current_progress"] - pbar.n)
+                                pbar.total = data["total_progress"]
+                                pbar.write(data["message"])
+                                pbar.update(data["current_progress"] - pbar.n)
                             case BgtaskStatus.FAILED:
                                 error_msg = data["message"]
                                 completion_msg_func = lambda: print_fail(

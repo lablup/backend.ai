@@ -91,7 +91,10 @@ class ServicePortRule(SessionValidatorRule):
         # Validate for each kernel spec
         for kernel_spec in spec.kernel_specs:
             # Get preopen ports from kernel spec or fall back to creation config
-            preopen_ports = kernel_spec.get("preopen_ports") or creation_preopen_ports
+            preopen_ports = (
+                kernel_spec.get("creation_config", {}).get("preopen_ports")
+                or creation_preopen_ports
+            )
             if not preopen_ports:
                 continue
             if not isinstance(preopen_ports, list):

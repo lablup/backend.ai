@@ -1,4 +1,5 @@
 import logging
+from uuid import UUID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.event_types.artifact.anycast import (
@@ -51,19 +52,23 @@ class ArtifactEventHandler:
             raise InvalidArtifactRegistryTypeError(
                 f"Unsupported artifact registry type: {event.registry_type}"
             )
-
+        registry_id: UUID
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
-                registry_data = await self._huggingface_repository.get_registry_data_by_name(
-                    event.registry_name
+                huggingface_registry_data = (
+                    await self._huggingface_repository.get_registry_data_by_name(
+                        event.registry_name
+                    )
                 )
+                registry_id = huggingface_registry_data.id
             case ArtifactRegistryType.RESERVOIR:
                 registry_data = await self._reservoir_repository.get_registry_data_by_name(
                     event.registry_name
                 )
+                registry_id = registry_data.id
 
         artifact = await self._artifact_repository.get_model_artifact(
-            event.model_id, registry_id=registry_data.id
+            event.model_id, registry_id=registry_id
         )
 
         # Get the specific revision
@@ -101,18 +106,23 @@ class ArtifactEventHandler:
                 f"Unsupported artifact registry type: {model_info.registry_type}"
             )
 
+        registry_id: UUID
         match registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
-                registry_data = await self._huggingface_repository.get_registry_data_by_name(
-                    model_info.registry_name
+                huggingface_registry_data = (
+                    await self._huggingface_repository.get_registry_data_by_name(
+                        model_info.registry_name
+                    )
                 )
+                registry_id = huggingface_registry_data.id
             case ArtifactRegistryType.RESERVOIR:
                 registry_data = await self._reservoir_repository.get_registry_data_by_name(
                     model_info.registry_name
                 )
+                registry_id = registry_data.id
 
         artifact = await self._artifact_repository.get_model_artifact(
-            model_info.model_id, registry_id=registry_data.id
+            model_info.model_id, registry_id=registry_id
         )
 
         # Get the specific revision

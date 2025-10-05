@@ -9,17 +9,37 @@ from glide import Script
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
-    create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience import (
+    BackoffStrategy,
+    MetricArgs,
+    MetricPolicy,
+    Resilience,
+    RetryArgs,
+    RetryPolicy,
+)
 from ai.backend.common.types import ValkeyTarget
 from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
-# Layer-specific decorator for valkey_leader client
-valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_STREAM)
+# Resilience instance for valkey_leader layer
+valkey_leader_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_STREAM)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 # Lua script for atomic leader election/renewal
 LEADER_SCRIPT: Final[str] = """
@@ -100,12 +120,12 @@ class ValkeyLeaderClient:
         await client.connect()
         return cls(client=client)
 
-    @valkey_decorator()
+    @valkey_leader_resilience.apply()
     async def close(self) -> None:
         """Close the ValkeyLeaderClient connection."""
         await self._client.disconnect()
 
-    @valkey_decorator(retry_count=1)
+    @valkey_leader_resilience.apply()
     async def acquire_or_renew_leadership(
         self,
         server_id: str,
@@ -137,7 +157,7 @@ class ValkeyLeaderClient:
         )
         return bool(result == 1)
 
-    @valkey_decorator()
+    @valkey_leader_resilience.apply()
     async def release_leadership(
         self,
         server_id: str,

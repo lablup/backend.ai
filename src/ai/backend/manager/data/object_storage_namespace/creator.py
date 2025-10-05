@@ -6,7 +6,7 @@ from ai.backend.manager.types import Creator
 
 
 @dataclass
-class ObjectStorageNamespaceCreator(Creator):
+class StorageNamespaceCreator(Creator):
     storage_id: uuid.UUID
     bucket: str
 
@@ -14,5 +14,5 @@ class ObjectStorageNamespaceCreator(Creator):
     def fields_to_store(self) -> dict[str, Any]:
         return {
             "storage_id": self.storage_id,
-            "bucket": self.bucket,
+            "namespace": self.bucket,
         }

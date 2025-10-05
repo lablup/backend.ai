@@ -13,6 +13,7 @@ MetricValueFieldPair = tuple[MetricValueFieldKey, str]
 CURRENT_METRIC_KEY = MetricValueFieldKey("current")
 CAPACITY_METRIC_KEY = MetricValueFieldKey("capacity")
 PCT_METRIC_KEY = MetricValueFieldKey("pct")
+ALL_METRIC_VALUE_TYPES = {CURRENT_METRIC_KEY, CAPACITY_METRIC_KEY, PCT_METRIC_KEY}
 
 
 @dataclass

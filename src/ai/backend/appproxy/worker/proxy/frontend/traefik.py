@@ -104,7 +104,6 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
             log.debug("Wrote {} keys", len(keys))
         except Exception:
             log.exception("_last_used_time_marker_writer():")
-            raise
 
     async def mark_last_used_time(self, request: web.Request) -> web.StreamResponse:
         key = request.match_info["key"]
@@ -120,7 +119,10 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
 
     async def mark_inactive(self, request: web.Request) -> web.StreamResponse:
         key = request.match_info["key"]
-        self.active_circuits.remove(uuid.UUID(key))
+        try:
+            self.active_circuits.remove(uuid.UUID(key))
+        except KeyError:
+            log.warning("mark_inactive(): key {!r} not found in active circuits", key)
 
         return web.StreamResponse(status=204)
 
@@ -135,7 +137,6 @@ class AbstractTraefikFrontend(Generic[TCircuitKey], BaseFrontend[TraefikBackend,
                     self.redis_keys.update(keys)
         except Exception:
             log.exception("_active_circuit_writer():")
-            raise
 
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> TraefikBackend:
         return TraefikBackend(self.root_context, circuit, routes)

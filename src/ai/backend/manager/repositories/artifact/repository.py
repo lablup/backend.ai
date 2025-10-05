@@ -12,7 +12,11 @@ from sqlalchemy.sql import Select
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
@@ -23,9 +27,6 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
 from ai.backend.manager.errors.artifact import (
     ArtifactAssociationDeletionError,
     ArtifactAssociationNotFoundError,
@@ -53,8 +54,19 @@ from ai.backend.manager.repositories.types import (
     PaginationOptions,
 )
 
-# Layer-specific decorator for artifact repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.ARTIFACT)
+artifact_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.ARTIFACT_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class ArtifactFilterApplier(BaseFilterApplier[ArtifactFilterOptions]):
@@ -197,7 +209,7 @@ class ArtifactRepository:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def get_artifact_by_id(self, artifact_id: uuid.UUID) -> ArtifactData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -208,7 +220,7 @@ class ArtifactRepository:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             return row.to_dataclass()
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def get_artifact_revision_by_id(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -221,7 +233,7 @@ class ArtifactRepository:
                 )
             return row.to_dataclass()
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def get_model_artifact(self, model_id: str, registry_id: uuid.UUID) -> ArtifactData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -236,7 +248,7 @@ class ArtifactRepository:
                 )
             return row.to_dataclass()
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def get_artifact_revision(
         self, artifact_id: uuid.UUID, revision: str
     ) -> ArtifactRevisionData:
@@ -254,7 +266,7 @@ class ArtifactRepository:
                 raise ArtifactRevisionNotFoundError(f"Revision {revision} not found")
             return row.to_dataclass()
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def update_artifact(
         self, artifact_id: uuid.UUID, modifier: ArtifactModifier
     ) -> ArtifactData:
@@ -290,7 +302,7 @@ class ArtifactRepository:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             return row.to_dataclass()
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -300,7 +312,7 @@ class ArtifactRepository:
             return [row.to_dataclass() for row in rows]
 
     # TODO: Refactor using on_conflict_do_update?
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def upsert_artifacts(
         self,
         artifacts: list[ArtifactData],
@@ -354,7 +366,7 @@ class ArtifactRepository:
 
             return result_artifacts
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def upsert_artifact_revisions(
         self,
         revisions: list[ArtifactRevisionData],
@@ -388,6 +400,7 @@ class ArtifactRepository:
                         readme=revision_data.readme,
                         size=revision_data.size,
                         status=ArtifactStatus.SCANNED,
+                        remote_status=revision_data.remote_status,
                         created_at=revision_data.created_at,
                         updated_at=revision_data.updated_at,
                     )
@@ -410,6 +423,7 @@ class ArtifactRepository:
                         existing_revision.size = revision_data.size
                         existing_revision.created_at = revision_data.created_at
                         existing_revision.updated_at = revision_data.updated_at
+                        existing_revision.remote_status = revision_data.remote_status
                         artifact_ids_to_update.add(revision_data.artifact_id)
 
                     await db_sess.flush()
@@ -426,7 +440,7 @@ class ArtifactRepository:
 
             return result_revisions
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def upsert_huggingface_model_artifacts(
         self,
         model_list: list[ModelData],
@@ -535,7 +549,7 @@ class ArtifactRepository:
 
         return result
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def associate_artifact_with_storage(
         self,
         artifact_revision_id: uuid.UUID,
@@ -576,7 +590,7 @@ class ArtifactRepository:
                 storage_namespace_id=storage_namespace_id,
             )
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def disassociate_artifact_with_storage(
         self, artifact_revision_id: uuid.UUID, storage_namespace_id: uuid.UUID
     ) -> AssociationArtifactsStoragesData:
@@ -617,7 +631,7 @@ class ArtifactRepository:
 
             return association_data
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def approve_artifact(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -655,7 +669,7 @@ class ArtifactRepository:
 
             return updated_row.to_dataclass()
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def reject_artifact(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -683,7 +697,7 @@ class ArtifactRepository:
 
             return updated_row.to_dataclass()
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def reset_artifact_revision_status(self, revision_id: uuid.UUID) -> uuid.UUID:
         async with self._db.begin_session() as db_sess:
             stmt = (
@@ -694,7 +708,7 @@ class ArtifactRepository:
             await db_sess.execute(stmt)
             return revision_id
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def update_artifact_revision_status(
         self, artifact_revision_id: uuid.UUID, status: ArtifactStatus
     ) -> uuid.UUID:
@@ -707,7 +721,7 @@ class ArtifactRepository:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def delete_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
         async with self._db.begin_session() as db_sess:
             # Update availability to DELETED for the given artifact IDs (only for ALIVE artifacts)
@@ -729,7 +743,7 @@ class ArtifactRepository:
             rows: list[ArtifactRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def restore_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
         async with self._db.begin_session() as db_sess:
             # Update availability to ALIVE for the given artifact IDs (only for DELETED artifacts)
@@ -751,7 +765,7 @@ class ArtifactRepository:
             rows: list[ArtifactRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def update_artifact_revision_bytesize(
         self, artifact_revision_id: uuid.UUID, size: int
     ) -> uuid.UUID:
@@ -764,7 +778,7 @@ class ArtifactRepository:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def update_artifact_revision_readme(
         self, artifact_revision_id: uuid.UUID, readme: str
     ) -> uuid.UUID:
@@ -777,7 +791,7 @@ class ArtifactRepository:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> str:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -792,7 +806,7 @@ class ArtifactRepository:
                 )
             return readme
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def list_artifacts_paginated(
         self,
         *,
@@ -853,7 +867,7 @@ class ArtifactRepository:
             )
             return data_objects, total_count
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def list_artifacts_with_revisions_paginated(
         self,
         *,
@@ -921,7 +935,7 @@ class ArtifactRepository:
 
             return data_objects, total_count
 
-    @repository_decorator()
+    @artifact_repository_resilience.apply()
     async def list_artifact_revisions_paginated(
         self,
         *,

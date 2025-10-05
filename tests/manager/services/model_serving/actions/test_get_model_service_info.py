@@ -6,6 +6,7 @@ import pytest
 from pydantic import HttpUrl
 
 from ai.backend.common.types import RuntimeVariant
+from ai.backend.manager.data.model_serving.types import RequesterCtx, RouteInfo, ServiceInfo
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.get_model_service_info import (
     GetModelServiceInfoAction,
@@ -14,7 +15,6 @@ from ai.backend.manager.services.model_serving.actions.get_model_service_info im
 from ai.backend.manager.services.model_serving.processors.model_serving import (
     ModelServingProcessors,
 )
-from ai.backend.manager.services.model_serving.types import RequesterCtx, RouteInfo, ServiceInfo
 
 from ...utils import ScenarioBase
 

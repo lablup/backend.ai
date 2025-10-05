@@ -275,7 +275,7 @@ async def delete_worker(request: web.Request) -> PydanticResponse[StubResponseMo
         worker = await Worker.get(sess, worker_id)
         worker.nodes -= 1
         if worker.nodes == 0:
-            await sess.delete(worker)
+            worker.status = WorkerStatus.LOST
 
     async with root_ctx.db.connect() as db_conn:
         await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
@@ -344,8 +344,8 @@ async def check_worker_lost(
             workers = await Worker.list_workers(sess)
             worker_map = {w.authority: w for w in workers}
 
-        for worker_id_str, prev in msg_data.items():
-            prev = datetime.fromtimestamp(float(prev), tzutc())
+        for worker_id_str, prev_str in msg_data.items():
+            prev = datetime.fromtimestamp(float(prev_str), tzutc())
             if (
                 (now - prev) > timeout
                 and worker_id_str in worker_map

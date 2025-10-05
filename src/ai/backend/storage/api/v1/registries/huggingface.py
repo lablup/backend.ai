@@ -30,11 +30,11 @@ from ai.backend.common.dto.storage.response import (
     HuggingFaceScanModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.config.unified import HuggingfaceConfig, LegacyHuggingfaceConfig
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
 )
-from ai.backend.storage.services.storages.object_storage import ObjectStorageService
 
 from ....utils import log_client_api_entry
 
@@ -130,6 +130,33 @@ class HuggingFaceRegistryAPIHandler:
         )
 
     @api_handler
+    async def scan_models_sync(
+        self,
+        body: BodyParam[HuggingFaceScanModelsReq],
+    ) -> APIResponse:
+        """
+        Scan HuggingFace registry and return metadata including README content synchronously.
+        This endpoint waits for all metadata (including README) to be fully downloaded before responding.
+        """
+        await log_client_api_entry(log, "scan_models_sync", body.parsed)
+
+        models = await self._huggingface_service.scan_models_sync(
+            registry_name=body.parsed.registry_name,
+            limit=body.parsed.limit,
+            search=body.parsed.search,
+            sort=body.parsed.order,
+        )
+
+        response = HuggingFaceScanModelsResponse(
+            models=models,
+        )
+
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=response,
+        )
+
+    @api_handler
     async def import_models(
         self,
         body: BodyParam[HuggingFaceImportModelsReq],
@@ -143,7 +170,6 @@ class HuggingFaceRegistryAPIHandler:
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
             storage_name=body.parsed.storage_name,
-            bucket_name=body.parsed.bucket_name,
         )
 
         response = HuggingFaceImportModelsResponse(
@@ -161,17 +187,22 @@ def create_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app["prefix"] = "v1/registries/huggingface"
 
-    storage_service = ObjectStorageService(storage_configs=ctx.local_config.storages)
+    # Get huggingface configs from new artifact_registries
+    huggingface_registry_configs: dict[str, HuggingfaceConfig] = {
+        name: r.huggingface
+        for name, r in ctx.local_config.artifact_registries.items()
+        if r.registry_type == ArtifactRegistryType.HUGGINGFACE and r.huggingface is not None
+    }
 
-    huggingface_registry_configs = dict(
-        (r.name, r.config)
-        for r in ctx.local_config.registries
-        if r.config.registry_type == ArtifactRegistryType.HUGGINGFACE.value
-    )
+    # Legacy registries support - add from legacy registries for backward compatibility
+    for legacy_registry in ctx.local_config.registries:
+        if isinstance(legacy_registry.config, LegacyHuggingfaceConfig):
+            huggingface_registry_configs[legacy_registry.name] = legacy_registry.config
+
     huggingface_service = HuggingFaceService(
         HuggingFaceServiceArgs(
             background_task_manager=ctx.background_task_manager,
-            storage_service=storage_service,
+            storage_pool=ctx.storage_pool,
             registry_configs=huggingface_registry_configs,
             event_producer=ctx.event_producer,
         )
@@ -179,6 +210,7 @@ def create_app(ctx: RootContext) -> web.Application:
     huggingface_api_handler = HuggingFaceRegistryAPIHandler(huggingface_service=huggingface_service)
 
     app.router.add_route("POST", "/scan", huggingface_api_handler.scan_models)
+    app.router.add_route("POST", "/scan/sync", huggingface_api_handler.scan_models_sync)
     app.router.add_route("POST", "/import", huggingface_api_handler.import_models)
 
     app.router.add_route("GET", "/model/{model_id}", huggingface_api_handler.retrieve_model)

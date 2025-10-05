@@ -140,6 +140,23 @@ Added in 24.12.0. One of ['read_attribute', 'update_attribute', 'create_compute_
 scalar AgentPermissionField
   @join__type(graph: GRAPHENE)
 
+"""Added in 25.15.0"""
+type AgentResource
+  @join__type(graph: STRAWBERRY)
+{
+  free: JSON!
+  used: JSON!
+  capacity: JSON!
+}
+
+"""Added in 25.15.0"""
+type AgentStats
+  @join__type(graph: STRAWBERRY)
+{
+  """Added in 25.15.0"""
+  totalResource: AgentResource!
+}
+
 """A schema for normal users."""
 type AgentSummary implements Item
   @join__implements(graph: GRAPHENE, interface: "Item")
@@ -295,11 +312,59 @@ type ArtifactRegistry
   type: ArtifactRegistryType!
 }
 
+"""
+Added in 25.15.0.
+
+Represents common metadata for an artifact registry.
+All artifact registry nodes expose that information regardless of type.
+"""
+type ArtifactRegistryMeta implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  registryId: ID!
+  type: ArtifactRegistryType!
+  url: String!
+}
+
+"""Added in 25.15.0"""
+type ArtifactRegistryMetaConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [ArtifactRegistryMetaEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type ArtifactRegistryMetaEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: ArtifactRegistryMeta!
+}
+
 enum ArtifactRegistryType
   @join__type(graph: STRAWBERRY)
 {
   HUGGINGFACE @join__enumValue(graph: STRAWBERRY)
   RESERVOIR @join__enumValue(graph: STRAWBERRY)
+}
+
+enum ArtifactRemoteStatus
+  @join__type(graph: STRAWBERRY)
+{
+  SCANNED @join__enumValue(graph: STRAWBERRY)
+  AVAILABLE @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.14.0"""
@@ -310,6 +375,9 @@ type ArtifactRevision implements Node
   """The Globally Unique ID of this object"""
   id: ID!
   status: ArtifactStatus!
+
+  """Added in 25.15.0"""
+  remoteStatus: ArtifactRemoteStatus
   version: String!
   readme: String
   size: ByteSize
@@ -1401,6 +1469,9 @@ type CreateUser
   ok: Boolean
   msg: String
   user: User
+
+  """Added in 25.15.0."""
+  keypair: KeyPair
 }
 
 type CreateUserResourcePolicy
@@ -1450,6 +1521,87 @@ type DealiasImage
 {
   ok: Boolean
   msg: String
+}
+
+"""Added in 25.15.0"""
+input DelegateeTarget
+  @join__type(graph: STRAWBERRY)
+{
+  delegateeReservoirId: ID!
+  targetRegistryId: ID!
+}
+
+"""
+Added in 25.15.0.
+
+Input type for delegated import of artifact revisions from a reservoir registry's remote registry.
+Used to specify which artifact revisions should be imported from the remote registry source
+into the local reservoir registry storage.
+"""
+input DelegateImportArtifactsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """List of artifact revision IDs of delegatee artifact registry"""
+  artifactRevisionIds: [ID!]!
+}
+
+"""
+Added in 25.15.0.
+
+Response payload for delegated artifact import operation.
+Contains the imported artifact revisions and associated background tasks.
+The tasks can be monitored to track the progress of the import operation.
+"""
+type DelegateImportArtifactsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Connection of artifact revisions that were imported from the reservoir registry's remote registry
+  """
+  artifactRevisions: ArtifactRevisionConnection!
+
+  """List of background tasks created for importing the artifact revisions"""
+  tasks: [ArtifactRevisionImportTask!]!
+}
+
+"""
+Added in 25.15.0.
+
+Input type for delegated scanning of artifacts from a delegatee reservoir registry's remote registry.
+"""
+input DelegateScanArtifactsInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the reservoir registry to delegate the scan request to"""
+  delegatorReservoirId: ID = null
+
+  """Target delegatee reservoir registry and its remote registry to scan"""
+  delegateeTarget: DelegateeTarget = null
+
+  """Maximum number of artifacts to scan (max: 500)"""
+  limit: Int!
+
+  """Filter artifacts by type (e.g., model, image, package)"""
+  artifactType: ArtifactType = null
+
+  """Search term to filter artifacts by name or description"""
+  search: String = null
+}
+
+"""
+Added in 25.15.0.
+
+Response payload for delegated artifact scanning operation.
+Contains the list of artifacts discovered during the scan of a reservoir registry's remote registry.
+These artifacts are now available for import or direct use.
+"""
+type DelegateScanArtifactsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  List of artifacts discovered during the delegated scan from the reservoir registry's remote registry
+  """
+  artifacts: [Artifact!]!
 }
 
 """Added in 25.15.0"""
@@ -2428,6 +2580,13 @@ enum join__Graph {
   GRAPHENE @join__graph(name: "graphene", url: "http://host.docker.internal:8091/admin/gql")
   STRAWBERRY @join__graph(name: "strawberry", url: "http://host.docker.internal:8091/admin/gql/strawberry")
 }
+
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf).
+"""
+scalar JSON
+  @join__type(graph: STRAWBERRY)
+  @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
 """
 Allows use of a JSON String for input / output from the GraphQL schema.
@@ -3766,6 +3925,37 @@ type Mutation
   """Added in 25.14.0"""
   importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 25.15.0.
+  
+  Triggers artifact scanning on a remote reservoir registry.
+  
+  This mutation instructs a reservoir-type registry to initiate a scan of artifacts
+  from its associated remote reservoir registry source. The scan process will discover and
+  catalog artifacts available in the remote reservoir, making them accessible
+  through the local reservoir registry.
+  
+  Requirements:
+  - The delegator registry must be of type 'reservoir'
+  - The delegator reservoir registry must have a valid remote registry configuration
+  """
+  delegateScanArtifacts(input: DelegateScanArtifactsInput!): DelegateScanArtifactsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 25.15.0.
+  
+  Trigger import of artifact revisions from a remote reservoir registry.
+  
+  This mutation instructs a reservoir-type registry to import specific artifact revisions
+  that were previously discovered during a scan from its remote registry.
+  Note that this operation does not import the artifacts directly into the local registry, but only into the delegator reservoir's storage.
+  
+  Requirements:
+  - The delegator registry must be of type 'reservoir'
+  - The delegator registry must have a valid remote registry configuration
+  """
+  delegateImportArtifacts(input: DelegateImportArtifactsInput!): DelegateImportArtifactsPayload! @join__field(graph: STRAWBERRY)
+
   """Added in 25.14.0"""
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload! @join__field(graph: STRAWBERRY)
 
@@ -3794,11 +3984,19 @@ type Mutation
   """Added in 25.14.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
-  registerObjectStorageBucket(input: RegisterObjectStorageBucketInput!): RegisterObjectStorageBucketPayload! @join__field(graph: STRAWBERRY)
+  """
+  Added in 25.15.0.
+  
+  Registers a new namespace within a storage.
+  """
+  registerStorageNamespace(input: RegisterStorageNamespaceInput!): RegisterStorageNamespacePayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
-  unregisterObjectStorageBucket(input: UnregisterObjectStorageBucketInput!): UnregisterObjectStorageBucketPayload! @join__field(graph: STRAWBERRY)
+  """
+  Added in 25.15.0.
+  
+  Unregisters an existing namespace from a storage.
+  """
+  unregisterStorageNamespace(input: UnregisterStorageNamespaceInput!): UnregisterStorageNamespacePayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
   createHuggingfaceRegistry(input: CreateHuggingFaceRegistryInput!): CreateHuggingFaceRegistryPayload! @join__field(graph: STRAWBERRY)
@@ -3899,7 +4097,7 @@ type ObjectStorage implements Node
   secretKey: String!
   endpoint: String!
   region: String!
-  namespaces(before: String, after: String, first: Int, last: Int, limit: Int, offset: Int): ObjectStorageNamespaceConnection!
+  namespaces(before: String, after: String, first: Int, last: Int, limit: Int, offset: Int): StorageNamespaceConnection!
 }
 
 """Added in 25.14.0"""
@@ -3923,40 +4121,6 @@ type ObjectStorageEdge
 
   """The item at the end of the edge"""
   node: ObjectStorage!
-}
-
-"""Added in 25.14.0"""
-type ObjectStorageNamespace implements Node
-  @join__implements(graph: STRAWBERRY, interface: "Node")
-  @join__type(graph: STRAWBERRY)
-{
-  """The Globally Unique ID of this object"""
-  id: ID!
-  storageId: ID!
-  bucket: String!
-}
-
-"""Added in 25.14.0"""
-type ObjectStorageNamespaceConnection
-  @join__type(graph: STRAWBERRY)
-{
-  """Pagination data for this connection"""
-  pageInfo: PageInfo!
-
-  """Contains the nodes in this connection"""
-  edges: [ObjectStorageNamespaceEdge!]!
-  count: Int!
-}
-
-"""An edge in a connection."""
-type ObjectStorageNamespaceEdge
-  @join__type(graph: STRAWBERRY)
-{
-  """A cursor for use in pagination"""
-  cursor: String!
-
-  """The item at the end of the edge"""
-  node: ObjectStorageNamespace!
 }
 
 enum OrderDirection
@@ -4572,6 +4736,9 @@ type Query
 
   """Added in 25.14.0"""
   defaultArtifactRegistry(artifactType: ArtifactType!): ArtifactRegistry @join__field(graph: STRAWBERRY)
+
+  """Added in 25.15.0"""
+  agentStats: AgentStats! @join__field(graph: STRAWBERRY)
 }
 
 type QuotaDetails
@@ -4605,16 +4772,24 @@ type RawServiceConfig
   extraCliParameters: String
 }
 
-"""Added in 25.14.0"""
-input RegisterObjectStorageBucketInput
+"""
+Added in 25.15.0.
+
+Input type for registering a storage namespace.
+"""
+input RegisterStorageNamespaceInput
   @join__type(graph: STRAWBERRY)
 {
   storageId: UUID!
-  bucketName: String!
+  namespace: String!
 }
 
-"""Added in 25.14.0"""
-type RegisterObjectStorageBucketPayload
+"""
+Added in 25.15.0.
+
+Payload returned after storage namespace registration.
+"""
+type RegisterStorageNamespacePayload
   @join__type(graph: STRAWBERRY)
 {
   id: UUID!
@@ -4681,6 +4856,7 @@ type ReservoirRegistry implements Node
   accessKey: String!
   secretKey: String!
   apiVersion: String!
+  remoteArtifactRegistries: ArtifactRegistryMetaConnection!
 }
 
 """Added in 25.14.0"""
@@ -5062,6 +5238,53 @@ type SourceInfo
   url: String
 }
 
+"""
+Added in 25.15.0.
+
+Storage namespace provides logical separation of data within a single storage system
+to organize and isolate domain-specific concerns.
+
+Implementation varies by storage type:
+- Object Storage (S3, MinIO): Uses bucket-based namespace separation
+- File System (VFS): Uses directory path prefix for namespace distinction
+"""
+type StorageNamespace implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  storageId: ID!
+  namespace: String!
+}
+
+"""
+Added in 25.15.0.
+
+Storage namespace connection for pagination.
+"""
+type StorageNamespaceConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [StorageNamespaceEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type StorageNamespaceEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: StorageNamespace!
+}
+
 type StorageVolume implements Item
   @join__implements(graph: GRAPHENE, interface: "Item")
   @join__type(graph: GRAPHENE)
@@ -5135,16 +5358,24 @@ type UnloadImage
   task_id: String
 }
 
-"""Added in 25.14.0"""
-input UnregisterObjectStorageBucketInput
+"""
+Added in 25.15.0.
+
+Input type for unregistering a storage namespace.
+"""
+input UnregisterStorageNamespaceInput
   @join__type(graph: STRAWBERRY)
 {
   storageId: UUID!
-  bucketName: String!
+  namespace: String!
 }
 
-"""Added in 25.14.0"""
-type UnregisterObjectStorageBucketPayload
+"""
+Added in 25.15.0.
+
+Payload returned after storage namespace unregistration.
+"""
+type UnregisterStorageNamespacePayload
   @join__type(graph: STRAWBERRY)
 {
   id: UUID!

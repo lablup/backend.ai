@@ -113,6 +113,7 @@ preview = true
 [tool.mypy]
 plugins = ["pydantic.mypy", "strawberry.ext.mypy_plugin"]
 ignore_missing_imports = true
+follow_untyped_imports = false
 mypy_path = "stubs:src:tools/pants-plugins"
 namespace_packages = true
 explicit_package_bases = true
@@ -134,6 +135,7 @@ exclude = [
 ]
 venvPath = "dist/export/python/virtualenvs/python-default"
 venv = "3.13.7"
+typeCheckingMode = "standard"
 
 [tool.pydantic-mypy]
 init_forbid_extra = true
@@ -141,4 +143,4 @@ init_typed = true
 warn_required_dynamic_aliases = false
 
 [tool.setuptools.dynamic]
-version = {file = "VERSION"}
+version = { file = "VERSION" }

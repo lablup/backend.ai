@@ -491,6 +491,20 @@ async def extend_login_session(request: web.Request) -> web.Response:
     return web.json_response(result)
 
 
+async def check_health(request: web.Request) -> web.Response:
+    """Simple health check endpoint"""
+    from .response import HealthResponse
+
+    request["do_not_print_access_log"] = True
+
+    response = HealthResponse(
+        status="healthy",
+        version=__version__,
+        component="webserver",
+    )
+    return web.json_response(response.model_dump())
+
+
 async def webserver_healthcheck(request: web.Request) -> web.Response:
     stats: WebStats = request.app["stats"]
     stats.active_healthcheck_handlers.add(asyncio.current_task())  # type: ignore
@@ -776,6 +790,7 @@ async def server_main(
     )
     cors.add(app.router.add_route("POST", "/server/extend-login-session", extend_login_session))
     cors.add(app.router.add_route("GET", "/stats", view_stats))
+    cors.add(app.router.add_route("GET", "/health", check_health))
     cors.add(app.router.add_route("GET", "/func/ping", webserver_healthcheck))
     cors.add(app.router.add_route("GET", "/func/{path:cloud/.*$}", anon_web_plugin_handler))
     cors.add(app.router.add_route("POST", "/func/{path:cloud/.*$}", anon_web_plugin_handler))

@@ -8,19 +8,38 @@ from glide import Batch, ExpirySet, ExpiryType
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
-    create_layer_aware_valkey_decorator,
     create_valkey_client,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json_str, load_json
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience import (
+    BackoffStrategy,
+    MetricArgs,
+    MetricPolicy,
+    Resilience,
+    RetryArgs,
+    RetryPolicy,
+)
 from ai.backend.common.types import SessionId, ValkeyTarget
 
 PENDING_QUEUE_EXPIRY_SEC = 600  # 10 minutes
 ROUTE_HEALTH_TTL_SEC = 120  # 2 minutes
 
-
-# Layer-specific decorator for valkey_schedule client
-valkey_decorator = create_layer_aware_valkey_decorator(LayerType.VALKEY_SCHEDULE)
+# Resilience instance for valkey_schedule layer
+valkey_schedule_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_SCHEDULE)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 @dataclass
@@ -110,7 +129,7 @@ class ValkeyScheduleClient:
         """
         return f"route:health:{route_id}"
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def mark_schedule_needed(self, schedule_type: str) -> None:
         """
         Mark that scheduling is needed for the given schedule type.
@@ -121,7 +140,7 @@ class ValkeyScheduleClient:
         key = self._get_schedule_key(schedule_type)
         await self._client.client.set(key, b"1")
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def load_and_delete_schedule_mark(self, schedule_type: str) -> bool:
         """
         Check if a scheduling mark exists and atomically delete it.
@@ -148,7 +167,7 @@ class ValkeyScheduleClient:
     def _queue_position_key(self, session_id: SessionId) -> str:
         return f"queue_position:{session_id}"
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def set_pending_queue(
         self, resource_group_id: str, session_ids: Sequence[SessionId]
     ) -> None:
@@ -167,7 +186,7 @@ class ValkeyScheduleClient:
             )
         await self._client.client.exec(batch, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def get_pending_queue(self, resource_group_id: str) -> list[SessionId]:
         """
         Get the pending queue for a specific resource group.
@@ -179,7 +198,7 @@ class ValkeyScheduleClient:
         raw_session_ids = load_json(result)
         return [SessionId(UUID(sid)) for sid in raw_session_ids]
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def get_queue_positions(self, session_ids: Sequence[SessionId]) -> list[Optional[int]]:
         """
         Get the positions of multiple sessions in their pending queue.
@@ -205,7 +224,7 @@ class ValkeyScheduleClient:
                     result.append(None)
         return result
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def mark_deployment_needed(self, lifecycle_type: str) -> None:
         """
         Mark that a deployment lifecycle operation is needed.
@@ -216,7 +235,7 @@ class ValkeyScheduleClient:
         key = self._get_deployment_key(lifecycle_type)
         await self._client.client.set(key, b"1")
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def load_and_delete_deployment_mark(self, lifecycle_type: str) -> bool:
         """
         Check if a deployment lifecycle mark exists and atomically delete it.
@@ -237,7 +256,7 @@ class ValkeyScheduleClient:
             return results[0] is not None
         return False
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def mark_route_needed(self, lifecycle_type: str) -> None:
         """
         Mark that a route lifecycle operation is needed.
@@ -248,7 +267,7 @@ class ValkeyScheduleClient:
         key = self._get_route_key(lifecycle_type)
         await self._client.client.set(key, b"1")
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def load_and_delete_route_mark(self, lifecycle_type: str) -> bool:
         """
         Check if a route lifecycle mark exists and atomically delete it.
@@ -269,7 +288,7 @@ class ValkeyScheduleClient:
             return results[0] is not None
         return False
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def get_route_health_status(self, route_id: str) -> Optional[HealthStatus]:
         """
         Get health status for a route from Redis.
@@ -292,7 +311,7 @@ class ValkeyScheduleClient:
 
         return HealthStatus(readiness=readiness, liveness=liveness, last_check=last_check)
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def initialize_routes_health_status_batch(self, route_ids: list[str]) -> None:
         """
         Batch initialize health status for multiple routes in Redis with TTL.
@@ -319,7 +338,7 @@ class ValkeyScheduleClient:
 
         await self._client.client.exec(batch, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def update_route_readiness(self, route_id: str, readiness: bool) -> None:
         """
         Update readiness status for a route in Redis.
@@ -336,7 +355,7 @@ class ValkeyScheduleClient:
         batch.expire(key, ROUTE_HEALTH_TTL_SEC)
         await self._client.client.exec(batch, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def update_route_liveness(self, route_id: str, liveness: bool) -> None:
         """
         Update liveness status for a route in Redis.
@@ -353,7 +372,7 @@ class ValkeyScheduleClient:
         batch.expire(key, ROUTE_HEALTH_TTL_SEC)
         await self._client.client.exec(batch, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def check_route_health_status(
         self, route_ids: list[str]
     ) -> Mapping[str, Optional[HealthStatus]]:
@@ -406,7 +425,7 @@ class ValkeyScheduleClient:
 
         return health_statuses
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def update_routes_readiness_batch(self, route_readiness: Mapping[str, bool]) -> None:
         """
         Batch update readiness status for multiple routes in Redis.
@@ -426,7 +445,7 @@ class ValkeyScheduleClient:
 
         await self._client.client.exec(batch, raise_on_error=True)
 
-    @valkey_decorator()
+    @valkey_schedule_resilience.apply()
     async def close(self) -> None:
         """
         Close the ValkeyScheduleClient connection.

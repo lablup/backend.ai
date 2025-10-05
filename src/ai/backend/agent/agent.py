@@ -78,6 +78,7 @@ from ai.backend.common.clients.valkey_client.valkey_container_log.client import 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
@@ -193,6 +194,7 @@ from ai.backend.common.types import (
     MountPermission,
     MountTypes,
     RedisTarget,
+    ResourceSlot,
     RuntimeVariant,
     Sentinel,
     ServicePort,
@@ -200,6 +202,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
     SlotName,
+    SlotTypes,
     VFolderMount,
     VFolderUsageMode,
     VolumeMountableNodeType,
@@ -226,6 +229,7 @@ from .kernel import (
     match_distro_data,
 )
 from .observer.heartbeat import HeartbeatObserver
+from .observer.host_port import HostPortObserver
 from .resources import (
     AbstractComputeDevice,
     AbstractComputePlugin,
@@ -988,7 +992,9 @@ class AbstractAgent(
 
         self._agent_runner = Runner(resources=[])
         container_observer = HeartbeatObserver(self, self.event_producer)
+        host_port_observer = HostPortObserver(self)
         await self._agent_runner.register_observer(container_observer)
+        await self._agent_runner.register_observer(host_port_observer)
         await self._agent_runner.start()
 
         if abuse_report_path := self.local_config.agent.abuse_report_path:
@@ -1167,41 +1173,41 @@ class AbstractAgent(
         """
         Send my status information and available kernel images to the manager(s).
         """
-        res_slots = {}
+        slot_key_and_units: dict[SlotName, SlotTypes] = {}
+        res_slots: dict[SlotName, Decimal] = {}
         try:
             for cctx in self.computers.values():
                 for slot_key, slot_type in cctx.instance.slot_types:
-                    res_slots[slot_key] = (
-                        slot_type,
-                        str(self.slots.get(slot_key, 0)),
-                    )
+                    slot_key_and_units[slot_key] = slot_type
+                    res_slots[slot_key] = Decimal(str(self.slots.get(slot_key, 0)))
             if self.local_config.agent.advertised_rpc_addr:
                 rpc_addr = self.local_config.agent.advertised_rpc_addr
             else:
                 rpc_addr = self.local_config.agent.rpc_listen_addr
-            agent_info = {
-                "ip": str(rpc_addr.host),
-                "region": self.local_config.agent.region,
-                "scaling_group": self.local_config.agent.scaling_group,
-                "addr": f"tcp://{rpc_addr}",
-                "public_key": self.agent_public_key,
-                "public_host": str(self._get_public_host()),
-                "resource_slots": res_slots,
-                "version": VERSION,
-                "compute_plugins": {
+            agent_info = AgentInfo(
+                ip=str(rpc_addr.host),
+                region=self.local_config.agent.region,
+                scaling_group=self.local_config.agent.scaling_group,
+                addr=f"tcp://{rpc_addr}",
+                public_key=self.agent_public_key,
+                public_host=str(self._get_public_host()),
+                available_resource_slots=ResourceSlot(res_slots),
+                slot_key_and_units=slot_key_and_units,
+                version=VERSION,
+                compute_plugins={
                     key: {
                         "version": computer.instance.get_version(),
                         **(await computer.instance.extra_info()),
                     }
                     for key, computer in self.computers.items()
                 },
-                "images": zlib.compress(
+                images=zlib.compress(
                     msgpack.packb([(repo_tag, digest) for repo_tag, digest in self.images.items()])
                 ),
-                "images.opts": {"compression": "zlib"},  # compression: zlib or None
-                "architecture": get_arch_name(),
-                "auto_terminate_abusing_kernel": self.local_config.agent.force_terminate_abusing_containers,
-            }
+                images_opts=ImageOpts(compression="zlib"),  # compression: zlib or None
+                architecture=get_arch_name(),
+                auto_terminate_abusing_kernel=self.local_config.agent.force_terminate_abusing_containers,
+            )
             await self.anycast_event(AgentHeartbeatEvent(agent_info))
         except asyncio.TimeoutError:
             log.warning("event dispatch timeout: instance_heartbeat")
@@ -1408,6 +1414,7 @@ class AbstractAgent(
             # let the destruction task finish first
             await destruction_task
             del destruction_task
+        await self.stat_ctx.remove_kernel_metric(ev.kernel_id)
         async with self.registry_lock:
             try:
                 kernel_obj = self.kernel_registry.get(ev.kernel_id)
@@ -1473,6 +1480,47 @@ class AbstractAgent(
         ]
         self.port_pool.update(restored_ports)
 
+    def current_used_port_set(self) -> set[int]:
+        """
+        Get the current port pool.
+        """
+        total_port_set = set(
+            range(
+                self.local_config.container.port_range[0],
+                self.local_config.container.port_range[1] + 1,
+            )
+        )
+        return total_port_set - self.port_pool
+
+    def release_unused_ports(self, unused_ports: set[int]) -> None:
+        """
+        Release the given unused ports back to the port pool.
+        """
+        if not unused_ports:
+            return
+        log.info(
+            "releasing unused ports back to port pool. current port-pool length: {}, releasing length: {}",
+            len(self.port_pool),
+            len(unused_ports),
+        )
+        self.port_pool.update(unused_ports)
+
+    def reset_port_pool(self, used_ports: Iterable[int]) -> None:
+        """
+        Reset the port pool by excluding the given used ports.
+        """
+        used_port_set = set(used_ports)
+        port_range = self.local_config.container.port_range
+        log.info(
+            "reset port pool with used ports. current port-pool length: {}, used ports length: {}",
+            len(self.port_pool),
+            len(used_port_set),
+        )
+        original_port_pool: set[int] = {
+            p for p in range(port_range[0], port_range[1] + 1) if p not in used_port_set
+        }
+        self.port_pool = original_port_pool
+
     async def purge_containers(self, containers: Iterable[ContainerKernelId]) -> None:
         tasks = [self._purge_container(container) for container in containers]
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -1499,6 +1547,7 @@ class AbstractAgent(
             )
             raise
 
+        await self.stat_ctx.remove_kernel_metric(kernel_id)
         try:
             await self.clean_kernel(kernel_id, container_id, restarting=False)
         except Exception as e:

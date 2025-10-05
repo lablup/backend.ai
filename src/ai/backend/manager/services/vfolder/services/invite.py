@@ -30,8 +30,12 @@ from ..actions.invite import (
     ListInvitationActionResult,
     RejectInvitationAction,
     RejectInvitationActionResult,
+    RevokeInvitedVFolderAction,
+    RevokeInvitedVFolderActionResult,
     UpdateInvitationAction,
     UpdateInvitationActionResult,
+    UpdateInvitedVFolderMountPermissionAction,
+    UpdateInvitedVFolderMountPermissionActionResult,
 )
 from ..types import VFolderInvitationInfo
 
@@ -86,7 +90,7 @@ class VFolderInviteService:
             )
 
         # Create invitations
-        invited_ids = []
+        invited_ids: list[str] = []
 
         for _, user_email in invitee_users:
             # Check if invitation already exists
@@ -271,3 +275,21 @@ class VFolderInviteService:
         await self._vfolder_repository.delete_vfolder_permission(action.vfolder_uuid, user_uuid)
 
         return LeaveInvitedVFolderActionResult(vfolder_data.id)
+
+    async def revoke_invited_vfolder(
+        self, action: RevokeInvitedVFolderAction
+    ) -> RevokeInvitedVFolderActionResult:
+        await self._vfolder_repository.delete_vfolder_permission(
+            action.vfolder_id, action.shared_user_id
+        )
+        return RevokeInvitedVFolderActionResult(action.vfolder_id, action.shared_user_id)
+
+    async def update_invited_vfolder_mount_permission(
+        self, action: UpdateInvitedVFolderMountPermissionAction
+    ) -> UpdateInvitedVFolderMountPermissionActionResult:
+        await self._vfolder_repository.update_invited_vfolder_mount_permission(
+            action.vfolder_id, action.user_id, action.permission
+        )
+        return UpdateInvitedVFolderMountPermissionActionResult(
+            action.vfolder_id, action.user_id, action.permission
+        )

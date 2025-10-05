@@ -2,6 +2,7 @@
 TODO: rewrite
 """
 
+import os
 from unittest.mock import AsyncMock
 
 import pytest
@@ -48,9 +49,13 @@ async def test_read_agent_config_container_invalid01(arpcs_no_ainit, mocker):
     inspect_mock = AsyncMock(return_value={"a": 1, "b": 2})
     mocker.patch.object(arpcs_no_ainit.etcd, "get_prefix", new=inspect_mock)
     await arpcs_no_ainit.read_agent_config_container()
-    # Check that kernel-gid and kernel-uid are still at their default values
-    assert arpcs_no_ainit.local_config.container.kernel_gid.real == -1  # default value
-    assert arpcs_no_ainit.local_config.container.kernel_uid.real == -1  # default value
+    # Check that kernel-gid and kernel-uid are still at their default values (converted from -1)
+    assert (
+        arpcs_no_ainit.local_config.container.kernel_gid.real == os.getgid()
+    )  # default value (os.getgid())
+    assert (
+        arpcs_no_ainit.local_config.container.kernel_uid.real == os.getuid()
+    )  # default value (os.getuid())
 
 
 @pytest.mark.asyncio
@@ -58,9 +63,13 @@ async def test_read_agent_config_container_invalid02(arpcs_no_ainit, mocker):
     inspect_mock = AsyncMock(return_value={})
     mocker.patch.object(arpcs_no_ainit.etcd, "get_prefix", new=inspect_mock)
     await arpcs_no_ainit.read_agent_config_container()
-    # Check that kernel-gid and kernel-uid are still at their default values
-    assert arpcs_no_ainit.local_config.container.kernel_gid.real == -1  # default value
-    assert arpcs_no_ainit.local_config.container.kernel_uid.real == -1  # default value
+    # Check that kernel-gid and kernel-uid are still at their default values (converted from -1)
+    assert (
+        arpcs_no_ainit.local_config.container.kernel_gid.real == os.getgid()
+    )  # default value (os.getgid())
+    assert (
+        arpcs_no_ainit.local_config.container.kernel_uid.real == os.getuid()
+    )  # default value (os.getuid())
 
 
 @pytest.mark.asyncio
@@ -70,7 +79,9 @@ async def test_read_agent_config_container_1valid(arpcs_no_ainit, mocker):
     await arpcs_no_ainit.read_agent_config_container()
 
     assert arpcs_no_ainit.local_config.container.kernel_gid.real == 10
-    assert arpcs_no_ainit.local_config.container.kernel_uid.real == -1  # default value
+    assert (
+        arpcs_no_ainit.local_config.container.kernel_uid.real == os.getuid()
+    )  # default value (os.getuid())
 
 
 @pytest.mark.asyncio

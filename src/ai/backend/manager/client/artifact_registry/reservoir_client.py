@@ -9,8 +9,12 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.auth.utils import generate_signature
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
-from ai.backend.manager.dto.request import SearchArtifactsReq
+from ai.backend.manager.dto.request import (
+    DelegateScanArtifactsReq,
+    SearchArtifactsReq,
+)
 from ai.backend.manager.dto.response import (
+    DelegateScanArtifactsResponse,
     GetArtifactRevisionReadmeResponse,
     SearchArtifactsResponse,
 )
@@ -69,12 +73,22 @@ class ReservoirRegistryClient:
                 response.raise_for_status()
                 return await response.json()
 
+    async def delegate_scan_artifacts(
+        self, req: DelegateScanArtifactsReq
+    ) -> DelegateScanArtifactsResponse:
+        resp = await self._request(
+            "POST", "/artifact-registries/delegation/scan", json=req.model_dump(mode="json")
+        )
+        return DelegateScanArtifactsResponse.model_validate(resp)
+
     async def search_artifacts(self, req: SearchArtifactsReq) -> SearchArtifactsResponse:
-        return await self._request(
+        resp = await self._request(
             "POST", "/artifact-registries/search", json=req.model_dump(mode="json")
         )
+        return SearchArtifactsResponse.model_validate(resp)
 
     async def get_readme(
         self, artifact_revision_id: uuid.UUID
     ) -> GetArtifactRevisionReadmeResponse:
-        return await self._request("GET", f"/artifacts/revisions/{artifact_revision_id}/readme")
+        resp = await self._request("GET", f"/artifacts/revisions/{artifact_revision_id}/readme")
+        return GetArtifactRevisionReadmeResponse.model_validate(resp)

@@ -20,6 +20,7 @@ from ai.backend.manager.data.domain.types import (
     DomainModifier,
     UserInfo,
 )
+from ai.backend.manager.errors.resource import DomainHasUsers
 from ai.backend.manager.models.domain import domains, row_to_data
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.user import UserRole, UserStatus, users
@@ -454,7 +455,7 @@ class TestDomainRepository:
 
         try:
             # Try to purge domain (should fail due to users)
-            with pytest.raises(RuntimeError) as exc_info:
+            with pytest.raises(DomainHasUsers) as exc_info:
                 await domain_repository.purge_domain_validated(domain_name)
 
             assert "There are users bound to the domain" in str(exc_info.value)

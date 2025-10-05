@@ -230,7 +230,9 @@ class TestServicePortRule:
             kernel_specs=[
                 {
                     "image_ref": type("ImageRef", (), {"canonical": "test-image"})(),
-                    "preopen_ports": [2000, 8080],  # 2000 is reserved
+                    "creation_config": {
+                        "preopen_ports": [2000, 8080],  # 2000 is reserved
+                    },
                 }
             ],
             creation_spec={},
@@ -256,7 +258,9 @@ class TestServicePortRule:
             kernel_specs=[
                 {
                     "image_ref": type("ImageRef", (), {"canonical": "test-image"})(),
-                    "preopen_ports": [8888, 9000],  # 8888 overlaps with jupyter service port
+                    "creation_config": {
+                        "preopen_ports": [8888, 9000],  # 8888 overlaps with jupyter service port
+                    },
                 }
             ],
             creation_spec={},
@@ -305,7 +309,9 @@ class TestServicePortRule:
             kernel_specs=[
                 {
                     "image_ref": type("ImageRef", (), {"canonical": "test-image"})(),
-                    "preopen_ports": [3000, 4000, 5000],  # All valid ports
+                    "creation_config": {
+                        "preopen_ports": [3000, 4000, 5000],  # All valid ports
+                    },
                 }
             ],
             creation_spec={},

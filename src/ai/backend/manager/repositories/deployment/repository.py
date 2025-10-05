@@ -16,7 +16,11 @@ from ruamel.yaml import YAML
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.exception import BackendAIError, InvalidAPIParameters
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -65,6 +69,23 @@ class AutoScalingMetricsData:
     kernels_by_session: dict[SessionId, list[KernelId]] = field(default_factory=dict)
 
 
+deployment_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(
+            MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.DEPLOYMENT_REPOSITORY)
+        ),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
+
+
 class DeploymentRepository:
     """Repository for deployment-related operations."""
 
@@ -90,6 +111,7 @@ class DeploymentRepository:
 
     # Endpoint operations
 
+    @deployment_repository_resilience.apply()
     async def create_endpoint(
         self,
         creator: DeploymentCreator,
@@ -97,6 +119,7 @@ class DeploymentRepository:
         """Create a new endpoint and return DeploymentInfo."""
         return await self._db_source.create_endpoint(creator)
 
+    @deployment_repository_resilience.apply()
     async def get_modified_endpoint(
         self,
         endpoint_id: uuid.UUID,
@@ -116,6 +139,7 @@ class DeploymentRepository:
         """
         return await self._db_source.get_modified_endpoint(endpoint_id, modifier)
 
+    @deployment_repository_resilience.apply()
     async def update_endpoint_with_modifier(
         self,
         endpoint_id: uuid.UUID,
@@ -136,6 +160,7 @@ class DeploymentRepository:
         """
         return await self._db_source.update_endpoint_with_modifier(endpoint_id, modifier)
 
+    @deployment_repository_resilience.apply()
     async def update_endpoint_lifecycle_bulk(
         self,
         endpoint_ids: list[uuid.UUID],
@@ -147,6 +172,7 @@ class DeploymentRepository:
             endpoint_ids, prevoius_status, new_status
         )
 
+    @deployment_repository_resilience.apply()
     async def get_endpoints_by_ids(
         self,
         endpoint_ids: set[uuid.UUID],
@@ -154,6 +180,7 @@ class DeploymentRepository:
         """Get endpoints by their IDs."""
         return await self._db_source.get_endpoints_by_ids(endpoint_ids)
 
+    @deployment_repository_resilience.apply()
     async def get_endpoints_by_statuses(
         self,
         statuses: list[EndpointLifecycle],
@@ -161,6 +188,7 @@ class DeploymentRepository:
         """Get endpoints by lifecycle statuses."""
         return await self._db_source.get_endpoints_by_statuses(statuses)
 
+    @deployment_repository_resilience.apply()
     async def get_endpoint_info(
         self,
         endpoint_id: uuid.UUID,
@@ -172,6 +200,7 @@ class DeploymentRepository:
         """
         return await self._db_source.get_endpoint(endpoint_id)
 
+    @deployment_repository_resilience.apply()
     async def destroy_endpoint(
         self,
         endpoint_id: uuid.UUID,
@@ -181,6 +210,7 @@ class DeploymentRepository:
             endpoint_id, EndpointLifecycle.DESTROYING
         )
 
+    @deployment_repository_resilience.apply()
     async def delete_endpoint(
         self,
         endpoint_id: uuid.UUID,
@@ -188,6 +218,7 @@ class DeploymentRepository:
         """Delete an endpoint and all its routes."""
         return await self._db_source.delete_endpoint_with_routes(endpoint_id)
 
+    @deployment_repository_resilience.apply()
     async def get_service_endpoint(
         self,
         endpoint_id: uuid.UUID,
@@ -203,6 +234,7 @@ class DeploymentRepository:
 
     # Route operations
 
+    @deployment_repository_resilience.apply()
     async def create_autoscaling_rule(
         self,
         endpoint_id: uuid.UUID,
@@ -211,6 +243,7 @@ class DeploymentRepository:
         """Create a new autoscaling rule for an endpoint."""
         return await self._db_source.create_autoscaling_rule(endpoint_id, creator)
 
+    @deployment_repository_resilience.apply()
     async def list_autoscaling_rules(
         self,
         endpoint_id: uuid.UUID,
@@ -218,6 +251,7 @@ class DeploymentRepository:
         """List all autoscaling rules for an endpoint."""
         return await self._db_source.list_autoscaling_rules(endpoint_id)
 
+    @deployment_repository_resilience.apply()
     async def update_autoscaling_rule(
         self,
         rule_id: uuid.UUID,
@@ -226,6 +260,7 @@ class DeploymentRepository:
         """Update an existing autoscaling rule."""
         return await self._db_source.update_autoscaling_rule(rule_id, modifier)
 
+    @deployment_repository_resilience.apply()
     async def delete_autoscaling_rule(
         self,
         rule_id: uuid.UUID,
@@ -234,6 +269,7 @@ class DeploymentRepository:
         return await self._db_source.delete_autoscaling_rule(rule_id)
 
     # Data fetching operations
+    @deployment_repository_resilience.apply()
     async def fetch_model_definition(
         self,
         vfolder_id: uuid.UUID,
@@ -270,6 +306,7 @@ class DeploymentRepository:
         yaml = YAML()
         return yaml.load(model_definition_bytes)
 
+    @deployment_repository_resilience.apply()
     async def fetch_definition_files(
         self,
         vfolder_id: uuid.UUID,
@@ -325,12 +362,14 @@ class DeploymentRepository:
             model_definition=model_definition_content,
         )
 
+    @deployment_repository_resilience.apply()
     async def get_endpoints_with_autoscaling_rules(
         self,
     ) -> list[DeploymentInfoWithAutoScalingRules]:
         """Get endpoints that have autoscaling rules."""
         return await self._db_source.get_endpoints_with_autoscaling_rules()
 
+    @deployment_repository_resilience.apply()
     async def update_autoscaling_rule_triggered(
         self,
         rule_id: uuid.UUID,
@@ -339,6 +378,7 @@ class DeploymentRepository:
         """Update the last triggered time for an autoscaling rule."""
         return await self._db_source.update_autoscaling_rule_triggered(rule_id, triggered_at)
 
+    @deployment_repository_resilience.apply()
     async def batch_update_desired_replicas(
         self,
         updates: dict[uuid.UUID, int],
@@ -346,6 +386,7 @@ class DeploymentRepository:
         """Batch update desired replicas for multiple endpoints."""
         return await self._db_source.batch_update_desired_replicas(updates)
 
+    @deployment_repository_resilience.apply()
     async def fetch_scaling_group_proxy_targets(
         self,
         scaling_group: set[str],
@@ -353,6 +394,7 @@ class DeploymentRepository:
         """Fetch the proxy target URL for a scaling group endpoint."""
         return await self._db_source.fetch_scaling_group_proxy_targets(scaling_group)
 
+    @deployment_repository_resilience.apply()
     async def fetch_auto_scaling_rules_by_endpoint_ids(
         self,
         endpoint_ids: set[uuid.UUID],
@@ -360,6 +402,7 @@ class DeploymentRepository:
         """Fetch autoscaling rules for multiple endpoints."""
         return await self._db_source.fetch_auto_scaling_rules_by_endpoint_ids(endpoint_ids)
 
+    @deployment_repository_resilience.apply()
     async def fetch_active_routes_by_endpoint_ids(
         self,
         endpoint_ids: set[uuid.UUID],
@@ -367,6 +410,7 @@ class DeploymentRepository:
         """Fetch routes for multiple endpoints."""
         return await self._db_source.fetch_active_routes_by_endpoint_ids(endpoint_ids)
 
+    @deployment_repository_resilience.apply()
     async def scale_routes(
         self,
         scale_outs: Sequence[ScaleOutDecision],
@@ -376,6 +420,7 @@ class DeploymentRepository:
 
     # Route operations
 
+    @deployment_repository_resilience.apply()
     async def get_routes_by_statuses(
         self,
         statuses: list[RouteStatus],
@@ -390,6 +435,7 @@ class DeploymentRepository:
         """
         return await self._db_source.get_routes_by_statuses(statuses)
 
+    @deployment_repository_resilience.apply()
     async def update_route_status_bulk(
         self,
         route_ids: set[uuid.UUID],
@@ -405,6 +451,7 @@ class DeploymentRepository:
         """
         await self._db_source.update_route_status_bulk(route_ids, previous_statuses, new_status)
 
+    @deployment_repository_resilience.apply()
     async def mark_terminating_route_status_bulk(
         self,
         route_ids: set[uuid.UUID],
@@ -418,6 +465,7 @@ class DeploymentRepository:
         """
         await self._db_source.mark_terminating_route_status_bulk(route_ids)
 
+    @deployment_repository_resilience.apply()
     async def update_desired_replicas_bulk(
         self,
         replica_updates: Mapping[uuid.UUID, int],
@@ -429,6 +477,7 @@ class DeploymentRepository:
         """
         await self._db_source.update_desired_replicas_bulk(replica_updates)
 
+    @deployment_repository_resilience.apply()
     async def update_endpoint_urls_bulk(
         self,
         url_updates: Mapping[uuid.UUID, str],
@@ -440,6 +489,7 @@ class DeploymentRepository:
         """
         await self._db_source.update_endpoint_urls_bulk(url_updates)
 
+    @deployment_repository_resilience.apply()
     async def update_route_sessions(
         self,
         route_session_ids: Mapping[uuid.UUID, SessionId],
@@ -454,6 +504,7 @@ class DeploymentRepository:
         route_id_strings = [str(route_id) for route_id in route_session_ids.keys()]
         await self._valkey_schedule.initialize_routes_health_status_batch(route_id_strings)
 
+    @deployment_repository_resilience.apply()
     async def delete_routes_by_route_ids(
         self,
         route_ids: set[uuid.UUID],
@@ -465,6 +516,7 @@ class DeploymentRepository:
         """
         await self._db_source.delete_routes_by_route_ids(route_ids)
 
+    @deployment_repository_resilience.apply()
     async def fetch_deployment_context(
         self,
         deployment_info: DeploymentInfo,
@@ -481,6 +533,7 @@ class DeploymentRepository:
 
     # Auto-scaling operations
 
+    @deployment_repository_resilience.apply()
     async def fetch_metrics_for_autoscaling(
         self,
         deployments: Sequence[DeploymentInfo],
@@ -560,6 +613,7 @@ class DeploymentRepository:
             kernels_by_session=kernels_by_session_id,
         )
 
+    @deployment_repository_resilience.apply()
     async def calculate_desired_replicas_for_deployment(
         self,
         deployment: DeploymentInfo,
@@ -733,6 +787,7 @@ class DeploymentRepository:
 
         return None
 
+    @deployment_repository_resilience.apply()
     async def fetch_session_statuses_by_route_ids(
         self,
         route_ids: set[uuid.UUID],
@@ -740,6 +795,7 @@ class DeploymentRepository:
         """Fetch session IDs for multiple routes."""
         return await self._db_source.fetch_session_statuses_by_route_ids(route_ids)
 
+    @deployment_repository_resilience.apply()
     async def update_endpoint_route_info(
         self,
         endpoint_id: uuid.UUID,
@@ -757,6 +813,7 @@ class DeploymentRepository:
             health_check_config,
         )
 
+    @deployment_repository_resilience.apply()
     async def get_endpoint_id_by_session(
         self,
         session_id: uuid.UUID,

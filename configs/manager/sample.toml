@@ -544,7 +544,7 @@
   # Each key is a proxy name used in volume host references.
   [volumes.proxies]
 
-[resource_slots]
+[resource-slots]
 
 [otel]
   # Whether to enable OpenTelemetry for tracing or logging.
@@ -559,7 +559,7 @@
   # Should include the host and port of the OTLP receiver.
   endpoint = "http://localhost:4317"
 
-[service_discovery]
+[service-discovery]
   # Type of service discovery to use.
   type = "redis"
 
@@ -572,6 +572,9 @@
   # Whether to enable the approval process for artifact uploads.
   # When enabled, artifacts require approval before being available.
   enable-approve-process = false
+  # Whether this reservoir is a leaf in a delegation hierarchy.
+  # If true, it cannot delegate to other reservoirs.
+  is-delegation-leaf = false
   # Name of the reservoir storage configuration.
   # Used to identify this storage in the system.
   storage-name = "RESERVOIR_STORAGE_NAME"

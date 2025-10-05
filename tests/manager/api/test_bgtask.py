@@ -102,12 +102,15 @@ async def test_background_task(bgtask_fixture: BgtaskFixture) -> None:
     background_task_manager, producer, dispatcher = bgtask_fixture
     update_handler_ctx: dict[str, Any] = {}
     done_handler_ctx: dict[str, Any] = {}
+    update_call_count = 0
 
     async def update_sub(
         context: ContextSentinel,
         source: AgentId,
         event: BgtaskUpdatedEvent,
     ) -> None:
+        nonlocal update_call_count
+        update_call_count += 1
         update_handler_ctx["context"] = context
         # Copy the arguments to the uppser scope
         # since assertions inside the handler does not affect the test result
@@ -129,26 +132,38 @@ async def test_background_task(bgtask_fixture: BgtaskFixture) -> None:
 
     async def _mock_task(reporter):
         reporter.total_progress = 2
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.1)
         await reporter.update(1, message="BGTask ex1")
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.1)
         await reporter.update(1, message="BGTask ex2")
         return "hooray"
 
     dispatcher.subscribe(BgtaskUpdatedEvent, ContextSentinel.TOKEN, update_sub)
     dispatcher.subscribe(BgtaskDoneEvent, ContextSentinel.TOKEN, done_sub)
     task_id = await background_task_manager.start(_mock_task, name="MockTask1234")
-    await asyncio.sleep(2)
 
+    # Wait for task completion and event processing
+    await asyncio.sleep(1.0)
+
+    # Wait a bit more for event handlers to be called
+    for _ in range(50):  # Max 5 seconds
+        if "context" in done_handler_ctx:
+            break
+        await asyncio.sleep(0.1)
+
+    assert "context" in update_handler_ctx, "update_sub handler was not called"
     assert update_handler_ctx["context"] is ContextSentinel.TOKEN
     assert update_handler_ctx["task_id"] == task_id
     assert update_handler_ctx["event_name"] == "bgtask_updated"
     assert update_handler_ctx["total_progress"] == 2
-    assert update_handler_ctx["message"] in ["BGTask ex1", "BGTask ex2"]
+    assert update_handler_ctx["message"] in ["BGTask ex1", "BGTask ex2", "Task started"]
     if update_handler_ctx["message"] == "BGTask ex1":
         assert update_handler_ctx["current_progress"] == 1
-    else:
+    elif update_handler_ctx["message"] == "BGTask ex2":
         assert update_handler_ctx["current_progress"] == 2
+    # "Task started" message has current_progress == 0
+
+    assert "context" in done_handler_ctx, "done_sub handler was not called"
     assert done_handler_ctx["context"] is ContextSentinel.TOKEN
     assert done_handler_ctx["task_id"] == task_id
     assert done_handler_ctx["event_name"] == "bgtask_done"
@@ -173,14 +188,23 @@ async def test_background_task_fail(bgtask_fixture: BgtaskFixture) -> None:
 
     async def _mock_task(reporter):
         reporter.total_progress = 2
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.1)
         await reporter.update(1, message="BGTask ex1")
         raise ZeroDivisionError("oops")
 
     dispatcher.subscribe(BgtaskFailedEvent, ContextSentinel.TOKEN, fail_sub)
     task_id = await background_task_manager.start(_mock_task, name="MockTask1234")
-    await asyncio.sleep(2)
 
+    # Wait for task completion and event processing
+    await asyncio.sleep(1.0)
+
+    # Wait a bit more for event handlers to be called
+    for _ in range(50):  # Max 5 seconds
+        if "context" in fail_handler_ctx:
+            break
+        await asyncio.sleep(0.1)
+
+    assert "context" in fail_handler_ctx, "fail_sub handler was not called"
     assert fail_handler_ctx["context"] is ContextSentinel.TOKEN
     assert fail_handler_ctx["task_id"] == task_id
     assert fail_handler_ctx["event_name"] == "bgtask_failed"

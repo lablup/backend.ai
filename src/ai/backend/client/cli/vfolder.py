@@ -25,7 +25,7 @@ from ..compat import asyncio_run
 from ..session import AsyncSession
 from .extensions import pass_ctx_obj
 from .pretty import (
-    ProgressViewer,
+    ProgressBarWithSpinner,
     print_done,
     print_error,
     print_fail,
@@ -837,21 +837,18 @@ def clone(name, target_name, target_host, usage_mode, permission):
                 completion_msg_func = lambda: print_done("Cloning the vfolder is complete.")
                 async with (
                     bgtask.listen_events() as response,
-                    ProgressViewer(
+                    ProgressBarWithSpinner(
                         "Cloning the vfolder... "
                         "(This may take a while depending on its size and number of files!)",
-                    ) as viewer,
+                    ) as pbar,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
                         match ev.event:
                             case BgtaskStatus.UPDATED:
-                                if viewer.tqdm is None:
-                                    pbar = await viewer.to_tqdm()
-                                else:
-                                    pbar.total = data["total_progress"]
-                                    pbar.write(data["message"])
-                                    pbar.update(data["current_progress"] - pbar.n)
+                                pbar.total = data["total_progress"]
+                                pbar.write(data["message"])
+                                pbar.update(data["current_progress"] - pbar.n)
                             case BgtaskStatus.FAILED:
                                 error_msg = data["message"]
                                 completion_msg_func = lambda: print_fail(

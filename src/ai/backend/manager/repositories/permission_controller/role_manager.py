@@ -1,10 +1,13 @@
+import logging
 import uuid
 from collections.abc import Iterable, Mapping
 from typing import Protocol
 
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.permission.association_scopes_entities import (
     AssociationScopesEntitiesCreateInput,
 )
@@ -37,6 +40,8 @@ from ...data.permission.role import (
     RoleData,
 )
 from ...models.rbac_models.role import RoleRow
+
+log = BraceStyleAdapter(logging.getLogger(__name__))
 
 
 class ScopeSystemRoleData(Protocol):
@@ -125,9 +130,16 @@ class RoleManager:
             scope_id=scope_id,
             object_id=entity_id,
         )
-        await db_session.execute(
-            sa.insert(AssociationScopesEntitiesRow).values(creator.fields_to_store())
-        )
+        try:
+            await db_session.execute(
+                sa.insert(AssociationScopesEntitiesRow).values(creator.fields_to_store())
+            )
+        except IntegrityError:
+            log.exception(
+                "entity and scope mapping already exists: {}, {}. Skipping.",
+                entity_id.to_str(),
+                scope_id.to_str(),
+            )
 
     async def unmap_entity_from_scope(
         self,
@@ -168,11 +180,12 @@ class RoleManager:
             for operation in operations
         ]
 
-        rows = await db_session.execute(
-            sa.insert(ObjectPermissionRow).returning(ObjectPermissionRow),
-            [input.fields_to_store() for input in creators],
-        )
-        result = [ObjectPermissionRow.from_sa_row(row).to_data() for row in rows]
+        rows = [ObjectPermissionRow.from_input(creator) for creator in creators]
+        db_session.add_all(rows)
+        await db_session.flush()
+        for row in rows:
+            await db_session.refresh(row)
+        result = [row.to_data() for row in rows]
         return result
 
     async def delete_object_permission_of_user(

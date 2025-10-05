@@ -29,6 +29,8 @@ from ..base import (
 )
 
 if TYPE_CHECKING:
+    from .permission.object_permission import ObjectPermissionRow
+    from .permission.permission_group import PermissionGroupRow
     from .user_role import UserRoleRow
 
 
@@ -67,6 +69,16 @@ class RoleRow(Base):
         "UserRoleRow",
         back_populates="role_row",
         primaryjoin="RoleRow.id == foreign(UserRoleRow.role_id)",
+    )
+    object_permission_rows: list[ObjectPermissionRow] = relationship(
+        "ObjectPermissionRow",
+        back_populates="role_row",
+        primaryjoin="RoleRow.id == foreign(ObjectPermissionRow.role_id)",
+    )
+    permission_group_rows: list[PermissionGroupRow] = relationship(
+        "PermissionGroupRow",
+        back_populates="role_row",
+        primaryjoin="RoleRow.id == foreign(PermissionGroupRow.role_id)",
     )
 
     def to_data(self) -> RoleData:

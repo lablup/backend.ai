@@ -22,7 +22,7 @@ from ..exceptions import BackendError
 from ..output.fields import routing_fields, service_fields
 from ..output.types import FieldSpec
 from .extensions import pass_ctx_obj
-from .pretty import ProgressViewer, print_done, print_fail, print_warn
+from .pretty import ProgressBarWithSpinner, print_done, print_fail, print_warn
 from .types import CLIContext
 
 _default_detail_fields: Sequence[FieldSpec] = (
@@ -550,23 +550,20 @@ def try_start(
 
     async def try_start_tracker(bgtask_id):
         async with AsyncSession() as session:
+            completion_msg_func = lambda: print_done("Model service validation started.")
             try:
                 bgtask = session.BackgroundTask(bgtask_id)
-                completion_msg_func = lambda: print_done("Model service validation started.")
                 async with (
                     bgtask.listen_events() as response,
-                    ProgressViewer("Starting the session...") as viewer,
+                    ProgressBarWithSpinner("Starting the session...") as pbar,
                 ):
                     async for ev in response:
                         data = json.loads(ev.data)
                         match ev.event:
                             case BgtaskStatus.UPDATED:
                                 print(data["message"])
-                                if viewer.tqdm is None:
-                                    pbar = await viewer.to_tqdm()
-                                else:
-                                    pbar.total = data["total_progress"]
-                                    pbar.update(data["current_progress"] - pbar.n)
+                                pbar.total = data["total_progress"]
+                                pbar.update(data["current_progress"] - pbar.n)
                             case BgtaskStatus.FAILED:
                                 error_msg = data["message"]
                                 completion_msg_func = lambda: print_fail(

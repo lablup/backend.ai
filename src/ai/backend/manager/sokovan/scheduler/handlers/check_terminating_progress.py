@@ -61,8 +61,8 @@ class CheckTerminatingProgressHandler(SchedulerHandler):
         affected_keys: set[AccessKey] = {
             event_data.access_key for event_data in result.scheduled_sessions
         }
-        await self._repository.invalidate_keypair_concurrency_cache(list(affected_keys))
-        log.debug("Invalidated concurrency cache for {} access keys", len(affected_keys))
+        await self._repository.invalidate_kernel_related_cache(list(affected_keys))
+        log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))
 
         # Broadcast batch event for sessions that transitioned to TERMINATED
         events: list[AbstractBroadcastEvent] = [

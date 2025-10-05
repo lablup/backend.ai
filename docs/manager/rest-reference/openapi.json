@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "25.14.2",
+    "version": "25.15.0",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -1874,6 +1874,26 @@
     "/artifact-registries/scan": {
       "post": {
         "operationId": "artifact-registries.scan_artifacts",
+        "tags": [
+          "artifact-registries"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/artifact-registries/delegation/scan": {
+      "post": {
+        "operationId": "artifact-registries.delegate_scan_artifacts",
         "tags": [
           "artifact-registries"
         ],

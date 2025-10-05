@@ -5,7 +5,8 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import groupby
-from typing import Any, Awaitable, Coroutine, Optional
+from typing import Any, Awaitable, Optional
+from uuid import UUID
 
 import aiotools
 import async_timeout
@@ -587,7 +588,7 @@ class Scheduler:
             # Create termination tasks for all kernels in this session
             termination_tasks: list[Awaitable[KernelTerminationResult]] = []
             for kernel in session.kernels:
-                if kernel.agent_id and kernel.container_id:
+                if kernel.agent_id:
                     # Create task to terminate this kernel
                     task = self._terminate_kernel(
                         kernel.agent_id,
@@ -599,13 +600,17 @@ class Scheduler:
                     termination_tasks.append(task)
                 else:
                     log.warning(
-                        "Kernel {} in session {} has no agent or container ID, skipping termination",
+                        "Kernel {} in session {} has not been assigned to agent, skipping termination",
                         kernel.kernel_id,
                         session.session_id,
                     )
-                    # If no agent/container, just mark as successful termination
+                    # If no agent, just mark as successful termination
                     # This is a fallback for kernels that might not have been scheduled properly
                     # or were already terminated
+                    await self._repository.update_kernel_status_terminated(
+                        UUID(kernel.kernel_id),
+                        session_result.reason,
+                    )
                     session_result.kernel_results.append(
                         KernelTerminationResult(
                             kernel_id=str(kernel.kernel_id),
@@ -657,7 +662,7 @@ class Scheduler:
             agent_client = self._agent_pool.get_agent_client(agent_id)
 
             # Call agent's destroy_kernel RPC method with correct parameters
-            await agent_client.destroy_kernel(kernel_id, session_id, reason)
+            await agent_client.destroy_kernel(kernel_id, session_id, reason, suppress_events=False)
             return KernelTerminationResult(
                 kernel_id=kernel_id,
                 agent_id=agent_id,
@@ -948,7 +953,7 @@ class Scheduler:
                         agent_image_configs[agent_id][canonical] = image_config
 
         # Trigger image checking and pulling on each agent
-        pull_tasks: list[Coroutine[Any, Any, Mapping[str, str]]] = []
+        pull_tasks: list[Awaitable[Mapping[str, str]]] = []
         for agent_id, agent_images in agent_image_configs.items():
             agent_client = self._agent_pool.get_agent_client(agent_id)
             pull_tasks.append(agent_client.check_and_pull(agent_images))
@@ -1063,8 +1068,8 @@ class Scheduler:
                     key=keyfunc,
                 )
             }
-
             environ: dict[str, str] = {
+                **session.environ,
                 "BACKENDAI_USER_UUID": str(session.user_uuid),
                 "BACKENDAI_USER_EMAIL": session.user_email,
                 "BACKENDAI_USER_NAME": session.user_name,
@@ -1188,10 +1193,10 @@ class Scheduler:
                     # Create image ref for this kernel
                     kernel_image_refs[KernelId(k.kernel_id)] = ImageRef.from_image_str(
                         image_str,
-                        project=None,
-                        registry="",  # Would need proper registry in production
+                        project=kernel_image_config["project"],
+                        registry=kernel_image_config["registry"]["name"],
                         architecture=k.architecture,
-                        is_local=False,
+                        is_local=kernel_image_config["is_local"],
                     )
 
                 # Create cluster info with network and SSH configuration

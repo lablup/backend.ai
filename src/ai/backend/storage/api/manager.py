@@ -57,7 +57,6 @@ from ai.backend.common.types import (
 from ai.backend.logging import BraceStyleAdapter
 
 from .. import __version__
-from ..bgtask.tags import ROOT_PRIVILEGED_TAG
 from ..bgtask.tasks.clone import VFolderCloneTaskArgs
 from ..bgtask.tasks.delete import VFolderDeleteTaskArgs
 from ..exception import (
@@ -76,6 +75,7 @@ from ..watcher import ChownTask, MountTask, UmountTask
 from .v1.registries.huggingface import create_app as create_huggingface_registries_app
 from .v1.registries.reservoir import create_app as create_reservoir_registries_app
 from .v1.storages.object_storage import create_app as create_object_storages_app
+from .v1.storages.vfs_storage import create_app as create_vfs_storages_app
 from .vfolder.handler import VFolderHandler
 
 if TYPE_CHECKING:
@@ -106,6 +106,21 @@ def skip_token_auth(
 ) -> Callable[[web.Request], Awaitable[web.StreamResponse]]:
     setattr(handler, "skip_token_auth", True)
     return handler
+
+
+@skip_token_auth
+async def check_health(request: web.Request) -> web.Response:
+    """Simple health check endpoint"""
+    from ..types import HealthResponse
+
+    request["do_not_print_access_log"] = True
+
+    response = HealthResponse(
+        status="healthy",
+        version=__version__,
+        component="storage-proxy",
+    )
+    return web.json_response(response.model_dump())
 
 
 @skip_token_auth
@@ -426,7 +441,6 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         task_id = await ctx.background_task_manager.start_retriable(
             TaskName.DELETE_VFOLDER,
             delete_args,
-            tags=[ROOT_PRIVILEGED_TAG],
         )
         data = VFolderDeleteResponse(bgtask_id=task_id).model_dump(mode="json")
         return web.json_response(data, status=HTTPStatus.ACCEPTED)
@@ -1184,6 +1198,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app["ctx"] = ctx
     app.on_shutdown.append(_shutdown)
     app.router.add_route("GET", "/", check_status)
+    app.router.add_route("GET", "/health", check_health)
     app.router.add_route("GET", "/status", check_status)
     app.router.add_route("GET", "/volumes", get_volumes)
     app.router.add_route("GET", "/volume/hwinfo", get_hwinfo)
@@ -1213,6 +1228,7 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/delete", delete_files)
 
     app.add_subapp("/v1/storages/s3", create_object_storages_app(ctx))
+    app.add_subapp("/v1/storages/vfs", create_vfs_storages_app(ctx))
     app.add_subapp("/v1/registries/huggingface", create_huggingface_registries_app(ctx))
     app.add_subapp("/v1/registries/reservoir", create_reservoir_registries_app(ctx))
 

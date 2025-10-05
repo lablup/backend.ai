@@ -1,30 +1,18 @@
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Self, override
-
-from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
-from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
-from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
-from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
-from ai.backend.manager.services.deployment.processors import DeploymentProcessors
-from ai.backend.manager.services.deployment.service import DeploymentService
-from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
-from ai.backend.manager.services.object_storage.service import ObjectStorageService
-
-if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.deployment import DeploymentController
-    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from typing import Optional, Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
@@ -35,10 +23,16 @@ from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
+from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
+from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
+from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
+from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.container_registry.service import ContainerRegistryService
+from ai.backend.manager.services.deployment.processors import DeploymentProcessors
+from ai.backend.manager.services.deployment.service import DeploymentService
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.group.processors import GroupProcessors
@@ -64,6 +58,8 @@ from ai.backend.manager.services.model_serving.services.auto_scaling import Auto
 from ai.backend.manager.services.model_serving.services.model_serving import (
     ModelServingService,
 )
+from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
+from ai.backend.manager.services.object_storage.service import ObjectStorageService
 from ai.backend.manager.services.project_resource_policy.processors import (
     ProjectResourcePolicyProcessors,
 )
@@ -72,6 +68,8 @@ from ai.backend.manager.services.resource_preset.processors import ResourcePrese
 from ai.backend.manager.services.resource_preset.service import ResourcePresetService
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
+from ai.backend.manager.services.storage_namespace.service import StorageNamespaceService
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
@@ -84,6 +82,8 @@ from ai.backend.manager.services.vfolder.processors import (
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
 
 @dataclass
@@ -103,8 +103,10 @@ class ServiceArgs:
     idle_checker_host: IdleCheckerHost
     event_dispatcher: EventDispatcher
     hook_plugin_ctx: HookPluginContext
-    scheduling_controller: "SchedulingController"
-    deployment_controller: "DeploymentController"
+    scheduling_controller: SchedulingController
+    deployment_controller: DeploymentController
+    event_producer: EventProducer
+    agent_cache: AgentRPCCache
 
 
 @dataclass
@@ -132,6 +134,7 @@ class Services:
     artifact_revision: ArtifactRevisionService
     artifact_registry: ArtifactRegistryService
     deployment: DeploymentService
+    storage_namespace: StorageNamespaceService
 
     @classmethod
     def create(cls, args: ServiceArgs) -> Self:
@@ -141,6 +144,10 @@ class Services:
             args.agent_registry,
             args.config_provider,
             repositories.agent.repository,
+            repositories.scheduler.repository,
+            args.hook_plugin_ctx,
+            args.event_producer,
+            args.agent_cache,
         )
         domain_service = DomainService(
             repositories.domain.repository, repositories.domain.admin_repository
@@ -264,6 +271,9 @@ class Services:
             repositories.artifact_registry.repository,
         )
         deployment_service = DeploymentService(args.deployment_controller)
+        storage_namespace_service = StorageNamespaceService(
+            repositories.storage_namespace.repository
+        )
 
         return cls(
             agent=agent_service,
@@ -289,6 +299,7 @@ class Services:
             artifact_revision=artifact_revision_service,
             artifact_registry=artifact_registry_service,
             deployment=deployment_service,
+            storage_namespace=storage_namespace_service,
         )
 
 
@@ -322,6 +333,7 @@ class Processors(AbstractProcessorPackage):
     artifact_registry: ArtifactRegistryProcessors
     artifact_revision: ArtifactRevisionProcessors
     deployment: Optional[DeploymentProcessors]
+    storage_namespace: StorageNamespaceProcessors
 
     @classmethod
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
@@ -376,6 +388,10 @@ class Processors(AbstractProcessorPackage):
         if services.deployment is not None:
             deployment_processors = DeploymentProcessors(services.deployment, action_monitors)
 
+        storage_namespace_processors = StorageNamespaceProcessors(
+            services.storage_namespace, action_monitors
+        )
+
         return cls(
             agent=agent_processors,
             domain=domain_processors,
@@ -400,6 +416,7 @@ class Processors(AbstractProcessorPackage):
             artifact_registry=artifact_registry_processors,
             artifact_revision=artifact_revision_processors,
             deployment=deployment_processors,
+            storage_namespace=storage_namespace_processors,
         )
 
     @override
@@ -428,4 +445,5 @@ class Processors(AbstractProcessorPackage):
             *self.artifact_revision.supported_actions(),
             *self.artifact.supported_actions(),
             *(self.deployment.supported_actions() if self.deployment else []),
+            *self.storage_namespace.supported_actions(),
         ]

@@ -33,6 +33,9 @@ from ai.backend.manager.repositories.resource_preset.repositories import Resourc
 from ai.backend.manager.repositories.schedule.repositories import ScheduleRepositories
 from ai.backend.manager.repositories.scheduler.repositories import SchedulerRepositories
 from ai.backend.manager.repositories.session.repositories import SessionRepositories
+from ai.backend.manager.repositories.storage_namespace.repositories import (
+    StorageNamespaceRepositories,
+)
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.user.repositories import UserRepositories
 from ai.backend.manager.repositories.user_resource_policy.repositories import (
@@ -66,6 +69,7 @@ class Repositories:
     huggingface_registry: HuggingFaceRegistryRepositories
     artifact: ArtifactRepositories
     artifact_registry: ArtifactRegistryRepositories
+    storage_namespace: StorageNamespaceRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -92,6 +96,7 @@ class Repositories:
         artifact_repositories = ArtifactRepositories.create(args)
         huggingface_registry_repositories = HuggingFaceRegistryRepositories.create(args)
         artifact_registries = ArtifactRegistryRepositories.create(args)
+        storage_namespace_repositories = StorageNamespaceRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -117,4 +122,5 @@ class Repositories:
             huggingface_registry=huggingface_registry_repositories,
             artifact=artifact_repositories,
             artifact_registry=artifact_registries,
+            storage_namespace=storage_namespace_repositories,
         )

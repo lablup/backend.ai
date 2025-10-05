@@ -3,6 +3,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any, Optional, Self, override
 
+from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     EventDomain,
@@ -111,16 +112,16 @@ class AgentErrorEvent(AgentOperationEvent):
 
 @dataclass
 class AgentHeartbeatEvent(AgentOperationEvent):
-    agent_info: Mapping[str, Any]
+    agent_info: AgentInfo
 
     @override
     def serialize(self) -> tuple:
-        return (self.agent_info,)
+        return (self.agent_info.model_dump(),)
 
     @classmethod
     @override
     def deserialize(cls, value: tuple) -> Self:
-        return cls(value[0])
+        return cls(AgentInfo.model_validate(value[0]))
 
     @classmethod
     @override

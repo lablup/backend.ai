@@ -44,6 +44,7 @@ from ai.backend.common import msgpack
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
 from ai.backend.common.api_handlers import BaseFieldModel
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     VFolderHostPermission,
@@ -51,13 +52,12 @@ from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.kernel.types import KernelStatus
-
-if TYPE_CHECKING:
-    from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.resource import get_watcher_info
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.model_serving.types import EndpointLifecycle
+from ai.backend.manager.data.permission.types import ScopeType
 from ai.backend.manager.models.storage import StorageSessionManager
 
 from ..errors.api import InvalidAPIParameters
@@ -74,7 +74,6 @@ from ..errors.storage import (
 )
 from ..models import (
     ACTIVE_USER_STATUSES,
-    AgentStatus,
     EndpointRow,
     UserRole,
     UserStatus,
@@ -134,7 +133,9 @@ from ..services.vfolder.actions.invite import (
     LeaveInvitedVFolderAction,
     ListInvitationAction,
     RejectInvitationAction,
+    RevokeInvitedVFolderAction,
     UpdateInvitationAction,
+    UpdateInvitedVFolderMountPermissionAction,
 )
 from ..services.vfolder.exceptions import (
     ModelServiceDependencyNotCleared as VFolderMountedOnModelService,
@@ -430,6 +431,13 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
     folder_host = params.folder_host
     unmanaged_path = params.unmanaged_path
 
+    if group_id_or_name is not None:
+        scope_type = ScopeType.PROJECT
+        scope_id = str(group_id_or_name)
+    else:
+        scope_type = ScopeType.USER
+        scope_id = str(user_uuid)
+
     try:
         result = await root_ctx.processors.vfolder.create_vfolder.wait_for_complete(
             CreateVFolderAction(
@@ -445,6 +453,8 @@ async def create(request: web.Request, params: CreateRequestModel) -> web.Respon
                 user_uuid=user_uuid,
                 user_role=user_role,
                 creator_email=request["user"]["email"],
+                _scope_type=scope_type,
+                _scope_id=scope_id,
             )
         )
     except (VFolderInvalidParameter, VFolderAlreadyExists) as e:
@@ -492,9 +502,18 @@ async def list_folders(request: web.Request, params: Any) -> web.Response:
         request["keypair"]["access_key"],
     )
     owner_user_uuid, owner_user_role = await get_user_scopes(request, params)
+    group_id = params["group_id"]
+    if group_id is not None:
+        scope_type = ScopeType.PROJECT
+        scope_id = str(group_id)
+    else:
+        scope_type = ScopeType.USER
+        scope_id = str(owner_user_uuid)
     result = await root_ctx.processors.vfolder.list_vfolder.wait_for_complete(
         ListVFolderAction(
             user_uuid=owner_user_uuid,
+            _scope_type=scope_type,
+            _scope_id=scope_id,
         )
     )
     resp = []
@@ -2100,21 +2119,18 @@ async def update_shared_vfolder(request: web.Request, params: Any) -> web.Respon
         user_uuid,
         perm,
     )
-    async with root_ctx.db.begin() as conn:
-        if perm is not None:
-            query = (
-                sa.update(vfolder_permissions)
-                .values(permission=perm)
-                .where(vfolder_permissions.c.vfolder == vfolder_id)
-                .where(vfolder_permissions.c.user == user_uuid)
+    if perm is not None:
+        await root_ctx.processors.vfolder_invite.update_invited_vfolder_mount_permission.wait_for_complete(
+            UpdateInvitedVFolderMountPermissionAction(
+                vfolder_id=vfolder_id,
+                user_id=user_uuid,
+                permission=perm,
             )
-        else:
-            query = (
-                sa.delete(vfolder_permissions)
-                .where(vfolder_permissions.c.vfolder == vfolder_id)
-                .where(vfolder_permissions.c.user == user_uuid)
-            )
-        await conn.execute(query)
+        )
+    else:
+        await root_ctx.processors.vfolder_invite.revoke_invited_vfolder.wait_for_complete(
+            RevokeInvitedVFolderAction(vfolder_id=vfolder_id, shared_user_id=user_uuid)
+        )
     resp = {"msg": "shared vfolder permission updated"}
     return web.json_response(resp, status=HTTPStatus.OK)
 

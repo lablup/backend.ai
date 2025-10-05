@@ -106,6 +106,7 @@ async def server_main(
     from .bgtask.registry import BgtaskHandlerRegistryCreator
     from .context import RootContext
     from .migration import check_latest
+    from .storages.storage_pool import StoragePool
     from .volumes.pool import VolumePool
     from .watcher import WatcherClient
 
@@ -211,6 +212,10 @@ async def server_main(
             valkey_client=valkey_client,
             server_id=local_config.storage_proxy.node_id,
         )
+
+        # Create StoragePool with both object storage and VFS storage
+        storage_pool = StoragePool.from_config(local_config)
+
         ctx = RootContext(
             pid=os.getpid(),
             node_id=local_config.storage_proxy.node_id,
@@ -218,6 +223,7 @@ async def server_main(
             local_config=local_config,
             etcd=etcd,
             volume_pool=volume_pool,
+            storage_pool=storage_pool,
             background_task_manager=bgtask_mgr,
             event_producer=event_producer,
             event_dispatcher=event_dispatcher,
@@ -472,7 +478,7 @@ def main(
                     log_config.debug("debug mode enabled.")
                 if local_config.debug.enabled:
                     print("== Storage proxy configuration ==")
-                    pprint(local_config)
+                    pprint(local_config.model_dump())
                 if local_config.storage_proxy.event_loop == "uvloop":
                     import uvloop
 

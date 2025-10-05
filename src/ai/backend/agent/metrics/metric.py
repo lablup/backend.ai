@@ -1,4 +1,8 @@
+import asyncio
 import enum
+import functools
+import uuid
+from collections.abc import Iterable
 from typing import Optional, Self
 
 from prometheus_client import Counter, Gauge, Histogram
@@ -7,10 +11,15 @@ from ai.backend.common.metrics.types import (
     CONTAINER_UTILIZATION_METRIC_LABEL_NAME,
     DEVICE_UTILIZATION_METRIC_LABEL_NAME,
     UNDEFINED,
+    UTILIZATION_METRIC_DETENTION,
 )
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, KernelId, MetricKey, SessionId
 
-from .types import FlattenedDeviceMetric, FlattenedKernelMetric
+from .types import (
+    ALL_METRIC_VALUE_TYPES,
+    FlattenedDeviceMetric,
+    FlattenedKernelMetric,
+)
 
 
 class StatScope(enum.StrEnum):
@@ -65,11 +74,13 @@ class RPCMetricObserver:
 
 class UtilizationMetricObserver:
     _instance: Optional[Self] = None
+    _removal_tasks: dict[KernelId, asyncio.Task[None]]
 
     _container_metric: Gauge
     _device_metric: Gauge
 
     def __init__(self) -> None:
+        self._removal_tasks = {}
         self._container_metric = Gauge(
             name="backendai_container_utilization",
             documentation="Container utilization metrics",
@@ -115,6 +126,40 @@ class UtilizationMetricObserver:
                 project_id=metric.project_id or UNDEFINED,
                 value_type=metric_value_type,
             ).set(float(value))
+
+    async def lazy_remove_container_metric(
+        self,
+        *,
+        agent_id: AgentId,
+        kernel_id: KernelId,
+        session_id: Optional[SessionId],
+        owner_user_id: Optional[uuid.UUID],
+        project_id: Optional[uuid.UUID],
+        keys: Iterable[MetricKey],
+    ) -> None:
+        async def remove_later() -> None:
+            await asyncio.sleep(UTILIZATION_METRIC_DETENTION)
+            for key in keys:
+                for value_type in ALL_METRIC_VALUE_TYPES:
+                    try:
+                        self._container_metric.remove(
+                            key,
+                            agent_id,
+                            kernel_id,
+                            session_id or UNDEFINED,
+                            owner_user_id or UNDEFINED,
+                            project_id or UNDEFINED,
+                            value_type,
+                        )
+                    except KeyError:
+                        continue
+
+        def callback(task: asyncio.Task) -> None:
+            self._removal_tasks.pop(kernel_id, None)
+
+        task = asyncio.create_task(remove_later())
+        self._removal_tasks[kernel_id] = task
+        task.add_done_callback(functools.partial(callback))
 
     def observe_device_metric(
         self,

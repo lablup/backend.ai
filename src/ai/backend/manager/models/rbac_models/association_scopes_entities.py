@@ -22,7 +22,7 @@ class AssociationScopesEntitiesRow(Base):
     __tablename__ = "association_scopes_entities"
     __table_args__ = (
         # constraint
-        sa.UniqueConstraint("scope_id", "entity_id", name="uq_scope_id_entity_id"),
+        sa.UniqueConstraint("scope_type", "scope_id", "entity_id", name="uq_scope_id_entity_id"),
     )
 
     id: uuid.UUID = IDColumn()
@@ -55,6 +55,12 @@ class AssociationScopesEntitiesRow(Base):
         Convert the association to a tuple of ScopeId and ObjectId.
         """
         return ObjectId(entity_type=self.entity_type, entity_id=self.entity_id)
+
+    def parsed_scope_id(self) -> ScopeId:
+        """
+        Convert the association to a ScopeId.
+        """
+        return ScopeId(scope_type=self.scope_type, scope_id=self.scope_id)
 
     def to_data(self) -> AssociationScopesEntitiesData:
         """

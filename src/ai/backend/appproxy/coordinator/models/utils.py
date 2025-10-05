@@ -18,7 +18,6 @@ from typing import (
     TypeVar,
     overload,
 )
-from urllib.parse import quote_plus as urlquote
 
 import sqlalchemy as sa
 import sqlalchemy.sql.functions
@@ -37,6 +36,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
+from yarl import URL
 
 from ai.backend.appproxy.common.exceptions import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
@@ -325,13 +325,15 @@ async def connect_database(
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     from .base import pgsql_connect_opts
 
-    username = local_config.db.user
-    password = local_config.db.password
-    address = local_config.db.addr
-    dbname = local_config.db.name
-    url = f"postgresql+asyncpg://{urlquote(username)}:{urlquote(password)}@{address}/{urlquote(dbname)}"
+    db_url = (
+        URL(f"postgresql+asyncpg://{local_config.db.addr.host}/{local_config.db.name}")
+        .with_port(local_config.db.addr.port)
+        .with_user(local_config.db.user)
+    )
+    if local_config.db.password is not None:
+        db_url = db_url.with_password(local_config.db.password)
 
-    version_check_db = create_async_engine(url)
+    version_check_db = create_async_engine(str(db_url))
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
         version_str: str | None = result.scalar()
@@ -343,7 +345,7 @@ async def connect_database(
     await version_check_db.dispose()
 
     db = create_async_engine(
-        url,
+        str(db_url),
         connect_args=pgsql_connect_opts,
         pool_size=local_config.db.pool_size,
         max_overflow=local_config.db.max_overflow,

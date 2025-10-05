@@ -14,13 +14,13 @@ from typing import Any, Mapping, Optional
 
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
     FilePath,
     field_validator,
 )
 
+from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
@@ -62,7 +62,7 @@ class ScratchType(enum.StrEnum):
     K8S_NFS = "k8s-nfs"
 
 
-class SyncContainerLifecyclesConfig(BaseModel):
+class SyncContainerLifecyclesConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=True,
         description="Whether to enable container lifecycle synchronization",
@@ -76,7 +76,7 @@ class SyncContainerLifecyclesConfig(BaseModel):
     )
 
 
-class PyroscopeConfig(BaseModel):
+class PyroscopeConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="Whether to enable Pyroscope profiling",
@@ -105,7 +105,7 @@ class PyroscopeConfig(BaseModel):
     )
 
 
-class OTELConfig(BaseModel):
+class OTELConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="Whether to enable OpenTelemetry",
@@ -125,7 +125,7 @@ class OTELConfig(BaseModel):
     )
 
 
-class ServiceDiscoveryConfig(BaseModel):
+class ServiceDiscoveryConfig(BaseConfigSchema):
     type: ServiceDiscoveryType = Field(
         default=ServiceDiscoveryType.REDIS,
         description="Type of service discovery to use",
@@ -133,7 +133,7 @@ class ServiceDiscoveryConfig(BaseModel):
     )
 
 
-class CoreDumpConfig(BaseModel):
+class CoreDumpConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="Whether to enable core dump collection",
@@ -161,6 +161,10 @@ class CoreDumpConfig(BaseModel):
     )
     _core_path: Optional[Path]
 
+    def __init__(self, _core_path: Optional[Path] = None, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self._core_path = _core_path
+
     def set_core_path(self, core_path: Path) -> None:
         """
         Set the core path for core dumps.
@@ -185,7 +189,7 @@ class CoreDumpConfig(BaseModel):
     )
 
 
-class DebugConfig(BaseModel):
+class DebugConfig(BaseConfigSchema):
     enabled: bool = Field(
         default=False,
         description="Master switch for debug mode",
@@ -274,7 +278,7 @@ class DebugConfig(BaseModel):
     )
 
 
-class AgentConfig(BaseModel):
+class AgentConfig(BaseConfigSchema):
     backend: AgentBackend = Field(
         description=textwrap.dedent("""
         Backend type for the agent.
@@ -581,7 +585,7 @@ class AgentConfig(BaseModel):
     )
 
 
-class ContainerConfig(BaseModel):
+class ContainerConfig(BaseConfigSchema):
     kernel_uid: UserID = Field(
         default=UserID(-1),
         description="Kernel user ID",
@@ -721,7 +725,7 @@ class ContainerConfig(BaseModel):
         raise ValueError("port_range must be a tuple of two integers")
 
 
-class ResourceConfig(BaseModel):
+class ResourceConfig(BaseConfigSchema):
     reserved_cpu: int = Field(
         default=1,
         description="The number of CPU cores reserved for the operating system and the agent service.",
@@ -795,7 +799,7 @@ class ResourceConfig(BaseModel):
         return v
 
 
-class EtcdConfig(BaseModel):
+class EtcdConfig(BaseConfigSchema):
     namespace: str = Field(
         description="Etcd namespace",
         examples=["local", "backend"],
@@ -830,7 +834,7 @@ class EtcdConfig(BaseModel):
         )
 
 
-class ContainerLogsConfig(BaseModel):
+class ContainerLogsConfig(BaseConfigSchema):
     max_length: BinarySizeField = Field(
         default=BinarySize.finite_from_str("10M"),
         description="Maximum length of container logs",
@@ -851,7 +855,7 @@ class ContainerLogsConfig(BaseModel):
     )
 
 
-class APIConfig(BaseModel):
+class APIConfig(BaseConfigSchema):
     pull_timeout: Optional[float] = Field(
         default=7200.0,  # 2 hours
         ge=0,
@@ -870,7 +874,7 @@ class APIConfig(BaseModel):
     )
 
 
-class KernelLifecyclesConfig(BaseModel):
+class KernelLifecyclesConfig(BaseConfigSchema):
     init_polling_attempt: int = Field(
         default=10,
         description="Number of init polling attempts",
@@ -894,7 +898,7 @@ class KernelLifecyclesConfig(BaseModel):
     )
 
 
-class DockerExtraConfig(BaseModel):
+class DockerExtraConfig(BaseConfigSchema):
     """
     For checking additional Docker configurations
     """
@@ -908,7 +912,7 @@ class DockerExtraConfig(BaseModel):
     )
 
 
-class AgentUnifiedConfig(BaseModel):
+class AgentUnifiedConfig(BaseConfigSchema):
     # Local config
     agent: AgentConfig = Field(
         description="Agent configuration",

@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Mapping, Optional, cast
@@ -10,15 +11,17 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import joinedload, load_only, noload
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.metrics.metric import LayerType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.utils import nmget
+from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
-from ai.backend.manager.data.user.types import UserCreator, UserData
-from ai.backend.manager.decorators.repository_decorator import (
-    create_layer_aware_repository_decorator,
-)
+from ai.backend.manager.data.user.types import UserCreateResultData, UserCreator, UserData
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.errors.user import (
     KeyPairForbidden,
@@ -33,15 +36,29 @@ from ai.backend.manager.models import kernels
 from ai.backend.manager.models.domain import DomainRow
 from ai.backend.manager.models.group import ProjectType, association_groups_users, groups
 from ai.backend.manager.models.kernel import RESOURCE_USAGE_KERNEL_STATUSES
-from ai.backend.manager.models.keypair import KeyPairRow, keypairs, prepare_new_keypair
+from ai.backend.manager.models.keypair import KeyPairRow, generate_keypair_data, keypairs
 from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.user.actions.modify_user import UserModifier
 
 from ..permission_controller.role_manager import RoleManager
 
-# Layer-specific decorator for user repository
-repository_decorator = create_layer_aware_repository_decorator(LayerType.USER)
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+user_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.USER_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class UserRepository:
@@ -52,7 +69,7 @@ class UserRepository:
         self._db = db
         self._role_manager = RoleManager()
 
-    @repository_decorator()
+    @user_repository_resilience.apply()
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
         """
         Get user by UUID without ownership validation.
@@ -62,7 +79,7 @@ class UserRepository:
             user_row = await self._get_user_by_uuid(db_session, user_uuid)
             return user_row.to_data()
 
-    @repository_decorator()
+    @user_repository_resilience.apply()
     async def get_by_email_validated(
         self,
         email: str,
@@ -75,10 +92,10 @@ class UserRepository:
             user_row = await self._get_user_by_email(session, email)
             return UserData.from_row(user_row)
 
-    @repository_decorator()
+    @user_repository_resilience.apply()
     async def create_user_validated(
         self, user_creator: UserCreator, group_ids: Optional[list[str]]
-    ) -> UserData:
+    ) -> UserCreateResultData:
         """
         Create a new user with default keypair and group associations.
         """
@@ -124,16 +141,16 @@ class UserRepository:
                 resource_policy=DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME,
                 rate_limit=DEFAULT_KEYPAIR_RATE_LIMIT,
             )
-            kp_data = prepare_new_keypair(email, keypair_creator)
-            kp_insert_query = sa.insert(KeyPairRow).values(
-                **kp_data,
-                user=created_user.uuid,
-            )
-            await db_session.execute(kp_insert_query)
+            generated = generate_keypair_data()
+            kp_row = KeyPairRow.from_creator(keypair_creator, generated, created_user.id, email)
+            db_session.add(kp_row)
+            await db_session.flush()
+            await db_session.refresh(kp_row)
+            kp_data = kp_row.to_data()
 
             # Update user main_access_key
-            row.main_access_key = kp_data["access_key"]
-            created_user.main_access_key = kp_data["access_key"]
+            row.main_access_key = kp_data.access_key
+            created_user.main_access_key = kp_data.access_key
 
             # Add user to groups including model store project
             await self._add_user_to_groups(
@@ -148,14 +165,13 @@ class UserRepository:
                 ScopeId(ScopeType.DOMAIN, str(created_user.domain_name)),
             )
 
-        return created_user
+        return UserCreateResultData(created_user, kp_data)
 
-    @repository_decorator()
+    @user_repository_resilience.apply()
     async def update_user_validated(
         self,
         email: str,
         modifier: UserModifier,
-        group_ids: Optional[list[str]],
         requester_uuid: Optional[UUID],
     ) -> UserData:
         """
@@ -192,6 +208,7 @@ class UserRepository:
                 await self._sync_keypair_roles(conn, updated_user.uuid, role)
 
             # Handle group updates
+            group_ids = modifier.group_ids_value
             if prev_role != updated_user.role and group_ids is None:
                 await self._clear_user_groups(conn, updated_user.uuid)
 
@@ -202,7 +219,7 @@ class UserRepository:
             res = UserData.from_row(updated_user)
         return res
 
-    @repository_decorator()
+    @user_repository_resilience.apply()
     async def soft_delete_user_validated(self, email: str, requester_uuid: Optional[UUID]) -> None:
         """
         Soft delete user by setting status to DELETED and deactivating keypairs.
@@ -286,6 +303,12 @@ class UserRepository:
                 group_data = [{"user_id": user_uuid, "group_id": grp.id} for grp in grps]
                 group_insert_query = sa.insert(association_groups_users).values(group_data)
                 await db_session.execute(group_insert_query)
+            else:
+                log.warning(
+                    "No valid groups found to add user {0} in domain {1}", user_uuid, domain_name
+                )
+        else:
+            log.info("Adding new user {0} with no groups in domain {1}", user_uuid, domain_name)
 
     async def _validate_and_update_main_access_key(
         self, conn, email: str, main_access_key: str
@@ -395,7 +418,7 @@ class UserRepository:
             values = [{"user_id": user_uuid, "group_id": grp.id} for grp in grps]
             await conn.execute(sa.insert(association_groups_users).values(values))
 
-    @repository_decorator()
+    @user_repository_resilience.apply()
     async def get_user_time_binned_monthly_stats(
         self,
         user_uuid: UUID,
