@@ -1,0 +1,1 @@
+"""Manager setup context providers."""

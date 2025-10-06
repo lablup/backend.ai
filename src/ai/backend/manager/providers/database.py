@@ -1,0 +1,17 @@
+from __future__ import annotations
+
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager as actxmgr
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..api.context import RootContext
+
+
+@actxmgr
+async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from ..models.utils import connect_database
+
+    async with connect_database(root_ctx.config_provider.config.db) as db:
+        root_ctx.db = db
+        yield
