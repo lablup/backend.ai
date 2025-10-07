@@ -262,9 +262,6 @@ class ArtifactService:
                                     and local_revision.remote_status == ArtifactRemoteStatus.SCANNED
                                 ):
                                     remote_status = ArtifactRemoteStatus.AVAILABLE
-                                elif local_revision.remote_status is not None:
-                                    # Preserve existing remote_status for tracked revisions
-                                    remote_status = local_revision.remote_status
                             except ArtifactRevisionNotFoundError:
                                 # New artifact revision - no remote_status to track
                                 pass
@@ -453,9 +450,6 @@ class ArtifactService:
                                     and local_revision.remote_status == ArtifactRemoteStatus.SCANNED
                                 ):
                                     remote_status = ArtifactRemoteStatus.AVAILABLE
-                                elif local_revision.remote_status is not None:
-                                    # Preserve existing remote_status for tracked revisions
-                                    remote_status = local_revision.remote_status
                             except ArtifactRevisionNotFoundError:
                                 # New artifact revision - no remote_status to track
                                 pass

@@ -93,6 +93,7 @@ class ArtifactRevisionRow(Base):
             f"readme={self.readme[:15]}, "  # truncate for display
             f"size={self.size}, "
             f"status={self.status}, "
+            f"remote_status={self.remote_status}, "
             f"created_at={self.created_at.isoformat()}, "
             f"updated_at={self.updated_at.isoformat()})"
         )
@@ -122,6 +123,7 @@ class ArtifactRevisionRow(Base):
             readme=model_data.readme,
             size=model_data.size,
             status=ArtifactStatus.SCANNED.value,
+            remote_status=None,
             created_at=model_data.created_at,
             updated_at=model_data.modified_at,
         )

@@ -426,6 +426,7 @@ class ArtifactRepository:
                     # Update existing revision only if there are changes
                     has_changes = (
                         existing_revision.readme != revision_data.readme
+                        or existing_revision.remote_status != revision_data.remote_status
                         or existing_revision.size != revision_data.size
                         or existing_revision.created_at != revision_data.created_at
                         or existing_revision.updated_at != revision_data.updated_at
