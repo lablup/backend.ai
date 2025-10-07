@@ -3,6 +3,8 @@ import uuid
 from typing import Callable
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.storage.registries.types import ModelTarget
+from ai.backend.common.dto.storage.request import ReservoirImportModelsReq
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
     DoPullReservoirRegistryEvent,
     DoScanReservoirRegistryEvent,
@@ -27,6 +29,7 @@ from ai.backend.manager.repositories.reservoir_registry.repository import (
 )
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.processors import Processors
+from ai.backend.manager.types import PaginationOptions
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -114,7 +117,6 @@ class ArtifactRegistryEventHandler:
                     ArtifactStatusFilter,
                     ArtifactStatusFilterType,
                 )
-                from ai.backend.manager.types import PaginationOptions
 
                 # Query for artifact revisions that need to be pulled
                 revision_filters = ArtifactRevisionFilterOptions(
@@ -136,7 +138,6 @@ class ArtifactRegistryEventHandler:
                 )
 
                 if not revisions_to_pull:
-                    print("abc")
                     continue
 
                 log.info(
@@ -167,10 +168,6 @@ class ArtifactRegistryEventHandler:
                 # Call /import API on storage proxy for artifacts that need pulling
                 for artifact_data in artifacts_to_pull.values():
                     try:
-                        # Call the import API endpoint
-                        from ai.backend.common.data.storage.registries.types import ModelTarget
-                        from ai.backend.common.dto.storage.request import ReservoirImportModelsReq
-
                         # ArtifactDataWithRevisions provides direct access to artifact and revisions
                         # Create models list from artifact revisions
                         models: list[ModelTarget] = []

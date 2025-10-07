@@ -192,7 +192,7 @@ type ArtifactRevisionEdge {
 input ArtifactRevisionFilter {
   status: ArtifactRevisionStatusFilter = null
 
-  """Added in 25.15.0"""
+  """Added in 25.16.0"""
   remoteStatus: ArtifactRevisionRemoteStatusFilter = null
   version: StringFilter = null
   artifactId: ID = null
@@ -222,7 +222,7 @@ enum ArtifactRevisionOrderField {
   STATUS
 }
 
-"""Added in 25.15.0"""
+"""Added in 25.16.0"""
 input ArtifactRevisionRemoteStatusFilter {
   in: [ArtifactRemoteStatus!] = null
   equals: ArtifactRemoteStatus = null

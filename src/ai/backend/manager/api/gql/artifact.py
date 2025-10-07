@@ -125,7 +125,7 @@ class ArtifactRevisionStatusFilter:
     equals: Optional[ArtifactStatus] = None
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class ArtifactRevisionRemoteStatusFilter:
     in_: Optional[list[ArtifactRemoteStatus]] = strawberry.field(name="in", default=None)
     equals: Optional[ArtifactRemoteStatus] = None
@@ -135,7 +135,7 @@ class ArtifactRevisionRemoteStatusFilter:
 class ArtifactRevisionFilter:
     status: Optional[ArtifactRevisionStatusFilter] = None
     remote_status: Optional[ArtifactRevisionRemoteStatusFilter] = strawberry.field(
-        default=None, description="Added in 25.15.0"
+        default=None, description="Added in 25.16.0"
     )
     version: Optional[StringFilter] = None
     artifact_id: Optional[ID] = None

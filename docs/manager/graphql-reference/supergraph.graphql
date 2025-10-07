@@ -415,7 +415,7 @@ input ArtifactRevisionFilter
 {
   status: ArtifactRevisionStatusFilter = null
 
-  """Added in 25.15.0"""
+  """Added in 25.16.0"""
   remoteStatus: ArtifactRevisionRemoteStatusFilter = null
   version: StringFilter = null
   artifactId: ID = null
@@ -451,7 +451,7 @@ enum ArtifactRevisionOrderField
   STATUS @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 25.15.0"""
+"""Added in 25.16.0"""
 input ArtifactRevisionRemoteStatusFilter
   @join__type(graph: STRAWBERRY)
 {
