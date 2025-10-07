@@ -365,8 +365,10 @@ Used to specify which artifact revisions should be imported from the remote regi
 into the local reservoir registry storage.
 """
 input DelegateImportArtifactsInput {
-  """List of artifact revision IDs of delegatee artifact registry"""
   artifactRevisionIds: [ID!]!
+  delegatorReservoirId: ID = null
+  artifactType: ArtifactType = null
+  delegateeTarget: DelegateeTarget = null
 }
 
 """

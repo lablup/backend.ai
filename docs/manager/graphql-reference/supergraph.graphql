@@ -1541,8 +1541,10 @@ into the local reservoir registry storage.
 input DelegateImportArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
-  """List of artifact revision IDs of delegatee artifact registry"""
   artifactRevisionIds: [ID!]!
+  delegatorReservoirId: ID = null
+  artifactType: ArtifactType = null
+  delegateeTarget: DelegateeTarget = null
 }
 
 """
