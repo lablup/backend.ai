@@ -101,6 +101,15 @@ class RejectArtifactRevisionReq(BaseRequestModel):
     artifact_revision_id: uuid.UUID = Field(description="The artifact revision ID to reject.")
 
 
+class DelegateImportArtifactsReq(BaseRequestModel):
+    artifact_revision_ids: list[uuid.UUID] = Field()
+    delegator_reservoir_id: Optional[uuid.UUID] = Field(default=None, description="")
+    delegatee_target: Optional[DelegateeTarget] = Field(
+        default=None,
+    )
+    artifact_type: Optional[ArtifactType]
+
+
 class ImportArtifactsReq(BaseRequestModel):
     artifact_revision_ids: list[uuid.UUID] = Field(
         description="List of artifact revision IDs to import."

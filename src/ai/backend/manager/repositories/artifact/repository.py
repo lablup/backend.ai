@@ -22,6 +22,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
     ArtifactDataWithRevisions,
+    ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactStatus,
     ArtifactType,
@@ -717,6 +718,19 @@ class ArtifactRepository:
                 sa.update(ArtifactRevisionRow)
                 .where(ArtifactRevisionRow.id == artifact_revision_id)
                 .values(status=status)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    @artifact_repository_resilience.apply()
+    async def update_artifact_revision_remote_status(
+        self, artifact_revision_id: uuid.UUID, remote_status: ArtifactRemoteStatus
+    ) -> uuid.UUID:
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(remote_status=remote_status)
             )
             await db_sess.execute(stmt)
             return artifact_revision_id

@@ -100,3 +100,47 @@ class ModelMetadataFetchDoneEvent(BaseArtifactEvent):
     @override
     def user_event(self) -> Optional[UserEvent]:
         return None
+
+
+@dataclass
+class RemoteArtifactImportDoneEvent(BaseArtifactEvent):
+    artifact_revision_id: str
+    artifact_name: str
+    revision: str
+    registry_type: ArtifactRegistryType
+    registry_name: str
+    import_success: bool
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "remote_artifact_import_done"
+
+    def serialize(self) -> tuple:
+        return (
+            self.artifact_revision_id,
+            self.artifact_name,
+            self.revision,
+            self.registry_type,
+            self.registry_name,
+            self.import_success,
+        )
+
+    @classmethod
+    def deserialize(cls, value: tuple):
+        return cls(
+            artifact_revision_id=value[0],
+            artifact_name=value[1],
+            revision=value[2],
+            registry_type=value[3],
+            registry_name=value[4],
+            import_success=value[5],
+        )
+
+    @override
+    def domain_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def user_event(self) -> Optional[UserEvent]:
+        return None

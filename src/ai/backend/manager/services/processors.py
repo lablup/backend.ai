@@ -259,6 +259,7 @@ class Services:
         )
         artifact_revision_service = ArtifactRevisionService(
             artifact_repository=repositories.artifact.repository,
+            artifact_registry_repository=repositories.artifact_registry.repository,
             storage_manager=args.storage_manager,
             object_storage_repository=repositories.object_storage.repository,
             huggingface_registry_repository=repositories.huggingface_registry.repository,
