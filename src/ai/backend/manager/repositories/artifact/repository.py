@@ -172,6 +172,18 @@ class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOpti
             elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
                 conditions.append(ArtifactRevisionRow.status == status_values[0])
 
+        if filters.remote_status_filter is not None:
+            # Handle different remote status filter types
+            from ai.backend.manager.repositories.artifact.types import (
+                ArtifactRemoteStatusFilterType,
+            )
+
+            remote_status_values = [status.value for status in filters.remote_status_filter.values]
+            if filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.IN:
+                conditions.append(ArtifactRevisionRow.remote_status.in_(remote_status_values))
+            elif filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.EQUALS:
+                conditions.append(ArtifactRevisionRow.remote_status == remote_status_values[0])
+
         # Handle StringFilter-based version filter
         if filters.version_filter is not None:
             version_condition = filters.version_filter.apply_to_column(ArtifactRevisionRow.version)
@@ -1011,6 +1023,22 @@ class ArtifactRepository:
                     count_stmt = count_stmt.where(ArtifactRevisionRow.status.in_(status_values))
                 elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
                     count_stmt = count_stmt.where(ArtifactRevisionRow.status == status_values[0])
+            if filters.remote_status_filter is not None:
+                from ai.backend.manager.repositories.artifact.types import (
+                    ArtifactRemoteStatusFilterType,
+                )
+
+                remote_status_values = [
+                    status.value for status in filters.remote_status_filter.values
+                ]
+                if filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.IN:
+                    count_stmt = count_stmt.where(
+                        ArtifactRevisionRow.remote_status.in_(remote_status_values)
+                    )
+                elif filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.EQUALS:
+                    count_stmt = count_stmt.where(
+                        ArtifactRevisionRow.remote_status == remote_status_values[0]
+                    )
             if filters.version_filter is not None:
                 version_condition = filters.version_filter.apply_to_column(
                     ArtifactRevisionRow.version

@@ -1,8 +1,10 @@
 import logging
+import uuid
 from typing import Callable
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
+    DoPullReservoirRegistryEvent,
     DoScanReservoirRegistryEvent,
 )
 from ai.backend.common.types import (
@@ -10,6 +12,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.artifact.types import (
+    ArtifactDataWithRevisions,
+    ArtifactRemoteStatus,
+    ArtifactStatus,
+)
 from ai.backend.manager.errors.artifact_registry import ReservoirConnectionError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
@@ -30,6 +38,7 @@ class ArtifactRegistryEventHandler:
     _reservoir_registry_repository: ReservoirRegistryRepository
     _object_storage_repository: ObjectStorageRepository
     _storage_manager: StorageSessionManager
+    _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
@@ -39,6 +48,7 @@ class ArtifactRegistryEventHandler:
         reservoir_registry_repository: ReservoirRegistryRepository,
         object_storage_repository: ObjectStorageRepository,
         storage_manager: StorageSessionManager,
+        config_provider: ManagerConfigProvider,
     ) -> None:
         self._processors_factory = processors_factory
         self._artifact_repository = artifact_repository
@@ -46,6 +56,7 @@ class ArtifactRegistryEventHandler:
         self._reservoir_registry_repository = reservoir_registry_repository
         self._object_storage_repository = object_storage_repository
         self._storage_manager = storage_manager
+        self._config_provider = config_provider
 
     async def handle_artifact_registry_scan(
         self, context: None, source: AgentId, event: DoScanReservoirRegistryEvent
@@ -73,4 +84,133 @@ class ArtifactRegistryEventHandler:
                 log.warning(
                     "Failed to scan reservoir registry: {}.",
                     registry.registry_id,
+                )
+
+    async def handle_artifact_registry_pull(
+        self, context: None, source: AgentId, event: DoPullReservoirRegistryEvent
+    ) -> None:
+        """
+        Handle periodic pulling of artifacts from remote reservoir storage to local storage.
+        """
+
+        reservoir_config = self._config_provider.config.reservoir
+        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
+        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+
+        # Get all reservoir registries
+        registries = await self._artifact_registry_repository.list_artifact_registry_data()
+
+        for registry in registries:
+            if registry.type != ArtifactRegistryType.RESERVOIR:
+                continue
+
+            try:
+                # Find artifacts with status=SCANNED and remote_status=AVAILABLE
+                # These are artifacts that have been imported in remote reservoir but not yet downloaded locally
+                from ai.backend.manager.repositories.artifact.types import (
+                    ArtifactRemoteStatusFilter,
+                    ArtifactRemoteStatusFilterType,
+                    ArtifactRevisionFilterOptions,
+                    ArtifactStatusFilter,
+                    ArtifactStatusFilterType,
+                )
+                from ai.backend.manager.types import PaginationOptions
+
+                # Query for artifact revisions that need to be pulled
+                revision_filters = ArtifactRevisionFilterOptions(
+                    status_filter=ArtifactStatusFilter(
+                        type=ArtifactStatusFilterType.EQUALS, values=[ArtifactStatus.SCANNED]
+                    ),
+                    remote_status_filter=ArtifactRemoteStatusFilter(
+                        type=ArtifactRemoteStatusFilterType.EQUALS,
+                        values=[ArtifactRemoteStatus.AVAILABLE],
+                    ),
+                )
+
+                (
+                    revisions_to_pull,
+                    _,
+                ) = await self._artifact_repository.list_artifact_revisions_paginated(
+                    pagination=PaginationOptions(),
+                    filters=revision_filters,
+                )
+
+                if not revisions_to_pull:
+                    print("abc")
+                    continue
+
+                log.info(
+                    "Found {} artifact revisions to pull from reservoir registry: {}",
+                    len(revisions_to_pull),
+                    registry.registry_id,
+                )
+
+                # Get the reservoir registry data to get the correct registry name
+                reservoir_registry_data = (
+                    await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
+                        registry.registry_id
+                    )
+                )
+
+                # Group revisions by artifact to batch import
+                artifacts_to_pull: dict[uuid.UUID, ArtifactDataWithRevisions] = {}
+                for revision in revisions_to_pull:
+                    artifact = await self._artifact_repository.get_artifact_by_id(
+                        revision.artifact_id
+                    )
+                    if artifact.id not in artifacts_to_pull:
+                        artifacts_to_pull[artifact.id] = ArtifactDataWithRevisions.from_dataclasses(
+                            artifact_data=artifact, revisions=[]
+                        )
+                    artifacts_to_pull[artifact.id].revisions.append(revision)
+
+                # Call /import API on storage proxy for artifacts that need pulling
+                for artifact_data in artifacts_to_pull.values():
+                    try:
+                        # Call the import API endpoint
+                        from ai.backend.common.data.storage.registries.types import ModelTarget
+                        from ai.backend.common.dto.storage.request import ReservoirImportModelsReq
+
+                        # ArtifactDataWithRevisions provides direct access to artifact and revisions
+                        # Create models list from artifact revisions
+                        models: list[ModelTarget] = []
+                        for revision in artifact_data.revisions:
+                            models.append(
+                                ModelTarget(
+                                    model_id=artifact_data.name,
+                                    revision=revision.version,
+                                )
+                            )
+
+                        import_req = ReservoirImportModelsReq(
+                            models=models,
+                            registry_name=reservoir_registry_data.name,
+                            storage_name=reservoir_config.storage_name,
+                        )
+
+                        # Call storage proxy import API
+                        import_response = await storage_proxy_client.import_reservoir_models(
+                            import_req
+                        )
+
+                        log.info(
+                            "Triggered import for artifact {} with {} revisions (task_id: {})",
+                            artifact_data.name,
+                            len(models),
+                            import_response.task_id,
+                        )
+
+                    except Exception as e:
+                        log.error(
+                            "Failed to trigger import for artifact {} with revisions {}: {}",
+                            artifact_data.name,
+                            [rev.version for rev in artifact_data.revisions],
+                            e,
+                        )
+
+            except Exception as e:
+                log.error(
+                    "Failed to pull artifacts from reservoir registry {}: {}",
+                    registry.registry_id,
+                    e,
                 )
