@@ -1,5 +1,5 @@
 import uuid
-from typing import cast
+from typing import Optional, cast
 from uuid import UUID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
@@ -10,6 +10,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
 )
+from ai.backend.manager.client.artifact_registry.reservoir_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import (
@@ -17,14 +18,26 @@ from ai.backend.manager.config.unified import (
     ReservoirObjectStorageConfig,
     ReservoirVFSStorageConfig,
 )
-from ai.backend.manager.data.artifact.types import ArtifactRevisionReadme, ArtifactStatus
+from ai.backend.manager.data.artifact.types import (
+    ArtifactRemoteStatus,
+    ArtifactRevisionData,
+    ArtifactRevisionReadme,
+    ArtifactStatus,
+    ArtifactType,
+)
+from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
 )
-from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
+from ai.backend.manager.errors.artifact_registry import (
+    ArtifactRegistryBadImportRequestError,
+    InvalidArtifactRegistryTypeError,
+    RemoteReservoirImportError,
+)
 from ai.backend.manager.errors.storage import UnsupportedStorageTypeError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
+from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
@@ -47,6 +60,10 @@ from ai.backend.manager.services.artifact_revision.actions.cancel_import import 
 from ai.backend.manager.services.artifact_revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
     CleanupArtifactRevisionActionResult,
+)
+from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
+    DelegateImportArtifactRevisionBatchAction,
+    DelegateImportArtifactRevisionBatchActionResult,
 )
 from ai.backend.manager.services.artifact_revision.actions.disassociate_with_storage import (
     DisassociateWithStorageAction,
@@ -76,6 +93,7 @@ from ai.backend.manager.services.artifact_revision.actions.reject import (
 
 class ArtifactRevisionService:
     _artifact_repository: ArtifactRepository
+    _artifact_registry_repository: ArtifactRegistryRepository
     _object_storage_repository: ObjectStorageRepository
     _vfs_storage_repository: VFSStorageRepository
     _storage_namespace_repository: StorageNamespaceRepository
@@ -87,6 +105,7 @@ class ArtifactRevisionService:
     def __init__(
         self,
         artifact_repository: ArtifactRepository,
+        artifact_registry_repository: ArtifactRegistryRepository,
         object_storage_repository: ObjectStorageRepository,
         vfs_storage_repository: VFSStorageRepository,
         storage_namespace_repository: StorageNamespaceRepository,
@@ -96,6 +115,7 @@ class ArtifactRevisionService:
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._artifact_repository = artifact_repository
+        self._artifact_registry_repository = artifact_registry_repository
         self._object_storage_repository = object_storage_repository
         self._vfs_storage_repository = vfs_storage_repository
         self._storage_namespace_repository = storage_namespace_repository
@@ -363,3 +383,104 @@ class ArtifactRevisionService:
             revision_data.id
         )
         return CleanupArtifactRevisionActionResult(result=artifact_revision)
+
+    async def delegate_import_revision_batch(
+        self, action: DelegateImportArtifactRevisionBatchAction
+    ) -> DelegateImportArtifactRevisionBatchActionResult:
+        # If this is a leaf node, perform local import instead of delegation
+        if self._config_provider.config.reservoir.is_delegation_leaf:
+            registry_id = None
+            if action.delegatee_target:
+                registry_id = action.delegatee_target.target_registry_id
+
+            registry_meta = await self._resolve_artifact_registry_meta(
+                action.artifact_type, registry_id
+            )
+
+            try:
+                # TODO: Improve this
+                task_ids = []
+                result: list[ArtifactRevisionData] = []
+                for revision_id in action.artifact_revision_ids:
+                    import_result = await self.import_revision(
+                        ImportArtifactRevisionAction(artifact_revision_id=revision_id)
+                    )
+                    task_ids.append(import_result.task_id)
+                    result.append(import_result.result)
+            except Exception as e:
+                raise RemoteReservoirImportError(
+                    f"Failed to import artifacts from remote reservoir: {e}"
+                ) from e
+
+            return DelegateImportArtifactRevisionBatchActionResult(result=result, task_ids=task_ids)
+
+        # If not a leaf node, perform delegation to remote reservoir
+        registry_meta = await self._resolve_artifact_registry_meta(
+            action.artifact_type, action.delegator_reservoir_id
+        )
+        registry_type = registry_meta.type
+        registry_id = registry_meta.registry_id
+
+        if registry_type != ArtifactRegistryType.RESERVOIR:
+            raise ArtifactRegistryBadImportRequestError(
+                "Only Reservoir type registry is supported for delegated import"
+            )
+
+        registry_data = await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
+            registry_id
+        )
+
+        # Update remote_status to SCANNED for all revisions before delegation
+        result_revisions: list[ArtifactRevisionData] = []
+        for revision_id in action.artifact_revision_ids:
+            await self._artifact_repository.update_artifact_revision_remote_status(
+                revision_id, ArtifactRemoteStatus.SCANNED
+            )
+            revision_data = await self._artifact_repository.get_artifact_revision_by_id(revision_id)
+            result_revisions.append(revision_data)
+
+        # Delegate import to remote reservoir
+        from ai.backend.manager.dto.request import DelegateImportArtifactsReq
+
+        # Pass delegatee_reservoir_id to delegator_reservoir_id for the remote call
+        delegatee_reservoir_id = (
+            action.delegatee_target.delegatee_reservoir_id if action.delegatee_target else None
+        )
+        req = DelegateImportArtifactsReq(
+            artifact_revision_ids=action.artifact_revision_ids,
+            delegator_reservoir_id=delegatee_reservoir_id,
+            delegatee_target=action.delegatee_target,
+            artifact_type=action.artifact_type,
+        )
+
+        remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
+        client_resp = await remote_reservoir_client.delegate_import_artifacts(req)
+
+        if client_resp is None:
+            raise RemoteReservoirImportError("Failed to connect to remote reservoir")
+
+        # Extract task_ids from remote response
+        task_ids = [uuid.UUID(task.task_id) for task in client_resp.tasks]
+
+        return DelegateImportArtifactRevisionBatchActionResult(
+            result=result_revisions, task_ids=task_ids
+        )
+
+    async def _resolve_artifact_registry_meta(
+        self, artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
+    ) -> ArtifactRegistryData:
+        if registry_id_or_none is None:
+            # TODO: Handle `artifact_type` for other types
+            registry_name = self._config_provider.config.artifact_registry.model_registry
+            registry_meta = (
+                await self._artifact_registry_repository.get_artifact_registry_data_by_name(
+                    registry_name
+                )
+            )
+        else:
+            registry_id = registry_id_or_none
+            registry_meta = await self._artifact_registry_repository.get_artifact_registry_data(
+                registry_id
+            )
+
+        return registry_meta

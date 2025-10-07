@@ -5,13 +5,14 @@ from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.event_types.artifact.anycast import (
     ModelImportDoneEvent,
     ModelMetadataFetchDoneEvent,
+    RemoteArtifactImportDoneEvent,
 )
 from ai.backend.common.types import (
     AgentId,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.artifact.types import ArtifactStatus
+from ai.backend.manager.data.artifact.types import ArtifactRemoteStatus, ArtifactStatus
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
@@ -153,4 +154,50 @@ class ArtifactEventHandler:
                 "Failed to process metadata update for model: {} - {}",
                 model_info.model_id,
                 model_error,
+            )
+
+    async def handle_remote_artifact_import_done(
+        self,
+        context: None,
+        source: AgentId,
+        event: RemoteArtifactImportDoneEvent,
+    ) -> None:
+        import uuid
+
+        try:
+            revision_id = uuid.UUID(event.artifact_revision_id)
+        except ValueError as e:
+            log.error(
+                "Invalid artifact revision ID in remote import event: {} - {}",
+                event.artifact_revision_id,
+                e,
+            )
+            return
+
+        try:
+            # Update remote_status based on import success
+            remote_status = (
+                ArtifactRemoteStatus.AVAILABLE
+                if event.import_success
+                else ArtifactRemoteStatus.SCANNED
+            )
+
+            await self._artifact_repository.update_artifact_revision_remote_status(
+                revision_id, remote_status
+            )
+
+            log.info(
+                "Updated remote_status for artifact revision {} to {} (artifact: {}, revision: {}, success: {})",
+                revision_id,
+                remote_status,
+                event.artifact_name,
+                event.revision,
+                event.import_success,
+            )
+        except Exception as e:
+            log.error(
+                "Failed to update remote_status for artifact revision {}: {} - {}",
+                revision_id,
+                event.artifact_name,
+                e,
             )

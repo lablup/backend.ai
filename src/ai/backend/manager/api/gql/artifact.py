@@ -35,7 +35,6 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.artifact.types import DelegateeTarget as DelegateeTargetData
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
-from ai.backend.manager.errors.api import NotImplementedAPI
 from ai.backend.manager.errors.artifact import ArtifactScanLimitExceededError
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
@@ -59,6 +58,9 @@ from ai.backend.manager.services.artifact_revision.actions.approve import (
 from ai.backend.manager.services.artifact_revision.actions.cancel_import import CancelImportAction
 from ai.backend.manager.services.artifact_revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
+    DelegateImportArtifactRevisionBatchAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
@@ -233,9 +235,10 @@ class DelegateScanArtifactsInput:
 """)
 )
 class DelegateImportArtifactsInput:
-    artifact_revision_ids: list[ID] = strawberry.field(
-        description="List of artifact revision IDs of delegatee artifact registry"
-    )
+    artifact_revision_ids: list[ID]
+    delegator_reservoir_id: Optional[ID] = strawberry.field(default=None)
+    artifact_type: Optional[ArtifactType] = strawberry.field(default=None)
+    delegatee_target: Optional[DelegateeTarget] = strawberry.field(default=None)
 
 
 @strawberry.input(description="Added in 25.14.0")
@@ -1010,7 +1013,55 @@ async def delegate_scan_artifacts(
 async def delegate_import_artifacts(
     input: DelegateImportArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DelegateImportArtifactsPayload:
-    raise NotImplementedAPI("This mutation is not implemented yet.")
+    imported_artifacts = []
+    tasks = []
+
+    action_result = await info.context.processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
+        DelegateImportArtifactRevisionBatchAction(
+            delegator_reservoir_id=uuid.UUID(input.delegator_reservoir_id)
+            if input.delegator_reservoir_id
+            else None,
+            delegatee_target=input.delegatee_target.to_dataclass()
+            if input.delegatee_target
+            else None,
+            artifact_type=input.artifact_type,
+            artifact_revision_ids=[
+                uuid.UUID(revision_id) for revision_id in input.artifact_revision_ids
+            ],
+        )
+    )
+    artifact_revisions = [
+        ArtifactRevision.from_dataclass(result) for result in action_result.result
+    ]
+    imported_artifacts.extend(artifact_revisions)
+
+    for i, artifact_revision in enumerate(artifact_revisions):
+        tasks.append(
+            ArtifactRevisionImportTask(
+                task_id=ID(str(action_result.task_ids[i]))
+                if i < len(action_result.task_ids)
+                else ID(""),
+                artifact_revision=artifact_revision,
+            )
+        )
+
+    edges = [
+        ArtifactRevisionEdge(node=artifact, cursor=to_global_id(ArtifactRevisionEdge, artifact.id))
+        for artifact in imported_artifacts
+    ]
+
+    artifacts_connection = ArtifactRevisionConnection(
+        count=len(imported_artifacts),
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+    )
+
+    return DelegateImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
 
 
 @strawberry.mutation(description="Added in 25.14.0")

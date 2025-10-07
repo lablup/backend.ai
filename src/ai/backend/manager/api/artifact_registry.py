@@ -9,6 +9,7 @@ from aiohttp import web
 
 from ai.backend.common.api_handlers import (
     APIResponse,
+    BaseResponseModel,
     BodyParam,
     PathParam,
     QueryParam,
@@ -21,6 +22,7 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.request import (
+    DelegateImportArtifactsReq,
     DelegateScanArtifactsReq,
     ScanArtifactModelPathParam,
     ScanArtifactModelQueryParam,
@@ -29,6 +31,7 @@ from ai.backend.manager.dto.request import (
     SearchArtifactsReq,
 )
 from ai.backend.manager.dto.response import (
+    DelegateImportArtifactsResponse,
     DelegateScanArtifactsResponse,
     RetreiveArtifactModelResponse,
     ScanArtifactModelsResponse,
@@ -44,11 +47,18 @@ from ai.backend.manager.services.artifact.actions.retrieve_model_multi import (
     RetrieveModelsAction,
 )
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
+from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
+    DelegateImportArtifactRevisionBatchAction,
+)
 
 from .auth import auth_required_for_method
 from .types import CORSOptions, WebMiddleware
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class ErrorResponse(BaseResponseModel):
+    error: str
 
 
 class APIHandler:
@@ -109,6 +119,59 @@ class APIHandler:
             readme_data=action_result.readme_data,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def delegate_import_artifacts(
+        self,
+        body: BodyParam[DelegateImportArtifactsReq],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
+        from ai.backend.manager.dto.response import ArtifactRevisionImportTask
+
+        # Validate request
+        if not body.parsed.artifact_revision_ids:
+            return APIResponse.build(
+                status_code=HTTPStatus.BAD_REQUEST,
+                response_model=ErrorResponse(error="artifact_revision_ids cannot be empty"),
+            )
+
+        processors = processors_ctx.processors
+        try:
+            action_result = (
+                await processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
+                    DelegateImportArtifactRevisionBatchAction(
+                        delegator_reservoir_id=body.parsed.delegator_reservoir_id,
+                        artifact_type=body.parsed.artifact_type,
+                        delegatee_target=body.parsed.delegatee_target
+                        if body.parsed.delegatee_target
+                        else None,
+                        artifact_revision_ids=body.parsed.artifact_revision_ids,
+                    )
+                )
+            )
+
+            # Convert to ArtifactRevisionImportTask format
+            tasks = []
+            for i, revision in enumerate(action_result.result):
+                task_id = action_result.task_ids[i] if i < len(action_result.task_ids) else None
+                tasks.append(
+                    ArtifactRevisionImportTask(
+                        task_id=str(task_id) if task_id else "",
+                        artifact_revision=ArtifactRevisionResponseData.from_revision_data(revision),
+                    )
+                )
+
+            resp = DelegateImportArtifactsResponse(tasks=tasks)
+            return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+        except Exception as e:
+            log.error("Failed to delegate import artifacts: {}", e)
+            return APIResponse.build(
+                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+                response_model=ErrorResponse(error=f"Failed to delegate import: {str(e)}"),
+            )
 
     @auth_required_for_method
     @api_handler
@@ -193,6 +256,9 @@ def create_app(
     api_handler = APIHandler()
     cors.add(app.router.add_route("POST", "/scan", api_handler.scan_artifacts))
     cors.add(app.router.add_route("POST", "/delegation/scan", api_handler.delegate_scan_artifacts))
+    cors.add(
+        app.router.add_route("POST", "/delegation/import", api_handler.delegate_import_artifacts)
+    )
     cors.add(app.router.add_route("POST", "/search", api_handler.search_artifacts))
 
     cors.add(app.router.add_route("GET", "/model/{model_id}", api_handler.scan_single_model))
