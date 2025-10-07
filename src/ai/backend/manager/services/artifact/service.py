@@ -251,16 +251,8 @@ class ArtifactService:
                             remote_status = None
                             try:
                                 # Try to get existing local revision to check current remote_status
-                                local_revision = (
-                                    await self._artifact_repository.get_artifact_revision(
-                                        response_revision.artifact_id, response_revision.version
-                                    )
-                                )
                                 # If remote artifact is AVAILABLE and we were tracking it, update remote_status
-                                if (
-                                    response_revision.status == ArtifactStatus.AVAILABLE
-                                    and local_revision.remote_status == ArtifactRemoteStatus.SCANNED
-                                ):
+                                if response_revision.status == ArtifactStatus.AVAILABLE:
                                     remote_status = ArtifactRemoteStatus.AVAILABLE
                             except ArtifactRevisionNotFoundError:
                                 # New artifact revision - no remote_status to track
@@ -438,17 +430,8 @@ class ArtifactService:
                             # This allows delegate_import operations to be tracked properly
                             remote_status = None
                             try:
-                                # Try to get existing local revision to check current remote_status
-                                local_revision = (
-                                    await self._artifact_repository.get_artifact_revision(
-                                        response_revision.artifact_id, response_revision.version
-                                    )
-                                )
                                 # If remote artifact is AVAILABLE and we were tracking it, update remote_status
-                                if (
-                                    response_revision.status == ArtifactStatus.AVAILABLE
-                                    and local_revision.remote_status == ArtifactRemoteStatus.SCANNED
-                                ):
+                                if response_revision.status == ArtifactStatus.AVAILABLE:
                                     remote_status = ArtifactRemoteStatus.AVAILABLE
                             except ArtifactRevisionNotFoundError:
                                 # New artifact revision - no remote_status to track
