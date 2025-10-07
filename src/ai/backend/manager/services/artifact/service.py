@@ -35,6 +35,7 @@ from ai.backend.manager.dto.response import (
     DelegateScanArtifactsResponse,
     SearchArtifactsResponse,
 )
+from ai.backend.manager.errors.artifact import ArtifactRevisionNotFoundError
 from ai.backend.manager.errors.artifact_registry import (
     ArtifactRegistryBadScanRequestError,
     RemoteReservoirScanError,
@@ -245,6 +246,29 @@ class ArtifactService:
                                 )
                                 readme = None
 
+                            # Determine remote_status based on remote artifact status
+                            # This allows delegate_import operations to be tracked properly
+                            remote_status = None
+                            try:
+                                # Try to get existing local revision to check current remote_status
+                                local_revision = (
+                                    await self._artifact_repository.get_artifact_revision(
+                                        response_revision.artifact_id, response_revision.version
+                                    )
+                                )
+                                # If remote artifact is AVAILABLE and we were tracking it, update remote_status
+                                if (
+                                    response_revision.status == ArtifactStatus.AVAILABLE
+                                    and local_revision.remote_status == ArtifactRemoteStatus.SCANNED
+                                ):
+                                    remote_status = ArtifactRemoteStatus.AVAILABLE
+                                elif local_revision.remote_status is not None:
+                                    # Preserve existing remote_status for tracked revisions
+                                    remote_status = local_revision.remote_status
+                            except ArtifactRevisionNotFoundError:
+                                # New artifact revision - no remote_status to track
+                                pass
+
                             # Create full revision data with readme
                             full_revision = ArtifactRevisionData(
                                 id=response_revision.id,
@@ -253,7 +277,7 @@ class ArtifactService:
                                 readme=readme,
                                 size=response_revision.size,
                                 status=response_revision.status,
-                                remote_status=None,
+                                remote_status=remote_status,
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
                             )
@@ -413,6 +437,29 @@ class ArtifactService:
                                 )
                                 readme = None
 
+                            # Determine remote_status based on remote artifact status
+                            # This allows delegate_import operations to be tracked properly
+                            remote_status = None
+                            try:
+                                # Try to get existing local revision to check current remote_status
+                                local_revision = (
+                                    await self._artifact_repository.get_artifact_revision(
+                                        response_revision.artifact_id, response_revision.version
+                                    )
+                                )
+                                # If remote artifact is AVAILABLE and we were tracking it, update remote_status
+                                if (
+                                    response_revision.status == ArtifactStatus.AVAILABLE
+                                    and local_revision.remote_status == ArtifactRemoteStatus.SCANNED
+                                ):
+                                    remote_status = ArtifactRemoteStatus.AVAILABLE
+                                elif local_revision.remote_status is not None:
+                                    # Preserve existing remote_status for tracked revisions
+                                    remote_status = local_revision.remote_status
+                            except ArtifactRevisionNotFoundError:
+                                # New artifact revision - no remote_status to track
+                                pass
+
                             # Create full revision data with readme
                             full_revision = ArtifactRevisionData(
                                 id=response_revision.id,
@@ -421,7 +468,7 @@ class ArtifactService:
                                 readme=readme,
                                 size=response_revision.size,
                                 status=response_revision.status,
-                                remote_status=None,
+                                remote_status=remote_status,
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
                             )
