@@ -1812,6 +1812,29 @@ class ReservoirConfig(BaseConfigSchema):
         Configuration for the storage.
         """,
     )
+    storage_step_selection: dict[ArtifactStorageImportStep, str] = Field(
+        description="""
+        Storage step selection configuration for artifact model imports.
+        Maps different import steps (download, archive) to specific storage backends.
+        Required for artifact model import operations.
+        """,
+        validation_alias=AliasChoices("storage_step_selection", "storage-step-selection"),
+        serialization_alias="storage-step-selection",
+    )
+
+    @field_validator("storage_step_selection")
+    @classmethod
+    def _validate_required_steps(
+        cls, v: dict[ArtifactStorageImportStep, str]
+    ) -> dict[ArtifactStorageImportStep, str]:
+        required_steps = {ArtifactStorageImportStep.DOWNLOAD, ArtifactStorageImportStep.ARCHIVE}
+        missing_steps = required_steps - set(v.keys())
+        if missing_steps:
+            missing_step_names = [step.value for step in missing_steps]
+            raise ValueError(
+                f"storage_mappings must contain at least 'download' and 'archive' steps. Missing: {missing_step_names}"
+            )
+        return v
 
 
 class ModelRegistryConfig(BaseConfigSchema):
@@ -1825,24 +1848,6 @@ class ModelRegistryConfig(BaseConfigSchema):
         validation_alias=AliasChoices("model-registry", "model_registry"),
         serialization_alias="model-registry",
     )
-
-
-class StorageStepSelectionConfig(BaseConfigSchema):
-    storage_mappings: dict[ArtifactStorageImportStep, str]  # step_name -> storage_name
-
-    @field_validator("storage_mappings")
-    @classmethod
-    def _validate_required_steps(
-        cls, v: dict[ArtifactStorageImportStep, str]
-    ) -> dict[ArtifactStorageImportStep, str]:
-        required_steps = {ArtifactStorageImportStep.DOWNLOAD, ArtifactStorageImportStep.ARCHIVE}
-        missing_steps = required_steps - set(v.keys())
-        if missing_steps:
-            missing_step_names = [step.value for step in missing_steps]
-            raise ValueError(
-                f"storage_mappings must contain at least 'download' and 'archive' steps. Missing: {missing_step_names}"
-            )
-        return v
 
 
 class ManagerUnifiedConfig(BaseConfigSchema):
@@ -2032,15 +2037,6 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         description="""
         Reservoir configuration.
         """,
-    )
-    storage_step_selection: StorageStepSelectionConfig = Field(
-        description="""
-        Storage step selection configuration for artifact model imports.
-        Maps different import steps (download, archive) to specific storage backends.
-        Required for artifact model import operations.
-        """,
-        validation_alias=AliasChoices("storage_step_selection", "storage-step-selection"),
-        serialization_alias="storage-step-selection",
     )
 
     # TODO: Remove me after changing the method of loading the license server address in the plugins
