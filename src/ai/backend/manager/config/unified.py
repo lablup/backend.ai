@@ -192,6 +192,7 @@ from pydantic import (
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
+from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.typed_validators import (
@@ -1826,6 +1827,24 @@ class ModelRegistryConfig(BaseConfigSchema):
     )
 
 
+class StorageStepSelectionConfig(BaseConfigSchema):
+    storage_mappings: dict[ArtifactStorageImportStep, str]  # step_name -> storage_name
+
+    @field_validator("storage_mappings")
+    @classmethod
+    def _validate_required_steps(
+        cls, v: dict[ArtifactStorageImportStep, str]
+    ) -> dict[ArtifactStorageImportStep, str]:
+        required_steps = {ArtifactStorageImportStep.DOWNLOAD, ArtifactStorageImportStep.ARCHIVE}
+        missing_steps = required_steps - set(v.keys())
+        if missing_steps:
+            missing_step_names = [step.value for step in missing_steps]
+            raise ValueError(
+                f"storage_mappings must contain at least 'download' and 'archive' steps. Missing: {missing_step_names}"
+            )
+        return v
+
+
 class ManagerUnifiedConfig(BaseConfigSchema):
     # From legacy local config
     db: DatabaseConfig = Field(
@@ -2013,6 +2032,15 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         description="""
         Reservoir configuration.
         """,
+    )
+    storage_step_selection: StorageStepSelectionConfig = Field(
+        description="""
+        Storage step selection configuration for artifact model imports.
+        Maps different import steps (download, archive) to specific storage backends.
+        Required for artifact model import operations.
+        """,
+        validation_alias=AliasChoices("storage_step_selection", "storage-step-selection"),
+        serialization_alias="storage-step-selection",
     )
 
     # TODO: Remove me after changing the method of loading the license server address in the plugins

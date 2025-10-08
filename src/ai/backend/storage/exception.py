@@ -430,3 +430,42 @@ class ObjectStorageObjectDeletionError(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.HARD_DELETE,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class StorageTransferError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/storage/transfer/failed"
+    error_title = "Storage Transfer Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class StorageStepSelectionConfigNotFoundError(StorageTransferError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage/step-selection/config/not-found"
+    error_title = "Storage Step Selection Config Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class StorageStepMappingNotProvidedError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage/step-mapping-not-provided"
+    error_title = "Storage Step Mapping Not Provided"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

@@ -1,5 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
+from typing import Any
 
 from ai.backend.common.types import StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -19,4 +20,12 @@ class AbstractStorage(ABC):
 
     @abstractmethod
     async def stream_download(self, filepath: str) -> StreamReader:
+        raise NotImplementedAPI
+
+    @abstractmethod
+    async def delete_object(self, filepath: str) -> None:
+        raise NotImplementedAPI
+
+    @abstractmethod
+    async def get_object_info(self, filepath: str) -> Any:
         raise NotImplementedAPI

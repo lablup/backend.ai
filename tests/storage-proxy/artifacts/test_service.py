@@ -15,6 +15,9 @@ from ai.backend.common.data.storage.registries.types import (
     ModelSortKey,
     ModelTarget,
 )
+from ai.backend.common.data.storage.types import (
+    ArtifactStorageImportStep,
+)
 from ai.backend.storage.client.huggingface import HuggingFaceClient
 from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
@@ -208,7 +211,7 @@ def reservoir_service(
         background_task_manager=mock_background_task_manager,
         event_producer=MagicMock(),
         storage_pool=mock_storage_pool,
-        reservoir_registry_configs=[mock_reservoir_config],
+        reservoir_registry_configs={"test_registry": mock_reservoir_config},
     )
     return ReservoirService(args)
 
@@ -409,10 +412,20 @@ class TestHuggingFaceService:
             ModelTarget(model_id="microsoft/DialoGPT-medium"),
             ModelTarget(model_id="microsoft/DialoGPT-small"),
         ]
+        storage_step_mappings = {
+            ArtifactStorageImportStep.DOWNLOAD: "test_storage",
+            ArtifactStorageImportStep.ARCHIVE: "test_storage",
+        }
+        # Create mock pipeline
+        from ai.backend.storage.services.artifacts.types import ImportPipeline
+
+        mock_pipeline = MagicMock(spec=ImportPipeline)
+
         task_id = await hf_service.import_models_batch(
             registry_name="test_registry",
             models=models,
-            storage_name="test_storage",
+            storage_step_mappings=storage_step_mappings,
+            pipeline=mock_pipeline,
         )
 
         assert task_id == expected_task_id
@@ -525,11 +538,15 @@ class TestHuggingFaceService:
             mock_stream_instance = AsyncMock()
             mock_stream_class.return_value = mock_stream_instance
 
-            await hf_service._pipe_single_file_to_storage(
+            storage_step_mappings = {
+                ArtifactStorageImportStep.DOWNLOAD: "test_storage",
+                ArtifactStorageImportStep.ARCHIVE: "test_storage",
+            }
+            await hf_service._import_single_file_with_step_mappings(
                 file_info=mock_file_info,
                 model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
-                storage_name="test_storage",
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
+                storage_step_mappings=storage_step_mappings,
             )
 
             # Verify the stream reader was created with correct parameters
@@ -563,15 +580,19 @@ class TestHuggingFaceService:
             mock_stream_instance = AsyncMock()
             mock_stream_class.return_value = mock_stream_instance
 
+            storage_step_mappings = {
+                ArtifactStorageImportStep.DOWNLOAD: "test_storage",
+                ArtifactStorageImportStep.ARCHIVE: "test_storage",
+            }
             with pytest.raises(HuggingFaceAPIError):
-                await hf_service._pipe_single_file_to_storage(
+                await hf_service._import_single_file_with_step_mappings(
                     file_info=mock_file_info,
                     model=ModelTarget(
                         model_id="microsoft/DialoGPT-medium",
                         revision="main",
                     ),
-                    storage_name="test_storage",
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
+                    storage_step_mappings=storage_step_mappings,
                 )
 
     @pytest.mark.asyncio
@@ -589,12 +610,16 @@ class TestHuggingFaceService:
             service._background_task_manager = mock_background_task_manager
             service._storage_pool = None  # type: ignore
 
+        storage_step_mappings = {
+            ArtifactStorageImportStep.DOWNLOAD: "test_storage",
+            ArtifactStorageImportStep.ARCHIVE: "test_storage",
+        }
         with pytest.raises(ObjectStorageConfigInvalidError):
-            await service._pipe_single_file_to_storage(
+            await service._import_single_file_with_step_mappings(
                 file_info=mock_file_info,
                 model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
-                storage_name="test_storage",
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
+                storage_step_mappings=storage_step_mappings,
             )
 
     @pytest.mark.asyncio
@@ -615,12 +640,16 @@ class TestHuggingFaceService:
             mock_stream_instance = AsyncMock()
             mock_stream_class.return_value = mock_stream_instance
 
+            storage_step_mappings = {
+                ArtifactStorageImportStep.DOWNLOAD: "test_storage",
+                ArtifactStorageImportStep.ARCHIVE: "test_storage",
+            }
             with pytest.raises(HuggingFaceAPIError):
-                await hf_service._pipe_single_file_to_storage(
+                await hf_service._import_single_file_with_step_mappings(
                     file_info=mock_file_info,
                     model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
-                    storage_name="test_storage",
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
+                    storage_step_mappings=storage_step_mappings,
                 )
 
 
@@ -812,11 +841,21 @@ class TestReservoirService:
             mock_stream.return_value = 1000
             mock_event_producer.anycast_event = AsyncMock()
 
+            storage_step_mappings = {
+                ArtifactStorageImportStep.DOWNLOAD: "test_storage",
+                ArtifactStorageImportStep.ARCHIVE: "test_storage",
+            }
+            # Create mock pipeline
+            from ai.backend.storage.services.artifacts.types import ImportPipeline
+
+            mock_pipeline = MagicMock(spec=ImportPipeline)
+
             await reservoir_service.import_model(
                 registry_name="test_registry",
                 model=model_target,
-                storage_name="test_storage",
                 reporter=mock_progress_reporter,
+                storage_step_mappings=storage_step_mappings,
+                pipeline=mock_pipeline,
             )
 
             mock_stream.assert_called_once()
@@ -830,18 +869,29 @@ class TestReservoirService:
             background_task_manager=MagicMock(),
             event_producer=MagicMock(),
             storage_pool=MagicMock(spec=StoragePool),
-            reservoir_registry_configs=[],
+            reservoir_registry_configs={},
         )
         service = ReservoirService(args)
 
         model_target = ModelTarget(model_id="test/model", revision="main")
 
+        # Create mock pipeline
+        from ai.backend.storage.services.artifacts.types import ImportPipeline
+
+        mock_pipeline = MagicMock(spec=ImportPipeline)
+
+        storage_step_mappings = {
+            ArtifactStorageImportStep.DOWNLOAD: "test_storage",
+            ArtifactStorageImportStep.ARCHIVE: "test_storage",
+        }
+
         with pytest.raises(ReservoirStorageConfigInvalidError):
             await service.import_model(
                 registry_name="test_registry",
                 model=model_target,
-                storage_name="test_storage",
                 reporter=MagicMock(),
+                storage_step_mappings=storage_step_mappings,
+                pipeline=mock_pipeline,
             )
 
     @pytest.mark.asyncio
@@ -859,10 +909,20 @@ class TestReservoirService:
             ModelTarget(model_id="microsoft/DialoGPT-small", revision="main"),
         ]
 
+        storage_step_mappings = {
+            ArtifactStorageImportStep.DOWNLOAD: "test_storage",
+            ArtifactStorageImportStep.ARCHIVE: "test_storage",
+        }
+        # Create mock pipeline
+        from ai.backend.storage.services.artifacts.types import ImportPipeline
+
+        mock_pipeline = MagicMock(spec=ImportPipeline)
+
         task_id = await reservoir_service.import_models_batch(
             registry_name="test_registry",
             models=models,
-            storage_name="test_storage",
+            storage_step_mappings=storage_step_mappings,
+            pipeline=mock_pipeline,
         )
 
         assert task_id == expected_task_id
@@ -878,10 +938,20 @@ class TestReservoirService:
         expected_task_id = uuid.uuid4()
         mock_background_task_manager.start.return_value = expected_task_id
 
+        storage_step_mappings = {
+            ArtifactStorageImportStep.DOWNLOAD: "test_storage",
+            ArtifactStorageImportStep.ARCHIVE: "test_storage",
+        }
+        # Create mock pipeline
+        from ai.backend.storage.services.artifacts.types import ImportPipeline
+
+        mock_pipeline = MagicMock(spec=ImportPipeline)
+
         task_id = await reservoir_service.import_models_batch(
             registry_name="test_registry",
             models=[],
-            storage_name="test_storage",
+            storage_step_mappings=storage_step_mappings,
+            pipeline=mock_pipeline,
         )
 
         assert task_id == expected_task_id
