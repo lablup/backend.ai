@@ -5,16 +5,15 @@ from typing import Optional
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 
 
-def create_storage_step_mappings(
-    storage_step_mappings: Optional[dict[ArtifactStorageImportStep, str]],
-    fallback_storage_name: str,
+def get_storage_step_mappings(
+    storage_per_steps: Optional[dict[ArtifactStorageImportStep, str]],
+    fallback_storage: str,
 ) -> dict[ArtifactStorageImportStep, str]:
-    """Create storage step mappings, using fallback storage if not provided."""
-    if storage_step_mappings is not None:
-        return storage_step_mappings
+    if storage_per_steps is not None:
+        return storage_per_steps
     else:
         # Use storage_name as fallback for all steps
         return {
-            ArtifactStorageImportStep.DOWNLOAD: fallback_storage_name,
-            ArtifactStorageImportStep.ARCHIVE: fallback_storage_name,
+            ArtifactStorageImportStep.DOWNLOAD: fallback_storage,
+            ArtifactStorageImportStep.ARCHIVE: fallback_storage,
         }

@@ -27,7 +27,7 @@ from ai.backend.storage.services.artifacts.reservoir import ReservoirService, Re
 from ai.backend.storage.services.artifacts.types import create_reservoir_pipeline
 
 from ....utils import log_client_api_entry
-from ...utils import create_storage_step_mappings
+from ...utils import get_storage_step_mappings
 
 if TYPE_CHECKING:
     from ....context import RootContext
@@ -55,7 +55,7 @@ class ReservoirRegistryAPIHandler:
         await log_client_api_entry(log, "import_models", None)
 
         # Create storage step mappings with fallback to storage_name
-        storage_step_mappings = create_storage_step_mappings(
+        storage_step_mappings = get_storage_step_mappings(
             body.parsed.storage_step_mappings, body.parsed.storage_name
         )
 
