@@ -90,7 +90,7 @@ def create_app(ctx: RootContext) -> web.Application:
         if r.registry_type == ArtifactRegistryType.RESERVOIR and r.reservoir is not None
     }
 
-    # Legacy registries support - add from legacy registries for backward compatibility
+    # Legacy registry configs support - add from legacy registries for backward compatibility
     for legacy_registry in ctx.local_config.registries:
         if isinstance(legacy_registry.config, LegacyReservoirConfig):
             reservoir_registry_configs[legacy_registry.name] = legacy_registry.config

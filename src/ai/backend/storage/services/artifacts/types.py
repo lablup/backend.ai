@@ -9,8 +9,6 @@ from ai.backend.common.data.storage.registries.types import FileObjectData, Mode
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.storage.storages.storage_pool import StoragePool
 
-T = TypeVar("T")
-
 
 @dataclass
 class ImportStepContext:
@@ -33,7 +31,10 @@ class DownloadStepResult:
     total_bytes: int
 
 
-class ImportStep(abc.ABC, Generic[T]):
+InputType = TypeVar("InputType")
+
+
+class ImportStep(abc.ABC, Generic[InputType]):
     """Base class for import pipeline steps"""
 
     @property
@@ -43,7 +44,7 @@ class ImportStep(abc.ABC, Generic[T]):
         pass
 
     @abc.abstractmethod
-    async def execute(self, context: ImportStepContext, input_data: T) -> Any:
+    async def execute(self, context: ImportStepContext, input_data: InputType) -> Any:
         """Execute step and return data to pass to next step"""
         pass
 
