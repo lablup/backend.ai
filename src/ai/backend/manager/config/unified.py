@@ -210,6 +210,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
+from ai.backend.manager.errors.common import BadConfigurationError
 from ai.backend.manager.pglock import PgAdvisoryLock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -1831,8 +1832,8 @@ class ReservoirConfig(BaseConfigSchema):
         missing_steps = required_steps - set(v.keys())
         if missing_steps:
             missing_step_names = [step.value for step in missing_steps]
-            raise ValueError(
-                f"storage_mappings must contain at least 'download' and 'archive' steps. Missing: {missing_step_names}"
+            raise BadConfigurationError(
+                f"storage_step_selection must contain at least 'download' and 'archive' steps. Missing: {missing_step_names}"
             )
         return v
 

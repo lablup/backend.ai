@@ -4,7 +4,7 @@ Common and generic exceptions that don't belong to a specific domain.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 from aiohttp import web
 
@@ -16,9 +16,6 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.common.plugin.hook import HookResult
-
-if TYPE_CHECKING:
-    pass
 
 
 class URLNotFound(BackendAIError, web.HTTPNotFound):  # TODO: Misused now.
@@ -183,4 +180,17 @@ class Forbidden(BackendAIError, web.HTTPForbidden):
             domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class BadConfigurationError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/bad-configuration"
+    error_title = "Bad configuration error."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

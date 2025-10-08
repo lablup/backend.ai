@@ -1041,7 +1041,6 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
         validation_alias=AliasChoices("artifact-storages", "artifact_storages"),
         serialization_alias="artifact-storages",
     )
-
     artifact_registries: dict[str, ArtifactRegistryConfig] = Field(
         default_factory=dict,
         description="""
