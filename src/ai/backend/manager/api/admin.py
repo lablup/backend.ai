@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import traceback
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Self, Tuple, cast
+from typing import TYPE_CHECKING, Any, Iterable, Tuple, cast
 
 import aiohttp_cors
 import attrs
@@ -15,16 +15,10 @@ from graphene.validation import depth_limit_validator
 from graphql import ValidationRule, parse, validate
 from graphql.error import GraphQLError  # pants: no-infer-dep
 from graphql.execution import ExecutionResult  # pants: no-infer-dep
-from pydantic import ConfigDict, Field
+from strawberry.aiohttp.views import GraphQLView
 
 from ai.backend.common import validators as tx
-from ai.backend.common.api_handlers import APIResponse, BodyParam, MiddlewareParam, api_handler
-from ai.backend.common.dto.manager.request import GraphQLReq
-from ai.backend.common.dto.manager.response import GraphQLResponse
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.dto.context import ProcessorsCtx
 
 from ..api.gql.schema import schema as strawberry_schema
 from ..errors.api import GraphQLError as BackendGQLError
@@ -37,7 +31,7 @@ from ..models.gql import (
     Mutation,
     Query,
 )
-from .auth import auth_required, auth_required_for_method
+from .auth import auth_required
 from .manager import GQLMutationUnfrozenRequiredMiddleware
 from .types import CORSOptions, WebMiddleware
 from .utils import check_api_params
@@ -160,110 +154,6 @@ async def handle_gql_graphene(request: web.Request, params: Any) -> web.Response
     return web.json_response(result.formatted, status=HTTPStatus.OK)
 
 
-class GQLInspectionConfigCtx(MiddlewareParam):
-    gql_v2_schema: strawberry.Schema = Field(
-        ..., description="Strawberry GraphQL schema for v2 API."
-    )
-    allow_graphql_schema_introspection: bool
-    max_gql_query_depth: Optional[int]
-
-    # Allow strawberry.Schema to be used as a type
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    @classmethod
-    async def from_request(cls, request: web.Request) -> Self:
-        root_ctx: RootContext = request.app["_root.context"]
-        app_ctx: PrivateContext = request.app["admin.context"]
-
-        return cls(
-            gql_v2_schema=app_ctx.gql_v2_schema,
-            allow_graphql_schema_introspection=root_ctx.config_provider.config.api.allow_graphql_schema_introspection,
-            max_gql_query_depth=root_ctx.config_provider.config.api.max_gql_query_depth,
-        )
-
-
-class ConfigProviderCtx(MiddlewareParam):
-    config_provider: ManagerConfigProvider
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
-    @classmethod
-    async def from_request(cls, request: web.Request) -> Self:
-        root_ctx: RootContext = request.app["_root.context"]
-
-        return cls(
-            config_provider=root_ctx.config_provider,
-        )
-
-
-class GQLAPIHandler:
-    @auth_required_for_method
-    @api_handler
-    async def handle_gql_strawberry(
-        self,
-        body: BodyParam[GraphQLReq],
-        gql_config_ctx: GQLInspectionConfigCtx,
-        config_provider_ctx: ConfigProviderCtx,
-        processors_ctx: ProcessorsCtx,
-    ) -> APIResponse:
-        rules = []
-
-        if not gql_config_ctx.allow_graphql_schema_introspection:
-            rules.append(CustomIntrospectionRule)
-        max_depth = cast(int | None, gql_config_ctx.max_gql_query_depth)
-        if max_depth is not None:
-            rules.append(depth_limit_validator(max_depth=max_depth))
-
-        if rules:
-            validate_errors = validate(
-                # TODO: Instead of accessing private field, use another approach
-                schema=gql_config_ctx.gql_v2_schema._schema,
-                document_ast=parse(body.parsed.query),
-                rules=rules,
-            )
-            if validate_errors:
-                validation_result = ExecutionResult(None, errors=validate_errors)
-                return APIResponse.build(
-                    status_code=HTTPStatus.BAD_REQUEST,
-                    response_model=GraphQLResponse(
-                        data=None, errors=validation_result.formatted.get("errors", [])
-                    ),
-                )
-
-        strawberry_ctx = StrawberryGQLContext(
-            processors=processors_ctx.processors,
-            config_provider=config_provider_ctx.config_provider,
-        )
-
-        query, variables, operation_name = (
-            body.parsed.query,
-            body.parsed.variables,
-            body.parsed.operation_name,
-        )
-
-        result = await gql_config_ctx.gql_v2_schema.execute(
-            query,
-            root_value=None,
-            variable_values=variables,
-            operation_name=operation_name,
-            context_value=strawberry_ctx,
-        )
-
-        errors = []
-        if result.errors:
-            for err in result.errors:
-                log.error("ADMIN.GQL-V2 Exception: {}", err.formatted)
-                errors.append(err.formatted)
-
-        response_data = GraphQLResponse(
-            data=result.data, errors=errors, extensions=result.extensions
-        )
-        return APIResponse.build(
-            status_code=HTTPStatus.OK,
-            response_model=response_data,
-        )
-
-
 @auth_required
 @check_api_params(
     t.Dict({
@@ -326,8 +216,7 @@ def create_app(
     cors.add(app.router.add_route("POST", r"/graphql", handle_gql_legacy))
     cors.add(app.router.add_route("POST", r"/gql", handle_gql_graphene))
 
-    gql_api_handler = GQLAPIHandler()
-    cors.add(
-        app.router.add_route("POST", r"/gql/strawberry", gql_api_handler.handle_gql_strawberry)
-    )
+    # Use GraphQLView for strawberry schema with subscription support
+    gql_view = GraphQLView(schema=strawberry_schema, graphiql=True)
+    cors.add(app.router.add_route("POST", r"/gql/strawberry", gql_view))
     return app, []
