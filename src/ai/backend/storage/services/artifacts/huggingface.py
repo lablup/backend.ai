@@ -8,7 +8,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Callable, Final, Optional, Protocol, override
+from typing import Any, Callable, Final, Optional, Protocol, override
 
 import aiohttp
 
@@ -1056,3 +1056,21 @@ class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
             log.warning(
                 f"[cleanup] Failed to cleanup archive: {archive_storage}:{model_prefix}: {str(e)}"
             )
+
+
+def create_huggingface_import_pipeline(
+    registry_configs: dict[str, Any],
+    transfer_manager: StorageTransferManager,
+    storage_step_mappings: dict[ArtifactStorageImportStep, str],
+) -> ImportPipeline:
+    """Create ImportPipeline for HuggingFace based on storage step mappings."""
+    steps: list[ImportStep[Any]] = []
+
+    # Add steps based on what's present in storage_step_mappings
+    if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:
+        steps.append(HuggingFaceDownloadStep(registry_configs))
+
+    if ArtifactStorageImportStep.ARCHIVE in storage_step_mappings:
+        steps.append(HuggingFaceArchiveStep(transfer_manager))
+
+    return ImportPipeline(steps)

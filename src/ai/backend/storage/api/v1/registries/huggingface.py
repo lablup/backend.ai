@@ -37,8 +37,8 @@ from ai.backend.storage.config.unified import (
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
+    create_huggingface_import_pipeline,
 )
-from ai.backend.storage.services.artifacts.types import create_huggingface_pipeline
 
 from ....utils import log_client_api_entry
 from ...utils import get_storage_step_mappings
@@ -177,7 +177,7 @@ class HuggingFaceRegistryAPIHandler:
         )
 
         # Create import pipeline based on storage step mappings
-        pipeline = create_huggingface_pipeline(
+        pipeline = create_huggingface_import_pipeline(
             registry_configs=self._huggingface_service._registry_configs,
             transfer_manager=self._huggingface_service._transfer_manager,
             storage_step_mappings=storage_step_mappings,

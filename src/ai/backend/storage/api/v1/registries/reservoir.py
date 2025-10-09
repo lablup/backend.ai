@@ -23,8 +23,11 @@ from ai.backend.storage.config.unified import (
     LegacyReservoirConfig,
     ReservoirConfig,
 )
-from ai.backend.storage.services.artifacts.reservoir import ReservoirService, ReservoirServiceArgs
-from ai.backend.storage.services.artifacts.types import create_reservoir_pipeline
+from ai.backend.storage.services.artifacts.reservoir import (
+    ReservoirService,
+    ReservoirServiceArgs,
+    create_reservoir_import_pipeline,
+)
 
 from ....utils import log_client_api_entry
 from ...utils import get_storage_step_mappings
@@ -60,7 +63,7 @@ class ReservoirRegistryAPIHandler:
         )
 
         # Create import pipeline based on storage step mappings
-        pipeline = create_reservoir_pipeline(
+        pipeline = create_reservoir_import_pipeline(
             registry_configs=self._reservoir_service._reservoir_registry_configs,
             storage_step_mappings=storage_step_mappings,
         )

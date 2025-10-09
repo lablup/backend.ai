@@ -4,7 +4,7 @@ import mimetypes
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import Any, Optional, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
@@ -716,3 +716,20 @@ class ReservoirArchiveStep(ImportStep[DownloadStepResult]):
         """Reservoir archive cleanup - already handled in download step"""
         # ReservoirDownloadStep already handles cleanup, so this is no-op
         pass
+
+
+def create_reservoir_import_pipeline(
+    registry_configs: dict[str, Any],
+    storage_step_mappings: dict[ArtifactStorageImportStep, str],
+) -> ImportPipeline:
+    """Create ImportPipeline for Reservoir based on storage step mappings."""
+    steps: list[ImportStep[Any]] = []
+
+    # Add steps based on what's present in storage_step_mappings
+    if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:
+        steps.append(ReservoirDownloadStep(registry_configs))
+
+    if ArtifactStorageImportStep.ARCHIVE in storage_step_mappings:
+        steps.append(ReservoirArchiveStep())
+
+    return ImportPipeline(steps)
