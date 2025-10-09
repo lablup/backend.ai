@@ -80,7 +80,7 @@ class ObjectStorageService:
             ObjectMetaResponse with object metadata
         """
         storage = self._resolve_storage(storage_name, bucket_name)
-        return await storage.get_object_info(filepath)
+        return await storage.get_file_info(filepath)
 
     async def delete_object(self, storage_name: str, bucket_name: str, prefix: str) -> None:
         """
@@ -92,7 +92,7 @@ class ObjectStorageService:
             prefix: Prefix of the object to delete
         """
         storage = self._resolve_storage(storage_name, bucket_name)
-        await storage.delete_object(prefix)
+        await storage.delete_file(prefix)
 
     async def generate_presigned_upload_url(
         self, storage_name: str, bucket_name: str, key: str

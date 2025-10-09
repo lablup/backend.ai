@@ -837,7 +837,7 @@ class HuggingFaceService:
         for storage_name in set(storages):  # Remove duplicates
             try:
                 storage = self._storage_pool.get_storage(storage_name)
-                await storage.delete_object(storage_key)
+                await storage.delete_file(storage_key)
                 log.info(f"[cleanup] Removed failed import file: {storage_name}:{storage_key}")
             except Exception as e:
                 log.warning(
@@ -980,7 +980,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
 
         try:
             storage = context.storage_pool.get_storage(download_storage_name)
-            await storage.delete_object(model_prefix)
+            await storage.delete_file(model_prefix)
             log.info(f"[cleanup] Removed failed download: {download_storage_name}:{model_prefix}")
         except Exception as e:
             log.warning(
@@ -1050,7 +1050,7 @@ class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
 
         try:
             storage = context.storage_pool.get_storage(archive_storage)
-            await storage.delete_object(model_prefix)
+            await storage.delete_file(model_prefix)
             log.info(f"[cleanup] Removed failed archive: {archive_storage}:{model_prefix}")
         except Exception as e:
             log.warning(

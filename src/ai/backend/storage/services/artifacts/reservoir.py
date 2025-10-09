@@ -433,7 +433,7 @@ class ReservoirService:
         for storage_name in set(storages):  # Remove duplicates
             try:
                 storage = self._storage_pool.get_storage(storage_name)
-                await storage.delete_object(model_prefix)
+                await storage.delete_file(model_prefix)
                 log.info(f"[cleanup] Removed failed import model: {storage_name}:{model_prefix}")
             except Exception as e:
                 log.warning(
@@ -687,7 +687,7 @@ class ReservoirDownloadStep(ImportStep[None]):
 
         try:
             storage = context.storage_pool.get_storage(archive_storage_name)
-            await storage.delete_object(model_prefix)
+            await storage.delete_file(model_prefix)
             log.info(
                 f"[cleanup] Removed failed reservoir copy: {archive_storage_name}:{model_prefix}"
             )

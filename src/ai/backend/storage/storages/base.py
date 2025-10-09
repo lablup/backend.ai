@@ -23,9 +23,9 @@ class AbstractStorage(ABC):
         raise NotImplementedAPI
 
     @abstractmethod
-    async def delete_object(self, filepath: str) -> None:
+    async def delete_file(self, filepath: str) -> None:
         raise NotImplementedAPI
 
     @abstractmethod
-    async def get_object_info(self, filepath: str) -> Any:
+    async def get_file_info(self, filepath: str) -> Any:
         raise NotImplementedAPI

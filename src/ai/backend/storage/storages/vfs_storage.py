@@ -181,7 +181,8 @@ class VFSStorage(AbstractStorage):
         except Exception as e:
             raise FileStreamDownloadError(f"Download failed: {str(e)}") from e
 
-    async def get_object_info(self, filepath: str) -> VFSFileMetaResponse:
+    @override
+    async def get_file_info(self, filepath: str) -> VFSFileMetaResponse:
         """
         Get file information.
 
@@ -225,7 +226,8 @@ class VFSStorage(AbstractStorage):
         except Exception as e:
             raise ObjectInfoFetchError(f"Get file info failed: {str(e)}") from e
 
-    async def delete_object(self, filepath: str) -> None:
+    @override
+    async def delete_file(self, filepath: str) -> None:
         """
         Delete a file or directory.
 

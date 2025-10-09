@@ -228,8 +228,8 @@ class StorageTransferManager:
             dest_storage = self._storage_pool.get_storage(dest_storage_name)
 
             # Get metadata from both storages
-            source_meta = await source_storage.get_object_info(source_path)
-            dest_meta = await dest_storage.get_object_info(dest_path)
+            source_meta = await source_storage.get_file_info(source_path)
+            dest_meta = await dest_storage.get_file_info(dest_path)
 
             # Compare file sizes
             if hasattr(source_meta, "size") and hasattr(dest_meta, "size"):
