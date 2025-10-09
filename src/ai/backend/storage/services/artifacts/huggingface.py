@@ -38,7 +38,7 @@ from ai.backend.storage.exception import (
     HuggingFaceModelNotFoundError,
     ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
-    StorageStepMappingNotProvidedError,
+    StorageStepRequiredStepNotProvided,
 )
 from ai.backend.storage.services.artifacts.storage_transfer import StorageTransferManager
 from ai.backend.storage.services.artifacts.types import (
@@ -756,11 +756,11 @@ class HuggingFaceService:
         archive_storage_name = storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
 
         if not download_storage_name:
-            raise StorageStepMappingNotProvidedError(
+            raise StorageStepRequiredStepNotProvided(
                 "No storage mapping provided for DOWNLOAD step"
             )
         if not archive_storage_name:
-            raise StorageStepMappingNotProvidedError("No storage mapping provided for ARCHIVE step")
+            raise StorageStepRequiredStepNotProvided("No storage mapping provided for ARCHIVE step")
 
         try:
             # Stage 1: Download to download storage
@@ -887,7 +887,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             ArtifactStorageImportStep.DOWNLOAD
         )
         if not download_storage_name:
-            raise StorageStepMappingNotProvidedError(
+            raise StorageStepRequiredStepNotProvided(
                 "No storage mapping provided for DOWNLOAD step"
             )
 
@@ -1004,7 +1004,7 @@ class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
         archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
 
         if not archive_storage:
-            raise StorageStepMappingNotProvidedError("No storage mapping provided for ARCHIVE step")
+            raise StorageStepRequiredStepNotProvided("No storage mapping provided for ARCHIVE step")
 
         # No need to move if download and archive storage are the same
         if download_storage == archive_storage:

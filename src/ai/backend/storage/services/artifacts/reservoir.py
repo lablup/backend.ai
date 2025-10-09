@@ -26,7 +26,7 @@ from ai.backend.storage.exception import (
     ObjectStorageBucketNotFoundError,
     ReservoirStorageConfigInvalidError,
     StorageNotFoundError,
-    StorageStepMappingNotProvidedError,
+    StorageStepRequiredStepNotProvided,
 )
 from ai.backend.storage.services.artifacts.storage_transfer import StorageTransferManager
 from ai.backend.storage.services.artifacts.types import (
@@ -459,7 +459,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         # For Reservoir, copy directly to archive storage in download step
         archive_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
         if not archive_storage_name:
-            raise StorageStepMappingNotProvidedError("No storage mapping provided for ARCHIVE step")
+            raise StorageStepRequiredStepNotProvided("No storage mapping provided for ARCHIVE step")
 
         # Find matching reservoir config
         reservoir_config = self._registry_configs.get(context.registry_name)
