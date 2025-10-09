@@ -1,5 +1,4 @@
 from enum import StrEnum
-from pathlib import Path
 from typing import Optional, Self
 
 from pydantic import (
@@ -11,6 +10,8 @@ from pydantic import (
     model_serializer,
     model_validator,
 )
+
+from ai.backend.common.typed_validators import AutoDirectoryPath
 
 from .exceptions import ConfigurationError
 from .types import LogFormat, LogLevel, MsgpackOptions
@@ -79,7 +80,9 @@ class ConsoleConfig(BaseConfigModel):
 
 
 class FileConfig(BaseConfigModel):
-    path: Path = Field(description="Path to store log.", examples=["/var/log/backend.ai"])
+    path: AutoDirectoryPath = Field(
+        description="Path to store log.", examples=["/var/log/backend.ai"]
+    )
     filename: str = Field(description="Log file name.", examples=["wsproxy.log"])
     backup_count: int = Field(description="Number of outdated log files to retain.", default=5)
     rotation_size: ByteSize = Field(
