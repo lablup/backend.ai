@@ -1814,6 +1814,7 @@ class ReservoirConfig(BaseConfigSchema):
         """,
     )
     storage_step_selection: dict[ArtifactStorageImportStep, str] = Field(
+        default_factory=dict,
         description="""
         Storage step selection configuration for artifact model imports.
         Maps different import steps (download, archive) to specific storage backends.
