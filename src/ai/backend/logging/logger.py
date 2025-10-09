@@ -18,6 +18,8 @@ import zmq
 from glide.exceptions import ConfigurationError
 from pydantic import ByteSize
 
+from ai.backend.common.typed_validators import AutoDirectoryPath
+
 from .abc import AbstractLogger
 from .config import (
     LoggerConfig,
@@ -262,7 +264,7 @@ def setup_file_log_handler(config: LoggingConfig) -> Iterator[logging.Handler]:
     # FIXME: Refactor using layered config loader pattern
     if (env_legacy_logfile_path := os.environ.get("BACKEND_LOG_FILE", None)) is not None:
         p = Path(env_legacy_logfile_path)
-        config.file.path = p.parent
+        config.file.path = AutoDirectoryPath(p.parent)
         config.file.filename = p.name
     if (env_legacy_backup_count := os.environ.get("BACKEND_LOG_FILE_COUNT", None)) is not None:
         config.file.backup_count = int(env_legacy_backup_count)
