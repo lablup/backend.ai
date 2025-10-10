@@ -7,8 +7,10 @@ from typing import Any, AsyncIterator, Final, Optional
 import aiohttp
 import yarl
 
+from ai.backend.common.exception import ErrorCode, ErrorDomain
 from ai.backend.common.json import load_json
 from ai.backend.manager.errors.storage import (
+    QuotaScopeNotFoundError,
     UnexpectedStorageProxyResponseError,
     VFolderBadRequest,
     VFolderGone,
@@ -34,6 +36,60 @@ class StorageProxyHTTPClient:
         self._client_session = client_session
         self._endpoint = args.endpoint
         self._secret = args.secret
+
+    def _handle_vfolder_failure(self, status_code: HTTPStatus) -> None:
+        match status_code:
+            case HTTPStatus.BAD_REQUEST:
+                raise VFolderBadRequest(
+                    extra_msg="Bad request to storage proxy",
+                )
+            case HTTPStatus.NOT_FOUND:
+                raise VFolderNotFound(
+                    extra_msg="Requested resource not found",
+                )
+            case HTTPStatus.GONE:
+                raise VFolderGone(
+                    extra_msg=(
+                        "The requested resource is gone. It may have been deleted or moved."
+                    ),
+                )
+            case HTTPStatus.INTERNAL_SERVER_ERROR:
+                raise VFolderOperationFailed(
+                    extra_msg="Internal server error from storage proxy",
+                )
+            case _:
+                raise VFolderOperationFailed(
+                    extra_msg=f"Unexpected error {status_code} from storage proxy",
+                )
+
+    def _handle_quota_scope_failure(self, status_code: HTTPStatus) -> None:
+        match status_code:
+            case HTTPStatus.NOT_FOUND:
+                raise QuotaScopeNotFoundError(
+                    extra_msg="Requested quota scope not found",
+                )
+            case _:
+                # For other status codes, raise a generic VFolderOperationFailed by default
+                raise VFolderOperationFailed(
+                    extra_msg=f"Unexpected error {status_code} from storage proxy",
+                )
+
+    async def _handle_exceptional_response(self, resp: aiohttp.ClientResponse) -> None:
+        try:
+            data = await resp.json()
+            err_code = ErrorCode.from_str(data.get("error_code", ""))
+            err_domain = err_code.domain
+        except ValueError:
+            err_domain = ErrorDomain.VFolder  # Default domain if parsing fails
+        match err_domain:
+            case ErrorDomain.VFOLDER:
+                self._handle_vfolder_failure(resp.status)
+            case ErrorDomain.QUOTA_SCOPE:
+                self._handle_quota_scope_failure(resp.status)
+            case _:
+                raise VFolderOperationFailed(
+                    extra_msg=f"Unexpected error {resp.status} from storage proxy",
+                )
 
     @actxmgr
     async def request_stream_response(
@@ -65,29 +121,7 @@ class StorageProxyHTTPClient:
             if client_resp.status // 100 == 2:
                 yield client_resp
                 return
-            match client_resp.status:
-                case HTTPStatus.BAD_REQUEST:
-                    raise VFolderBadRequest(
-                        extra_msg="Bad request to storage proxy",
-                    )
-                case HTTPStatus.NOT_FOUND:
-                    raise VFolderNotFound(
-                        extra_msg="Requested resource not found",
-                    )
-                case HTTPStatus.GONE:
-                    raise VFolderGone(
-                        extra_msg=(
-                            "The requested resource is gone. It may have been deleted or moved."
-                        ),
-                    )
-                case HTTPStatus.INTERNAL_SERVER_ERROR:
-                    raise VFolderOperationFailed(
-                        extra_msg="Internal server error from storage proxy",
-                    )
-                case _:
-                    raise VFolderOperationFailed(
-                        extra_msg=f"Unexpected error {client_resp.status} from storage proxy",
-                    )
+            await self._handle_exceptional_response(client_resp)
 
     async def request(
         self,

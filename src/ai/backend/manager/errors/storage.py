@@ -62,6 +62,18 @@ class VFolderNotFound(ObjectNotFound):
         )
 
 
+class QuotaScopeNotFoundError(ObjectNotFound):
+    object_name = "quota scope"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class VFolderAlreadyExists(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-already-exists"
     error_title = "The virtual folder already exists with the same name."

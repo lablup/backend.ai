@@ -157,6 +157,7 @@ class ErrorDomain(enum.StrEnum):
     ROUTE = "route"
     DOTFILE = "dotfile"
     VFOLDER = "vfolder"
+    QUOTA_SCOPE = "quota-scope"
     VFOLDER_INVITATION = "vfolder-invitation"
     MODEL_SERVICE = "model-service"
     MODEL_DEPLOYMENT = "model-deployment"
@@ -288,6 +289,27 @@ class ErrorCode:
 
     def __str__(self) -> str:
         return f"{self.domain}_{self.operation}_{self.error_detail}"
+
+    @classmethod
+    def from_str(cls, code_str: str) -> Self:
+        """
+        Parses an error code string and returns an ErrorCode instance.
+
+        :param code_str: The error code string to parse.
+        :return: An ErrorCode instance.
+        :raises ValueError: If the code_str is not in the correct format.
+        """
+        parts = code_str.split("_")
+        if len(parts) != 3:
+            raise ValueError(f"Invalid error code format: {code_str}")
+        domain_str, operation_str, error_detail_str = parts
+        try:
+            domain = ErrorDomain(domain_str)
+            operation = ErrorOperation(operation_str)
+            error_detail = ErrorDetail(error_detail_str)
+        except ValueError as e:
+            raise ValueError(f"Invalid error code value: {e}") from e
+        return cls(domain=domain, operation=operation, error_detail=error_detail)
 
 
 class BackendAIError(web.HTTPError, ABC):
