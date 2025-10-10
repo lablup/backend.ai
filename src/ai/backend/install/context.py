@@ -319,6 +319,7 @@ class Context(metaclass=ABCMeta):
         with tempfile.TemporaryDirectory() as tmpdir:
             service = self.install_info.service_config
             fixture_path = Path(tmpdir) / "fixture.json"
+            # Use existing wsproxy_* columns to store approxy info (same as install-dev.sh)
             with open(fixture_path, "w") as fw:
                 fw.write(
                     json.dumps({
@@ -326,8 +327,8 @@ class Context(metaclass=ABCMeta):
                         "scaling_groups": [
                             {
                                 "name": "default",
-                                "appproxy_addr": f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
-                                "appproxy_api_token": service.appproxy_api_secret,
+                                "wsproxy_addr": f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
+                                "wsproxy_api_token": service.appproxy_api_secret,
                             }
                         ],
                     })
