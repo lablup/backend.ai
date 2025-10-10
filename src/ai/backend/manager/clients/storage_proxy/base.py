@@ -69,8 +69,7 @@ class StorageProxyHTTPClient:
                     extra_msg="Requested quota scope not found",
                 )
             case _:
-                # For other status codes, raise a generic VFolderOperationFailed by default
-                raise VFolderOperationFailed(
+                raise UnexpectedStorageProxyResponseError(
                     extra_msg=f"Unexpected error {status_code} from storage proxy",
                 )
 
@@ -87,7 +86,7 @@ class StorageProxyHTTPClient:
             case ErrorDomain.QUOTA_SCOPE:
                 self._handle_quota_scope_failure(HTTPStatus(resp.status))
             case _:
-                raise VFolderOperationFailed(
+                raise UnexpectedStorageProxyResponseError(
                     extra_msg=f"Unexpected error {resp.status} from storage proxy",
                 )
 
