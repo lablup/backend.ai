@@ -6,11 +6,11 @@ Agent Configuration Schema
 from __future__ import annotations
 
 import enum
+import ipaddress
 import logging
 import os
 import sys
 import textwrap
-from ipaddress import IPv4Address, IPv6Address
 from pathlib import Path
 from typing import Any, Mapping, Optional, Self
 
@@ -19,6 +19,7 @@ from pydantic import (
     ConfigDict,
     Field,
     FilePath,
+    PrivateAttr,
     ValidationInfo,
     field_validator,
     model_validator,
@@ -164,7 +165,7 @@ class CoreDumpConfig(BaseConfigSchema):
         validation_alias=AliasChoices("size-limit", "size_limit"),
         serialization_alias="size-limit",
     )
-    _core_path: Optional[Path] = Field(default=None, exclude=True, repr=False, init=True)
+    _core_path: Optional[Path] = PrivateAttr(default=None)
 
     @property
     def core_path(self) -> Path:
@@ -190,10 +191,9 @@ class CoreDumpConfig(BaseConfigSchema):
         arbitrary_types_allowed=True,
     )
 
-    @model_validator(mode="before")
-    @classmethod
-    def _set_coredump_path(cls, data: dict[str, Any], info: ValidationInfo) -> dict[str, Any]:
-        if isinstance(data, dict) and data.get("enabled"):
+    @model_validator(mode="after")
+    def _set_coredump_path(self, info: ValidationInfo) -> Self:
+        if self.enabled:
             context = get_config_validation_context(info)
             if context is None:
                 raise ValueError("context must be specified in model_validate()")
@@ -206,8 +206,8 @@ class CoreDumpConfig(BaseConfigSchema):
                     "/proc/sys/kernel/core_pattern must be an absolute path to enable container coredumps.",
                 )
 
-            data["_core_path"] = Path(core_pattern).parent
-        return data
+            self._core_path = Path(core_pattern).parent
+        return self
 
 
 class DebugConfig(BaseConfigSchema):
@@ -617,12 +617,12 @@ class AgentConfig(BaseConfigSchema):
     @field_validator("rpc_listen_addr", mode="after")
     @classmethod
     def _validate_rpc_listen_addr(cls, rpc_listen_addr: HostPortPair) -> HostPortPair:
-        rpc_host = rpc_listen_addr.host
-        if isinstance(rpc_host, (IPv4Address, IPv6Address)):
-            if rpc_host.is_unspecified or rpc_host.is_link_local:
-                raise ValueError(
-                    "Cannot use link-local or unspecified IP address as the RPC listening host."
-                )
+        try:
+            rpc_host = ipaddress.ip_address(rpc_listen_addr.host)
+        except ValueError:
+            return rpc_listen_addr
+        if rpc_host.is_link_local:
+            raise ValueError("Cannot use link-local IP address as the RPC listening host.")
         return rpc_listen_addr
 
 

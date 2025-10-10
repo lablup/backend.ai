@@ -1445,7 +1445,7 @@ def main(
         server_config = AgentUnifiedConfig.model_validate(
             raw_cfg,
             context=ConfigValidationContext(
-                debug=debug,
+                debug=log_level == LogLevel.DEBUG,
                 log_level=log_level,
                 is_not_invoked_subcommand=is_not_invoked_subcommand,
             ),
