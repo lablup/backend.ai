@@ -80,12 +80,12 @@ class StorageProxyHTTPClient:
             err_code = ErrorCode.from_str(data.get("error_code", ""))
             err_domain = err_code.domain
         except ValueError:
-            err_domain = ErrorDomain.VFolder  # Default domain if parsing fails
+            err_domain = ErrorDomain.VFOLDER  # Default domain if parsing fails
         match err_domain:
             case ErrorDomain.VFOLDER:
-                self._handle_vfolder_failure(resp.status)
+                self._handle_vfolder_failure(HTTPStatus(resp.status))
             case ErrorDomain.QUOTA_SCOPE:
-                self._handle_quota_scope_failure(resp.status)
+                self._handle_quota_scope_failure(HTTPStatus(resp.status))
             case _:
                 raise VFolderOperationFailed(
                     extra_msg=f"Unexpected error {resp.status} from storage proxy",
