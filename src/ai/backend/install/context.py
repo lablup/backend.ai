@@ -613,6 +613,146 @@ class Context(metaclass=ABCMeta):
         ]
         dotenv_path.write_text("\n".join(envs))
 
+    async def install_appproxy_db(self) -> None:
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
+
+        self.log_header("Setting up databases... (app-proxy)")
+
+        # 1. Connect to core DB
+        core_conn = await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="backend",
+        )
+
+        # 2. Create role/database if not exist
+        await core_conn.execute(
+            """
+            DO $$
+            BEGIN
+               IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'appproxy') THEN
+                  CREATE ROLE appproxy WITH LOGIN PASSWORD 'develove';
+               ELSE
+                  ALTER ROLE appproxy WITH LOGIN PASSWORD 'develove';
+               END IF;
+            END
+            $$;
+            """
+        )
+        exists = await core_conn.fetchval("SELECT 1 FROM pg_database WHERE datname = 'appproxy'")
+        if not exists:
+            await core_conn.execute("CREATE DATABASE appproxy OWNER appproxy;")
+        await core_conn.execute("GRANT ALL PRIVILEGES ON DATABASE appproxy TO appproxy;")
+        await core_conn.close()
+
+        # 3. Grant privileges
+        app_conn = await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="appproxy",
+        )
+        await app_conn.execute("GRANT ALL ON SCHEMA public TO appproxy;")
+        await app_conn.close()
+
+        # 4. Run Alembic migration for app-proxy
+        alembic_ini = self.copy_config("alembic-appproxy.ini")
+        await self.run_exec(
+            [sys.executable, "-m", "alembic", "-c", str(alembic_ini), "upgrade", "head"],
+            cwd=self.install_info.base_path,
+        )
+
+        # 5. Update scaling_groups in core DB
+        # TODO: Still using wsproxy_* columns for backward compatibility (same with install-dev.sh logic)
+        core_conn = await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="backend",
+        )
+        await core_conn.execute(
+            """
+            UPDATE scaling_groups
+            SET wsproxy_api_token = $1,
+                wsproxy_addr = $2
+            WHERE name = 'default'
+            """,
+            service.appproxy_api_secret,
+            f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
+        )
+        await core_conn.close()
+
+    async def configure_appproxy(self) -> None:
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
+
+        # Coordinator
+        coord_conf = self.copy_config("app-proxy-coordinator.toml")
+
+        self.log.write(f"DB HOST = {halfstack.postgres_addr.face.host}")
+        self.log.write(f"DB PORT = {halfstack.postgres_addr.face.port}")
+        self.log.write(f"API SECRET = {service.appproxy_api_secret}")
+
+        with coord_conf.open("r") as fp:
+            data = tomlkit.load(fp)
+            data["db"]["type"] = "postgresql"
+            data["db"]["name"] = "appproxy"
+            data["db"]["user"] = "appproxy"
+            data["db"]["password"] = "develove"
+            data["db"]["pool_size"] = 8
+            data["db"]["max_overflow"] = 64
+            data["db"]["addr"]["host"] = halfstack.postgres_addr.face.host
+            data["db"]["addr"]["port"] = halfstack.postgres_addr.face.port
+            data["redis"]["host"] = halfstack.redis_addr.face.host
+            data["redis"]["port"] = halfstack.redis_addr.face.port
+            data["secrets"]["api_secret"] = service.appproxy_api_secret
+            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret
+            data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret
+            data["proxy_coordinator"]["bind_addr"]["host"] = (
+                service.appproxy_coordinator_addr.bind.host
+            )
+            data["proxy_coordinator"]["bind_addr"]["port"] = (
+                service.appproxy_coordinator_addr.bind.port
+            )
+        with coord_conf.open("w") as fp:
+            tomlkit.dump(data, fp)
+
+        # Worker
+        worker_conf = self.copy_config("app-proxy-worker.toml")
+        with worker_conf.open("r") as fp:
+            data = tomlkit.load(fp)
+            data["redis"]["host"] = halfstack.redis_addr.face.host
+            data["redis"]["port"] = halfstack.redis_addr.face.port
+            data["proxy_worker"]["port_proxy"]["bind_port"] = service.appproxy_worker_addr.bind.port
+            data["proxy_worker"]["port_proxy"]["bind_host"] = service.appproxy_worker_addr.bind.host
+            data["secrets"]["api_secret"] = service.appproxy_api_secret
+            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret
+            data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret
+        with worker_conf.open("w") as fp:
+            tomlkit.dump(data, fp)
+
+        self.log.write("insatll db 4 worker ---")
+        # Alembic migration config
+        alembic_cfg = self.copy_config("alembic-appproxy.ini")
+        self.sed_in_place_multi(
+            alembic_cfg,
+            [
+                (
+                    "localhost:8100",
+                    f"{halfstack.postgres_addr.face.host}:{halfstack.postgres_addr.face.port}",
+                ),
+                (
+                    re.compile(r"^#?sqlalchemy.url\s*=.*", flags=re.M),
+                    f"sqlalchemy.url = postgresql+asyncpg://appproxy:develove@{halfstack.postgres_addr.face.host}:{halfstack.postgres_addr.face.port}/appproxy",
+                ),
+            ],
+        )
+
     async def configure_client(self) -> None:
         # TODO: add an option to generate keypairs
         base_path = self.install_info.base_path
