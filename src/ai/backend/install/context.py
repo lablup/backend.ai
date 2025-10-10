@@ -263,10 +263,6 @@ class Context(metaclass=ABCMeta):
         self.copy_config("prometheus.yaml")
         self.copy_config("grafana-dashboards")
         self.copy_config("grafana-provisioning")
-        try:
-            self.copy_config("loki")
-        except FileNotFoundError:
-            self.copy_root_config("loki")
 
         volume_path = self.install_info.base_path / "volumes"
         (volume_path / "postgres-data").mkdir(parents=True, exist_ok=True)
@@ -599,19 +595,6 @@ class Context(metaclass=ABCMeta):
             "",
         ]
         dotenv_path.write_text("\n".join(envs))
-
-    def copy_root_config(self, rel_path: str) -> Path:
-        repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
-        src_path = repo_root / "configs" / rel_path
-        if not src_path.exists():
-            raise FileNotFoundError(f"Config file not found: {src_path}")
-        dst_path = self.dist_info.target_path / rel_path
-        dst_path.parent.mkdir(parents=True, exist_ok=True)
-        if src_path.is_dir():
-            shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
-        else:
-            shutil.copy(src_path, dst_path)
-        return dst_path
 
     async def install_appproxy_db(self) -> None:
         halfstack = self.install_info.halfstack_config
