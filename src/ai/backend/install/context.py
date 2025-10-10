@@ -296,8 +296,6 @@ class Context(metaclass=ABCMeta):
         )
 
     async def load_fixtures(self) -> None:
-        await self.run_manager_cli(["mgr", "schema", "oneshot"])
-
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
 
@@ -1048,6 +1046,11 @@ class DevContext(Context):
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
         await self.configure_manager()
+
+        # Manager schema must exist before updating scaling_groups
+        self.log_header("Initializing manager database schema...")
+        await self.run_manager_cli(["mgr", "schema", "oneshot"])
+
         self.log_header("Configuring agent...")
         await self.configure_agent()
         self.log_header("Configuring storage-proxy...")
