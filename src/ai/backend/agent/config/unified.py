@@ -16,6 +16,7 @@ from typing import Any, Mapping, Optional, Self
 
 from pydantic import (
     AliasChoices,
+    BaseModel,
     ConfigDict,
     Field,
     FilePath,
@@ -67,12 +68,18 @@ class ScratchType(enum.StrEnum):
     K8S_NFS = "k8s-nfs"
 
 
-def _get_model_validation_context(info: ValidationInfo) -> dict[str, Any] | None:
+class ConfigValidationContext(BaseModel, extra="forbid", frozen=True):
+    debug: bool
+    log_level: LogLevel
+    is_not_invoked_subcommand: bool
+
+
+def _get_config_validation_context(info: ValidationInfo) -> ConfigValidationContext | None:
     context = info.context
     if context is None:
         return None
-    if not isinstance(context, dict):
-        raise ValueError("context must be provided as a dictionary")
+    if not isinstance(context, ConfigValidationContext):
+        raise ValueError("context must be provided as a ConfigValidationContext")
     return context
 
 
@@ -205,11 +212,10 @@ class CoreDumpConfig(BaseConfigSchema):
     @model_validator(mode="after")
     def _validate_coredump(self, info: ValidationInfo) -> Self:
         if self.enabled:
-            context = _get_model_validation_context(info)
+            context = _get_config_validation_context(info)
             if context is None:
                 raise ValueError("context must be specified in model_validate()")
-            is_not_invoked_subcommand: bool = context["is_not_invoked_subcommand"]
-            if is_not_invoked_subcommand and not sys.platform.startswith("linux"):
+            if context.is_not_invoked_subcommand and not sys.platform.startswith("linux"):
                 raise ValueError("Storing container coredumps is only supported in Linux.")
 
             core_pattern = Path("/proc/sys/kernel/core_pattern").read_text().strip()
@@ -1083,15 +1089,13 @@ class AgentUnifiedConfig(BaseConfigSchema):
 
     @model_validator(mode="after")
     def _set_command_line_args(self, info: ValidationInfo) -> Self:
-        context = _get_model_validation_context(info)
+        context = _get_config_validation_context(info)
         if context is None:
             # Likely in tests, command line args do not need to be set.
             return self
-        debug: bool = context["debug"]
-        log_level: LogLevel = context["log_level"]
 
-        self.debug.enabled = debug
-        if log_level != LogLevel.NOTSET:
-            self.logging.level = log_level
-            self.logging.pkg_ns["ai.backend"] = log_level
+        self.debug.enabled = context.debug
+        if context.log_level != LogLevel.NOTSET:
+            self.logging.level = context.log_level
+            self.logging.pkg_ns["ai.backend"] = context.log_level
         return self

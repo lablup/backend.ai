@@ -116,6 +116,7 @@ from . import __version__ as VERSION
 from .config.unified import (
     AgentUnifiedConfig,
     APIConfig,
+    ConfigValidationContext,
     ContainerLogsConfig,
     EventLoopType,
     KernelLifecyclesConfig,
@@ -1443,11 +1444,11 @@ def main(
         is_not_invoked_subcommand = cli_ctx.invoked_subcommand is None
         server_config = AgentUnifiedConfig.model_validate(
             raw_cfg,
-            context={
-                "debug": debug,
-                "log_level": log_level,
-                "is_not_invoked_subcommand": is_not_invoked_subcommand,
-            },
+            context=ConfigValidationContext(
+                debug=debug,
+                log_level=log_level,
+                is_not_invoked_subcommand=is_not_invoked_subcommand,
+            ),
         )
 
         if server_config.debug.enabled:
