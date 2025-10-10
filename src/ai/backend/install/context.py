@@ -9,6 +9,7 @@ import random
 import re
 import secrets
 import shutil
+import sys
 import tempfile
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
@@ -262,6 +263,10 @@ class Context(metaclass=ABCMeta):
         self.copy_config("prometheus.yaml")
         self.copy_config("grafana-dashboards")
         self.copy_config("grafana-provisioning")
+        try:
+            self.copy_config("loki")
+        except FileNotFoundError:
+            self.copy_root_config("loki")
 
         volume_path = self.install_info.base_path / "volumes"
         (volume_path / "postgres-data").mkdir(parents=True, exist_ok=True)
@@ -321,8 +326,8 @@ class Context(metaclass=ABCMeta):
                         "scaling_groups": [
                             {
                                 "name": "default",
-                                "wsproxy_addr": f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}",
-                                "wsproxy_api_token": service.wsproxy_api_token,
+                                "appproxy_addr": f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
+                                "appproxy_api_token": service.appproxy_api_secret,
                             }
                         ],
                     })
@@ -548,11 +553,11 @@ class Context(metaclass=ABCMeta):
         assert halfstack.redis_addr is not None
         with conf_path.open("r") as fp:
             data = tomlkit.load(fp)
-            wsproxy_itable = tomlkit.inline_table()
-            wsproxy_itable["url"] = (
-                f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
+            appproxy_itable = tomlkit.inline_table()
+            appproxy_itable["url"] = (
+                f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}"
             )
-            data["service"]["wsproxy"] = wsproxy_itable  # type: ignore
+            data["service"]["appproxy"] = appproxy_itable  # type: ignore
             data["api"][  # type: ignore
                 "endpoint"
             ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
@@ -585,23 +590,6 @@ class Context(metaclass=ABCMeta):
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
-    async def configure_wsproxy(self) -> None:
-        conf_path = self.copy_config("wsproxy.toml")
-        halfstack = self.install_info.halfstack_config
-        service = self.install_info.service_config
-        assert halfstack.redis_addr is not None
-        with conf_path.open("r") as fp:
-            data = tomlkit.load(fp)
-            data["wsproxy"]["bind_host"] = service.local_proxy_addr.bind.host  # type: ignore
-            data["wsproxy"]["advertised_host"] = service.local_proxy_addr.face.host  # type: ignore
-            data["wsproxy"]["bind_api_port"] = service.local_proxy_addr.bind.port  # type: ignore
-            data["wsproxy"]["advertised_api_port"] = service.local_proxy_addr.face.port  # type: ignore
-            data["wsproxy"]["jwt_encrypt_key"] = service.wsproxy_jwt_key  # type: ignore
-            data["wsproxy"]["permit_hash_key"] = service.wsproxy_hash_key  # type: ignore
-            data["wsproxy"]["api_secret"] = service.wsproxy_api_token  # type: ignore
-        with conf_path.open("w") as fp:
-            tomlkit.dump(data, fp)
-
     async def configure_webui(self) -> None:
         dotenv_path = self.install_info.base_path / ".env"
         service = self.install_info.service_config
@@ -612,6 +600,19 @@ class Context(metaclass=ABCMeta):
             "",
         ]
         dotenv_path.write_text("\n".join(envs))
+
+    def copy_root_config(self, rel_path: str) -> Path:
+        repo_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+        src_path = repo_root / "configs" / rel_path
+        if not src_path.exists():
+            raise FileNotFoundError(f"Config file not found: {src_path}")
+        dst_path = self.dist_info.target_path / rel_path
+        dst_path.parent.mkdir(parents=True, exist_ok=True)
+        if src_path.is_dir():
+            shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+        else:
+            shutil.copy(src_path, dst_path)
+        return dst_path
 
     async def install_appproxy_db(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -904,13 +905,13 @@ class Context(metaclass=ABCMeta):
                     if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
                         await self.alias_image(
                             "python",
-                            "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+                            "cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64",
                             "aarch64",
                         )
                     else:
                         await self.alias_image(
                             "python",
-                            "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+                            "cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64",
                             "x86_64",
                         )
                 case ImageSource.DOCKER_HUB:
@@ -999,10 +1000,13 @@ class DevContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
-            wsproxy_hash_key=self.generate_passphrase(),
-            wsproxy_jwt_key=self.generate_passphrase(),
-            wsproxy_api_token=self.generate_passphrase(),
+            appproxy_api_secret=secrets.token_hex(32),
+            appproxy_jwt_secret=secrets.token_hex(32),
+            appproxy_permit_hash_secret=secrets.token_hex(32),
+            appproxy_coordinator_addr=ServerAddr(HostPortPair("127.0.0.1", 10200)),
+            appproxy_worker_addr=ServerAddr(HostPortPair("127.0.0.1", 10201)),
         )
+
         return InstallInfo(
             version=self.dist_info.version,
             base_path=Path.cwd(),
@@ -1050,8 +1054,9 @@ class DevContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
-        self.log_header("Configuring wsproxy...")
-        await self.configure_wsproxy()
+        self.log_header("Configuring app-proxy...")
+        await self.install_appproxy_db()
+        await self.configure_appproxy()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
         self.log_header("Loading fixtures...")
@@ -1115,9 +1120,6 @@ class PackageContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
-            wsproxy_hash_key=self.generate_passphrase(),
-            wsproxy_jwt_key=self.generate_passphrase(),
-            wsproxy_api_token=self.generate_passphrase(),
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -1246,7 +1248,8 @@ class PackageContext(Context):
                         tg.create_task(self._fetch_package("agent", vpane))
                         tg.create_task(self._fetch_package("agent-watcher", vpane))
                         tg.create_task(self._fetch_package("webserver", vpane))
-                        tg.create_task(self._fetch_package("wsproxy", vpane))
+                        tg.create_task(self._fetch_package("app-proxy-coordinator", vpane))
+                        tg.create_task(self._fetch_package("app-proxy-worker", vpane))
                         tg.create_task(self._fetch_package("storage-proxy", vpane))
                         tg.create_task(self._fetch_package("client", vpane))
                         tg.create_task(self._fetch_checksums(vpane))
@@ -1255,7 +1258,8 @@ class PackageContext(Context):
                     await self._verify_package("agent", fat=False)
                     await self._verify_package("agent-watcher", fat=False)
                     await self._verify_package("webserver", fat=False)
-                    await self._verify_package("wsproxy", fat=False)
+                    await self._verify_package("app-proxy-coordinator", fat=False)
+                    await self._verify_package("app-proxy-worker", fat=False)
                     await self._verify_package("storage-proxy", fat=False)
                     await self._verify_package("client", fat=False)
                 case PackageSource.LOCAL_DIR:
@@ -1270,7 +1274,12 @@ class PackageContext(Context):
                     await self._install_package(
                         "webserver", vpane, fat=self.dist_info.use_fat_binary
                     )
-                    await self._install_package("wsproxy", vpane, fat=self.dist_info.use_fat_binary)
+                    await self._install_package(
+                        "app-proxy-coordinator", vpane, fat=self.dist_info.use_fat_binary
+                    )
+                    await self._install_package(
+                        "app-proxy-worker", vpane, fat=self.dist_info.use_fat_binary
+                    )
                     await self._install_package(
                         "storage-proxy", vpane, fat=self.dist_info.use_fat_binary
                     )
@@ -1280,7 +1289,12 @@ class PackageContext(Context):
                     await self._verify_package("agent", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
-                    await self._verify_package("wsproxy", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package(
+                        "app-proxy-coordinator", fat=self.dist_info.use_fat_binary
+                    )
+                    await self._verify_package(
+                        "app-proxy-worker", fat=self.dist_info.use_fat_binary
+                    )
                     await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("client", fat=self.dist_info.use_fat_binary)
         finally:
@@ -1298,8 +1312,9 @@ class PackageContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
-        self.log_header("Configuring wsproxy...")
-        await self.configure_wsproxy()
+        self.log_header("Configuring app-proxy...")
+        await self.install_appproxy_db()
+        await self.configure_appproxy()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
         self.log_header("Loading fixtures...")
