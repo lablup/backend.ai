@@ -310,24 +310,6 @@ class Context(metaclass=ABCMeta):
             "ai.backend.install.fixtures", "example-resource-presets.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with tempfile.TemporaryDirectory() as tmpdir:
-            service = self.install_info.service_config
-            fixture_path = Path(tmpdir) / "fixture.json"
-            # Use existing wsproxy_* columns to store approxy info (same as install-dev.sh)
-            with open(fixture_path, "w") as fw:
-                fw.write(
-                    json.dumps({
-                        "__mode": "update",
-                        "scaling_groups": [
-                            {
-                                "name": "default",
-                                "wsproxy_addr": f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
-                                "wsproxy_api_token": service.appproxy_api_secret,
-                            }
-                        ],
-                    })
-                )
-            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
@@ -736,6 +718,27 @@ class Context(metaclass=ABCMeta):
             ],
         )
 
+    async def configure_appproxy_fixture(self) -> None:
+        self.log_header("Updating manager scaling_groups to point to appproxy coordinator...")
+
+        service = self.install_info.service_config
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fixture_path = Path(tmpdir) / "fixture.json"
+            with open(fixture_path, "w") as fw:
+                fw.write(
+                    json.dumps({
+                        "__mode": "update",
+                        "scaling_groups": [
+                            {
+                                "name": "default",
+                                "wsproxy_addr": f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
+                                "wsproxy_api_token": service.appproxy_api_secret,
+                            }
+                        ],
+                    })
+                )
+            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
+
     async def configure_client(self) -> None:
         # TODO: add an option to generate keypairs
         base_path = self.install_info.base_path
@@ -1036,18 +1039,27 @@ class DevContext(Context):
 
         self.log_header("Configuring agent...")
         await self.configure_agent()
+
+        self.log_header("Initializing app-proxy database...")
+        await self.install_appproxy_db()
+
         self.log_header("Configuring storage-proxy...")
         await self.configure_storage_proxy()
+
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
-        self.log_header("Configuring app-proxy...")
-        await self.install_appproxy_db()
-        await self.configure_appproxy()
-        self.log_header("Generating client environ configs...")
-        await self.configure_client()
+
         self.log_header("Loading fixtures...")
         await self.load_fixtures()
+
+        self.log_header("Configuring app-proxy...")
+        await self.configure_appproxy()
+        await self.configure_appproxy_fixture()
+
+        self.log_header("Generating client environ configs...")
+        await self.configure_client()
+
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
 
