@@ -28,6 +28,7 @@ from pydantic import (
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.configs.validation_context import BaseConfigValidationContext
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
@@ -42,7 +43,7 @@ from ai.backend.common.types import (
     ServiceDiscoveryType,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.logging.config import LoggingConfig, get_config_validation_context
+from ai.backend.logging.config import LoggingConfig
 
 from ..affinity_map import AffinityPolicy
 from ..stats import StatModes
@@ -66,6 +67,10 @@ class ScratchType(enum.StrEnum):
     HOSTFILE = "hostfile"
     MEMORY = "memory"
     K8S_NFS = "k8s-nfs"
+
+
+class AgentConfigValidationContext(BaseConfigValidationContext):
+    is_not_invoked_subcommand: bool
 
 
 class SyncContainerLifecyclesConfig(BaseConfigSchema):
@@ -194,7 +199,7 @@ class CoreDumpConfig(BaseConfigSchema):
     @model_validator(mode="after")
     def _set_coredump_path(self, info: ValidationInfo) -> Self:
         if self.enabled:
-            context = get_config_validation_context(info)
+            context = AgentConfigValidationContext.get_config_validation_context(info)
             if context is None:
                 raise ValueError("context must be specified in model_validate()")
             if context.is_not_invoked_subcommand and not sys.platform.startswith("linux"):
@@ -301,7 +306,7 @@ class DebugConfig(BaseConfigSchema):
     @field_validator("enabled", mode="before")
     @classmethod
     def _set_enabled(cls, v: Any, info: ValidationInfo) -> Any:
-        context = get_config_validation_context(info)
+        context = AgentConfigValidationContext.get_config_validation_context(info)
         if context is None:
             # Likely in tests, command line args do not need to be set.
             return v

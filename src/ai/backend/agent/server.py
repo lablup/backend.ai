@@ -110,11 +110,11 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.config import ConfigValidationContext
 from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__ as VERSION
 from .config.unified import (
+    AgentConfigValidationContext,
     AgentUnifiedConfig,
     APIConfig,
     ContainerLogsConfig,
@@ -1444,7 +1444,7 @@ def main(
         is_not_invoked_subcommand = cli_ctx.invoked_subcommand is None
         server_config = AgentUnifiedConfig.model_validate(
             raw_cfg,
-            context=ConfigValidationContext(
+            context=AgentConfigValidationContext(
                 debug=log_level == LogLevel.DEBUG,
                 log_level=log_level,
                 is_not_invoked_subcommand=is_not_invoked_subcommand,

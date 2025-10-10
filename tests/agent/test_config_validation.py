@@ -12,6 +12,7 @@ from ai.backend.agent.affinity_map import AffinityPolicy
 from ai.backend.agent.config.unified import (
     AgentBackend,
     AgentConfig,
+    AgentConfigValidationContext,
     AgentUnifiedConfig,
     ContainerConfig,
     ContainerSandboxType,
@@ -23,7 +24,6 @@ from ai.backend.agent.config.unified import (
 from ai.backend.agent.stats import StatModes
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.logging.config import (
-    ConfigValidationContext,
     LoggingConfig,
     LogLevel,
     default_pkg_ns,
@@ -37,8 +37,8 @@ CONTEXT_DEFAULT_LOG_LEVEL = LogLevel.DEBUG
 
 
 @pytest.fixture
-def default_context() -> ConfigValidationContext:
-    return ConfigValidationContext(
+def default_context() -> AgentConfigValidationContext:
+    return AgentConfigValidationContext(
         debug=CONTEXT_DEFAULT_DEBUG,
         log_level=CONTEXT_DEFAULT_LOG_LEVEL,
         is_not_invoked_subcommand=True,
@@ -58,7 +58,7 @@ class LoggingConfigTest:
     def test_level_field_uses_context_log_level(
         self,
         default_raw_config: RawConfigT,
-        default_context: ConfigValidationContext,
+        default_context: AgentConfigValidationContext,
     ) -> None:
         config = LoggingConfig.model_validate(default_raw_config, context=default_context)
 
@@ -73,7 +73,7 @@ class LoggingConfigTest:
     def test_level_field_with_notset_context(
         self,
         default_raw_config: RawConfigT,
-        default_context: ConfigValidationContext,
+        default_context: AgentConfigValidationContext,
     ) -> None:
         context = default_context.model_copy(update={"log_level": LogLevel.NOTSET})
         config = LoggingConfig.model_validate(default_raw_config, context=context)
@@ -83,7 +83,7 @@ class LoggingConfigTest:
     def test_pkg_ns_field_updates_ai_backend_from_context(
         self,
         default_raw_config: RawConfigT,
-        default_context: ConfigValidationContext,
+        default_context: AgentConfigValidationContext,
     ) -> None:
         raw_config = {**default_raw_config, "pkg-ns": None}
         config = LoggingConfig.model_validate(raw_config, context=default_context)
@@ -97,7 +97,7 @@ class LoggingConfigTest:
     def test_pkg_ns_field_merges_with_existing_values(
         self,
         default_raw_config: RawConfigT,
-        default_context: ConfigValidationContext,
+        default_context: AgentConfigValidationContext,
     ) -> None:
         raw_config = {**default_raw_config, "pkg-ns": {"aiohttp": LogLevel.ERROR}}
         context = default_context.model_copy(update={"log_level": LogLevel.WARNING})
@@ -117,7 +117,7 @@ class LoggingConfigTest:
     def test_pkg_ns_field_with_notset_context(
         self,
         default_raw_config: RawConfigT,
-        default_context: ConfigValidationContext,
+        default_context: AgentConfigValidationContext,
     ) -> None:
         raw_config = {**default_raw_config, "pkg-ns": {"aiohttp": LogLevel.WARNING}}
         context = default_context.model_copy(update={"log_level": LogLevel.NOTSET})
@@ -132,8 +132,8 @@ class CoreDumpConfigTest:
         return {"enabled": True}
 
     @pytest.fixture
-    def default_context(self) -> ConfigValidationContext:
-        return ConfigValidationContext(
+    def default_context(self) -> AgentConfigValidationContext:
+        return AgentConfigValidationContext(
             debug=True,
             log_level=CONTEXT_DEFAULT_LOG_LEVEL,
             is_not_invoked_subcommand=True,
@@ -143,7 +143,7 @@ class CoreDumpConfigTest:
     def test_coredump_enabled_requires_absolute_core_pattern(
         self,
         default_raw_config: RawConfigT,
-        default_context: ConfigValidationContext,
+        default_context: AgentConfigValidationContext,
     ) -> None:
         # core_pattern with pipe pattern
         with patch("pathlib.Path.read_text", return_value="|/usr/lib/systemd/systemd-coredump"):
@@ -163,7 +163,7 @@ class CoreDumpConfigTest:
     def test_coredump_enabled_succeeds_with_absolute_core_pattern_on_linux(
         self,
         default_raw_config: RawConfigT,
-        default_context: ConfigValidationContext,
+        default_context: AgentConfigValidationContext,
     ) -> None:
         with patch("pathlib.Path.read_text", return_value="/var/lib/coredumps/core.%p"):
             config = CoreDumpConfig.model_validate(default_raw_config, context=default_context)
@@ -175,7 +175,7 @@ class CoreDumpConfigTest:
     def test_coredump_enabled_fails_on_non_linux_darwin(
         self,
         default_raw_config: RawConfigT,
-        default_context: ConfigValidationContext,
+        default_context: AgentConfigValidationContext,
     ) -> None:
         with pytest.raises(ValidationError) as exc_info:
             CoreDumpConfig.model_validate(default_raw_config, context=default_context)
@@ -186,7 +186,7 @@ class CoreDumpConfigTest:
     def test_coredump_enabled_fails_on_non_linux_windows(
         self,
         default_raw_config: RawConfigT,
-        default_context: ConfigValidationContext,
+        default_context: AgentConfigValidationContext,
     ) -> None:
         with pytest.raises(ValidationError) as exc_info:
             CoreDumpConfig.model_validate(default_raw_config, context=default_context)
@@ -196,7 +196,7 @@ class CoreDumpConfigTest:
     def test_coredump_disabled_does_not_validate_core_pattern(
         self,
         default_raw_config: RawConfigT,
-        default_context: ConfigValidationContext,
+        default_context: AgentConfigValidationContext,
     ) -> None:
         raw_config = {**default_raw_config, "enabled": False}
 
@@ -222,7 +222,7 @@ class DebugConfigTest:
     def test_enabled_field_uses_context_debug_value(
         self,
         default_raw_config: RawConfigT,
-        default_context: ConfigValidationContext,
+        default_context: AgentConfigValidationContext,
     ) -> None:
         config = DebugConfig.model_validate(
             default_raw_config,

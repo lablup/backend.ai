@@ -13,6 +13,7 @@ from pydantic import (
     model_validator,
 )
 
+from ai.backend.common.configs.validation_context import BaseConfigValidationContext
 from ai.backend.common.typed_validators import AutoDirectoryPath
 
 from .exceptions import ConfigurationError
@@ -37,21 +38,6 @@ class LogstashProtocol(StrEnum):
     ZMQ_PUB = "zmq.pub"
     TCP = "tcp"
     UDP = "udp"
-
-
-class ConfigValidationContext(BaseModel, extra="forbid", frozen=True):
-    debug: bool
-    log_level: LogLevel
-    is_not_invoked_subcommand: bool
-
-
-def get_config_validation_context(info: ValidationInfo) -> ConfigValidationContext | None:
-    context = info.context
-    if context is None:
-        return None
-    if not isinstance(context, ConfigValidationContext):
-        raise ValueError("context must be provided as a ConfigValidationContext")
-    return context
 
 
 class BaseConfigModel(BaseModel):
@@ -246,9 +232,10 @@ class LoggingConfig(BaseConfigModel):
     @field_validator("level", mode="before")
     @classmethod
     def _set_level(cls, v: Any, info: ValidationInfo) -> Any:
-        context = get_config_validation_context(info)
+        context = BaseConfigValidationContext.get_config_validation_context(info)
         if context is None:
-            # Likely in tests, command line args do not need to be set.
+            # In tests or server scripts that do not use Pydantic validation yet.
+            # Command line args are not set.
             return v
 
         if context.log_level != LogLevel.NOTSET:
@@ -258,9 +245,10 @@ class LoggingConfig(BaseConfigModel):
     @field_validator("pkg_ns", mode="before")
     @classmethod
     def _set_pkg_ns(cls, v: Any, info: ValidationInfo) -> Any:
-        context = get_config_validation_context(info)
+        context = BaseConfigValidationContext.get_config_validation_context(info)
         if context is None:
-            # Likely in tests, command line args do not need to be set.
+            # In tests or server scripts that do not use Pydantic validation yet.
+            # Command line args are not set.
             return v
 
         if context.log_level != LogLevel.NOTSET:
