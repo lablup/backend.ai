@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Optional, Self
+from typing import Any, Optional, Self
 
 from pydantic import (
     AliasChoices,
@@ -7,6 +7,8 @@ from pydantic import (
     ByteSize,
     ConfigDict,
     Field,
+    ValidationInfo,
+    field_validator,
     model_serializer,
     model_validator,
 )
@@ -35,6 +37,21 @@ class LogstashProtocol(StrEnum):
     ZMQ_PUB = "zmq.pub"
     TCP = "tcp"
     UDP = "udp"
+
+
+class ConfigValidationContext(BaseModel, extra="forbid", frozen=True):
+    debug: bool
+    log_level: LogLevel
+    is_not_invoked_subcommand: bool
+
+
+def get_config_validation_context(info: ValidationInfo) -> ConfigValidationContext | None:
+    context = info.context
+    if context is None:
+        return None
+    if not isinstance(context, ConfigValidationContext):
+        raise ValueError("context must be provided as a ConfigValidationContext")
+    return context
 
 
 class BaseConfigModel(BaseModel):
@@ -225,6 +242,31 @@ class LoggingConfig(BaseConfigModel):
         validation_alias=AliasChoices("pkg_ns", "pkg-ns"),
         serialization_alias="pkg-ns",
     )
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def _set_level(cls, v: Any, info: ValidationInfo) -> Any:
+        context = get_config_validation_context(info)
+        if context is None:
+            # Likely in tests, command line args do not need to be set.
+            return v
+
+        if context.log_level != LogLevel.NOTSET:
+            return context.log_level
+        return v
+
+    @field_validator("pkg_ns", mode="before")
+    @classmethod
+    def _set_pkg_ns(cls, v: Any, info: ValidationInfo) -> Any:
+        context = get_config_validation_context(info)
+        if context is None:
+            # Likely in tests, command line args do not need to be set.
+            return v
+
+        if context.log_level != LogLevel.NOTSET:
+            v = {} if v is None else dict(v)
+            v["ai.backend"] = context.log_level
+        return v
 
     @model_validator(mode="after")
     def validate_driver_configs(self) -> Self:

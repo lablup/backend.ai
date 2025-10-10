@@ -110,13 +110,13 @@ from ai.backend.common.types import (
 )
 from ai.backend.common.utils import current_loop
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
+from ai.backend.logging.config import ConfigValidationContext
 from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__ as VERSION
 from .config.unified import (
     AgentUnifiedConfig,
     APIConfig,
-    ConfigValidationContext,
     ContainerLogsConfig,
     EventLoopType,
     KernelLifecyclesConfig,

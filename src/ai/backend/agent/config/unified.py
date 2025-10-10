@@ -16,7 +16,6 @@ from typing import Any, Mapping, Optional, Self
 
 from pydantic import (
     AliasChoices,
-    BaseModel,
     ConfigDict,
     Field,
     FilePath,
@@ -41,8 +40,8 @@ from ai.backend.common.types import (
     ResourceGroupType,
     ServiceDiscoveryType,
 )
-from ai.backend.logging import BraceStyleAdapter, LogLevel
-from ai.backend.logging.config import LoggingConfig
+from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.config import LoggingConfig, get_config_validation_context
 
 from ..affinity_map import AffinityPolicy
 from ..stats import StatModes
@@ -66,21 +65,6 @@ class ScratchType(enum.StrEnum):
     HOSTFILE = "hostfile"
     MEMORY = "memory"
     K8S_NFS = "k8s-nfs"
-
-
-class ConfigValidationContext(BaseModel, extra="forbid", frozen=True):
-    debug: bool
-    log_level: LogLevel
-    is_not_invoked_subcommand: bool
-
-
-def _get_config_validation_context(info: ValidationInfo) -> ConfigValidationContext | None:
-    context = info.context
-    if context is None:
-        return None
-    if not isinstance(context, ConfigValidationContext):
-        raise ValueError("context must be provided as a ConfigValidationContext")
-    return context
 
 
 class SyncContainerLifecyclesConfig(BaseConfigSchema):
@@ -180,18 +164,7 @@ class CoreDumpConfig(BaseConfigSchema):
         validation_alias=AliasChoices("size-limit", "size_limit"),
         serialization_alias="size-limit",
     )
-    _core_path: Optional[Path]
-
-    def __init__(self, _core_path: Optional[Path] = None, **kwargs) -> None:
-        super().__init__(**kwargs)
-        self._core_path = _core_path
-
-    def set_core_path(self, core_path: Path) -> None:
-        """
-        Set the core path for core dumps.
-        This is used to set the core pattern file path.
-        """
-        self._core_path = core_path
+    _core_path: Optional[Path] = Field(default=None, exclude=True, repr=False, init=True)
 
     @property
     def core_path(self) -> Path:
@@ -205,14 +178,23 @@ class CoreDumpConfig(BaseConfigSchema):
             )
         return self._core_path
 
+    @core_path.setter
+    def core_path(self, core_path: Path) -> None:
+        """
+        Set the core path for core dumps.
+        This is used to set the core pattern file path.
+        """
+        self._core_path = core_path
+
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
     )
 
-    @model_validator(mode="after")
-    def _validate_coredump(self, info: ValidationInfo) -> Self:
-        if self.enabled:
-            context = _get_config_validation_context(info)
+    @model_validator(mode="before")
+    @classmethod
+    def _set_coredump_path(cls, data: dict[str, Any], info: ValidationInfo) -> dict[str, Any]:
+        if isinstance(data, dict) and data.get("enabled"):
+            context = get_config_validation_context(info)
             if context is None:
                 raise ValueError("context must be specified in model_validate()")
             if context.is_not_invoked_subcommand and not sys.platform.startswith("linux"):
@@ -223,8 +205,9 @@ class CoreDumpConfig(BaseConfigSchema):
                 raise ValueError(
                     "/proc/sys/kernel/core_pattern must be an absolute path to enable container coredumps.",
                 )
-            self.set_core_path(Path(core_pattern).parent)
-        return self
+
+            data["_core_path"] = Path(core_pattern).parent
+        return data
 
 
 class DebugConfig(BaseConfigSchema):
@@ -311,9 +294,18 @@ class DebugConfig(BaseConfigSchema):
         serialization_alias="log-docker-events",
     )
     coredump: CoreDumpConfig = Field(
-        default_factory=lambda: CoreDumpConfig(_core_path=None),
+        default_factory=CoreDumpConfig,
         description="Core dump configuration",
     )
+
+    @field_validator("enabled", mode="before")
+    @classmethod
+    def _set_enabled(cls, v: Any, info: ValidationInfo) -> Any:
+        context = get_config_validation_context(info)
+        if context is None:
+            # Likely in tests, command line args do not need to be set.
+            return v
+        return context.debug
 
 
 class AgentConfig(BaseConfigSchema):
@@ -1085,17 +1077,4 @@ class AgentUnifiedConfig(BaseConfigSchema):
     def _validate_docker_config(self) -> Self:
         if self.agent_backend == AgentBackend.DOCKER:
             DockerExtraConfig.model_validate(self.container.model_dump())
-        return self
-
-    @model_validator(mode="after")
-    def _set_command_line_args(self, info: ValidationInfo) -> Self:
-        context = _get_config_validation_context(info)
-        if context is None:
-            # Likely in tests, command line args do not need to be set.
-            return self
-
-        self.debug.enabled = context.debug
-        if context.log_level != LogLevel.NOTSET:
-            self.logging.level = context.log_level
-            self.logging.pkg_ns["ai.backend"] = context.log_level
         return self
