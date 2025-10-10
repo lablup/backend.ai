@@ -1069,7 +1069,7 @@ class AgentUnifiedConfig(BaseConfigSchema):
     @model_validator(mode="after")
     def _validate_kubernetes_config(self) -> Self:
         if self.agent_backend == AgentBackend.KUBERNETES:
-            if self.container.scratch_type == "k8s-nfs" and (
+            if self.container.scratch_type == ScratchType.K8S_NFS and (
                 self.container.scratch_nfs_address is None
                 or self.container.scratch_nfs_options is None
             ):
