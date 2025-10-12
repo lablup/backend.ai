@@ -19,6 +19,7 @@ from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelT
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisionsResponse,
+    ArtifactRevisionResponseData,
 )
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.request import (
@@ -38,6 +39,7 @@ from ai.backend.manager.dto.response import (
     ScanArtifactsResponse,
     SearchArtifactsResponse,
 )
+from ai.backend.manager.errors.artifact import ArtifactImportDelegationError
 from ai.backend.manager.services.artifact.actions.delegate_scan import DelegateScanArtifactsAction
 from ai.backend.manager.services.artifact.actions.list_with_revisions import (
     ListArtifactsWithRevisionsAction,
@@ -127,7 +129,6 @@ class APIHandler:
         body: BodyParam[DelegateImportArtifactsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
         from ai.backend.manager.dto.response import ArtifactRevisionImportTask
 
         # Validate request
@@ -152,13 +153,17 @@ class APIHandler:
                 )
             )
 
+            if len(action_result.result) != len(action_result.task_ids):
+                raise ArtifactImportDelegationError(
+                    "Mismatch between artifact revisions and task IDs returned"
+                )
+
             # Convert to ArtifactRevisionImportTask format
             tasks = []
-            for i, revision in enumerate(action_result.result):
-                task_id = action_result.task_ids[i] if i < len(action_result.task_ids) else None
+            for task_id, revision in zip(action_result.task_ids, action_result.result, strict=True):
                 tasks.append(
                     ArtifactRevisionImportTask(
-                        task_id=str(task_id) if task_id else "",
+                        task_id=str(task_id),
                         artifact_revision=ArtifactRevisionResponseData.from_revision_data(revision),
                     )
                 )
