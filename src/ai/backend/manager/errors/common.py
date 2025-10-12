@@ -181,16 +181,3 @@ class Forbidden(BackendAIError, web.HTTPForbidden):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
         )
-
-
-class BadConfigurationError(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/bad-configuration"
-    error_title = "Bad configuration error."
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.BACKENDAI,
-            operation=ErrorOperation.SETUP,
-            error_detail=ErrorDetail.INTERNAL_ERROR,
-        )
