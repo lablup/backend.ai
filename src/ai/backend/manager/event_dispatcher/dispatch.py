@@ -22,7 +22,6 @@ from ai.backend.common.events.event_types.agent.anycast import (
 from ai.backend.common.events.event_types.artifact.anycast import (
     ModelImportDoneEvent,
     ModelMetadataFetchDoneEvent,
-    RemoteArtifactImportDoneEvent,
 )
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
     DoScanReservoirRegistryEvent,
@@ -581,11 +580,6 @@ class Dispatchers:
             ModelImportDoneEvent,
             None,
             self._artifact_event_handler.handle_model_import_done,
-        )
-        evd.consume(
-            RemoteArtifactImportDoneEvent,
-            None,
-            self._artifact_event_handler.handle_remote_artifact_import_done,
         )
 
     def _dispatch_artifact_registry_events(self, event_dispatcher: EventDispatcher) -> None:
