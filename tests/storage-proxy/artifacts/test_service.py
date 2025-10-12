@@ -42,6 +42,7 @@ from ai.backend.storage.services.artifacts.reservoir import (
     ReservoirService,
     ReservoirServiceArgs,
 )
+from ai.backend.storage.services.artifacts.types import ImportPipeline
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool
 from ai.backend.storage.types import BucketCopyOptions
@@ -416,9 +417,6 @@ class TestHuggingFaceService:
             ArtifactStorageImportStep.DOWNLOAD: "test_storage",
             ArtifactStorageImportStep.ARCHIVE: "test_storage",
         }
-        # Create mock pipeline
-        from ai.backend.storage.services.artifacts.types import ImportPipeline
-
         mock_pipeline = MagicMock(spec=ImportPipeline)
 
         task_id = await hf_service.import_models_batch(
@@ -845,9 +843,6 @@ class TestReservoirService:
                 ArtifactStorageImportStep.DOWNLOAD: "test_storage",
                 ArtifactStorageImportStep.ARCHIVE: "test_storage",
             }
-            # Create mock pipeline
-            from ai.backend.storage.services.artifacts.types import ImportPipeline
-
             mock_pipeline = MagicMock(spec=ImportPipeline)
 
             await reservoir_service.import_model(
@@ -874,9 +869,6 @@ class TestReservoirService:
         service = ReservoirService(args)
 
         model_target = ModelTarget(model_id="test/model", revision="main")
-
-        # Create mock pipeline
-        from ai.backend.storage.services.artifacts.types import ImportPipeline
 
         mock_pipeline = MagicMock(spec=ImportPipeline)
 
@@ -913,9 +905,6 @@ class TestReservoirService:
             ArtifactStorageImportStep.DOWNLOAD: "test_storage",
             ArtifactStorageImportStep.ARCHIVE: "test_storage",
         }
-        # Create mock pipeline
-        from ai.backend.storage.services.artifacts.types import ImportPipeline
-
         mock_pipeline = MagicMock(spec=ImportPipeline)
 
         task_id = await reservoir_service.import_models_batch(
@@ -942,8 +931,6 @@ class TestReservoirService:
             ArtifactStorageImportStep.DOWNLOAD: "test_storage",
             ArtifactStorageImportStep.ARCHIVE: "test_storage",
         }
-        # Create mock pipeline
-        from ai.backend.storage.services.artifacts.types import ImportPipeline
 
         mock_pipeline = MagicMock(spec=ImportPipeline)
 
