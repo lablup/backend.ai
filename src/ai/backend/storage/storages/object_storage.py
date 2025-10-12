@@ -208,6 +208,22 @@ class ObjectStorage(AbstractStorage):
         except Exception as e:
             raise PresignedDownloadURLGenerationError() from e
 
+    async def list_objects_with_prefix(self, prefix: str) -> list[str]:
+        """
+        List all object keys in the storage with the given prefix.
+
+        Args:
+            prefix: The prefix to filter object keys
+
+        Returns:
+            list[str]: List of object keys matching the prefix
+        """
+        try:
+            s3_client = self._get_s3_client()
+            return await s3_client.list_objects_with_prefix(prefix)
+        except Exception as e:
+            raise ObjectInfoFetchError(f"List objects failed: {str(e)}") from e
+
     def _get_s3_client(self) -> S3Client:
         return S3Client(
             bucket_name=self._bucket,

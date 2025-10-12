@@ -197,11 +197,9 @@ class StorageTransferManager:
     ) -> list[str]:
         """List files in Object storage with given prefix."""
         try:
-            # Use storage's list_objects method if available
-            # This is a simplified implementation - actual implementation would depend on storage interface
-            # For now, return empty list and rely on higher-level logic
-            return []
-        except Exception:
+            return await storage.list_objects_with_prefix(prefix)
+        except Exception as e:
+            log.warning(f"Failed to list objects with prefix '{prefix}': {str(e)}")
             return []
 
     async def verify_transfer(
