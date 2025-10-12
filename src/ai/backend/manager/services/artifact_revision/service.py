@@ -21,6 +21,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
+from ai.backend.manager.dto.request import DelegateImportArtifactsReq
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
@@ -349,9 +350,6 @@ class ArtifactRevisionService:
             )
             revision_data = await self._artifact_repository.get_artifact_revision_by_id(revision_id)
             result_revisions.append(revision_data)
-
-        # Delegate import to remote reservoir
-        from ai.backend.manager.dto.request import DelegateImportArtifactsReq
 
         # Pass delegatee_reservoir_id to delegator_reservoir_id for the remote call
         delegatee_reservoir_id = (

@@ -1,4 +1,5 @@
 import logging
+import uuid
 from uuid import UUID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
@@ -162,8 +163,6 @@ class ArtifactEventHandler:
         source: AgentId,
         event: RemoteArtifactImportDoneEvent,
     ) -> None:
-        import uuid
-
         try:
             revision_id = uuid.UUID(event.artifact_revision_id)
         except ValueError as e:
@@ -175,24 +174,19 @@ class ArtifactEventHandler:
             return
 
         try:
-            # Update remote_status based on import success
-            remote_status = (
-                ArtifactRemoteStatus.AVAILABLE
-                if event.import_success
-                else ArtifactRemoteStatus.SCANNED
-            )
+            # Update remote_status to AVAILABLE
+            remote_status = ArtifactRemoteStatus.AVAILABLE
 
             await self._artifact_repository.update_artifact_revision_remote_status(
                 revision_id, remote_status
             )
 
             log.info(
-                "Updated remote_status for artifact revision {} to {} (artifact: {}, revision: {}, success: {})",
+                "Updated remote_status for artifact revision {} to {} (artifact: {}, revision: {})",
                 revision_id,
                 remote_status,
                 event.artifact_name,
                 event.revision,
-                event.import_success,
             )
         except Exception as e:
             log.error(
