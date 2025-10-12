@@ -109,7 +109,6 @@ class RemoteArtifactImportDoneEvent(BaseArtifactEvent):
     revision: str
     registry_type: ArtifactRegistryType
     registry_name: str
-    import_success: bool
 
     @classmethod
     @override
@@ -123,7 +122,6 @@ class RemoteArtifactImportDoneEvent(BaseArtifactEvent):
             self.revision,
             self.registry_type,
             self.registry_name,
-            self.import_success,
         )
 
     @classmethod
@@ -134,7 +132,6 @@ class RemoteArtifactImportDoneEvent(BaseArtifactEvent):
             revision=value[2],
             registry_type=value[3],
             registry_name=value[4],
-            import_success=value[5],
         )
 
     @override

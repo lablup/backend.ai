@@ -35,7 +35,10 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.artifact.types import DelegateeTarget as DelegateeTargetData
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
-from ai.backend.manager.errors.artifact import ArtifactScanLimitExceededError
+from ai.backend.manager.errors.artifact import (
+    ArtifactImportDelegationError,
+    ArtifactScanLimitExceededError,
+)
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
     ArtifactOrderingOptions,
@@ -1035,12 +1038,15 @@ async def delegate_import_artifacts(
     ]
     imported_artifacts.extend(artifact_revisions)
 
-    for i, artifact_revision in enumerate(artifact_revisions):
+    if len(artifact_revisions) != len(action_result.task_ids):
+        raise ArtifactImportDelegationError(
+            "Mismatch between artifact revisions and task IDs returned"
+        )
+
+    for task_id, artifact_revision in zip(action_result.task_ids, artifact_revisions, strict=True):
         tasks.append(
             ArtifactRevisionImportTask(
-                task_id=ID(str(action_result.task_ids[i]))
-                if i < len(action_result.task_ids)
-                else ID(""),
+                task_id=ID(str(task_id)),
                 artifact_revision=artifact_revision,
             )
         )
