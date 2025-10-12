@@ -32,6 +32,7 @@ from ai.backend.manager.dto.request import (
     SearchArtifactsReq,
 )
 from ai.backend.manager.dto.response import (
+    ArtifactRevisionImportTask,
     DelegateImportArtifactsResponse,
     DelegateScanArtifactsResponse,
     RetreiveArtifactModelResponse,
@@ -129,8 +130,6 @@ class APIHandler:
         body: BodyParam[DelegateImportArtifactsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        from ai.backend.manager.dto.response import ArtifactRevisionImportTask
-
         # Validate request
         if not body.parsed.artifact_revision_ids:
             return APIResponse.build(
