@@ -133,7 +133,6 @@ class ErrorDomain(enum.StrEnum):
     API = "api"
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact-registry"
-    ARTIFACT_REVISION = "artifact-revision"
     ARTIFACT_ASSOCIATION = "artifact-association"
     OBJECT_STORAGE = "object-storage"
     STORAGE_NAMESPACE = "storage-namespace"
