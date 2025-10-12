@@ -15,7 +15,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class StorageTransferManager:
-    """Utility class for transferring data between different storage types."""
+    """
+    Manages transferring files between different artifact storage backends.
+    """
 
     def __init__(self, storage_pool: StoragePool):
         self._storage_pool = storage_pool
