@@ -1845,10 +1845,8 @@ class ReservoirConfig(BaseConfigSchema):
                 converted_dict[enum_key] = value
             except ValueError:
                 # Skip invalid step names
-                log.error(f"Invalid artifact storage step key: {key}, skipping...")
+                log.warning(f"Invalid artifact storage step key: {key}, skipping...")
                 continue
-            else:
-                converted_dict[key] = value
 
         # Check for required steps
         missing_steps = _REQUIRED_STEPS - set(converted_dict.keys())
