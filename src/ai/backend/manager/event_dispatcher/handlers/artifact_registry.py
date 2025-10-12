@@ -22,6 +22,13 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.errors.artifact_registry import ReservoirConnectionError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
+from ai.backend.manager.repositories.artifact.types import (
+    ArtifactRemoteStatusFilter,
+    ArtifactRemoteStatusFilterType,
+    ArtifactRevisionFilterOptions,
+    ArtifactStatusFilter,
+    ArtifactStatusFilterType,
+)
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
@@ -108,16 +115,6 @@ class ArtifactRegistryEventHandler:
                 continue
 
             try:
-                # Find artifacts with status=SCANNED and remote_status=AVAILABLE
-                # These are artifacts that have been imported in remote reservoir but not yet downloaded locally
-                from ai.backend.manager.repositories.artifact.types import (
-                    ArtifactRemoteStatusFilter,
-                    ArtifactRemoteStatusFilterType,
-                    ArtifactRevisionFilterOptions,
-                    ArtifactStatusFilter,
-                    ArtifactStatusFilterType,
-                )
-
                 # Query for artifact revisions that need to be pulled
                 revision_filters = ArtifactRevisionFilterOptions(
                     status_filter=ArtifactStatusFilter(

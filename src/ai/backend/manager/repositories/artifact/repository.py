@@ -44,6 +44,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
     ArtifactOrderingOptions,
+    ArtifactRemoteStatusFilterType,
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
     ArtifactStatusFilterType,
@@ -1025,10 +1026,6 @@ class ArtifactRepository:
                 elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
                     count_stmt = count_stmt.where(ArtifactRevisionRow.status == status_values[0])
             if filters.remote_status_filter is not None:
-                from ai.backend.manager.repositories.artifact.types import (
-                    ArtifactRemoteStatusFilterType,
-                )
-
                 remote_status_values = [
                     status.value for status in filters.remote_status_filter.values
                 ]
