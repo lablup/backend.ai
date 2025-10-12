@@ -185,6 +185,7 @@ from pydantic import (
     Field,
     FilePath,
     IPvAnyNetwork,
+    ValidationInfo,
     field_serializer,
     field_validator,
 )
@@ -210,7 +211,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
-from ai.backend.manager.errors.common import BadConfigurationError
 from ai.backend.manager.pglock import PgAdvisoryLock
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -1824,19 +1824,40 @@ class ReservoirConfig(BaseConfigSchema):
         serialization_alias="storage-step-selection",
     )
 
-    @field_validator("storage_step_selection")
+    @field_validator("storage_step_selection", mode="before")
     @classmethod
     def _validate_required_steps(
-        cls, v: dict[ArtifactStorageImportStep, str]
+        cls, v: dict[str, str], info: ValidationInfo
     ) -> dict[ArtifactStorageImportStep, str]:
-        required_steps = {ArtifactStorageImportStep.DOWNLOAD, ArtifactStorageImportStep.ARCHIVE}
-        missing_steps = required_steps - set(v.keys())
-        if missing_steps:
-            missing_step_names = [step.value for step in missing_steps]
-            raise BadConfigurationError(
-                f"storage_step_selection must contain at least 'download' and 'archive' steps. Missing: {missing_step_names}"
-            )
-        return v
+        _REQUIRED_STEPS = {ArtifactStorageImportStep.DOWNLOAD, ArtifactStorageImportStep.ARCHIVE}
+
+        # Get storage_name from the current model data being validated
+        default_storage_name = info.data.get("storage_name", "RESERVOIR_STORAGE_NAME")
+
+        if not v:  # If storage_step_selection is empty or None
+            return {step: default_storage_name for step in _REQUIRED_STEPS}
+
+        # Convert string keys to ArtifactStorageImportStep enum keys if needed
+        converted_dict = {}
+        for key, value in v.items():
+            try:
+                enum_key = ArtifactStorageImportStep(key)
+                converted_dict[enum_key] = value
+            except ValueError:
+                # Skip invalid step names
+                log.error(f"Invalid artifact storage step key: {key}, skipping...")
+                continue
+            else:
+                converted_dict[key] = value
+
+        # Check for required steps
+        missing_steps = _REQUIRED_STEPS - set(converted_dict.keys())
+
+        # Add missing steps with default storage name
+        for step in missing_steps:
+            converted_dict[step] = default_storage_name
+
+        return converted_dict
 
 
 class ModelRegistryConfig(BaseConfigSchema):
