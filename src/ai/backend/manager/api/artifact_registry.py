@@ -9,7 +9,6 @@ from aiohttp import web
 
 from ai.backend.common.api_handlers import (
     APIResponse,
-    BaseResponseModel,
     BodyParam,
     PathParam,
     QueryParam,
@@ -58,10 +57,6 @@ from .auth import auth_required_for_method
 from .types import CORSOptions, WebMiddleware
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-class ErrorResponse(BaseResponseModel):
-    error: str
 
 
 class APIHandler:
