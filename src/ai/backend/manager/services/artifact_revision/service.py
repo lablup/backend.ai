@@ -30,11 +30,11 @@ from ai.backend.manager.dto.request import DelegateImportArtifactsReq
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
+    ArtifactImportBadRequestError,
+    RemoteReservoirArtifactImportError,
 )
 from ai.backend.manager.errors.artifact_registry import (
-    ArtifactRegistryBadImportRequestError,
     InvalidArtifactRegistryTypeError,
-    RemoteReservoirImportError,
 )
 from ai.backend.manager.errors.storage import UnsupportedStorageTypeError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
@@ -409,7 +409,7 @@ class ArtifactRevisionService:
                     task_ids.append(import_result.task_id)
                     result.append(import_result.result)
             except Exception as e:
-                raise RemoteReservoirImportError(
+                raise RemoteReservoirArtifactImportError(
                     f"Failed to import artifacts from remote reservoir: {e}"
                 ) from e
 
@@ -423,7 +423,7 @@ class ArtifactRevisionService:
         registry_id = registry_meta.registry_id
 
         if registry_type != ArtifactRegistryType.RESERVOIR:
-            raise ArtifactRegistryBadImportRequestError(
+            raise ArtifactImportBadRequestError(
                 "Only Reservoir type registry is supported for delegated import"
             )
 
@@ -455,7 +455,7 @@ class ArtifactRevisionService:
         client_resp = await remote_reservoir_client.delegate_import_artifacts(req)
 
         if client_resp is None:
-            raise RemoteReservoirImportError("Failed to connect to remote reservoir")
+            raise RemoteReservoirArtifactImportError("Failed to connect to remote reservoir")
 
         # Extract task_ids from remote response
         task_ids = [uuid.UUID(task.task_id) for task in client_resp.tasks]
