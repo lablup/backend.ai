@@ -175,10 +175,6 @@ class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOpti
 
         if filters.remote_status_filter is not None:
             # Handle different remote status filter types
-            from ai.backend.manager.repositories.artifact.types import (
-                ArtifactRemoteStatusFilterType,
-            )
-
             remote_status_values = [status.value for status in filters.remote_status_filter.values]
             if filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.IN:
                 conditions.append(ArtifactRevisionRow.remote_status.in_(remote_status_values))
