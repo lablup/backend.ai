@@ -238,7 +238,9 @@ class DelegateScanArtifactsInput:
 """)
 )
 class DelegateImportArtifactsInput:
-    artifact_revision_ids: list[ID]
+    artifact_revision_ids: list[ID] = strawberry.field(
+        description="List of artifact revision IDs of delegatee artifact registry"
+    )
     delegator_reservoir_id: Optional[ID] = strawberry.field(default=None)
     artifact_type: Optional[ArtifactType] = strawberry.field(default=None)
     delegatee_target: Optional[DelegateeTarget] = strawberry.field(default=None)
