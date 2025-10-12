@@ -1,4 +1,4 @@
-"""Tests for HuggingFace Service implementation."""
+"""Tests for DownloadStep implementations."""
 
 import uuid
 from datetime import datetime
@@ -28,21 +28,23 @@ from ai.backend.storage.exception import (
     ArtifactStorageEmptyError,
     HuggingFaceAPIError,
     ObjectStorageBucketNotFoundError,
-    ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
     ReservoirStorageConfigInvalidError,
     StorageNotFoundError,
 )
 from ai.backend.storage.services.artifacts.huggingface import (
+    HuggingFaceDownloadStep,
     HuggingFaceFileDownloadStreamReader,
-    HuggingFaceService,
-    HuggingFaceServiceArgs,
+    HuggingFaceScanner,
 )
 from ai.backend.storage.services.artifacts.reservoir import (
-    ReservoirService,
-    ReservoirServiceArgs,
+    ReservoirDownloadStep,
 )
-from ai.backend.storage.services.artifacts.types import ImportPipeline
+from ai.backend.storage.services.artifacts.storage_transfer import StorageTransferManager
+from ai.backend.storage.services.artifacts.types import (
+    DownloadStepResult,
+    ImportStepContext,
+)
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool
 from ai.backend.storage.types import BucketCopyOptions
@@ -126,19 +128,19 @@ def mock_registry_configs(
 
 
 @pytest.fixture
-def hf_service(
+def mock_storage_transfer_manager(mock_storage_pool: MagicMock) -> StorageTransferManager:
+    """Mock StorageTransferManager."""
+    return StorageTransferManager(mock_storage_pool)
+
+
+@pytest.fixture
+def hf_download_step(
     mock_registry_configs: dict[str, HuggingfaceConfig],
-    mock_background_task_manager: MagicMock,
-    mock_storage_pool: MagicMock,
-) -> HuggingFaceService:
-    """Create HuggingFaceService instance for testing."""
-    args = HuggingFaceServiceArgs(
+) -> HuggingFaceDownloadStep:
+    """Create HuggingFaceDownloadStep instance for testing."""
+    return HuggingFaceDownloadStep(
         registry_configs=mock_registry_configs,
-        background_task_manager=mock_background_task_manager,
-        storage_pool=mock_storage_pool,
-        event_producer=MagicMock(),  # Mock event producer
     )
-    return HuggingFaceService(args)
 
 
 @pytest.fixture
@@ -201,36 +203,64 @@ def mock_object_storage_config() -> ObjectStorageConfig:
 
 
 @pytest.fixture
-def reservoir_service(
-    mock_background_task_manager: MagicMock,
+def mock_import_step_context(
     mock_storage_pool: MagicMock,
-    mock_reservoir_config: ReservoirConfig,
-    mock_object_storage_config: ObjectStorageConfig,
-) -> ReservoirService:
-    """Create ReservoirService instance for testing."""
-    args = ReservoirServiceArgs(
-        background_task_manager=mock_background_task_manager,
-        event_producer=MagicMock(),
+    mock_progress_reporter: MagicMock,
+) -> ImportStepContext:
+    """Mock ImportStepContext."""
+    storage_step_mappings = {
+        ArtifactStorageImportStep.DOWNLOAD: "test_storage",
+        ArtifactStorageImportStep.ARCHIVE: "test_storage",
+    }
+    return ImportStepContext(
+        model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
+        registry_name="test_registry",
         storage_pool=mock_storage_pool,
-        reservoir_registry_configs={"test_registry": mock_reservoir_config},
+        progress_reporter=mock_progress_reporter,
+        storage_step_mappings=storage_step_mappings,
+        step_metadata={},
     )
-    return ReservoirService(args)
 
 
-class TestHuggingFaceService:
-    """Test cases for HuggingFaceService."""
+@pytest.fixture
+def mock_reservoir_registry_configs() -> dict[str, ReservoirConfig]:
+    """Mock Reservoir registry configurations."""
+    return {
+        "test_registry": ReservoirConfig(
+            endpoint="https://s3.amazonaws.com",
+            object_storage_region="us-west-2",
+            object_storage_access_key="test_access_key",
+            object_storage_secret_key="test_secret_key",
+        )
+    }
 
-    def test_make_scanner_registry_not_found(self, hf_service: HuggingFaceService) -> None:
+
+@pytest.fixture
+def reservoir_download_step(
+    mock_reservoir_registry_configs: dict[str, ReservoirConfig],
+) -> ReservoirDownloadStep:
+    """Create ReservoirDownloadStep instance for testing."""
+    return ReservoirDownloadStep(
+        registry_configs=mock_reservoir_registry_configs,
+    )
+
+
+class TestHuggingFaceDownloadStep:
+    """Test cases for HuggingFaceDownloadStep."""
+
+    def test_make_scanner_registry_not_found(
+        self, hf_download_step: HuggingFaceDownloadStep
+    ) -> None:
         """Test scanner creation with registry not found."""
         with pytest.raises(RegistryNotFoundError):
-            hf_service._make_scanner("nonexistent_registry")
+            hf_download_step._make_scanner("nonexistent_registry")
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_models")
     async def test_scan_models_success(
         self,
         mock_list_models: MagicMock,
-        hf_service: HuggingFaceService,
+        hf_download_step: HuggingFaceDownloadStep,
         mock_model_info: ModelData,
     ) -> None:
         """Test successful models scanning."""
@@ -243,9 +273,8 @@ class TestHuggingFaceService:
         mock_hf_model.last_modified = datetime(2023, 6, 15)
         mock_list_models.return_value = [mock_hf_model]
 
-        models = await hf_service.scan_models(
-            registry_name="test_registry", limit=5, search="DialoGPT", sort=ModelSortKey.DOWNLOADS
-        )
+        scanner = hf_download_step._make_scanner("test_registry")
+        models = await scanner.scan_models(limit=5, search="DialoGPT", sort=ModelSortKey.DOWNLOADS)
 
         assert len(models) == 1
         assert models[0].id == "microsoft/DialoGPT-medium"
@@ -264,20 +293,19 @@ class TestHuggingFaceService:
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_models")
     async def test_scan_models_api_error(
-        self, mock_list_models: MagicMock, hf_service: HuggingFaceService
+        self, mock_list_models: MagicMock, hf_download_step: HuggingFaceDownloadStep
     ) -> None:
         """Test models scanning with API error."""
         mock_list_models.side_effect = Exception("API Error")
 
+        scanner = hf_download_step._make_scanner("test_registry")
         with pytest.raises(HuggingFaceAPIError):
-            await hf_service.scan_models(
-                registry_name="test_registry", limit=10, sort=ModelSortKey.DOWNLOADS
-            )
+            await scanner.scan_models(limit=10, sort=ModelSortKey.DOWNLOADS)
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
     async def test_scan_model_success(
-        self, mock_model_info: MagicMock, hf_service: HuggingFaceService
+        self, mock_model_info: MagicMock, hf_download_step: HuggingFaceDownloadStep
     ) -> None:
         """Test successful single model scanning."""
         # Mock the HuggingFace API response
@@ -289,8 +317,9 @@ class TestHuggingFaceService:
         mock_hf_model.last_modified = datetime(2023, 6, 15)
         mock_model_info.return_value = mock_hf_model
 
+        scanner = hf_download_step._make_scanner("test_registry")
         model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
-        model = await hf_service.scan_model(registry_name="test_registry", model=model_target)
+        model = await scanner.scan_model(model=model_target)
 
         assert model.id == "microsoft/DialoGPT-medium"
         assert model.name == "DialoGPT-medium"
@@ -304,33 +333,35 @@ class TestHuggingFaceService:
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
     async def test_scan_model_not_found(
-        self, mock_model_info: MagicMock, hf_service: HuggingFaceService
+        self, mock_model_info: MagicMock, hf_download_step: HuggingFaceDownloadStep
     ) -> None:
         """Test single model scanning with model not found."""
         mock_model_info.side_effect = Exception("not found")
 
+        scanner = hf_download_step._make_scanner("test_registry")
         with pytest.raises(HuggingFaceAPIError):
             model_target = ModelTarget(model_id="nonexistent/model")
-            await hf_service.scan_model(registry_name="test_registry", model=model_target)
+            await scanner.scan_model(model=model_target)
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.model_info")
     async def test_scan_model_api_error(
-        self, mock_model_info: MagicMock, hf_service: HuggingFaceService
+        self, mock_model_info: MagicMock, hf_download_step: HuggingFaceDownloadStep
     ) -> None:
         """Test single model scanning with API error."""
         mock_model_info.side_effect = Exception("Network error")
 
+        scanner = hf_download_step._make_scanner("test_registry")
         with pytest.raises(HuggingFaceAPIError):
             model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
-            await hf_service.scan_model(registry_name="test_registry", model=model_target)
+            await scanner.scan_model(model=model_target)
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_repo_files")
     async def test_list_model_files_success(
         self,
         mock_list_repo_files: MagicMock,
-        hf_service: HuggingFaceService,
+        hf_download_step: HuggingFaceDownloadStep,
         mock_file_info: FileObjectData,
     ) -> None:
         """Test successful model files listing."""
@@ -352,10 +383,9 @@ class TestHuggingFaceService:
                     "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
                 )
 
+                scanner = hf_download_step._make_scanner("test_registry")
                 model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
-                files = await hf_service.list_model_files(
-                    registry_name="test_registry", model=model_target
-                )
+                files = await scanner.list_model_files_info(model=model_target)
 
                 assert len(files) == 1
                 assert files[0].path == "config.json"
@@ -365,29 +395,30 @@ class TestHuggingFaceService:
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.list_repo_files")
     async def test_list_model_files_api_error(
-        self, mock_list_repo_files: MagicMock, hf_service: HuggingFaceService
+        self, mock_list_repo_files: MagicMock, hf_download_step: HuggingFaceDownloadStep
     ) -> None:
         """Test model files listing with API error."""
         mock_list_repo_files.side_effect = Exception("API Error")
 
+        scanner = hf_download_step._make_scanner("test_registry")
         model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
 
         with pytest.raises(HuggingFaceAPIError):
-            await hf_service.list_model_files(registry_name="test_registry", model=model_target)
+            await scanner.list_model_files_info(model=model_target)
 
     @pytest.mark.asyncio
     @patch("ai.backend.storage.client.huggingface.hf_hub_url")
     async def test_get_download_url_success(
-        self, mock_hf_hub_url: MagicMock, hf_service: HuggingFaceService
+        self, mock_hf_hub_url: MagicMock, hf_download_step: HuggingFaceDownloadStep
     ) -> None:
         """Test download URL generation."""
         mock_hf_hub_url.return_value = (
             "https://huggingface.co/microsoft/DialoGPT-medium/resolve/main/config.json"
         )
 
+        scanner = hf_download_step._make_scanner("test_registry")
         model_target = ModelTarget(model_id="microsoft/DialoGPT-medium")
-        url = hf_service.get_download_url(
-            registry_name="test_registry",
+        url = scanner.get_download_url(
             model=model_target,
             filename="config.json",
         )
@@ -403,36 +434,36 @@ class TestHuggingFaceService:
 
     @pytest.mark.asyncio
     async def test_import_models_batch_success(
-        self, hf_service: HuggingFaceService, mock_background_task_manager: MagicMock
+        self,
+        hf_download_step: HuggingFaceDownloadStep,
+        mock_import_step_context: ImportStepContext,
+        mock_file_info: FileObjectData,
     ) -> None:
         """Test successful batch model import."""
-        expected_task_id = uuid.uuid4()
-        mock_background_task_manager.start.return_value = expected_task_id
+        # Mock the scanner to return file list
+        with patch.object(hf_download_step, "_make_scanner") as mock_make_scanner:
+            mock_scanner = MagicMock(spec=HuggingFaceScanner)
+            mock_scanner.list_model_files_info = AsyncMock(return_value=[mock_file_info])
+            mock_make_scanner.return_value = mock_scanner
 
-        models = [
-            ModelTarget(model_id="microsoft/DialoGPT-medium"),
-            ModelTarget(model_id="microsoft/DialoGPT-small"),
-        ]
-        storage_step_mappings = {
-            ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-            ArtifactStorageImportStep.ARCHIVE: "test_storage",
-        }
-        mock_pipeline = MagicMock(spec=ImportPipeline)
+            # Mock file download
+            with patch.object(
+                hf_download_step, "_download_file_to_storage"
+            ) as mock_download_upload:
+                mock_download_upload.return_value = "test/storage/key"  # Return storage key
 
-        task_id = await hf_service.import_models_batch(
-            registry_name="test_registry",
-            models=models,
-            storage_step_mappings=storage_step_mappings,
-            pipeline=mock_pipeline,
-        )
+                result = await hf_download_step.execute(mock_import_step_context, None)
 
-        assert task_id == expected_task_id
-        mock_background_task_manager.start.assert_called_once()
+                assert isinstance(result, DownloadStepResult)
+                assert len(result.downloaded_files) == 1
+                assert result.downloaded_files[0][0].path == "config.json"
+                assert result.storage_name == "test_storage"
+                mock_download_upload.assert_called_once()
 
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
     async def test_make_download_file_stream_success(
-        self, mock_client_session: MagicMock, hf_service: HuggingFaceService
+        self, mock_client_session: MagicMock, hf_download_step: HuggingFaceDownloadStep
     ) -> None:
         """Test successful file download stream."""
 
@@ -477,7 +508,7 @@ class TestHuggingFaceService:
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
     async def test_make_download_file_stream_http_error(
-        self, mock_client_session: MagicMock, hf_service: HuggingFaceService
+        self, mock_client_session: MagicMock, hf_download_step: HuggingFaceDownloadStep
     ) -> None:
         """Test file download stream with HTTP error."""
         mock_session, mock_response = create_mock_aiohttp_session()
@@ -506,7 +537,7 @@ class TestHuggingFaceService:
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
     async def test_make_download_file_stream_client_error(
-        self, mock_client_session: MagicMock, hf_service: HuggingFaceService
+        self, mock_client_session: MagicMock, hf_download_step: HuggingFaceDownloadStep
     ) -> None:
         """Test file download stream with client error."""
         mock_client_session.side_effect = ClientError("Connection error")
@@ -524,9 +555,10 @@ class TestHuggingFaceService:
     @pytest.mark.asyncio
     async def test_upload_model_file_success(
         self,
-        hf_service: HuggingFaceService,
+        hf_download_step: HuggingFaceDownloadStep,
         mock_file_info: FileObjectData,
         mock_storage_pool: MagicMock,
+        mock_import_step_context: ImportStepContext,
     ) -> None:
         """Test successful model file upload."""
         # Mock the HuggingFaceFileDownloadStreamReader class
@@ -536,15 +568,12 @@ class TestHuggingFaceService:
             mock_stream_instance = AsyncMock()
             mock_stream_class.return_value = mock_stream_instance
 
-            storage_step_mappings = {
-                ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-                ArtifactStorageImportStep.ARCHIVE: "test_storage",
-            }
-            await hf_service._import_single_file_with_step_mappings(
+            await hf_download_step._download_file_to_storage(
                 file_info=mock_file_info,
-                model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
+                model=mock_import_step_context.model,
+                storage_name="test_storage",
+                storage_pool=mock_import_step_context.storage_pool,
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
-                storage_step_mappings=storage_step_mappings,
             )
 
             # Verify the stream reader was created with correct parameters
@@ -562,9 +591,10 @@ class TestHuggingFaceService:
     @pytest.mark.asyncio
     async def test_upload_model_file_upload_failure(
         self,
-        hf_service: HuggingFaceService,
+        hf_download_step: HuggingFaceDownloadStep,
         mock_file_info: FileObjectData,
         mock_storage_pool: MagicMock,
+        mock_import_step_context: ImportStepContext,
     ) -> None:
         """Test model file upload with upload failure."""
         # Mock failed upload result - setup the mock storage from the pool
@@ -578,54 +608,57 @@ class TestHuggingFaceService:
             mock_stream_instance = AsyncMock()
             mock_stream_class.return_value = mock_stream_instance
 
-            storage_step_mappings = {
-                ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-                ArtifactStorageImportStep.ARCHIVE: "test_storage",
-            }
-            with pytest.raises(HuggingFaceAPIError):
-                await hf_service._import_single_file_with_step_mappings(
+            with pytest.raises(Exception):
+                await hf_download_step._download_file_to_storage(
                     file_info=mock_file_info,
-                    model=ModelTarget(
-                        model_id="microsoft/DialoGPT-medium",
-                        revision="main",
-                    ),
+                    model=mock_import_step_context.model,
+                    storage_name="test_storage",
+                    storage_pool=mock_import_step_context.storage_pool,
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
-                    storage_step_mappings=storage_step_mappings,
                 )
 
     @pytest.mark.asyncio
     async def test_upload_model_file_no_storage_service(
         self,
         mock_registry_configs: dict[str, HuggingfaceConfig],
-        mock_background_task_manager: MagicMock,
+        mock_storage_transfer_manager: StorageTransferManager,
         mock_file_info: FileObjectData,
     ) -> None:
         """Test model file upload with no storage pool configured."""
-        # Create service without storage pool
-        with patch.object(HuggingFaceService, "__init__", lambda self, args: None):
-            service = HuggingFaceService.__new__(HuggingFaceService)
-            service._registry_configs = mock_registry_configs
-            service._background_task_manager = mock_background_task_manager
-            service._storage_pool = None  # type: ignore
+        # Create context without storage pool
+        context = ImportStepContext(
+            model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
+            registry_name="test_registry",
+            storage_pool=None,  # type: ignore
+            progress_reporter=None,
+            storage_step_mappings={
+                ArtifactStorageImportStep.DOWNLOAD: "test_storage",
+                ArtifactStorageImportStep.ARCHIVE: "test_storage",
+            },
+            step_metadata={},
+        )
 
-        storage_step_mappings = {
-            ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-            ArtifactStorageImportStep.ARCHIVE: "test_storage",
-        }
-        with pytest.raises(ObjectStorageConfigInvalidError):
-            await service._import_single_file_with_step_mappings(
+        # Create step instance
+        step = HuggingFaceDownloadStep(
+            registry_configs=mock_registry_configs,
+        )
+
+        with pytest.raises(AttributeError):
+            await step._download_file_to_storage(
                 file_info=mock_file_info,
-                model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
+                model=context.model,
+                storage_name="test_storage",
+                storage_pool=context.storage_pool,
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
-                storage_step_mappings=storage_step_mappings,
             )
 
     @pytest.mark.asyncio
     async def test_upload_model_file_exception(
         self,
-        hf_service: HuggingFaceService,
+        hf_download_step: HuggingFaceDownloadStep,
         mock_file_info: FileObjectData,
         mock_storage_pool: MagicMock,
+        mock_import_step_context: ImportStepContext,
     ) -> None:
         """Test model file upload with exception."""
         mock_storage = mock_storage_pool.get_storage.return_value
@@ -638,70 +671,76 @@ class TestHuggingFaceService:
             mock_stream_instance = AsyncMock()
             mock_stream_class.return_value = mock_stream_instance
 
-            storage_step_mappings = {
-                ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-                ArtifactStorageImportStep.ARCHIVE: "test_storage",
-            }
-            with pytest.raises(HuggingFaceAPIError):
-                await hf_service._import_single_file_with_step_mappings(
+            with pytest.raises(Exception):
+                await hf_download_step._download_file_to_storage(
                     file_info=mock_file_info,
-                    model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
+                    model=mock_import_step_context.model,
+                    storage_name="test_storage",
+                    storage_pool=mock_import_step_context.storage_pool,
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
-                    storage_step_mappings=storage_step_mappings,
                 )
 
 
-class TestReservoirService:
-    """Test cases for ReservoirService."""
+class TestReservoirDownloadStep:
+    """Test cases for ReservoirDownloadStep."""
 
     def test_get_s3_client_success(
         self,
-        reservoir_service: ReservoirService,
+        reservoir_download_step: ReservoirDownloadStep,
         mock_object_storage_config: ObjectStorageConfig,
+        mock_storage_pool: MagicMock,
     ) -> None:
         """Test successful S3 client creation."""
-        client, bucket_name = reservoir_service._get_s3_client("test_storage")
+        client, bucket_name = reservoir_download_step._get_s3_client(
+            mock_storage_pool, "test_storage"
+        )
         assert bucket_name == "test-bucket"
         assert client.bucket_name == "test-bucket"
 
-    def test_get_s3_client_storage_not_found(self, reservoir_service: ReservoirService) -> None:
+    def test_get_s3_client_storage_not_found(
+        self,
+        reservoir_download_step: ReservoirDownloadStep,
+        mock_storage_pool: MagicMock,
+    ) -> None:
         """Test S3 client creation with storage not found."""
-        # Configure mock to raise KeyError for unknown storage
-        original_storage = reservoir_service._storage_pool.get_storage("test_storage")
 
+        # Configure mock to raise KeyError for unknown storage
         def mock_get_storage(name: str):
             if name == "test_storage":
-                return original_storage
+                return mock_storage_pool.get_storage("test_storage")
             else:
                 raise KeyError(name)
 
-        reservoir_service._storage_pool = Mock(spec=StoragePool)
-        reservoir_service._storage_pool.get_storage = Mock(side_effect=mock_get_storage)
+        mock_storage_pool_with_error = Mock(spec=StoragePool)
+        mock_storage_pool_with_error.get_storage = Mock(side_effect=mock_get_storage)
 
         with pytest.raises(StorageNotFoundError):
-            reservoir_service._get_s3_client("nonexistent_storage")
+            reservoir_download_step._get_s3_client(
+                mock_storage_pool_with_error, "nonexistent_storage"
+            )
 
     def test_get_s3_client_no_buckets_configured(
         self,
-        reservoir_service: ReservoirService,
+        reservoir_download_step: ReservoirDownloadStep,
         mock_object_storage_config: ObjectStorageConfig,
+        mock_storage_pool: MagicMock,
     ) -> None:
         """Test S3 client creation with no buckets configured."""
         # Mock storage with empty bucket (this would be invalid ObjectStorage config)
-        mock_storage = reservoir_service._storage_pool.get_storage("test_storage")
+        mock_storage = mock_storage_pool.get_storage("test_storage")
         assert isinstance(mock_storage, MagicMock)  # Type narrowing for mypy
         mock_storage._bucket = ""  # Simulate no bucket configured
 
         with pytest.raises(ObjectStorageBucketNotFoundError):
-            reservoir_service._get_s3_client("test_storage")
+            reservoir_download_step._get_s3_client(mock_storage_pool, "test_storage")
 
     @pytest.mark.asyncio
     async def test_list_all_keys_and_sizes_success(
-        self, reservoir_service: ReservoirService
+        self, reservoir_download_step: ReservoirDownloadStep
     ) -> None:
         """Test successful listing of all keys and sizes."""
         # Mock the entire method since it's a complex AWS integration
-        with patch.object(reservoir_service, "_list_all_keys_and_sizes") as mock_list_keys:
+        with patch.object(reservoir_download_step, "_list_all_keys_and_sizes") as mock_list_keys:
             mock_list_keys.return_value = (
                 ["model.bin", "config.json"],  # keys
                 {"model.bin": 1000, "config.json": 500},  # size_map
@@ -713,7 +752,7 @@ class TestReservoirService:
 
             mock_s3_client = Mock()
 
-            keys, size_map, total = await reservoir_service._list_all_keys_and_sizes(
+            keys, size_map, total = await reservoir_download_step._list_all_keys_and_sizes(
                 s3_client=mock_s3_client,
                 prefix="models/",
             )
@@ -727,11 +766,11 @@ class TestReservoirService:
 
     @pytest.mark.asyncio
     async def test_list_all_keys_and_sizes_empty_bucket(
-        self, reservoir_service: ReservoirService
+        self, reservoir_download_step: ReservoirDownloadStep
     ) -> None:
         """Test listing keys from empty bucket."""
         # Mock the entire method for empty bucket case
-        with patch.object(reservoir_service, "_list_all_keys_and_sizes") as mock_list_keys:
+        with patch.object(reservoir_download_step, "_list_all_keys_and_sizes") as mock_list_keys:
             mock_list_keys.return_value = ([], {}, 0)
 
             # Create a mock S3Client for testing
@@ -739,7 +778,7 @@ class TestReservoirService:
 
             mock_s3_client = Mock()
 
-            keys, size_map, total = await reservoir_service._list_all_keys_and_sizes(
+            keys, size_map, total = await reservoir_download_step._list_all_keys_and_sizes(
                 s3_client=mock_s3_client,
             )
 
@@ -750,14 +789,15 @@ class TestReservoirService:
     @pytest.mark.asyncio
     async def test_stream_bucket_to_bucket_success(
         self,
-        reservoir_service: ReservoirService,
+        reservoir_download_step: ReservoirDownloadStep,
         mock_reservoir_config: ReservoirConfig,
         mock_progress_reporter: MagicMock,
+        mock_import_step_context: ImportStepContext,
     ) -> None:
         """Test successful bucket to bucket streaming."""
         with (
-            patch.object(reservoir_service, "_list_all_keys_and_sizes") as mock_list_keys,
-            patch.object(reservoir_service, "_get_s3_client") as mock_get_s3_client,
+            patch.object(reservoir_download_step, "_list_all_keys_and_sizes") as mock_list_keys,
+            patch.object(reservoir_download_step, "_get_s3_client") as mock_get_s3_client,
             patch(
                 "ai.backend.storage.services.artifacts.reservoir.S3Client"
             ) as mock_s3_client_class,
@@ -791,11 +831,12 @@ class TestReservoirService:
             mock_meta.content_type = "application/octet-stream"
             mock_src_client.get_object_meta.return_value = mock_meta
 
-            bytes_copied = await reservoir_service._stream_bucket_to_bucket(
+            bytes_copied = await reservoir_download_step._stream_bucket_to_bucket(
                 source_cfg=mock_reservoir_config,
                 storage_name="test_storage",
+                storage_pool=mock_import_step_context.storage_pool,
                 options=BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0),
-                progress_reporter=mock_progress_reporter,
+                progress_reporter=mock_import_step_context.progress_reporter,
                 key_prefix="models/",
             )
 
@@ -806,140 +847,83 @@ class TestReservoirService:
     @pytest.mark.asyncio
     async def test_stream_bucket_to_bucket_no_objects(
         self,
-        reservoir_service: ReservoirService,
+        reservoir_download_step: ReservoirDownloadStep,
         mock_reservoir_config: ReservoirConfig,
         mock_progress_reporter: MagicMock,
+        mock_import_step_context: ImportStepContext,
     ) -> None:
         """Test bucket streaming with no objects to copy."""
-        with patch.object(reservoir_service, "_list_all_keys_and_sizes") as mock_list_keys:
+        with patch.object(reservoir_download_step, "_list_all_keys_and_sizes") as mock_list_keys:
             mock_list_keys.return_value = ([], {}, 0)
 
             with pytest.raises(ArtifactStorageEmptyError):
-                await reservoir_service._stream_bucket_to_bucket(
+                await reservoir_download_step._stream_bucket_to_bucket(
                     source_cfg=mock_reservoir_config,
                     storage_name="test_storage",
+                    storage_pool=mock_import_step_context.storage_pool,
                     options=BucketCopyOptions(concurrency=1, progress_log_interval_bytes=0),
-                    progress_reporter=mock_progress_reporter,
+                    progress_reporter=mock_import_step_context.progress_reporter,
                     key_prefix="models/",
                 )
 
     @pytest.mark.asyncio
     async def test_import_model_success(
         self,
-        reservoir_service: ReservoirService,
+        reservoir_download_step: ReservoirDownloadStep,
         mock_progress_reporter: MagicMock,
+        mock_import_step_context: ImportStepContext,
     ) -> None:
         """Test successful model import."""
-        model_target = ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main")
-
-        with (
-            patch.object(reservoir_service, "_stream_bucket_to_bucket") as mock_stream,
-            patch.object(reservoir_service, "_event_producer") as mock_event_producer,
-        ):
+        with patch.object(reservoir_download_step, "_stream_bucket_to_bucket") as mock_stream:
             mock_stream.return_value = 1000
-            mock_event_producer.anycast_event = AsyncMock()
 
-            storage_step_mappings = {
-                ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-                ArtifactStorageImportStep.ARCHIVE: "test_storage",
-            }
-            mock_pipeline = MagicMock(spec=ImportPipeline)
+            result = await reservoir_download_step.execute(mock_import_step_context, None)
 
-            await reservoir_service.import_model(
-                registry_name="test_registry",
-                model=model_target,
-                reporter=mock_progress_reporter,
-                storage_step_mappings=storage_step_mappings,
-                pipeline=mock_pipeline,
-            )
-
+            assert isinstance(result, DownloadStepResult)
+            assert result.total_bytes == 1000
+            assert result.storage_name == "test_storage"  # Archive storage name
             mock_stream.assert_called_once()
-            mock_event_producer.anycast_event.assert_called_once()
 
     @pytest.mark.asyncio
-    async def test_import_model_no_registry_config(self) -> None:
+    async def test_import_model_no_registry_config(
+        self,
+        mock_storage_pool: MagicMock,
+        mock_import_step_context: ImportStepContext,
+    ) -> None:
         """Test model import with no registry configuration."""
-        # Create service without reservoir configs
-        args = ReservoirServiceArgs(
-            background_task_manager=MagicMock(),
-            event_producer=MagicMock(),
-            storage_pool=MagicMock(spec=StoragePool),
-            reservoir_registry_configs={},
+        # Create step without reservoir configs
+        step = ReservoirDownloadStep(
+            registry_configs={},
         )
-        service = ReservoirService(args)
-
-        model_target = ModelTarget(model_id="test/model", revision="main")
-
-        mock_pipeline = MagicMock(spec=ImportPipeline)
-
-        storage_step_mappings = {
-            ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-            ArtifactStorageImportStep.ARCHIVE: "test_storage",
-        }
 
         with pytest.raises(ReservoirStorageConfigInvalidError):
-            await service.import_model(
-                registry_name="test_registry",
-                model=model_target,
-                reporter=MagicMock(),
-                storage_step_mappings=storage_step_mappings,
-                pipeline=mock_pipeline,
-            )
+            await step.execute(mock_import_step_context, None)
 
     @pytest.mark.asyncio
     async def test_import_models_batch_success(
         self,
-        reservoir_service: ReservoirService,
-        mock_background_task_manager: MagicMock,
+        reservoir_download_step: ReservoirDownloadStep,
+        mock_import_step_context: ImportStepContext,
     ) -> None:
         """Test successful batch model import."""
-        expected_task_id = uuid.uuid4()
-        mock_background_task_manager.start.return_value = expected_task_id
+        with patch.object(reservoir_download_step, "_stream_bucket_to_bucket") as mock_stream:
+            mock_stream.return_value = 1000
 
-        models = [
-            ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
-            ModelTarget(model_id="microsoft/DialoGPT-small", revision="main"),
-        ]
+            result = await reservoir_download_step.execute(mock_import_step_context, None)
 
-        storage_step_mappings = {
-            ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-            ArtifactStorageImportStep.ARCHIVE: "test_storage",
-        }
-        mock_pipeline = MagicMock(spec=ImportPipeline)
-
-        task_id = await reservoir_service.import_models_batch(
-            registry_name="test_registry",
-            models=models,
-            storage_step_mappings=storage_step_mappings,
-            pipeline=mock_pipeline,
-        )
-
-        assert task_id == expected_task_id
-        mock_background_task_manager.start.assert_called_once()
+            assert isinstance(result, DownloadStepResult)
+            assert result.total_bytes == 1000
+            mock_stream.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_import_models_batch_empty_models(
         self,
-        reservoir_service: ReservoirService,
-        mock_background_task_manager: MagicMock,
+        reservoir_download_step: ReservoirDownloadStep,
+        mock_import_step_context: ImportStepContext,
     ) -> None:
         """Test batch model import with empty model list."""
-        expected_task_id = uuid.uuid4()
-        mock_background_task_manager.start.return_value = expected_task_id
+        with patch.object(reservoir_download_step, "_stream_bucket_to_bucket") as mock_stream:
+            mock_stream.side_effect = ArtifactStorageEmptyError("No objects found")
 
-        storage_step_mappings = {
-            ArtifactStorageImportStep.DOWNLOAD: "test_storage",
-            ArtifactStorageImportStep.ARCHIVE: "test_storage",
-        }
-
-        mock_pipeline = MagicMock(spec=ImportPipeline)
-
-        task_id = await reservoir_service.import_models_batch(
-            registry_name="test_registry",
-            models=[],
-            storage_step_mappings=storage_step_mappings,
-            pipeline=mock_pipeline,
-        )
-
-        assert task_id == expected_task_id
-        mock_background_task_manager.start.assert_called_once()
+            with pytest.raises(ArtifactStorageEmptyError):
+                await reservoir_download_step.execute(mock_import_step_context, None)
