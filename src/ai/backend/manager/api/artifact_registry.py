@@ -130,52 +130,37 @@ class APIHandler:
         body: BodyParam[DelegateImportArtifactsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        # Validate request
-        if not body.parsed.artifact_revision_ids:
-            return APIResponse.build(
-                status_code=HTTPStatus.BAD_REQUEST,
-                response_model=ErrorResponse(error="artifact_revision_ids cannot be empty"),
-            )
-
         processors = processors_ctx.processors
-        try:
-            action_result = (
-                await processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
-                    DelegateImportArtifactRevisionBatchAction(
-                        delegator_reservoir_id=body.parsed.delegator_reservoir_id,
-                        artifact_type=body.parsed.artifact_type,
-                        delegatee_target=body.parsed.delegatee_target
-                        if body.parsed.delegatee_target
-                        else None,
-                        artifact_revision_ids=body.parsed.artifact_revision_ids,
-                    )
+        action_result = (
+            await processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
+                DelegateImportArtifactRevisionBatchAction(
+                    delegator_reservoir_id=body.parsed.delegator_reservoir_id,
+                    artifact_type=body.parsed.artifact_type,
+                    delegatee_target=body.parsed.delegatee_target
+                    if body.parsed.delegatee_target
+                    else None,
+                    artifact_revision_ids=body.parsed.artifact_revision_ids,
+                )
+            )
+        )
+
+        if len(action_result.result) != len(action_result.task_ids):
+            raise ArtifactImportDelegationError(
+                "Mismatch between artifact revisions and task IDs returned"
+            )
+
+        # Convert to ArtifactRevisionImportTask format
+        tasks = []
+        for task_id, revision in zip(action_result.task_ids, action_result.result, strict=True):
+            tasks.append(
+                ArtifactRevisionImportTask(
+                    task_id=str(task_id),
+                    artifact_revision=ArtifactRevisionResponseData.from_revision_data(revision),
                 )
             )
 
-            if len(action_result.result) != len(action_result.task_ids):
-                raise ArtifactImportDelegationError(
-                    "Mismatch between artifact revisions and task IDs returned"
-                )
-
-            # Convert to ArtifactRevisionImportTask format
-            tasks = []
-            for task_id, revision in zip(action_result.task_ids, action_result.result, strict=True):
-                tasks.append(
-                    ArtifactRevisionImportTask(
-                        task_id=str(task_id),
-                        artifact_revision=ArtifactRevisionResponseData.from_revision_data(revision),
-                    )
-                )
-
-            resp = DelegateImportArtifactsResponse(tasks=tasks)
-            return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
-
-        except Exception as e:
-            log.error("Failed to delegate import artifacts: {}", e)
-            return APIResponse.build(
-                status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
-                response_model=ErrorResponse(error=f"Failed to delegate import: {str(e)}"),
-            )
+        resp = DelegateImportArtifactsResponse(tasks=tasks)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     @auth_required_for_method
     @api_handler
