@@ -300,7 +300,7 @@ class ArtifactRevisionService:
         self, action: DelegateImportArtifactRevisionBatchAction
     ) -> DelegateImportArtifactRevisionBatchActionResult:
         # If this is a leaf node, perform local import instead of delegation
-        if self._config_provider.config.reservoir.is_delegation_leaf:
+        if self._config_provider.config.reservoir.use_delegation:
             registry_id = None
             if action.delegatee_target:
                 registry_id = action.delegatee_target.target_registry_id
