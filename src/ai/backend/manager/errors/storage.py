@@ -306,3 +306,16 @@ class UnexpectedStorageProxyResponseError(BackendAIError, web.HTTPInternalServer
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.UNREACHABLE,
         )
+
+
+class UnsupportedStorageTypeError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/unsupported-storage-type"
+    error_title = "Unsupported storage type."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

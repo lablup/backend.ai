@@ -10,6 +10,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.errors.artifact import ArtifactNotApproved, ArtifactReadonly
+from ai.backend.manager.errors.object_storage import ObjectStorageOperationNotSupported
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.services.object_storage.actions.create import (
@@ -116,6 +117,13 @@ class ObjectStorageService:
 
         reservoir_config = self._config_provider.config.reservoir
         storage_name = reservoir_config.storage_name
+
+        # Only object storage is supported for presigned URLs
+        if reservoir_config.config.storage_type != "object_storage":
+            raise ObjectStorageOperationNotSupported(
+                "Presigned URLs are only supported for object storage"
+            )
+
         bucket_name = reservoir_config.config.bucket_name
         storage_data = await self._object_storage_repository.get_by_name(storage_name)
         storage_namespace = await self._object_storage_repository.get_storage_namespace(
@@ -159,6 +167,13 @@ class ObjectStorageService:
 
         reservoir_config = self._config_provider.config.reservoir
         storage_name = reservoir_config.storage_name
+
+        # Only object storage is supported for presigned URLs
+        if reservoir_config.config.storage_type != "object_storage":
+            raise ObjectStorageOperationNotSupported(
+                "Presigned URLs are only supported for object storage"
+            )
+
         bucket_name = reservoir_config.config.bucket_name
         storage_data = await self._object_storage_repository.get_by_name(storage_name)
         storage_namespace = await self._object_storage_repository.get_storage_namespace(

@@ -269,6 +269,7 @@ class Services:
             storage_manager=args.storage_manager,
             object_storage_repository=repositories.object_storage.repository,
             vfs_storage_repository=repositories.vfs_storage.repository,
+            storage_namespace_repository=repositories.storage_namespace.repository,
             huggingface_registry_repository=repositories.huggingface_registry.repository,
             reservoir_registry_repository=repositories.reservoir_registry.repository,
             config_provider=args.config_provider,

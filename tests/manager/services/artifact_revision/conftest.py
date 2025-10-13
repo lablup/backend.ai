@@ -10,6 +10,7 @@ from ai.backend.manager.repositories.object_storage.repository import (
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
+from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact_revision.processors import ArtifactRevisionProcessors
 from ai.backend.manager.services.artifact_revision.service import ArtifactRevisionService
@@ -21,6 +22,7 @@ def processors(extra_fixtures, database_fixture, database_engine, registry_ctx):
     # Mock other dependencies for artifact revision service
     object_storage_repository = MagicMock(spec=ObjectStorageRepository)
     vfs_storage_repository = MagicMock(spec=VFSStorageRepository)
+    storage_namespace_repository = MagicMock(spec=StorageNamespaceRepository)
     huggingface_registry_repository = MagicMock(spec=HuggingFaceRepository)
     reservoir_registry_repository = MagicMock(spec=ReservoirRegistryRepository)
     storage_manager = MagicMock()
@@ -30,6 +32,7 @@ def processors(extra_fixtures, database_fixture, database_engine, registry_ctx):
         artifact_repository=artifact_repository,
         object_storage_repository=object_storage_repository,
         vfs_storage_repository=vfs_storage_repository,
+        storage_namespace_repository=storage_namespace_repository,
         huggingface_registry_repository=huggingface_registry_repository,
         reservoir_registry_repository=reservoir_registry_repository,
         storage_manager=storage_manager,

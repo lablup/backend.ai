@@ -1,5 +1,4 @@
 import uuid
-from typing import Dict, List
 
 import sqlalchemy as sa
 
@@ -123,7 +122,7 @@ class StorageNamespaceRepository:
             return [row.to_dataclass() for row in rows]
 
     @storage_namespace_repository_resilience.apply()
-    async def get_all_namespaces_by_storage(self) -> Dict[uuid.UUID, List[str]]:
+    async def get_all_namespaces_by_storage(self) -> dict[uuid.UUID, list[str]]:
         """
         Get all namespaces grouped by storage ID.
 
@@ -135,7 +134,7 @@ class StorageNamespaceRepository:
             result = await db_session.execute(query)
             rows = result.all()
 
-            namespaces_by_storage: Dict[uuid.UUID, List[str]] = {}
+            namespaces_by_storage: dict[uuid.UUID, list[str]] = {}
             for row in rows:
                 storage_id = row.storage_id
                 namespace = row.namespace

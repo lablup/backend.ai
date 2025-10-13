@@ -1,4 +1,5 @@
 import uuid
+from typing import cast
 from uuid import UUID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
@@ -11,19 +12,25 @@ from ai.backend.common.dto.storage.request import (
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.config.unified import (
+    ReservoirConfig,
+    ReservoirObjectStorageConfig,
+    ReservoirVFSStorageConfig,
+)
 from ai.backend.manager.data.artifact.types import ArtifactRevisionReadme, ArtifactStatus
-from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
 )
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
+from ai.backend.manager.errors.storage import UnsupportedStorageTypeError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
+from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
 from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
@@ -71,6 +78,7 @@ class ArtifactRevisionService:
     _artifact_repository: ArtifactRepository
     _object_storage_repository: ObjectStorageRepository
     _vfs_storage_repository: VFSStorageRepository
+    _storage_namespace_repository: StorageNamespaceRepository
     _huggingface_registry_repository: HuggingFaceRepository
     _reservoir_registry_repository: ReservoirRegistryRepository
     _storage_manager: StorageSessionManager
@@ -81,6 +89,7 @@ class ArtifactRevisionService:
         artifact_repository: ArtifactRepository,
         object_storage_repository: ObjectStorageRepository,
         vfs_storage_repository: VFSStorageRepository,
+        storage_namespace_repository: StorageNamespaceRepository,
         huggingface_registry_repository: HuggingFaceRepository,
         reservoir_registry_repository: ReservoirRegistryRepository,
         storage_manager: StorageSessionManager,
@@ -89,30 +98,52 @@ class ArtifactRevisionService:
         self._artifact_repository = artifact_repository
         self._object_storage_repository = object_storage_repository
         self._vfs_storage_repository = vfs_storage_repository
+        self._storage_namespace_repository = storage_namespace_repository
         self._huggingface_registry_repository = huggingface_registry_repository
         self._reservoir_registry_repository = reservoir_registry_repository
         self._storage_manager = storage_manager
         self._config_provider = config_provider
 
+    def _resolve_storage_namespace(self, reservoir_config: ReservoirConfig) -> str:
+        """Resolve namespace based on storage type
+        Args:
+            reservoir_config: Reservoir configuration
+        Returns:
+            Namespace (bucket name for object storage, subpath for VFS storage)
+        """
+        match reservoir_config.config.storage_type:
+            case ArtifactStorageType.OBJECT_STORAGE.value:
+                return cast(ReservoirObjectStorageConfig, reservoir_config.config).bucket_name
+            case ArtifactStorageType.VFS_STORAGE.value:
+                return cast(ReservoirVFSStorageConfig, reservoir_config.config).subpath
+            case _:
+                raise UnsupportedStorageTypeError(
+                    f"Unsupported storage type: {reservoir_config.config.storage_type}"
+                )
+
     async def _get_storage_info(
-        self, storage_name: str, bucket_name: str
+        self, storage_name: str, namespace: str
     ) -> tuple[str, uuid.UUID, str]:
         """Get storage info by trying object_storage first, then vfs_storage as fallback
+        Args:
+            storage_name: Name of the storage
+            namespace: Bucket name for object storage or subpath for VFS storage
         Returns: (storage_host, namespace_id, storage_name)
         """
         try:
             storage_data = await self._object_storage_repository.get_by_name(storage_name)
-            storage_namespace = await self._object_storage_repository.get_storage_namespace(
-                storage_data.id, bucket_name
+            storage_namespace = (
+                await self._storage_namespace_repository.get_by_storage_and_namespace(
+                    storage_data.id, namespace
+                )
             )
             return storage_data.host, storage_namespace.id, storage_data.name
         except Exception:
             vfs_storage_data = await self._vfs_storage_repository.get_by_name(storage_name)
-            # For VFS storage, create StorageNamespaceData with empty namespace for now
-            storage_namespace = StorageNamespaceData(
-                id=vfs_storage_data.id,  # Use VFS storage ID as namespace ID
-                storage_id=vfs_storage_data.id,
-                namespace="",  # Empty namespace for VFS storage
+            storage_namespace = (
+                await self._storage_namespace_repository.get_by_storage_and_namespace(
+                    vfs_storage_data.id, namespace
+                )
             )
             return vfs_storage_data.host, storage_namespace.id, vfs_storage_data.name
 
@@ -194,9 +225,10 @@ class ArtifactRevisionService:
         storage_type = reservoir_config.config.storage_type
         reservoir_storage_name = reservoir_config.storage_name
 
-        bucket_name = reservoir_config.config.bucket_name
+        # Get bucket name or subpath depending on storage type
+        namespace = self._resolve_storage_namespace(reservoir_config)
         storage_host, namespace_id, storage_name = await self._get_storage_info(
-            reservoir_storage_name, bucket_name
+            reservoir_storage_name, namespace
         )
 
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_host)
@@ -271,7 +303,7 @@ class ArtifactRevisionService:
         reservoir_config = self._config_provider.config.reservoir
         reservoir_storage_name = reservoir_config.storage_name
         # TODO: Abstract this.
-        bucket_name = reservoir_config.config.bucket_name
+        namespace = self._resolve_storage_namespace(reservoir_config)
 
         storage_data = None
         vfs_storage_data = None
@@ -282,8 +314,10 @@ class ArtifactRevisionService:
 
         try:
             storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
-            storage_namespace = await self._object_storage_repository.get_storage_namespace(
-                storage_data.id, bucket_name
+            storage_namespace = (
+                await self._storage_namespace_repository.get_by_storage_and_namespace(
+                    storage_data.id, namespace
+                )
             )
             storage_host = storage_data.host
             namespace_id = storage_namespace.id
@@ -292,18 +326,16 @@ class ArtifactRevisionService:
             vfs_storage_data = await self._vfs_storage_repository.get_by_name(
                 reservoir_storage_name
             )
-            storage_host = vfs_storage_data.host
-            # For VFS storage, create StorageNamespaceData with empty namespace for now
-
-            storage_namespace = StorageNamespaceData(
-                id=vfs_storage_data.id,  # Use VFS storage ID as namespace ID
-                storage_id=vfs_storage_data.id,
-                namespace="",  # Empty namespace for VFS storage
+            storage_namespace = (
+                await self._storage_namespace_repository.get_by_storage_and_namespace(
+                    vfs_storage_data.id, namespace
+                )
             )
+            storage_host = vfs_storage_data.host
             namespace_id = storage_namespace.id
             storage_name = vfs_storage_data.name
 
-        if storage_data is None:
+        if storage_data is None and vfs_storage_data is None:
             raise ArtifactDeletionError("Storage data not found for artifact deletion")
 
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_host)
