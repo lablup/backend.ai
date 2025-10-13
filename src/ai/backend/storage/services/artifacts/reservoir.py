@@ -306,34 +306,39 @@ class ReservoirService:
             storage_name: Target storage name
             reporter: ProgressReporter for tracking progress
         """
-        if model.revision is None:
-            raise ArtifactRevisionEmptyError(f"Revision must be specified for model: {model}")
+        success = False
+        try:
+            if model.revision is None:
+                raise ArtifactRevisionEmptyError(f"Revision must be specified for model: {model}")
 
-        if len(self._reservoir_registry_configs) == 0:
-            raise ReservoirStorageConfigInvalidError("No reservoir registry configuration found.")
+            if len(self._reservoir_registry_configs) == 0:
+                raise ReservoirStorageConfigInvalidError(
+                    "No reservoir registry configuration found."
+                )
 
-        reservoir_config = self._reservoir_registry_configs[0]
-        prefix_key = f"{model.model_id}/{model.revision}"
-
-        await self._stream_bucket_to_bucket(
-            source_cfg=reservoir_config,
-            storage_name=storage_name,
-            options=BucketCopyOptions(
-                concurrency=16,
-                progress_log_interval_bytes=0,  # disabled
-            ),
-            progress_reporter=reporter,
-            key_prefix=prefix_key,
-        )
-
-        await self._event_producer.anycast_event(
-            ModelImportDoneEvent(
-                model_id=model.model_id,
-                revision=model.resolve_revision(ArtifactRegistryType.RESERVOIR),
-                registry_name=registry_name,
-                registry_type=ArtifactRegistryType.RESERVOIR,
+            reservoir_config = self._reservoir_registry_configs[0]
+            prefix_key = f"{model.model_id}/{model.revision}"
+            await self._stream_bucket_to_bucket(
+                source_cfg=reservoir_config,
+                storage_name=storage_name,
+                options=BucketCopyOptions(
+                    concurrency=16,
+                    progress_log_interval_bytes=0,  # disabled
+                ),
+                progress_reporter=reporter,
+                key_prefix=prefix_key,
             )
-        )
+            success = True
+        finally:
+            await self._event_producer.anycast_event(
+                ModelImportDoneEvent(
+                    success=success,
+                    model_id=model.model_id,
+                    revision=model.resolve_revision(ArtifactRegistryType.RESERVOIR),
+                    registry_name=registry_name,
+                    registry_type=ArtifactRegistryType.RESERVOIR,
+                )
+            )
 
     async def import_models_batch(
         self,

@@ -536,18 +536,20 @@ class HuggingFaceService:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
-        if not self._storage_pool:
-            raise ObjectStorageConfigInvalidError(
-                "Storage pool not configured for import operations"
-            )
-
-        registry_config = self._registry_configs.get(registry_name)
-        if not registry_config:
-            raise RegistryNotFoundError(f"Unknown registry: {registry_name}")
-        chunk_size = registry_config.download_chunk_size
-
-        artifact_total_size = 0
+        success = False
         try:
+            if not self._storage_pool:
+                raise ObjectStorageConfigInvalidError(
+                    "Storage pool not configured for import operations"
+                )
+
+            registry_config = self._registry_configs.get(registry_name)
+            if not registry_config:
+                raise RegistryNotFoundError(f"Unknown registry: {registry_name}")
+            chunk_size = registry_config.download_chunk_size
+
+            artifact_total_size = 0
+
             log.info(f"Rescanning model for latest metadata: {model}")
             scanner = self._make_scanner(registry_name)
             file_infos = await scanner.list_model_files_info(model)
@@ -587,19 +589,22 @@ class HuggingFaceService:
             if failed_uploads > 0:
                 log.warning(f"Some files failed to import: {model}, failed_count={failed_uploads}")
 
+            if successful_uploads > 0:
+                success = True
+        except HuggingFaceModelNotFoundError:
+            raise
+        except Exception as e:
+            raise HuggingFaceAPIError(f"Import failed for {model}: {str(e)}") from e
+        finally:
             await self._event_producer.anycast_event(
                 ModelImportDoneEvent(
+                    success=success,
                     model_id=model.model_id,
                     revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
                     registry_name=registry_name,
                     registry_type=ArtifactRegistryType.HUGGINGFACE,
                 )
             )
-
-        except HuggingFaceModelNotFoundError:
-            raise
-        except Exception as e:
-            raise HuggingFaceAPIError(f"Import failed for {model}: {str(e)}") from e
 
     async def _download_readme_content(self, download_url: str) -> Optional[str]:
         """Download README content from the given URL.
