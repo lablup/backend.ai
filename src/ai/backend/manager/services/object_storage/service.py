@@ -13,6 +13,7 @@ from ai.backend.manager.errors.artifact import ArtifactNotApproved, ArtifactRead
 from ai.backend.manager.errors.object_storage import ObjectStorageOperationNotSupported
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
+from ai.backend.manager.repositories.storage_namespace.repository import StorageNamespaceRepository
 from ai.backend.manager.services.object_storage.actions.create import (
     CreateObjectStorageAction,
     CreateObjectStorageActionResult,
@@ -48,6 +49,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 class ObjectStorageService:
     _artifact_repository: ArtifactRepository
     _object_storage_repository: ObjectStorageRepository
+    _storage_namespace_repository: StorageNamespaceRepository
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
 
@@ -55,11 +57,13 @@ class ObjectStorageService:
         self,
         artifact_repository: ArtifactRepository,
         object_storage_repository: ObjectStorageRepository,
+        storage_namespace_repository: StorageNamespaceRepository,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._artifact_repository = artifact_repository
         self._object_storage_repository = object_storage_repository
+        self._storage_namespace_repository = storage_namespace_repository
         self._storage_manager = storage_manager
         self._config_provider = config_provider
 
@@ -126,7 +130,7 @@ class ObjectStorageService:
 
         bucket_name = reservoir_config.config.bucket_name
         storage_data = await self._object_storage_repository.get_by_name(storage_name)
-        storage_namespace = await self._object_storage_repository.get_storage_namespace(
+        storage_namespace = await self._storage_namespace_repository.get_by_storage_and_namespace(
             storage_data.id, bucket_name
         )
         revision_data = await self._artifact_repository.get_artifact_revision_by_id(
@@ -176,7 +180,7 @@ class ObjectStorageService:
 
         bucket_name = reservoir_config.config.bucket_name
         storage_data = await self._object_storage_repository.get_by_name(storage_name)
-        storage_namespace = await self._object_storage_repository.get_storage_namespace(
+        storage_namespace = await self._storage_namespace_repository.get_by_storage_and_namespace(
             storage_data.id, bucket_name
         )
 
