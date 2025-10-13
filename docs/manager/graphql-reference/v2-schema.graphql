@@ -354,14 +354,14 @@ type CreateReservoirRegistryPayload {
   reservoir: ReservoirRegistry!
 }
 
-"""Input for creating VFS storage"""
+"""Added in 25.16.0. Input for creating VFS storage"""
 input CreateVFSStorageInput {
   name: String!
   host: String!
   basePath: String!
 }
 
-"""Payload for creating VFS storage"""
+"""Added in 25.16.0. Payload for creating VFS storage"""
 type CreateVFSStoragePayload {
   vfsStorage: VFSStorage!
 }
@@ -488,12 +488,12 @@ type DeleteReservoirRegistryPayload {
   id: ID!
 }
 
-"""Input for deleting VFS storage"""
+"""Added in 25.16.0. Input for deleting VFS storage"""
 input DeleteVFSStorageInput {
   id: ID!
 }
 
-"""Payload for deleting VFS storage"""
+"""Added in 25.16.0. Payload for deleting VFS storage"""
 type DeleteVFSStoragePayload {
   id: ID!
 }
@@ -870,13 +870,13 @@ type Mutation {
   """Added in 25.14.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload!
 
-  """Create a new VFS storage"""
+  """Added in 25.16.0. Create a new VFS storage"""
   createVFSStorage(input: CreateVFSStorageInput!): CreateVFSStoragePayload!
 
-  """Update an existing VFS storage"""
+  """Added in 25.16.0. Update an existing VFS storage"""
   updateVFSStorage(input: UpdateVFSStorageInput!): UpdateVFSStoragePayload!
 
-  """Delete a VFS storage"""
+  """Added in 25.16.0. Delete a VFS storage"""
   deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload!
 
   """
@@ -1039,10 +1039,10 @@ type Query {
   """Added in 25.14.0"""
   objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ObjectStorageConnection!
 
-  """Get a VFS storage by ID"""
+  """Added in 25.16.0. Get a VFS storage by ID"""
   vfsStorage(id: ID!): VFSStorage
 
-  """List all VFS storages"""
+  """Added in 25.16.0. List all VFS storages"""
   vfsStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFSStorageConnection!
 
   """Added in 25.14.0"""
@@ -1375,7 +1375,7 @@ type UpdateReservoirRegistryPayload {
   reservoir: ReservoirRegistry!
 }
 
-"""Input for updating VFS storage"""
+"""Added in 25.16.0. Input for updating VFS storage"""
 input UpdateVFSStorageInput {
   id: ID!
   name: String
@@ -1383,7 +1383,7 @@ input UpdateVFSStorageInput {
   basePath: String
 }
 
-"""Payload for updating VFS storage"""
+"""Added in 25.16.0. Payload for updating VFS storage"""
 type UpdateVFSStoragePayload {
   vfsStorage: VFSStorage!
 }
@@ -1392,7 +1392,7 @@ extend type UserNode @key(fields: "id") {
   id: ID! @external
 }
 
-"""VFS Storage configuration"""
+"""Added in 25.16.0. VFS Storage configuration"""
 type VFSStorage implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -1401,7 +1401,7 @@ type VFSStorage implements Node {
   basePath: String!
 }
 
-"""VFS Storage connection"""
+"""Added in 25.16.0. VFS Storage connection"""
 type VFSStorageConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!

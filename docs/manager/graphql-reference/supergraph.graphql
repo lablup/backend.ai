@@ -1507,7 +1507,7 @@ input CreateUserResourcePolicyInput
   max_customized_image_count: Int
 }
 
-"""Input for creating VFS storage"""
+"""Added in 25.16.0. Input for creating VFS storage"""
 input CreateVFSStorageInput
   @join__type(graph: STRAWBERRY)
 {
@@ -1516,7 +1516,7 @@ input CreateVFSStorageInput
   basePath: String!
 }
 
-"""Payload for creating VFS storage"""
+"""Added in 25.16.0. Payload for creating VFS storage"""
 type CreateVFSStoragePayload
   @join__type(graph: STRAWBERRY)
 {
@@ -1803,14 +1803,14 @@ type DeleteUserResourcePolicy
   msg: String
 }
 
-"""Input for deleting VFS storage"""
+"""Added in 25.16.0. Input for deleting VFS storage"""
 input DeleteVFSStorageInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
 }
 
-"""Payload for deleting VFS storage"""
+"""Added in 25.16.0. Payload for deleting VFS storage"""
 type DeleteVFSStoragePayload
   @join__type(graph: STRAWBERRY)
 {
@@ -4014,13 +4014,13 @@ type Mutation
   """Added in 25.14.0"""
   deleteObjectStorage(input: DeleteObjectStorageInput!): DeleteObjectStoragePayload! @join__field(graph: STRAWBERRY)
 
-  """Create a new VFS storage"""
+  """Added in 25.16.0. Create a new VFS storage"""
   createVFSStorage(input: CreateVFSStorageInput!): CreateVFSStoragePayload! @join__field(graph: STRAWBERRY)
 
-  """Update an existing VFS storage"""
+  """Added in 25.16.0. Update an existing VFS storage"""
   updateVFSStorage(input: UpdateVFSStorageInput!): UpdateVFSStoragePayload! @join__field(graph: STRAWBERRY)
 
-  """Delete a VFS storage"""
+  """Added in 25.16.0. Delete a VFS storage"""
   deleteVFSStorage(input: DeleteVFSStorageInput!): DeleteVFSStoragePayload! @join__field(graph: STRAWBERRY)
 
   """
@@ -4761,10 +4761,10 @@ type Query
   """Added in 25.14.0"""
   objectStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ObjectStorageConnection! @join__field(graph: STRAWBERRY)
 
-  """Get a VFS storage by ID"""
+  """Added in 25.16.0. Get a VFS storage by ID"""
   vfsStorage(id: ID!): VFSStorage @join__field(graph: STRAWBERRY)
 
-  """List all VFS storages"""
+  """Added in 25.16.0. List all VFS storages"""
   vfsStorages(before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFSStorageConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
@@ -5540,7 +5540,7 @@ type UpdateReservoirRegistryPayload
   reservoir: ReservoirRegistry!
 }
 
-"""Input for updating VFS storage"""
+"""Added in 25.16.0. Input for updating VFS storage"""
 input UpdateVFSStorageInput
   @join__type(graph: STRAWBERRY)
 {
@@ -5550,7 +5550,7 @@ input UpdateVFSStorageInput
   basePath: String
 }
 
-"""Payload for updating VFS storage"""
+"""Added in 25.16.0. Payload for updating VFS storage"""
 type UpdateVFSStoragePayload
   @join__type(graph: STRAWBERRY)
 {
@@ -5820,7 +5820,7 @@ Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribut
 scalar VFolderPermissionValueField
   @join__type(graph: GRAPHENE)
 
-"""VFS Storage configuration"""
+"""Added in 25.16.0. VFS Storage configuration"""
 type VFSStorage implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -5832,7 +5832,7 @@ type VFSStorage implements Node
   basePath: String!
 }
 
-"""VFS Storage connection"""
+"""Added in 25.16.0. VFS Storage connection"""
 type VFSStorageConnection
   @join__type(graph: STRAWBERRY)
 {

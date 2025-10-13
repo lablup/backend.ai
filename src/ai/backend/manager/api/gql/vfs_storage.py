@@ -21,7 +21,7 @@ from ...types import OptionalState
 from .types import StrawberryGQLContext
 
 
-@strawberry.type(description="VFS Storage configuration")
+@strawberry.type(description="Added in 25.16.0. VFS Storage configuration")
 class VFSStorage(Node):
     id: NodeID[str]
     name: str
@@ -41,14 +41,14 @@ class VFSStorage(Node):
 VFSStorageEdge = Edge[VFSStorage]
 
 
-@strawberry.type(description="VFS Storage connection")
+@strawberry.type(description="Added in 25.16.0. VFS Storage connection")
 class VFSStorageConnection(Connection[VFSStorage]):
     @strawberry.field
     def count(self) -> int:
         return len(self.edges)
 
 
-@strawberry.field(description="Get a VFS storage by ID")
+@strawberry.field(description="Added in 25.16.0. Get a VFS storage by ID")
 async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> Optional[VFSStorage]:
     processors = info.context.processors
     action_result = await processors.vfs_storage.get.wait_for_complete(
@@ -57,7 +57,7 @@ async def vfs_storage(id: ID, info: Info[StrawberryGQLContext]) -> Optional[VFSS
     return VFSStorage.from_dataclass(action_result.result)
 
 
-@strawberry.field(description="List all VFS storages")
+@strawberry.field(description="Added in 25.16.0. List all VFS storages")
 async def vfs_storages(
     info: Info[StrawberryGQLContext],
     before: Optional[str] = None,
@@ -87,7 +87,7 @@ async def vfs_storages(
     )
 
 
-@strawberry.input(description="Input for creating VFS storage")
+@strawberry.input(description="Added in 25.16.0. Input for creating VFS storage")
 class CreateVFSStorageInput:
     name: str
     host: str
@@ -101,7 +101,7 @@ class CreateVFSStorageInput:
         )
 
 
-@strawberry.input(description="Input for updating VFS storage")
+@strawberry.input(description="Added in 25.16.0. Input for updating VFS storage")
 class UpdateVFSStorageInput:
     id: ID
     name: Optional[str] = UNSET
@@ -116,27 +116,29 @@ class UpdateVFSStorageInput:
         )
 
 
-@strawberry.input(description="Input for deleting VFS storage")
+@strawberry.input(description="Added in 25.16.0. Input for deleting VFS storage")
 class DeleteVFSStorageInput:
     id: ID
 
 
-@strawberry.type(description="Payload for creating VFS storage")
+@strawberry.type(description="Added in 25.16.0. Payload for creating VFS storage")
 class CreateVFSStoragePayload:
     vfs_storage: VFSStorage
 
 
-@strawberry.type(description="Payload for updating VFS storage")
+@strawberry.type(description="Added in 25.16.0. Payload for updating VFS storage")
 class UpdateVFSStoragePayload:
     vfs_storage: VFSStorage
 
 
-@strawberry.type(description="Payload for deleting VFS storage")
+@strawberry.type(description="Added in 25.16.0. Payload for deleting VFS storage")
 class DeleteVFSStoragePayload:
     id: ID
 
 
-@strawberry.mutation(name="createVFSStorage", description="Create a new VFS storage")
+@strawberry.mutation(
+    name="createVFSStorage", description="Added in 25.16.0. Create a new VFS storage"
+)
 async def create_vfs_storage(
     input: CreateVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> CreateVFSStoragePayload:
@@ -151,7 +153,9 @@ async def create_vfs_storage(
     return CreateVFSStoragePayload(vfs_storage=VFSStorage.from_dataclass(action_result.result))
 
 
-@strawberry.mutation(name="updateVFSStorage", description="Update an existing VFS storage")
+@strawberry.mutation(
+    name="updateVFSStorage", description="Added in 25.16.0. Update an existing VFS storage"
+)
 async def update_vfs_storage(
     input: UpdateVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> UpdateVFSStoragePayload:
@@ -167,7 +171,7 @@ async def update_vfs_storage(
     return UpdateVFSStoragePayload(vfs_storage=VFSStorage.from_dataclass(action_result.result))
 
 
-@strawberry.mutation(name="deleteVFSStorage", description="Delete a VFS storage")
+@strawberry.mutation(name="deleteVFSStorage", description="Added in 25.16.0. Delete a VFS storage")
 async def delete_vfs_storage(
     input: DeleteVFSStorageInput, info: Info[StrawberryGQLContext]
 ) -> DeleteVFSStoragePayload:
