@@ -101,6 +101,49 @@ class ObjectStorage(AbstractStorage):
         except Exception as e:
             raise FileStreamDownloadError("Download failed") from e
 
+    @override
+    async def get_file_info(self, filepath: str) -> ObjectMetaResponse:
+        """
+        Get object information.
+
+        Args:
+            filepath: Path to the file to download
+
+        Returns:
+            ObjectMetaResponse with object metadata
+        """
+        try:
+            s3_client = self._get_s3_client()
+            object_info = await s3_client.get_object_meta(filepath)
+
+            if object_info is None:
+                raise StorageBucketFileNotFoundError()
+
+            return ObjectMetaResponse(
+                content_length=object_info.content_length,
+                content_type=object_info.content_type,
+                last_modified=object_info.last_modified,
+                etag=object_info.etag,
+                metadata=object_info.metadata,
+            )
+
+        except Exception as e:
+            raise ObjectInfoFetchError(f"Get object info failed: {str(e)}") from e
+
+    @override
+    async def delete_file(self, filepath: str) -> None:
+        """
+        Delete an object and all its contents.
+
+        Args:
+            filepath: Path of the file to delete
+        """
+        try:
+            s3_client = self._get_s3_client()
+            await s3_client.delete_object(filepath)
+        except Exception as e:
+            raise ObjectStorageObjectDeletionError(f"Delete object failed: {str(e)}") from e
+
     async def generate_presigned_upload_url(self, key: str) -> PresignedUploadObjectResponse:
         """
         Generate presigned upload URL.
@@ -165,46 +208,21 @@ class ObjectStorage(AbstractStorage):
         except Exception as e:
             raise PresignedDownloadURLGenerationError() from e
 
-    async def get_object_info(self, filepath: str) -> ObjectMetaResponse:
+    async def list_objects_with_prefix(self, prefix: str) -> list[str]:
         """
-        Get object information.
+        List all object keys in the storage with the given prefix.
 
         Args:
-            filepath: Path to the file to download
+            prefix: The prefix to filter object keys
 
         Returns:
-            ObjectMetaResponse with object metadata
+            list[str]: List of object keys matching the prefix
         """
         try:
             s3_client = self._get_s3_client()
-            object_info = await s3_client.get_object_meta(filepath)
-
-            if object_info is None:
-                raise StorageBucketFileNotFoundError()
-
-            return ObjectMetaResponse(
-                content_length=object_info.content_length,
-                content_type=object_info.content_type,
-                last_modified=object_info.last_modified,
-                etag=object_info.etag,
-                metadata=object_info.metadata,
-            )
-
+            return await s3_client.list_objects_with_prefix(prefix)
         except Exception as e:
-            raise ObjectInfoFetchError(f"Get object info failed: {str(e)}") from e
-
-    async def delete_object(self, prefix: str) -> None:
-        """
-        Delete an object and all its contents.
-
-        Args:
-            prefix: Prefix of the object to delete
-        """
-        try:
-            s3_client = self._get_s3_client()
-            await s3_client.delete_object(prefix)
-        except Exception as e:
-            raise ObjectStorageObjectDeletionError(f"Delete object failed: {str(e)}") from e
+            raise ObjectInfoFetchError(f"List objects failed: {str(e)}") from e
 
     def _get_s3_client(self) -> S3Client:
         return S3Client(

@@ -4,7 +4,7 @@ Common and generic exceptions that don't belong to a specific domain.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 
 from aiohttp import web
 
@@ -16,9 +16,6 @@ from ai.backend.common.exception import (
     ErrorOperation,
 )
 from ai.backend.common.plugin.hook import HookResult
-
-if TYPE_CHECKING:
-    pass
 
 
 class URLNotFound(BackendAIError, web.HTTPNotFound):  # TODO: Misused now.

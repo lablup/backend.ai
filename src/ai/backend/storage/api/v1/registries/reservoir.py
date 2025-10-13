@@ -19,8 +19,15 @@ from ai.backend.common.dto.storage.response import (
     ReservoirImportModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.config.unified import LegacyReservoirConfig, ReservoirConfig
-from ai.backend.storage.services.artifacts.reservoir import ReservoirService, ReservoirServiceArgs
+from ai.backend.storage.config.unified import (
+    LegacyReservoirConfig,
+    ReservoirConfig,
+)
+from ai.backend.storage.services.artifacts.reservoir import (
+    ReservoirService,
+    ReservoirServiceArgs,
+    create_reservoir_import_pipeline,
+)
 
 from ....utils import log_client_api_entry
 
@@ -49,10 +56,19 @@ class ReservoirRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", None)
 
+        # Create storage step mappings with fallback to storage_name
+
+        # Create import pipeline based on storage step mappings
+        pipeline = create_reservoir_import_pipeline(
+            registry_configs=self._reservoir_service._reservoir_registry_configs,
+            storage_step_mappings=body.parsed.storage_step_mappings,
+        )
+
         task_id = await self._reservoir_service.import_models_batch(
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
-            storage_name=body.parsed.storage_name,
+            storage_step_mappings=body.parsed.storage_step_mappings,
+            pipeline=pipeline,
         )
 
         return APIResponse.build(
@@ -67,16 +83,16 @@ def create_app(ctx: RootContext) -> web.Application:
     app["prefix"] = "v1/registries/reservoir"
 
     # Get reservoir configs from new artifact_registries
-    reservoir_registry_configs: list[ReservoirConfig] = [
-        r.reservoir
-        for r in ctx.local_config.artifact_registries.values()
+    reservoir_registry_configs: dict[str, ReservoirConfig] = {
+        name: r.reservoir
+        for name, r in ctx.local_config.artifact_registries.items()
         if r.registry_type == ArtifactRegistryType.RESERVOIR and r.reservoir is not None
-    ]
+    }
 
-    # Legacy registries support - add from legacy registries for backward compatibility
+    # Legacy registry configs support - add from legacy registries for backward compatibility
     for legacy_registry in ctx.local_config.registries:
         if isinstance(legacy_registry.config, LegacyReservoirConfig):
-            reservoir_registry_configs.append(legacy_registry.config)
+            reservoir_registry_configs[legacy_registry.name] = legacy_registry.config
 
     reservoir_service = ReservoirService(
         ReservoirServiceArgs(

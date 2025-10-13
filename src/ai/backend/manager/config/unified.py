@@ -185,6 +185,7 @@ from pydantic import (
     Field,
     FilePath,
     IPvAnyNetwork,
+    ValidationInfo,
     field_serializer,
     field_validator,
 )
@@ -192,6 +193,7 @@ from pydantic import (
 from ai.backend.common.config import BaseConfigSchema
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
+from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
 from ai.backend.common.typed_validators import (
@@ -1770,7 +1772,26 @@ class ReservoirObjectStorageConfig(BaseConfigSchema):
     )
 
 
-StorageSpecificConfig = Union[ReservoirObjectStorageConfig]
+class ReservoirVFSStorageConfig(BaseConfigSchema):
+    storage_type: Literal["vfs_storage"] = Field(
+        default="vfs_storage",
+        description="""
+        Type of the storage configuration.
+        This is used to identify the specific storage type.
+        """,
+        alias="type",
+    )
+    subpath: str = Field(
+        default="",
+        description="""
+        Subpath within the VFS storage for the reservoir.
+        This is appended to the VFS storage's base_path.
+        """,
+        examples=["artifacts", "models", ""],
+    )
+
+
+StorageSpecificConfig = Union[ReservoirObjectStorageConfig, ReservoirVFSStorageConfig]
 
 
 class ReservoirConfig(BaseConfigSchema):
@@ -1811,6 +1832,49 @@ class ReservoirConfig(BaseConfigSchema):
         Configuration for the storage.
         """,
     )
+    storage_step_selection: dict[ArtifactStorageImportStep, str] = Field(
+        default_factory=dict,
+        description="""
+        Storage step selection configuration for artifact model imports.
+        Maps different import steps (download, archive) to specific storage backends.
+        Required for artifact model import operations.
+        """,
+        validation_alias=AliasChoices("storage_step_selection", "storage-step-selection"),
+        serialization_alias="storage-step-selection",
+    )
+
+    @field_validator("storage_step_selection", mode="before")
+    @classmethod
+    def _validate_required_steps(
+        cls, v: dict[str, str], info: ValidationInfo
+    ) -> dict[ArtifactStorageImportStep, str]:
+        _REQUIRED_STEPS = {ArtifactStorageImportStep.DOWNLOAD, ArtifactStorageImportStep.ARCHIVE}
+
+        # Get storage_name from the current model data being validated
+        default_storage_name = info.data.get("storage_name", "RESERVOIR_STORAGE_NAME")
+
+        if not v:  # If storage_step_selection is empty or None
+            return {step: default_storage_name for step in _REQUIRED_STEPS}
+
+        # Convert string keys to ArtifactStorageImportStep enum keys if needed
+        converted_dict = {}
+        for key, value in v.items():
+            try:
+                enum_key = ArtifactStorageImportStep(key)
+                converted_dict[enum_key] = value
+            except ValueError:
+                # Skip invalid step names
+                log.warning(f"Invalid artifact storage step key: {key}, skipping...")
+                continue
+
+        # Check for required steps
+        missing_steps = _REQUIRED_STEPS - set(converted_dict.keys())
+
+        # Add missing steps with default storage name
+        for step in missing_steps:
+            converted_dict[step] = default_storage_name
+
+        return converted_dict
 
 
 class ModelRegistryConfig(BaseConfigSchema):

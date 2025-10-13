@@ -136,6 +136,7 @@ class ErrorDomain(enum.StrEnum):
     ARTIFACT_REVISION = "artifact-revision"
     ARTIFACT_ASSOCIATION = "artifact-association"
     OBJECT_STORAGE = "object-storage"
+    VFS_STORAGE = "vfs-storage"
     STORAGE_NAMESPACE = "storage-namespace"
     PLUGIN = "plugin"
     BGTASK = "bgtask"

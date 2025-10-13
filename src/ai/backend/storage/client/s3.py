@@ -439,3 +439,33 @@ class S3Client:
                 # TODO: Improve exception handling
                 # Ignore if it doesn't exist or bucket is not versioned / marker absent
                 pass
+
+    async def list_objects_with_prefix(self, prefix: str) -> list[str]:
+        """
+        List all object keys in the bucket with the given prefix.
+
+        Args:
+            prefix: The prefix to filter object keys
+
+        Returns:
+            list[str]: List of object keys matching the prefix
+        """
+        async with self.session.client(
+            "s3",
+            endpoint_url=self.endpoint_url,
+            region_name=self.region_name,
+            aws_access_key_id=self.aws_access_key_id,
+            aws_secret_access_key=self.aws_secret_access_key,
+        ) as s3_client:
+            object_keys = []
+
+            paginator = s3_client.get_paginator("list_objects_v2")
+            async for page in paginator.paginate(Bucket=self.bucket_name, Prefix=prefix):
+                contents = page.get("Contents", [])
+                for obj in contents:
+                    # Only include files, not directory markers
+                    key = obj["Key"]
+                    if not key.endswith("/"):
+                        object_keys.append(key)
+
+            return object_keys

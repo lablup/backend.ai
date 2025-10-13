@@ -866,7 +866,7 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
         validation_alias=AliasChoices("object-storage", "object_storage"),
         serialization_alias="object-storage",
     )
-    vfs: Optional[VFSStorageConfig] = Field(
+    vfs_storage: Optional[VFSStorageConfig] = Field(
         default=None,
         description="""
         VFS storage configuration.
@@ -881,8 +881,8 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
                     raise InvalidConfigError(
                         "object_storage config is required when storage_type is 'object_storage'"
                     )
-            case ArtifactStorageType.VFS:
-                if self.vfs is None:
+            case ArtifactStorageType.VFS_STORAGE:
+                if self.vfs_storage is None:
                     raise InvalidConfigError("vfs config is required when storage_type is 'vfs'")
             case ArtifactStorageType.GIT_LFS:
                 raise GenericNotImplementedError("git_lfs is not supported yet")

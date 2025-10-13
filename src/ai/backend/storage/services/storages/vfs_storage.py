@@ -66,7 +66,7 @@ class VFSStorageService:
             VFSFileMetaResponse with file metadata
         """
         storage = self._resolve_storage(storage_name)
-        return await storage.get_object_info(filepath)
+        return await storage.get_file_info(filepath)
 
     async def delete_file(self, storage_name: str, filepath: str) -> None:
         """
@@ -77,7 +77,7 @@ class VFSStorageService:
             filepath: Path to the file/directory to delete
         """
         storage = self._resolve_storage(storage_name)
-        await storage.delete_object(filepath)
+        await storage.delete_file(filepath)
 
     async def list_files(self, storage_name: str, directory: str) -> list[dict]:
         """

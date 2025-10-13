@@ -30,10 +30,14 @@ from ai.backend.common.dto.storage.response import (
     HuggingFaceScanModelsResponse,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.config.unified import HuggingfaceConfig, LegacyHuggingfaceConfig
+from ai.backend.storage.config.unified import (
+    HuggingfaceConfig,
+    LegacyHuggingfaceConfig,
+)
 from ai.backend.storage.services.artifacts.huggingface import (
     HuggingFaceService,
     HuggingFaceServiceArgs,
+    create_huggingface_import_pipeline,
 )
 
 from ....utils import log_client_api_entry
@@ -166,10 +170,18 @@ class HuggingFaceRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", body.parsed)
 
+        # Create import pipeline based on storage step mappings
+        pipeline = create_huggingface_import_pipeline(
+            registry_configs=self._huggingface_service._registry_configs,
+            transfer_manager=self._huggingface_service._transfer_manager,
+            storage_step_mappings=body.parsed.storage_step_mappings,
+        )
+
         task_id = await self._huggingface_service.import_models_batch(
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
-            storage_name=body.parsed.storage_name,
+            storage_step_mappings=body.parsed.storage_step_mappings,
+            pipeline=pipeline,
         )
 
         response = HuggingFaceImportModelsResponse(
@@ -194,7 +206,7 @@ def create_app(ctx: RootContext) -> web.Application:
         if r.registry_type == ArtifactRegistryType.HUGGINGFACE and r.huggingface is not None
     }
 
-    # Legacy registries support - add from legacy registries for backward compatibility
+    # Legacy registry configs support - add from legacy registries for backward compatibility
     for legacy_registry in ctx.local_config.registries:
         if isinstance(legacy_registry.config, LegacyHuggingfaceConfig):
             huggingface_registry_configs[legacy_registry.name] = legacy_registry.config

@@ -8,7 +8,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Callable, Final, Optional, Protocol, override
+from typing import Any, Callable, Final, Optional, Protocol, override
 
 import aiohttp
 
@@ -19,6 +19,9 @@ from ai.backend.common.data.storage.registries.types import (
     ModelData,
     ModelSortKey,
     ModelTarget,
+)
+from ai.backend.common.data.storage.types import (
+    ArtifactStorageImportStep,
 )
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
@@ -35,6 +38,14 @@ from ai.backend.storage.exception import (
     HuggingFaceModelNotFoundError,
     ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
+    StorageStepRequiredStepNotProvided,
+)
+from ai.backend.storage.services.artifacts.storage_transfer import StorageTransferManager
+from ai.backend.storage.services.artifacts.types import (
+    DownloadStepResult,
+    ImportPipeline,
+    ImportStep,
+    ImportStepContext,
 )
 from ai.backend.storage.storages.storage_pool import StoragePool
 
@@ -307,12 +318,14 @@ class HuggingFaceService:
     _background_task_manager: BackgroundTaskManager
     _registry_configs: dict[str, HuggingfaceConfig]
     _event_producer: EventProducer
+    _transfer_manager: StorageTransferManager
 
     def __init__(self, args: HuggingFaceServiceArgs):
         self._storage_pool = args.storage_pool
         self._background_task_manager = args.background_task_manager
         self._registry_configs = args.registry_configs
         self._event_producer = args.event_producer
+        self._transfer_manager = StorageTransferManager(args.storage_pool)
 
     def _make_scanner(self, registry_name: str) -> HuggingFaceScanner:
         config = self._registry_configs.get(registry_name)
@@ -523,69 +536,36 @@ class HuggingFaceService:
         self,
         registry_name: str,
         model: ModelTarget,
-        storage_name: str,
+        storage_step_mappings: dict[ArtifactStorageImportStep, str],
+        pipeline: ImportPipeline,
     ) -> None:
-        """Import a HuggingFace model to storage.
+        """Import a HuggingFace model to storage using ImportPipeline.
 
         Args:
             registry_name: Name of the HuggingFace registry
             model: HuggingFace model to import
-            storage_name: Target storage name
+            storage_step_mappings: Mapping of import steps to storage names
+            pipeline: ImportPipeline configured for this request
 
         Raises:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
-        if not self._storage_pool:
-            raise ObjectStorageConfigInvalidError(
-                "Storage pool not configured for import operations"
-            )
+        # Create import context
+        context = ImportStepContext(
+            model=model,
+            registry_name=registry_name,
+            storage_pool=self._storage_pool,
+            progress_reporter=None,  # Not needed for single model import
+            storage_step_mappings=storage_step_mappings,
+            step_metadata={},
+        )
 
-        registry_config = self._registry_configs.get(registry_name)
-        if not registry_config:
-            raise RegistryNotFoundError(f"Unknown registry: {registry_name}")
-        chunk_size = registry_config.download_chunk_size
-
-        artifact_total_size = 0
         try:
-            log.info(f"Rescanning model for latest metadata: {model}")
-            scanner = self._make_scanner(registry_name)
-            file_infos = await scanner.list_model_files_info(model)
+            # Execute import pipeline
+            await pipeline.execute(context)
 
-            file_count = len(file_infos)
-            file_total_size = sum(file.size for file in file_infos)
-            log.info(
-                f"Found files to import: model={model}, file_count={file_count}, "
-                f"total_size={file_total_size / (1024 * 1024)} MB"
-            )
-            artifact_total_size += file_total_size
-
-            successful_uploads = 0
-            failed_uploads = 0
-
-            for file_info in file_infos:
-                try:
-                    await self._pipe_single_file_to_storage(
-                        file_info=file_info,
-                        model=model,
-                        storage_name=storage_name,
-                        download_chunk_size=chunk_size,
-                    )
-
-                    successful_uploads += 1
-                except Exception as e:
-                    log.error(
-                        f"Failed to upload file: {str(e)}, {model}, file_path={file_info.path}"
-                    )
-                    failed_uploads += 1
-
-            log.info(
-                f"Model import completed: {model}, successful_uploads={successful_uploads}, "
-                f"failed_uploads={failed_uploads}, total_files={len(file_infos)}"
-            )
-
-            if failed_uploads > 0:
-                log.warning(f"Some files failed to import: {model}, failed_count={failed_uploads}")
+            log.info(f"Model import completed: {model}")
 
             await self._event_producer.anycast_event(
                 ModelImportDoneEvent(
@@ -626,14 +606,14 @@ class HuggingFaceService:
         self,
         registry_name: str,
         models: list[ModelTarget],
-        storage_name: str,
+        storage_step_mappings: dict[ArtifactStorageImportStep, str],
+        pipeline: ImportPipeline,
     ) -> uuid.UUID:
         """Import multiple HuggingFace models to storage in batch.
 
         Args:
             registry_name: Name of the HuggingFace registry
             models: List of HuggingFace models to import
-            storage_name: Target storage name
 
         Raises:
             HuggingFaceAPIError: If API call fails
@@ -647,10 +627,7 @@ class HuggingFaceService:
 
             reporter.total_progress = model_count
 
-            log.info(
-                f"Starting batch model import: model_count={model_count}, "
-                f"storage_name={storage_name}"
-            )
+            log.info(f"Starting batch model import: model_count={model_count}")
 
             try:
                 successful_models = 0
@@ -667,11 +644,11 @@ class HuggingFaceService:
                             f"Processing model in batch: model_id={model_id}, progress={idx}/{model_count}"
                         )
 
-                        # TODO: Batch import logic can be optimized further
                         await self.import_model(
-                            registry_name,
+                            registry_name=registry_name,
                             model=model,
-                            storage_name=storage_name,
+                            storage_step_mappings=storage_step_mappings,
+                            pipeline=pipeline,
                         )
 
                         successful_models += 1
@@ -717,60 +694,233 @@ class HuggingFaceService:
         bgtask_id = await self._background_task_manager.start(_import_models_batch)
         return bgtask_id
 
-    async def _pipe_single_file_to_storage(
-        self,
-        *,
-        file_info: FileObjectData,
-        model: ModelTarget,
-        download_chunk_size: int,
-        storage_name: str,
-    ) -> None:
-        """Upload a single file to storage.
 
-        Args:
-            file_info: File information with download URL
-            model: HuggingFace model target
-            download_chunk_size: Chunk size for file download
-            storage_name: Target storage name
-        """
-        if not self._storage_pool:
+# Import Pipeline Steps
+
+
+class HuggingFaceDownloadStep(ImportStep[None]):
+    """Step to download files from HuggingFace"""
+
+    def __init__(self, registry_configs: dict[str, HuggingfaceConfig]) -> None:
+        self._registry_configs = registry_configs
+
+    @property
+    def step_type(self) -> ArtifactStorageImportStep:
+        return ArtifactStorageImportStep.DOWNLOAD
+
+    def _make_scanner(self, registry_name: str) -> HuggingFaceScanner:
+        config = self._registry_configs.get(registry_name)
+        if not config:
+            raise RegistryNotFoundError(f"HuggingFace registry not found: {registry_name}")
+
+        client = HuggingFaceClient(
+            HuggingFaceClientArgs(
+                token=config.token,
+                endpoint=config.endpoint,
+            )
+        )
+        scanner = HuggingFaceScanner(client)
+        return scanner
+
+    @override
+    async def execute(self, context: ImportStepContext, input_data: None) -> DownloadStepResult:
+        if not context.storage_pool:
             raise ObjectStorageConfigInvalidError(
                 "Storage pool not configured for import operations"
             )
 
-        storage = self._storage_pool.get_storage(storage_name)
+        registry_config = self._registry_configs.get(context.registry_name)
+        if not registry_config:
+            raise RegistryNotFoundError(f"Unknown registry: {context.registry_name}")
+
+        download_storage_name = context.storage_step_mappings.get(
+            ArtifactStorageImportStep.DOWNLOAD
+        )
+        if not download_storage_name:
+            raise StorageStepRequiredStepNotProvided(
+                "No storage mapping provided for DOWNLOAD step"
+            )
+
+        chunk_size = registry_config.download_chunk_size
+
+        log.info(f"Rescanning model for latest metadata: {context.model}")
+        scanner = self._make_scanner(context.registry_name)
+        file_infos = await scanner.list_model_files_info(context.model)
+
+        file_count = len(file_infos)
+        file_total_size = sum(file.size for file in file_infos)
+        log.info(
+            f"Found files to download: model={context.model}, file_count={file_count}, "
+            f"total_size={file_total_size / (1024 * 1024)} MB"
+        )
+
+        downloaded_files: list[tuple[FileObjectData, str]] = []
+        total_bytes = 0
+
+        for file_info in file_infos:
+            storage_key = await self._download_file_to_storage(
+                file_info=file_info,
+                model=context.model,
+                storage_name=download_storage_name,
+                storage_pool=context.storage_pool,
+                download_chunk_size=chunk_size,
+            )
+            downloaded_files.append((file_info, storage_key))
+            total_bytes += file_info.size
+
+        log.info(
+            f"Download completed: model={context.model}, files={len(downloaded_files)}, "
+            f"total_bytes={total_bytes}"
+        )
+
+        return DownloadStepResult(
+            downloaded_files=downloaded_files,
+            storage_name=download_storage_name,
+            total_bytes=total_bytes,
+        )
+
+    async def _download_file_to_storage(
+        self,
+        *,
+        file_info: FileObjectData,
+        model: ModelTarget,
+        storage_name: str,
+        storage_pool: StoragePool,
+        download_chunk_size: int,
+    ) -> str:
+        """Download file from HuggingFace to specified storage"""
+        storage = storage_pool.get_storage(storage_name)
+
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+        storage_key = f"{model.model_id}/{revision}/{file_info.path}"
+
+        log.info(
+            f"[download] Starting download to {storage_name}: file_path={file_info.path}, "
+            f"storage_key={storage_key}, file_size={file_info.size}"
+        )
+
+        ctype = mimetypes.guess_type(file_info.path)[0] or "application/octet-stream"
+
+        data_stream = HuggingFaceFileDownloadStreamReader(
+            url=file_info.download_url,
+            chunk_size=download_chunk_size,
+            max_retries=8,
+            content_type=ctype,
+        )
+
+        await storage.stream_upload(
+            filepath=storage_key,
+            data_stream=data_stream,
+        )
+
+        log.info(f"[download] Successfully downloaded to {storage_name}: {storage_key}")
+        return storage_key
+
+    @override
+    async def cleanup_on_failure(self, context: ImportStepContext) -> None:
+        """Clean up failed files from download storage"""
+        download_storage_name = context.storage_step_mappings.get(
+            ArtifactStorageImportStep.DOWNLOAD
+        )
+        if not download_storage_name:
+            return
+
+        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+        model_prefix = f"{context.model.model_id}/{revision}"
 
         try:
-            # Create storage key path
-            revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
-            storage_key = f"{model.model_id}/{revision}/{file_info.path}"
-
-            log.info(
-                f"[stream_hf2b] Starting file upload to {storage_name}: {model}, file_path={file_info.path}, "
-                f"storage_key={storage_key}, file_size={file_info.size}"
-            )
-
-            ctype = mimetypes.guess_type(file_info.path)[0] or "application/octet-stream"
-
-            data_stream = HuggingFaceFileDownloadStreamReader(
-                url=file_info.download_url,
-                chunk_size=download_chunk_size,
-                max_retries=8,  # TODO: Add config
-                content_type=ctype,
-            )
-
-            # Upload to storage using existing service
-            await storage.stream_upload(
-                filepath=storage_key,
-                data_stream=data_stream,
-            )
-
-            log.info(
-                f"Successfully uploaded file to {storage_name}: {model}, file_path={file_info.path}, "
-                f"storage_key={storage_key}"
-            )
-
+            storage = context.storage_pool.get_storage(download_storage_name)
+            await storage.delete_file(model_prefix)
+            log.info(f"[cleanup] Removed failed download: {download_storage_name}:{model_prefix}")
         except Exception as e:
-            raise HuggingFaceAPIError(
-                f"Unexpected error uploading {file_info.path}: {str(e)}"
-            ) from e
+            log.warning(
+                f"[cleanup] Failed to cleanup download: {download_storage_name}:{model_prefix}: {str(e)}"
+            )
+
+
+class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
+    """Step to move downloaded files to archive storage"""
+
+    def __init__(self, transfer_manager: StorageTransferManager) -> None:
+        self._transfer_manager = transfer_manager
+
+    @property
+    def step_type(self) -> ArtifactStorageImportStep:
+        return ArtifactStorageImportStep.ARCHIVE
+
+    @override
+    async def execute(self, context: ImportStepContext, input_data: DownloadStepResult) -> None:
+        download_storage = input_data.storage_name
+        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
+
+        if not archive_storage:
+            raise StorageStepRequiredStepNotProvided("No storage mapping provided for ARCHIVE step")
+
+        # No need to move if download and archive storage are the same
+        if download_storage == archive_storage:
+            log.info(
+                f"Archive step skipped - download and archive storage are the same: {archive_storage}"
+            )
+            return
+
+        log.info(
+            f"Starting archive transfer: {download_storage} -> {archive_storage}, "
+            f"files={len(input_data.downloaded_files)}"
+        )
+
+        # Move each file from download storage to archive storage
+        for file_info, storage_key in input_data.downloaded_files:
+            try:
+                await self._transfer_manager.transfer_file(
+                    source_storage_name=download_storage,
+                    dest_storage_name=archive_storage,
+                    source_path=storage_key,
+                    dest_path=storage_key,
+                )
+                log.debug(f"Transferred file to archive: {storage_key}")
+            except Exception as e:
+                log.error(f"Failed to transfer file to archive: {storage_key}: {str(e)}")
+                raise
+
+        log.info(
+            f"Archive transfer completed: {download_storage} -> {archive_storage}, "
+            f"files={len(input_data.downloaded_files)}"
+        )
+
+    @override
+    async def cleanup_on_failure(self, context: ImportStepContext) -> None:
+        """Clean up failed files from archive storage"""
+        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
+        if not archive_storage:
+            return
+
+        # Delete entire model (cleaning up individual files is complex)
+        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+        model_prefix = f"{context.model.model_id}/{revision}"
+
+        try:
+            storage = context.storage_pool.get_storage(archive_storage)
+            await storage.delete_file(model_prefix)
+            log.info(f"[cleanup] Removed failed archive: {archive_storage}:{model_prefix}")
+        except Exception as e:
+            log.warning(
+                f"[cleanup] Failed to cleanup archive: {archive_storage}:{model_prefix}: {str(e)}"
+            )
+
+
+def create_huggingface_import_pipeline(
+    registry_configs: dict[str, Any],
+    transfer_manager: StorageTransferManager,
+    storage_step_mappings: dict[ArtifactStorageImportStep, str],
+) -> ImportPipeline:
+    """Create ImportPipeline for HuggingFace based on storage step mappings."""
+    steps: list[ImportStep[Any]] = []
+
+    # Add steps based on what's present in storage_step_mappings
+    if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:
+        steps.append(HuggingFaceDownloadStep(registry_configs))
+
+    if ArtifactStorageImportStep.ARCHIVE in storage_step_mappings:
+        steps.append(HuggingFaceArchiveStep(transfer_manager))
+
+    return ImportPipeline(steps)

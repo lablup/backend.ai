@@ -66,6 +66,7 @@ class ObjectStorageRow(Base):
         "AssociationArtifactsStorageRow",
         back_populates="object_storage_row",
         primaryjoin=_get_object_storage_association_artifact_join_cond,
+        overlaps="vfs_storage_row",
     )
     namespace_rows = relationship(
         "StorageNamespaceRow",
