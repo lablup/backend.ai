@@ -104,8 +104,12 @@ class RejectArtifactRevisionReq(BaseRequestModel):
 
 
 class DelegateImportArtifactsReq(BaseRequestModel):
-    artifact_revision_ids: list[uuid.UUID] = Field()
-    delegator_reservoir_id: Optional[uuid.UUID] = Field(default=None, description="")
+    artifact_revision_ids: list[uuid.UUID] = Field(
+        description="List of artifact revision IDs to delegate the import request."
+    )
+    delegator_reservoir_id: Optional[uuid.UUID] = Field(
+        default=None, description="ID of the reservoir registry to delegate the import request to"
+    )
     delegatee_target: Optional[DelegateeTarget] = Field(
         default=None,
     )
