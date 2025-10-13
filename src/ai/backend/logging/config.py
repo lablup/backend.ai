@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Optional, Self
+from typing import Any, Optional, Self
 
 from pydantic import (
     AliasChoices,
@@ -7,10 +7,13 @@ from pydantic import (
     ByteSize,
     ConfigDict,
     Field,
+    ValidationInfo,
+    field_validator,
     model_serializer,
     model_validator,
 )
 
+from ai.backend.common.configs.validation_context import BaseConfigValidationContext
 from ai.backend.common.typed_validators import AutoDirectoryPath
 
 from .exceptions import ConfigurationError
@@ -225,6 +228,33 @@ class LoggingConfig(BaseConfigModel):
         validation_alias=AliasChoices("pkg_ns", "pkg-ns"),
         serialization_alias="pkg-ns",
     )
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def _set_level(cls, v: Any, info: ValidationInfo) -> Any:
+        context = BaseConfigValidationContext.get_config_validation_context(info)
+        if context is None:
+            # In tests or server scripts that do not use Pydantic validation yet.
+            # Command line args are not set.
+            return v
+
+        if context.log_level != LogLevel.NOTSET:
+            return context.log_level
+        return v
+
+    @field_validator("pkg_ns", mode="before")
+    @classmethod
+    def _set_pkg_ns(cls, v: Any, info: ValidationInfo) -> Any:
+        context = BaseConfigValidationContext.get_config_validation_context(info)
+        if context is None:
+            # In tests or server scripts that do not use Pydantic validation yet.
+            # Command line args are not set.
+            return v
+
+        if context.log_level != LogLevel.NOTSET:
+            v = {} if v is None else dict(v)
+            v["ai.backend"] = context.log_level
+        return v
 
     @model_validator(mode="after")
     def validate_driver_configs(self) -> Self:
