@@ -379,6 +379,8 @@ into the local reservoir registry storage.
 input DelegateImportArtifactsInput {
   """List of artifact revision IDs of delegatee artifact registry"""
   artifactRevisionIds: [ID!]!
+
+  """ID of the reservoir registry to delegate the import request to"""
   delegatorReservoirId: ID = null
   artifactType: ArtifactType = null
   delegateeTarget: DelegateeTarget = null
