@@ -22,6 +22,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
     ArtifactDataWithRevisions,
+    ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactStatus,
     ArtifactType,
@@ -43,6 +44,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
     ArtifactOrderingOptions,
+    ArtifactRemoteStatusFilterType,
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
     ArtifactStatusFilterType,
@@ -170,6 +172,14 @@ class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOpti
                 conditions.append(ArtifactRevisionRow.status.in_(status_values))
             elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
                 conditions.append(ArtifactRevisionRow.status == status_values[0])
+
+        if filters.remote_status_filter is not None:
+            # Handle different remote status filter types
+            remote_status_values = [status.value for status in filters.remote_status_filter.values]
+            if filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.IN:
+                conditions.append(ArtifactRevisionRow.remote_status.in_(remote_status_values))
+            elif filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.EQUALS:
+                conditions.append(ArtifactRevisionRow.remote_status == remote_status_values[0])
 
         # Handle StringFilter-based version filter
         if filters.version_filter is not None:
@@ -413,6 +423,7 @@ class ArtifactRepository:
                     # Update existing revision only if there are changes
                     has_changes = (
                         existing_revision.readme != revision_data.readme
+                        or existing_revision.remote_status != revision_data.remote_status
                         or existing_revision.size != revision_data.size
                         or existing_revision.created_at != revision_data.created_at
                         or existing_revision.updated_at != revision_data.updated_at
@@ -423,7 +434,10 @@ class ArtifactRepository:
                         existing_revision.size = revision_data.size
                         existing_revision.created_at = revision_data.created_at
                         existing_revision.updated_at = revision_data.updated_at
-                        existing_revision.remote_status = revision_data.remote_status
+
+                        # This must be done to avoid overwriting local revisions' remote_status with None
+                        if revision_data.remote_status is not None:
+                            existing_revision.remote_status = revision_data.remote_status
                         artifact_ids_to_update.add(revision_data.artifact_id)
 
                     await db_sess.flush()
@@ -722,6 +736,19 @@ class ArtifactRepository:
             return artifact_revision_id
 
     @artifact_repository_resilience.apply()
+    async def update_artifact_revision_remote_status(
+        self, artifact_revision_id: uuid.UUID, remote_status: ArtifactRemoteStatus
+    ) -> uuid.UUID:
+        async with self._db.begin_session() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(remote_status=remote_status)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    @artifact_repository_resilience.apply()
     async def delete_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
         async with self._db.begin_session() as db_sess:
             # Update availability to DELETED for the given artifact IDs (only for ALIVE artifacts)
@@ -997,6 +1024,18 @@ class ArtifactRepository:
                     count_stmt = count_stmt.where(ArtifactRevisionRow.status.in_(status_values))
                 elif filters.status_filter.type == ArtifactStatusFilterType.EQUALS:
                     count_stmt = count_stmt.where(ArtifactRevisionRow.status == status_values[0])
+            if filters.remote_status_filter is not None:
+                remote_status_values = [
+                    status.value for status in filters.remote_status_filter.values
+                ]
+                if filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.IN:
+                    count_stmt = count_stmt.where(
+                        ArtifactRevisionRow.remote_status.in_(remote_status_values)
+                    )
+                elif filters.remote_status_filter.type == ArtifactRemoteStatusFilterType.EQUALS:
+                    count_stmt = count_stmt.where(
+                        ArtifactRevisionRow.remote_status == remote_status_values[0]
+                    )
             if filters.version_filter is not None:
                 version_condition = filters.version_filter.apply_to_column(
                     ArtifactRevisionRow.version

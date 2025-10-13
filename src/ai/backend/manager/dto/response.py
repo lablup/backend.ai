@@ -79,6 +79,10 @@ class ImportArtifactsResponse(BaseResponseModel):
     tasks: list[ArtifactRevisionImportTask]
 
 
+class DelegateImportArtifactsResponse(BaseResponseModel):
+    tasks: list[ArtifactRevisionImportTask]
+
+
 class UpdateArtifactResponse(BaseResponseModel):
     artifact: ArtifactData
 

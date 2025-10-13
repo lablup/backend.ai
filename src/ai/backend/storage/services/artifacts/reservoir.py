@@ -131,32 +131,35 @@ class ReservoirService:
             reporter: ProgressReporter for tracking progress
             storage_step_mappings: Mapping of import steps to storage names
         """
-        if model.revision is None:
-            raise ArtifactRevisionEmptyError(f"Revision must be specified for model: {model}")
+        success = False
+        try:
+            if model.revision is None:
+                raise ArtifactRevisionEmptyError(f"Revision must be specified for model: {model}")
 
-        # Create import context
-        context = ImportStepContext(
-            model=model,
-            registry_name=registry_name,
-            storage_pool=self._storage_pool,
-            progress_reporter=reporter,
-            storage_step_mappings=storage_step_mappings,
-            step_metadata={},
-        )
-
-        # Execute import pipeline
-        await pipeline.execute(context)
-
-        log.info(f"Model import completed: {model}")
-
-        await self._event_producer.anycast_event(
-            ModelImportDoneEvent(
-                model_id=model.model_id,
-                revision=model.resolve_revision(ArtifactRegistryType.RESERVOIR),
+            # Create import context
+            context = ImportStepContext(
+                model=model,
                 registry_name=registry_name,
-                registry_type=ArtifactRegistryType.RESERVOIR,
+                storage_pool=self._storage_pool,
+                progress_reporter=reporter,
+                storage_step_mappings=storage_step_mappings,
+                step_metadata={},
             )
-        )
+
+            # Execute import pipeline
+            await pipeline.execute(context)
+            log.info(f"Model import completed: {model}")
+            success = True
+        finally:
+            await self._event_producer.anycast_event(
+                ModelImportDoneEvent(
+                    success=success,
+                    model_id=model.model_id,
+                    revision=model.resolve_revision(ArtifactRegistryType.RESERVOIR),
+                    registry_name=registry_name,
+                    registry_type=ArtifactRegistryType.RESERVOIR,
+                )
+            )
 
     async def import_models_batch(
         self,

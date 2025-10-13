@@ -69,6 +69,7 @@ from ai.backend.common.defs import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
+    DoPullReservoirRegistryEvent,
     DoScanReservoirRegistryEvent,
 )
 from ai.backend.common.events.fetcher import EventFetcher
@@ -1063,14 +1064,23 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     task_specs = root_ctx.sokovan_orchestrator.create_task_specs()
 
     # Rescan reservoir registry periodically
-    task_specs.append(
-        EventTaskSpec(
-            name="reservoir_registry_scan",
-            event_factory=lambda: DoScanReservoirRegistryEvent(),
-            interval=3600,  # 1 hour
-            initial_delay=0,
+    if root_ctx.config_provider.config.reservoir.use_delegation:
+        task_specs.append(
+            EventTaskSpec(
+                name="reservoir_registry_scan",
+                event_factory=lambda: DoScanReservoirRegistryEvent(),
+                interval=600,  # 10 minutes
+                initial_delay=0,
+            )
         )
-    )
+        task_specs.append(
+            EventTaskSpec(
+                name="reservoir_registry_pull",
+                event_factory=lambda: DoPullReservoirRegistryEvent(),
+                interval=600,  # 10 minutes
+                initial_delay=0,
+            )
+        )
 
     # Create event producer tasks from specs
     leader_tasks: list[PeriodicTask] = [

@@ -365,6 +365,7 @@ enum ArtifactRemoteStatus
 {
   SCANNED @join__enumValue(graph: STRAWBERRY)
   AVAILABLE @join__enumValue(graph: STRAWBERRY)
+  FAILED @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.14.0"""
@@ -414,6 +415,9 @@ input ArtifactRevisionFilter
   @join__type(graph: STRAWBERRY)
 {
   status: ArtifactRevisionStatusFilter = null
+
+  """Added in 25.16.0"""
+  remoteStatus: ArtifactRevisionRemoteStatusFilter = null
   version: StringFilter = null
   artifactId: ID = null
   size: IntFilter = null
@@ -446,6 +450,14 @@ enum ArtifactRevisionOrderField
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
   STATUS @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 25.16.0"""
+input ArtifactRevisionRemoteStatusFilter
+  @join__type(graph: STRAWBERRY)
+{
+  in: [ArtifactRemoteStatus!] = null
+  equals: ArtifactRemoteStatus = null
 }
 
 """Added in 25.14.0"""
@@ -1559,6 +1571,11 @@ input DelegateImportArtifactsInput
 {
   """List of artifact revision IDs of delegatee artifact registry"""
   artifactRevisionIds: [ID!]!
+
+  """ID of the reservoir registry to delegate the import request to"""
+  delegatorReservoirId: ID = null
+  artifactType: ArtifactType = null
+  delegateeTarget: DelegateeTarget = null
 }
 
 """

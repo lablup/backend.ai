@@ -76,6 +76,13 @@ class ArtifactEventHandler:
             artifact.id, revision=event.revision
         )
 
+        if event.success is False:
+            log.warning("Model import failed: {} revision: {}", event.model_id, event.revision)
+            await self._artifact_repository.update_artifact_revision_status(
+                revision.id, ArtifactStatus.FAILED
+            )
+            return
+
         try:
             if self._config_provider.config.reservoir.enable_approve_process:
                 await self._artifact_repository.update_artifact_revision_status(
