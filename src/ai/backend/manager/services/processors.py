@@ -248,6 +248,7 @@ class Services:
         object_storage_service = ObjectStorageService(
             artifact_repository=repositories.artifact.repository,
             object_storage_repository=repositories.object_storage.repository,
+            storage_namespace_repository=repositories.storage_namespace.repository,
             storage_manager=args.storage_manager,
             config_provider=args.config_provider,
         )
