@@ -42,6 +42,8 @@ from ai.backend.manager.errors.artifact import (
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
     ArtifactOrderingOptions,
+    ArtifactRemoteStatusFilter,
+    ArtifactRemoteStatusFilterType,
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
     ArtifactStatusFilter,
@@ -123,9 +125,18 @@ class ArtifactRevisionStatusFilter:
     equals: Optional[ArtifactStatus] = None
 
 
+@strawberry.input(description="Added in 25.16.0")
+class ArtifactRevisionRemoteStatusFilter:
+    in_: Optional[list[ArtifactRemoteStatus]] = strawberry.field(name="in", default=None)
+    equals: Optional[ArtifactRemoteStatus] = None
+
+
 @strawberry.input(description="Added in 25.14.0")
 class ArtifactRevisionFilter:
     status: Optional[ArtifactRevisionStatusFilter] = None
+    remote_status: Optional[ArtifactRevisionRemoteStatusFilter] = strawberry.field(
+        default=None, description="Added in 25.16.0"
+    )
     version: Optional[StringFilter] = None
     artifact_id: Optional[ID] = None
     size: Optional[IntFilter] = None
@@ -150,6 +161,17 @@ class ArtifactRevisionFilter:
             elif self.status.equals:
                 repo_filter.status_filter = ArtifactStatusFilter(
                     type=ArtifactStatusFilterType.EQUALS, values=[self.status.equals]
+                )
+
+        # Handle remote_status filter using ArtifactRevisionRemoteStatusFilter
+        if self.remote_status:
+            if self.remote_status.in_:
+                repo_filter.remote_status_filter = ArtifactRemoteStatusFilter(
+                    type=ArtifactRemoteStatusFilterType.IN, values=self.remote_status.in_
+                )
+            elif self.remote_status.equals:
+                repo_filter.remote_status_filter = ArtifactRemoteStatusFilter(
+                    type=ArtifactRemoteStatusFilterType.EQUALS, values=[self.remote_status.equals]
                 )
 
         # Pass StringFilter directly for processing in repository

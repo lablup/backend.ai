@@ -8,6 +8,7 @@ from ai.backend.manager.api.gql.base import IntFilter, StringFilter
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactOrderField,
+    ArtifactRemoteStatus,
     ArtifactRevisionOrderField,
     ArtifactStatus,
     ArtifactType,
@@ -65,12 +66,26 @@ class ArtifactStatusFilter:
     values: list[ArtifactStatus]
 
 
+class ArtifactRemoteStatusFilterType(Enum):
+    IN = "in"
+    EQUALS = "equals"
+
+
+@dataclass
+class ArtifactRemoteStatusFilter:
+    """Remote status filter with operation type and values."""
+
+    type: ArtifactRemoteStatusFilterType
+    values: list[ArtifactRemoteStatus]
+
+
 @dataclass
 class ArtifactRevisionFilterOptions:
     """Filtering options for artifact revisions."""
 
     artifact_id: Optional[uuid.UUID] = None
     status_filter: Optional[ArtifactStatusFilter] = None
+    remote_status_filter: Optional[ArtifactRemoteStatusFilter] = None
     version_filter: Optional[StringFilter] = None
     size_filter: Optional[IntFilter] = None
 

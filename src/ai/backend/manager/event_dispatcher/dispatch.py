@@ -24,6 +24,7 @@ from ai.backend.common.events.event_types.artifact.anycast import (
     ModelMetadataFetchDoneEvent,
 )
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
+    DoPullReservoirRegistryEvent,
     DoScanReservoirRegistryEvent,
 )
 from ai.backend.common.events.event_types.bgtask.broadcast import (
@@ -218,6 +219,7 @@ class Dispatchers:
             args.repositories.reservoir_registry.repository,
             args.repositories.object_storage.repository,
             args.storage_manager,
+            args.config_provider,
         )
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
@@ -588,6 +590,11 @@ class Dispatchers:
             DoScanReservoirRegistryEvent,
             None,
             self._artifact_registry_event_handler.handle_artifact_registry_scan,
+        )
+        evd.consume(
+            DoPullReservoirRegistryEvent,
+            None,
+            self._artifact_registry_event_handler.handle_artifact_registry_pull,
         )
 
     def _dispatch_idle_check_events(

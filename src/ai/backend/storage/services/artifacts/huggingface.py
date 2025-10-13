@@ -551,35 +551,37 @@ class HuggingFaceService:
             HuggingFaceModelNotFoundError: If model is not found
             HuggingFaceAPIError: If API call fails
         """
-        # Create import context
-        context = ImportStepContext(
-            model=model,
-            registry_name=registry_name,
-            storage_pool=self._storage_pool,
-            progress_reporter=None,  # Not needed for single model import
-            storage_step_mappings=storage_step_mappings,
-            step_metadata={},
-        )
-
+        success = False
         try:
+            # Create import context
+            context = ImportStepContext(
+                model=model,
+                registry_name=registry_name,
+                storage_pool=self._storage_pool,
+                progress_reporter=None,  # Not needed for single model import
+                storage_step_mappings=storage_step_mappings,
+                step_metadata={},
+            )
+
             # Execute import pipeline
             await pipeline.execute(context)
+            success = True
 
             log.info(f"Model import completed: {model}")
-
+        except HuggingFaceModelNotFoundError:
+            raise
+        except Exception as e:
+            raise HuggingFaceAPIError(f"Import failed for {model}: {str(e)}") from e
+        finally:
             await self._event_producer.anycast_event(
                 ModelImportDoneEvent(
+                    success=success,
                     model_id=model.model_id,
                     revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
                     registry_name=registry_name,
                     registry_type=ArtifactRegistryType.HUGGINGFACE,
                 )
             )
-
-        except HuggingFaceModelNotFoundError:
-            raise
-        except Exception as e:
-            raise HuggingFaceAPIError(f"Import failed for {model}: {str(e)}") from e
 
     async def _download_readme_content(self, download_url: str) -> Optional[str]:
         """Download README content from the given URL.

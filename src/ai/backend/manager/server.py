@@ -69,6 +69,7 @@ from ai.backend.common.defs import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
+    DoPullReservoirRegistryEvent,
     DoScanReservoirRegistryEvent,
 )
 from ai.backend.common.events.fetcher import EventFetcher
@@ -1068,7 +1069,15 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             EventTaskSpec(
                 name="reservoir_registry_scan",
                 event_factory=lambda: DoScanReservoirRegistryEvent(),
-                interval=3600,  # 1 hour
+                interval=600,  # 10 minutes
+                initial_delay=0,
+            )
+        )
+        task_specs.append(
+            EventTaskSpec(
+                name="reservoir_registry_pull",
+                event_factory=lambda: DoPullReservoirRegistryEvent(),
+                interval=600,  # 10 minutes
                 initial_delay=0,
             )
         )

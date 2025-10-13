@@ -151,6 +151,7 @@ enum ArtifactRegistryType {
 enum ArtifactRemoteStatus {
   SCANNED
   AVAILABLE
+  FAILED
 }
 
 """Added in 25.14.0"""
@@ -191,6 +192,9 @@ type ArtifactRevisionEdge {
 """Added in 25.14.0"""
 input ArtifactRevisionFilter {
   status: ArtifactRevisionStatusFilter = null
+
+  """Added in 25.16.0"""
+  remoteStatus: ArtifactRevisionRemoteStatusFilter = null
   version: StringFilter = null
   artifactId: ID = null
   size: IntFilter = null
@@ -217,6 +221,12 @@ enum ArtifactRevisionOrderField {
   CREATED_AT
   UPDATED_AT
   STATUS
+}
+
+"""Added in 25.16.0"""
+input ArtifactRevisionRemoteStatusFilter {
+  in: [ArtifactRemoteStatus!] = null
+  equals: ArtifactRemoteStatus = null
 }
 
 """Added in 25.14.0"""
