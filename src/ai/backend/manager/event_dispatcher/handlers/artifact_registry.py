@@ -153,6 +153,10 @@ class ArtifactRegistryEventHandler:
                 # Group revisions by artifact to batch import
                 artifacts_to_pull: dict[uuid.UUID, ArtifactDataWithRevisions] = {}
                 for revision in revisions_to_pull:
+                    await self._artifact_repository.update_artifact_revision_status(
+                        revision.id, ArtifactStatus.PULLING
+                    )
+
                     artifact = await self._artifact_repository.get_artifact_by_id(
                         revision.artifact_id
                     )

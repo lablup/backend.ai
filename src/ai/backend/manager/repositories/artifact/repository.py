@@ -434,7 +434,10 @@ class ArtifactRepository:
                         existing_revision.size = revision_data.size
                         existing_revision.created_at = revision_data.created_at
                         existing_revision.updated_at = revision_data.updated_at
-                        existing_revision.remote_status = revision_data.remote_status
+
+                        # This must be done to avoid overwriting local revisions' remote_status with None
+                        if revision_data.remote_status is not None:
+                            existing_revision.remote_status = revision_data.remote_status
                         artifact_ids_to_update.add(revision_data.artifact_id)
 
                     await db_sess.flush()
