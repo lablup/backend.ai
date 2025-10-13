@@ -41,7 +41,6 @@ from ai.backend.storage.services.artifacts.huggingface import (
 )
 
 from ....utils import log_client_api_entry
-from ...utils import get_storage_step_mappings
 
 if TYPE_CHECKING:
     from ....context import RootContext
@@ -171,22 +170,17 @@ class HuggingFaceRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", body.parsed)
 
-        # Create storage step mappings with fallback to storage_name
-        storage_step_mappings = get_storage_step_mappings(
-            body.parsed.storage_step_mappings, body.parsed.storage_name
-        )
-
         # Create import pipeline based on storage step mappings
         pipeline = create_huggingface_import_pipeline(
             registry_configs=self._huggingface_service._registry_configs,
             transfer_manager=self._huggingface_service._transfer_manager,
-            storage_step_mappings=storage_step_mappings,
+            storage_step_mappings=body.parsed.storage_step_mappings,
         )
 
         task_id = await self._huggingface_service.import_models_batch(
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
-            storage_step_mappings=storage_step_mappings,
+            storage_step_mappings=body.parsed.storage_step_mappings,
             pipeline=pipeline,
         )
 

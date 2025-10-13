@@ -166,11 +166,6 @@ class ArtifactRevisionService:
         storage_type = reservoir_config.config.storage_type
         reservoir_storage_name = reservoir_config.storage_name
 
-        # Convert enum keys to strings for request
-        storage_step_mappings_str = {
-            step.value: storage_name
-            for step, storage_name in reservoir_config.storage_step_selection.items()
-        }
         bucket_name = reservoir_config.config.bucket_name
         storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
         storage_namespace = await self._object_storage_repository.get_storage_namespace(
@@ -193,7 +188,7 @@ class ArtifactRevisionService:
                         ],
                         registry_name=huggingface_registry_data.name,
                         storage_name=storage_data.name,
-                        storage_step_mappings=storage_step_mappings_str,
+                        storage_step_mappings=reservoir_config.storage_step_selection,
                     )
                 )
                 task_id = huggingface_result.task_id
@@ -211,7 +206,7 @@ class ArtifactRevisionService:
                         ],
                         registry_name=registry_data.name,
                         storage_name=storage_data.name,
-                        storage_step_mappings=storage_step_mappings_str,
+                        storage_step_mappings=reservoir_config.storage_step_selection,
                     )
                 )
                 task_id = result.task_id

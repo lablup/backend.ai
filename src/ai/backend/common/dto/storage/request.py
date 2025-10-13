@@ -2,6 +2,8 @@ from typing import Optional
 
 from pydantic import Field
 
+from ai.backend.common.data.storage.types import ArtifactStorageImportStep
+
 from ...api_handlers import BaseRequestModel
 from ...data.storage.registries.types import ModelSortKey, ModelTarget
 from ...types import QuotaConfig, VFolderID
@@ -226,8 +228,7 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         """,
         examples=["default-minio", "s3-storage", "local-storage"],
     )
-    storage_step_mappings: Optional[dict[str, str]] = Field(
-        default=None,
+    storage_step_mappings: dict[ArtifactStorageImportStep, str] = Field(
         description="""
         Optional mapping of import steps to specific storage backends.
         If provided, overrides storage_name for step-wise storage selection.
@@ -267,8 +268,7 @@ class ReservoirImportModelsReq(BaseRequestModel):
         """,
         examples=["default-minio", "s3-storage", "local-storage"],
     )
-    storage_step_mappings: Optional[dict[str, str]] = Field(
-        default=None,
+    storage_step_mappings: dict[ArtifactStorageImportStep, str] = Field(
         description="""
         Optional mapping of import steps to specific storage backends.
         If provided, overrides storage_name for step-wise storage selection.

@@ -30,7 +30,6 @@ from ai.backend.storage.services.artifacts.reservoir import (
 )
 
 from ....utils import log_client_api_entry
-from ...utils import get_storage_step_mappings
 
 if TYPE_CHECKING:
     from ....context import RootContext
@@ -58,20 +57,17 @@ class ReservoirRegistryAPIHandler:
         await log_client_api_entry(log, "import_models", None)
 
         # Create storage step mappings with fallback to storage_name
-        storage_step_mappings = get_storage_step_mappings(
-            body.parsed.storage_step_mappings, body.parsed.storage_name
-        )
 
         # Create import pipeline based on storage step mappings
         pipeline = create_reservoir_import_pipeline(
             registry_configs=self._reservoir_service._reservoir_registry_configs,
-            storage_step_mappings=storage_step_mappings,
+            storage_step_mappings=body.parsed.storage_step_mappings,
         )
 
         task_id = await self._reservoir_service.import_models_batch(
             registry_name=body.parsed.registry_name,
             models=body.parsed.models,
-            storage_step_mappings=storage_step_mappings,
+            storage_step_mappings=body.parsed.storage_step_mappings,
             pipeline=pipeline,
         )
 

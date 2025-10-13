@@ -9,7 +9,7 @@ class ArtifactStorageType(enum.StrEnum):
     GIT_LFS = "git_lfs"
 
 
-class ArtifactStorageImportStep(enum.Enum):
+class ArtifactStorageImportStep(enum.StrEnum):
     DOWNLOAD = "download"
     VERIFY = "verify"
     ARCHIVE = "archive"
