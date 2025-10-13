@@ -254,6 +254,8 @@ class ArtifactService:
                                 # If remote artifact is AVAILABLE and we were tracking it, update remote_status
                                 if response_revision.status == ArtifactStatus.AVAILABLE:
                                     remote_status = ArtifactRemoteStatus.AVAILABLE
+                                if response_revision.status == ArtifactStatus.FAILED:
+                                    remote_status = ArtifactRemoteStatus.FAILED
                             except ArtifactRevisionNotFoundError:
                                 # New artifact revision - no remote_status to track
                                 pass

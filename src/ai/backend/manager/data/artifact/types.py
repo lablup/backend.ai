@@ -37,6 +37,7 @@ class ArtifactRemoteStatus(enum.StrEnum):
 
     SCANNED = "SCANNED"
     AVAILABLE = "AVAILABLE"
+    FAILED = "FAILED"
 
 
 class ArtifactAvailability(enum.StrEnum):

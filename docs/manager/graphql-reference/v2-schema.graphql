@@ -151,6 +151,7 @@ enum ArtifactRegistryType {
 enum ArtifactRemoteStatus {
   SCANNED
   AVAILABLE
+  FAILED
 }
 
 """Added in 25.14.0"""
