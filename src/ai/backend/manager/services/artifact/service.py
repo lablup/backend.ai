@@ -651,7 +651,7 @@ class ArtifactService:
         self, action: DelegateScanArtifactsAction
     ) -> DelegateScanArtifactsActionResult:
         # If this is a leaf node, perform local scan instead of delegation
-        if self._config_provider.config.reservoir.use_delegation:
+        if not self._config_provider.config.reservoir.use_delegation:
             registry_id = None
             if action.delegatee_target:
                 registry_id = action.delegatee_target.target_registry_id
