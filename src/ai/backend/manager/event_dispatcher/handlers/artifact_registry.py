@@ -184,6 +184,7 @@ class ArtifactRegistryEventHandler:
                             models=models,
                             registry_name=reservoir_registry_data.name,
                             storage_name=reservoir_config.storage_name,
+                            storage_step_mappings=reservoir_config.storage_step_selection,
                         )
 
                         # Call storage proxy import API
