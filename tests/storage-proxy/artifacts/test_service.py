@@ -238,10 +238,12 @@ def mock_reservoir_registry_configs() -> dict[str, ReservoirConfig]:
 @pytest.fixture
 def reservoir_download_step(
     mock_reservoir_registry_configs: dict[str, ReservoirConfig],
+    mock_storage_pool: MagicMock,
 ) -> ReservoirDownloadStep:
     """Create ReservoirDownloadStep instance for testing."""
     return ReservoirDownloadStep(
         registry_configs=mock_reservoir_registry_configs,
+        storage_pool=mock_storage_pool,
     )
 
 
@@ -894,6 +896,7 @@ class TestReservoirDownloadStep:
         # Create step without reservoir configs
         step = ReservoirDownloadStep(
             registry_configs={},
+            storage_pool=mock_storage_pool,
         )
 
         with pytest.raises(ReservoirStorageConfigInvalidError):

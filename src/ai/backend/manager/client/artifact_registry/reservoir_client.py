@@ -1,5 +1,5 @@
 import uuid
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from datetime import datetime
 from typing import Any
 
@@ -8,6 +8,7 @@ import yarl
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth.utils import generate_signature
+from ai.backend.common.dto.storage.request import VFSDownloadFileReq
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.dto.request import (
     DelegateImportArtifactsReq,
@@ -102,3 +103,35 @@ class ReservoirRegistryClient:
     ) -> GetArtifactRevisionReadmeResponse:
         resp = await self._request("GET", f"/artifacts/revisions/{artifact_revision_id}/readme")
         return GetArtifactRevisionReadmeResponse.model_validate(resp)
+
+    async def download_vfs_file_streaming(
+        self, storage_name: str, filepath: str
+    ) -> AsyncIterator[bytes]:
+        """
+        Download a file from VFS storage via streaming.
+
+        Args:
+            storage_name: Name of the VFS storage
+            filepath: Path to the file to download
+
+        Yields:
+            Chunks of file content as bytes
+        """
+        rel_url = f"/vfs-storage/{storage_name}/download"
+        header = self._build_header(method="POST", rel_url=rel_url)
+        url = yarl.URL(self._endpoint) / rel_url.lstrip("/")
+
+        # Create VFS download request
+        vfs_req = VFSDownloadFileReq(filepath=filepath)
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                str(url), headers=header, json=vfs_req.model_dump(mode="json")
+            ) as response:
+                response.raise_for_status()
+
+                # Stream the response content in chunks
+                chunk_size = 8192  # 8KB chunks
+                async for chunk in response.content.iter_chunked(chunk_size):
+                    if chunk:
+                        yield chunk

@@ -60,6 +60,7 @@ class ReservoirRegistryAPIHandler:
 
         # Create import pipeline based on storage step mappings
         pipeline = create_reservoir_import_pipeline(
+            storage_pool=self._reservoir_service._storage_pool,
             registry_configs=self._reservoir_service._reservoir_registry_configs,
             storage_step_mappings=body.parsed.storage_step_mappings,
         )

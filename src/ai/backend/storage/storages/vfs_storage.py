@@ -58,6 +58,7 @@ class VFSStorage(AbstractStorage):
     _base_path: Path
     _upload_chunk_size: int
     _download_chunk_size: int
+    _reservoir_download_chunk_size: int
     _max_file_size: Optional[int]
 
     def __init__(self, name: str, cfg: VFSStorageConfig) -> None:
@@ -69,6 +70,7 @@ class VFSStorage(AbstractStorage):
         self._upload_chunk_size = cfg.upload_chunk_size
         self._download_chunk_size = cfg.download_chunk_size
         self._max_file_size = cfg.max_file_size
+        self._reservoir_download_chunk_size = cfg.reservoir_download_chunk_size
 
         # Ensure base path exists
         self._base_path.mkdir(parents=True, exist_ok=True)
