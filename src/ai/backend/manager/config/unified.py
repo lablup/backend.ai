@@ -1772,7 +1772,26 @@ class ReservoirObjectStorageConfig(BaseConfigSchema):
     )
 
 
-StorageSpecificConfig = Union[ReservoirObjectStorageConfig]
+class ReservoirVFSStorageConfig(BaseConfigSchema):
+    storage_type: Literal["vfs_storage"] = Field(
+        default="vfs_storage",
+        description="""
+        Type of the storage configuration.
+        This is used to identify the specific storage type.
+        """,
+        alias="type",
+    )
+    subpath: str = Field(
+        default="",
+        description="""
+        Subpath within the VFS storage for the reservoir.
+        This is appended to the VFS storage's base_path.
+        """,
+        examples=["artifacts", "models", ""],
+    )
+
+
+StorageSpecificConfig = Union[ReservoirObjectStorageConfig, ReservoirVFSStorageConfig]
 
 
 class ReservoirConfig(BaseConfigSchema):

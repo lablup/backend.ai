@@ -68,6 +68,13 @@ from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
 )
+from .vfs_storage import (
+    create_vfs_storage,
+    delete_vfs_storage,
+    update_vfs_storage,
+    vfs_storage,
+    vfs_storages,
+)
 
 
 @strawberry.type
@@ -83,6 +90,8 @@ class Query:
     replica = replica
     object_storage = object_storage
     object_storages = object_storages
+    vfs_storage = vfs_storage
+    vfs_storages = vfs_storages
     huggingface_registry = huggingface_registry
     huggingface_registries = huggingface_registries
     reservoir_registry = reservoir_registry
@@ -110,6 +119,9 @@ class Mutation:
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     delete_object_storage = delete_object_storage
+    create_vfs_storage = create_vfs_storage
+    update_vfs_storage = update_vfs_storage
+    delete_vfs_storage = delete_vfs_storage
     register_storage_namespace = register_storage_namespace
     unregister_storage_namespace = unregister_storage_namespace
     create_huggingface_registry = create_huggingface_registry

@@ -644,19 +644,12 @@ class HuggingFaceService:
                             f"Processing model in batch: model_id={model_id}, progress={idx}/{model_count}"
                         )
 
-                        # TODO: Batch import logic can be optimized further
-                        # Create import context for batch processing
-                        context = ImportStepContext(
-                            model=model,
+                        await self.import_model(
                             registry_name=registry_name,
-                            storage_pool=self._storage_pool,
-                            progress_reporter=reporter,
+                            model=model,
                             storage_step_mappings=storage_step_mappings,
-                            step_metadata={},
+                            pipeline=pipeline,
                         )
-
-                        # Execute import pipeline
-                        await pipeline.execute(context)
 
                         successful_models += 1
                         log.info(

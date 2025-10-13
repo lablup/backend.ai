@@ -8,8 +8,8 @@ from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.manager.api.gql.utils import dedent_strip
-from ai.backend.manager.data.object_storage_namespace.creator import StorageNamespaceCreator
-from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.data.storage_namespace.creator import StorageNamespaceCreator
+from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.services.storage_namespace.actions.register import (
     RegisterNamespaceAction,
 )

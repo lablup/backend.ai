@@ -82,6 +82,8 @@ from ai.backend.manager.services.vfolder.processors import (
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
+from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 from ai.backend.manager.sokovan.deployment import DeploymentController
 from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 
@@ -130,6 +132,7 @@ class Services:
     model_serving_auto_scaling: AutoScalingService
     auth: AuthService
     object_storage: ObjectStorageService
+    vfs_storage: VFSStorageService
     artifact: ArtifactService
     artifact_revision: ArtifactRevisionService
     artifact_registry: ArtifactRegistryService
@@ -245,14 +248,19 @@ class Services:
         object_storage_service = ObjectStorageService(
             artifact_repository=repositories.artifact.repository,
             object_storage_repository=repositories.object_storage.repository,
+            storage_namespace_repository=repositories.storage_namespace.repository,
             storage_manager=args.storage_manager,
             config_provider=args.config_provider,
+        )
+        vfs_storage_service = VFSStorageService(
+            vfs_storage_repository=repositories.vfs_storage.repository,
         )
         artifact_service = ArtifactService(
             artifact_repository=repositories.artifact.repository,
             artifact_registry_repository=repositories.artifact_registry.repository,
             storage_manager=args.storage_manager,
             object_storage_repository=repositories.object_storage.repository,
+            vfs_storage_repository=repositories.vfs_storage.repository,
             huggingface_registry_repository=repositories.huggingface_registry.repository,
             config_provider=args.config_provider,
             reservoir_registry_repository=repositories.reservoir_registry.repository,
@@ -261,6 +269,8 @@ class Services:
             artifact_repository=repositories.artifact.repository,
             storage_manager=args.storage_manager,
             object_storage_repository=repositories.object_storage.repository,
+            vfs_storage_repository=repositories.vfs_storage.repository,
+            storage_namespace_repository=repositories.storage_namespace.repository,
             huggingface_registry_repository=repositories.huggingface_registry.repository,
             reservoir_registry_repository=repositories.reservoir_registry.repository,
             config_provider=args.config_provider,
@@ -295,6 +305,7 @@ class Services:
             model_serving_auto_scaling=model_serving_auto_scaling,
             auth=auth,
             object_storage=object_storage_service,
+            vfs_storage=vfs_storage_service,
             artifact=artifact_service,
             artifact_revision=artifact_revision_service,
             artifact_registry=artifact_registry_service,
@@ -329,6 +340,7 @@ class Processors(AbstractProcessorPackage):
     model_serving_auto_scaling: ModelServingAutoScalingProcessors
     auth: AuthProcessors
     object_storage: ObjectStorageProcessors
+    vfs_storage: VFSStorageProcessors
     artifact: ArtifactProcessors
     artifact_registry: ArtifactRegistryProcessors
     artifact_revision: ArtifactRevisionProcessors
@@ -375,6 +387,7 @@ class Processors(AbstractProcessorPackage):
         object_storage_processors = ObjectStorageProcessors(
             services.object_storage, action_monitors
         )
+        vfs_storage_processors = VFSStorageProcessors(services.vfs_storage, action_monitors)
         artifact_processors = ArtifactProcessors(services.artifact, action_monitors)
         artifact_registry_processors = ArtifactRegistryProcessors(
             services.artifact_registry, action_monitors
@@ -412,6 +425,7 @@ class Processors(AbstractProcessorPackage):
             model_serving_auto_scaling=model_serving_auto_scaling_processors,
             auth=auth,
             object_storage=object_storage_processors,
+            vfs_storage=vfs_storage_processors,
             artifact=artifact_processors,
             artifact_registry=artifact_registry_processors,
             artifact_revision=artifact_revision_processors,
@@ -441,6 +455,7 @@ class Processors(AbstractProcessorPackage):
             *self.model_serving_auto_scaling.supported_actions(),
             *self.auth.supported_actions(),
             *self.object_storage.supported_actions(),
+            *self.vfs_storage.supported_actions(),
             *self.artifact_registry.supported_actions(),
             *self.artifact_revision.supported_actions(),
             *self.artifact.supported_actions(),

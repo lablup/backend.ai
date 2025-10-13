@@ -3,12 +3,11 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
-from ai.backend.manager.services.storage_namespace.actions.base import StorageNamespaceAction
+from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageAction
 
 
 @dataclass
-class GetNamespacesAction(StorageNamespaceAction):
+class DeleteVFSStorageAction(VFSStorageAction):
     storage_id: uuid.UUID
 
     @override
@@ -18,13 +17,13 @@ class GetNamespacesAction(StorageNamespaceAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "get_multi"
+        return "delete"
 
 
 @dataclass
-class GetNamespacesActionResult(BaseActionResult):
-    result: list[StorageNamespaceData]
+class DeleteVFSStorageActionResult(BaseActionResult):
+    deleted_storage_id: uuid.UUID
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.deleted_storage_id)

@@ -5,7 +5,6 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.exception import (
     BackendAIError,
-    StorageNamespaceNotFoundError,
 )
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -14,7 +13,6 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.object_storage.creator import ObjectStorageCreator
 from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.errors.object_storage import (
     ObjectStorageNotFoundError,
 )
@@ -91,45 +89,6 @@ class ObjectStorageRepository:
                     f"Object storage with namespace ID {storage_namespace_id} not found."
                 )
             return row.object_storage_row.to_dataclass()
-
-    @object_storage_repository_resilience.apply()
-    async def get_storage_namespace(
-        self, storage_id: uuid.UUID, bucket_name: str
-    ) -> StorageNamespaceData:
-        """
-        Get an existing object storage namespace from the database.
-        """
-        async with self._db.begin_session() as db_session:
-            query = sa.select(StorageNamespaceRow).where(
-                StorageNamespaceRow.storage_id == storage_id,
-                StorageNamespaceRow.namespace == bucket_name,
-            )
-            result = await db_session.execute(query)
-            row: StorageNamespaceRow = result.scalar_one_or_none()
-            if row is None:
-                raise StorageNamespaceNotFoundError(
-                    f"Object storage namespace with bucket_name {bucket_name} not found."
-                )
-            return row.to_dataclass()
-
-    @object_storage_repository_resilience.apply()
-    async def get_storage_namespace_by_id(
-        self, storage_namespace_id: uuid.UUID
-    ) -> StorageNamespaceData:
-        """
-        Get an existing object storage namespace from the database by ID.
-        """
-        async with self._db.begin_session() as db_session:
-            query = sa.select(StorageNamespaceRow).where(
-                StorageNamespaceRow.id == storage_namespace_id
-            )
-            result = await db_session.execute(query)
-            row: StorageNamespaceRow = result.scalar_one_or_none()
-            if row is None:
-                raise StorageNamespaceNotFoundError(
-                    f"Object storage namespace ID {storage_namespace_id} not found."
-                )
-            return row.to_dataclass()
 
     @object_storage_repository_resilience.apply()
     async def create(self, creator: ObjectStorageCreator) -> ObjectStorageData:

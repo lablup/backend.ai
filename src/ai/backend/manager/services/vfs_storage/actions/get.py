@@ -3,12 +3,12 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
-from ai.backend.manager.services.storage_namespace.actions.base import StorageNamespaceAction
+from ai.backend.manager.data.vfs_storage.types import VFSStorageData
+from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageAction
 
 
 @dataclass
-class GetNamespacesAction(StorageNamespaceAction):
+class GetVFSStorageAction(VFSStorageAction):
     storage_id: uuid.UUID
 
     @override
@@ -18,13 +18,13 @@ class GetNamespacesAction(StorageNamespaceAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "get_multi"
+        return "get"
 
 
 @dataclass
-class GetNamespacesActionResult(BaseActionResult):
-    result: list[StorageNamespaceData]
+class GetVFSStorageActionResult(BaseActionResult):
+    result: VFSStorageData
 
     @override
     def entity_id(self) -> Optional[str]:
-        return None
+        return str(self.result.id)

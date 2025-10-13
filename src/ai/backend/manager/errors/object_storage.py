@@ -20,3 +20,16 @@ class ObjectStorageNotFoundError(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class ObjectStorageOperationNotSupported(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/object-storage-operation-not-supported"
+    error_title = "Object Storage Operation Not Supported"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.OBJECT_STORAGE,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
