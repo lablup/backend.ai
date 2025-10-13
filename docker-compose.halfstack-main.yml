@@ -168,20 +168,18 @@ services:
       - "4317" # otlp grpc
 
   backendai-half-apollo-router:
-    image: ghcr.io/apollographql/router:v1.61.9
+    image: ghcr.io/wundergraph/cosmo/router:latest
     restart: unless-stopped
     networks:
       - half
     ports:
       - "4000:4000"
+    environment:
+      - LISTEN_ADDR=0.0.0.0:4000
+      - EXECUTION_CONFIG_FILE_PATH=/config/router-config.json
+      - DEV_MODE=true
     volumes:
-      - ./configs/graphql:/etc/graphql
-      - ./docs/manager/graphql-reference:/etc/schemas
-    command:
-      - "--config"
-      - "/etc/graphql/router.yaml"
-      - "--supergraph"
-      - "/etc/schemas/supergraph.graphql"
+      - ./configs/graphql/router-config.json:/config/router-config.json:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
