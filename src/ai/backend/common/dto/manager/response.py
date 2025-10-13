@@ -77,17 +77,6 @@ class ObjectStorageListResponse(BaseResponseModel):
     storages: list[ObjectStorageResponse] = Field(description="List of object storages")
 
 
-class VFSStorageResponse(BaseResponseModel):
-    id: str = Field(description="ID of the VFS storage")
-    name: str = Field(description="Name of the VFS storage")
-    host: str = Field(description="Host address of the VFS storage")
-    base_path: str = Field(description="Base filesystem path for VFS storage")
-
-
-class VFSStorageListResponse(BaseResponseModel):
-    storages: list[VFSStorageResponse] = Field(description="List of VFS storages")
-
-
 class GetPresignedDownloadURLResponse(BaseResponseModel):
     presigned_url: str = Field(description="The presigned download URL")
 
