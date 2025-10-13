@@ -241,7 +241,9 @@ class DelegateImportArtifactsInput:
     artifact_revision_ids: list[ID] = strawberry.field(
         description="List of artifact revision IDs of delegatee artifact registry"
     )
-    delegator_reservoir_id: Optional[ID] = strawberry.field(default=None)
+    delegator_reservoir_id: Optional[ID] = strawberry.field(
+        default=None, description="ID of the reservoir registry to delegate the import request to"
+    )
     artifact_type: Optional[ArtifactType] = strawberry.field(default=None)
     delegatee_target: Optional[DelegateeTarget] = strawberry.field(default=None)
 
