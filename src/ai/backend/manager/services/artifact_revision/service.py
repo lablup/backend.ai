@@ -11,6 +11,7 @@ from ai.backend.common.dto.storage.request import (
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactRevisionReadme, ArtifactStatus
+from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
@@ -22,6 +23,7 @@ from ai.backend.manager.repositories.object_storage.repository import ObjectStor
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
+from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact_revision.actions.approve import (
     ApproveArtifactRevisionAction,
     ApproveArtifactRevisionActionResult,
@@ -67,6 +69,7 @@ from ai.backend.manager.services.artifact_revision.actions.reject import (
 class ArtifactRevisionService:
     _artifact_repository: ArtifactRepository
     _object_storage_repository: ObjectStorageRepository
+    _vfs_storage_repository: VFSStorageRepository
     _huggingface_registry_repository: HuggingFaceRepository
     _reservoir_registry_repository: ReservoirRegistryRepository
     _storage_manager: StorageSessionManager
@@ -76,6 +79,7 @@ class ArtifactRevisionService:
         self,
         artifact_repository: ArtifactRepository,
         object_storage_repository: ObjectStorageRepository,
+        vfs_storage_repository: VFSStorageRepository,
         huggingface_registry_repository: HuggingFaceRepository,
         reservoir_registry_repository: ReservoirRegistryRepository,
         storage_manager: StorageSessionManager,
@@ -83,6 +87,7 @@ class ArtifactRevisionService:
     ) -> None:
         self._artifact_repository = artifact_repository
         self._object_storage_repository = object_storage_repository
+        self._vfs_storage_repository = vfs_storage_repository
         self._huggingface_registry_repository = huggingface_registry_repository
         self._reservoir_registry_repository = reservoir_registry_repository
         self._storage_manager = storage_manager
@@ -167,11 +172,36 @@ class ArtifactRevisionService:
         reservoir_storage_name = reservoir_config.storage_name
 
         bucket_name = reservoir_config.config.bucket_name
-        storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
-        storage_namespace = await self._object_storage_repository.get_storage_namespace(
-            storage_data.id, bucket_name
-        )
-        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
+        storage_data = None
+        vfs_storage_data = None
+        storage_namespace = None
+        storage_host = None
+        namespace_id = None
+        storage_name = None
+
+        try:
+            storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
+            storage_namespace = await self._object_storage_repository.get_storage_namespace(
+                storage_data.id, bucket_name
+            )
+            storage_host = storage_data.host
+            namespace_id = storage_namespace.id
+            storage_name = storage_data.name
+        except Exception:
+            vfs_storage_data = await self._vfs_storage_repository.get_by_name(
+                reservoir_storage_name
+            )
+            storage_host = vfs_storage_data.host
+            # For VFS storage, create StorageNamespaceData with empty namespace for now
+            storage_namespace = StorageNamespaceData(
+                id=vfs_storage_data.id,  # Use VFS storage ID as namespace ID
+                storage_id=vfs_storage_data.id,
+                namespace="",  # Empty namespace for VFS storage
+            )
+            namespace_id = storage_namespace.id
+            storage_name = vfs_storage_data.name
+
+        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_host)
         task_id: UUID
         match artifact.registry_type:
             case ArtifactRegistryType.HUGGINGFACE:
@@ -187,7 +217,7 @@ class ArtifactRevisionService:
                             ModelTarget(model_id=artifact.name, revision=revision_data.version)
                         ],
                         registry_name=huggingface_registry_data.name,
-                        storage_name=storage_data.name,
+                        storage_name=storage_name,
                         storage_step_mappings=reservoir_config.storage_step_selection,
                     )
                 )
@@ -205,7 +235,7 @@ class ArtifactRevisionService:
                             ModelTarget(model_id=artifact.name, revision=revision_data.version)
                         ],
                         registry_name=registry_data.name,
-                        storage_name=storage_data.name,
+                        storage_name=storage_name,
                         storage_step_mappings=reservoir_config.storage_step_selection,
                     )
                 )
@@ -217,7 +247,7 @@ class ArtifactRevisionService:
 
         await self.associate_with_storage(
             AssociateWithStorageAction(
-                revision_data.id, storage_namespace.id, ArtifactStorageType(storage_type)
+                revision_data.id, namespace_id, ArtifactStorageType(storage_type)
             )
         )
 
@@ -245,17 +275,45 @@ class ArtifactRevisionService:
         # TODO: Abstract this.
         bucket_name = reservoir_config.config.bucket_name
 
-        storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
-        storage_namespace = await self._object_storage_repository.get_storage_namespace(
-            storage_data.id, bucket_name
-        )
-        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_data.host)
+        storage_data = None
+        vfs_storage_data = None
+        storage_namespace = None
+        storage_host = None
+        namespace_id = None
+        storage_name = None
 
+        try:
+            storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
+            storage_namespace = await self._object_storage_repository.get_storage_namespace(
+                storage_data.id, bucket_name
+            )
+            storage_host = storage_data.host
+            namespace_id = storage_namespace.id
+            storage_name = storage_data.name
+        except Exception:
+            vfs_storage_data = await self._vfs_storage_repository.get_by_name(
+                reservoir_storage_name
+            )
+            storage_host = vfs_storage_data.host
+            # For VFS storage, create StorageNamespaceData with empty namespace for now
+
+            storage_namespace = StorageNamespaceData(
+                id=vfs_storage_data.id,  # Use VFS storage ID as namespace ID
+                storage_id=vfs_storage_data.id,
+                namespace="",  # Empty namespace for VFS storage
+            )
+            namespace_id = storage_namespace.id
+            storage_name = vfs_storage_data.name
+
+        if storage_data is None:
+            raise ArtifactDeletionError("Storage data not found for artifact deletion")
+
+        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_host)
         key = f"{artifact_data.name}/{revision_data.version}/"
 
         try:
             await storage_proxy_client.delete_s3_object(
-                storage_name=storage_data.name,
+                storage_name=storage_name,
                 bucket_name=storage_namespace.namespace,
                 req=DeleteObjectReq(
                     key=key,
@@ -267,7 +325,7 @@ class ArtifactRevisionService:
         await self.disassociate_with_storage(
             DisassociateWithStorageAction(
                 artifact_revision_id=revision_data.id,
-                storage_namespace_id=storage_namespace.id,
+                storage_namespace_id=namespace_id,
             )
         )
 

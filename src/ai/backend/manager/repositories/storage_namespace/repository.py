@@ -11,8 +11,8 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.object_storage_namespace.creator import StorageNamespaceCreator
-from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.data.storage_namespace.creator import StorageNamespaceCreator
+from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 

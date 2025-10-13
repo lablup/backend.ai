@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 
 from .base import (
     GUID,

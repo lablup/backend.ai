@@ -14,7 +14,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.object_storage.creator import ObjectStorageCreator
 from ai.backend.manager.data.object_storage.modifier import ObjectStorageModifier
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
-from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.errors.object_storage import (
     ObjectStorageNotFoundError,
 )

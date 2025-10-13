@@ -34,6 +34,7 @@ from . import storage as _storage
 from . import storage_namespace as _storage_namespace
 from . import user as _user
 from . import vfolder as _vfolder
+from . import vfs_storage as _vfs_storage
 from .base import metadata
 from .gql_models import agent as _relay_agent
 from .gql_models import kernel as _relay_kernel
@@ -74,6 +75,7 @@ __all__ = (
     *_sessiontemplate.__all__,
     *_storage.__all__,
     *_storage_namespace.__all__,
+    *_vfs_storage.__all__,
     *_errorlogs.__all__,
     *_eventlog.__all__,
     *_relay_agent.__all__,
@@ -115,6 +117,7 @@ from .storage import *  # noqa
 from .storage_namespace import *  # noqa
 from .user import *  # noqa
 from .vfolder import *  # noqa
+from .vfs_storage import *  # noqa
 from .rbac_models import *  # noqa
 from .gql_models.agent import *  # noqa
 from .gql_models.kernel import *  # noqa
