@@ -42,6 +42,7 @@ class VFSStorageRow(Base):
         "AssociationArtifactsStorageRow",
         back_populates="vfs_storage_row",
         primaryjoin=_get_vfs_storage_association_artifact_join_cond,
+        overlaps="association_artifacts_storages_rows,object_storage_row",
     )
 
     def __str__(self) -> str:

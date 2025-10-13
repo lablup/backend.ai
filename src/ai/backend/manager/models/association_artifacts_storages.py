@@ -68,6 +68,7 @@ class AssociationArtifactsStorageRow(Base):
         "ObjectStorageRow",
         back_populates="association_artifacts_storages_rows",
         primaryjoin=_get_association_object_storage_join_cond,
+        overlaps="vfs_storage_row",
     )
 
     # only valid when storage_type is "vfs"
@@ -75,4 +76,5 @@ class AssociationArtifactsStorageRow(Base):
         "VFSStorageRow",
         back_populates="association_artifacts_storages_rows",
         primaryjoin=_get_association_vfs_storage_join_cond,
+        overlaps="object_storage_row",
     )

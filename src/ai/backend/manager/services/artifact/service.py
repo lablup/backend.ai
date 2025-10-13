@@ -47,6 +47,7 @@ from ai.backend.manager.repositories.object_storage.repository import ObjectStor
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
+from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,
@@ -108,6 +109,7 @@ class ArtifactService:
     _artifact_repository: ArtifactRepository
     _artifact_registry_repository: ArtifactRegistryRepository
     _object_storage_repository: ObjectStorageRepository
+    _vfs_storage_repository: VFSStorageRepository
     _huggingface_registry_repository: HuggingFaceRepository
     _reservoir_registry_repository: ReservoirRegistryRepository
     _storage_manager: StorageSessionManager
@@ -118,6 +120,7 @@ class ArtifactService:
         artifact_repository: ArtifactRepository,
         artifact_registry_repository: ArtifactRegistryRepository,
         object_storage_repository: ObjectStorageRepository,
+        vfs_storage_repository: VFSStorageRepository,
         huggingface_registry_repository: HuggingFaceRepository,
         reservoir_registry_repository: ReservoirRegistryRepository,
         storage_manager: StorageSessionManager,
@@ -126,17 +129,26 @@ class ArtifactService:
         self._artifact_repository = artifact_repository
         self._artifact_registry_repository = artifact_registry_repository
         self._object_storage_repository = object_storage_repository
+        self._vfs_storage_repository = vfs_storage_repository
         self._huggingface_registry_repository = huggingface_registry_repository
         self._reservoir_registry_repository = reservoir_registry_repository
         self._storage_manager = storage_manager
         self._config_provider = config_provider
 
+    async def _get_storage_client(self, storage_name: str):
+        """Get storage client by trying object_storage first, then vfs_storage as fallback"""
+        try:
+            storage = await self._object_storage_repository.get_by_name(storage_name)
+            return self._storage_manager.get_manager_facing_client(storage.host)
+        except Exception:
+            vfs_storage = await self._vfs_storage_repository.get_by_name(storage_name)
+            return self._storage_manager.get_manager_facing_client(vfs_storage.host)
+
     async def scan(self, action: ScanArtifactsAction) -> ScanArtifactsActionResult:
         reservoir_config = self._config_provider.config.reservoir
-        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
 
         # TODO: Abstract remote registry client layer (scan, import)
-        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+        storage_proxy_client = await self._get_storage_client(reservoir_config.storage_name)
 
         registry_meta = await self._resolve_artifact_registry_meta(
             action.artifact_type, action.registry_id
@@ -151,7 +163,6 @@ class ArtifactService:
                 huggingface_registry_data = (
                     await self._huggingface_registry_repository.get_registry_data_by_id(registry_id)
                 )
-                storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
 
                 if not (action.limit and action.order):
                     raise ArtifactRegistryBadScanRequestError(
@@ -301,10 +312,9 @@ class ArtifactService:
         This action scans and returns all metadata, including readme, size, and other information
         """
         reservoir_config = self._config_provider.config.reservoir
-        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
 
         # TODO: Abstract remote registry client layer (scan, import)
-        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+        storage_proxy_client = await self._get_storage_client(reservoir_config.storage_name)
 
         registry_meta = await self._resolve_artifact_registry_meta(
             action.artifact_type, action.registry_id
@@ -319,7 +329,6 @@ class ArtifactService:
                 huggingface_registry_data = (
                     await self._huggingface_registry_repository.get_registry_data_by_id(registry_id)
                 )
-                storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
 
                 if not (action.limit and action.order):
                     raise ArtifactRegistryBadScanRequestError(

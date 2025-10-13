@@ -1,3 +1,4 @@
+import uuid
 from uuid import UUID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
@@ -93,6 +94,28 @@ class ArtifactRevisionService:
         self._storage_manager = storage_manager
         self._config_provider = config_provider
 
+    async def _get_storage_info(
+        self, storage_name: str, bucket_name: str
+    ) -> tuple[str, uuid.UUID, str]:
+        """Get storage info by trying object_storage first, then vfs_storage as fallback
+        Returns: (storage_host, namespace_id, storage_name)
+        """
+        try:
+            storage_data = await self._object_storage_repository.get_by_name(storage_name)
+            storage_namespace = await self._object_storage_repository.get_storage_namespace(
+                storage_data.id, bucket_name
+            )
+            return storage_data.host, storage_namespace.id, storage_data.name
+        except Exception:
+            vfs_storage_data = await self._vfs_storage_repository.get_by_name(storage_name)
+            # For VFS storage, create StorageNamespaceData with empty namespace for now
+            storage_namespace = StorageNamespaceData(
+                id=vfs_storage_data.id,  # Use VFS storage ID as namespace ID
+                storage_id=vfs_storage_data.id,
+                namespace="",  # Empty namespace for VFS storage
+            )
+            return vfs_storage_data.host, storage_namespace.id, vfs_storage_data.name
+
     async def get(self, action: GetArtifactRevisionAction) -> GetArtifactRevisionActionResult:
         revision = await self._artifact_repository.get_artifact_revision_by_id(
             action.artifact_revision_id
@@ -172,34 +195,9 @@ class ArtifactRevisionService:
         reservoir_storage_name = reservoir_config.storage_name
 
         bucket_name = reservoir_config.config.bucket_name
-        storage_data = None
-        vfs_storage_data = None
-        storage_namespace = None
-        storage_host = None
-        namespace_id = None
-        storage_name = None
-
-        try:
-            storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
-            storage_namespace = await self._object_storage_repository.get_storage_namespace(
-                storage_data.id, bucket_name
-            )
-            storage_host = storage_data.host
-            namespace_id = storage_namespace.id
-            storage_name = storage_data.name
-        except Exception:
-            vfs_storage_data = await self._vfs_storage_repository.get_by_name(
-                reservoir_storage_name
-            )
-            storage_host = vfs_storage_data.host
-            # For VFS storage, create StorageNamespaceData with empty namespace for now
-            storage_namespace = StorageNamespaceData(
-                id=vfs_storage_data.id,  # Use VFS storage ID as namespace ID
-                storage_id=vfs_storage_data.id,
-                namespace="",  # Empty namespace for VFS storage
-            )
-            namespace_id = storage_namespace.id
-            storage_name = vfs_storage_data.name
+        storage_host, namespace_id, storage_name = await self._get_storage_info(
+            reservoir_storage_name, bucket_name
+        )
 
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_host)
         task_id: UUID
