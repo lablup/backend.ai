@@ -70,7 +70,7 @@ class ScratchType(enum.StrEnum):
 
 
 class AgentConfigValidationContext(BaseConfigValidationContext):
-    is_not_invoked_subcommand: bool
+    is_invoked_subcommand: bool
 
 
 class SyncContainerLifecyclesConfig(BaseConfigSchema):
@@ -202,7 +202,7 @@ class CoreDumpConfig(BaseConfigSchema):
             context = AgentConfigValidationContext.get_config_validation_context(info)
             if context is None:
                 raise ValueError("context must be specified in model_validate()")
-            if context.is_not_invoked_subcommand and not sys.platform.startswith("linux"):
+            if context.is_invoked_subcommand and not sys.platform.startswith("linux"):
                 raise ValueError("Storing container coredumps is only supported in Linux.")
 
             core_pattern = Path("/proc/sys/kernel/core_pattern").read_text().strip()

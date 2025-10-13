@@ -41,7 +41,7 @@ def default_context() -> AgentConfigValidationContext:
     return AgentConfigValidationContext(
         debug=CONTEXT_DEFAULT_DEBUG,
         log_level=CONTEXT_DEFAULT_LOG_LEVEL,
-        is_not_invoked_subcommand=True,
+        is_invoked_subcommand=False,
     )
 
 
@@ -136,7 +136,7 @@ class CoreDumpConfigTest:
         return AgentConfigValidationContext(
             debug=True,
             log_level=CONTEXT_DEFAULT_LOG_LEVEL,
-            is_not_invoked_subcommand=True,
+            is_invoked_subcommand=False,
         )
 
     @patch.object(sys, "platform", "linux")

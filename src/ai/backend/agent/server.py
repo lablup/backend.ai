@@ -1441,13 +1441,13 @@ def main(
     # Validate and fill configurations
     # (allow_extra will make configs to be forward-copmatible)
     try:
-        is_not_invoked_subcommand = cli_ctx.invoked_subcommand is None
+        is_invoked_subcommand = cli_ctx.invoked_subcommand is not None
         server_config = AgentUnifiedConfig.model_validate(
             raw_cfg,
             context=AgentConfigValidationContext(
                 debug=log_level == LogLevel.DEBUG,
                 log_level=log_level,
-                is_not_invoked_subcommand=is_not_invoked_subcommand,
+                is_invoked_subcommand=is_invoked_subcommand,
             ),
         )
 
@@ -1469,7 +1469,7 @@ def main(
         print(str(e), file=sys.stderr)
         raise click.Abort()
 
-    if is_not_invoked_subcommand:
+    if not is_invoked_subcommand:
         server_config.agent.pid_file.write_text(str(os.getpid()))
         image_commit_path = server_config.agent.image_commit_path
         image_commit_path.mkdir(parents=True, exist_ok=True)
