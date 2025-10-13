@@ -7,7 +7,7 @@ from typing import Any, AsyncIterator, Final, Optional
 import aiohttp
 import yarl
 
-from ai.backend.common.exception import ErrorCode, ErrorDomain
+from ai.backend.common.exception import ErrorCode, ErrorDomain, InvalidErrorCode
 from ai.backend.common.json import load_json
 from ai.backend.manager.errors.storage import (
     QuotaScopeNotFoundError,
@@ -74,11 +74,11 @@ class StorageProxyHTTPClient:
                 )
 
     async def _handle_exceptional_response(self, resp: aiohttp.ClientResponse) -> None:
+        data = await resp.json()
         try:
-            data = await resp.json()
             err_code = ErrorCode.from_str(data.get("error_code", ""))
             err_domain = err_code.domain
-        except ValueError:
+        except InvalidErrorCode:
             err_domain = ErrorDomain.VFOLDER  # Default domain if parsing fails
         match err_domain:
             case ErrorDomain.VFOLDER:
