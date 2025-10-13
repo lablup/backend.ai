@@ -2,20 +2,24 @@ from __future__ import annotations
 
 import logging
 import mimetypes
+import os
+from collections.abc import AsyncIterator
 from http import HTTPStatus
-from typing import Iterable, Tuple
+from typing import Iterable, Optional, Tuple
 
+import aiohttp
 import aiohttp_cors
 from aiohttp import web
 
 from ai.backend.common.api_handlers import (
     APIStreamResponse,
+    BaseResponseModel,
     BodyParam,
     PathParam,
     stream_api_handler,
 )
-from ai.backend.common.dto.base import BaseResponseModel
 from ai.backend.common.dto.storage.request import VFSDownloadFileReq, VFSStorageAPIPathParams
+from ai.backend.common.types import StreamReader
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.dto.context import ProcessorsCtx
 
@@ -39,6 +43,105 @@ class VFSErrorResponse(BaseResponseModel):
     error: str
 
 
+class VFSFileDownloadStreamReader(StreamReader):
+    """StreamReader implementation for VFS file downloads from storage proxy."""
+
+    def __init__(
+        self,
+        manager_client,
+        storage_name: str,
+        req,  # VFSDownloadFileReq
+        filepath: str,
+    ):
+        self._manager_client = manager_client
+        self._storage_name = storage_name
+        self._req = req
+        self._filepath = filepath
+        self._content_type: Optional[str] = None
+        self._guessed_content_type: Optional[str] = None
+
+        # Guess content type from filepath
+        guessed_type, _ = mimetypes.guess_type(filepath)
+        self._guessed_content_type = guessed_type
+
+    def content_type(self) -> Optional[str]:
+        """Return the content type for this download."""
+        # Return actual content type from response if available,
+        # otherwise return guessed type
+        return self._content_type or self._guessed_content_type or "application/octet-stream"
+
+    async def read(self) -> AsyncIterator[bytes]:
+        """Stream file content from storage proxy."""
+        try:
+            # Use the context manager to get response from storage proxy
+            async with self._manager_client.download_vfs_file_streaming(
+                self._storage_name, self._req
+            ) as resp:
+                # Check response status
+                if resp.status != 200:
+                    error_text = await resp.text()
+                    log.error(
+                        f"Storage proxy error for {self._filepath}: {resp.status} - {error_text}"
+                    )
+                    yield f"Error: Storage proxy returned {resp.status}: {error_text}".encode(
+                        "utf-8"
+                    )
+                    return
+
+                # Get actual content type from response
+                self._content_type = resp.headers.get("Content-Type", self._guessed_content_type)
+
+                # Stream the content in chunks
+                chunk_size = 8192  # 8KB chunks
+                bytes_streamed = 0
+
+                try:
+                    async for chunk in resp.content.iter_chunked(chunk_size):
+                        if chunk:
+                            bytes_streamed += len(chunk)
+                            yield chunk
+
+                    log.debug(f"Successfully streamed {self._filepath}: {bytes_streamed} bytes")
+
+                except (
+                    aiohttp.ClientPayloadError,
+                    aiohttp.ClientConnectionError,
+                    ConnectionResetError,
+                    BrokenPipeError,
+                ) as e:
+                    # Client disconnected during streaming - this is expected behavior
+                    log.debug(
+                        f"Client disconnected while streaming {self._filepath}: {type(e).__name__}: {e}"
+                    )
+                    return
+
+                except Exception as e:
+                    # Unexpected error during streaming
+                    log.error(f"Unexpected error streaming {self._filepath}: {e}", exc_info=True)
+                    raise
+
+        except Exception as e:
+            # Error setting up the connection
+            log.error(f"Failed to initialize streaming for {self._filepath}: {e}", exc_info=True)
+            yield f"Error: Failed to download file: {str(e)}".encode("utf-8")
+
+
+class VFSErrorStreamReader(StreamReader):
+    """StreamReader implementation for error responses."""
+
+    def __init__(self, error_message: str, status_code: int = 500):
+        self._error_message = error_message
+        self._status_code = status_code
+
+    def content_type(self) -> Optional[str]:
+        """Return plain text content type for error messages."""
+        return "text/plain; charset=utf-8"
+
+    async def read(self) -> AsyncIterator[bytes]:
+        """Yield error message as bytes."""
+        yield self._error_message.encode("utf-8")
+
+
 class APIHandler:
     @auth_required_for_method
     @stream_api_handler
@@ -57,65 +160,62 @@ class APIHandler:
             processors_ctx: Processing context
 
         Returns:
-            APIStreamResponse: Streaming file content
+            APIStreamResponse with StreamReader body
         """
         req = body.parsed
         filepath = req.filepath
         storage_name = path.parsed.storage_name
 
+        log.info(f"Download request for file: {filepath} from storage: {storage_name}")
+
         try:
-            # 1. Get storage_manager from proper context ✅
+            # Get storage manager from context
             storage_manager = processors_ctx.storage_manager
 
-            # TODO: 2. Map storage_name to proxy_name based on VFS storage configuration
-            # For now, we'll use the first available proxy
+            # TODO: Map storage_name to proxy_name based on VFS storage configuration
+            # For now, use the first available proxy
             proxy_name = next(iter(storage_manager._manager_facing_clients.keys()))
 
-            # 3. Get the manager_client using storage_manager ✅
+            # Get the manager client for the proxy
             manager_client = storage_manager.get_manager_facing_client(proxy_name)
 
-            # 4. Use the client to stream download from storage proxy ✅
-            async with manager_client.download_vfs_file_streaming(storage_name, req) as resp:
-                if resp.status != HTTPStatus.OK:
-                    error_text = await resp.text()
-                    log.error(f"Storage proxy VFS download failed: {error_text}")
-                    raise Exception(f"Storage proxy VFS download failed: {error_text}")
+            # Create stream reader for the download
+            stream_reader = VFSFileDownloadStreamReader(
+                manager_client=manager_client, storage_name=storage_name, req=req, filepath=filepath
+            )
 
-                # Determine content type
-                content_type = resp.headers.get("Content-Type", "application/octet-stream")
-                if not content_type or content_type == "application/octet-stream":
-                    guessed_type, _ = mimetypes.guess_type(filepath)
-                    content_type = guessed_type or "application/octet-stream"
-
-                # Create a streaming response that reads from storage proxy response
-                async def stream_generator():
-                    chunk_size = 8192  # 8KB chunks
-                    async for chunk in resp.content.iter_chunked(chunk_size):
-                        yield chunk
-
-                return APIStreamResponse(
-                    body=stream_generator(),
-                    status=HTTPStatus.OK,
-                    headers={
-                        "Content-Type": content_type,
-                    },
-                )
-
-        except Exception as e:
-            log.error(f"Unexpected error downloading VFS file '{filepath}': {str(e)}")
-
-            # For streaming responses, we can't return an APIResponse error
-            # Instead, we need to return an error stream
-            async def error_generator():
-                error_msg = f"Error downloading file: {str(e)}"
-                yield error_msg.encode("utf-8")
+            # Prepare response headers
+            filename = os.path.basename(filepath)
+            headers = {
+                "Content-Type": stream_reader.content_type(),
+                "Content-Disposition": f'attachment; filename="{filename}"',
+                "Cache-Control": "no-cache",
+            }
 
             return APIStreamResponse(
-                body=error_generator(),
+                body=stream_reader,
+                status=HTTPStatus.OK,
+                headers=headers,
+            )
+
+        except KeyError as e:
+            error_msg = f"No storage proxy available: {str(e)}"
+            log.error(error_msg)
+
+            return APIStreamResponse(
+                body=VFSErrorStreamReader(error_msg),
+                status=HTTPStatus.SERVICE_UNAVAILABLE,
+                headers={"Content-Type": "text/plain; charset=utf-8"},
+            )
+
+        except Exception as e:
+            error_msg = f"Failed to initialize download for '{filepath}': {str(e)}"
+            log.error(error_msg, exc_info=True)
+
+            return APIStreamResponse(
+                body=VFSErrorStreamReader(error_msg),
                 status=HTTPStatus.INTERNAL_SERVER_ERROR,
-                headers={
-                    "Content-Type": "text/plain",
-                },
+                headers={"Content-Type": "text/plain; charset=utf-8"},
             )
 
 

@@ -241,9 +241,11 @@ def reservoir_download_step(
     mock_storage_pool: MagicMock,
 ) -> ReservoirDownloadStep:
     """Create ReservoirDownloadStep instance for testing."""
+    # Create a mock storage object
+    mock_download_storage = MagicMock()
     return ReservoirDownloadStep(
         registry_configs=mock_reservoir_registry_configs,
-        storage_pool=mock_storage_pool,
+        download_storage=mock_download_storage,
     )
 
 
@@ -894,9 +896,11 @@ class TestReservoirDownloadStep:
     ) -> None:
         """Test model import with no registry configuration."""
         # Create step without reservoir configs
+        # Create a mock storage object
+        mock_download_storage = MagicMock()
         step = ReservoirDownloadStep(
             registry_configs={},
-            storage_pool=mock_storage_pool,
+            download_storage=mock_download_storage,
         )
 
         with pytest.raises(ReservoirStorageConfigInvalidError):

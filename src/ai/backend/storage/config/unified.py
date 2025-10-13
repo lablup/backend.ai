@@ -848,6 +848,16 @@ class ReservoirConfig(BaseConfigSchema):
         validation_alias=AliasChoices("object-storage-region", "object_storage_region"),
         serialization_alias="object-storage-region",
     )
+    storage_name: Optional[str] = Field(
+        # TODO: FIx this
+        default="vfs-storage",
+        description="""
+        Name of the object storage configuration to use with the reservoir registry.
+        """,
+        examples=["s3-storage", "minio-storage"],
+        validation_alias=AliasChoices("storage-name", "storage_name"),
+        serialization_alias="storage-name",
+    )
 
 
 class LegacyReservoirConfig(ReservoirConfig):
