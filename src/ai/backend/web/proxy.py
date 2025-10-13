@@ -181,6 +181,17 @@ async def web_handler(
     api_endpoint: Optional[str] = None,
     http_headers_to_forward_extra: Iterable[str] | None = None,
 ) -> web.StreamResponse:
+    # Check if this is a WebSocket upgrade request (for GraphQL subscriptions)
+    if (
+        frontend_rqst.headers.get("Upgrade", "").lower() == "websocket"
+        and "upgrade" in frontend_rqst.headers.get("Connection", "").lower()
+    ):
+        return await websocket_handler(
+            frontend_rqst,
+            is_anonymous=is_anonymous,
+            api_endpoint=api_endpoint,
+        )
+
     stats: WebStats = frontend_rqst.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
     path = frontend_rqst.match_info.get("path", "")
@@ -418,8 +429,12 @@ async def websocket_handler(
                 content_type=request.content_type,
                 override_api_version=request_api_version,
             )
-            async with api_request.connect_websocket() as up_conn:
-                down_conn = web.WebSocketResponse()
+            # Extract WebSocket subprotocols from client request (e.g., graphql-ws for GraphQL subscriptions)
+            protocols_header: str = request.headers.get("Sec-WebSocket-Protocol", "")
+            protocols = tuple([p.strip() for p in protocols_header.split(",") if p.strip()])
+            log.info("websocket_handler: client requested protocols: {}", protocols)
+            async with api_request.connect_websocket(protocols=protocols) as up_conn:
+                down_conn = web.WebSocketResponse(protocols=protocols)
                 await down_conn.prepare(request)
                 web_socket_proxy = WebSocketProxy(up_conn.raw_websocket, down_conn)
                 await web_socket_proxy.proxy()

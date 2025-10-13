@@ -165,8 +165,14 @@ def create_app(
     app["prefix"] = "spec"
     app.on_startup.append(init)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
+    from strawberry.aiohttp.views import GraphQLView
+
+    from ..api.gql.schema import schema as strawberry_schema
+
+    gql_view = GraphQLView(schema=strawberry_schema, graphiql=True)
     cors.add(app.router.add_route("GET", "/graphiql", render_graphiql_graphene_html))
-    cors.add(app.router.add_route("GET", "/graphiql/strawberry", render_graphiql_strawberry_html))
+    cors.add(app.router.add_route("GET", "/graphiql/strawberry", gql_view))
+    cors.add(app.router.add_route("POST", "/graphiql/strawberry", gql_view))
     cors.add(app.router.add_route("GET", "/openapi", render_openapi_html))
     cors.add(app.router.add_route("GET", "/openapi/spec.json", generate_openapi_spec))
 
