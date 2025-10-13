@@ -826,9 +826,12 @@ class TestReservoirService:
     async def test_import_model_no_registry_config(self) -> None:
         """Test model import with no registry configuration."""
         # Create service without reservoir configs
+        mock_event_producer = MagicMock()
+        mock_event_producer.anycast_event = AsyncMock()
+
         args = ReservoirServiceArgs(
             background_task_manager=MagicMock(),
-            event_producer=MagicMock(),
+            event_producer=mock_event_producer,
             storage_pool=MagicMock(spec=StoragePool),
             reservoir_registry_configs=[],
         )
