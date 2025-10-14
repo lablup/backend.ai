@@ -39,7 +39,6 @@ class ReservoirRegistryRow(Base):
     access_key = sa.Column("access_key", sa.String, nullable=False)
     secret_key = sa.Column("secret_key", sa.String, nullable=False)
     api_version = sa.Column("api_version", sa.String, nullable=False)
-    storage_type = sa.Column("storage_type", sa.String, nullable=False, default="object_storage")
 
     artifacts = relationship(
         "ArtifactRow",
@@ -70,7 +69,6 @@ class ReservoirRegistryRow(Base):
                 access_key=self.access_key,
                 secret_key=self.secret_key,
                 api_version=self.api_version,
-                storage_type=self.storage_type,
             )
         except Exception:
             raise RelationNotLoadedError()

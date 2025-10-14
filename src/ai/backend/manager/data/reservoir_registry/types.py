@@ -10,4 +10,3 @@ class ReservoirRegistryData:
     access_key: str
     secret_key: str
     api_version: str
-    storage_type: str
