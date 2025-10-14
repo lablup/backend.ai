@@ -1,10 +1,15 @@
 import asyncio
 import logging
 import mimetypes
+import tarfile
+import tempfile
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from pathlib import Path
+from typing import Any, Optional, cast, override
+
+import aiofiles
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
@@ -75,6 +80,62 @@ class ReservoirVFSDownloadStreamReader(StreamReader):
     @override
     def content_type(self) -> Optional[str]:
         return self._content_type
+
+
+class TarExtractor:
+    """Simple tar extractor that downloads and extracts VFS tar files."""
+
+    _stream_reader: StreamReader
+
+    def __init__(self, stream_reader: StreamReader):
+        self._stream_reader = stream_reader
+
+    async def extract_to(self, target_dir: Path) -> None:
+        """
+        Download tar file to temp location and extract to target directory.
+
+        Args:
+            target_dir: Directory where to extract the tar contents
+        """
+        temp_file = None
+        try:
+            # Create temporary file for tar
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".tar") as tf:
+                temp_file = Path(tf.name)
+                log.debug(f"Downloading tar to temp file: {temp_file}")
+
+                # Download to temp file
+                bytes_downloaded = 0
+                async with aiofiles.open(temp_file, "wb") as f:
+                    async for chunk in self._stream_reader.read():
+                        await f.write(chunk)
+                        bytes_downloaded += len(chunk)
+
+                log.debug(f"Downloaded {bytes_downloaded} bytes to {temp_file}")
+
+            # Ensure target directory exists
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            # Extract tar file in executor to avoid blocking
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self._extract_tar, temp_file, target_dir)
+
+            log.info(f"Successfully extracted tar to: {target_dir}")
+
+        finally:
+            # Clean up temp file
+            if temp_file and temp_file.exists():
+                try:
+                    temp_file.unlink()
+                    log.debug(f"Cleaned up temp file: {temp_file}")
+                except Exception as e:
+                    log.warning(f"Failed to remove temp file {temp_file}: {e}")
+
+    def _extract_tar(self, tar_path: Path, target_dir: Path) -> None:
+        """Extract tar archive to target directory."""
+        with tarfile.open(tar_path, "r") as tar:
+            tar.extractall(path=target_dir)
+        log.debug(f"Tar extraction completed: {tar_path} -> {target_dir}")
 
 
 @dataclass
@@ -324,7 +385,12 @@ class ReservoirDownloadStep(ImportStep[None]):
 
         if storage_type == "vfs":
             # Handle VFS storage type
-            bytes_copied = await self._handle_vfs_download(registry_config, context, model_prefix)
+            dest_path = (
+                cast(VFSStorage, self._download_storage).base_path / model.model_id / revision
+            )
+            bytes_copied = await self._handle_vfs_download(
+                registry_config, context, model_prefix, dest_path
+            )
         elif storage_type == "object_storage":
             # Handle object storage type (existing implementation)
             bytes_copied = await self._handle_object_storage_download(
@@ -349,6 +415,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         registry_config: ReservoirConfig,
         context: ImportStepContext,
         model_prefix: str,
+        dest_path: Path,
     ) -> int:
         """Handle file downloads for VFS storage type using ManagerHTTPClient."""
 
@@ -382,7 +449,7 @@ class ReservoirDownloadStep(ImportStep[None]):
             )
 
             # Determine content type based on file extension
-            content_type = mimetypes.guess_type(model_prefix)[0] or "application/octet-stream"
+            content_type = mimetypes.guess_type(dest_path)[0] or "application/octet-stream"
 
             if not registry_config.storage_name:
                 raise ReservoirStorageConfigInvalidError(
@@ -398,7 +465,10 @@ class ReservoirDownloadStep(ImportStep[None]):
             )
 
             # Stream the file from reservoir VFS to target storage
-            await storage.stream_upload(model_prefix, data_stream)
+
+            # await storage.stream_upload(model_prefix, data_stream)
+            await TarExtractor(data_stream).extract_to(dest_path)
+
         except Exception as e:
             log.error(f"VFS download failed for {model_prefix}: {str(e)}")
             raise

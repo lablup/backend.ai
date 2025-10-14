@@ -1,18 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import logging
 import mimetypes
 import os
-import tarfile
-import tempfile
 from collections.abc import AsyncIterator
 from http import HTTPStatus
-from pathlib import Path
 from typing import Iterable, Optional, Tuple, override
 
-import aiofiles
-import aiofiles.os
 import aiohttp
 import aiohttp_cors
 from aiohttp import web
@@ -51,13 +45,9 @@ class VFSDirectoryDownloadClientStreamReader(StreamReader):
         self._storage_name = storage_name
         self._req = req
         self._filepath = filepath
-        self._content_type: Optional[str] = None
-        self._guessed_content_type: Optional[str] = None
-        self._temp_file: Optional[Path] = None
 
         # Guess content type from filepath
         guessed_type, _ = mimetypes.guess_type(filepath)
-        self._guessed_content_type = guessed_type
 
     @override
     def content_type(self) -> Optional[str]:
@@ -77,16 +67,19 @@ class VFSDirectoryDownloadClientStreamReader(StreamReader):
                     log.error(
                         f"Storage proxy error for {self._filepath}: {resp.status} - {error_text}"
                     )
+                    # Yield error message as a single chunk
                     yield f"Error: Storage proxy returned {resp.status}: {error_text}".encode(
                         "utf-8"
                     )
                     return
 
-                # Get actual content type from response
-                self._content_type = resp.headers.get("Content-Type", self._guessed_content_type)
+                # Update content type from response if available
+                if "Content-Type" in resp.headers:
+                    self._content_type = resp.headers.get("Content-Type")
 
-                # Stream to temp file first, then extract
-                yield await self._download_and_extract_tar(resp)
+                # Stream content directly
+                async for chunk in self._stream_content(resp):
+                    yield chunk
 
         except Exception as e:
             # Error setting up the connection
@@ -121,70 +114,6 @@ class VFSDirectoryDownloadClientStreamReader(StreamReader):
         except Exception as e:
             # Unexpected error during streaming
             log.error(f"Unexpected error streaming {self._filepath}: {e}", exc_info=True)
-            raise
-
-    async def _download_and_extract_tar(self, resp) -> bytes:
-        """Download tar file to temp location and extract it to temp directory."""
-        loop = asyncio.get_running_loop()
-
-        try:
-            # Get system temp directory (works on macOS and Linux)
-            temp_dir = Path(tempfile.gettempdir())
-
-            # Create temporary file for the tar archive
-            with tempfile.NamedTemporaryFile(
-                delete=False, suffix=".tar", dir=temp_dir
-            ) as temp_file:
-                self._temp_file = Path(temp_file.name)
-                log.debug(f"Downloading tar to temp file: {self._temp_file}")
-
-                # Download entire tar file to temp location
-                chunk_size = 8192
-                bytes_downloaded = 0
-
-                async with aiofiles.open(self._temp_file, "wb") as f:
-                    async for chunk in resp.content.iter_chunked(chunk_size):
-                        if chunk:
-                            await f.write(chunk)
-                            bytes_downloaded += len(chunk)
-
-                log.debug(f"Downloaded {bytes_downloaded} bytes to {self._temp_file}")
-
-                # Extract tar archive to the directory of filepath
-                extract_dir = Path(self._filepath).parent
-
-                # Extract tar archive in executor to avoid blocking
-                await loop.run_in_executor(
-                    None, self._extract_tar_archive, str(self._temp_file), str(extract_dir)
-                )
-
-                # Return success message as bytes
-                return f"Successfully extracted tar archive to {extract_dir}".encode("utf-8")
-
-        finally:
-            # Clean up temp file
-            if self._temp_file and self._temp_file.exists():
-                try:
-                    await aiofiles.os.remove(self._temp_file)
-                    log.debug(f"Cleaned up temp file: {self._temp_file}")
-                except Exception as e:
-                    log.warning(f"Failed to remove temp file {self._temp_file}: {e}")
-
-    def _extract_tar_archive(self, tar_path: str, target_dir: str) -> None:
-        """Extract tar archive to target directory."""
-        try:
-            log.debug(f"Extracting tar archive: {tar_path} -> {target_dir}")
-
-            # Ensure target directory exists
-            Path(target_dir).mkdir(parents=True, exist_ok=True)
-
-            with tarfile.open(tar_path, "r") as tar:
-                # Extract all files to target directory
-                tar.extractall(path=target_dir)
-
-            log.debug(f"Tar archive extracted successfully to: {target_dir}")
-        except Exception as e:
-            log.error(f"Failed to extract tar archive: {e}")
             raise
 
 
