@@ -1761,6 +1761,8 @@ class RuntimeVariant(enum.StrEnum):
     NIM = "nim"
     CMD = "cmd"
     HUGGINGFACE_TGI = "huggingface-tgi"
+    SGLANG = "sglang"
+    MODULAR_MAX = "modular-max"
     CUSTOM = "custom"
 
 
@@ -1774,6 +1776,12 @@ MODEL_SERVICE_RUNTIME_PROFILES: Mapping[RuntimeVariant, ModelServiceProfile] = {
     ),
     RuntimeVariant.HUGGINGFACE_TGI: ModelServiceProfile(
         name="Huggingface TGI", health_check_endpoint="/info", port=3000
+    ),
+    RuntimeVariant.SGLANG: ModelServiceProfile(
+        name="SGLang", health_check_endpoint="/health", port=9001
+    ),
+    RuntimeVariant.MODULAR_MAX: ModelServiceProfile(
+        name="Modular MAX", health_check_endpoint="/health", port=8000
     ),
     RuntimeVariant.CMD: ModelServiceProfile(name="Predefined Image Command"),
 }
