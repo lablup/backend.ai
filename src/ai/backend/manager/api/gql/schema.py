@@ -64,6 +64,9 @@ from .reservoir_registry import (
     reservoir_registry,
     update_reservoir_registry,
 )
+from .scheduler import (
+    scheduling_events_by_session,
+)
 from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
@@ -142,6 +145,7 @@ class Subscription:
     artifact_import_progress_updated = artifact_import_progress_updated
     deployment_status_changed = deployment_status_changed
     replica_status_changed = replica_status_changed
+    scheduling_events_by_session = scheduling_events_by_session
 
 
 class CustomizedSchema(Schema):
