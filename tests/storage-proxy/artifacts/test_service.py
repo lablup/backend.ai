@@ -849,7 +849,7 @@ class TestReservoirDownloadStep:
             mock_meta.content_type = "application/octet-stream"
             mock_src_client.get_object_meta.return_value = mock_meta
 
-            bytes_copied = await reservoir_download_step._stream_bucket_to_bucket(
+            downloaded_files, bytes_copied = await reservoir_download_step._stream_bucket_to_bucket(
                 source_cfg=mock_reservoir_config,
                 storage_name="test_storage",
                 storage_pool=mock_import_step_context.storage_pool,
@@ -859,6 +859,9 @@ class TestReservoirDownloadStep:
             )
 
             assert bytes_copied == 1500
+            assert len(downloaded_files) == 2
+            assert downloaded_files[0][0].path == "model.bin"
+            assert downloaded_files[1][0].path == "config.json"
             mock_list_keys.assert_called_once()
             assert mock_dst_client.upload_stream.call_count == 2
 
@@ -893,13 +896,25 @@ class TestReservoirDownloadStep:
     ) -> None:
         """Test successful model import."""
         with patch.object(reservoir_download_step, "_stream_bucket_to_bucket") as mock_stream:
-            mock_stream.return_value = 1000
+            # Mock return value as tuple (downloaded_files, bytes_copied)
+            mock_downloaded_files = [
+                (
+                    FileObjectData(path="model.bin", size=500, type="file", download_url=""),
+                    "model.bin",
+                ),
+                (
+                    FileObjectData(path="config.json", size=500, type="file", download_url=""),
+                    "config.json",
+                ),
+            ]
+            mock_stream.return_value = (mock_downloaded_files, 1000)
 
             result = await reservoir_download_step.execute(mock_import_step_context, None)
 
             assert isinstance(result, DownloadStepResult)
             assert result.total_bytes == 1000
             assert result.storage_name == "test_storage"  # Archive storage name
+            assert len(result.downloaded_files) == 2
             mock_stream.assert_called_once()
 
     @pytest.mark.asyncio
@@ -928,12 +943,20 @@ class TestReservoirDownloadStep:
     ) -> None:
         """Test successful batch model import."""
         with patch.object(reservoir_download_step, "_stream_bucket_to_bucket") as mock_stream:
-            mock_stream.return_value = 1000
+            # Mock return value as tuple (downloaded_files, bytes_copied)
+            mock_downloaded_files = [
+                (
+                    FileObjectData(path="model.bin", size=1000, type="file", download_url=""),
+                    "model.bin",
+                )
+            ]
+            mock_stream.return_value = (mock_downloaded_files, 1000)
 
             result = await reservoir_download_step.execute(mock_import_step_context, None)
 
             assert isinstance(result, DownloadStepResult)
             assert result.total_bytes == 1000
+            assert len(result.downloaded_files) == 1
             mock_stream.assert_called_once()
 
     @pytest.mark.asyncio
