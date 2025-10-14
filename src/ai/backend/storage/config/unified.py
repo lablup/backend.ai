@@ -652,6 +652,17 @@ class VFSStorageConfig(BaseConfigSchema):
         validation_alias=AliasChoices("download-chunk-size", "download_chunk_size"),
         serialization_alias="download-chunk-size",
     )
+    reservoir_download_chunk_size: int = Field(
+        default=8192,
+        description="""
+        Chunk size (in bytes) for downloading files from the remote reservoir storage.
+        """,
+        examples=[8192],
+        validation_alias=AliasChoices(
+            "reservoir-download-chunk-size", "reservoir_download_chunk_size"
+        ),
+        serialization_alias="reservoir-download-chunk-size",
+    )
     max_file_size: Optional[int] = Field(
         default=None,
         description="""
@@ -836,6 +847,49 @@ class ReservoirConfig(BaseConfigSchema):
         """,
         validation_alias=AliasChoices("object-storage-region", "object_storage_region"),
         serialization_alias="object-storage-region",
+    )
+
+    manager_endpoint: Optional[str] = Field(
+        default=None,
+        description="""
+        Custom endpoint for the reservoir manager API.
+        """,
+        examples=["https://manager.reservoir.ai"],
+        validation_alias=AliasChoices("manager-endpoint", "manager_endpoint"),
+        serialization_alias="manager-endpoint",
+    )
+    manager_access_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Access key for authenticating with the reservoir manager API.
+        """,
+        validation_alias=AliasChoices("manager-access-key", "manager_access_key"),
+        serialization_alias="manager-access-key",
+    )
+    manager_secret_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Secret key for authenticating with the reservoir manager API.
+        """,
+        validation_alias=AliasChoices("manager-secret-key", "manager_secret_key"),
+        serialization_alias="manager-secret-key",
+    )
+    manager_api_version: Optional[str] = Field(
+        default=None,
+        description="""
+        API version for the reservoir manager API.
+        """,
+        examples=["v1"],
+        validation_alias=AliasChoices("manager-api-version", "manager_api_version"),
+        serialization_alias="manager-api-version",
+    )
+    storage_name: Optional[str] = Field(
+        description="""
+        Name of the object storage configuration to use with the reservoir registry.
+        """,
+        examples=["s3-storage", "minio-storage"],
+        validation_alias=AliasChoices("storage-name", "storage_name"),
+        serialization_alias="storage-name",
     )
 
 
