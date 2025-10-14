@@ -962,7 +962,7 @@
             "description": "Type of the inference runtime the image will try to load."
           },
           "arch": {
-            "default": "aarch64",
+            "default": "x86_64",
             "description": "Image architecture",
             "title": "Arch",
             "type": "string"
@@ -5633,7 +5633,7 @@
                   },
                   "arch": {
                     "type": "string",
-                    "default": "aarch64"
+                    "default": "x86_64"
                   },
                   "type": {
                     "type": "string",
@@ -5798,7 +5798,7 @@
                   },
                   "arch": {
                     "type": "string",
-                    "default": "aarch64"
+                    "default": "x86_64"
                   },
                   "type": {
                     "type": "string",
