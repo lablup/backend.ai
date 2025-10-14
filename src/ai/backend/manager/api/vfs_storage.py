@@ -6,9 +6,8 @@ from collections.abc import AsyncIterator
 from http import HTTPStatus
 from typing import Iterable, Optional, Tuple, cast, override
 
-import aiohttp
 import aiohttp_cors
-from aiohttp import web
+from aiohttp import ClientResponse, web
 
 from ai.backend.common.api_handlers import (
     APIResponse,
@@ -61,65 +60,27 @@ class VFSDirectoryDownloadClientStreamReader(StreamReader):
     @override
     async def read(self) -> AsyncIterator[bytes]:
         """Stream file content from storage proxy."""
-        try:
-            # Use the context manager to get response from storage proxy
-            async with self._storage_proxy_client.download_vfs_file_streaming(
-                self._storage_name, self._req
-            ) as resp:
-                # Check response status
-                if resp.status != 200:
-                    error_text = await resp.text()
-                    log.error(
-                        f"Storage proxy error for {self._filepath}: {resp.status} - {error_text}"
-                    )
-                    # Yield error message as a single chunk
-                    yield f"Error: Storage proxy returned {resp.status}: {error_text}".encode(
-                        "utf-8"
-                    )
-                    return
+        # Use the context manager to get response from storage proxy
+        async with self._storage_proxy_client.download_vfs_file_streaming(
+            self._storage_name, self._req
+        ) as resp:
+            resp.raise_for_status()
 
-                # Update content type from response if available
-                if "Content-Type" in resp.headers:
-                    self._content_type = resp.headers.get("Content-Type")
+            # Stream content directly
+            async for chunk in self._stream_content(resp):
+                yield chunk
 
-                # Stream content directly
-                async for chunk in self._stream_content(resp):
-                    yield chunk
-
-        except Exception as e:
-            # Error setting up the connection
-            log.error(f"Failed to initialize streaming for {self._filepath}: {e}", exc_info=True)
-            yield f"Error: Failed to download file: {str(e)}".encode("utf-8")
-
-    async def _stream_content(self, resp) -> AsyncIterator[bytes]:
+    async def _stream_content(self, resp: ClientResponse) -> AsyncIterator[bytes]:
         """Stream content directly without saving."""
         chunk_size = 8192  # 8KB chunks
         bytes_streamed = 0
 
-        try:
-            async for chunk in resp.content.iter_chunked(chunk_size):
-                if chunk:
-                    bytes_streamed += len(chunk)
-                    yield chunk
+        async for chunk in resp.content.iter_chunked(chunk_size):
+            if chunk:
+                bytes_streamed += len(chunk)
+                yield chunk
 
-            log.debug(f"Successfully streamed {self._filepath}: {bytes_streamed} bytes")
-
-        except (
-            aiohttp.ClientPayloadError,
-            aiohttp.ClientConnectionError,
-            ConnectionResetError,
-            BrokenPipeError,
-        ) as e:
-            # Client disconnected during streaming - this is expected behavior
-            log.debug(
-                f"Client disconnected while streaming {self._filepath}: {type(e).__name__}: {e}"
-            )
-            return
-
-        except Exception as e:
-            # Unexpected error during streaming
-            log.error(f"Unexpected error streaming {self._filepath}: {e}", exc_info=True)
-            raise
+        log.debug(f"Successfully streamed {self._filepath}: {bytes_streamed} bytes")
 
 
 class VFSErrorStreamReader(StreamReader):
