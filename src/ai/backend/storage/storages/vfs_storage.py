@@ -36,10 +36,14 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 class VFSDirectoryDownloadServerStreamReader(StreamReader):
     """Stream reader that creates a tar archive of a directory on-the-fly."""
 
+    _directory_path: Path
+    _chunk_size: int
+    _temp_file: Optional[Path]
+
     def __init__(self, directory_path: Path, chunk_size: int) -> None:
         self._directory_path = directory_path
         self._chunk_size = chunk_size
-        self._temp_file: Optional[Path] = None
+        self._temp_file = None
 
     @override
     async def read(self) -> AsyncIterator[bytes]:
@@ -97,7 +101,6 @@ class VFSStorage(AbstractStorage):
     _base_path: Path
     _upload_chunk_size: int
     _download_chunk_size: int
-    _reservoir_download_chunk_size: int
     _max_file_size: Optional[int]
 
     def __init__(self, name: str, cfg: VFSStorageConfig) -> None:
@@ -106,13 +109,11 @@ class VFSStorage(AbstractStorage):
         if cfg.subpath:
             base_path = base_path / cfg.subpath
         self._base_path = base_path
+        # Ensure base path exists
+        self._base_path.mkdir(parents=True, exist_ok=True)
         self._upload_chunk_size = cfg.upload_chunk_size
         self._download_chunk_size = cfg.download_chunk_size
         self._max_file_size = cfg.max_file_size
-        self._reservoir_download_chunk_size = cfg.reservoir_download_chunk_size
-
-        # Ensure base path exists
-        self._base_path.mkdir(parents=True, exist_ok=True)
 
     @property
     def name(self) -> str:

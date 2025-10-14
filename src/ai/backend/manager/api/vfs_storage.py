@@ -93,7 +93,7 @@ class APIHandler:
         storage_session_manager_ctx: StorageSessionManagerCtx,
     ) -> APIStreamResponse:
         """
-        Download a file from VFS storage via storage proxy streaming.
+        Download artifact directory from VFS storage via storage proxy streaming.
 
         Args:
             path: Path parameters including storage name

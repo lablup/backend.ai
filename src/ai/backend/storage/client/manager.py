@@ -13,6 +13,8 @@ from dateutil.tz import tzutc
 from ai.backend.common.auth.utils import generate_signature
 from ai.backend.logging import BraceStyleAdapter
 
+_HASH_TYPE = "sha256"
+
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
@@ -23,9 +25,6 @@ class ManagerHTTPClientArgs:
     access_key: str
     secret_key: str
     api_version: str
-
-
-_HASH_TYPE = "sha256"
 
 
 # TODO: Remove this and reconstruct to request storage proxy directly.
@@ -62,7 +61,7 @@ class ManagerHTTPClient:
         )
 
         return {
-            "User-Agent": "Backend.AI Manager facing manager client",
+            "User-Agent": "Backend.AI Manager facing storage-proxy client",
             "Content-Type": "application/json",
             "X-BackendAI-Version": self._api_version,
             "Date": date.isoformat(),
@@ -78,7 +77,6 @@ class ManagerHTTPClient:
                 return await response.json()
 
     async def _request_stream(self, method: str, rel_url: str, **kwargs) -> AsyncIterator[bytes]:
-        """Internal method for streaming requests."""
         headers = self._build_header(method=method, rel_url=rel_url)
         url = yarl.URL(self._endpoint) / rel_url.lstrip("/")
 

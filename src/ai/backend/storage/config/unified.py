@@ -652,17 +652,6 @@ class VFSStorageConfig(BaseConfigSchema):
         validation_alias=AliasChoices("download-chunk-size", "download_chunk_size"),
         serialization_alias="download-chunk-size",
     )
-    reservoir_download_chunk_size: int = Field(
-        default=8192,
-        description="""
-        Chunk size (in bytes) for downloading files from the remote reservoir storage.
-        """,
-        examples=[8192],
-        validation_alias=AliasChoices(
-            "reservoir-download-chunk-size", "reservoir_download_chunk_size"
-        ),
-        serialization_alias="reservoir-download-chunk-size",
-    )
     max_file_size: Optional[int] = Field(
         default=None,
         description="""
@@ -888,7 +877,7 @@ class ReservoirConfig(BaseConfigSchema):
         description="""
         Name of the object storage configuration to use with the reservoir registry.
         """,
-        examples=["s3-storage", "minio-storage"],
+        examples=["s3-storage", "vfs-storage"],
         validation_alias=AliasChoices("storage-name", "storage_name"),
         serialization_alias="storage-name",
     )
