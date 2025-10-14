@@ -865,19 +865,17 @@ class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
             )
             return
 
-        log.info(
-            f"Starting archive transfer: {download_storage} -> {archive_storage}, "
-            f"files={len(input_data.downloaded_files)}"
-        )
+        log.info(f"Starting archive transfer: {download_storage} -> {archive_storage}")
 
+        archieved_file_cnt = 0
         # Move each file from download storage to archive storage
         for file_info, storage_key in input_data.downloaded_files:
             try:
-                await self._transfer_manager.transfer_file(
+                archieved_file_cnt += await self._transfer_manager.transfer_directory(
                     source_storage_name=download_storage,
                     dest_storage_name=archive_storage,
-                    source_path=storage_key,
-                    dest_path=storage_key,
+                    source_prefix=storage_key,
+                    dest_prefix=storage_key,
                 )
                 log.debug(f"Transferred file to archive: {storage_key}")
             except Exception as e:
@@ -886,7 +884,7 @@ class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
 
         log.info(
             f"Archive transfer completed: {download_storage} -> {archive_storage}, "
-            f"files={len(input_data.downloaded_files)}"
+            f"files={archieved_file_cnt}"
         )
 
     @override

@@ -33,6 +33,33 @@ from ai.backend.storage.utils import normalize_filepath
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
+class VFSFileDownloadServerStreamReader(StreamReader):
+    """Stream reader that creates a tar archive of a directory on-the-fly."""
+
+    _file_path: Path
+    _chunk_size: int
+
+    def __init__(self, file_path: Path, chunk_size: int) -> None:
+        self._file_path = file_path
+        self._chunk_size = chunk_size
+
+    @override
+    async def read(self) -> AsyncIterator[bytes]:
+        """Create a tar archive of the directory and stream it."""
+        async with aiofiles.open(self._file_path, "rb") as f:
+            bytes_streamed = 0
+            while True:
+                chunk = await f.read(self._chunk_size)
+                if not chunk:
+                    break
+                bytes_streamed += len(chunk)
+                yield chunk
+
+    @override
+    def content_type(self) -> Optional[str]:
+        return "application/octet-stream"
+
+
 class VFSDirectoryDownloadServerStreamReader(StreamReader):
     """Stream reader that creates a tar archive of a directory on-the-fly."""
 
@@ -211,11 +238,13 @@ class VFSStorage(AbstractStorage):
             if not target_path.exists():
                 raise FileStreamDownloadError(f"Path not found: {filepath}")
 
-            if not target_path.is_dir():
-                raise FileStreamDownloadError(f"Path is not a directory: {filepath}")
-
-            # Handle directory download as tar archive
-            return VFSDirectoryDownloadServerStreamReader(target_path, self._download_chunk_size)
+            if target_path.is_dir():
+                # Handle directory download as tar archive
+                return VFSDirectoryDownloadServerStreamReader(
+                    target_path, self._download_chunk_size
+                )
+            else:
+                return VFSFileDownloadServerStreamReader(target_path, self._download_chunk_size)
 
         except Exception as e:
             raise FileStreamDownloadError(f"Download failed: {str(e)}") from e

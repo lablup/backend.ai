@@ -75,7 +75,7 @@ class StorageTransferManager:
         source_prefix: str,
         dest_prefix: str,
         concurrency: int = 10,
-    ) -> None:
+    ) -> int:
         """
         Transfer all files with given prefix from source to destination storage.
 
@@ -88,7 +88,7 @@ class StorageTransferManager:
         """
         if source_storage_name == dest_storage_name:
             log.debug(f"Skipping transfer - same storage: {source_storage_name}")
-            return
+            return 0
 
         source_storage = self._storage_pool.get_storage(source_storage_name)
 
@@ -98,7 +98,7 @@ class StorageTransferManager:
 
             if not file_list:
                 log.warning(f"No files found with prefix: {source_prefix}")
-                return
+                return 0
 
             log.info(
                 f"Transferring {len(file_list)} files from {source_storage_name} to {dest_storage_name}"
@@ -127,6 +127,7 @@ class StorageTransferManager:
             log.info(
                 f"Successfully transferred {len(file_list)} files from {source_storage_name} to {dest_storage_name}"
             )
+            return len(file_list)
 
         except Exception as e:
             raise StorageTransferError(
