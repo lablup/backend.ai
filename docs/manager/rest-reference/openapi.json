@@ -9612,6 +9612,35 @@
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
+    },
+    "/vfs-storage/{storage_name}/download": {
+      "post": {
+        "operationId": "vfs-storage.download_file",
+        "tags": [
+          "vfs-storage"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "storage_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nDownload a file from VFS storage via storage proxy streaming.\n\nArgs:\n    path: Path parameters including storage name\n    body: Request body with file path\n    processors_ctx: Processing context\n\nReturns:\n    APIStreamResponse with StreamReader body\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
     }
   }
 }
