@@ -124,13 +124,13 @@ def _make_download_progress_logger(
             eta_str = _fmt_eta(eta_sec)
 
             log.trace(
-                "[stream_hf2b] Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
+                "[stream_hf] Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
                     pct, offset / _MiB, total / _MiB, inst_mibs, eta_str
                 )
             )
         else:
             log.trace(
-                "[stream_hf2b] Downloading... {:,.1f} MiB (total unknown) inst={:.2f} MiB/s".format(
+                "[stream_hf] Downloading... {:,.1f} MiB (total unknown) inst={:.2f} MiB/s".format(
                     offset / _MiB, inst_mibs
                 )
             )

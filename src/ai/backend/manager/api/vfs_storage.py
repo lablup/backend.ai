@@ -38,7 +38,7 @@ from .types import CORSOptions, WebMiddleware
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class VFSDirectoryDownloadClientStreamReader(StreamReader):
+class VFSDirectoryDownloadProxyStreamReader(StreamReader):
     """StreamReader implementation for VFS file downloads from storage proxy."""
 
     def __init__(
@@ -99,8 +99,6 @@ class APIHandler:
         Args:
             path: Path parameters including storage name
             body: Request body with file path
-            storage_session_manager_ctx: Storage manager context
-            processors_ctx: Processing context
 
         Returns:
             APIStreamResponse with StreamReader body
@@ -121,7 +119,7 @@ class APIHandler:
         manager_client = storage_manager.get_manager_facing_client(action_result.result.host)
 
         # Create stream reader for the download
-        stream_reader = VFSDirectoryDownloadClientStreamReader(
+        stream_reader = VFSDirectoryDownloadProxyStreamReader(
             storage_proxy_client=manager_client,
             storage_name=storage_name,
             req=req,
@@ -155,7 +153,6 @@ class APIHandler:
 
         Args:
             path: Path parameters including storage name
-            processors_ctx: Processing context
 
         Returns:
             APIResponse with storage information
@@ -189,9 +186,6 @@ class APIHandler:
     ) -> APIResponse:
         """
         List all VFS storages.
-
-        Args:
-            processors_ctx: Processing context
 
         Returns:
             APIResponse with storage information
