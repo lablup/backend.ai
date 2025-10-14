@@ -396,7 +396,7 @@ class Context(metaclass=ABCMeta):
                 "proxies": {
                     "local": {
                         "client_api": f"http://{storage_client_facing_addr.face.host}:{storage_client_facing_addr.face.port}",
-                        "manager_api": f"http://{storage_manager_facing_addr.face.host}:{storage_manager_facing_addr.face.port}",
+                        "manager_api": f"https://{storage_manager_facing_addr.face.host}:{storage_manager_facing_addr.face.port}",
                         "secret": self.install_info.service_config.storage_proxy_manager_auth_key,
                         "ssl_verify": "false",
                     }
