@@ -574,9 +574,14 @@
   enable-approve-process = false
   # Whether this reservoir is a leaf in a delegation hierarchy.
   # If true, it cannot delegate to other reservoirs.
-  is-delegation-leaf = false
+  use-delegation = false
   # Name of the reservoir storage configuration.
   # Used to identify this storage in the system.
   storage-name = "RESERVOIR_STORAGE_NAME"
   # Configuration for the storage.
   config = "..."
+
+  # Storage step selection configuration for artifact model imports.
+  # Maps different import steps (download, archive) to specific storage backends.
+  # Required for artifact model import operations.
+  [reservoir.storage_step_selection]
