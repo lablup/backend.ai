@@ -19,6 +19,7 @@ from strawberry.aiohttp.views import GraphQLView
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from ..api.gql.schema import schema as strawberry_schema
 from ..errors.api import GraphQLError as BackendGQLError
@@ -49,13 +50,21 @@ class CustomGraphQLView(GraphQLView):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        # Add __name__ attribute for OpenAPI generation compatibility
         self.__name__ = "handle_graphql_strawberry"
         self.__doc__ = """
         GraphQL endpoint using Strawberry schema.
 
         Supports both query/mutation via POST and subscriptions via WebSocket.
         """
+
+    async def get_context(  # type: ignore[override]
+        self, request: web.Request, response: web.Response | web.WebSocketResponse
+    ) -> StrawberryGQLContext:
+        root_context: RootContext = request.app["_root.context"]
+        return StrawberryGQLContext(
+            processors=root_context.processors,
+            config_provider=root_context.config_provider,
+        )
 
 
 class GQLLoggingMiddleware:
