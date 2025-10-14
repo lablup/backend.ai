@@ -129,8 +129,10 @@ class ImageDBSource:
         canonicals: list[str],
         status_filter: Optional[list[ImageStatus]] = None,
     ) -> list[ImageDataWithDetails]:
-        query = sa.select(ImageRow).where(
-            ImageRow.name.in_(canonicals).options(selectinload(ImageRow.aliases))
+        query = (
+            sa.select(ImageRow)
+            .where(ImageRow.name.in_(canonicals))
+            .options(selectinload(ImageRow.aliases))
         )
         if status_filter:
             query = query.where(ImageRow.status.in_(status_filter))
