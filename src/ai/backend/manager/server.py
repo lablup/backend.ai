@@ -1070,7 +1070,7 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             EventTaskSpec(
                 name="reservoir_registry_scan",
                 event_factory=lambda: DoScanReservoirRegistryEvent(),
-                interval=10,  # 10 minutes
+                interval=600,  # 10 minutes
                 initial_delay=0,
             )
         )
@@ -1078,7 +1078,7 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             EventTaskSpec(
                 name="reservoir_registry_pull",
                 event_factory=lambda: DoPullReservoirRegistryEvent(),
-                interval=10,  # 10 minutes
+                interval=600,  # 10 minutes
                 initial_delay=0,
             )
         )
