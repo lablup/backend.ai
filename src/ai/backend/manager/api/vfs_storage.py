@@ -83,22 +83,6 @@ class VFSDirectoryDownloadClientStreamReader(StreamReader):
         log.debug(f"Successfully streamed {self._filepath}: {bytes_streamed} bytes")
 
 
-class VFSErrorStreamReader(StreamReader):
-    """StreamReader implementation for error responses."""
-
-    def __init__(self, error_message: str, status_code: int = 500):
-        self._error_message = error_message
-        self._status_code = status_code
-
-    def content_type(self) -> Optional[str]:
-        """Return plain text content type for error messages."""
-        return "text/plain; charset=utf-8"
-
-    async def read(self) -> AsyncIterator[bytes]:
-        """Yield error message as bytes."""
-        yield self._error_message.encode("utf-8")
-
-
 class APIHandler:
     @auth_required_for_method
     @stream_api_handler
