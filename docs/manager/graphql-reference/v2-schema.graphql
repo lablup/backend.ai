@@ -1248,6 +1248,12 @@ type Subscription {
   artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
+  timeUpdates(interval: Int! = 1): TimeUpdate!
+}
+
+type TimeUpdate {
+  currentTime: String!
+  counter: Int!
 }
 
 scalar UUID

@@ -150,6 +150,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
     })
 )
 async def handle_gql_graphene(request: web.Request, params: Any) -> web.Response:
+    log.info("GQL request received")
     result = await _handle_gql_common(request, params)
     return web.json_response(result.formatted, status=HTTPStatus.OK)
 
@@ -217,6 +218,7 @@ def create_app(
     cors.add(app.router.add_route("POST", r"/gql", handle_gql_graphene))
 
     # Use GraphQLView for strawberry schema with subscription support
-    gql_view = GraphQLView(schema=strawberry_schema, graphiql=True)
+    gql_view = GraphQLView(schema=strawberry_schema, graphiql=False)
+    cors.add(app.router.add_route("GET", r"/gql/strawberry", gql_view))
     cors.add(app.router.add_route("POST", r"/gql/strawberry", gql_view))
     return app, []

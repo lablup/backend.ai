@@ -390,11 +390,19 @@ async def web_plugin_handler(
 
 
 async def websocket_handler(
-    request, *, is_anonymous=False, api_endpoint: Optional[str] = None
+    request: web.Request, *, is_anonymous=False, api_endpoint: Optional[str] = None
 ) -> web.StreamResponse:
+    if api_endpoint:
+        if api_endpoint.startswith("http://"):
+            api_endpoint = api_endpoint.replace("http://", "ws://", 1)
     stats: WebStats = request.app["stats"]
     stats.active_proxy_websocket_handlers.add(asyncio.current_task())  # type: ignore
-    path = request.match_info["path"]
+    log.info("match_info: {}", request.match_info)
+    path = request.match_info.get("path", None)
+    if path is None:
+        request_path = request.path
+        if request_path.startswith("/func"):
+            path = request_path.removeprefix("/func")
     session = await get_session(request)
     app = request.query.get("app")
 
@@ -440,6 +448,8 @@ async def websocket_handler(
                 await web_socket_proxy.proxy()
                 if should_save_session:
                     storage = request.get(STORAGE_KEY)
+                    if storage is None:
+                        raise RuntimeError("Session storage is not available in the request.")
                     config = cast(WebServerUnifiedConfig, request.app["config"])
                     extension_sec = config.session.login_session_extension_sec
                     await storage.save_session(request, down_conn, session, extension_sec)

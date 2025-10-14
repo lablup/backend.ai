@@ -26,8 +26,10 @@ async def time_updates(interval: int = 1) -> AsyncGenerator[TimeUpdate, None]:
         interval: Seconds between updates (default: 1)
     """
     counter = 0
+    print(f"Starting time_updates subscription with interval {interval} seconds")
     while True:
         counter += 1
+        print(f"Emitting time update {counter} at {datetime.now().isoformat()}")
         yield TimeUpdate(
             current_time=datetime.now().isoformat(),
             counter=counter,
