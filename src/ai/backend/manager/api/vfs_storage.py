@@ -224,7 +224,7 @@ def create_app(
 ) -> Tuple[web.Application, Iterable[WebMiddleware]]:
     """Initialize VFS storage API handlers."""
     app = web.Application()
-    app["api_versions"] = (1,)
+    app["api_versions"] = (1, 2, 3, 4, 5)
     app["prefix"] = "vfs-storages"
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     api_handler = APIHandler()
