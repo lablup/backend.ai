@@ -56,19 +56,16 @@ class ReservoirVFSDownloadStreamReader(StreamReader):
     _client: ManagerHTTPClient
     _storage_name: str
     _filepath: str
-    _content_type: Optional[str]
 
     def __init__(
         self,
         client: ManagerHTTPClient,
         storage_name: str,
         filepath: str,
-        content_type: Optional[str] = None,
     ):
         self._client = client
         self._storage_name = storage_name
         self._filepath = filepath
-        self._content_type = content_type
 
     @override
     async def read(self) -> AsyncIterator[bytes]:
@@ -79,7 +76,7 @@ class ReservoirVFSDownloadStreamReader(StreamReader):
 
     @override
     def content_type(self) -> Optional[str]:
-        return self._content_type
+        return "application/x-tar"
 
 
 class TarExtractor:
@@ -90,14 +87,19 @@ class TarExtractor:
     def __init__(self, stream_reader: StreamReader):
         self._stream_reader = stream_reader
 
-    async def extract_to(self, target_dir: Path) -> None:
+    async def extract_to(self, target_dir: Path) -> int:
         """
         Download tar file to temp location and extract to target directory.
 
         Args:
             target_dir: Directory where to extract the tar contents
+
+        Returns:
+            int: Total size of downloaded file in bytes
         """
         temp_file = None
+        bytes_downloaded = 0
+
         try:
             # Create temporary file for tar
             with tempfile.NamedTemporaryFile(delete=False, suffix=".tar") as tf:
@@ -105,7 +107,6 @@ class TarExtractor:
                 log.debug(f"Downloading tar to temp file: {temp_file}")
 
                 # Download to temp file
-                bytes_downloaded = 0
                 async with aiofiles.open(temp_file, "wb") as f:
                     async for chunk in self._stream_reader.read():
                         await f.write(chunk)
@@ -121,6 +122,8 @@ class TarExtractor:
             await loop.run_in_executor(None, self._extract_tar, temp_file, target_dir)
 
             log.info(f"Successfully extracted tar to: {target_dir}")
+
+            return bytes_downloaded
 
         finally:
             # Clean up temp file
@@ -391,8 +394,9 @@ class ReservoirDownloadStep(ImportStep[None]):
             bytes_copied = await self._handle_vfs_download(
                 registry_config, context, model_prefix, dest_path
             )
+        # TODO: This only make sense when both storage are ObjectStorage
         elif storage_type == "object_storage":
-            # Handle object storage type (existing implementation)
+            # Handle object storage type
             bytes_copied = await self._handle_object_storage_download(
                 registry_config, download_storage_name, context, model_prefix
             )
@@ -448,9 +452,6 @@ class ReservoirDownloadStep(ImportStep[None]):
                 )
             )
 
-            # Determine content type based on file extension
-            content_type = mimetypes.guess_type(dest_path)[0] or "application/octet-stream"
-
             if not registry_config.storage_name:
                 raise ReservoirStorageConfigInvalidError(
                     f"Reservoir registry storage name not configured: {context.registry_name}"
@@ -461,20 +462,14 @@ class ReservoirDownloadStep(ImportStep[None]):
                 client=manager_client,
                 storage_name=registry_config.storage_name,
                 filepath=model_prefix,
-                content_type=content_type,
             )
 
-            # Stream the file from reservoir VFS to target storage
-
-            # await storage.stream_upload(model_prefix, data_stream)
-            await TarExtractor(data_stream).extract_to(dest_path)
+            # Stream the file from reservoir VFS to target VFS storage
+            return await TarExtractor(data_stream).extract_to(dest_path)
 
         except Exception as e:
             log.error(f"VFS download failed for {model_prefix}: {str(e)}")
             raise
-
-        # This should be enhanced to track actual file size
-        return 0
 
     async def _handle_object_storage_download(
         self,
