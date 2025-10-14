@@ -43,6 +43,7 @@ from .asyncio import (  # for legacy imports  # noqa
 from .defs import DEFAULT_FILE_IO_TIMEOUT
 from .enum_extension import StringSetFlag  # for legacy imports  # noqa
 from .exception import (
+    BaseNFSMountCheckFailed,
     ExportPathNotFound,
     NFSTimeoutError,
     NFSUnexpectedError,
@@ -367,6 +368,8 @@ async def check_nfs_remote_server(
 
         # Export path not found
         raise ExportPathNotFound(f"Export '{export_path}' not found on server '{server}'.")
+    except BaseNFSMountCheckFailed:
+        raise
 
     except asyncio.TimeoutError:
         raise NFSTimeoutError(f"Timeout: No response from {server} within 10 seconds")
