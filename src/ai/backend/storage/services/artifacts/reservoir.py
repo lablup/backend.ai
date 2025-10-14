@@ -13,7 +13,7 @@ import aiofiles
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.common.data.storage.registries.types import ModelTarget
+from ai.backend.common.data.storage.registries.types import FileObjectData, ModelTarget
 from ai.backend.common.data.storage.types import (
     ArtifactStorageImportStep,
 )
@@ -384,6 +384,7 @@ class ReservoirDownloadStep(ImportStep[None]):
             storage_type = "unknown"
 
         bytes_copied = 0
+        downloaded_files: list[tuple[FileObjectData, str]] = []
 
         if storage_type == "vfs":
             # Handle VFS storage type
@@ -393,10 +394,18 @@ class ReservoirDownloadStep(ImportStep[None]):
             bytes_copied = await self._handle_vfs_download(
                 registry_config, context, model_prefix, dest_path
             )
+            # For VFS downloads, create a single entry representing the extracted archive
+            file_obj = FileObjectData(
+                path=str(dest_path),
+                size=bytes_copied,
+                type="directory",
+                download_url="",  # Not applicable for VFS
+            )
+            downloaded_files.append((file_obj, model_prefix))
         # TODO: This only make sense when both storage are ObjectStorage
         elif storage_type == "object_storage":
             # Handle object storage type
-            bytes_copied = await self._handle_object_storage_download(
+            downloaded_files, bytes_copied = await self._handle_object_storage_download(
                 registry_config, download_storage_name, context, model_prefix
             )
         else:
@@ -406,9 +415,8 @@ class ReservoirDownloadStep(ImportStep[None]):
 
         log.info(f"Reservoir copy completed: {context.model}, bytes_copied={bytes_copied}")
 
-        # Return virtual file list for Reservoir (actual file info unknown)
         return DownloadStepResult(
-            downloaded_files=[],  # Reservoir doesn't track individual file info
+            downloaded_files=downloaded_files,
             storage_name=download_storage_name,  # Downloaded to download storage
             total_bytes=bytes_copied,
         )
@@ -476,7 +484,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         download_storage_name: str,
         context: ImportStepContext,
         model_prefix: str,
-    ) -> int:
+    ) -> tuple[list[tuple[FileObjectData, str]], int]:
         """Handle file downloads for object storage type."""
         # Use existing object storage download logic
         options = BucketCopyOptions(
@@ -484,7 +492,7 @@ class ReservoirDownloadStep(ImportStep[None]):
             progress_log_interval_bytes=8 * 1024 * 1024,  # 8MB intervals
         )
 
-        bytes_copied = await self._stream_bucket_to_bucket(
+        downloaded_files, bytes_copied = await self._stream_bucket_to_bucket(
             source_cfg=registry_config,
             storage_name=download_storage_name,
             storage_pool=context.storage_pool,
@@ -493,7 +501,7 @@ class ReservoirDownloadStep(ImportStep[None]):
             key_prefix=model_prefix,
         )
 
-        return bytes_copied
+        return downloaded_files, bytes_copied
 
     def _get_s3_client(self, storage_pool: StoragePool, storage_name: str) -> tuple[S3Client, str]:
         """Get S3 client for the specified storage"""
@@ -534,7 +542,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         options: BucketCopyOptions,
         progress_reporter: Optional[ProgressReporter],
         key_prefix: Optional[str] = None,
-    ) -> int:
+    ) -> tuple[list[tuple[FileObjectData, str]], int]:
         """Direct copy from Reservoir S3 to target storage"""
         dst_client, bucket_name = self._get_s3_client(storage_pool, storage_name)
 
@@ -625,7 +633,20 @@ class ReservoirDownloadStep(ImportStep[None]):
         log.trace(
             "[stream_bucket_to_bucket] all done objects={} total_bytes={}", copied, total_bytes
         )
-        return bytes_copied
+
+        # Build downloaded files list
+        downloaded_files: list[tuple[FileObjectData, str]] = []
+        for key in target_keys:
+            size = size_map.get(key, 0)
+            file_obj = FileObjectData(
+                path=key,
+                size=size,
+                type="file",
+                download_url="",  # Not applicable for reservoir
+            )
+            downloaded_files.append((file_obj, key))
+
+        return downloaded_files, bytes_copied
 
     async def _list_all_keys_and_sizes(
         self,

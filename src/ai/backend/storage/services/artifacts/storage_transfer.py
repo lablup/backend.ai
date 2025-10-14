@@ -145,13 +145,32 @@ class StorageTransferManager:
         source_full_path = source_storage._resolve_path(source_path)
         dest_full_path = dest_storage._resolve_path(dest_path)
 
-        # Ensure destination directory exists
-        dest_full_path.parent.mkdir(parents=True, exist_ok=True)
+        # Check if source is a file or directory
+        if source_full_path.is_file():
+            # Ensure destination directory exists
+            dest_full_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # Use efficient file system copy
-        await asyncio.get_event_loop().run_in_executor(
-            None, shutil.copy2, str(source_full_path), str(dest_full_path)
-        )
+            # Copy file
+            await asyncio.get_event_loop().run_in_executor(
+                None, shutil.copy2, str(source_full_path), str(dest_full_path)
+            )
+        elif source_full_path.is_dir():
+            # Copy entire directory tree
+            # Remove destination if it exists to avoid conflicts
+            if dest_full_path.exists():
+                await asyncio.get_event_loop().run_in_executor(
+                    None, shutil.rmtree, str(dest_full_path)
+                )
+
+            # Ensure parent directory exists
+            dest_full_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Copy directory tree
+            await asyncio.get_event_loop().run_in_executor(
+                None, shutil.copytree, str(source_full_path), str(dest_full_path)
+            )
+        else:
+            raise StorageTransferError(f"Source path does not exist: {source_full_path}")
 
     async def _copy_via_stream(
         self,
