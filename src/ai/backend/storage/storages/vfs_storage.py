@@ -209,15 +209,13 @@ class VFSStorage(AbstractStorage):
             target_path = self._resolve_path(filepath)
 
             if not target_path.exists():
-                raise StorageBucketFileNotFoundError(f"File not found: {filepath}")
+                raise FileStreamDownloadError(f"Path not found: {filepath}")
 
-            if target_path.is_dir():
-                # Handle directory download as tar archive
-                return VFSDirectoryDownloadServerStreamReader(
-                    target_path, self._download_chunk_size
-                )
-            else:
-                raise FileStreamDownloadError(f"Path is neither a file nor a directory: {filepath}")
+            if not target_path.is_dir():
+                raise FileStreamDownloadError(f"Path is not a directory: {filepath}")
+
+            # Handle directory download as tar archive
+            return VFSDirectoryDownloadServerStreamReader(target_path, self._download_chunk_size)
 
         except Exception as e:
             raise FileStreamDownloadError(f"Download failed: {str(e)}") from e
