@@ -156,6 +156,7 @@ class ErrorDomain(enum.StrEnum):
     ENDPOINT_AUTO_SCALING = "endpoint-auto-scaling"
     ROUTE = "route"
     DOTFILE = "dotfile"
+    QUOTA_SCOPE = "quota-scope"
     VFOLDER = "vfolder"
     QUOTA_SCOPE = "quota-scope"
     VFOLDER_INVITATION = "vfolder-invitation"
