@@ -842,6 +842,7 @@ class ReservoirConfig(BaseConfigSchema):
         default=None,
         description="""
         Custom endpoint for the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
         """,
         examples=["https://manager.reservoir.ai"],
         validation_alias=AliasChoices("manager-endpoint", "manager_endpoint"),
@@ -851,6 +852,7 @@ class ReservoirConfig(BaseConfigSchema):
         default=None,
         description="""
         Access key for authenticating with the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
         """,
         validation_alias=AliasChoices("manager-access-key", "manager_access_key"),
         serialization_alias="manager-access-key",
@@ -859,6 +861,7 @@ class ReservoirConfig(BaseConfigSchema):
         default=None,
         description="""
         Secret key for authenticating with the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
         """,
         validation_alias=AliasChoices("manager-secret-key", "manager_secret_key"),
         serialization_alias="manager-secret-key",
@@ -867,6 +870,7 @@ class ReservoirConfig(BaseConfigSchema):
         default=None,
         description="""
         API version for the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
         """,
         examples=["v1"],
         validation_alias=AliasChoices("manager-api-version", "manager_api_version"),
@@ -876,6 +880,7 @@ class ReservoirConfig(BaseConfigSchema):
         default=None,
         description="""
         Name of the object storage configuration to use with the reservoir registry.
+        Required if the remote reservoir registry use vfs storage.
         """,
         examples=["s3-storage", "vfs-storage"],
         validation_alias=AliasChoices("storage-name", "storage_name"),
