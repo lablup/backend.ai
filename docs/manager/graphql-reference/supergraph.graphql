@@ -694,6 +694,27 @@ type AvailableServiceNode implements Node
   service_variants: [String]!
 }
 
+"""Background task event payload"""
+type BackgroundTaskEventPayload
+  @join__type(graph: STRAWBERRY)
+{
+  taskId: ID!
+  eventType: BgtaskEventType!
+  message: String!
+  currentProgress: Float
+  totalProgress: Float
+}
+
+"""Type of background task event"""
+enum BgtaskEventType
+  @join__type(graph: STRAWBERRY)
+{
+  UPDATED @join__enumValue(graph: STRAWBERRY)
+  DONE @join__enumValue(graph: STRAWBERRY)
+  CANCELLED @join__enumValue(graph: STRAWBERRY)
+  FAILED @join__enumValue(graph: STRAWBERRY)
+}
+
 """
 BigInt is an extension of the regular graphene.Int scalar type
 to support integers outside the range of a signed 32-bit integer.
@@ -5432,6 +5453,11 @@ type Subscription
   Subscribe to real-time scheduling events for a specific session. Streams status transition events during the session lifecycle (PENDING → SCHEDULED → PREPARING → RUNNING → TERMINATED). Added in 25.15.0.
   """
   schedulingEventsBySession(sessionId: ID!): SchedulingBroadcastEventPayload!
+
+  """
+  Subscribe to real-time events for a specific background task. Streams progress updates and completion events (done/cancelled/failed) for the task lifecycle.
+  """
+  backgroundTaskEvents(taskId: ID!): BackgroundTaskEventPayload!
 }
 
 """Added in 25.5.0."""

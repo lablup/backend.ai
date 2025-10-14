@@ -262,6 +262,23 @@ enum ArtifactType {
   IMAGE
 }
 
+"""Background task event payload"""
+type BackgroundTaskEventPayload {
+  taskId: ID!
+  eventType: BgtaskEventType!
+  message: String!
+  currentProgress: Float
+  totalProgress: Float
+}
+
+"""Type of background task event"""
+enum BgtaskEventType {
+  UPDATED
+  DONE
+  CANCELLED
+  FAILED
+}
+
 scalar ByteSize
 
 """Added in 25.14.0"""
@@ -1328,6 +1345,11 @@ type Subscription {
   Subscribe to real-time scheduling events for a specific session. Streams status transition events during the session lifecycle (PENDING → SCHEDULED → PREPARING → RUNNING → TERMINATED). Added in 25.15.0.
   """
   schedulingEventsBySession(sessionId: ID!): SchedulingBroadcastEventPayload!
+
+  """
+  Subscribe to real-time events for a specific background task. Streams progress updates and completion events (done/cancelled/failed) for the task lifecycle.
+  """
+  backgroundTaskEvents(taskId: ID!): BackgroundTaskEventPayload!
 }
 
 scalar UUID

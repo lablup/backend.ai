@@ -26,6 +26,7 @@ from .artifact import (
     update_artifact,
 )
 from .artifact_registry import default_artifact_registry
+from .background_task import background_task_events
 from .huggingface_registry import (
     create_huggingface_registry,
     delete_huggingface_registry,
@@ -146,6 +147,7 @@ class Subscription:
     deployment_status_changed = deployment_status_changed
     replica_status_changed = replica_status_changed
     scheduling_events_by_session = scheduling_events_by_session
+    background_task_events = background_task_events
 
 
 class CustomizedSchema(Schema):
