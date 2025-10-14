@@ -194,7 +194,11 @@ async def web_handler(
 
     stats: WebStats = frontend_rqst.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
-    path = frontend_rqst.match_info.get("path", "")
+    path = frontend_rqst.match_info.get("path", None)
+    if path is None:
+        request_path = frontend_rqst.path
+        if request_path.startswith("/func"):
+            path = request_path.removeprefix("/func")
     if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(frontend_rqst, api_endpoint))
     else:

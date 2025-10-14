@@ -1,8 +1,16 @@
 import { defineConfig } from '@graphql-hive/gateway';
 
 export const gatewayConfig = defineConfig({
+  propagateHeaders: {
+    fromClientToSubgraphs({ request }) {
+      let headers = Object.fromEntries(request.headers.entries());
+      delete headers['content-length'];
+      return headers;
+    }
+  },
   supergraph: '/gateway/supergraph.graphql',
   graphqlEndpoint: '/admin/gql',
+  skipValidation: true,
   transportEntries: {
     GRAPHENE: {
       // Location points to the manager's GraphQL path
