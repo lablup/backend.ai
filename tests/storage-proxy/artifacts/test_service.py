@@ -235,14 +235,28 @@ def mock_reservoir_registry_configs() -> dict[str, ReservoirConfig]:
     }
 
 
+class MockObjectStorage(ObjectStorage):
+    """Mock ObjectStorage class for testing."""
+
+    def __init__(self) -> None:
+        # Don't call super().__init__() to avoid initialization complexity
+        self._bucket = "test-bucket"
+        self._endpoint = "https://s3.amazonaws.com"
+        self._region = "us-west-2"
+        self._access_key = "test_access_key"
+        self._secret_key = "test_secret_key"
+        self._upload_chunk_size = 5 * 1024 * 1024
+        self._reservoir_download_chunk_size = 8192
+
+
 @pytest.fixture
 def reservoir_download_step(
     mock_reservoir_registry_configs: dict[str, ReservoirConfig],
     mock_storage_pool: MagicMock,
 ) -> ReservoirDownloadStep:
     """Create ReservoirDownloadStep instance for testing."""
-    # Create a mock storage object
-    mock_download_storage = MagicMock()
+    # Create a mock storage object that properly inherits from ObjectStorage
+    mock_download_storage = MockObjectStorage()
     return ReservoirDownloadStep(
         registry_configs=mock_reservoir_registry_configs,
         download_storage=mock_download_storage,

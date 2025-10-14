@@ -104,7 +104,7 @@ class TarExtractor:
             # Create temporary file for tar
             with tempfile.NamedTemporaryFile(delete=False, suffix=".tar") as tf:
                 temp_file = Path(tf.name)
-                log.debug(f"Downloading tar to temp file: {temp_file}")
+                log.debug(f"Downloading artifact tar to temp directory: {temp_file}")
 
                 # Download to temp file
                 async with aiofiles.open(temp_file, "wb") as f:
@@ -121,8 +121,7 @@ class TarExtractor:
             loop = asyncio.get_running_loop()
             await loop.run_in_executor(None, self._extract_tar, temp_file, target_dir)
 
-            log.info(f"Successfully extracted tar to: {target_dir}")
-
+            log.info(f"Successfully extracted artifact tar to: {target_dir}")
             return bytes_downloaded
 
         finally:
