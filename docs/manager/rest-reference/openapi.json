@@ -9639,7 +9639,7 @@
             }
           }
         ],
-        "description": "\nDownload a file from VFS storage via storage proxy streaming.\n\nArgs:\n    path: Path parameters including storage name\n    body: Request body with file path\n    processors_ctx: Processing context\n\nReturns:\n    APIStreamResponse with StreamReader body\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nDownload artifact directory from VFS storage via storage proxy streaming.\n\nArgs:\n    path: Path parameters including storage name\n    body: Request body with file path\n    processors_ctx: Processing context\n\nReturns:\n    APIStreamResponse with StreamReader body\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/vfs-storages/{storage_name}": {
