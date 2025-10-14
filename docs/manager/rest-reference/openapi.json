@@ -9639,7 +9639,7 @@
             }
           }
         ],
-        "description": "\nDownload artifact directory from VFS storage via storage proxy streaming.\n\nArgs:\n    path: Path parameters including storage name\n    body: Request body with file path\n    storage_session_manager_ctx: Storage manager context\n    processors_ctx: Processing context\n\nReturns:\n    APIStreamResponse with StreamReader body\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nDownload artifact directory from VFS storage via storage proxy streaming.\n\nArgs:\n    path: Path parameters including storage name\n    body: Request body with file path\n\nReturns:\n    APIStreamResponse with StreamReader body\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/vfs-storages/{storage_name}": {
@@ -9668,7 +9668,7 @@
             }
           }
         ],
-        "description": "\nGet VFS storage information by storage name.\n\nArgs:\n    path: Path parameters including storage name\n    processors_ctx: Processing context\n\nReturns:\n    APIResponse with storage information\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nGet VFS storage information by storage name.\n\nArgs:\n    path: Path parameters including storage name\n\nReturns:\n    APIResponse with storage information\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/vfs-storages/": {
@@ -9688,7 +9688,7 @@
           }
         ],
         "parameters": [],
-        "description": "\nList all VFS storages.\n\nArgs:\n    processors_ctx: Processing context\n\nReturns:\n    APIResponse with storage information\n\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nList all VFS storages.\n\nReturns:\n    APIResponse with storage information\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }
