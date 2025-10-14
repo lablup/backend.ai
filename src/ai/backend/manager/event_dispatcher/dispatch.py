@@ -218,6 +218,7 @@ class Dispatchers:
             args.repositories.artifact_registry.repository,
             args.repositories.reservoir_registry.repository,
             args.repositories.object_storage.repository,
+            args.repositories.vfs_storage.repository,
             args.storage_manager,
             args.config_provider,
         )

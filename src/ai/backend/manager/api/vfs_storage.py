@@ -4,7 +4,7 @@ import logging
 import os
 from collections.abc import AsyncIterator
 from http import HTTPStatus
-from typing import Iterable, Optional, Tuple, override
+from typing import Iterable, Optional, Tuple, cast, override
 
 import aiohttp
 import aiohttp_cors
@@ -184,8 +184,9 @@ class APIHandler:
 
         # Prepare response headers
         filename = os.path.basename(filepath)
+        content_type = cast(str, stream_reader.content_type())
         headers = {
-            "Content-Type": stream_reader.content_type(),
+            "Content-Type": content_type,
             "Content-Disposition": f'attachment; filename="{filename}"',
             "Cache-Control": "no-cache",
         }

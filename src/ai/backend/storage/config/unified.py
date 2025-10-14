@@ -884,6 +884,7 @@ class ReservoirConfig(BaseConfigSchema):
         serialization_alias="manager-api-version",
     )
     storage_name: Optional[str] = Field(
+        default=None,
         description="""
         Name of the object storage configuration to use with the reservoir registry.
         """,
