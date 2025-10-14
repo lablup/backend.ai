@@ -20,6 +20,8 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactRemoteStatus,
     ArtifactStatus,
 )
+from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.errors.artifact_registry import ReservoirConnectionError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact.types import (
@@ -34,6 +36,7 @@ from ai.backend.manager.repositories.object_storage.repository import ObjectStor
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
+from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact.actions.scan import ScanArtifactsAction
 from ai.backend.manager.services.processors import Processors
 from ai.backend.manager.types import PaginationOptions
@@ -47,6 +50,7 @@ class ArtifactRegistryEventHandler:
     _artifact_registry_repository: ArtifactRegistryRepository
     _reservoir_registry_repository: ReservoirRegistryRepository
     _object_storage_repository: ObjectStorageRepository
+    _vfs_storage_repository: VFSStorageRepository
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
 
@@ -57,6 +61,7 @@ class ArtifactRegistryEventHandler:
         artifact_registry_repository: ArtifactRegistryRepository,
         reservoir_registry_repository: ReservoirRegistryRepository,
         object_storage_repository: ObjectStorageRepository,
+        vfs_storage_repository: VFSStorageRepository,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
     ) -> None:
@@ -65,6 +70,7 @@ class ArtifactRegistryEventHandler:
         self._artifact_registry_repository = artifact_registry_repository
         self._reservoir_registry_repository = reservoir_registry_repository
         self._object_storage_repository = object_storage_repository
+        self._vfs_storage_repository = vfs_storage_repository
         self._storage_manager = storage_manager
         self._config_provider = config_provider
 
@@ -104,7 +110,7 @@ class ArtifactRegistryEventHandler:
         """
 
         reservoir_config = self._config_provider.config.reservoir
-        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
+        storage = await self._resolve_storage_data(reservoir_config.storage_name)
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
 
         # Get all reservoir registries
@@ -213,3 +219,9 @@ class ArtifactRegistryEventHandler:
                     registry.registry_id,
                     e,
                 )
+
+    async def _resolve_storage_data(self, storage_name: str) -> ObjectStorageData | VFSStorageData:
+        try:
+            return await self._object_storage_repository.get_by_name(storage_name)
+        except Exception:
+            return await self._vfs_storage_repository.get_by_name(storage_name)

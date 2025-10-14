@@ -89,3 +89,17 @@ class UpdateArtifactResponse(BaseResponseModel):
 
 class GetArtifactRevisionReadmeResponse(BaseResponseModel):
     readme: Optional[str]
+
+
+class VFSStorage(BaseModel):
+    name: str
+    base_path: str
+    host: str
+
+
+class GetVFSStorageResponse(BaseResponseModel):
+    storage: VFSStorage
+
+
+class ListVFSStorageResponse(BaseResponseModel):
+    storages: list[VFSStorage]

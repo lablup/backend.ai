@@ -28,6 +28,7 @@ class ManagerHTTPClientArgs:
 _HASH_TYPE = "sha256"
 
 
+# TODO: Remove this and reconstruct to request storage proxy directly.
 class ManagerHTTPClient:
     """
     HTTP client for communicating with Backend.AI Manager APIs from storage services.
@@ -95,7 +96,7 @@ class ManagerHTTPClient:
         self, storage_name: str, filepath: str
     ) -> AsyncIterator[bytes]:
         """
-        Download a file from VFS storage via manager API streaming.
+        Download a directory from VFS storage via manager API streaming.
 
         Args:
             storage_name: Name of the VFS storage
@@ -104,15 +105,7 @@ class ManagerHTTPClient:
         Yields:
             Chunks of file content as bytes
         """
-        rel_url = f"/vfs-storage/{storage_name}/download"
+        rel_url = f"/vfs-storages/{storage_name}/download"
         request_body = {"filepath": filepath}
-        try:
-            async for chunk in self._request_stream("POST", rel_url, json=request_body):
-                yield chunk
-
-        except aiohttp.ClientError as e:
-            log.error(f"HTTP error downloading VFS file {filepath}: {str(e)}")
-            raise
-        except Exception as e:
-            log.error(f"Unexpected error downloading VFS file {filepath}: {str(e)}")
-            raise
+        async for chunk in self._request_stream("POST", rel_url, json=request_body):
+            yield chunk

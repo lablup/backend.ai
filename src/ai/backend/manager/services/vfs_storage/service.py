@@ -64,7 +64,14 @@ class VFSStorageService:
         Get an existing VFS storage by ID.
         """
         log.info("Getting VFS storage with id: {}", action.storage_id)
-        storage_data = await self._vfs_storage_repository.get_by_id(action.storage_id)
+        if action.storage_id:
+            storage_data = await self._vfs_storage_repository.get_by_id(action.storage_id)
+        elif action.storage_name:
+            storage_data = await self._vfs_storage_repository.get_by_name(action.storage_name)
+        else:
+            # TODO: Make exception
+            raise ValueError("Either storage_id or storage_name must be provided")
+
         return GetVFSStorageActionResult(result=storage_data)
 
     async def list(self, action: ListVFSStorageAction) -> ListVFSStorageActionResult:
