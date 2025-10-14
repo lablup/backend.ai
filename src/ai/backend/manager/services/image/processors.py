@@ -31,6 +31,10 @@ from ai.backend.manager.services.image.actions.get_image_by_identifier import (
     GetImageByIdentifierAction,
     GetImageByIdentifierActionResult,
 )
+from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
+    GetImagesByCanonicalsAction,
+    GetImagesByCanonicalsActionResult,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
@@ -88,8 +92,14 @@ class ImageProcessors(AbstractProcessorPackage):
     get_image_by_identifier: ActionProcessor[
         GetImageByIdentifierAction, GetImageByIdentifierActionResult
     ]
+    get_images_by_canonicals: ActionProcessor[
+        GetImagesByCanonicalsAction, GetImagesByCanonicalsActionResult
+    ]
 
     def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
+        self.get_images_by_canonicals = ActionProcessor(
+            service.get_images_by_canonicals, action_monitors
+        )
         self.get_image_by_identifier = ActionProcessor(
             service.get_image_by_identifier, action_monitors
         )

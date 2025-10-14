@@ -5,6 +5,7 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
@@ -122,6 +123,22 @@ class ImageDBSource:
         if not image_alias_row:
             raise ImageAliasNotFound(f"Image alias '{alias}' not found.")
         return image_alias_row
+
+    async def get_images_by_canonicals(
+        self,
+        canonicals: list[str],
+        status_filter: Optional[list[ImageStatus]] = None,
+    ) -> list[ImageDataWithDetails]:
+        query = sa.select(ImageRow).where(
+            ImageRow.name.in_(canonicals).options(selectinload(ImageRow.aliases))
+        )
+        if status_filter:
+            query = query.where(ImageRow.status.in_(status_filter))
+
+        async with self._db.begin_readonly_session() as session:
+            result = await session.execute(query)
+            image_rows: list[ImageRow] = result.scalars().all()
+            return [row.to_detailed_dataclass() for row in image_rows]
 
     async def get_image_details_by_identifier(
         self,

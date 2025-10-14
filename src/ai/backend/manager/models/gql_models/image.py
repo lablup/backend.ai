@@ -61,6 +61,9 @@ from ai.backend.manager.services.image.actions.get_image_by_id import GetImageBy
 from ai.backend.manager.services.image.actions.get_image_by_identifier import (
     GetImageByIdentifierAction,
 )
+from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
+    GetImagesByCanonicalsAction,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ImageModifier,
     ModifyImageAction,
@@ -273,17 +276,6 @@ class Image(graphene.ObjectType):
         return ret
 
     @classmethod
-    async def from_row(
-        cls,
-        ctx: GraphQueryContext,
-        row: ImageRow,
-    ) -> Image:
-        # TODO: add architecture
-        _installed_agents = await ctx.valkey_image.get_agents_for_image(row.name)
-        installed_agents: List[str] = list(_installed_agents)
-        return cls.populate_row(ctx, row, installed_agents)
-
-    @classmethod
     async def bulk_load(
         cls,
         ctx: GraphQueryContext,
@@ -302,17 +294,15 @@ class Image(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         image_names: Sequence[str],
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
-    ) -> Sequence[Optional[Image]]:
-        query = (
-            sa.select(ImageRow)
-            .where(ImageRow.name.in_(image_names))
-            .options(selectinload(ImageRow.aliases))
+    ) -> list[Self]:
+        result = await graph_ctx.processors.image.get_images_by_canonicals.wait_for_complete(
+            GetImagesByCanonicalsAction(
+                image_canonicals=list(image_names),
+                user_role=graph_ctx.user["role"],
+                image_status=filter_by_statuses,
+            )
         )
-        if filter_by_statuses:
-            query = query.where(ImageRow.status.in_(filter_by_statuses))
-        async with graph_ctx.db.begin_readonly_session() as session:
-            result = await session.execute(query)
-            return [await Image.from_row(graph_ctx, row) for row in result.scalars().all()]
+        return [cls.from_image_with_agent_status(img) for img in result.images_with_agent_status]
 
     @classmethod
     async def batch_load_by_image_ref(

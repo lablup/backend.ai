@@ -81,6 +81,49 @@ class ImageRepository:
         return await self._db_source.resolve_images_batch(identifier_lists)
 
     @image_repository_resilience.apply()
+    async def get_images_by_canonicals(
+        self,
+        image_canonicals: list[str],
+        status_filter: Optional[list[ImageStatus]] = None,
+        requested_by_superadmin: bool = False,
+    ) -> list[ImageWithAgentStatus]:
+        images_data: list[ImageDataWithDetails] = await self._db_source.get_images_by_canonicals(
+            image_canonicals, status_filter
+        )
+
+        installed_agents_for_images: list[set[str]] = []
+        with suppress_with_log(
+            [Exception],
+            message=f"Failed to get agents for images {image_canonicals}",
+        ):
+            image_names = [image.name for image in images_data]
+            installed_agents_for_images = await self._cache_source.get_agents_for_images(
+                image_names
+            )
+
+        # TODO: Handle mismatch in lengths more gracefully
+        if len(installed_agents_for_images) != len(images_data):
+            installed_agents_for_images = [set() for _ in images_data]
+
+        hide_agents = (
+            False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
+        )
+
+        images_with_agent_status: list[ImageWithAgentStatus] = []
+        for image, installed_agents in zip(images_data, installed_agents_for_images):
+            images_with_agent_status.append(
+                ImageWithAgentStatus(
+                    image=image,
+                    agent_status=ImageAgentStatus(
+                        installed=bool(installed_agents),
+                        agent_names=[] if hide_agents else list(installed_agents),
+                    ),
+                )
+            )
+
+        return images_with_agent_status
+
+    @image_repository_resilience.apply()
     async def get_image_by_identifier(
         self,
         identifier: ImageIdentifier,
