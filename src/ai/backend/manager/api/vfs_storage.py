@@ -91,6 +91,7 @@ class APIHandler:
         path: PathParam[VFSStorageAPIPathParams],
         body: BodyParam[VFSDownloadFileReq],
         storage_session_manager_ctx: StorageSessionManagerCtx,
+        processors_ctx: ProcessorsCtx,
     ) -> APIStreamResponse:
         """
         Download artifact directory from VFS storage via storage proxy streaming.
@@ -98,6 +99,7 @@ class APIHandler:
         Args:
             path: Path parameters including storage name
             body: Request body with file path
+            storage_session_manager_ctx: Storage manager context
             processors_ctx: Processing context
 
         Returns:
@@ -111,13 +113,12 @@ class APIHandler:
 
         # Get storage manager from context
         storage_manager = storage_session_manager_ctx.storage_manager
-
-        # TODO: Map storage_name to proxy_name based on VFS storage configuration
-        # For now, use the first available proxy
-        proxy_name = next(iter(storage_manager._manager_facing_clients.keys()))
+        action_result = await processors_ctx.processors.vfs_storage.get.wait_for_complete(
+            GetVFSStorageAction(storage_name=storage_name)
+        )
 
         # Get the manager client for the proxy
-        manager_client = storage_manager.get_manager_facing_client(proxy_name)
+        manager_client = storage_manager.get_manager_facing_client(action_result.result.host)
 
         # Create stream reader for the download
         stream_reader = VFSDirectoryDownloadClientStreamReader(
