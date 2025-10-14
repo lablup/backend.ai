@@ -99,7 +99,7 @@ class BackgroundTaskEventPayload:
             case BgtaskStatus.FAILED:
                 event_type = BgtaskEventType.FAILED
             case _:
-                log.warning(f"Unknown task status in BgtaskAlreadyDoneEvent: {event.task_status}")
+                log.warning("Unknown task status in BgtaskAlreadyDoneEvent: {}", event.task_status)
                 event_type = BgtaskEventType.FAILED
 
         return cls(
@@ -138,7 +138,7 @@ async def background_task_events(
     try:
         task_uuid = uuid.UUID(task_id)
     except (ValueError, AttributeError) as e:
-        log.warning(f"Invalid task ID format: {task_id}")
+        log.warning("Invalid task ID format: {}", task_id)
         raise InvalidBgtaskId(f"Invalid task ID format: {task_id}") from e
 
     event_hub = info.context.event_hub
