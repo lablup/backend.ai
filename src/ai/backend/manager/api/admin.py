@@ -44,6 +44,20 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
+class CustomGraphQLView(GraphQLView):
+    """Custom GraphQL view for Backend.AI with OpenAPI compatibility."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        # Add __name__ attribute for OpenAPI generation compatibility
+        self.__name__ = "handle_graphql_strawberry"
+        self.__doc__ = """
+        GraphQL endpoint using Strawberry schema.
+
+        Supports both query/mutation via POST and subscriptions via WebSocket.
+        """
+
+
 class GQLLoggingMiddleware:
     def resolve(self, next, root, info: graphene.ResolveInfo, **args) -> Any:
         if info.path.prev is None:  # indicates the root query
@@ -216,8 +230,8 @@ def create_app(
     cors.add(app.router.add_route("POST", r"/graphql", handle_gql_legacy))
     cors.add(app.router.add_route("POST", r"/gql", handle_gql_graphene))
 
-    # Use GraphQLView for strawberry schema with subscription support
-    gql_view = GraphQLView(schema=strawberry_schema, graphiql=False)
+    # Use CustomGraphQLView for strawberry schema with subscription support
+    gql_view = CustomGraphQLView(schema=strawberry_schema, graphiql=False)
     cors.add(app.router.add_route("GET", r"/gql/strawberry", gql_view))
     cors.add(app.router.add_route("POST", r"/gql/strawberry", gql_view))
     return app, []

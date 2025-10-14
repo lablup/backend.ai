@@ -962,7 +962,7 @@
             "description": "Type of the inference runtime the image will try to load."
           },
           "arch": {
-            "default": "x86_64",
+            "default": "aarch64",
             "description": "Image architecture",
             "title": "Arch",
             "type": "string"
@@ -5006,8 +5006,8 @@
       }
     },
     "//gql/strawberry": {
-      "post": {
-        "operationId": "root.handle_gql_strawberry",
+      "get": {
+        "operationId": "root.handle_graphql_strawberry",
         "tags": [
           "root"
         ],
@@ -5016,13 +5016,21 @@
             "description": "Successful response"
           }
         },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nGraphQL endpoint using Strawberry schema.\n\nSupports both query/mutation via POST and subscriptions via WebSocket.\n"
+      },
+      "post": {
+        "operationId": "root.handle_graphql_strawberry.2",
+        "tags": [
+          "root"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "parameters": [],
+        "description": "\nGraphQL endpoint using Strawberry schema.\n\nSupports both query/mutation via POST and subscriptions via WebSocket.\n"
       }
     },
     "/spec/graphiql": {
@@ -5625,7 +5633,7 @@
                   },
                   "arch": {
                     "type": "string",
-                    "default": "x86_64"
+                    "default": "aarch64"
                   },
                   "type": {
                     "type": "string",
@@ -5790,7 +5798,7 @@
                   },
                   "arch": {
                     "type": "string",
-                    "default": "x86_64"
+                    "default": "aarch64"
                   },
                   "type": {
                     "type": "string",
