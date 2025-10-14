@@ -8,8 +8,10 @@ from ai.backend.manager.services.image.service import ImageService
 
 @pytest.fixture
 def processors(extra_fixtures, database_fixture, database_engine, registry_ctx):
-    agent_registry, _, _, _, _, _, _ = registry_ctx
-    image_repository = ImageRepository(database_engine)
+    agent_registry, _, _, _, config_provider, _, _ = registry_ctx
+    # Extract valkey_image from agent_registry
+    valkey_image = agent_registry.valkey_image
+    image_repository = ImageRepository(database_engine, valkey_image, config_provider)
     admin_repository = AdminImageRepository(database_engine)
     image_service = ImageService(
         agent_registry=agent_registry,

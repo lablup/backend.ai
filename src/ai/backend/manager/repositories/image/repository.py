@@ -1,6 +1,7 @@
 from typing import Optional
 from uuid import UUID
 
+from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -8,12 +9,23 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import ImageAlias
-from ai.backend.manager.data.image.types import ImageAliasData, ImageData, RescanImagesResult
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.image.types import (
+    ImageAgentStatus,
+    ImageAliasData,
+    ImageData,
+    ImageDataWithDetails,
+    ImageStatus,
+    ImageWithAgentStatus,
+    RescanImagesResult,
+)
 from ai.backend.manager.models.image import (
     ImageIdentifier,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.image.cache_source.cache_source import ImageCacheSource
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
+from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 
 image_repository_resilience = Resilience(
     policies=[
@@ -32,9 +44,18 @@ image_repository_resilience = Resilience(
 
 class ImageRepository:
     _db_source: ImageDBSource
+    _cache_source: ImageCacheSource
+    _config_provider: ManagerConfigProvider
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(
+        self,
+        db: ExtendedAsyncSAEngine,
+        valkey_image: ValkeyImageClient,
+        config_provider: ManagerConfigProvider,
+    ) -> None:
         self._db_source = ImageDBSource(db)
+        self._cache_source = ImageCacheSource(valkey_image)
+        self._config_provider = config_provider
 
     @image_repository_resilience.apply()
     async def resolve_image(
@@ -61,9 +82,32 @@ class ImageRepository:
 
     @image_repository_resilience.apply()
     async def get_image_by_id(
-        self, image_id: UUID, load_aliases: bool = False
-    ) -> Optional[ImageData]:
-        return await self._db_source.get_image_by_id(image_id, load_aliases)
+        self,
+        image_id: UUID,
+        load_aliases: bool = False,
+        status_filter: Optional[list[ImageStatus]] = None,
+        requested_by_superadmin: bool = False,
+    ) -> ImageWithAgentStatus:
+        image_data: ImageDataWithDetails = await self._db_source.get_image_details_by_id(
+            image_id, load_aliases, status_filter
+        )
+        installed_agents: set[str] = set()
+        with suppress_with_log(
+            [Exception],
+            message=f"Failed to get agents for image {image_data.name}",
+        ):
+            installed_agents = await self._cache_source.get_agents_for_image(image_data.name)
+        hide_agents = (
+            False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
+        )
+
+        return ImageWithAgentStatus(
+            image=image_data,
+            agent_status=ImageAgentStatus(
+                installed=bool(installed_agents),
+                agent_names=[] if hide_agents else list(installed_agents),
+            ),
+        )
 
     @image_repository_resilience.apply()
     async def soft_delete_user_image(

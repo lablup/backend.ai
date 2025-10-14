@@ -7,11 +7,14 @@ from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
+    ImageDataWithDetails,
+    ImageStatus,
     RescanImagesResult,
 )
 from ai.backend.manager.errors.image import (
@@ -20,6 +23,7 @@ from ai.backend.manager.errors.image import (
     ForgetImageForbiddenError,
     ForgetImageNotFoundError,
     ImageAliasNotFound,
+    ImageNotFound,
     ModifyImageActionValueError,
     RegistryNotFoundForImage,
 )
@@ -80,13 +84,19 @@ class ImageDBSource:
         return await ImageRow.resolve(session, identifiers)
 
     async def _get_image_by_id(
-        self, session: SASession, image_id: UUID, load_aliases: bool = False
+        self,
+        session: SASession,
+        image_id: UUID,
+        load_aliases: bool = False,
+        status_filter: Optional[list[ImageStatus]] = None,
     ) -> Optional[ImageRow]:
         """
         Private method to get an image by ID using an existing session.
         Returns None if image is not found.
         """
-        return await ImageRow.get(session, image_id, load_aliases=load_aliases)
+        return await ImageRow.get(
+            session, image_id, load_aliases=load_aliases, filter_by_statuses=status_filter
+        )
 
     async def _validate_image_ownership(
         self, session: SASession, image_id: UUID, user_id: UUID, load_aliases: bool = False
@@ -113,14 +123,22 @@ class ImageDBSource:
             raise ImageAliasNotFound(f"Image alias '{alias}' not found.")
         return image_alias_row
 
-    async def get_image_by_id(
-        self, image_id: UUID, load_aliases: bool = False
-    ) -> Optional[ImageData]:
+    async def get_image_details_by_id(
+        self,
+        image_id: UUID,
+        load_aliases: bool = False,
+        status_filter: Optional[list[ImageStatus]] = None,
+    ) -> ImageDataWithDetails:
         async with self._db.begin_session() as session:
-            row = await self._get_image_by_id(session, image_id, load_aliases)
-            if not row:
-                return None
-            data = row.to_dataclass()
+            try:
+                row: Optional[ImageRow] = await self._get_image_by_id(
+                    session, image_id, load_aliases, status_filter
+                )
+                if not row:
+                    raise ImageNotFound()
+            except UnknownImageReference:
+                raise ImageNotFound()
+            data = row.to_detailed_dataclass()
         return data
 
     async def soft_delete_user_image(

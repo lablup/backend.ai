@@ -2,7 +2,8 @@ import enum
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import TYPE_CHECKING, NamedTuple, Optional
+from decimal import Decimal
+from typing import TYPE_CHECKING, Any, NamedTuple, Optional
 
 from ai.backend.common.types import CIStrEnum
 
@@ -59,6 +60,65 @@ class ImageData:
     labels: ImageLabelsData
     resources: ImageResourcesData
     status: ImageStatus
+
+
+@dataclass
+class KVPair:
+    key: str
+    value: str
+
+
+@dataclass
+class ResourceLimit:
+    key: str
+    min: Decimal
+    max: Decimal
+
+
+@dataclass
+class ImageDataWithDetails:
+    id: uuid.UUID = field(compare=False)
+    name: str
+    namespace: str
+    base_image_name: str
+    project: str
+    humanized_name: str
+    tag: Optional[str]
+    tags: list[KVPair]
+    version: Optional[str]
+    registry: str
+    architecture: str
+    is_local: bool
+    status: ImageStatus
+    resource_limits: list[ResourceLimit]
+    supported_accelerators: list[str] = field(default_factory=list)
+    digest: Optional[str] = field(default=None)
+    labels: list[KVPair] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
+    size_bytes: int = field(default=0)
+    # legacy
+    hash: Optional[str] = field(default=None)
+    raw_labels: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ImageAgentStatus:
+    """
+    Represents the installation status of an image on agents.
+    """
+
+    installed: bool
+    agent_names: list[str] = field(default_factory=list)
+
+
+@dataclass
+class ImageWithAgentStatus:
+    """
+    Wraps detailed image information and its agent installation status.
+    """
+
+    image: ImageDataWithDetails
+    agent_status: ImageAgentStatus
 
 
 @dataclass

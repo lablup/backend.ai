@@ -59,6 +59,7 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
 )
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
+from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
 from ai.backend.manager.services.image.actions.modify_image import (
     ImageModifier,
     ModifyImageAction,
@@ -76,7 +77,7 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
 from ai.backend.manager.services.image.types import ImageRefData
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...data.image.types import ImageStatus, ImageType
+from ...data.image.types import ImageStatus, ImageType, ImageWithAgentStatus
 from ...defs import DEFAULT_IMAGE_ARCH
 from ...errors.image import ImageNotFound
 from ..base import (
@@ -193,6 +194,43 @@ class Image(graphene.ObjectType):
     raw_labels: dict[str, Any]
 
     @classmethod
+    def from_image_with_agent_status(cls, data: ImageWithAgentStatus) -> Self:
+        return cls(
+            id=data.image.id,
+            name=data.image.name,
+            namespace=data.image.namespace,
+            base_image_name=data.image.base_image_name,
+            project=data.image.project,
+            humanized_name=data.image.humanized_name,
+            tag=data.image.tag,
+            tags=[KVPair(key=kvpair.key, value=kvpair.value) for kvpair in data.image.tags],
+            version=data.image.version,
+            registry=data.image.registry,
+            architecture=data.image.architecture,
+            is_local=data.image.is_local,
+            digest=data.image.digest,
+            labels=[KVPair(key=kvpair.key, value=kvpair.value) for kvpair in data.image.labels],
+            aliases=data.image.aliases,
+            size_bytes=data.image.size_bytes,
+            status=data.image.status,
+            resource_limits=[
+                ResourceLimit(
+                    key=resource_limit.key, min=resource_limit.min, max=resource_limit.max
+                )
+                for resource_limit in data.image.resource_limits
+            ],
+            supported_accelerators=data.image.supported_accelerators,
+            installed=data.agent_status.installed,
+            installed_agents=data.agent_status.agent_names
+            if data.agent_status.agent_names
+            else None,
+            # legacy
+            hash=data.image.digest,
+            # internal
+            raw_labels=data.image.raw_labels,
+        )
+
+    @classmethod
     def populate_row(
         cls,
         ctx: GraphQueryContext,
@@ -293,14 +331,14 @@ class Image(graphene.ObjectType):
         id: UUID,
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Image:
-        async with ctx.db.begin_readonly_session() as session:
-            row = await ImageRow.get(
-                session, id, load_aliases=True, filter_by_statuses=filter_by_statuses
+        result = await ctx.processors.image.get_image_by_id.wait_for_complete(
+            GetImageByIdAction(
+                image_id=id,
+                user_role=ctx.user["role"],
+                image_status=filter_by_statuses,
             )
-            if not row:
-                raise ImageNotFound
-
-            return await cls.from_row(ctx, row)
+        )
+        return cls.from_image_with_agent_status(result.image_with_agent_status)
 
     @classmethod
     async def load_item(
