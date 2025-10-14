@@ -695,7 +695,10 @@ class ReservoirDownloadStep(ImportStep[None]):
 
 
 class ReservoirArchiveStep(ImportStep[DownloadStepResult]):
-    """Reservoir archive step - no-op since files are already copied to archive in download step"""
+    """Step to move downloaded files to archive storage"""
+
+    def __init__(self, transfer_manager: StorageTransferManager) -> None:
+        self._transfer_manager = transfer_manager
 
     @property
     def step_type(self) -> ArtifactStorageImportStep:
@@ -703,22 +706,69 @@ class ReservoirArchiveStep(ImportStep[DownloadStepResult]):
 
     @override
     async def execute(self, context: ImportStepContext, input_data: DownloadStepResult) -> None:
-        # For Reservoir, files are already copied to archive storage in download step
+        download_storage = input_data.storage_name
+        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
+
+        if not archive_storage:
+            raise StorageStepRequiredStepNotProvided("No storage mapping provided for ARCHIVE step")
+
+        # No need to move if download and archive storage are the same
+        if download_storage == archive_storage:
+            log.info(
+                f"Archive step skipped - download and archive storage are the same: {archive_storage}"
+            )
+            return
+
         log.info(
-            f"Archive step for reservoir - already copied to archive storage: {input_data.storage_name}"
+            f"Starting archive transfer: {download_storage} -> {archive_storage}, "
+            f"files={len(input_data.downloaded_files)}"
+        )
+
+        # Move each file from download storage to archive storage
+        for file_info, storage_key in input_data.downloaded_files:
+            try:
+                await self._transfer_manager.transfer_file(
+                    source_storage_name=download_storage,
+                    dest_storage_name=archive_storage,
+                    source_path=storage_key,
+                    dest_path=storage_key,
+                )
+                log.debug(f"Transferred file to archive: {storage_key}")
+            except Exception as e:
+                log.error(f"Failed to transfer file to archive: {storage_key}: {str(e)}")
+                raise
+
+        log.info(
+            f"Archive transfer completed: {download_storage} -> {archive_storage}, "
+            f"files={len(input_data.downloaded_files)}"
         )
 
     @override
     async def cleanup_on_failure(self, context: ImportStepContext) -> None:
-        """Reservoir archive cleanup - already handled in download step"""
-        # ReservoirDownloadStep already handles cleanup, so this is no-op
-        pass
+        """Clean up failed files from archive storage"""
+        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
+        if not archive_storage:
+            return
+
+        # Delete entire model (cleaning up individual files is complex)
+        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+        model_prefix = f"{context.model.model_id}/{revision}"
+
+        try:
+            storage = context.storage_pool.get_storage(archive_storage)
+            await storage.delete_file(model_prefix)
+            log.info(f"[cleanup] Removed failed archive: {archive_storage}:{model_prefix}")
+        except Exception as e:
+            log.warning(
+                f"[cleanup] Failed to cleanup archive: {archive_storage}:{model_prefix}: {str(e)}"
+            )
 
 
 def create_reservoir_import_pipeline(
     storage_pool: StoragePool,
     registry_configs: dict[str, Any],
     storage_step_mappings: dict[ArtifactStorageImportStep, str],
+    transfer_manager: StorageTransferManager,
 ) -> ImportPipeline:
     """Create ImportPipeline for Reservoir based on storage step mappings."""
     steps: list[ImportStep[Any]] = []
@@ -734,6 +784,6 @@ def create_reservoir_import_pipeline(
         steps.append(ReservoirDownloadStep(registry_configs, download_storage))
 
     if ArtifactStorageImportStep.ARCHIVE in storage_step_mappings:
-        steps.append(ReservoirArchiveStep())
+        steps.append(ReservoirArchiveStep(transfer_manager))
 
     return ImportPipeline(steps)

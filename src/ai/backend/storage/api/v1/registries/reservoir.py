@@ -56,13 +56,12 @@ class ReservoirRegistryAPIHandler:
         """
         await log_client_api_entry(log, "import_models", None)
 
-        # Create storage step mappings with fallback to storage_name
-
         # Create import pipeline based on storage step mappings
         pipeline = create_reservoir_import_pipeline(
             storage_pool=self._reservoir_service._storage_pool,
             registry_configs=self._reservoir_service._reservoir_registry_configs,
             storage_step_mappings=body.parsed.storage_step_mappings,
+            transfer_manager=self._reservoir_service._transfer_manager,
         )
 
         task_id = await self._reservoir_service.import_models_batch(
