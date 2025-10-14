@@ -168,8 +168,6 @@ def create_app(
     app["prefix"] = "spec"
     app.on_startup.append(init)
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
-
-    # gql_view = GraphQLView(schema=strawberry_schema, graphiql=True)
     cors.add(app.router.add_route("GET", "/graphiql", render_graphiql_graphene_html))
     cors.add(app.router.add_route("GET", "/graphiql/strawberry", render_graphiql_strawberry_html))
     cors.add(app.router.add_route("GET", "/openapi", render_openapi_html))

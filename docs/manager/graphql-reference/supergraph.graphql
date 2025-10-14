@@ -5338,14 +5338,6 @@ type Subscription
   artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
-  timeUpdates(interval: Int! = 1): TimeUpdate!
-}
-
-type TimeUpdate
-  @join__type(graph: STRAWBERRY)
-{
-  currentTime: String!
-  counter: Int!
 }
 
 """Added in 25.5.0."""

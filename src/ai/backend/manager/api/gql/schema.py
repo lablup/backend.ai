@@ -68,7 +68,6 @@ from .storage_namespace import (
     register_storage_namespace,
     unregister_storage_namespace,
 )
-from .test_subscription import time_updates
 
 
 @strawberry.type
@@ -131,7 +130,6 @@ class Subscription:
     artifact_import_progress_updated = artifact_import_progress_updated
     deployment_status_changed = deployment_status_changed
     replica_status_changed = replica_status_changed
-    time_updates = time_updates
 
 
 class CustomizedSchema(Schema):

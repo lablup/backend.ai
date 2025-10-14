@@ -397,7 +397,6 @@ async def websocket_handler(
             api_endpoint = api_endpoint.replace("http://", "ws://", 1)
     stats: WebStats = request.app["stats"]
     stats.active_proxy_websocket_handlers.add(asyncio.current_task())  # type: ignore
-    log.info("match_info: {}", request.match_info)
     path = request.match_info.get("path", None)
     if path is None:
         request_path = request.path
@@ -440,7 +439,6 @@ async def websocket_handler(
             # Extract WebSocket subprotocols from client request (e.g., graphql-ws for GraphQL subscriptions)
             protocols_header: str = request.headers.get("Sec-WebSocket-Protocol", "")
             protocols = tuple([p.strip() for p in protocols_header.split(",") if p.strip()])
-            log.info("websocket_handler: client requested protocols: {}", protocols)
             async with api_request.connect_websocket(protocols=protocols) as up_conn:
                 down_conn = web.WebSocketResponse(protocols=protocols)
                 await down_conn.prepare(request)
