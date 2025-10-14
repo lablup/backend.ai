@@ -1230,6 +1230,29 @@ type ScanArtifactsPayload {
   artifacts: [Artifact!]!
 }
 
+"""Added in 25.15.0. Scheduling event broadcast payload"""
+type SchedulingBroadcastEventPayload {
+  sessionId: ID!
+  creationId: String!
+  statusTransition: SchedulingStatus!
+  reason: String!
+}
+
+"""Status of session scheduling transitions"""
+enum SchedulingStatus {
+  PENDING
+  SCHEDULED
+  PREPARING
+  PULLING
+  PREPARED
+  CREATING
+  RUNNING
+  TERMINATING
+  TERMINATED
+  CANCELLED
+  ERROR
+}
+
 """Different service configurations for model runtime"""
 union ServiceConfig = RawServiceConfig
 
@@ -1300,6 +1323,11 @@ type Subscription {
   artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
+
+  """
+  Subscribe to real-time scheduling events for a specific session. Streams status transition events during the session lifecycle (PENDING → SCHEDULED → PREPARING → RUNNING → TERMINATED). Added in 25.15.0.
+  """
+  schedulingEventsBySession(sessionId: ID!): SchedulingBroadcastEventPayload!
 }
 
 scalar UUID

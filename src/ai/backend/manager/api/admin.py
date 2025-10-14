@@ -64,6 +64,7 @@ class CustomGraphQLView(GraphQLView):
         return StrawberryGQLContext(
             processors=root_context.processors,
             config_provider=root_context.config_provider,
+            event_hub=root_context.event_hub,
         )
 
 

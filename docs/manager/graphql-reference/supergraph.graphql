@@ -5194,6 +5194,33 @@ type ScanArtifactsPayload
   artifacts: [Artifact!]!
 }
 
+"""Added in 25.15.0. Scheduling event broadcast payload"""
+type SchedulingBroadcastEventPayload
+  @join__type(graph: STRAWBERRY)
+{
+  sessionId: ID!
+  creationId: String!
+  statusTransition: SchedulingStatus!
+  reason: String!
+}
+
+"""Status of session scheduling transitions"""
+enum SchedulingStatus
+  @join__type(graph: STRAWBERRY)
+{
+  PENDING @join__enumValue(graph: STRAWBERRY)
+  SCHEDULED @join__enumValue(graph: STRAWBERRY)
+  PREPARING @join__enumValue(graph: STRAWBERRY)
+  PULLING @join__enumValue(graph: STRAWBERRY)
+  PREPARED @join__enumValue(graph: STRAWBERRY)
+  CREATING @join__enumValue(graph: STRAWBERRY)
+  RUNNING @join__enumValue(graph: STRAWBERRY)
+  TERMINATING @join__enumValue(graph: STRAWBERRY)
+  TERMINATED @join__enumValue(graph: STRAWBERRY)
+  CANCELLED @join__enumValue(graph: STRAWBERRY)
+  ERROR @join__enumValue(graph: STRAWBERRY)
+}
+
 """
 Added in 24.12.0. A string value in the format '<SCOPE_TYPE>:<SCOPE_ID>'. <SCOPE_TYPE> should be one of [system, domain, project, user]. <SCOPE_ID> should be the ID value of the scope. e.g. `domain:default`, `user:123e4567-e89b-12d3-a456-426614174000`.
 """
@@ -5400,6 +5427,11 @@ type Subscription
   artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
+
+  """
+  Subscribe to real-time scheduling events for a specific session. Streams status transition events during the session lifecycle (PENDING → SCHEDULED → PREPARING → RUNNING → TERMINATED). Added in 25.15.0.
+  """
+  schedulingEventsBySession(sessionId: ID!): SchedulingBroadcastEventPayload!
 }
 
 """Added in 25.5.0."""
