@@ -9,7 +9,7 @@ import tempfile
 from collections.abc import AsyncIterator
 from http import HTTPStatus
 from pathlib import Path
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, Optional, Tuple, override
 
 import aiofiles
 import aiofiles.os
@@ -37,7 +37,7 @@ from .types import CORSOptions, WebMiddleware
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class VFSFileDownloadClientStreamReader(StreamReader):
+class VFSDirectoryDownloadClientStreamReader(StreamReader):
     """StreamReader implementation for VFS file downloads from storage proxy."""
 
     def __init__(
@@ -59,12 +59,11 @@ class VFSFileDownloadClientStreamReader(StreamReader):
         guessed_type, _ = mimetypes.guess_type(filepath)
         self._guessed_content_type = guessed_type
 
+    @override
     def content_type(self) -> Optional[str]:
-        """Return the content type for this download."""
-        # Return actual content type from response if available,
-        # otherwise return guessed type
-        return self._content_type or self._guessed_content_type or "application/octet-stream"
+        return "application/x-tar"
 
+    @override
     async def read(self) -> AsyncIterator[bytes]:
         """Stream file content from storage proxy."""
         try:
@@ -86,18 +85,8 @@ class VFSFileDownloadClientStreamReader(StreamReader):
                 # Get actual content type from response
                 self._content_type = resp.headers.get("Content-Type", self._guessed_content_type)
 
-                # Check if this is a tar file
-                is_tar_file = (
-                    self._filepath.endswith(".tar") or self._content_type == "application/x-tar"
-                )
-
-                if is_tar_file:
-                    # Stream to temp file first, then extract
-                    yield await self._download_and_extract_tar(resp)
-                else:
-                    # Normal streaming without extraction
-                    async for chunk in self._stream_content(resp):
-                        yield chunk
+                # Stream to temp file first, then extract
+                yield await self._download_and_extract_tar(resp)
 
         except Exception as e:
             # Error setting up the connection
@@ -253,7 +242,7 @@ class APIHandler:
             manager_client = storage_manager.get_manager_facing_client(proxy_name)
 
             # Create stream reader for the download
-            stream_reader = VFSFileDownloadClientStreamReader(
+            stream_reader = VFSDirectoryDownloadClientStreamReader(
                 storage_proxy_client=manager_client,
                 storage_name=storage_name,
                 req=req,

@@ -33,7 +33,7 @@ from ai.backend.storage.utils import normalize_filepath
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
-class VFSDirectoryDownloadStreamReader(StreamReader):
+class VFSDirectoryDownloadServerStreamReader(StreamReader):
     """Stream reader that creates a tar archive of a directory on-the-fly."""
 
     def __init__(self, directory_path: Path, chunk_size: int) -> None:
@@ -71,6 +71,10 @@ class VFSDirectoryDownloadStreamReader(StreamReader):
                 await aiofiles.os.remove(self._temp_file)
                 log.debug(f"Cleaned up temp file: {self._temp_file}")
 
+    @override
+    def content_type(self) -> Optional[str]:
+        return "application/x-tar"
+
     def _create_tar_archive(self, source_dir: str, tar_path: str) -> None:
         """Create tar archive of directory contents."""
         try:
@@ -81,10 +85,6 @@ class VFSDirectoryDownloadStreamReader(StreamReader):
         except Exception as e:
             log.error(f"Failed to create tar archive: {e}")
             raise
-
-    @override
-    def content_type(self) -> Optional[str]:
-        return "application/x-tar"
 
 
 class VFSStorage(AbstractStorage):
@@ -212,7 +212,9 @@ class VFSStorage(AbstractStorage):
 
             if target_path.is_dir():
                 # Handle directory download as tar archive
-                return VFSDirectoryDownloadStreamReader(target_path, self._download_chunk_size)
+                return VFSDirectoryDownloadServerStreamReader(
+                    target_path, self._download_chunk_size
+                )
             else:
                 raise FileStreamDownloadError(f"Path is neither a file nor a directory: {filepath}")
 
