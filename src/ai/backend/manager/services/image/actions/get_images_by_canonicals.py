@@ -27,9 +27,10 @@ class GetImagesByCanonicalsAction(ImageAction):
 
 
 @dataclass
+# TODO: Refactor dataclass with BatchActionResult
 class GetImagesByCanonicalsActionResult(BaseActionResult):
     images_with_agent_install_status: list[ImageWithAgentInstallStatus]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.images_with_agent_install_status[0].image.id)
+        return None
