@@ -9620,6 +9620,84 @@
         "parameters": [],
         "description": "\n**Preconditions:**\n* User privilege required.\n"
       }
+    },
+    "/vfs-storages/{storage_name}/download": {
+      "post": {
+        "operationId": "vfs-storages.download_file",
+        "tags": [
+          "vfs-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "storage_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nDownload artifact directory from VFS storage via storage proxy streaming.\n\nArgs:\n    path: Path parameters including storage name\n    body: Request body with file path\n\nReturns:\n    APIStreamResponse with StreamReader body\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/vfs-storages/{storage_name}": {
+      "get": {
+        "operationId": "vfs-storages.get_storage",
+        "tags": [
+          "vfs-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "storage_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nGet VFS storage information by storage name.\n\nArgs:\n    path: Path parameters including storage name\n\nReturns:\n    APIResponse with storage information\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/vfs-storages/": {
+      "get": {
+        "operationId": "vfs-storages.list_storages",
+        "tags": [
+          "vfs-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\nList all VFS storages.\n\nReturns:\n    APIResponse with storage information\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
     }
   }
 }

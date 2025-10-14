@@ -9,7 +9,8 @@ from ai.backend.manager.services.vfs_storage.actions.base import VFSStorageActio
 
 @dataclass
 class GetVFSStorageAction(VFSStorageAction):
-    storage_id: uuid.UUID
+    storage_id: Optional[uuid.UUID] = None
+    storage_name: Optional[str] = None
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -1,14 +1,19 @@
 import asyncio
 import logging
 import mimetypes
+import tarfile
+import tempfile
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from pathlib import Path
+from typing import Any, Optional, cast, override
+
+import aiofiles
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.common.data.storage.registries.types import ModelTarget
+from ai.backend.common.data.storage.registries.types import FileObjectData, ModelTarget
 from ai.backend.common.data.storage.types import (
     ArtifactStorageImportStep,
 )
@@ -16,6 +21,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.artifact.anycast import ModelImportDoneEvent
 from ai.backend.common.types import DispatchResult, StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.storage.client.manager import ManagerHTTPClient, ManagerHTTPClientArgs
 from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.unified import (
     ReservoirConfig,
@@ -35,11 +41,103 @@ from ai.backend.storage.services.artifacts.types import (
     ImportStep,
     ImportStepContext,
 )
+from ai.backend.storage.storages.base import AbstractStorage
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool
+from ai.backend.storage.storages.vfs_storage import VFSStorage
 from ai.backend.storage.types import BucketCopyOptions
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+class ReservoirVFSDownloadStreamReader(StreamReader):
+    """StreamReader that wraps ManagerHTTPClient VFS download stream."""
+
+    _client: ManagerHTTPClient
+    _storage_name: str
+    _filepath: str
+
+    def __init__(
+        self,
+        client: ManagerHTTPClient,
+        storage_name: str,
+        filepath: str,
+    ):
+        self._client = client
+        self._storage_name = storage_name
+        self._filepath = filepath
+
+    @override
+    async def read(self) -> AsyncIterator[bytes]:
+        async for chunk in self._client.download_vfs_file_streaming(
+            self._storage_name, self._filepath
+        ):
+            yield chunk
+
+    @override
+    def content_type(self) -> Optional[str]:
+        return "application/x-tar"
+
+
+class TarExtractor:
+    """Simple tar extractor that downloads and extracts VFS tar files."""
+
+    _stream_reader: StreamReader
+
+    def __init__(self, stream_reader: StreamReader):
+        self._stream_reader = stream_reader
+
+    async def extract_to(self, target_dir: Path) -> int:
+        """
+        Download tar file to temp location and extract to target directory.
+
+        Args:
+            target_dir: Directory where to extract the tar contents
+
+        Returns:
+            int: Total size of downloaded file in bytes
+        """
+        temp_file = None
+        bytes_downloaded = 0
+
+        try:
+            # Create temporary file for tar
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".tar") as tf:
+                temp_file = Path(tf.name)
+                log.debug(f"Downloading artifact tar to temp directory: {temp_file}")
+
+                # Download to temp file
+                async with aiofiles.open(temp_file, "wb") as f:
+                    async for chunk in self._stream_reader.read():
+                        await f.write(chunk)
+                        bytes_downloaded += len(chunk)
+
+                log.debug(f"Downloaded {bytes_downloaded} bytes to {temp_file}")
+
+            # Ensure target directory exists
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            # Extract tar file in executor to avoid blocking
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self._extract_tar, temp_file, target_dir)
+
+            log.info(f"Successfully extracted artifact tar to: {target_dir}")
+            return bytes_downloaded
+
+        finally:
+            # Clean up temp file
+            if temp_file and temp_file.exists():
+                try:
+                    temp_file.unlink()
+                    log.debug(f"Cleaned up temp file: {temp_file}")
+                except Exception as e:
+                    log.warning(f"Failed to remove temp file {temp_file}: {e}")
+
+    def _extract_tar(self, tar_path: Path, target_dir: Path) -> None:
+        """Extract tar archive to target directory."""
+        with tarfile.open(tar_path, "r") as tar:
+            tar.extractall(path=target_dir)
+        log.debug(f"Tar extraction completed: {tar_path} -> {target_dir}")
 
 
 @dataclass
@@ -242,10 +340,13 @@ class ReservoirService:
 
 
 class ReservoirDownloadStep(ImportStep[None]):
-    """Step to copy files from Reservoir (effectively direct copy to archive)"""
+    """Step to copy files from Reservoir (effectively direct copy to download storage)"""
 
-    def __init__(self, registry_configs: dict[str, ReservoirConfig]) -> None:
+    def __init__(
+        self, registry_configs: dict[str, ReservoirConfig], download_storage: AbstractStorage
+    ) -> None:
         self._registry_configs = registry_configs
+        self._download_storage = download_storage
 
     @property
     def step_type(self) -> ArtifactStorageImportStep:
@@ -253,45 +354,157 @@ class ReservoirDownloadStep(ImportStep[None]):
 
     @override
     async def execute(self, context: ImportStepContext, input_data: None) -> DownloadStepResult:
-        # For Reservoir, copy directly to archive storage in download step
-        archive_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
-        if not archive_storage_name:
-            raise StorageStepRequiredStepNotProvided("No storage mapping provided for ARCHIVE step")
+        # Get storage mapping for download step
+        download_storage_name = context.storage_step_mappings.get(
+            ArtifactStorageImportStep.DOWNLOAD
+        )
+        if not download_storage_name:
+            raise StorageStepRequiredStepNotProvided("Download storage not specified in mappings")
 
-        # Find matching reservoir config
-        reservoir_config = self._registry_configs.get(context.registry_name)
-        if not reservoir_config:
+        # Get registry configuration
+        registry_config = self._registry_configs.get(context.registry_name)
+        if not registry_config:
             raise ReservoirStorageConfigInvalidError(
-                f"No reservoir registry configuration found for: {context.registry_name}"
+                f"Registry configuration not found for: {context.registry_name}"
             )
 
-        revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
-        key_prefix = f"{context.model.model_id}/{revision}"
+        # Get the registry record to check storage_name
+        # For now, we'll assume the storage_name from the registry configuration
+        # In a real implementation, you'd query the database to get this information
+        model = context.model
+        revision = model.resolve_revision(ArtifactRegistryType.RESERVOIR)
+        model_prefix = f"{model.model_id}/{revision}"
 
-        # Direct copy from Reservoir S3 to archive storage
-        bytes_copied = await self._stream_bucket_to_bucket(
-            source_cfg=reservoir_config,
-            storage_name=archive_storage_name,
-            storage_pool=context.storage_pool,
-            options=BucketCopyOptions(concurrency=1, progress_log_interval_bytes=0),
-            progress_reporter=context.progress_reporter,
-            key_prefix=key_prefix,
-        )
+        # Determine storage type based on the actual download storage object type
+        if isinstance(self._download_storage, VFSStorage):
+            storage_type = "vfs"
+        elif isinstance(self._download_storage, ObjectStorage):
+            storage_type = "object_storage"
+        else:
+            storage_type = "unknown"
+
+        bytes_copied = 0
+        downloaded_files: list[tuple[FileObjectData, str]] = []
+
+        if storage_type == "vfs":
+            # Handle VFS storage type
+            dest_path = (
+                cast(VFSStorage, self._download_storage).base_path / model.model_id / revision
+            )
+            bytes_copied = await self._handle_vfs_download(
+                registry_config, context, model_prefix, dest_path
+            )
+            # For VFS downloads, create a single entry representing the extracted archive
+            file_obj = FileObjectData(
+                path=str(dest_path),
+                size=bytes_copied,
+                type="directory",
+                download_url="",  # Not applicable for VFS
+            )
+            downloaded_files.append((file_obj, model_prefix))
+        # TODO: This only make sense when both storage are ObjectStorage
+        elif storage_type == "object_storage":
+            # Handle object storage type
+            downloaded_files, bytes_copied = await self._handle_object_storage_download(
+                registry_config, download_storage_name, context, model_prefix
+            )
+        else:
+            raise ReservoirStorageConfigInvalidError(
+                f"Unsupported storage type: {storage_type} (storage class: {type(self._download_storage)})"
+            )
 
         log.info(f"Reservoir copy completed: {context.model}, bytes_copied={bytes_copied}")
 
-        # Return virtual file list for Reservoir (actual file info unknown)
         return DownloadStepResult(
-            downloaded_files=[],  # Reservoir doesn't track individual file info
-            storage_name=archive_storage_name,  # Copied directly to archive
+            downloaded_files=downloaded_files,
+            storage_name=download_storage_name,  # Downloaded to download storage
             total_bytes=bytes_copied,
         )
 
+    async def _handle_vfs_download(
+        self,
+        registry_config: ReservoirConfig,
+        context: ImportStepContext,
+        model_prefix: str,
+        dest_path: Path,
+    ) -> int:
+        """Handle file downloads for VFS storage type using ManagerHTTPClient."""
+
+        # Use the pre-resolved download storage object
+        storage = self._download_storage
+        if not isinstance(storage, VFSStorage):
+            raise StorageNotFoundError(
+                f"Download storage is not a VFS storage type: {type(storage)}"
+            )
+
+        try:
+            if (
+                not registry_config.manager_endpoint
+                or not registry_config.manager_access_key
+                or not registry_config.manager_secret_key
+                or not registry_config.manager_api_version
+            ):
+                raise ReservoirStorageConfigInvalidError(
+                    f"Manager access key not configured for reservoir registry: {context.registry_name}"
+                )
+
+            # Create ManagerHTTPClient from config
+            manager_client = ManagerHTTPClient(
+                ManagerHTTPClientArgs(
+                    name=context.registry_name,
+                    endpoint=registry_config.manager_endpoint,
+                    access_key=registry_config.manager_access_key,
+                    secret_key=registry_config.manager_secret_key,
+                    api_version=registry_config.manager_api_version,
+                )
+            )
+
+            if not registry_config.storage_name:
+                raise ReservoirStorageConfigInvalidError(
+                    f"Reservoir registry storage name not configured: {context.registry_name}"
+                )
+
+            # Create stream reader that uses ManagerHTTPClient
+            data_stream = ReservoirVFSDownloadStreamReader(
+                client=manager_client,
+                storage_name=registry_config.storage_name,
+                filepath=model_prefix,
+            )
+
+            # Stream the file from reservoir VFS to target VFS storage
+            return await TarExtractor(data_stream).extract_to(dest_path)
+
+        except Exception as e:
+            log.error(f"VFS download failed for {model_prefix}: {str(e)}")
+            raise
+
+    async def _handle_object_storage_download(
+        self,
+        registry_config: ReservoirConfig,
+        download_storage_name: str,
+        context: ImportStepContext,
+        model_prefix: str,
+    ) -> tuple[list[tuple[FileObjectData, str]], int]:
+        """Handle file downloads for object storage type."""
+        # Use existing object storage download logic
+        options = BucketCopyOptions(
+            concurrency=4,
+            progress_log_interval_bytes=8 * 1024 * 1024,  # 8MB intervals
+        )
+
+        downloaded_files, bytes_copied = await self._stream_bucket_to_bucket(
+            source_cfg=registry_config,
+            storage_name=download_storage_name,
+            storage_pool=context.storage_pool,
+            options=options,
+            progress_reporter=context.progress_reporter,
+            key_prefix=model_prefix,
+        )
+
+        return downloaded_files, bytes_copied
+
     def _get_s3_client(self, storage_pool: StoragePool, storage_name: str) -> tuple[S3Client, str]:
         """Get S3 client for the specified storage"""
-        if not storage_pool:
-            raise StorageNotFoundError("Storage pool not configured")
-
         # Get storage from pool and verify it's ObjectStorage type
         try:
             storage = storage_pool.get_storage(storage_name)
@@ -329,7 +542,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         options: BucketCopyOptions,
         progress_reporter: Optional[ProgressReporter],
         key_prefix: Optional[str] = None,
-    ) -> int:
+    ) -> tuple[list[tuple[FileObjectData, str]], int]:
         """Direct copy from Reservoir S3 to target storage"""
         dst_client, bucket_name = self._get_s3_client(storage_pool, storage_name)
 
@@ -420,7 +633,20 @@ class ReservoirDownloadStep(ImportStep[None]):
         log.trace(
             "[stream_bucket_to_bucket] all done objects={} total_bytes={}", copied, total_bytes
         )
-        return bytes_copied
+
+        # Build downloaded files list
+        downloaded_files: list[tuple[FileObjectData, str]] = []
+        for key in target_keys:
+            size = size_map.get(key, 0)
+            file_obj = FileObjectData(
+                path=key,
+                size=size,
+                type="file",
+                download_url="",  # Not applicable for reservoir
+            )
+            downloaded_files.append((file_obj, key))
+
+        return downloaded_files, bytes_copied
 
     async def _list_all_keys_and_sizes(
         self,
@@ -474,28 +700,26 @@ class ReservoirDownloadStep(ImportStep[None]):
 
     @override
     async def cleanup_on_failure(self, context: ImportStepContext) -> None:
-        """Clean up failed files from archive storage"""
-        archive_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
-        if not archive_storage_name:
-            return
-
+        """Clean up failed files from download storage"""
         revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
         model_prefix = f"{context.model.model_id}/{revision}"
 
         try:
-            storage = context.storage_pool.get_storage(archive_storage_name)
-            await storage.delete_file(model_prefix)
+            await self._download_storage.delete_file(model_prefix)
             log.info(
-                f"[cleanup] Removed failed reservoir copy: {archive_storage_name}:{model_prefix}"
+                f"[cleanup] Removed failed reservoir copy from download storage: {model_prefix}"
             )
         except Exception as e:
             log.warning(
-                f"[cleanup] Failed to cleanup reservoir copy: {archive_storage_name}:{model_prefix}: {str(e)}"
+                f"[cleanup] Failed to cleanup reservoir copy from download storage: {model_prefix}: {str(e)}"
             )
 
 
 class ReservoirArchiveStep(ImportStep[DownloadStepResult]):
-    """Reservoir archive step - no-op since files are already copied to archive in download step"""
+    """Step to move downloaded files to archive storage"""
+
+    def __init__(self, transfer_manager: StorageTransferManager) -> None:
+        self._transfer_manager = transfer_manager
 
     @property
     def step_type(self) -> ArtifactStorageImportStep:
@@ -503,30 +727,78 @@ class ReservoirArchiveStep(ImportStep[DownloadStepResult]):
 
     @override
     async def execute(self, context: ImportStepContext, input_data: DownloadStepResult) -> None:
-        # For Reservoir, files are already copied to archive storage in download step
+        download_storage = input_data.storage_name
+        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
+
+        if not archive_storage:
+            raise StorageStepRequiredStepNotProvided("No storage mapping provided for ARCHIVE step")
+
+        # No need to move if download and archive storage are the same
+        if download_storage == archive_storage:
+            log.info(
+                f"Archive step skipped - download and archive storage are the same: {archive_storage}"
+            )
+            return
+
+        log.info(f"Starting archive transfer: {download_storage} -> {archive_storage}")
+
+        # Move each file from download storage to archive storage
+        archieved_file_cnt = 0
+        for file_info, storage_key in input_data.downloaded_files:
+            archieved_file_cnt += await self._transfer_manager.transfer_directory(
+                source_storage_name=download_storage,
+                dest_storage_name=archive_storage,
+                source_prefix=storage_key,
+                dest_prefix=storage_key,
+            )
+            log.debug(f"Transferred file to archive: {storage_key}")
+
         log.info(
-            f"Archive step for reservoir - already copied to archive storage: {input_data.storage_name}"
+            f"Archive transfer completed: {download_storage} -> {archive_storage}, "
+            f"files={archieved_file_cnt}"
         )
 
     @override
     async def cleanup_on_failure(self, context: ImportStepContext) -> None:
-        """Reservoir archive cleanup - already handled in download step"""
-        # ReservoirDownloadStep already handles cleanup, so this is no-op
-        pass
+        """Clean up failed files from archive storage"""
+        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
+        if not archive_storage:
+            return
+
+        # Delete entire model (cleaning up individual files is complex)
+        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+        model_prefix = f"{context.model.model_id}/{revision}"
+
+        try:
+            storage = context.storage_pool.get_storage(archive_storage)
+            await storage.delete_file(model_prefix)
+            log.info(f"[cleanup] Removed failed archive: {archive_storage}:{model_prefix}")
+        except Exception as e:
+            log.warning(
+                f"[cleanup] Failed to cleanup archive: {archive_storage}:{model_prefix}: {str(e)}"
+            )
 
 
 def create_reservoir_import_pipeline(
+    storage_pool: StoragePool,
     registry_configs: dict[str, Any],
     storage_step_mappings: dict[ArtifactStorageImportStep, str],
+    transfer_manager: StorageTransferManager,
 ) -> ImportPipeline:
     """Create ImportPipeline for Reservoir based on storage step mappings."""
     steps: list[ImportStep[Any]] = []
 
     # Add steps based on what's present in storage_step_mappings
     if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:
-        steps.append(ReservoirDownloadStep(registry_configs))
+        # Get the download storage object from the pool
+        download_storage_name = storage_step_mappings.get(ArtifactStorageImportStep.DOWNLOAD)
+        if not download_storage_name:
+            raise StorageStepRequiredStepNotProvided("Download storage not specified in mappings")
+
+        download_storage = storage_pool.get_storage(download_storage_name)
+        steps.append(ReservoirDownloadStep(registry_configs, download_storage))
 
     if ArtifactStorageImportStep.ARCHIVE in storage_step_mappings:
-        steps.append(ReservoirArchiveStep())
+        steps.append(ReservoirArchiveStep(transfer_manager))
 
     return ImportPipeline(steps)

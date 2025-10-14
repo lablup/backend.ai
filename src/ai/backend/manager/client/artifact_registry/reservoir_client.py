@@ -18,6 +18,8 @@ from ai.backend.manager.dto.response import (
     DelegateImportArtifactsResponse,
     DelegateScanArtifactsResponse,
     GetArtifactRevisionReadmeResponse,
+    GetVFSStorageResponse,
+    ListVFSStorageResponse,
     SearchArtifactsResponse,
 )
 
@@ -102,3 +104,11 @@ class ReservoirRegistryClient:
     ) -> GetArtifactRevisionReadmeResponse:
         resp = await self._request("GET", f"/artifacts/revisions/{artifact_revision_id}/readme")
         return GetArtifactRevisionReadmeResponse.model_validate(resp)
+
+    async def get_vfs_storage(self, storage_name: str) -> GetVFSStorageResponse:
+        resp = await self._request("GET", f"/vfs-storages/{storage_name}")
+        return GetVFSStorageResponse.model_validate(resp)
+
+    async def list_vfs_storages(self) -> ListVFSStorageResponse:
+        resp = await self._request("GET", "/vfs-storages")
+        return ListVFSStorageResponse.model_validate(resp)

@@ -838,6 +838,55 @@ class ReservoirConfig(BaseConfigSchema):
         serialization_alias="object-storage-region",
     )
 
+    manager_endpoint: Optional[str] = Field(
+        default=None,
+        description="""
+        Custom endpoint for the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        examples=["https://manager.reservoir.ai"],
+        validation_alias=AliasChoices("manager-endpoint", "manager_endpoint"),
+        serialization_alias="manager-endpoint",
+    )
+    manager_access_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Access key for authenticating with the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        validation_alias=AliasChoices("manager-access-key", "manager_access_key"),
+        serialization_alias="manager-access-key",
+    )
+    manager_secret_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Secret key for authenticating with the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        validation_alias=AliasChoices("manager-secret-key", "manager_secret_key"),
+        serialization_alias="manager-secret-key",
+    )
+    manager_api_version: Optional[str] = Field(
+        default=None,
+        description="""
+        API version for the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        examples=["v1"],
+        validation_alias=AliasChoices("manager-api-version", "manager_api_version"),
+        serialization_alias="manager-api-version",
+    )
+    storage_name: Optional[str] = Field(
+        default=None,
+        description="""
+        Name of the object storage configuration to use with the reservoir registry.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        examples=["s3-storage", "vfs-storage"],
+        validation_alias=AliasChoices("storage-name", "storage_name"),
+        serialization_alias="storage-name",
+    )
+
 
 class LegacyReservoirConfig(ReservoirConfig):
     registry_type: Literal["reservoir"] = Field(

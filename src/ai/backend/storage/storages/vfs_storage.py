@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import mimetypes
+import logging
 import shutil
+import tarfile
+import tempfile
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Optional, override
@@ -16,6 +18,7 @@ from ai.backend.common.dto.storage.response import (
     VFSFileMetaResponse,
 )
 from ai.backend.common.types import StreamReader
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.config.unified import VFSStorageConfig
 from ai.backend.storage.exception import (
     FileStreamDownloadError,
@@ -27,25 +30,92 @@ from ai.backend.storage.exception import (
 from ai.backend.storage.storages.base import AbstractStorage
 from ai.backend.storage.utils import normalize_filepath
 
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
-class VFSDownloadStreamReader(StreamReader):
-    def __init__(self, file_path: Path, chunk_size: int, content_type: Optional[str]) -> None:
+
+class VFSFileDownloadServerStreamReader(StreamReader):
+    """Stream reader that creates a tar archive of a directory on-the-fly."""
+
+    _file_path: Path
+    _chunk_size: int
+
+    def __init__(self, file_path: Path, chunk_size: int) -> None:
         self._file_path = file_path
         self._chunk_size = chunk_size
-        self._content_type = content_type
 
     @override
     async def read(self) -> AsyncIterator[bytes]:
+        """Create a tar archive of the directory and stream it."""
         async with aiofiles.open(self._file_path, "rb") as f:
+            bytes_streamed = 0
             while True:
                 chunk = await f.read(self._chunk_size)
                 if not chunk:
                     break
+                bytes_streamed += len(chunk)
                 yield chunk
 
     @override
     def content_type(self) -> Optional[str]:
-        return self._content_type
+        return "application/octet-stream"
+
+
+class VFSDirectoryDownloadServerStreamReader(StreamReader):
+    """Stream reader that creates a tar archive of a directory on-the-fly."""
+
+    _directory_path: Path
+    _chunk_size: int
+    _temp_file: Optional[Path]
+
+    def __init__(self, directory_path: Path, chunk_size: int) -> None:
+        self._directory_path = directory_path
+        self._chunk_size = chunk_size
+        self._temp_file = None
+
+    @override
+    async def read(self) -> AsyncIterator[bytes]:
+        """Create a tar archive of the directory and stream it."""
+        loop = asyncio.get_running_loop()
+
+        # Create temporary file for the tar archive
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".tar") as temp_file:
+            self._temp_file = Path(temp_file.name)
+
+            # Create tar archive in executor to avoid blocking
+            await loop.run_in_executor(
+                None, self._create_tar_archive, str(self._directory_path), str(self._temp_file)
+            )
+
+        try:
+            # Stream the tar file
+            async with aiofiles.open(self._temp_file, "rb") as f:
+                bytes_streamed = 0
+                while True:
+                    chunk = await f.read(self._chunk_size)
+                    if not chunk:
+                        break
+                    bytes_streamed += len(chunk)
+                    yield chunk
+        finally:
+            # Clean up temp file
+            if self._temp_file and self._temp_file.exists():
+                await aiofiles.os.remove(self._temp_file)
+                log.debug(f"Cleaned up temp file: {self._temp_file}")
+
+    @override
+    def content_type(self) -> Optional[str]:
+        return "application/x-tar"
+
+    def _create_tar_archive(self, source_dir: str, tar_path: str) -> None:
+        """Create tar archive of directory contents."""
+        try:
+            log.debug(f"Creating tar archive: {source_dir} -> {tar_path}")
+            with tarfile.open(tar_path, "w") as tar:
+                tar.add(source_dir, arcname=".", recursive=True)
+            log.debug(f"Tar archive created successfully: {tar_path}")
+        except Exception as e:
+            log.error(f"Failed to create tar archive: {e}")
+            raise
 
 
 class VFSStorage(AbstractStorage):
@@ -66,12 +136,11 @@ class VFSStorage(AbstractStorage):
         if cfg.subpath:
             base_path = base_path / cfg.subpath
         self._base_path = base_path
+        # Ensure base path exists
+        self._base_path.mkdir(parents=True, exist_ok=True)
         self._upload_chunk_size = cfg.upload_chunk_size
         self._download_chunk_size = cfg.download_chunk_size
         self._max_file_size = cfg.max_file_size
-
-        # Ensure base path exists
-        self._base_path.mkdir(parents=True, exist_ok=True)
 
     @property
     def name(self) -> str:
@@ -121,7 +190,6 @@ class VFSStorage(AbstractStorage):
         Args:
             filepath: Path to the file to upload (relative to base_path)
             data_stream: Async iterator of file data chunks
-            content_type: Content type of the file (ignored for VFS)
         """
         try:
             # Validate constraints first
@@ -156,27 +224,27 @@ class VFSStorage(AbstractStorage):
     @override
     async def stream_download(self, filepath: str) -> StreamReader:
         """
-        Download a file from VFS using streaming.
+        Download a file or directory from VFS using streaming.
 
         Args:
-            filepath: Path to the file to download (relative to base_path)
+            filepath: Path to the file or directory to download (relative to base_path)
 
         Returns:
-            FileStream: Stream for reading file data
+            StreamReader: Stream for reading file data or tar archive for directories
         """
         try:
             target_path = self._resolve_path(filepath)
 
             if not target_path.exists():
-                raise StorageBucketFileNotFoundError(f"File not found: {filepath}")
+                raise FileStreamDownloadError(f"Path not found: {filepath}")
 
-            if not target_path.is_file():
-                raise FileStreamDownloadError(f"Path is not a file: {filepath}")
-
-            ctype = mimetypes.guess_type(str(target_path))[0] or "application/octet-stream"
-            return VFSDownloadStreamReader(
-                target_path, self._download_chunk_size, content_type=ctype
-            )
+            if target_path.is_dir():
+                # Handle directory download as tar archive
+                return VFSDirectoryDownloadServerStreamReader(
+                    target_path, self._download_chunk_size
+                )
+            else:
+                return VFSFileDownloadServerStreamReader(target_path, self._download_chunk_size)
 
         except Exception as e:
             raise FileStreamDownloadError(f"Download failed: {str(e)}") from e
@@ -254,6 +322,7 @@ class VFSStorage(AbstractStorage):
         except Exception as e:
             raise FileStreamUploadError(f"Delete failed: {str(e)}") from e
 
+    # TODO: Make type
     async def list_directory(self, directory: str) -> list[dict]:
         """
         List files and directories in a directory.

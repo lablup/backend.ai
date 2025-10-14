@@ -19,6 +19,7 @@ from ai.backend.common.dto.storage.request import (
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
     ReservoirImportModelsReq,
+    VFSDownloadFileReq,
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
@@ -833,3 +834,23 @@ class StorageProxyManagerFacingClient:
             f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object",
             body=req.model_dump(by_alias=True),
         )
+
+    @actxmgr
+    async def download_vfs_file_streaming(
+        self,
+        storage_name: str,
+        req: VFSDownloadFileReq,
+    ) -> AsyncIterator[aiohttp.ClientResponse]:
+        """
+        Download a file from VFS storage using streaming.
+
+        :param storage_name: Name of the VFS storage
+        :param req: VFS download file request
+        :return: Streaming response from the storage proxy
+        """
+        async with self._client.request_stream_response(
+            "POST",
+            f"v1/storages/vfs/{storage_name}/download",
+            body=req.model_dump(by_alias=True),
+        ) as response_stream:
+            yield response_stream

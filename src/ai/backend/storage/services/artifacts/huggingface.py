@@ -124,13 +124,13 @@ def _make_download_progress_logger(
             eta_str = _fmt_eta(eta_sec)
 
             log.trace(
-                "[stream_hf2b] Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
+                "[stream_hf] Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
                     pct, offset / _MiB, total / _MiB, inst_mibs, eta_str
                 )
             )
         else:
             log.trace(
-                "[stream_hf2b] Downloading... {:,.1f} MiB (total unknown) inst={:.2f} MiB/s".format(
+                "[stream_hf] Downloading... {:,.1f} MiB (total unknown) inst={:.2f} MiB/s".format(
                     offset / _MiB, inst_mibs
                 )
             )
@@ -865,19 +865,17 @@ class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
             )
             return
 
-        log.info(
-            f"Starting archive transfer: {download_storage} -> {archive_storage}, "
-            f"files={len(input_data.downloaded_files)}"
-        )
+        log.info(f"Starting archive transfer: {download_storage} -> {archive_storage}")
 
+        archieved_file_cnt = 0
         # Move each file from download storage to archive storage
         for file_info, storage_key in input_data.downloaded_files:
             try:
-                await self._transfer_manager.transfer_file(
+                archieved_file_cnt += await self._transfer_manager.transfer_directory(
                     source_storage_name=download_storage,
                     dest_storage_name=archive_storage,
-                    source_path=storage_key,
-                    dest_path=storage_key,
+                    source_prefix=storage_key,
+                    dest_prefix=storage_key,
                 )
                 log.debug(f"Transferred file to archive: {storage_key}")
             except Exception as e:
@@ -886,7 +884,7 @@ class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
 
         log.info(
             f"Archive transfer completed: {download_storage} -> {archive_storage}, "
-            f"files={len(input_data.downloaded_files)}"
+            f"files={archieved_file_cnt}"
         )
 
     @override

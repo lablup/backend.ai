@@ -152,13 +152,13 @@ class ArtifactRevisionService:
         Returns: (storage_host, namespace_id, storage_name)
         """
         try:
-            storage_data = await self._object_storage_repository.get_by_name(storage_name)
+            object_storage_data = await self._object_storage_repository.get_by_name(storage_name)
             storage_namespace = (
                 await self._storage_namespace_repository.get_by_storage_and_namespace(
-                    storage_data.id, namespace
+                    object_storage_data.id, namespace
                 )
             )
-            return storage_data.host, storage_namespace.id, storage_data.name
+            return object_storage_data.host, storage_namespace.id, object_storage_data.name
         except Exception:
             vfs_storage_data = await self._vfs_storage_repository.get_by_name(storage_name)
             storage_namespace = (
