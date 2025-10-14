@@ -123,6 +123,26 @@ class ImageDBSource:
             raise ImageAliasNotFound(f"Image alias '{alias}' not found.")
         return image_alias_row
 
+    async def get_image_details_by_identifier(
+        self,
+        identifier: ImageIdentifier,
+        status_filter: Optional[list[ImageStatus]] = None,
+    ) -> ImageDataWithDetails:
+        try:
+            async with self._db.begin_readonly_session() as session:
+                image_row = await ImageRow.resolve(
+                    session,
+                    [
+                        identifier,
+                        ImageAlias(identifier.canonical),
+                    ],
+                    filter_by_statuses=status_filter,
+                )
+        except UnknownImageReference:
+            raise ImageNotFound
+        data = image_row.to_detailed_dataclass()
+        return data
+
     async def get_image_details_by_id(
         self,
         image_id: UUID,

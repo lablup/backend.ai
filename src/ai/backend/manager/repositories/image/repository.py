@@ -81,6 +81,34 @@ class ImageRepository:
         return await self._db_source.resolve_images_batch(identifier_lists)
 
     @image_repository_resilience.apply()
+    async def get_image_by_identifier(
+        self,
+        identifier: ImageIdentifier,
+        status_filter: Optional[list[ImageStatus]] = None,
+        requested_by_superadmin: bool = False,
+    ) -> ImageWithAgentStatus:
+        image_data: ImageDataWithDetails = await self._db_source.get_image_details_by_identifier(
+            identifier, status_filter
+        )
+        installed_agents: set[str] = set()
+        with suppress_with_log(
+            [Exception],
+            message=f"Failed to get agents for image {image_data.name}",
+        ):
+            installed_agents = await self._cache_source.get_agents_for_image(image_data.name)
+        hide_agents = (
+            False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
+        )
+
+        return ImageWithAgentStatus(
+            image=image_data,
+            agent_status=ImageAgentStatus(
+                installed=bool(installed_agents),
+                agent_names=[] if hide_agents else list(installed_agents),
+            ),
+        )
+
+    @image_repository_resilience.apply()
     async def get_image_by_id(
         self,
         image_id: UUID,

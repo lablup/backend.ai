@@ -26,11 +26,9 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
-from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AgentId,
     DispatchResult,
-    ImageAlias,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -60,6 +58,9 @@ from ai.backend.manager.services.image.actions.forget_image import (
 )
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
 from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
+from ai.backend.manager.services.image.actions.get_image_by_identifier import (
+    GetImageByIdentifierAction,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ImageModifier,
     ModifyImageAction,
@@ -79,7 +80,6 @@ from ai.backend.manager.types import OptionalState, TriState
 
 from ...data.image.types import ImageStatus, ImageType, ImageWithAgentStatus
 from ...defs import DEFAULT_IMAGE_ARCH
-from ...errors.image import ImageNotFound
 from ..base import (
     FilterExprArg,
     OrderExprArg,
@@ -348,19 +348,14 @@ class Image(graphene.ObjectType):
         architecture: str,
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Image:
-        try:
-            async with ctx.db.begin_readonly_session() as session:
-                image_row = await ImageRow.resolve(
-                    session,
-                    [
-                        ImageIdentifier(reference, architecture),
-                        ImageAlias(reference),
-                    ],
-                    filter_by_statuses=filter_by_statuses,
-                )
-        except UnknownImageReference:
-            raise ImageNotFound
-        return await cls.from_row(ctx, image_row)
+        result = await ctx.processors.image.get_image_by_identifier.wait_for_complete(
+            GetImageByIdentifierAction(
+                image_identifier=ImageIdentifier(reference, architecture),
+                user_role=ctx.user["role"],
+                image_status=filter_by_statuses,
+            )
+        )
+        return cls.from_image_with_agent_status(result.image_with_agent_status)
 
     @classmethod
     async def load_all(

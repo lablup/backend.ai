@@ -27,6 +27,10 @@ from ai.backend.manager.services.image.actions.get_image_by_id import (
     GetImageByIdAction,
     GetImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.get_image_by_identifier import (
+    GetImageByIdentifierAction,
+    GetImageByIdentifierActionResult,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
@@ -81,8 +85,14 @@ class ImageProcessors(AbstractProcessorPackage):
         ClearImageCustomResourceLimitActionResult,
     ]
     get_image_by_id: ActionProcessor[GetImageByIdAction, GetImageByIdActionResult]
+    get_image_by_identifier: ActionProcessor[
+        GetImageByIdentifierAction, GetImageByIdentifierActionResult
+    ]
 
     def __init__(self, service: ImageService, action_monitors: list[ActionMonitor]) -> None:
+        self.get_image_by_identifier = ActionProcessor(
+            service.get_image_by_identifier, action_monitors
+        )
         self.get_image_by_id = ActionProcessor(service.get_image_by_id, action_monitors)
         self.forget_image = ActionProcessor(service.forget_image, action_monitors)
         self.forget_image_by_id = ActionProcessor(service.forget_image_by_id, action_monitors)

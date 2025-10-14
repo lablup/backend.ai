@@ -37,6 +37,10 @@ from ai.backend.manager.services.image.actions.get_image_by_id import (
     GetImageByIdAction,
     GetImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.get_image_by_identifier import (
+    GetImageByIdentifierAction,
+    GetImageByIdentifierActionResult,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ModifyImageAction,
     ModifyImageActionResult,
@@ -87,6 +91,18 @@ class ImageService:
         self._agent_registry = agent_registry
         self._image_repository = image_repository
         self._admin_image_repository = admin_image_repository
+
+    async def get_image_by_identifier(
+        self, action: GetImageByIdentifierAction
+    ) -> GetImageByIdentifierActionResult:
+        image_with_agent_status: ImageWithAgentStatus = (
+            await self._image_repository.get_image_by_identifier(
+                action.image_identifier,
+                status_filter=action.image_status,
+                requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
+            )
+        )
+        return GetImageByIdentifierActionResult(image_with_agent_status=image_with_agent_status)
 
     async def get_image_by_id(self, action: GetImageByIdAction) -> GetImageByIdActionResult:
         image_with_agent_status: ImageWithAgentStatus = (
