@@ -4,7 +4,7 @@ from typing import Optional, override
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.image.types import (
     ImageStatus,
-    ImageWithAgentStatus,
+    ImageWithAgentInstallStatus,
 )
 from ai.backend.manager.data.user.types import UserRole
 from ai.backend.manager.services.image.actions.base import ImageAction
@@ -28,8 +28,8 @@ class GetImagesByCanonicalsAction(ImageAction):
 
 @dataclass
 class GetImagesByCanonicalsActionResult(BaseActionResult):
-    images_with_agent_status: list[ImageWithAgentStatus]
+    images_with_agent_install_status: list[ImageWithAgentInstallStatus]
 
     @override
     def entity_id(self) -> Optional[str]:
-        return str(self.images_with_agent_status[0].image.id)
+        return str(self.images_with_agent_install_status[0].image.id)

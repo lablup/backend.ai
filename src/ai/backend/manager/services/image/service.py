@@ -4,7 +4,7 @@ from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageAlias
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.image.types import ImageWithAgentStatus
+from ai.backend.manager.data.image.types import ImageWithAgentInstallStatus
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.image import (
     ImageIdentifier,
@@ -99,29 +99,33 @@ class ImageService:
     async def get_images_by_canonicals(
         self, action: GetImagesByCanonicalsAction
     ) -> GetImagesByCanonicalsActionResult:
-        images_with_agent_status: list[
-            ImageWithAgentStatus
+        images_with_agent_install_status: list[
+            ImageWithAgentInstallStatus
         ] = await self._image_repository.get_images_by_canonicals(
             action.image_canonicals,
             status_filter=action.image_status,
             requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
         )
-        return GetImagesByCanonicalsActionResult(images_with_agent_status=images_with_agent_status)
+        return GetImagesByCanonicalsActionResult(
+            images_with_agent_install_status=images_with_agent_install_status
+        )
 
     async def get_image_by_identifier(
         self, action: GetImageByIdentifierAction
     ) -> GetImageByIdentifierActionResult:
-        image_with_agent_status: ImageWithAgentStatus = (
+        image_with_agent_install_status: ImageWithAgentInstallStatus = (
             await self._image_repository.get_image_by_identifier(
                 action.image_identifier,
                 status_filter=action.image_status,
                 requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
             )
         )
-        return GetImageByIdentifierActionResult(image_with_agent_status=image_with_agent_status)
+        return GetImageByIdentifierActionResult(
+            image_with_agent_install_status=image_with_agent_install_status
+        )
 
     async def get_image_by_id(self, action: GetImageByIdAction) -> GetImageByIdActionResult:
-        image_with_agent_status: ImageWithAgentStatus = (
+        image_with_agent_install_status: ImageWithAgentInstallStatus = (
             await self._image_repository.get_image_by_id(
                 action.image_id,
                 load_aliases=True,
@@ -129,7 +133,9 @@ class ImageService:
                 requested_by_superadmin=(action.user_role == UserRole.SUPERADMIN),
             )
         )
-        return GetImageByIdActionResult(image_with_agent_status=image_with_agent_status)
+        return GetImageByIdActionResult(
+            image_with_agent_install_status=image_with_agent_install_status
+        )
 
     async def forget_image(self, action: ForgetImageAction) -> ForgetImageActionResult:
         if action.client_role == UserRole.SUPERADMIN:

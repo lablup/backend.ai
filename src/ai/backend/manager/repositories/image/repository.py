@@ -11,12 +11,12 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import ImageAlias
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import (
-    ImageAgentStatus,
+    ImageAgentInstallStatus,
     ImageAliasData,
     ImageData,
     ImageDataWithDetails,
     ImageStatus,
-    ImageWithAgentStatus,
+    ImageWithAgentInstallStatus,
     RescanImagesResult,
 )
 from ai.backend.manager.models.image import (
@@ -86,7 +86,7 @@ class ImageRepository:
         image_canonicals: list[str],
         status_filter: Optional[list[ImageStatus]] = None,
         requested_by_superadmin: bool = False,
-    ) -> list[ImageWithAgentStatus]:
+    ) -> list[ImageWithAgentInstallStatus]:
         images_data: list[ImageDataWithDetails] = await self._db_source.get_images_by_canonicals(
             image_canonicals, status_filter
         )
@@ -109,19 +109,19 @@ class ImageRepository:
             False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )
 
-        images_with_agent_status: list[ImageWithAgentStatus] = []
+        images_with_agent_install_status: list[ImageWithAgentInstallStatus] = []
         for image, installed_agents in zip(images_data, installed_agents_for_images):
-            images_with_agent_status.append(
-                ImageWithAgentStatus(
+            images_with_agent_install_status.append(
+                ImageWithAgentInstallStatus(
                     image=image,
-                    agent_status=ImageAgentStatus(
+                    agent_install_status=ImageAgentInstallStatus(
                         installed=bool(installed_agents),
                         agent_names=[] if hide_agents else list(installed_agents),
                     ),
                 )
             )
 
-        return images_with_agent_status
+        return images_with_agent_install_status
 
     @image_repository_resilience.apply()
     async def get_image_by_identifier(
@@ -129,7 +129,7 @@ class ImageRepository:
         identifier: ImageIdentifier,
         status_filter: Optional[list[ImageStatus]] = None,
         requested_by_superadmin: bool = False,
-    ) -> ImageWithAgentStatus:
+    ) -> ImageWithAgentInstallStatus:
         image_data: ImageDataWithDetails = await self._db_source.get_image_details_by_identifier(
             identifier, status_filter
         )
@@ -143,9 +143,9 @@ class ImageRepository:
             False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )
 
-        return ImageWithAgentStatus(
+        return ImageWithAgentInstallStatus(
             image=image_data,
-            agent_status=ImageAgentStatus(
+            agent_install_status=ImageAgentInstallStatus(
                 installed=bool(installed_agents),
                 agent_names=[] if hide_agents else list(installed_agents),
             ),
@@ -158,7 +158,7 @@ class ImageRepository:
         load_aliases: bool = False,
         status_filter: Optional[list[ImageStatus]] = None,
         requested_by_superadmin: bool = False,
-    ) -> ImageWithAgentStatus:
+    ) -> ImageWithAgentInstallStatus:
         image_data: ImageDataWithDetails = await self._db_source.get_image_details_by_id(
             image_id, load_aliases, status_filter
         )
@@ -172,9 +172,9 @@ class ImageRepository:
             False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )
 
-        return ImageWithAgentStatus(
+        return ImageWithAgentInstallStatus(
             image=image_data,
-            agent_status=ImageAgentStatus(
+            agent_install_status=ImageAgentInstallStatus(
                 installed=bool(installed_agents),
                 agent_names=[] if hide_agents else list(installed_agents),
             ),

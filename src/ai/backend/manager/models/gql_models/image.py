@@ -81,7 +81,7 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
 from ai.backend.manager.services.image.types import ImageRefData
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...data.image.types import ImageStatus, ImageType, ImageWithAgentStatus
+from ...data.image.types import ImageStatus, ImageType, ImageWithAgentInstallStatus
 from ...defs import DEFAULT_IMAGE_ARCH
 from ..base import (
     FilterExprArg,
@@ -197,7 +197,7 @@ class Image(graphene.ObjectType):
     raw_labels: dict[str, Any]
 
     @classmethod
-    def from_image_with_agent_status(cls, data: ImageWithAgentStatus) -> Self:
+    def from_image_with_agent_install_status(cls, data: ImageWithAgentInstallStatus) -> Self:
         return cls(
             id=data.image.id,
             name=data.image.name,
@@ -223,9 +223,9 @@ class Image(graphene.ObjectType):
                 for resource_limit in data.image.resource_limits
             ],
             supported_accelerators=data.image.supported_accelerators,
-            installed=data.agent_status.installed,
-            installed_agents=data.agent_status.agent_names
-            if data.agent_status.agent_names
+            installed=data.agent_install_status.installed,
+            installed_agents=data.agent_install_status.agent_names
+            if data.agent_install_status.agent_names
             else None,
             # legacy
             hash=data.image.digest,
@@ -302,7 +302,10 @@ class Image(graphene.ObjectType):
                 image_status=filter_by_statuses,
             )
         )
-        return [cls.from_image_with_agent_status(img) for img in result.images_with_agent_status]
+        return [
+            cls.from_image_with_agent_install_status(img)
+            for img in result.images_with_agent_install_status
+        ]
 
     @classmethod
     async def batch_load_by_image_ref(
@@ -328,7 +331,7 @@ class Image(graphene.ObjectType):
                 image_status=filter_by_statuses,
             )
         )
-        return cls.from_image_with_agent_status(result.image_with_agent_status)
+        return cls.from_image_with_agent_install_status(result.image_with_agent_install_status)
 
     @classmethod
     async def load_item(
@@ -345,7 +348,7 @@ class Image(graphene.ObjectType):
                 image_status=filter_by_statuses,
             )
         )
-        return cls.from_image_with_agent_status(result.image_with_agent_status)
+        return cls.from_image_with_agent_install_status(result.image_with_agent_install_status)
 
     @classmethod
     async def load_all(

@@ -102,7 +102,7 @@ class ImageDataWithDetails:
 
 
 @dataclass
-class ImageAgentStatus:
+class ImageAgentInstallStatus:
     """
     Represents the installation status of an image on agents.
     """
@@ -112,13 +112,13 @@ class ImageAgentStatus:
 
 
 @dataclass
-class ImageWithAgentStatus:
+class ImageWithAgentInstallStatus:
     """
     Wraps detailed image information and its agent installation status.
     """
 
     image: ImageDataWithDetails
-    agent_status: ImageAgentStatus
+    agent_install_status: ImageAgentInstallStatus
 
 
 @dataclass
