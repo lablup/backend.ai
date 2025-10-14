@@ -1324,7 +1324,9 @@ type Subscription {
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
 
-  """Added in 25.15.0"""
+  """
+  Subscribe to real-time scheduling events for a specific session. Streams status transition events during the session lifecycle (PENDING → SCHEDULED → PREPARING → RUNNING → TERMINATED). Added in 25.15.0.
+  """
   schedulingEventsBySession(sessionId: ID!): SchedulingBroadcastEventPayload!
 }
 
