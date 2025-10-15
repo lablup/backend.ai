@@ -266,7 +266,7 @@ def create_app(
     api_handler = APIHandler()
 
     cors.add(app.router.add_route("POST", "/{storage_name}/download", api_handler.download_file))
-    cors.add(app.router.add_route("POST", "/{storage_name}/list", api_handler.list_files))
+    cors.add(app.router.add_route("GET", "/{storage_name}/files", api_handler.list_files))
     cors.add(app.router.add_route("GET", "/{storage_name}", api_handler.get_storage))
     cors.add(app.router.add_route("GET", "/", api_handler.list_storages))
     return app, []

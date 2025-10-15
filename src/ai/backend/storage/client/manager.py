@@ -120,7 +120,7 @@ class ManagerHTTPClient:
         Returns:
             Response containing list of files with metadata
         """
-        rel_url = f"/vfs-storages/{storage_name}/list"
+        rel_url = f"/vfs-storages/{storage_name}/files"
         request_body = {"directory": directory}
-        resp = await self._request("POST", rel_url, json=request_body)
+        resp = await self._request("GET", rel_url, json=request_body)
         return VFSListFilesResponse.model_validate(resp)

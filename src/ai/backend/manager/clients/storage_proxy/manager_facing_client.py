@@ -871,8 +871,8 @@ class StorageProxyManagerFacingClient:
         :return: Response containing list of files with metadata
         """
         resp = await self._client.request_with_response(
-            "POST",
-            f"v1/storages/vfs/{storage_name}/list",
+            "GET",
+            f"v1/storages/vfs/{storage_name}/files",
             body=req.model_dump(by_alias=True),
         )
         return VFSListFilesResponse.model_validate(resp)

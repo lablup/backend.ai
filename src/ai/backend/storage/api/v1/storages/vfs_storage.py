@@ -214,6 +214,6 @@ def create_app(ctx: RootContext) -> web.Application:
     app.router.add_route("DELETE", "/{storage_name}", api_handler.delete_file)
     app.router.add_route("POST", "/{storage_name}/upload", api_handler.upload_file)
     app.router.add_route("POST", "/{storage_name}/download", api_handler.download_file)
-    app.router.add_route("POST", "/{storage_name}/list", api_handler.list_files)
+    app.router.add_route("GET", "/{storage_name}/files", api_handler.list_files)
 
     return app
