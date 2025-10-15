@@ -16,6 +16,21 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.16.0rc2 (2025-10-15)
+
+### Features
+* Add support for Modular MAX and SGLang runtime variants ([#6237](https://github.com/lablup/backend.ai/issues/6237))
+* Add GraphQL subscription `backgroundTaskEvents` for real-time background task events ([#6243](https://github.com/lablup/backend.ai/issues/6243))
+
+### Fixes
+* Cleanup previous stages' files in artifact import pipeline ([#6251](https://github.com/lablup/backend.ai/issues/6251))
+* `ReservoirDownloadStep` fails with connection reset error when artifact size is too large in `vfs_storage` type remote reservoir registry ([#6254](https://github.com/lablup/backend.ai/issues/6254))
+
+### Documentation Updates
+* Add `Artifact` API descriptions ([#6104](https://github.com/lablup/backend.ai/issues/6104))
+* Add `Artifact` concept documentation ([#6105](https://github.com/lablup/backend.ai/issues/6105))
+
+
 ## 25.16.0rc1 (2025-10-14)
 
 ### Features
