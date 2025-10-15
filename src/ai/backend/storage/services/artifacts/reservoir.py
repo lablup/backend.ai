@@ -699,19 +699,17 @@ class ReservoirDownloadStep(ImportStep[None]):
         return keys, size_map, total
 
     @override
-    async def cleanup_on_failure(self, context: ImportStepContext) -> None:
-        """Clean up failed files from download storage"""
+    async def cleanup_stage(self, context: ImportStepContext) -> None:
+        """Clean up files from download storage after successful transfer"""
         revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
         model_prefix = f"{context.model.model_id}/{revision}"
 
         try:
             await self._download_storage.delete_file(model_prefix)
-            log.info(
-                f"[cleanup] Removed failed reservoir copy from download storage: {model_prefix}"
-            )
+            log.info(f"[cleanup] Removed download files from reservoir storage: {model_prefix}")
         except Exception as e:
             log.warning(
-                f"[cleanup] Failed to cleanup reservoir copy from download storage: {model_prefix}: {str(e)}"
+                f"[cleanup] Failed to cleanup reservoir download storage: {model_prefix}: {str(e)}"
             )
 
 
@@ -759,20 +757,20 @@ class ReservoirArchiveStep(ImportStep[DownloadStepResult]):
         )
 
     @override
-    async def cleanup_on_failure(self, context: ImportStepContext) -> None:
-        """Clean up failed files from archive storage"""
+    async def cleanup_stage(self, context: ImportStepContext) -> None:
+        """Clean up files from archive storage on failure"""
         archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
         if not archive_storage:
             return
 
         # Delete entire model (cleaning up individual files is complex)
-        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+        revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
         model_prefix = f"{context.model.model_id}/{revision}"
 
         try:
             storage = context.storage_pool.get_storage(archive_storage)
             await storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed failed archive: {archive_storage}:{model_prefix}")
+            log.info(f"[cleanup] Removed archive files: {archive_storage}:{model_prefix}")
         except Exception as e:
             log.warning(
                 f"[cleanup] Failed to cleanup archive: {archive_storage}:{model_prefix}: {str(e)}"
