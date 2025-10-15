@@ -1069,7 +1069,14 @@ type Mutation {
   """
   delegateImportArtifacts(input: DelegateImportArtifactsInput!): DelegateImportArtifactsPayload!
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Update artifact metadata properties.
+  
+  Modifies artifact metadata such as readonly status and description.
+  This operation does not affect the actual artifact files or revisions.
+  """
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload!
 
   """
@@ -1728,12 +1735,13 @@ Added in 25.14.0.
 
 Input for updating artifact metadata properties.
 
-Note: This only modifies metadata (description, readonly status).
-Actual artifact files remain unchanged.
+Modifies artifact metadata such as readonly status and description.
+This operation does not affect the actual artifact files or revisions.
 """
 input UpdateArtifactInput {
   artifactId: ID!
   readonly: Boolean
+  description: String
 }
 
 """

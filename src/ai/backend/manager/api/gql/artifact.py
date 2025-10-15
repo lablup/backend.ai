@@ -329,13 +329,14 @@ class DelegateImportArtifactsInput:
 
     Input for updating artifact metadata properties.
 
-    Note: This only modifies metadata (description, readonly status).
-    Actual artifact files remain unchanged.
+    Modifies artifact metadata such as readonly status and description.
+    This operation does not affect the actual artifact files or revisions.
     """)
 )
 class UpdateArtifactInput:
     artifact_id: ID
     readonly: Optional[bool] = UNSET
+    description: Optional[str] = UNSET
 
 
 @strawberry.input(
@@ -1471,14 +1472,26 @@ async def delegate_import_artifacts(
     return DelegateImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Update artifact metadata properties.
+
+    Modifies artifact metadata such as readonly status and description.
+    This operation does not affect the actual artifact files or revisions.
+    """)
+)
 async def update_artifact(
     input: UpdateArtifactInput, info: Info[StrawberryGQLContext]
 ) -> UpdateArtifactPayload:
     action_result = await info.context.processors.artifact.update.wait_for_complete(
         UpdateArtifactAction(
             artifact_id=uuid.UUID(input.artifact_id),
-            modifier=ArtifactModifier(readonly=TriState.from_graphql(input.readonly)),
+            modifier=ArtifactModifier(
+                readonly=TriState.from_graphql(input.readonly),
+                description=TriState.from_graphql(input.description),
+            ),
         )
     )
 
