@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.types import AgentId
+from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 
 
