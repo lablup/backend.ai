@@ -19,6 +19,7 @@ from ai.backend.common.dto.storage.request import (
     VFSDeleteFileReq,
     VFSDownloadFileReq,
     VFSGetFileMetaReq,
+    VFSListFilesReq,
     VFSStorageAPIPathParams,
     VFSUploadFileReq,
 )
@@ -165,6 +166,29 @@ class VFSStorageAPIHandler:
             ),
         )
 
+    @api_handler
+    async def list_files(
+        self,
+        path: PathParam[VFSStorageAPIPathParams],
+        body: BodyParam[VFSListFilesReq],
+    ) -> APIResponse:
+        """
+        List all files recursively in a VFS storage directory.
+        Returns comprehensive file information including paths, sizes, and timestamps.
+        """
+        req = body.parsed
+        directory = req.directory
+        storage_name = path.parsed.storage_name
+
+        await log_client_api_entry(log, "list_files", req)
+
+        response = await self._vfs_service.list_files_recursive(storage_name, directory)
+
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=response,
+        )
+
 
 def create_app(ctx: RootContext) -> web.Application:
     """
@@ -190,5 +214,6 @@ def create_app(ctx: RootContext) -> web.Application:
     app.router.add_route("DELETE", "/{storage_name}", api_handler.delete_file)
     app.router.add_route("POST", "/{storage_name}/upload", api_handler.upload_file)
     app.router.add_route("POST", "/{storage_name}/download", api_handler.download_file)
+    app.router.add_route("POST", "/{storage_name}/list", api_handler.list_files)
 
     return app

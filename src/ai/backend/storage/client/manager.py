@@ -11,6 +11,7 @@ import yarl
 from dateutil.tz import tzutc
 
 from ai.backend.common.auth.utils import generate_signature
+from ai.backend.common.dto.storage.response import VFSListFilesResponse
 from ai.backend.logging import BraceStyleAdapter
 
 _HASH_TYPE = "sha256"
@@ -107,3 +108,19 @@ class ManagerHTTPClient:
         request_body = {"filepath": filepath}
         async for chunk in self._request_stream("POST", rel_url, json=request_body):
             yield chunk
+
+    async def list_vfs_files(self, storage_name: str, directory: str) -> VFSListFilesResponse:
+        """
+        List files recursively in a VFS storage directory.
+
+        Args:
+            storage_name: Name of the VFS storage
+            directory: Directory path to list files from (empty string for root)
+
+        Returns:
+            Response containing list of files with metadata
+        """
+        rel_url = f"/vfs-storages/{storage_name}/list"
+        request_body = {"directory": directory}
+        resp = await self._request("POST", rel_url, json=request_body)
+        return VFSListFilesResponse.model_validate(resp)
