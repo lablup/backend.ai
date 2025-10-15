@@ -9652,6 +9652,35 @@
         "description": "\nDownload artifact directory from VFS storage via storage proxy streaming.\n\nArgs:\n    path: Path parameters including storage name\n    body: Request body with file path\n\nReturns:\n    APIStreamResponse with StreamReader body\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/vfs-storages/{storage_name}/files": {
+      "get": {
+        "operationId": "vfs-storages.list_files",
+        "tags": [
+          "vfs-storages"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "storage_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nList files recursively in a VFS storage directory via storage proxy.\n\nArgs:\n    path: Path parameters including storage name\n    body: Request body with directory path\n\nReturns:\n    APIResponse with list of files\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/vfs-storages/{storage_name}": {
       "get": {
         "operationId": "vfs-storages.get_storage",

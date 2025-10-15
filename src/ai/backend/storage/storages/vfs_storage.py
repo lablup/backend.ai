@@ -15,7 +15,9 @@ import aiofiles.os
 from ai.backend.common.dto.storage.response import (
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
+    VFSFileInfo,
     VFSFileMetaResponse,
+    VFSListFilesResponse,
 )
 from ai.backend.common.types import StreamReader
 from ai.backend.logging import BraceStyleAdapter
@@ -322,8 +324,7 @@ class VFSStorage(AbstractStorage):
         except Exception as e:
             raise FileStreamUploadError(f"Delete failed: {str(e)}") from e
 
-    # TODO: Make type
-    async def list_directory(self, directory: str) -> list[dict]:
+    async def list_directory(self, directory: str) -> list[VFSFileInfo]:
         """
         List files and directories in a directory.
 
@@ -346,18 +347,90 @@ class VFSStorage(AbstractStorage):
             entries_iter = await aiofiles.os.scandir(target_path)
             for entry in entries_iter:
                 stat_result = await aiofiles.os.stat(entry.path)
-                entries.append({
-                    "name": entry.name,
-                    "type": "directory" if entry.is_dir() else "file",
-                    "size": stat_result.st_size if entry.is_file() else None,
-                    "modified": stat_result.st_mtime,
-                    "created": stat_result.st_ctime,
-                })
+                entries.append(
+                    VFSFileInfo(
+                        name=entry.name,
+                        type="directory" if entry.is_dir() else "file",
+                        size=stat_result.st_size if entry.is_file() else None,
+                        modified=stat_result.st_mtime,
+                        created=stat_result.st_ctime,
+                        path=str(Path(directory) / entry.name),
+                    )
+                )
 
             return entries
 
         except Exception as e:
             raise FileStreamDownloadError(f"List directory failed: {str(e)}") from e
+
+    async def list_files_recursive(self, directory: str) -> VFSListFilesResponse:
+        """
+        Recursively list all files in a directory and its subdirectories.
+
+        Args:
+            directory: Directory path to start listing from (relative to base_path)
+
+        Returns:
+            VFSListFilesResponse containing all files found recursively
+        """
+        try:
+            target_path = self._resolve_path(directory)
+
+            if not target_path.exists():
+                raise StorageBucketFileNotFoundError(f"Directory not found: {directory}")
+
+            if not target_path.is_dir():
+                raise FileStreamDownloadError(f"Path is not a directory: {directory}")
+
+            files = await self._collect_files_recursive(target_path, directory)
+
+            return VFSListFilesResponse(files=files)
+
+        except Exception as e:
+            raise FileStreamDownloadError(f"List files recursively failed: {str(e)}") from e
+
+    async def _collect_files_recursive(
+        self, current_path: Path, relative_base: str
+    ) -> list[VFSFileInfo]:
+        """
+        Helper method to recursively collect files.
+
+        Args:
+            current_path: Current absolute path being processed
+            relative_base: Relative path from the original base directory
+
+        Returns:
+            List of found files
+        """
+        files: list[VFSFileInfo] = []
+        entries_iter = await aiofiles.os.scandir(current_path)
+        for entry in entries_iter:
+            stat_result = await aiofiles.os.stat(entry.path)
+
+            # Calculate relative path
+            if relative_base:
+                relative_path = str(Path(relative_base) / entry.name)
+            else:
+                relative_path = entry.name
+
+            file_info = VFSFileInfo(
+                name=entry.name,
+                type="directory" if entry.is_dir() else "file",
+                size=stat_result.st_size if entry.is_file() else None,
+                modified=stat_result.st_mtime,
+                created=stat_result.st_ctime,
+                path=relative_path,
+            )
+            files.append(file_info)
+
+            # Recursively process subdirectories
+            if entry.is_dir():
+                subdirectory_files = await self._collect_files_recursive(
+                    Path(entry.path), relative_path
+                )
+                files.extend(subdirectory_files)
+
+        return files
 
     async def create_directory(self, directory: str) -> None:
         """

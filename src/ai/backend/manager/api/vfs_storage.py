@@ -17,7 +17,11 @@ from ai.backend.common.api_handlers import (
     api_handler,
     stream_api_handler,
 )
-from ai.backend.common.dto.storage.request import VFSDownloadFileReq, VFSStorageAPIPathParams
+from ai.backend.common.dto.storage.request import (
+    VFSDownloadFileReq,
+    VFSListFilesReq,
+    VFSStorageAPIPathParams,
+)
 from ai.backend.common.types import StreamReader
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
@@ -212,6 +216,44 @@ class APIHandler:
 
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=response)
 
+    @auth_required_for_method
+    @api_handler
+    async def list_files(
+        self,
+        path: PathParam[VFSStorageAPIPathParams],
+        body: BodyParam[VFSListFilesReq],
+        storage_session_manager_ctx: StorageSessionManagerCtx,
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """
+        List files recursively in a VFS storage directory via storage proxy.
+
+        Args:
+            path: Path parameters including storage name
+            body: Request body with directory path
+
+        Returns:
+            APIResponse with list of files
+        """
+        req = body.parsed
+        directory = req.directory
+        storage_name = path.parsed.storage_name
+
+        log.info(f"List files request for directory: {directory} from storage: {storage_name}")
+
+        # Get storage manager from context
+        storage_manager = storage_session_manager_ctx.storage_manager
+        action_result = await processors_ctx.processors.vfs_storage.get.wait_for_complete(
+            GetVFSStorageAction(storage_name=storage_name)
+        )
+
+        # Get the manager client for the proxy
+        manager_client = storage_manager.get_manager_facing_client(action_result.result.host)
+
+        # Call storage proxy list files API
+        response_data = await manager_client.list_vfs_files(storage_name, req)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=response_data)
+
 
 def create_app(
     default_cors_options: CORSOptions,
@@ -224,6 +266,7 @@ def create_app(
     api_handler = APIHandler()
 
     cors.add(app.router.add_route("POST", "/{storage_name}/download", api_handler.download_file))
+    cors.add(app.router.add_route("GET", "/{storage_name}/files", api_handler.list_files))
     cors.add(app.router.add_route("GET", "/{storage_name}", api_handler.get_storage))
     cors.add(app.router.add_route("GET", "/", api_handler.list_storages))
     return app, []
