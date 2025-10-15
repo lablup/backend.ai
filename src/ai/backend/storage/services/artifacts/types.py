@@ -1,13 +1,17 @@
 from __future__ import annotations
 
 import abc
+import logging
 from dataclasses import dataclass
 from typing import Any, Generic, Optional, TypeVar
 
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.data.storage.registries.types import FileObjectData, ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.storages.storage_pool import StoragePool
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
 
 
 @dataclass
@@ -73,7 +77,11 @@ class ImportPipeline:
             # On success, cleanup all non-archive steps
             for step in completed_steps:
                 if step.step_type != ArtifactStorageImportStep.ARCHIVE:
-                    await step.cleanup_stage(context)
+                    try:
+                        await step.cleanup_stage(context)
+                    except Exception:
+                        log.error(f"Failed to cleanup step {step.step_type}")
+                        pass
 
         except Exception:
             # Cleanup completed steps in reverse order on failure
@@ -82,5 +90,6 @@ class ImportPipeline:
                     await step.cleanup_stage(context)
                 except Exception:
                     # Log cleanup failures but continue with other cleanups
+                    log.error(f"Failed to cleanup step {step.step_type}")
                     pass
             raise
