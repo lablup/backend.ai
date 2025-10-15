@@ -382,8 +382,7 @@ class VFSStorage(AbstractStorage):
             if not target_path.is_dir():
                 raise FileStreamDownloadError(f"Path is not a directory: {directory}")
 
-            files: list[VFSFileInfo] = []
-            await self._collect_files_recursive(target_path, directory, files)
+            files = await self._collect_files_recursive(target_path, directory)
 
             return VFSListFilesResponse(files=files)
 
@@ -391,16 +390,19 @@ class VFSStorage(AbstractStorage):
             raise FileStreamDownloadError(f"List files recursively failed: {str(e)}") from e
 
     async def _collect_files_recursive(
-        self, current_path: Path, relative_base: str, files: list[VFSFileInfo]
-    ) -> None:
+        self, current_path: Path, relative_base: str
+    ) -> list[VFSFileInfo]:
         """
         Helper method to recursively collect files.
 
         Args:
             current_path: Current absolute path being processed
             relative_base: Relative path from the original base directory
-            files: List to append found files to
+
+        Returns:
+            List of found files
         """
+        files: list[VFSFileInfo] = []
         entries_iter = await aiofiles.os.scandir(current_path)
         for entry in entries_iter:
             stat_result = await aiofiles.os.stat(entry.path)
@@ -423,7 +425,12 @@ class VFSStorage(AbstractStorage):
 
             # Recursively process subdirectories
             if entry.is_dir():
-                await self._collect_files_recursive(Path(entry.path), relative_path, files)
+                subdirectory_files = await self._collect_files_recursive(
+                    Path(entry.path), relative_path
+                )
+                files.extend(subdirectory_files)
+
+        return files
 
     async def create_directory(self, directory: str) -> None:
         """
