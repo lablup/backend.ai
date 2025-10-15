@@ -13,8 +13,14 @@ from ai.backend.manager.sokovan.deployment.definition_generator.custom import (
 from ai.backend.manager.sokovan.deployment.definition_generator.huggingface_tgi import (
     HuggingFaceTGIModelDefinitionGenerator,
 )
+from ai.backend.manager.sokovan.deployment.definition_generator.modular_max import (
+    ModularMAXModelDefinitionGenerator,
+)
 from ai.backend.manager.sokovan.deployment.definition_generator.nim import (
     NIMModelDefinitionGenerator,
+)
+from ai.backend.manager.sokovan.deployment.definition_generator.sglang import (
+    SGLangModelDefinitionGenerator,
 )
 from ai.backend.manager.sokovan.deployment.definition_generator.vllm import (
     VLLMModelDefinitionGenerator,
@@ -37,6 +43,8 @@ class ModelDefinitionGeneratorRegistry:
         self._generators[RuntimeVariant.VLLM] = VLLMModelDefinitionGenerator()
         self._generators[RuntimeVariant.HUGGINGFACE_TGI] = HuggingFaceTGIModelDefinitionGenerator()
         self._generators[RuntimeVariant.NIM] = NIMModelDefinitionGenerator()
+        self._generators[RuntimeVariant.SGLANG] = SGLangModelDefinitionGenerator()
+        self._generators[RuntimeVariant.MODULAR_MAX] = ModularMAXModelDefinitionGenerator()
         self._generators[RuntimeVariant.CMD] = CMDModelDefinitionGenerator()
 
     def get(self, runtime_variant: RuntimeVariant) -> ModelDefinitionGenerator:
