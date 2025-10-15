@@ -67,6 +67,15 @@ class APIHandler:
         body: BodyParam[ScanArtifactsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Scan external registries to discover available artifacts.
+
+        Searches HuggingFace or Reservoir registries for artifacts matching the specified
+        criteria and registers them in the system with SCANNED status. The artifacts
+        become available for import but are not downloaded until explicitly imported.
+
+        This is the first step in the artifact workflow: Scan → Import → Use.
+        """
         processors = processors_ctx.processors
         action_result = await processors.artifact.scan.wait_for_complete(
             ScanArtifactsAction(
@@ -164,6 +173,13 @@ class APIHandler:
         body: BodyParam[SearchArtifactsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Search registered artifacts with cursor-based pagination.
+
+        Returns artifacts that have been previously scanned and registered in the system.
+        Supports efficient pagination for browsing through large datasets of artifacts
+        with their revision information.
+        """
         processors = processors_ctx.processors
         pagination = body.parsed.pagination
 
@@ -190,6 +206,13 @@ class APIHandler:
         body: BodyParam[ScanArtifactModelsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Perform batch scanning of specific models from external registries.
+
+        Scans multiple specified models and retrieves detailed information.
+        The README content and file sizes are processed in the background,
+        unlike single model scanning which retrieves this information immediately.
+        """
         processors = processors_ctx.processors
         action_result = await processors.artifact.retrieve_models.wait_for_complete(
             RetrieveModelsAction(
@@ -214,6 +237,13 @@ class APIHandler:
         query: QueryParam[ScanArtifactModelQueryParam],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Scan a single model and retrieve detailed information immediately.
+
+        Performs immediate detailed scanning of a specified model including
+        README content and file sizes. This provides complete metadata
+        for the model, ready for import or direct use.
+        """
         processors = processors_ctx.processors
         model = ModelTarget(
             model_id=path.parsed.model_id,

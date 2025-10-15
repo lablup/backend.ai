@@ -808,6 +808,8 @@
           "nim",
           "cmd",
           "huggingface-tgi",
+          "sglang",
+          "modular-max",
           "custom"
         ],
         "title": "RuntimeVariant",
@@ -1712,7 +1714,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nClean up stored artifact revision data to free storage space.\n\nRemoves the downloaded files for the specified artifact revisions and\ntransitions them back to SCANNED status. The metadata remains, allowing\nthe artifacts to be re-imported later if needed.\n\nUse this operation to manage storage usage by removing unused artifacts.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/revisions/{artifact_revision_id}/approval": {
@@ -1741,7 +1743,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nApprove an artifact revision for general use.\n\nAdmin-only operation to approve artifact revisions, typically used\nin environments with approval workflows for artifact deployment.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/revisions/{artifact_revision_id}/rejection": {
@@ -1770,7 +1772,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nReject an artifact revision, preventing its use.\n\nAdmin-only operation to reject artifact revisions, typically used\nin environments with approval workflows for artifact deployment.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/task/cancel": {
@@ -1790,7 +1792,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nCancel an in-progress artifact import operation.\n\nStops the download process for the specified artifact revision and\nreverts its status back to SCANNED. The partially downloaded data is cleaned up.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/import": {
@@ -1810,7 +1812,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nImport scanned artifact revisions from external registries.\n\nDownloads the actual files for the specified artifact revisions, transitioning\nthem from SCANNED → PULLING → PULLED → AVAILABLE status.\n\nReturns background tasks that can be monitored for import progress.\nOnce AVAILABLE, artifacts can be used by users in their sessions.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/{artifact_id}": {
@@ -1839,7 +1841,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nUpdate artifact metadata properties.\n\nModifies artifact metadata such as readonly status and description.\nThis operation does not affect the actual artifact files or revisions.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifacts/revisions/{artifact_revision_id}/readme": {
@@ -1868,7 +1870,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nRetrieve the README content for a specific artifact revision.\n\nReturns the README documentation associated with the artifact revision,\nwhich typically contains usage instructions and model information.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifact-registries/scan": {
@@ -1888,7 +1890,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nScan external registries to discover available artifacts.\n\nSearches HuggingFace or Reservoir registries for artifacts matching the specified\ncriteria and registers them in the system with SCANNED status. The artifacts\nbecome available for import but are not downloaded until explicitly imported.\n\nThis is the first step in the artifact workflow: Scan → Import → Use.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifact-registries/delegation/scan": {
@@ -1948,7 +1950,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nSearch registered artifacts with cursor-based pagination.\n\nReturns artifacts that have been previously scanned and registered in the system.\nSupports efficient pagination for browsing through large datasets of artifacts\nwith their revision information.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifact-registries/model/{model_id}": {
@@ -1977,7 +1979,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nScan a single model and retrieve detailed information immediately.\n\nPerforms immediate detailed scanning of a specified model including\nREADME content and file sizes. This provides complete metadata\nfor the model, ready for import or direct use.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/artifact-registries/models/batch": {
@@ -1997,7 +1999,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nPerform batch scanning of specific models from external registries.\n\nScans multiple specified models and retrieves detailed information.\nThe README content and file sizes are processed in the background,\nunlike single model scanning which retrieves this information immediately.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/config/resource-slots": {
@@ -9529,7 +9531,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nGenerate a presigned URL for uploading artifact files.\n\nCreates a time-limited, secure URL that allows direct upload of files\nto object storage without exposing storage credentials. Includes\nadditional form fields required for the upload operation.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/object-storages/presigned/download": {
@@ -9549,7 +9551,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nGenerate a presigned URL for safely downloading artifact files.\n\nCreates a time-limited, secure URL that allows direct download of specific\nartifact files from object storage without exposing storage credentials.\nUsed to provide secure access to AVAILABLE artifact files.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/object-storages/buckets": {
@@ -9569,7 +9571,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nRetrieve all storage namespaces (buckets) across all storage systems.\n\nReturns a mapping of storage systems to their available namespaces.\nThis provides an overview of all available storage compartments\nwhere artifacts can be stored.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/object-storages/{storage_id}/buckets": {
@@ -9598,7 +9600,7 @@
             }
           }
         ],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nRetrieve storage namespaces (buckets) for a specific storage system.\n\nReturns the list of available namespaces within the specified storage\nsystem where artifacts can be organized and stored.\n\nNote: This API is deprecated. Use /storage-namespaces instead.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/object-storages/": {
@@ -9618,7 +9620,7 @@
           }
         ],
         "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
+        "description": "\nList all configured object storage systems.\n\nReturns information about all available storage systems that can be\nused for storing artifacts, including their configuration and capabilities.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/vfs-storages/{storage_name}/download": {

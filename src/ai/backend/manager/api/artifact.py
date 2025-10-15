@@ -65,6 +65,15 @@ class APIHandler:
         body: BodyParam[CleanupArtifactsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Clean up stored artifact revision data to free storage space.
+
+        Removes the downloaded files for the specified artifact revisions and
+        transitions them back to SCANNED status. The metadata remains, allowing
+        the artifacts to be re-imported later if needed.
+
+        Use this operation to manage storage usage by removing unused artifacts.
+        """
         processors = processors_ctx.processors
         cleaned_revisions = []
 
@@ -93,6 +102,12 @@ class APIHandler:
         body: BodyParam[CancelImportArtifactReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Cancel an in-progress artifact import operation.
+
+        Stops the download process for the specified artifact revision and
+        reverts its status back to SCANNED. The partially downloaded data is cleaned up.
+        """
         processors = processors_ctx.processors
         action_result = await processors.artifact_revision.cancel_import.wait_for_complete(
             CancelImportAction(
@@ -112,6 +127,12 @@ class APIHandler:
         path: PathParam[ApproveArtifactRevisionReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Approve an artifact revision for general use.
+
+        Admin-only operation to approve artifact revisions, typically used
+        in environments with approval workflows for artifact deployment.
+        """
         processors = processors_ctx.processors
         action_result = await processors.artifact_revision.approve.wait_for_complete(
             ApproveArtifactRevisionAction(
@@ -131,6 +152,12 @@ class APIHandler:
         path: PathParam[RejectArtifactRevisionReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Reject an artifact revision, preventing its use.
+
+        Admin-only operation to reject artifact revisions, typically used
+        in environments with approval workflows for artifact deployment.
+        """
         processors = processors_ctx.processors
         action_result = await processors.artifact_revision.reject.wait_for_complete(
             RejectArtifactRevisionAction(
@@ -150,6 +177,15 @@ class APIHandler:
         body: BodyParam[ImportArtifactsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Import scanned artifact revisions from external registries.
+
+        Downloads the actual files for the specified artifact revisions, transitioning
+        them from SCANNED → PULLING → PULLED → AVAILABLE status.
+
+        Returns background tasks that can be monitored for import progress.
+        Once AVAILABLE, artifacts can be used by users in their sessions.
+        """
         processors = processors_ctx.processors
         imported_revisions = []
         tasks = []
@@ -183,6 +219,12 @@ class APIHandler:
         body: BodyParam[UpdateArtifactReqBodyParam],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Update artifact metadata properties.
+
+        Modifies artifact metadata such as readonly status and description.
+        This operation does not affect the actual artifact files or revisions.
+        """
         processors = processors_ctx.processors
         action_result = await processors.artifact.update.wait_for_complete(
             UpdateArtifactAction(
@@ -203,6 +245,12 @@ class APIHandler:
         path: PathParam[GetArtifactRevisionReadmeReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
+        """
+        Retrieve the README content for a specific artifact revision.
+
+        Returns the README documentation associated with the artifact revision,
+        which typically contains usage instructions and model information.
+        """
         processors = processors_ctx.processors
         action_result = await processors.artifact_revision.get_readme.wait_for_complete(
             GetArtifactRevisionReadmeAction(
