@@ -49,6 +49,24 @@ Workflow
 3. **Use**: Mount artifacts in compute sessions as volumes
 4. **Cleanup**: Remove files while keeping metadata to free storage space
 
+Import Process
+--------------
+
+The artifact import process uses a multi-stage pipeline for optimal performance:
+
+**Import Stages**
+ - **DOWNLOAD**: Downloads files from external registry to temporary storage
+ - **VERIFY**: Validates downloaded files (optional)
+ - **ARCHIVE**: Moves files to final long-term storage
+
+**Storage Mapping**
+  Different storage backends can be assigned to each stage.
+  For example, use fast storage for downloads and cost-effective storage for archives.
+
+**Transfer Management**
+  The system automatically transfers files between storage backends during import,
+  with optimized methods for different storage types.
+
 Artifact Registries
 -------------------
 
@@ -58,6 +76,19 @@ Artifact Registries
 - **Reservoir**: Backend.AI's internal registry for enterprise deployments
 
 **Local registries** are Backend.AI's internal storage where artifacts are cached for access.
+
+Delegation Operations
+--------------------
+
+Backend.AI supports **delegation** for cross-Reservoir artifact operations:
+
+**Delegate Scan**
+  Request one Reservoir registry to scan artifacts from another Reservoir's external registries
+  (like HuggingFace or other sources).
+
+**Delegate Import**
+  Request one Reservoir registry to import artifacts on behalf of another Reservoir registry.
+  Useful for coordinating artifact distribution across multiple Backend.AI installations.
 
 Storage and Access
 -----------------
