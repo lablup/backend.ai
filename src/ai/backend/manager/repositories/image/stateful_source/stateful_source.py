@@ -8,9 +8,9 @@ from ai.backend.logging.utils import BraceStyleAdapter
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class ImageCacheSource:
+class ImageStatefulSource:
     """
-    Cache source for image-related operations.
+    Source for stateful image-related operations.
     Uses simple JSON serialization with short TTL for caching.
     """
 

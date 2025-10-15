@@ -23,9 +23,10 @@ from ai.backend.manager.models.image import (
     ImageIdentifier,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.image.cache_source.cache_source import ImageCacheSource
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
-from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
+from ai.backend.manager.repositories.image.stateful_source.stateful_source import (
+    ImageStatefulSource,
+)
 
 image_repository_resilience = Resilience(
     policies=[
@@ -44,7 +45,7 @@ image_repository_resilience = Resilience(
 
 class ImageRepository:
     _db_source: ImageDBSource
-    _cache_source: ImageCacheSource
+    _stateful_source: ImageStatefulSource
     _config_provider: ManagerConfigProvider
 
     def __init__(
@@ -54,7 +55,7 @@ class ImageRepository:
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._db_source = ImageDBSource(db)
-        self._cache_source = ImageCacheSource(valkey_image)
+        self._stateful_source = ImageStatefulSource(valkey_image)
         self._config_provider = config_provider
 
     @image_repository_resilience.apply()
@@ -92,14 +93,9 @@ class ImageRepository:
         )
 
         installed_agents_for_images: list[set[str]] = []
-        with suppress_with_log(
-            [Exception],
-            message=f"Failed to get agents for images {image_canonicals}",
-        ):
-            image_names = [image.name for image in images_data]
-            installed_agents_for_images = await self._cache_source.get_agents_for_images(
-                image_names
-            )
+
+        image_names = [image.name for image in images_data]
+        installed_agents_for_images = await self._stateful_source.get_agents_for_images(image_names)
 
         # TODO: Handle mismatch in lengths more gracefully
         if len(installed_agents_for_images) != len(images_data):
@@ -133,12 +129,7 @@ class ImageRepository:
         image_data: ImageDataWithDetails = await self._db_source.get_image_details_by_identifier(
             identifier, status_filter
         )
-        installed_agents: set[str] = set()
-        with suppress_with_log(
-            [Exception],
-            message=f"Failed to get agents for image {image_data.name}",
-        ):
-            installed_agents = await self._cache_source.get_agents_for_image(image_data.name)
+        installed_agents = await self._stateful_source.get_agents_for_image(image_data.name)
         hide_agents = (
             False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )
@@ -162,12 +153,7 @@ class ImageRepository:
         image_data: ImageDataWithDetails = await self._db_source.get_image_details_by_id(
             image_id, load_aliases, status_filter
         )
-        installed_agents: set[str] = set()
-        with suppress_with_log(
-            [Exception],
-            message=f"Failed to get agents for image {image_data.name}",
-        ):
-            installed_agents = await self._cache_source.get_agents_for_image(image_data.name)
+        installed_agents = await self._stateful_source.get_agents_for_image(image_data.name)
         hide_agents = (
             False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )
