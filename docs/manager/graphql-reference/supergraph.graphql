@@ -197,21 +197,48 @@ input AllowedGroups
   remove: [String] = []
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Input for approving an artifact revision.
+
+Admin-only operation to approve artifact revisions for general use.
+"""
 input ApproveArtifactInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Response payload for artifact revision approval operations.
+
+Contains the approved artifact revision. Admin-only operation.
+"""
 type ApproveArtifactPayload
   @join__type(graph: STRAWBERRY)
 {
   artifactRevision: ArtifactRevision!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+An artifact represents AI models, packages, images, or other resources that can be
+stored, managed, and used within Backend.AI.
+
+Artifacts are discovered through scanning external registries and,
+can have multiple revisions.
+
+Each artifact contains metadata and references to its source registry.
+
+Key concepts:
+- Type: MODEL, PACKAGE, or IMAGE
+- Availability: ALIVE (available), DELETED (soft-deleted)
+- Source: Original external registry where it was discovered
+"""
 type Artifact implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -237,7 +264,13 @@ enum ArtifactAvailability
   DELETED @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Paginated connection for artifacts with total count information.
+
+Used for relay-style pagination with cursor-based navigation.
+"""
 type ArtifactConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -260,7 +293,14 @@ type ArtifactEdge
   node: Artifact!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Filter options for artifacts based on various criteria such as type, name, registry,
+source, and availability status.
+
+Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+"""
 input ArtifactFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -274,7 +314,14 @@ input ArtifactFilter
   NOT: [ArtifactFilter!] = null
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Payload for artifact import progress subscription events.
+
+Provides real-time updates during the artifact import process,
+including progress percentage and current status.
+"""
 type ArtifactImportProgressUpdatedPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -283,7 +330,11 @@ type ArtifactImportProgressUpdatedPayload
   status: ArtifactStatus!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Specifies the field and direction for ordering artifacts in queries.
+"""
 input ArtifactOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -368,7 +419,20 @@ enum ArtifactRemoteStatus
   FAILED @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+A specific version/revision of an artifact containing the actual file data.
+
+Artifact revisions progress through different statuses:
+- SCANNED: Discovered in external registry, metadata only
+- PULLING: Currently downloading from external source
+- PULLED: Downloaded to temporary storage
+- AVAILABLE: Ready for use by users
+
+Contains version information, file size, README content, and timestamps.
+Most HuggingFace models only have a 'main' revision.
+"""
 type ArtifactRevision implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
@@ -387,7 +451,13 @@ type ArtifactRevision implements Node
   artifact: Artifact!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Paginated connection for artifact revisions with total count information.
+
+Used for relay-style pagination with cursor-based navigation.
+"""
 type ArtifactRevisionConnection
   @join__type(graph: STRAWBERRY)
 {
@@ -410,7 +480,13 @@ type ArtifactRevisionEdge
   node: ArtifactRevision!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Filter options for artifact revisions based on status, version, artifact ID, and file size.
+
+Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+"""
 input ArtifactRevisionFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -426,7 +502,14 @@ input ArtifactRevisionFilter
   NOT: [ArtifactRevisionFilter!] = null
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Represents a background task for importing an artifact revision.
+
+Contains the task ID for monitoring progress and the associated artifact revision
+being imported from external registries.
+"""
 type ArtifactRevisionImportTask
   @join__type(graph: STRAWBERRY)
 {
@@ -434,7 +517,11 @@ type ArtifactRevisionImportTask
   artifactRevision: ArtifactRevision!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Specifies the field and direction for ordering artifact revisions in queries.
+"""
 input ArtifactRevisionOrderBy
   @join__type(graph: STRAWBERRY)
 {
@@ -460,7 +547,11 @@ input ArtifactRevisionRemoteStatusFilter
   equals: ArtifactRemoteStatus = null
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
+"""
 input ArtifactRevisionStatusFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -481,14 +572,28 @@ enum ArtifactStatus
   REJECTED @join__enumValue(graph: STRAWBERRY)
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Input for subscribing to artifact status change notifications.
+
+Used with artifact_status_changed subscription to receive real-time updates
+when artifact revision statuses change.
+"""
 input ArtifactStatusChangedInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionIds: [ID!]!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Payload for artifact status change subscription events.
+
+Provides real-time notifications when artifact revision statuses change
+during import, cleanup, or other operations.
+"""
 type ArtifactStatusChangedPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -729,13 +834,27 @@ scalar Bytes
 scalar ByteSize
   @join__type(graph: STRAWBERRY)
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Input for canceling an in-progress artifact import operation.
+
+Stops the download process and reverts the artifact revision status back to SCANNED.
+"""
 input CancelArtifactInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
 }
 
+"""
+Added in 25.14.0.
+
+Response payload for canceling artifact import operations.
+
+Contains the artifact revision whose import was canceled,
+reverting its status back to SCANNED.
+"""
 type CancelImportArtifactPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -758,14 +877,28 @@ input CheckAndTransitStatusInput
   client_mutation_id: String
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Input for cleaning up stored artifact revision data.
+
+Removes downloaded files from storage and transitions the artifact revision
+back to SCANNED status, freeing up storage space.
+"""
 input CleanupArtifactRevisionsInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionIds: [ID!]!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Response payload for artifact revision cleanup operations.
+
+Contains the cleaned artifact revisions that have had their stored data removed,
+transitioning them back to SCANNED status to free storage space.
+"""
 type CleanupArtifactRevisionsPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -1658,14 +1791,27 @@ type DelegateScanArtifactsPayload
   artifacts: [Artifact!]!
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Input for soft-deleting artifacts from the system.
+
+Marks artifacts as deleted without permanently removing them.
+Deleted artifacts can be restored using restore_artifacts.
+"""
 input DeleteArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
   artifactIds: [ID!]!
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Response payload for artifact deletion operations.
+
+Contains the artifacts that were soft-deleted. These can be restored later.
+"""
 type DeleteArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -2593,14 +2739,28 @@ enum ImageType
   SERVICE @join__enumValue(graph: GRAPHENE)
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Input for importing scanned artifact revisions from external registries.
+
+Downloads artifact files from the external source and transitions them through:
+SCANNED → PULLING → PULLED → AVAILABLE status progression.
+"""
 input ImportArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionIds: [ID!]!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Response payload for artifact import operations.
+
+Contains the imported artifact revisions and their associated background tasks.
+Tasks can be monitored to track the import progress from SCANNED to AVAILABLE status.
+"""
 type ImportArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -3174,7 +3334,14 @@ input ModelRuntimeConfigInput
   environ: JSONString = null
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Specifies a target model for scanning operations.
+
+Used to identify specific models in external registries for detailed scanning.
+If revision is not specified, defaults to 'main' revision.
+"""
 input ModelTarget
   @join__type(graph: STRAWBERRY)
 {
@@ -3984,13 +4151,41 @@ type Mutation
   """Added in 24.12.0."""
   delete_network(network: String!): DeleteNetwork @join__field(graph: GRAPHENE)
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Scan external registries to discover available artifacts.
+  
+  Searches HuggingFace or Reservoir registries for artifacts matching the specified
+  criteria and registers them in the system with SCANNED status. The artifacts
+  become available for import but are not downloaded until explicitly imported.
+  
+  This is the first step in the artifact workflow: Scan → Import → Use.
+  """
   scanArtifacts(input: ScanArtifactsInput!): ScanArtifactsPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Perform detailed scanning of specific models.
+  
+  Unlike the general scan_artifacts operation, this performs immediate detailed
+  scanning of specified models including README content and file sizes.
+  Returns artifact revisions with complete metadata ready for use.
+  """
   scanArtifactModels(input: ScanArtifactModelsInput!): ScanArtifactModelsPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Import scanned artifact revisions from external registries.
+  
+  Downloads the actual files for the specified artifact revisions, transitioning
+  them from SCANNED → PULLING → PULLED → AVAILABLE status.
+  
+  Returns background tasks that can be monitored for import progress.
+  Once AVAILABLE, artifacts can be used by users in their sessions.
+  """
   importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload! @join__field(graph: STRAWBERRY)
 
   """
@@ -4027,16 +4222,47 @@ type Mutation
   """Added in 25.14.0"""
   updateArtifact(input: UpdateArtifactInput!): UpdateArtifactPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.15.0"""
+  """
+  Added in 25.15.0.
+  
+  Soft-delete artifacts from the system.
+  
+  Marks artifacts as deleted without permanently removing them.
+  Deleted artifacts can be restored using the restore_artifacts mutation.
+  """
   deleteArtifacts(input: DeleteArtifactsInput!): DeleteArtifactsPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.15.0"""
+  """
+  Added in 25.15.0.
+  
+  Restore previously deleted artifacts.
+  
+  Reverses the soft-delete operation, making the artifacts available again
+  for use in the system.
+  """
   restoreArtifacts(input: RestoreArtifactsInput!): RestoreArtifactsPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Clean up stored artifact revision data to free storage space.
+  
+  Removes the downloaded files for the specified artifact revisions and
+  transitions them back to SCANNED status. The metadata remains, allowing
+  the artifacts to be re-imported later if needed.
+  
+  Use this operation to manage storage usage by removing unused artifacts.
+  """
   cleanupArtifactRevisions(input: CleanupArtifactRevisionsInput!): CleanupArtifactRevisionsPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Cancel an in-progress artifact import operation.
+  
+  Stops the download process for the specified artifact revision and
+  reverts its status back to SCANNED. The partially downloaded data is cleaned up.
+  """
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload! @join__field(graph: STRAWBERRY)
   createModelDeployment(input: CreateModelDeploymentInput!): CreateModelDeploymentPayload! @join__field(graph: STRAWBERRY)
   updateModelDeployment(input: UpdateModelDeploymentInput!): UpdateModelDeploymentPayload! @join__field(graph: STRAWBERRY)
@@ -4099,10 +4325,24 @@ type Mutation
   """Added in 25.14.0"""
   getPresignedUploadUrl(input: GetPresignedUploadURLInput!): GetPresignedUploadURLPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Approve an artifact revision for general use.
+  
+  Admin-only operation to approve artifact revisions, typically used
+  in environments with approval workflows for artifact deployment.
+  """
   approveArtifactRevision(input: ApproveArtifactInput!): ApproveArtifactPayload! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Reject an artifact revision, preventing its use.
+  
+  Admin-only operation to reject artifact revisions, typically used
+  in environments with approval workflows for artifact deployment.
+  """
   rejectArtifactRevision(input: RejectArtifactInput!): RejectArtifactPayload! @join__field(graph: STRAWBERRY)
 }
 
@@ -4746,16 +4986,51 @@ type Query
   """Added in 25.8.0."""
   service_configs(services: [String]!, filter: String, order: String, offset: Int, before: String, after: String, first: Int, last: Int): ServiceConfigConnection @join__field(graph: GRAPHENE)
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Retrieve a specific artifact by its ID.
+  
+  Returns detailed information about the artifact including its metadata,
+  registry information, and availability status.
+  """
   artifact(id: ID!): Artifact @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Query artifacts with optional filtering, ordering, and pagination.
+  
+  Returns artifacts that are available in the system, discovered through scanning
+  external registries like HuggingFace or Reservoir. By default, only shows
+  ALIVE (non-deleted) artifacts.
+  
+  Use filters to narrow down results by type, name, registry, or availability.
+  Supports cursor-based pagination for efficient browsing of large datasets.
+  """
   artifacts(filter: ArtifactFilter = {type: null, name: null, registry: null, source: null, availability: [ALIVE], AND: null, OR: null, NOT: null}, orderBy: [ArtifactOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactConnection! @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Retrieve a specific artifact revision by its ID.
+  
+  Returns detailed information about the revision including its status,
+  version, file size, and README content.
+  """
   artifactRevision(id: ID!): ArtifactRevision @join__field(graph: STRAWBERRY)
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Query artifact revisions with optional filtering, ordering, and pagination.
+  
+  Returns specific versions/revisions of artifacts. Each revision represents
+  a specific version of an artifact with its own status, file data, and metadata.
+  
+  Use filters to find revisions by status, version, or artifact ID.
+  Supports cursor-based pagination for efficient browsing.
+  """
   artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection! @join__field(graph: STRAWBERRY)
   deployments(
     filter: DeploymentFilter = null
@@ -4878,14 +5153,26 @@ type RegisterStorageNamespacePayload
   id: UUID!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Input for rejecting an artifact revision.
+
+Admin-only operation to reject artifact revisions, preventing their use.
+"""
 input RejectArtifactInput
   @join__type(graph: STRAWBERRY)
 {
   artifactRevisionId: ID!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Response payload for artifact revision rejection operations.
+
+Contains the rejected artifact revision. Admin-only operation.
+"""
 type RejectArtifactPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -5018,14 +5305,26 @@ type ResourcePreset
   scaling_group_name: String
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Input for restoring previously deleted artifacts.
+
+Reverses the soft-delete operation, making the artifacts available again.
+"""
 input RestoreArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
   artifactIds: [ID!]!
 }
 
-"""Added in 25.15.0"""
+"""
+Added in 25.15.0.
+
+Response payload for artifact restoration operations.
+
+Contains the artifacts that were restored from soft-deleted state.
+"""
 type RestoreArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -5181,7 +5480,15 @@ type ScalingRule
   autoScalingRules: [EndpointAutoScalingRuleNode!]!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Input for batch scanning of specific models from external registries.
+
+Scans multiple specified models and retrieves detailed information including
+README content and file sizes. This operation performs immediate detailed scanning
+unlike the general scan_artifacts which only retrieves basic metadata.
+"""
 input ScanArtifactModelsInput
   @join__type(graph: STRAWBERRY)
 {
@@ -5189,14 +5496,28 @@ input ScanArtifactModelsInput
   registryId: UUID = null
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Response payload for batch model scanning operations.
+
+Contains the artifact revisions discovered during detailed scanning of specific models,
+including README content and file size information.
+"""
 type ScanArtifactModelsPayload
   @join__type(graph: STRAWBERRY)
 {
   artifactRevision: ArtifactRevisionConnection!
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Input for scanning artifacts from external registries (HuggingFace, Reservoir).
+
+Discovers available artifacts and registers their metadata in the system.
+Artifacts remain in SCANNED status until explicitly imported via import_artifacts.
+"""
 input ScanArtifactsInput
   @join__type(graph: STRAWBERRY)
 {
@@ -5208,7 +5529,14 @@ input ScanArtifactsInput
   search: String = null
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Response payload for artifact scanning operations.
+
+Contains the list of artifacts discovered during scanning of external registries.
+These artifacts are registered with SCANNED status and can be imported for actual use.
+"""
 type ScanArtifactsPayload
   @join__type(graph: STRAWBERRY)
 {
@@ -5340,7 +5668,13 @@ type SetQuotaScope
   quota_scope: QuotaScope
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Information about the source or registry of an artifact.
+
+Contains the name and URL of the registry where the artifact is stored or originates from.
+"""
 type SourceInfo
   @join__type(graph: STRAWBERRY)
 {
@@ -5441,10 +5775,26 @@ input StringFilter
 type Subscription
   @join__type(graph: STRAWBERRY)
 {
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Subscribe to real-time artifact status change notifications.
+  
+  Receives updates when artifact revision statuses change during import,
+  cleanup, or other operations. Useful for building reactive UIs that
+  show live progress of artifact operations.
+  """
   artifactStatusChanged(input: ArtifactStatusChangedInput!): ArtifactStatusChangedPayload!
 
-  """Added in 25.14.0"""
+  """
+  Added in 25.14.0.
+  
+  Subscribe to real-time artifact import progress updates.
+  
+  Receives progress notifications during artifact import operations,
+  including percentage completed and current status. Useful for displaying
+  progress bars and real-time import status to users.
+  """
   artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
@@ -5520,7 +5870,14 @@ type UntagImageFromRegistry
   image: ImageNode
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Input for updating artifact metadata properties.
+
+Note: This only modifies metadata (description, readonly status).
+Actual artifact files remain unchanged.
+"""
 input UpdateArtifactInput
   @join__type(graph: STRAWBERRY)
 {
@@ -5528,7 +5885,13 @@ input UpdateArtifactInput
   readonly: Boolean
 }
 
-"""Added in 25.14.0"""
+"""
+Added in 25.14.0.
+
+Response payload for artifact update operations.
+
+Returns the updated artifact with modified metadata properties.
+"""
 type UpdateArtifactPayload
   @join__type(graph: STRAWBERRY)
 {

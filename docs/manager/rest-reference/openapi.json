@@ -808,6 +808,8 @@
           "nim",
           "cmd",
           "huggingface-tgi",
+          "sglang",
+          "modular-max",
           "custom"
         ],
         "title": "RuntimeVariant",
