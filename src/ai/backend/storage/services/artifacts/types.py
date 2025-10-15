@@ -49,8 +49,8 @@ class ImportStep(abc.ABC, Generic[InputType]):
         pass
 
     @abc.abstractmethod
-    async def cleanup_on_failure(self, context: ImportStepContext) -> None:
-        """Perform cleanup on failure"""
+    async def cleanup_stage(self, context: ImportStepContext) -> None:
+        """Perform cleanup after stage completion, or after failure"""
         pass
 
 
@@ -70,11 +70,16 @@ class ImportPipeline:
                 current_data = await step.execute(context, current_data)
                 completed_steps.append(step)
 
+            # On success, cleanup all non-archive steps
+            for step in completed_steps:
+                if step.step_type != ArtifactStorageImportStep.ARCHIVE:
+                    await step.cleanup_stage(context)
+
         except Exception:
             # Cleanup completed steps in reverse order on failure
             for step in reversed(completed_steps):
                 try:
-                    await step.cleanup_on_failure(context)
+                    await step.cleanup_stage(context)
                 except Exception:
                     # Log cleanup failures but continue with other cleanups
                     pass

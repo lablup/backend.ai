@@ -819,8 +819,8 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         return storage_key
 
     @override
-    async def cleanup_on_failure(self, context: ImportStepContext) -> None:
-        """Clean up failed files from download storage"""
+    async def cleanup_stage(self, context: ImportStepContext) -> None:
+        """Clean up files from download storage after successful transfer"""
         download_storage_name = context.storage_step_mappings.get(
             ArtifactStorageImportStep.DOWNLOAD
         )
@@ -833,7 +833,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         try:
             storage = context.storage_pool.get_storage(download_storage_name)
             await storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed failed download: {download_storage_name}:{model_prefix}")
+            log.info(f"[cleanup] Removed download files: {download_storage_name}:{model_prefix}")
         except Exception as e:
             log.warning(
                 f"[cleanup] Failed to cleanup download: {download_storage_name}:{model_prefix}: {str(e)}"
@@ -888,8 +888,8 @@ class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
         )
 
     @override
-    async def cleanup_on_failure(self, context: ImportStepContext) -> None:
-        """Clean up failed files from archive storage"""
+    async def cleanup_stage(self, context: ImportStepContext) -> None:
+        """Clean up files from archive storage on failure"""
         archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
         if not archive_storage:
             return
@@ -901,7 +901,7 @@ class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
         try:
             storage = context.storage_pool.get_storage(archive_storage)
             await storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed failed archive: {archive_storage}:{model_prefix}")
+            log.info(f"[cleanup] Removed archive files: {archive_storage}:{model_prefix}")
         except Exception as e:
             log.warning(
                 f"[cleanup] Failed to cleanup archive: {archive_storage}:{model_prefix}: {str(e)}"
