@@ -401,34 +401,29 @@ class VFSStorage(AbstractStorage):
             relative_base: Relative path from the original base directory
             files: List to append found files to
         """
-        try:
-            entries_iter = await aiofiles.os.scandir(current_path)
-            for entry in entries_iter:
-                stat_result = await aiofiles.os.stat(entry.path)
+        entries_iter = await aiofiles.os.scandir(current_path)
+        for entry in entries_iter:
+            stat_result = await aiofiles.os.stat(entry.path)
 
-                # Calculate relative path
-                if relative_base:
-                    relative_path = str(Path(relative_base) / entry.name)
-                else:
-                    relative_path = entry.name
+            # Calculate relative path
+            if relative_base:
+                relative_path = str(Path(relative_base) / entry.name)
+            else:
+                relative_path = entry.name
 
-                file_info = VFSFileInfo(
-                    name=entry.name,
-                    type="directory" if entry.is_dir() else "file",
-                    size=stat_result.st_size if entry.is_file() else None,
-                    modified=stat_result.st_mtime,
-                    created=stat_result.st_ctime,
-                    path=relative_path,
-                )
-                files.append(file_info)
+            file_info = VFSFileInfo(
+                name=entry.name,
+                type="directory" if entry.is_dir() else "file",
+                size=stat_result.st_size if entry.is_file() else None,
+                modified=stat_result.st_mtime,
+                created=stat_result.st_ctime,
+                path=relative_path,
+            )
+            files.append(file_info)
 
-                # Recursively process subdirectories
-                if entry.is_dir():
-                    await self._collect_files_recursive(Path(entry.path), relative_path, files)
-
-        except Exception as e:
-            log.error(f"Error collecting files from {current_path}: {e}")
-            raise
+            # Recursively process subdirectories
+            if entry.is_dir():
+                await self._collect_files_recursive(Path(entry.path), relative_path, files)
 
     async def create_directory(self, directory: str) -> None:
         """
