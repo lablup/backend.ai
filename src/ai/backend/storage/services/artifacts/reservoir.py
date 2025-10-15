@@ -538,16 +538,9 @@ class ReservoirDownloadStep(ImportStep[None]):
                     relative_path = remote_file_path
 
                 local_file_path = dest_path / relative_path
-
-                try:
-                    bytes_downloaded = await downloader.download_file(
-                        remote_file_path, local_file_path
-                    )
-                    total_bytes += bytes_downloaded
-                    log.debug(f"Downloaded: {remote_file_path} ({bytes_downloaded} bytes)")
-                except Exception as e:
-                    log.error(f"Failed to download file {remote_file_path}: {e}")
-                    raise
+                bytes_downloaded = await downloader.download_file(remote_file_path, local_file_path)
+                total_bytes += bytes_downloaded
+                log.debug(f"Downloaded: {remote_file_path} ({bytes_downloaded} bytes)")
 
             log.info(f"VFS download completed: {model_prefix} -> {dest_path} ({total_bytes} bytes)")
             return total_bytes
