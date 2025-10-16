@@ -395,6 +395,8 @@ async def create_vfolder(request: web.Request) -> web.Response:
             try:
                 await volume.create_vfolder(params["vfid"], mode=perm_mode)
             except QuotaScopeNotFoundError:
+                if not ctx.local_config.storage_proxy.allow_auto_quota_scope_creation:
+                    raise
                 assert params["vfid"].quota_scope_id
                 if initial_max_size_for_quota_scope := (params["options"] or {}).get(
                     "initial_max_size_for_quota_scope"
