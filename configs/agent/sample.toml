@@ -178,7 +178,7 @@
   # page/hugepage size (e.g., 2 MiB).
   memory-align-size = "16M"
   # Resource allocation order
-  allocation-order = [ "cpu", "cuda", "mem", "rocm", "tpu",]
+  allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
   # Affinity policy
   affinity-policy = "INTERLEAVED"
 
@@ -361,16 +361,18 @@
 # be provided when defining subagents.
 [[sub-agents]]
 # Add multiple [[sub-agents]] sections as needed
-  # Agent config overrides for the individual subagent
+  # Agent config overrides for the individual subagent.
+  # All fields except Agent ID are by default optional.
+  # Only override fields if necessary.
   [sub-agents.agent]
-    # Agent socket port
-    agent-sock-port = 6007
     # Agent ID
-    ## id = "agent-001"
+    id = "agent-001"
+    # Agent socket port
+    ## agent-sock-port = 6007  # min=1024 max=65535
     # Mount path for containers
     ## mount-path = "/mnt/backend.ai"
     # Whether to enable cohabiting storage proxy
-    cohabiting-storage-proxy = true
+    ## cohabiting-storage-proxy = true
     # Allowed compute plugins
     ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
     # Blocked compute plugins
@@ -380,11 +382,11 @@
     # Blocked network plugins
     ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
     # Whether to force terminate abusing containers
-    force-terminate-abusing-containers = false
+    ## force-terminate-abusing-containers = true
     # Kernel creation concurrency
-    kernel-creation-concurrency = 4
+    ## kernel-creation-concurrency = 4  # min=1 max=32
     # Whether to use experimental Redis event dispatcher
-    use-experimental-redis-event-dispatcher = false
+    ## use-experimental-redis-event-dispatcher = true
     # Docker mode detected based on kernel version (linuxkit/native)
     ## docker-mode = "linuxkit"
     # Owner uid:gid of the mount directory
@@ -397,7 +399,7 @@
       # Synchronization interval in seconds
       interval = 10.0
 
-  # Agent config overrides for the individual subagent
+  # Container config overrides for the individual subagent
   [sub-agents.container]
     # Kernel user ID
     kernel-uid = -1
@@ -445,7 +447,7 @@
     # It is not intended to be set in the configuration file.
     ## [sub-agents.container.krunner-volumes]
 
-  # Agent config overrides for the individual subagent
+  # Resource config overrides for the individual subagent
   [sub-agents.resource]
     # The number of CPU cores reserved for the operating system and the agent
     # service.
@@ -465,6 +467,6 @@
     # page/hugepage size (e.g., 2 MiB).
     memory-align-size = 16777216
     # Resource allocation order
-    allocation-order = [ "cpu", "cuda", "mem", "rocm", "tpu",]
+    allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
     # Affinity policy
     affinity-policy = 1
