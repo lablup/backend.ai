@@ -830,7 +830,6 @@ type DeleteReservoirRegistryPayload {
   id: ID!
 }
 
-<<<<<<< HEAD
 """Added in 25.16.0. Input for deleting VFS storage"""
 input DeleteVFSStorageInput {
   id: ID!
@@ -841,10 +840,7 @@ type DeleteVFSStoragePayload {
   id: ID!
 }
 
-"""Added in 25.13.0"""
-=======
 """Added in 25.15.0"""
->>>>>>> ab13d198c (docs: Change model deployment type introduction version to 25.15.0)
 input DeploymentFilter {
   name: StringFilter = null
   status: DeploymentStatusFilter = null
