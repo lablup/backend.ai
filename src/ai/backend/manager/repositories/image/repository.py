@@ -7,7 +7,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import ImageAlias
+from ai.backend.common.types import ImageAlias, ImageID
 from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import (
@@ -88,25 +88,21 @@ class ImageRepository:
         status_filter: Optional[list[ImageStatus]] = None,
         requested_by_superadmin: bool = False,
     ) -> list[ImageWithAgentInstallStatus]:
-        images_data: list[ImageDataWithDetails] = await self._db_source.get_images_by_canonicals(
-            image_canonicals, status_filter
-        )
-
-        installed_agents_for_images: list[set[str]] = []
-
-        image_ids = [image.id for image in images_data]
-        installed_agents_for_images = await self._stateful_source.get_agents_for_images(image_ids)
-
-        # TODO: Handle mismatch in lengths more gracefully
-        if len(installed_agents_for_images) != len(images_data):
-            installed_agents_for_images = [set() for _ in images_data]
+        images_data: dict[
+            ImageID, ImageDataWithDetails
+        ] = await self._db_source.get_images_by_canonicals(image_canonicals, status_filter)
+        image_ids = list(images_data.keys())
+        installed_agents_for_images: dict[
+            ImageID, set[str]
+        ] = await self._stateful_source.get_agents_for_images(image_ids)
 
         hide_agents = (
             False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )
 
         images_with_agent_install_status: list[ImageWithAgentInstallStatus] = []
-        for image, installed_agents in zip(images_data, installed_agents_for_images):
+        for image_id, image in images_data.items():
+            installed_agents = installed_agents_for_images.get(image_id, set())
             images_with_agent_install_status.append(
                 ImageWithAgentInstallStatus(
                     image=image,
