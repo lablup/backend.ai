@@ -186,6 +186,7 @@ from ai.backend.common.types import (
     DeviceId,
     DeviceName,
     HardwareMetadata,
+    ImageCanonical,
     ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
@@ -294,8 +295,8 @@ def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int
 
 @dataclass
 class ScanImagesResult:
-    scanned_images: Mapping[str, ScannedImage]
-    removed_images: Mapping[str, ScannedImage]
+    scanned_images: Mapping[ImageCanonical, ScannedImage]
+    removed_images: Mapping[ImageCanonical, ScannedImage]
 
 
 @dataclass
@@ -765,7 +766,7 @@ class AbstractAgent(
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
     computers: MutableMapping[DeviceName, ComputerContext]
-    images: Mapping[str, ScannedImage]
+    images: Mapping[ImageCanonical, ScannedImage]
     port_pool: set[int]
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
@@ -1198,8 +1199,8 @@ class AbstractAgent(
                 },
                 images=zlib.compress(
                     msgpack.packb([
-                        (repo_tag, scanned_image.to_dict())
-                        for repo_tag, scanned_image in self.images.items()
+                        (canonical, scanned_image.to_dict())
+                        for canonical, scanned_image in self.images.items()
                     ])
                 ),
                 images_opts=ImageOpts(compression="zlib"),  # compression: zlib or None

@@ -1,6 +1,5 @@
 import logging
 from typing import ParamSpec, Self, TypeVar, cast
-from uuid import UUID
 
 from glide import Batch
 
@@ -18,7 +17,7 @@ from ai.backend.common.resilience import (
     RetryArgs,
     RetryPolicy,
 )
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import ImageID, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -93,7 +92,7 @@ class ValkeyImageClient:
     async def add_agent_to_images(
         self,
         agent_id: str,
-        image_ids: list[UUID],
+        image_ids: list[ImageID],
     ) -> None:
         """
         Add an agent to multiple image sets.
@@ -113,7 +112,7 @@ class ValkeyImageClient:
     async def remove_agent_from_images(
         self,
         agent_id: str,
-        image_ids: list[UUID],
+        image_ids: list[ImageID],
     ) -> None:
         """
         Remove an agent from multiple image sets.
@@ -161,7 +160,7 @@ class ValkeyImageClient:
     @valkey_image_resilience.apply()
     async def get_agents_for_image(
         self,
-        image_id: UUID,
+        image_id: ImageID,
     ) -> set[str]:
         """
         Get all agents that have a specific image.
@@ -175,7 +174,7 @@ class ValkeyImageClient:
     @valkey_image_resilience.apply()
     async def get_agents_for_images(
         self,
-        image_ids: list[UUID],
+        image_ids: list[ImageID],
     ) -> list[set[str]]:
         """
         Get all agents for multiple images.
@@ -202,7 +201,7 @@ class ValkeyImageClient:
     @valkey_image_resilience.apply()
     async def get_agent_counts_for_images(
         self,
-        image_ids: list[UUID],
+        image_ids: list[ImageID],
     ) -> list[int]:
         """
         Get the count of agents for multiple images.

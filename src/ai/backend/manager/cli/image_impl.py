@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from pprint import pformat, pprint
 from typing import Any, Optional
-from uuid import UUID
 
 import click
 import sqlalchemy as sa
@@ -12,7 +11,7 @@ from tabulate import tabulate
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.types import ImageAlias
+from ai.backend.common.types import ImageAlias, ImageID
 from ai.backend.logging import BraceStyleAdapter
 
 from ..data.image.types import ImageStatus
@@ -47,7 +46,7 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
                     if installed_count > 0:
                         installed_items.append(item)
 
-                installed_image_ids: list[UUID] = [item.id for item in installed_items]
+                installed_image_ids: list[ImageID] = [ImageID(item.id) for item in installed_items]
                 agents_per_installed_items = await redis_conn_set.image.get_agents_for_images(
                     installed_image_ids
                 )

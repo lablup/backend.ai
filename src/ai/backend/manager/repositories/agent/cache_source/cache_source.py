@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 
@@ -25,7 +24,7 @@ class AgentCacheSource:
         self._valkey_image = valkey_image
         self._valkey_live = valkey_live
 
-    async def set_agent_to_images(self, agent_id: AgentId, image_ids: list[UUID]) -> None:
+    async def set_agent_to_images(self, agent_id: AgentId, image_ids: list[ImageID]) -> None:
         await self._valkey_image.add_agent_to_images(agent_id, image_ids)
 
     async def update_agent_last_seen(self, agent_id: AgentId, time: datetime) -> None:
@@ -37,5 +36,5 @@ class AgentCacheSource:
     async def remove_agent_from_all_images(self, agent_id: AgentId) -> None:
         await self._valkey_image.remove_agent_from_all_images(agent_id)
 
-    async def remove_agent_from_images(self, agent_id: AgentId, image_ids: list[UUID]) -> None:
+    async def remove_agent_from_images(self, agent_id: AgentId, image_ids: list[ImageID]) -> None:
         await self._valkey_image.remove_agent_from_images(agent_id, image_ids)

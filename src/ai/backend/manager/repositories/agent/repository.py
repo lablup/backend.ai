@@ -2,7 +2,6 @@ import logging
 import zlib
 from collections.abc import Collection, Sequence
 from typing import Mapping, cast
-from uuid import UUID
 
 import sqlalchemy as sa
 from sqlalchemy.orm import contains_eager
@@ -15,7 +14,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, ImageCanonical, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -84,7 +83,7 @@ class AgentRepository:
         images_data = await self._db_source.get_images_by_digest([
             image.digest for image in scanned_images
         ])
-        image_ids: list[UUID] = list(images_data.keys())
+        image_ids: list[ImageID] = list(images_data.keys())
         with suppress_with_log(
             [Exception], message=f"Failed to cache agent: {agent_id} to images: {image_ids}"
         ):
@@ -131,10 +130,10 @@ class AgentRepository:
 
     @agent_repository_resilience.apply()
     async def remove_agent_from_images(
-        self, agent_id: AgentId, scanned_images: Mapping[str, ScannedImage]
+        self, agent_id: AgentId, scanned_images: Mapping[ImageCanonical, ScannedImage]
     ) -> None:
         digest_list = [image.digest for image in scanned_images.values()]
-        images: dict[UUID, ImageDataWithDetails] = await self._db_source.get_images_by_digest(
+        images: dict[ImageID, ImageDataWithDetails] = await self._db_source.get_images_by_digest(
             digest_list
         )
         with suppress_with_log(

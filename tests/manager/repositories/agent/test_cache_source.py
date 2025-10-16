@@ -6,7 +6,7 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, ImageID
 from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 
@@ -76,9 +76,9 @@ class TestAgentCacheSource:
         # Given
         agent_id = AgentId("agent-001")
         image_ids = [
-            UUID("00000000-0000-0000-0000-000000000000"),
-            UUID("11111111-1111-1111-1111-111111111111"),
-            UUID("22222222-2222-2222-2222-222222222222"),
+            ImageID(UUID("00000000-0000-0000-0000-000000000000")),
+            ImageID(UUID("11111111-1111-1111-1111-111111111111")),
+            ImageID(UUID("22222222-2222-2222-2222-222222222222")),
         ]
 
         # When
@@ -95,7 +95,7 @@ class TestAgentCacheSource:
     ) -> None:
         # Given
         agent_id = AgentId("agent-002")
-        image_ids: list[UUID] = []
+        image_ids: list[ImageID] = []
 
         # When
         await cache_source.set_agent_to_images(agent_id, image_ids)
@@ -112,9 +112,9 @@ class TestAgentCacheSource:
         # Given
         agent_id = AgentId("agent-003")
         images = [
-            UUID("00000000-0000-0000-0000-000000000000"),
-            UUID("00000000-0000-0000-0000-000000000000"),  # duplicate
-            UUID("11111111-1111-1111-1111-111111111111"),
+            ImageID(UUID("00000000-0000-0000-0000-000000000000")),
+            ImageID(UUID("00000000-0000-0000-0000-000000000000")),  # duplicate
+            ImageID(UUID("11111111-1111-1111-1111-111111111111")),
         ]
 
         # When
@@ -134,8 +134,8 @@ class TestAgentCacheSource:
         agents = [AgentId(f"agent-{i:03d}") for i in range(5)]
         heartbeat_time = datetime.now(tzutc())
         image_ids = [
-            UUID("00000000-0000-0000-0000-000000000000"),
-            UUID("11111111-1111-1111-1111-111111111111"),
+            ImageID(UUID("00000000-0000-0000-0000-000000000000")),
+            ImageID(UUID("11111111-1111-1111-1111-111111111111")),
         ]
 
         # When - simulate concurrent operations
@@ -162,7 +162,7 @@ class TestAgentCacheSource:
         # Given
         agent_id = AgentId("agent-error")
         heartbeat_time = datetime.now(tzutc())
-        image_ids = [UUID("22222222-2222-2222-2222-222222222222")]
+        image_ids = [ImageID(UUID("22222222-2222-2222-2222-222222222222"))]
 
         # Configure mocks to raise exceptions
         mock_valkey_live.update_agent_last_seen.side_effect = ConnectionError(

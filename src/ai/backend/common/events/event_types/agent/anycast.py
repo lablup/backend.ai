@@ -14,6 +14,7 @@ from ai.backend.common.types import (
     AgentId,
     ContainerId,
     ContainerStatus,
+    ImageCanonical,
     KernelContainerId,
     KernelId,
 )
@@ -132,13 +133,13 @@ class AgentHeartbeatEvent(AgentOperationEvent):
 
 @dataclass
 class AgentImagesRemoveEvent(AgentOperationEvent):
-    scanned_images: Mapping[str, ScannedImage]
+    scanned_images: Mapping[ImageCanonical, ScannedImage]
 
     @override
     def serialize(self) -> tuple:
         result = {}
         for canonical, image in self.scanned_images.items():
-            result[canonical] = image.to_dict()
+            result[str(canonical)] = image.to_dict()
         return (result,)
 
     @classmethod
@@ -146,7 +147,7 @@ class AgentImagesRemoveEvent(AgentOperationEvent):
     def deserialize(cls, value: tuple) -> Self:
         result = {}
         for canonical, image_data in value[0].items():
-            result[canonical] = ScannedImage.from_dict(image_data)
+            result[ImageCanonical(canonical)] = ScannedImage.from_dict(image_data)
         return cls(result)
 
     @classmethod
