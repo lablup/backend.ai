@@ -82,6 +82,9 @@ setuptools = "tools/setuptools.lock"
 bin = [
     "ruff",
 ]
+py_editable_in_resolve = [
+    "aiotools",
+]
 
 # [setup-py-generation]
 # first_party_depenency_version_scheme = "exact"

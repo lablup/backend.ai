@@ -12,6 +12,7 @@ import time
 import uuid
 from collections import defaultdict
 from collections.abc import (
+    Coroutine,
     Iterable,
     Mapping,
     MutableMapping,
@@ -1850,7 +1851,7 @@ class AgentRegistry:
         })
 
         # Aggregate by agents to minimize RPC calls
-        per_agent_tasks = []
+        per_agent_coros: list[Coroutine[Any, Any, None]] = []
         keyfunc = lambda binding: binding.agent_alloc_ctx.agent_id
         for agent_id, group_iterator in itertools.groupby(
             sorted(kernel_agent_bindings, key=keyfunc),
@@ -1859,37 +1860,30 @@ class AgentRegistry:
             items = [*group_iterator]
             # Within a group, agent_alloc_ctx are same.
             agent_alloc_ctx = items[0].agent_alloc_ctx
-            per_agent_tasks.append(
-                (
+            per_agent_coros.append(
+                self._create_kernels_in_one_agent(
                     agent_alloc_ctx,
-                    self._create_kernels_in_one_agent(
-                        agent_alloc_ctx,
-                        scheduled_session,
-                        items,
-                        img_configs,
-                        cluster_info,
-                        idle_timeout,
-                    ),
+                    scheduled_session,
+                    items,
+                    img_configs,
+                    cluster_info,
+                    idle_timeout,
                 ),
             )
-        if per_agent_tasks:
-            agent_errors = []
-            results = await asyncio.gather(
-                *[item[1] for item in per_agent_tasks],
-                return_exceptions=True,
+        agent_errors: list[BaseException] = []
+        async for task in aiotools.as_completed_safe(per_agent_coros):
+            try:
+                await task
+            except ExceptionGroup as e:
+                agent_errors.extend(e.exceptions)
+            except Exception as e:
+                agent_errors.append(e)
+        if agent_errors:
+            raise MultiAgentError(
+                "agent(s) raise errors during kernel creation",
+                agent_errors,
             )
-            for agent_alloc_tx, result in zip((item[0] for item in per_agent_tasks), results):
-                if isinstance(result, aiotools.TaskGroupError):
-                    agent_errors.extend(result.__errors__)
-                elif isinstance(result, Exception):
-                    # mark to be destroyed afterwards
-                    agent_errors.append(result)
-            if agent_errors:
-                raise MultiAgentError(
-                    "agent(s) raise errors during kernel creation",
-                    agent_errors,
-                )
-            await self.settle_agent_alloc(kernel_agent_bindings)
+        await self.settle_agent_alloc(kernel_agent_bindings)
 
     def convert_resource_spec_to_resource_slot(
         self,

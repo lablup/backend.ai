@@ -13,6 +13,7 @@ import aiohttp
 import aiotools
 import multidict
 import trafaret as t
+from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
@@ -1496,8 +1497,6 @@ class SessionService:
         owner_access_key = action.owner_access_key
         reader = action.reader
 
-        loop = asyncio.get_event_loop()
-
         session = await self._session_repository.get_session_validated(
             session_name,
             owner_access_key,
@@ -1506,28 +1505,32 @@ class SessionService:
 
         await self._agent_registry.increment_session_usage(session)
         file_count = 0
-        upload_tasks = []
-        async for file in aiotools.aiter(reader.next, None):
-            if file_count == 20:
-                raise InvalidAPIParameters("Too many files")
-            file_count += 1
-            # This API handles only small files, so let's read it at once.
-            chunks = []
-            recv_size = 0
-            while True:
-                chunk = await file.read_chunk(size=1048576)
-                if not chunk:
+
+        async with aiotools.TaskScope() as ts:
+            async for file in aiotools.aiter(reader.next, None):
+                if file_count == 20:
+                    raise InvalidAPIParameters("Too many files")
+                if file is None:
                     break
-                chunk_size = len(chunk)
-                if recv_size + chunk_size >= 1048576:
-                    raise InvalidAPIParameters("Too large file")
-                chunks.append(chunk)
-                recv_size += chunk_size
-            data = file.decode(b"".join(chunks))
-            log.debug("received file: {0} ({1:,} bytes)", file.filename, recv_size)
-            t = loop.create_task(self._agent_registry.upload_file(session, file.filename, data))
-            upload_tasks.append(t)
-        await asyncio.gather(*upload_tasks)
+                if not isinstance(file, BodyPartReader):
+                    raise InvalidAPIParameters("Nested multipart upload is not supported")
+                file_name = file.filename or f"upload-{secrets.token_hex(12)}"
+                file_count += 1
+                # This API handles only small files, so let's read it at once.
+                chunks = []
+                recv_size = 0
+                while True:
+                    chunk = await file.read_chunk(size=1048576)
+                    if not chunk:
+                        break
+                    chunk_size = len(chunk)
+                    if recv_size + chunk_size >= 1048576:
+                        raise InvalidAPIParameters("Too large file")
+                    chunks.append(chunk)
+                    recv_size += chunk_size
+                data = file.decode(b"".join(chunks))
+                log.debug("received file: {0} ({1:,} bytes)", file_name, recv_size)
+                ts.create_task(self._agent_registry.upload_file(session, file_name, data))
 
         return UploadFilesActionResult(result=None, session_data=session.to_dataclass())
 
