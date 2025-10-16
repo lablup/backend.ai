@@ -62,6 +62,9 @@ from ai.backend.manager.services.image.actions.get_image_by_id import GetImageBy
 from ai.backend.manager.services.image.actions.get_image_by_identifier import (
     GetImageByIdentifierAction,
 )
+from ai.backend.manager.services.image.actions.get_image_installed_agents import (
+    GetImageInstalledAgentsAction,
+)
 from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
     GetImagesByCanonicalsAction,
 )
@@ -502,8 +505,10 @@ class ImageNode(graphene.ObjectType):
     async def _batch_load_installed_agents(
         cls, ctx: GraphQueryContext, image_ids: Sequence[ImageID]
     ) -> list[set[AgentId]]:
-        results = await ctx.valkey_image.get_agents_for_images(list(image_ids))
-        return [{AgentId(agent_id) for agent_id in agents} for agents in results.values()]
+        result = await ctx.processors.image.get_image_installed_agents.wait_for_complete(
+            GetImageInstalledAgentsAction(image_ids=list(image_ids))
+        )
+        return list(result.data.values())
 
     async def resolve_installed(self, info: graphene.ResolveInfo) -> bool:
         graph_ctx: GraphQueryContext = info.context
