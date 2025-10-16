@@ -281,8 +281,8 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         rows: List[ImageRow],
     ) -> AsyncIterator[Image]:
-        image_canonicals = [row.name for row in rows]
-        results = await ctx.valkey_image.get_agents_for_images(image_canonicals)
+        image_ids = [row.id for row in rows]
+        results = await ctx.valkey_image.get_agents_for_images(image_ids)
 
         for idx, row in enumerate(rows):
             installed_agents: List[str] = list(results[idx])
@@ -498,9 +498,9 @@ class ImageNode(graphene.ObjectType):
 
     @classmethod
     async def _batch_load_installed_agents(
-        cls, ctx: GraphQueryContext, full_names: Sequence[str]
+        cls, ctx: GraphQueryContext, image_ids: Sequence[UUID]
     ) -> list[set[AgentId]]:
-        results = await ctx.valkey_image.get_agents_for_images(list(full_names))
+        results = await ctx.valkey_image.get_agents_for_images(list(image_ids))
         return [{AgentId(agent_id) for agent_id in agents} for agents in results]
 
     async def resolve_installed(self, info: graphene.ResolveInfo) -> bool:
@@ -508,7 +508,7 @@ class ImageNode(graphene.ObjectType):
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, self._batch_load_installed_agents
         )
-        agent_ids = await loader.load(self._canonical)
+        agent_ids = await loader.load(self.row_id)
         agent_ids = cast(Optional[set[AgentId]], agent_ids)
         return agent_ids is not None and len(agent_ids) > 0
 

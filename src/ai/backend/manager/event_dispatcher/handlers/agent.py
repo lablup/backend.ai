@@ -145,9 +145,7 @@ class AgentEventHandler:
     ) -> None:
         processor = await self.get_processors()
         await processor.agent.remove_agent_from_images.wait_for_complete(
-            action=RemoveAgentFromImagesAction(
-                agent_id=source, image_canonicals=event.image_canonicals
-            )
+            action=RemoveAgentFromImagesAction(agent_id=source, scanned_images=event.scanned_images)
         )
 
     async def handle_check_agent_resource(

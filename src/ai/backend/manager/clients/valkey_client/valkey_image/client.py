@@ -1,5 +1,6 @@
 import logging
 from typing import ParamSpec, Self, TypeVar, cast
+from uuid import UUID
 
 from glide import Batch
 
@@ -92,40 +93,40 @@ class ValkeyImageClient:
     async def add_agent_to_images(
         self,
         agent_id: str,
-        image_canonicals: list[str],
+        image_ids: list[UUID],
     ) -> None:
         """
         Add an agent to multiple image sets.
 
         :param agent_id: The agent ID to add.
-        :param image_canonicals: List of image canonical names.
+        :param image_identifiers: List of image identifiers (canonical:arch).
         """
-        if not image_canonicals:
+        if not image_ids:
             return
 
         tx = self._create_batch()
-        for image_canonical in image_canonicals:
-            tx.sadd(image_canonical, [agent_id])
+        for image_id in image_ids:
+            tx.sadd(str(image_id), [agent_id])
         await self._client.client.exec(tx, raise_on_error=True)
 
     @valkey_image_resilience.apply()
     async def remove_agent_from_images(
         self,
         agent_id: str,
-        image_canonicals: list[str],
+        image_ids: list[UUID],
     ) -> None:
         """
         Remove an agent from multiple image sets.
 
         :param agent_id: The agent ID to remove.
-        :param image_canonicals: List of image canonical names.
+        :param image_ids: List of image identifiers (Image ID).
         """
-        if not image_canonicals:
+        if not image_ids:
             return
 
         tx = self._create_batch()
-        for image_canonical in image_canonicals:
-            tx.srem(image_canonical, [agent_id])
+        for image_id in image_ids:
+            tx.srem(str(image_id), [agent_id])
         await self._client.client.exec(tx, raise_on_error=True)
 
     @valkey_image_resilience.apply()
@@ -160,34 +161,34 @@ class ValkeyImageClient:
     @valkey_image_resilience.apply()
     async def get_agents_for_image(
         self,
-        image_canonical: str,
+        image_id: UUID,
     ) -> set[str]:
         """
         Get all agents that have a specific image.
 
-        :param image_canonical: The image canonical name.
+        :param image_id: The image identifier.
         :return: Set of agent IDs.
         """
-        result = await self._client.client.smembers(image_canonical)
+        result = await self._client.client.smembers(str(image_id))
         return {member.decode() for member in result}
 
     @valkey_image_resilience.apply()
     async def get_agents_for_images(
         self,
-        image_canonicals: list[str],
+        image_ids: list[UUID],
     ) -> list[set[str]]:
         """
         Get all agents for multiple images.
 
-        :param image_canonicals: List of image canonical names.
+        :param image_ids: List of image identifiers (UUID).
         :return: List of agent ID sets, one for each image.
         """
-        if not image_canonicals:
+        if not image_ids:
             return []
 
         tx = self._create_batch()
-        for image_canonical in image_canonicals:
-            tx.smembers(image_canonical)
+        for image_id in image_ids:
+            tx.smembers(str(image_id))
 
         results = await self._client.client.exec(tx, raise_on_error=True)
         final_results: list[set[str]] = []
@@ -201,20 +202,20 @@ class ValkeyImageClient:
     @valkey_image_resilience.apply()
     async def get_agent_counts_for_images(
         self,
-        image_canonicals: list[str],
+        image_ids: list[UUID],
     ) -> list[int]:
         """
         Get the count of agents for multiple images.
 
-        :param image_canonicals: List of image canonical names.
+        :param image_ids: List of image identifiers (canonical:arch).
         :return: List of agent counts, one for each image.
         """
-        if not image_canonicals:
+        if not image_ids:
             return []
 
         tx = self._create_batch()
-        for image_canonical in image_canonicals:
-            tx.scard(image_canonical)
+        for image_id in image_ids:
+            tx.scard(str(image_id))
 
         results = await self._client.client.exec(tx, raise_on_error=True)
         if not results:

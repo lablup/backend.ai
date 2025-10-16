@@ -49,6 +49,7 @@ from aiotools import TaskGroup
 from async_timeout import timeout
 
 from ai.backend.common.cgroup import get_cgroup_mount_point
+from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.docker import (
     MAX_KERNELSPEC,
     MIN_KERNELSPEC,
@@ -1569,7 +1570,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     async def scan_images(self) -> ScanImagesResult:
         async with closing_async(Docker()) as docker:
             all_images = await docker.images.list()
-            scanned_images, removed_images = {}, {}
+            scanned_images: dict[str, ScannedImage] = {}
+            removed_images: dict[str, ScannedImage] = {}
             for image in all_images:
                 if image["RepoTags"] is None:
                     continue
@@ -1595,7 +1597,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
                     kernelspec = int(labels.get(LabelName.KERNEL_SPEC, "1"))
                     if MIN_KERNELSPEC <= kernelspec <= MAX_KERNELSPEC:
-                        scanned_images[repo_tag] = img_detail["Id"]
+                        scanned_images[repo_tag] = ScannedImage(
+                            canonical=repo_tag,
+                            digest=img_detail["Id"],
+                        )
             for added_image in scanned_images.keys() - self.images.keys():
                 log.debug("found kernel image: {0}", added_image)
 
