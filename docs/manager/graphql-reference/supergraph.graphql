@@ -2178,7 +2178,6 @@ type DeleteUserResourcePolicy
   msg: String
 }
 
-<<<<<<< HEAD
 """Added in 25.16.0. Input for deleting VFS storage"""
 input DeleteVFSStorageInput
   @join__type(graph: STRAWBERRY)
@@ -2193,10 +2192,7 @@ type DeleteVFSStoragePayload
   id: ID!
 }
 
-"""Added in 25.13.0"""
-=======
 """Added in 25.15.0"""
->>>>>>> ab13d198c (docs: Change model deployment type introduction version to 25.15.0)
 input DeploymentFilter
   @join__type(graph: STRAWBERRY)
 {
@@ -5265,7 +5261,7 @@ type Query
     last: Int
   ): ComputeSessionConnection @join__field(graph: GRAPHENE)
 
-  """Added in 25.13.0."""
+  """Added in 25.15.0."""
   session_pending_queue(
     resource_group_id: String!
 

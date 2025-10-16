@@ -19,6 +19,7 @@ from strawberry.aiohttp.views import GraphQLView
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.data_loader.registry import DataLoaderRegistry
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 from ..api.gql.schema import schema as strawberry_schema
@@ -65,6 +66,7 @@ class CustomGraphQLView(GraphQLView):
             config_provider=root_context.config_provider,
             event_hub=root_context.event_hub,
             event_fetcher=root_context.event_fetcher,
+            dataloader_registry=DataLoaderRegistry(),
         )
 
 
