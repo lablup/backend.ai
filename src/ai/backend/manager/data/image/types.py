@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, NamedTuple, Optional
 
-from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID
+from ai.backend.common.types import AgentId, CIStrEnum, ImageCanonical, ImageID
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.image import Resources
@@ -108,7 +108,7 @@ class ImageAgentInstallStatus:
     """
 
     installed: bool
-    agent_names: list[str] = field(default_factory=list)
+    agent_names: list[AgentId] = field(default_factory=list)
 
 
 @dataclass

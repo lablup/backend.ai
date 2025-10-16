@@ -41,6 +41,10 @@ from ai.backend.manager.services.image.actions.get_image_by_identifier import (
     GetImageByIdentifierAction,
     GetImageByIdentifierActionResult,
 )
+from ai.backend.manager.services.image.actions.get_image_installed_agents import (
+    GetImageInstalledAgentsAction,
+    GetImageInstalledAgentsActionResult,
+)
 from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
     GetImagesByCanonicalsAction,
     GetImagesByCanonicalsActionResult,
@@ -95,6 +99,13 @@ class ImageService:
         self._agent_registry = agent_registry
         self._image_repository = image_repository
         self._admin_image_repository = admin_image_repository
+
+    async def get_image_installed_agents(
+        self, action: GetImageInstalledAgentsAction
+    ) -> GetImageInstalledAgentsActionResult:
+        image_ids = action.image_ids
+        agent_counts_per_image = await self._image_repository.get_image_installed_agents(image_ids)
+        return GetImageInstalledAgentsActionResult(data=agent_counts_per_image)
 
     async def get_images_by_canonicals(
         self, action: GetImagesByCanonicalsAction

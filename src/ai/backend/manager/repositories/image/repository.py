@@ -7,7 +7,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import ImageAlias, ImageID
+from ai.backend.common.types import AgentId, ImageAlias, ImageID
 from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import (
@@ -82,6 +82,16 @@ class ImageRepository:
         return await self._db_source.resolve_images_batch(identifier_lists)
 
     @image_repository_resilience.apply()
+    async def get_image_installed_agents(
+        self, image_ids: list[ImageID]
+    ) -> dict[ImageID, set[AgentId]]:
+        """
+        Returns the set of installed agents for each image ID in the input list.
+        The result is a dictionary mapping ImageID to the set of installed agents.
+        """
+        return await self._stateful_source.get_agents_for_images(image_ids)
+
+    @image_repository_resilience.apply()
     async def get_images_by_canonicals(
         self,
         image_canonicals: list[str],
@@ -93,7 +103,7 @@ class ImageRepository:
         ] = await self._db_source.get_images_by_canonicals(image_canonicals, status_filter)
         image_ids = list(images_data.keys())
         installed_agents_for_images: dict[
-            ImageID, set[str]
+            ImageID, set[AgentId]
         ] = await self._stateful_source.get_agents_for_images(image_ids)
 
         hide_agents = (
