@@ -20,6 +20,7 @@ from typing import (
     AsyncGenerator,
     Callable,
     ClassVar,
+    Collection,
     Coroutine,
     Iterable,
     Literal,
@@ -27,7 +28,9 @@ from typing import (
     Optional,
     Sequence,
     Set,
+    Type,
     cast,
+    overload,
 )
 from uuid import UUID
 
@@ -93,6 +96,7 @@ from ai.backend.common.service_discovery.service_discovery import (
     ServiceMetadata,
 )
 from ai.backend.common.types import (
+    AgentId,
     ClusterInfo,
     CommitStatus,
     ContainerId,
@@ -188,7 +192,7 @@ def collect_error(meth: Callable) -> Callable:
         try:
             return await meth(self, *args, **kwargs)
         except Exception:
-            await self.agent.produce_error_event()
+            await self.default_agent.produce_error_event()
             raise
 
     return _inner
@@ -307,7 +311,8 @@ class AgentRPCServer(aobject):
     rpc_auth_agent_secret_key: Optional[SecretKey]
 
     loop: asyncio.AbstractEventLoop
-    agent: AbstractAgent
+    agents: Mapping[AgentId, AbstractAgent]
+    _default_agent_id: AgentId
     rpc_server: Peer
     rpc_addr: str
     agent_addr: str
@@ -378,13 +383,27 @@ class AgentRPCServer(aobject):
 
         backend = self.local_config.agent.backend
         agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
-        self.agent = await agent_mod.get_agent_cls().new(  # type: ignore
-            self.etcd,
-            self.local_config,
-            stats_monitor=self.stats_monitor,
-            error_monitor=self.error_monitor,
-            agent_public_key=self.rpc_auth_agent_public_key,
-        )
+        agent_cls: Type[AbstractAgent] = agent_mod.get_agent_cls()
+        global_config = self.local_config.global_config
+        agent_configs = self.local_config.agent_configs
+        async with asyncio.TaskGroup() as tg:
+            tasks = [
+                tg.create_task(
+                    agent_cls.new(
+                        self.etcd,
+                        global_config=global_config,
+                        agent_config=agent_config,
+                        stats_monitor=self.stats_monitor,
+                        error_monitor=self.error_monitor,
+                        agent_public_key=self.rpc_auth_agent_public_key,
+                    )
+                )
+                for agent_config in agent_configs
+            ]
+        agents = [task.result() for task in tasks]
+        # TODO: Is there a better way of choosing a default agent?
+        self._default_agent_id = agents[0].id
+        self.agents = {agent.id: agent for agent in agents}
 
         rpc_addr = self.local_config.agent.rpc_listen_addr
         self.rpc_server = Peer(
@@ -446,17 +465,20 @@ class AgentRPCServer(aobject):
                     return str(o)
 
         try:
-            if self.agent:
+            if self.agents:
+                # TODO: Is it acceptable to flatten out kernels and allocs across multiple subagents?
                 snapshot = {
                     "registry": {
                         str(kern_id): _ensure_serializable(kern.__getstate__())
-                        for kern_id, kern in self.agent.kernel_registry.items()
+                        for agent in self.agents.values()
+                        for kern_id, kern in agent.kernel_registry.items()
                     },
                     "allocs": {
                         str(computer): _ensure_serializable(
                             dict(computer_ctx.alloc_map.allocations)
                         )
-                        for computer, computer_ctx in self.agent.computers.items()
+                        for agent in self.agents.values()
+                        for computer, computer_ctx in agent.computers.items()
                     },
                 }
                 writer.write(pretty_json(snapshot))
@@ -498,7 +520,7 @@ class AgentRPCServer(aobject):
                 redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
 
         redis_config = RedisConfig.model_validate(redis_config_dict)
-        self.local_config.redis = redis_config
+        self.local_config = self.local_config.with_changes(redis=redis_config)
 
         # Fill up vfolder configs from etcd and store as separate attributes
         # TODO: Integrate vfolder_config into local_config
@@ -527,12 +549,10 @@ class AgentRPCServer(aobject):
                 )
 
                 # Update local config with parsed values
-                self.local_config = self.local_config.model_copy(
-                    update={
-                        "api": api_config,
-                        "container_logs": container_logs_config,
-                        "kernel_lifecycles": kernel_lifecycles_config,
-                    }
+                self.local_config = self.local_config.with_changes(
+                    api=api_config,
+                    container_logs=container_logs_config,
+                    kernel_lifecycles=kernel_lifecycles_config,
                 )
             except Exception as e:
                 log.warning("etcd: agent-config error: {}", e)
@@ -560,13 +580,8 @@ class AgentRPCServer(aobject):
                     )
 
                 if container_updates:
-                    # Create new container config with updated values
-                    new_container_config = self.local_config.container.model_copy(
-                        update=container_updates
-                    )
-                    # Create new full config with updated container section
-                    self.local_config = self.local_config.model_copy(
-                        update={"container": new_container_config}
+                    self.local_config = self.local_config.with_updates(
+                        container_update=container_updates
                     )
         except Exception as e:
             log.warning("etcd: container-config error: {}".format(e))
@@ -584,13 +599,83 @@ class AgentRPCServer(aobject):
         await asyncio.sleep(0)
         if not self.debug_server_task.done():
             await self.debug_server_task
-        await self.agent.shutdown(self._stop_signal)
+        for agent in self.agents.values():
+            await agent.shutdown(self._stop_signal)
         await self.stats_monitor.cleanup()
         await self.error_monitor.cleanup()
 
     @collect_error
     async def update_status(self, status):
         await self.etcd.put("", status, scope=ConfigScopes.NODE)
+
+    @property
+    def default_agent(self) -> AbstractAgent:
+        return self.agents[self._default_agent_id]
+
+    def _select_agent(
+        self,
+        agent_id: AgentId | None = None,
+    ) -> AbstractAgent:
+        if agent_id is None:
+            agent_id = self._default_agent_id
+
+        if agent_id not in self.agents:
+            raise ValueError(f"Agent with ID {agent_id} not found!")
+        return self.agents[agent_id]
+
+    @overload
+    def _find_agent(
+        self,
+        *,
+        kernel_id: KernelId | Collection[KernelId] | None = None,
+        image_name: str | Collection[str] | None = None,
+        throw_error: Literal[True],
+    ) -> AbstractAgent: ...
+
+    @overload
+    def _find_agent(
+        self,
+        *,
+        kernel_id: KernelId | Collection[KernelId] | None = None,
+        image_name: str | Collection[str] | None = None,
+        throw_error: Literal[False] = False,
+    ) -> AbstractAgent | None: ...
+
+    def _find_agent(
+        self,
+        *,
+        kernel_id: KernelId | Collection[KernelId] | None = None,
+        image_name: str | Collection[str] | None = None,
+        throw_error: bool = False,
+    ) -> AbstractAgent | None:
+        agents = list(self.agents.values())
+        if kernel_id is not None:
+            if isinstance(kernel_id, Collection):
+                kernel_id = set(kernel_id)
+            else:
+                kernel_id = {kernel_id}
+            agents = [agent for agent in agents if kernel_id <= agent.known_kernel_ids]
+
+        if image_name is not None:
+            if isinstance(image_name, str):
+                image_name = {image_name}
+            else:
+                image_name = set(image_name)
+            agents = [agent for agent in agents if image_name <= agent.known_image_names]
+
+        match agents:
+            case []:
+                if throw_error:
+                    raise RuntimeError(
+                        f"No agent found with search criteria: {kernel_id=}, {image_name=}"
+                    )
+                return None
+            case [agent]:
+                return agent
+            case _:
+                raise RuntimeError(
+                    f"More than one agent found with search criteria: {kernel_id=}, {image_name=}"
+                )
 
     @rpc_function
     @collect_error
@@ -603,10 +688,9 @@ class AgentRPCServer(aobject):
         with open(cfg_src_path, "w") as f:
             tomlkit.dump(data, f)
         # Update local config with new scaling group
-        new_agent_config = self.local_config.agent.model_copy(
-            update={"scaling_group": scaling_group}
+        self.local_config = self.local_config.with_updates(
+            agent_update={"scaling_group": scaling_group}
         )
-        self.local_config = self.local_config.model_copy(update={"agent": new_agent_config})
         log.info("rpc::update_scaling_group()")
 
     @rpc_function
@@ -619,20 +703,23 @@ class AgentRPCServer(aobject):
     @collect_error
     async def gather_hwinfo(self) -> Mapping[str, HardwareMetadata]:
         log.debug("rpc::gather_hwinfo()")
-        return await self.agent.gather_hwinfo()
+        return await self.default_agent.gather_hwinfo()
 
     @rpc_function
     @collect_error
     async def ping_kernel(self, kernel_id: str) -> dict[str, float] | None:
         log.debug("rpc::ping_kernel(k:{})", kernel_id)
-        return await self.agent.ping_kernel(KernelId(UUID(kernel_id)))
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        return await agent.ping_kernel(kid)
 
     @rpc_function
     @collect_error
     async def check_pulling(self, image_name: str) -> bool:
         """Check if an image is being pulled."""
         log.debug("rpc::check_pulling(image:{})", image_name)
-        return image_name in self.agent._active_pulls
+        agent = self._find_agent(image_name=image_name)
+        return agent is not None and image_name in agent._active_pulls
 
     @rpc_function
     @collect_error
@@ -641,7 +728,7 @@ class AgentRPCServer(aobject):
         log.debug("rpc::check_creating(k:{})", kernel_id)
         kid = KernelId(UUID(kernel_id))
         # Check if kernel is being created OR already exists in registry
-        return kid in self.agent._active_creates or kid in self.agent.kernel_registry
+        return self._find_agent(kernel_id=kid) is not None
 
     @rpc_function
     @collect_error
@@ -651,7 +738,10 @@ class AgentRPCServer(aobject):
         kid = KernelId(UUID(kernel_id))
 
         # Safely get kernel from registry
-        kernel_obj = self.agent.kernel_registry.get(kid)
+        agent = self._find_agent(kernel_id=kid)
+        if agent is None:
+            return False
+        kernel_obj = agent.kernel_registry.get(kid)
 
         # Check if kernel exists and is running
         if kernel_obj is None:
@@ -670,9 +760,8 @@ class AgentRPCServer(aobject):
             for raw_kid, raw_sid in raw_kernel_session_ids
         ]
         for kid, sid in kernel_session_ids:
-            if kid not in self.agent.kernel_registry:
-                # produce KernelTerminatedEvent
-                await self.agent.anycast_and_broadcast_event(
+            if self._find_agent(kernel_id=kid) is None:
+                await self.default_agent.anycast_and_broadcast_event(
                     KernelTerminatedAnycastEvent(
                         kid,
                         sid,
@@ -686,16 +775,17 @@ class AgentRPCServer(aobject):
                 )
 
         kernel_ids = {kern_id for kern_id, sess_id in kernel_session_ids}
-        for kid, kernel in self.agent.kernel_registry.items():
-            if kid not in kernel_ids:
-                # destroy kernel
-                await self.agent.inject_container_lifecycle_event(
-                    kid,
-                    kernel.session_id,
-                    LifecycleEvent.DESTROY,
-                    KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
-                    suppress_events=True,
-                )
+        for agent in self.agents.values():
+            for kid, kernel in agent.kernel_registry.items():
+                if kid not in kernel_ids:
+                    # destroy kernel
+                    await agent.inject_container_lifecycle_event(
+                        kid,
+                        kernel.session_id,
+                        LifecycleEvent.DESTROY,
+                        KernelLifecycleEventReason.NOT_FOUND_IN_MANAGER,
+                        suppress_events=True,
+                    )
 
     @rpc_function
     @collect_error
@@ -708,7 +798,8 @@ class AgentRPCServer(aobject):
         Delegates to agent's check_and_pull method which handles tracking.
         """
         log.debug("rpc::check_and_pull(images:{})", list(image_configs.keys()))
-        return await self.agent.check_and_pull(image_configs)
+        # TODO: Client should pass in the agent ID to select the agent
+        return await self._select_agent().check_and_pull(image_configs)
 
     @rpc_function
     @collect_error
@@ -732,12 +823,14 @@ class AgentRPCServer(aobject):
             )
             kernel_id = KernelId(UUID(raw_kernel_id))
             kernel_config = cast(KernelCreationConfig, raw_config)
+            # TODO: Client should pass in the agent ID to select the agent
+            agent = self._select_agent()
             coros.append(
-                self.agent.create_kernel(
+                agent.create_kernel(
                     KernelOwnershipData(
                         kernel_id,
                         session_id,
-                        self.agent.id,
+                        agent.id,
                         raw_config.get("owner_user_id"),
                         raw_config.get("owner_project_id"),
                     ),
@@ -788,8 +881,12 @@ class AgentRPCServer(aobject):
         loop = asyncio.get_running_loop()
         done = loop.create_future()
         log.info("rpc::destroy_kernel(k:{0})", kernel_id)
-        await self.agent.inject_container_lifecycle_event(
-            KernelId(UUID(kernel_id)),
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid)
+        if agent is None:
+            return None
+        await agent.inject_container_lifecycle_event(
+            kid,
             SessionId(UUID(session_id)),
             LifecycleEvent.DESTROY,
             reason or KernelLifecycleEventReason.USER_REQUESTED,
@@ -806,14 +903,13 @@ class AgentRPCServer(aobject):
     ) -> PurgeContainersResp:
         str_kernel_ids = [str(kid) for _, kid in container_kernel_ids]
         log.info("rpc::purge_containers(kernel_ids:{0})", str_kernel_ids)
-        kernel_container_pairs = [
-            ContainerKernelId(
-                ContainerId(cid),
-                KernelId(UUID(kid)),
-            )
-            for cid, kid in container_kernel_ids
+        cid_kids = [
+            ContainerKernelId(ContainerId(container_id), KernelId(UUID(kernel_id)))
+            for container_id, kernel_id in container_kernel_ids
         ]
-        asyncio.create_task(self.agent.purge_containers(kernel_container_pairs))
+        kids = [container_kernel_id.kernel_id for container_kernel_id in cid_kids]
+        agent = self._find_agent(kernel_id=kids, throw_error=True)
+        asyncio.create_task(agent.purge_containers(cid_kids))
         return PurgeContainersResp()
 
     @rpc_function_v2
@@ -824,27 +920,34 @@ class AgentRPCServer(aobject):
     ) -> DropKernelRegistryResp:
         str_kernel_ids = [str(kid) for kid in kernel_ids]
         log.info("rpc::drop_kernel_registry(kernel_ids:{0})", str_kernel_ids)
-        kernel_ids_to_purge = [KernelId(kid) for kid in kernel_ids]
-        asyncio.create_task(self.agent.clean_kernel_objects(kernel_ids_to_purge))
+        kids = [KernelId(kernel_uuid) for kernel_uuid in kernel_ids]
+        agent = self._find_agent(kernel_id=kids, throw_error=True)
+        asyncio.create_task(agent.clean_kernel_objects(kids))
         return DropKernelRegistryResp()
 
     @rpc_function
     @collect_error
     async def interrupt_kernel(self, kernel_id: str):
         log.info("rpc::interrupt_kernel(k:{0})", kernel_id)
-        await self.agent.interrupt_kernel(KernelId(UUID(kernel_id)))
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        await agent.interrupt_kernel(kid)
 
     @rpc_function_v2
     @collect_error
     async def get_completions(self, kernel_id: str, text: str, opts: dict) -> CodeCompletionResp:
         log.debug("rpc::get_completions(k:{0}, ...)", kernel_id)
-        return await self.agent.get_completions(KernelId(UUID(kernel_id)), text, opts)
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        return await agent.get_completions(kid, text, opts)
 
     @rpc_function
     @collect_error
     async def get_logs(self, kernel_id: str):
         log.info("rpc::get_logs(k:{0})", kernel_id)
-        return await self.agent.get_logs(KernelId(UUID(kernel_id)))
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        return await agent.get_logs(kid)
 
     @rpc_function
     @collect_error
@@ -856,11 +959,13 @@ class AgentRPCServer(aobject):
         updated_config: dict,
     ) -> dict[str, Any]:
         log.info("rpc::restart_kernel(s:{0}, k:{1})", session_id, kernel_id)
-        return await self.agent.restart_kernel(
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        return await agent.restart_kernel(
             KernelOwnershipData(
-                KernelId(UUID(kernel_id)),
+                kid,
                 SessionId(UUID(session_id)),
-                self.agent.id,
+                agent.id,
             ),
             kernel_image,
             cast(KernelCreationConfig, updated_config),
@@ -887,9 +992,11 @@ class AgentRPCServer(aobject):
                 mode,
                 code[:20] + "..." if len(code) > 20 else code,
             )
-        result = await self.agent.execute(
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        result = await agent.execute(
             SessionId(UUID(session_id)),
-            KernelId(UUID(kernel_id)),
+            kid,
             run_id,
             mode,
             code,
@@ -915,9 +1022,9 @@ class AgentRPCServer(aobject):
             code,
             timeout,
         )
-        await self.agent.create_batch_execution_task(
-            SessionId(UUID(session_id)), KernelId(UUID(kernel_id)), code, timeout
-        )
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        await agent.create_batch_execution_task(SessionId(UUID(session_id)), kid, code, timeout)
 
     @rpc_function
     @collect_error
@@ -928,7 +1035,9 @@ class AgentRPCServer(aobject):
         opts: dict[str, Any],
     ) -> dict[str, Any]:
         log.info("rpc::start_service(k:{0}, app:{1})", kernel_id, service)
-        return await self.agent.start_service(KernelId(UUID(kernel_id)), service, opts)
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        return await agent.start_service(KernelId(UUID(kernel_id)), service, opts)
 
     @rpc_function
     @collect_error
@@ -939,7 +1048,9 @@ class AgentRPCServer(aobject):
     ) -> dict[str, Any]:
         # Only this function logs debug since web sends request at short intervals
         log.debug("rpc::get_commit_status(k:{})", kernel_id)
-        status: CommitStatus = await self.agent.get_commit_status(
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        status: CommitStatus = await agent.get_commit_status(
             KernelId(UUID(kernel_id)),
             subdir,
         )
@@ -960,12 +1071,14 @@ class AgentRPCServer(aobject):
         extra_labels: dict[str, str] = {},
     ) -> dict[str, Any]:
         log.info("rpc::commit(k:{})", kernel_id)
-        bgtask_mgr = self.agent.background_task_manager
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        bgtask_mgr = agent.background_task_manager
 
         async def _commit(reporter: ProgressReporter) -> None:
-            await self.agent.commit(
+            await agent.commit(
                 reporter,
-                KernelId(UUID(kernel_id)),
+                kid,
                 subdir,
                 canonical=canonical,
                 filename=filename,
@@ -987,12 +1100,14 @@ class AgentRPCServer(aobject):
         registry_conf: ImageRegistry,
     ) -> dict[str, Any]:
         log.info("rpc::push_image(c:{})", image_ref.canonical)
-        bgtask_mgr = self.agent.background_task_manager
+        # TODO: Client should pass in the agent ID to select the agent
+        agent = self._select_agent()
+        bgtask_mgr = agent.background_task_manager
 
         image_push_timeout = cast(Optional[float], self.local_config.api.push_timeout)
 
         async def _push_image(reporter: ProgressReporter) -> None:
-            await self.agent.push_image(
+            await agent.push_image(
                 image_ref,
                 registry_conf,
                 timeout=image_push_timeout,
@@ -1015,7 +1130,8 @@ class AgentRPCServer(aobject):
             force,
             noprune,
         )
-        return await self.agent.purge_images(
+        agent = self._find_agent(image_name=image_canonicals, throw_error=True)
+        return await agent.purge_images(
             PurgeImagesReq(images=image_canonicals, force=force, noprune=noprune)
         )
 
@@ -1038,31 +1154,41 @@ class AgentRPCServer(aobject):
         service,  # type: str
     ):
         log.info("rpc::shutdown_service(k:{0}, app:{1})", kernel_id, service)
-        return await self.agent.shutdown_service(KernelId(UUID(kernel_id)), service)
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        return await agent.shutdown_service(kid, service)
 
     @rpc_function
     @collect_error
     async def upload_file(self, kernel_id: str, filename: str, filedata: bytes):
         log.info("rpc::upload_file(k:{0}, fn:{1})", kernel_id, filename)
-        await self.agent.accept_file(KernelId(UUID(kernel_id)), filename, filedata)
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        await agent.accept_file(KernelId(UUID(kernel_id)), filename, filedata)
 
     @rpc_function
     @collect_error
     async def download_file(self, kernel_id: str, filepath: str):
         log.info("rpc::download_file(k:{0}, fn:{1})", kernel_id, filepath)
-        return await self.agent.download_file(KernelId(UUID(kernel_id)), filepath)
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        return await agent.download_file(kid, filepath)
 
     @rpc_function
     @collect_error
     async def download_single(self, kernel_id: str, filepath: str):
         log.info("rpc::download_single(k:{0}, fn:{1})", kernel_id, filepath)
-        return await self.agent.download_single(KernelId(UUID(kernel_id)), filepath)
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        return await agent.download_single(kid, filepath)
 
     @rpc_function
     @collect_error
     async def list_files(self, kernel_id: str, path: str):
         log.info("rpc::list_files(k:{0}, fn:{1})", kernel_id, path)
-        return await self.agent.list_files(KernelId(UUID(kernel_id)), path)
+        kid = KernelId(UUID(kernel_id))
+        agent = self._find_agent(kernel_id=kid, throw_error=True)
+        return await agent.list_files(kid, path)
 
     @rpc_function
     @collect_error
@@ -1075,23 +1201,31 @@ class AgentRPCServer(aobject):
     @collect_error
     async def create_local_network(self, network_name: str) -> None:
         log.debug("rpc::create_local_network(name:{})", network_name)
-        return await self.agent.create_local_network(network_name)
+        # TODO: Client should pass in the agent ID to select the agent
+        agent = self._select_agent()
+        return await agent.create_local_network(network_name)
 
     @rpc_function
     @collect_error
     async def destroy_local_network(self, network_name: str) -> None:
         log.debug("rpc::destroy_local_network(name:{})", network_name)
-        return await self.agent.destroy_local_network(network_name)
+        # TODO: Client should pass in the agent ID to select the agent
+        agent = self._select_agent()
+        return await agent.destroy_local_network(network_name)
 
     @rpc_function
     @collect_error
     async def reset_agent(self):
         log.debug("rpc::reset()")
-        kernel_ids = tuple(self.agent.kernel_registry.keys())
+        # TODO: Client should pass in the agent ID to select the agent
+        agent = self._select_agent()
+        kernel_ids = tuple(agent.kernel_registry.keys())
         tasks = []
         for kernel_id in kernel_ids:
             try:
-                task = asyncio.ensure_future(self.agent.destroy_kernel(kernel_id, "agent-reset"))
+                task = asyncio.ensure_future(
+                    agent.destroy_kernel(kernel_id, ContainerId("agent-reset"))
+                )
                 tasks.append(task)
             except Exception:
                 await self.error_monitor.capture_exception()
@@ -1102,20 +1236,25 @@ class AgentRPCServer(aobject):
     @collect_error
     async def assign_port(self):
         log.debug("rpc::assign_port()")
-        return self.agent.port_pool.pop()
+        # TODO: Client should pass in the agent ID to select the agent
+        return self._select_agent().port_pool.pop()
 
     @rpc_function
     @collect_error
     async def release_port(self, port_no: int):
         log.debug("rpc::release_port(port_no:{})", port_no)
-        self.agent.port_pool.add(port_no)
+        # TODO: Client should pass in the agent ID to select the agent
+        self._select_agent().port_pool.add(port_no)
 
     @rpc_function
     @collect_error
     async def scan_gpu_alloc_map(self) -> Mapping[str, Any]:
         log.debug("rpc::scan_gpu_alloc_map()")
-        scratch_root = self.agent.local_config.container.scratch_root
-        result = await scan_gpu_alloc_map(list(self.agent.kernel_registry.keys()), scratch_root)
+        # TODO: Client should pass in the agent ID to select the agent
+        scratch_root = self.default_agent.local_config.container.scratch_root
+        result = await scan_gpu_alloc_map(
+            list(self.default_agent.kernel_registry.keys()), scratch_root
+        )
         return {k: str(v) for k, v in result.items()}
 
 
@@ -1221,20 +1360,18 @@ async def server_main(
     )
     krunner_volumes: Mapping[str, str] = await kernel_mod.prepare_krunner_env(
         local_config.model_dump(by_alias=True)
-    )  # type: ignore
+    )
+    local_config = local_config.with_updates(container_update={"krunner_volumes": krunner_volumes})
     # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
     log.info("Kernel runner environments: {}", [*krunner_volumes.keys()])
-    # Update agent id and instance type if not set
-    agent_updates = {}
-    if not local_config.agent.id:
-        agent_updates["id"] = await identity.get_instance_id()
-    if not local_config.agent.instance_type:
-        agent_updates["instance_type"] = await identity.get_instance_type()
-    local_config.container.krunner_volumes = krunner_volumes
 
-    if agent_updates:
-        new_agent_config = local_config.agent.model_copy(update=agent_updates)
-        local_config = local_config.model_copy(update={"agent": new_agent_config})
+    # Update agent id and instance type if not set
+    agent_update = {}
+    if not local_config.agent.id:
+        agent_update["id"] = await identity.get_instance_id()
+    if not local_config.agent.instance_type:
+        agent_update["instance_type"] = await identity.get_instance_type()
+    local_config = local_config.with_updates(agent_update=agent_update)
 
     etcd_credentials = None
     if local_config.etcd.user and local_config.etcd.password:
@@ -1266,31 +1403,33 @@ async def server_main(
             await identity.get_instance_ip(subnet_hint),
             rpc_addr.port,
         )
-        new_agent_config = local_config.agent.model_copy(update={"rpc_listen_addr": new_rpc_addr})
-        local_config = local_config.model_copy(update={"agent": new_agent_config})
+        local_config = local_config.with_updates(agent_update={"rpc_listen_addr": new_rpc_addr})
     # Handle container bind-host configuration
     if not local_config.container.bind_host:
         log.debug(
             "auto-detecting `container.bind-host` from container subnet config "
             "and agent.rpc-listen-addr"
         )
-        local_config.container.bind_host = await get_subnet_ip(
+        bind_host = await get_subnet_ip(
             etcd,
             "container",
             fallback_addr=local_config.agent.rpc_listen_addr.host,
         )
+        local_config = local_config.with_updates(container_update={"bind_host": bind_host})
     log.info("Agent external IP: {}", local_config.agent.rpc_listen_addr.host)
     log.info("Container external IP: {}", local_config.container.bind_host)
     # Update region if not set
     if not local_config.agent.region:
-        local_config.agent.region = await identity.get_instance_region()
+        region = await identity.get_instance_region()
+        local_config = local_config.with_updates(agent_update={"region": region})
     log.info(
         "Node ID: {0} (machine-type: {1}, host: {2})",
         local_config.agent.id,
         local_config.agent.instance_type,
         rpc_addr.host,
     )
-    local_config.plugins = await etcd.get_prefix_dict("config/plugins/accelerator")
+    plugins = await etcd.get_prefix_dict("config/plugins/accelerator")
+    local_config = local_config.with_changes(plugins=plugins)
 
     # Start RPC server.
     global agent_instance
@@ -1304,12 +1443,8 @@ async def server_main(
     app = build_root_server()
     runner = web.AppRunner(app)
     await runner.setup()
-    service_addr = HostPortPair(
-        local_config.agent.service_addr.host, local_config.agent.service_addr.port
-    )
-    announce_addr = HostPortPair(
-        local_config.agent.announce_addr.host, local_config.agent.announce_addr.port
-    )
+    service_addr = local_config.agent.service_addr.to_legacy()
+    announce_addr = local_config.agent.announce_addr.to_legacy()
     ssl_ctx = None
     sd_type = ServiceDiscoveryType(local_config.service_discovery.type)
 
