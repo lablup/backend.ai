@@ -591,8 +591,8 @@ class TestAgentUnifiedConfigValidation:
             "scratch-type": ScratchType.HOSTDIR,
         }
         config = AgentUnifiedConfig.model_validate(raw_config)
-        assert config.agent_backend == AgentBackend.DOCKER
+        assert config.agent.backend == AgentBackend.DOCKER
 
         raw_config["agent"]["backend"] = AgentBackend.KUBERNETES
         config = AgentUnifiedConfig.model_validate(raw_config)
-        assert config.agent_backend == AgentBackend.KUBERNETES
+        assert config.agent.backend == AgentBackend.KUBERNETES
