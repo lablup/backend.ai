@@ -642,19 +642,18 @@ class AgentConfig(BaseConfigSchema):
 
 
 class AgentConfigOverridables(BaseConfigSchema):
-    agent_sock_port: int = Field(
-        default=6007,
+    id: str = Field(
+        description="Agent ID",
+        examples=["agent-001"],
+    )
+    agent_sock_port: Optional[int] = Field(
+        default=None,
         ge=1024,
         le=65535,
         description="Agent socket port",
         examples=[6007],
         validation_alias=AliasChoices("agent-sock-port", "agent_sock_port"),
         serialization_alias="agent-sock-port",
-    )
-    id: Optional[str] = Field(
-        default=None,
-        description="Agent ID",
-        examples=["agent-001"],
     )
     mount_path: Optional[AutoDirectoryPath] = Field(
         default=None,
@@ -663,8 +662,8 @@ class AgentConfigOverridables(BaseConfigSchema):
         validation_alias=AliasChoices("mount-path", "mount_path"),
         serialization_alias="mount-path",
     )
-    cohabiting_storage_proxy: bool = Field(
-        default=True,
+    cohabiting_storage_proxy: Optional[bool] = Field(
+        default=None,
         description="Whether to enable cohabiting storage proxy",
         examples=[True, False],
         validation_alias=AliasChoices("cohabiting-storage-proxy", "cohabiting_storage_proxy"),
@@ -698,8 +697,8 @@ class AgentConfigOverridables(BaseConfigSchema):
         validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
         serialization_alias="block-network-plugins",
     )
-    force_terminate_abusing_containers: bool = Field(
-        default=False,
+    force_terminate_abusing_containers: Optional[bool] = Field(
+        default=None,
         description="Whether to force terminate abusing containers",
         examples=[True, False],
         validation_alias=AliasChoices(
@@ -707,8 +706,8 @@ class AgentConfigOverridables(BaseConfigSchema):
         ),
         serialization_alias="force-terminate-abusing-containers",
     )
-    kernel_creation_concurrency: int = Field(
-        default=4,
+    kernel_creation_concurrency: Optional[int] = Field(
+        default=None,
         ge=1,
         le=32,
         description="Kernel creation concurrency",
@@ -716,8 +715,8 @@ class AgentConfigOverridables(BaseConfigSchema):
         validation_alias=AliasChoices("kernel-creation-concurrency", "kernel_creation_concurrency"),
         serialization_alias="kernel-creation-concurrency",
     )
-    use_experimental_redis_event_dispatcher: bool = Field(
-        default=False,
+    use_experimental_redis_event_dispatcher: Optional[bool] = Field(
+        default=None,
         description="Whether to use experimental Redis event dispatcher",
         examples=[True, False],
         validation_alias=AliasChoices(
@@ -725,8 +724,8 @@ class AgentConfigOverridables(BaseConfigSchema):
         ),
         serialization_alias="use-experimental-redis-event-dispatcher",
     )
-    sync_container_lifecycles: SyncContainerLifecyclesConfig = Field(
-        default_factory=SyncContainerLifecyclesConfig,
+    sync_container_lifecycles: Optional[SyncContainerLifecyclesConfig] = Field(
+        default=None,
         description="Container lifecycle synchronization config",
         validation_alias=AliasChoices("sync-container-lifecycles", "sync_container_lifecycles"),
         serialization_alias="sync-container-lifecycles",
@@ -1199,7 +1198,11 @@ class AgentSpecificConfig(BaseConfigSchema):
 class SubAgentConfig(BaseConfigSchema):
     agent: AgentConfigOverridables | None = Field(
         default=None,
-        description="Agent config overrides for the individual subagent",
+        description=textwrap.dedent("""
+        Agent config overrides for the individual subagent.
+        All fields except Agent ID are by default optional.
+        Only override fields if necessary.
+        """),
     )
     container: ContainerConfig | None = Field(
         default=None,
