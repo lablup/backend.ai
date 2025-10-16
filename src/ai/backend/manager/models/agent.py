@@ -89,6 +89,13 @@ class AgentRow(Base):
     kernels = relationship("KernelRow", back_populates="agent_row")
     scaling_group_row = relationship("ScalingGroupRow", back_populates="agents")
 
+    def actual_occupied_slots(self) -> ResourceSlot:
+        kernel_rows = cast(list[KernelRow], self.kernels)
+        actual_occupied_slots = sum(
+            (kernel.occupied_slots for kernel in kernel_rows), ResourceSlot()
+        )
+        return actual_occupied_slots
+
     def to_data(self) -> AgentData:
         return AgentData(
             id=self.id,
@@ -98,7 +105,8 @@ class AgentRow(Base):
             scaling_group=self.scaling_group,
             schedulable=self.schedulable,
             available_slots=self.available_slots,
-            occupied_slots=self.occupied_slots,
+            cached_occupied_slots=self.occupied_slots,
+            actual_occupied_slots=self.actual_occupied_slots(),
             addr=self.addr,
             public_host=self.public_host,
             first_contact=self.first_contact,
@@ -120,7 +128,8 @@ class AgentRow(Base):
             scaling_group=self.scaling_group,
             schedulable=self.schedulable,
             available_slots=self.available_slots,
-            occupied_slots=self.occupied_slots,
+            cached_occupied_slots=self.occupied_slots,
+            actual_occupied_slots=self.actual_occupied_slots(),
             addr=self.addr,
             public_host=self.public_host,
             first_contact=self.first_contact,

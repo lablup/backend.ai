@@ -136,7 +136,23 @@ class AgentRepository:
         conditions: Sequence[QueryCondition],
         order_by: Sequence[QueryOrder] = tuple(),
     ) -> list[AgentData]:
-        stmt: sa.sql.Select = sa.select(AgentRow)
+        stmt: sa.sql.Select = (
+            sa.select(AgentRow)
+            .select_from(
+                sa.join(
+                    AgentRow,
+                    KernelRow,
+                    sa.and_(
+                        AgentRow.id == KernelRow.agent,
+                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
+                    ),
+                    isouter=True,
+                )
+            )
+            .options(
+                contains_eager(AgentRow.kernels),
+            )
+        )
         for cond in conditions:
             stmt = cond(stmt)
 
@@ -154,7 +170,7 @@ class AgentRepository:
         conditions: Sequence[QueryCondition],
         order_by: Sequence[QueryOrder] = tuple(),
         *,
-        kernel_statuses: Collection[KernelStatus] = (KernelStatus.RUNNING,),
+        kernel_statuses: Collection[KernelStatus] = KernelStatus.resource_occupied_statuses(),
     ) -> list[AgentDataExtended]:
         stmt: sa.sql.Select = (
             sa.select(AgentRow)
