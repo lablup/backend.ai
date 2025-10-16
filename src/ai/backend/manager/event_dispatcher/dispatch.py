@@ -14,6 +14,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
+    AgentInstalledImagesRemoveEvent,
     AgentStartedEvent,
     AgentStatusHeartbeat,
     AgentTerminatedEvent,
@@ -285,6 +286,11 @@ class Dispatchers:
         evd.consume(AgentTerminatedEvent, None, self._agent_event_handler.handle_agent_terminated)
         evd.consume(
             AgentImagesRemoveEvent, None, self._agent_event_handler.handle_agent_images_remove
+        )
+        evd.consume(
+            AgentInstalledImagesRemoveEvent,
+            None,
+            self._agent_event_handler.handle_agent_installed_images_remove,
         )
         evd.consume(
             AgentErrorEvent,

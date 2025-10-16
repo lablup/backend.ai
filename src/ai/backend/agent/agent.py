@@ -108,7 +108,7 @@ from ai.backend.common.events.dispatcher import (
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
-    AgentImagesRemoveEvent,
+    AgentInstalledImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
@@ -2101,7 +2101,9 @@ class AbstractAgent(
         result = await self.scan_images()
         self.images = result.scanned_images
         if result.removed_images:
-            await self.anycast_event(AgentImagesRemoveEvent(scanned_images=result.removed_images))
+            await self.anycast_event(
+                AgentInstalledImagesRemoveEvent(scanned_images=result.removed_images)
+            )
 
     @abstractmethod
     async def push_image(

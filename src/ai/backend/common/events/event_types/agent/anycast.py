@@ -131,8 +131,29 @@ class AgentHeartbeatEvent(AgentOperationEvent):
         return "agent_heartbeat"
 
 
+# For compatibility with redis key made with image canonical strings
+# Use AgentInstalledImagesRemoveEvent instead of this if possible
 @dataclass
 class AgentImagesRemoveEvent(AgentOperationEvent):
+    image_canonicals: list[ImageCanonical]
+
+    @override
+    def serialize(self) -> tuple:
+        return (self.image_canonicals,)
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple) -> Self:
+        return cls(value[0])
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "agent_images_remove"
+
+
+@dataclass
+class AgentInstalledImagesRemoveEvent(AgentOperationEvent):
     scanned_images: Mapping[ImageCanonical, ScannedImage]
 
     @override
@@ -153,7 +174,7 @@ class AgentImagesRemoveEvent(AgentOperationEvent):
     @classmethod
     @override
     def event_name(cls) -> str:
-        return "agent_images_remove"
+        return "agent_installed_images_remove"
 
 
 @dataclass

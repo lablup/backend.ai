@@ -52,6 +52,10 @@ from ai.backend.manager.services.agent.actions.remove_agent_from_images import (
     RemoveAgentFromImagesAction,
     RemoveAgentFromImagesActionResult,
 )
+from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canonicals import (
+    RemoveAgentFromImagesByCanonicalsAction,
+    RemoveAgentFromImagesByCanonicalsActionResult,
+)
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
@@ -260,3 +264,14 @@ class AgentService:
         )
 
         return RemoveAgentFromImagesActionResult(agent_id=action.agent_id)
+
+    # For compatibility with redis key made with image canonical strings
+    # Use remove_agent_from_images instead of this if possible
+    async def remove_agent_from_images_by_canonicals(
+        self, action: RemoveAgentFromImagesByCanonicalsAction
+    ) -> RemoveAgentFromImagesByCanonicalsActionResult:
+        await self._agent_repository.remove_agent_from_images_by_canonicals(
+            action.agent_id, action.image_canonicals
+        )
+
+        return RemoveAgentFromImagesByCanonicalsActionResult(agent_id=action.agent_id)

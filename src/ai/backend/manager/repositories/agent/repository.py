@@ -128,6 +128,20 @@ class AgentRepository:
     async def update_agent_status(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
         await self._db_source.update_agent_status(agent_id, modifier)
 
+    # For compatibility with redis key made with image canonical strings
+    # Use remove_agent_from_images instead of this if possible
+    @agent_repository_resilience.apply()
+    async def remove_agent_from_images_by_canonicals(
+        self, agent_id: AgentId, image_canonicals: list[ImageCanonical]
+    ) -> None:
+        with suppress_with_log(
+            [Exception],
+            message=f"Failed to remove agent: {agent_id} from images: {image_canonicals}",
+        ):
+            await self._cache_source.remove_agent_from_images_by_canonicals(
+                agent_id, image_canonicals
+            )
+
     @agent_repository_resilience.apply()
     async def remove_agent_from_images(
         self, agent_id: AgentId, scanned_images: Mapping[ImageCanonical, ScannedImage]

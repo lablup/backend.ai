@@ -60,13 +60,11 @@ from ai.backend.common.clients.http_client.client_pool import (
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
-from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import (
-    AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
@@ -134,9 +132,7 @@ from ai.backend.common.types import (
     DeviceId,
     HardwareMetadata,
     ImageAlias,
-    ImageCanonical,
     ImageConfig,
-    ImageID,
     ImageRegistry,
     KernelCreationConfig,
     KernelEnqueueingConfig,
@@ -3115,13 +3111,6 @@ class AgentRegistry:
         # noop for performance reasons
         pass
 
-    async def handle_agent_images_remove(
-        self, agent_id: AgentId, scanned_images: Mapping[ImageCanonical, ScannedImage]
-    ) -> None:
-        # TODO, FIXME: Move AgentImageRemoveEvent handling logic to AgentEventHandler
-        image_ids = [ImageID(uuid.UUID(key)) for key in scanned_images.keys()]
-        await self.valkey_image.remove_agent_from_images(agent_id, image_ids)
-
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
         await self.valkey_live.remove_agent_last_seen(agent_id)
 
@@ -4088,14 +4077,6 @@ async def handle_batch_result(
     )
 
     await invoke_session_callback(context, source, event)
-
-
-async def handle_agent_images_remove(
-    context: AgentRegistry,
-    source: AgentId,
-    event: AgentImagesRemoveEvent,
-) -> None:
-    await context.handle_agent_images_remove(source, event.scanned_images)
 
 
 async def handle_agent_lifecycle(

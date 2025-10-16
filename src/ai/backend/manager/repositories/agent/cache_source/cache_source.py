@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.types import AgentId, ImageID
+from ai.backend.common.types import AgentId, ImageCanonical, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 
@@ -38,3 +38,10 @@ class AgentCacheSource:
 
     async def remove_agent_from_images(self, agent_id: AgentId, image_ids: list[ImageID]) -> None:
         await self._valkey_image.remove_agent_from_images(agent_id, image_ids)
+
+    # For compatibility with redis key made with image canonical strings
+    # Use remove_agent_from_images instead of this if possible
+    async def remove_agent_from_images_by_canonicals(
+        self, agent_id: AgentId, image_canonicals: list[ImageCanonical]
+    ) -> None:
+        await self._valkey_image.remove_agent_from_images_by_canonicals(agent_id, image_canonicals)

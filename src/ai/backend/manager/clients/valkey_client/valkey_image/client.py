@@ -17,7 +17,7 @@ from ai.backend.common.resilience import (
     RetryArgs,
     RetryPolicy,
 )
-from ai.backend.common.types import ImageID, ValkeyTarget
+from ai.backend.common.types import ImageCanonical, ImageID, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -106,6 +106,28 @@ class ValkeyImageClient:
         tx = self._create_batch()
         for image_id in image_ids:
             tx.sadd(str(image_id), [agent_id])
+        await self._client.client.exec(tx, raise_on_error=True)
+
+    # For compatibility with redis key made with image canonical strings
+    # Use remove_agent_from_images instead of this if possible
+    @valkey_image_resilience.apply()
+    async def remove_agent_from_images_by_canonicals(
+        self,
+        agent_id: str,
+        image_canonicals: list[ImageCanonical],
+    ) -> None:
+        """
+        Remove an agent from multiple image sets.
+
+        :param agent_id: The agent ID to remove.
+        :param image_ids: List of image identifiers (Image ID).
+        """
+        if not image_canonicals:
+            return
+
+        tx = self._create_batch()
+        for image_canonical in image_canonicals:
+            tx.srem(str(image_canonical), [agent_id])
         await self._client.client.exec(tx, raise_on_error=True)
 
     @valkey_image_resilience.apply()
