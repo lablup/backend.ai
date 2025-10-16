@@ -92,7 +92,7 @@ class AgentRow(Base):
     def actual_occupied_slots(self) -> ResourceSlot:
         kernel_rows = cast(list[KernelRow], self.kernels)
         actual_occupied_slots = sum(
-            [kernel.occupied_slots for kernel in kernel_rows], ResourceSlot()
+            (kernel.occupied_slots for kernel in kernel_rows), ResourceSlot()
         )
         return actual_occupied_slots
 
