@@ -321,7 +321,7 @@ SecretKey = NewType("SecretKey", str)
 
 ClusterRole = NewType("ClusterRole", str)
 
-ImageID = NewType("ImageID", str)
+ImageID = NewType("ImageID", UUID)
 ImageCanonical = NewType("ImageCanonical", str)
 
 

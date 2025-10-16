@@ -134,7 +134,9 @@ from ai.backend.common.types import (
     DeviceId,
     HardwareMetadata,
     ImageAlias,
+    ImageCanonical,
     ImageConfig,
+    ImageID,
     ImageRegistry,
     KernelCreationConfig,
     KernelEnqueueingConfig,
@@ -3114,10 +3116,10 @@ class AgentRegistry:
         pass
 
     async def handle_agent_images_remove(
-        self, agent_id: AgentId, scanned_images: Mapping[str, ScannedImage]
+        self, agent_id: AgentId, scanned_images: Mapping[ImageCanonical, ScannedImage]
     ) -> None:
         # TODO, FIXME: Move AgentImageRemoveEvent handling logic to AgentEventHandler
-        image_ids = [uuid.UUID(key) for key in scanned_images.keys()]
+        image_ids = [ImageID(uuid.UUID(key)) for key in scanned_images.keys()]
         await self.valkey_image.remove_agent_from_images(agent_id, image_ids)
 
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:

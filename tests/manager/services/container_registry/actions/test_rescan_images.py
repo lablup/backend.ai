@@ -3,7 +3,7 @@ import uuid
 import pytest
 from aioresponses import aioresponses
 
-from ai.backend.common.types import SlotName
+from ai.backend.common.types import ImageCanonical, ImageID, SlotName
 from ai.backend.manager.data.image.types import (
     ImageData,
     ImageLabelsData,
@@ -29,8 +29,8 @@ from ...utils import ScenarioBase
 # Added some default values to IMAGE_FIXTURE_DATA
 EXPECTED_IMAGE_RESCAN_RESULT = [
     ImageData(
-        id=uuid.uuid4(),
-        name="registry.example.com/test_project/python:latest",
+        id=ImageID(uuid.uuid4()),
+        name=ImageCanonical("registry.example.com/test_project/python:latest"),
         project="test_project",
         image="test_project/python",
         created_at=None,

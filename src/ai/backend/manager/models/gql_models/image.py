@@ -29,6 +29,7 @@ from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.types import (
     AgentId,
     DispatchResult,
+    ImageID,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -498,7 +499,7 @@ class ImageNode(graphene.ObjectType):
 
     @classmethod
     async def _batch_load_installed_agents(
-        cls, ctx: GraphQueryContext, image_ids: Sequence[UUID]
+        cls, ctx: GraphQueryContext, image_ids: Sequence[ImageID]
     ) -> list[set[AgentId]]:
         results = await ctx.valkey_image.get_agents_for_images(list(image_ids))
         return [{AgentId(agent_id) for agent_id in agents} for agents in results]
