@@ -1,6 +1,7 @@
 from dataclasses import dataclass
-from typing import Optional, override
+from typing import Mapping, Optional, override
 
+from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.services.agent.actions.base import AgentAction
@@ -9,7 +10,7 @@ from ai.backend.manager.services.agent.actions.base import AgentAction
 @dataclass
 class RemoveAgentFromImagesAction(AgentAction):
     agent_id: AgentId
-    image_canonicals: list[str]
+    scanned_images: Mapping[str, ScannedImage]
 
     @override
     def entity_id(self) -> Optional[str]:

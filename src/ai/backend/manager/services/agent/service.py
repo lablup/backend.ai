@@ -256,7 +256,7 @@ class AgentService:
         self, action: RemoveAgentFromImagesAction
     ) -> RemoveAgentFromImagesActionResult:
         await self._agent_repository.remove_agent_from_images(
-            action.agent_id, action.image_canonicals
+            action.agent_id, action.scanned_images
         )
 
         return RemoveAgentFromImagesActionResult(agent_id=action.agent_id)

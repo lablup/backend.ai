@@ -79,6 +79,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
+from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
@@ -289,12 +290,6 @@ def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int
     else:
         additional_gids = set(gids)
     environ["ADDITIONAL_GIDS"] = ",".join(map(str, additional_gids))
-
-
-@dataclass
-class ScannedImage:
-    canonical: str
-    digest: str
 
 
 @dataclass
@@ -1202,7 +1197,10 @@ class AbstractAgent(
                     for key, computer in self.computers.items()
                 },
                 images=zlib.compress(
-                    msgpack.packb([(repo_tag, digest) for repo_tag, digest in self.images.items()])
+                    msgpack.packb([
+                        (repo_tag, scanned_image.to_dict())
+                        for repo_tag, scanned_image in self.images.items()
+                    ])
                 ),
                 images_opts=ImageOpts(compression="zlib"),  # compression: zlib or None
                 architecture=get_arch_name(),
@@ -2102,9 +2100,7 @@ class AbstractAgent(
         result = await self.scan_images()
         self.images = result.scanned_images
         if result.removed_images:
-            await self.anycast_event(
-                AgentImagesRemoveEvent(image_canonicals=list(result.removed_images.keys()))
-            )
+            await self.anycast_event(AgentImagesRemoveEvent(scanned_images=result.removed_images))
 
     @abstractmethod
     async def push_image(

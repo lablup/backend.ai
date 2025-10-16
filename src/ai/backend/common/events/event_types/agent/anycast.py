@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, Self, override
 
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     EventDomain,
@@ -131,16 +132,22 @@ class AgentHeartbeatEvent(AgentOperationEvent):
 
 @dataclass
 class AgentImagesRemoveEvent(AgentOperationEvent):
-    image_canonicals: list[str]
+    scanned_images: Mapping[str, ScannedImage]
 
     @override
     def serialize(self) -> tuple:
-        return (self.image_canonicals,)
+        result = {}
+        for canonical, image in self.scanned_images.items():
+            result[canonical] = image.to_dict()
+        return (result,)
 
     @classmethod
     @override
     def deserialize(cls, value: tuple) -> Self:
-        return cls(value[0])
+        result = {}
+        for canonical, image_data in value[0].items():
+            result[canonical] = ScannedImage.from_dict(image_data)
+        return cls(result)
 
     @classmethod
     @override
