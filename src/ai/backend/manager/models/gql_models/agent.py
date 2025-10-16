@@ -155,7 +155,6 @@ class AgentNode(graphene.ObjectType):
 
     @classmethod
     def from_extended_data(cls, data: AgentDataExtended) -> Self:
-        occupied_slots = data.running_kernel_occupied_slots().to_json()
         return cls(
             id=data.id,
             row_id=data.id,
@@ -165,7 +164,7 @@ class AgentNode(graphene.ObjectType):
             scaling_group=data.scaling_group,
             schedulable=data.schedulable,
             available_slots=data.available_slots.to_json(),
-            occupied_slots=occupied_slots,
+            occupied_slots=data.actual_occupied_slots.to_json(),
             addr=data.addr,
             architecture=data.architecture,
             first_contact=data.first_contact,
@@ -368,7 +367,7 @@ class Agent(graphene.ObjectType):
             scaling_group=data.scaling_group,
             schedulable=data.schedulable,
             available_slots=data.available_slots.to_json(),
-            occupied_slots=data.occupied_slots.to_json(),
+            occupied_slots=data.actual_occupied_slots.to_json(),
             addr=data.addr,
             architecture=data.architecture,
             first_contact=data.first_contact,
@@ -381,17 +380,15 @@ class Agent(graphene.ObjectType):
             cpu_slots=data.available_slots.get("cpu", 0),
             gpu_slots=data.available_slots.get("cuda.device", 0),
             tpu_slots=data.available_slots.get("tpu.device", 0),
-            used_mem_slots=data.occupied_slots.get("mem", 0) // mega,
-            used_cpu_slots=float(data.occupied_slots.get("cpu", 0)),
-            used_gpu_slots=float(data.occupied_slots.get("cuda.device", 0)),
-            used_tpu_slots=float(data.occupied_slots.get("tpu.device", 0)),
+            used_mem_slots=data.actual_occupied_slots.get("mem", 0) // mega,
+            used_cpu_slots=float(data.actual_occupied_slots.get("cpu", 0)),
+            used_gpu_slots=float(data.actual_occupied_slots.get("cuda.device", 0)),
+            used_tpu_slots=float(data.actual_occupied_slots.get("tpu.device", 0)),
         )
 
     @classmethod
     def from_extended_data(cls, data: AgentDataExtended) -> Self:
-        instance = cls.from_data(data)
-        instance.occupied_slots = data.running_kernel_occupied_slots().to_json()
-        return instance
+        return cls.from_data(data)
 
     async def resolve_compute_containers(
         self, info: graphene.ResolveInfo, *, status: Optional[str] = None
@@ -709,7 +706,7 @@ class AgentSummary(graphene.ObjectType):
             scaling_group=data.scaling_group,
             schedulable=data.schedulable,
             available_slots=data.available_slots.to_json(),
-            occupied_slots=data.occupied_slots.to_json(),
+            occupied_slots=data.actual_occupied_slots.to_json(),
             architecture=data.architecture,
         )
 
