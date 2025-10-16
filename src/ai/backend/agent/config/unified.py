@@ -784,8 +784,9 @@ class ContainerConfig(BaseConfigSchema):
         default=(30000, 31000),
         description=textwrap.dedent("""
         Port range for containers.
-        If subagents are used, user must ensure that the port ranges don't overlap between the
-        subagents, else it may cause subtle issues late into agent's runtime.
+        If subagents are used, user must ensure that the port ranges don't overlap
+        between the subagents, else it may cause subtle issues late into the
+        agent's runtime.
         """),
         examples=[(30000, 31000)],
         validation_alias=AliasChoices("port-range", "port_range"),
@@ -1202,11 +1203,11 @@ class SubAgentConfig(BaseConfigSchema):
     )
     container: ContainerConfig | None = Field(
         default=None,
-        description="Agent config overrides for the individual subagent",
+        description="Container config overrides for the individual subagent",
     )
     resource: ResourceConfig | None = Field(
         default=None,
-        description="Agent config overrides for the individual subagent",
+        description="Resource config overrides for the individual subagent",
     )
 
     def with_default(self, default_config: AgentSpecificConfig) -> AgentSpecificConfig:
@@ -1236,8 +1237,12 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
         default_factory=list,
         description=textwrap.dedent("""
         Configuration for any subagents.
-        If subagents will be used, at least 2 subagent configs must be provided.
-        If any field is populated, it is treated as an override to the global default values.
+        The system only supports 2 or more subagents, as running only one
+        subagent is functionally equivalent to using the existing configuration
+        of defining agent configurations at a global level.
+        Any field populated in the subagent config will be treated as an
+        override to the global default values. Thus the global fields must still
+        be provided when defining subagents.
         """),
         validation_alias=AliasChoices("sub-agents", "sub_agents"),
         serialization_alias="sub-agents",
