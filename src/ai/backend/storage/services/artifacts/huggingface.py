@@ -12,6 +12,7 @@ from typing import Any, Callable, Final, Optional, Protocol, override
 
 import aiohttp
 
+from ai.backend.common.artifact_storage import StoragePoolProtocol
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import (
@@ -33,6 +34,7 @@ from ai.backend.storage.client.huggingface import (
     HuggingFaceScanner,
 )
 from ai.backend.storage.config.unified import HuggingfaceConfig
+from ai.backend.storage.context_types import ArtifactVerifierContext
 from ai.backend.storage.exception import (
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
@@ -46,6 +48,7 @@ from ai.backend.storage.services.artifacts.types import (
     ImportPipeline,
     ImportStep,
     ImportStepContext,
+    VerifyStepResult,
 )
 from ai.backend.storage.storages.storage_pool import StoragePool
 
@@ -309,6 +312,7 @@ class HuggingFaceServiceArgs:
     background_task_manager: BackgroundTaskManager
     storage_pool: StoragePool
     event_producer: EventProducer
+    artifact_verifier_ctx: ArtifactVerifierContext
 
 
 class HuggingFaceService:
@@ -319,6 +323,7 @@ class HuggingFaceService:
     _registry_configs: dict[str, HuggingfaceConfig]
     _event_producer: EventProducer
     _transfer_manager: StorageTransferManager
+    _artifact_verifier_ctx: ArtifactVerifierContext
 
     def __init__(self, args: HuggingFaceServiceArgs):
         self._storage_pool = args.storage_pool
@@ -326,6 +331,7 @@ class HuggingFaceService:
         self._registry_configs = args.registry_configs
         self._event_producer = args.event_producer
         self._transfer_manager = StorageTransferManager(args.storage_pool)
+        self._artifact_verifier_ctx = args.artifact_verifier_ctx
 
     def _make_scanner(self, registry_name: str) -> HuggingFaceScanner:
         config = self._registry_configs.get(registry_name)
@@ -558,7 +564,6 @@ class HuggingFaceService:
                 model=model,
                 registry_name=registry_name,
                 storage_pool=self._storage_pool,
-                progress_reporter=None,  # Not needed for single model import
                 storage_step_mappings=storage_step_mappings,
                 step_metadata={},
             )
@@ -700,7 +705,7 @@ class HuggingFaceService:
 # Import Pipeline Steps
 
 
-class HuggingFaceDownloadStep(ImportStep[None]):
+class HuggingFaceDownloadStep(ImportStep):
     """Step to download files from HuggingFace"""
 
     def __init__(self, registry_configs: dict[str, HuggingfaceConfig]) -> None:
@@ -787,7 +792,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         file_info: FileObjectData,
         model: ModelTarget,
         storage_name: str,
-        storage_pool: StoragePool,
+        storage_pool: StoragePoolProtocol,
         download_chunk_size: int,
     ) -> str:
         """Download file from HuggingFace to specified storage"""
@@ -840,7 +845,39 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             )
 
 
-class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
+class HuggingFaceVerifyStep(ImportStep[DownloadStepResult]):
+    """Step to verify downloaded files in reservoir storage"""
+
+    _artifact_verifier_ctx: ArtifactVerifierContext
+
+    def __init__(self, artifact_verifier_ctx: ArtifactVerifierContext) -> None:
+        self._artifact_verifier_ctx = artifact_verifier_ctx
+
+    @property
+    def step_type(self) -> ArtifactStorageImportStep:
+        return ArtifactStorageImportStep.VERIFY
+
+    @override
+    async def execute(
+        self, context: ImportStepContext, input_data: DownloadStepResult
+    ) -> VerifyStepResult:
+        for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
+            log.info(f"Starting artifact verification using '{verifier_name}'")
+            await verifier.verify(context)
+            log.info(f"Artifact verification using '{verifier_name}' completed successfully")
+
+        return VerifyStepResult(
+            verified_files=input_data.downloaded_files,
+            storage_name=input_data.storage_name,
+            total_bytes=input_data.total_bytes,
+        )
+
+    @override
+    async def cleanup_stage(self, context: ImportStepContext) -> None:
+        pass
+
+
+class HuggingFaceArchiveStep(ImportStep):
     """Step to move downloaded files to archive storage"""
 
     def __init__(self, transfer_manager: StorageTransferManager) -> None:
@@ -851,7 +888,7 @@ class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
         return ArtifactStorageImportStep.ARCHIVE
 
     @override
-    async def execute(self, context: ImportStepContext, input_data: DownloadStepResult) -> None:
+    async def execute(self, context: ImportStepContext, input_data: VerifyStepResult) -> None:
         download_storage = input_data.storage_name
         archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
 
@@ -869,7 +906,7 @@ class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
 
         archieved_file_cnt = 0
         # Move each file from download storage to archive storage
-        for file_info, storage_key in input_data.downloaded_files:
+        for file_info, storage_key in input_data.verified_files:
             try:
                 archieved_file_cnt += await self._transfer_manager.transfer_directory(
                     source_storage_name=download_storage,
@@ -912,13 +949,17 @@ def create_huggingface_import_pipeline(
     registry_configs: dict[str, Any],
     transfer_manager: StorageTransferManager,
     storage_step_mappings: dict[ArtifactStorageImportStep, str],
+    artifact_verifier_ctx: ArtifactVerifierContext,
 ) -> ImportPipeline:
     """Create ImportPipeline for HuggingFace based on storage step mappings."""
-    steps: list[ImportStep[Any]] = []
+    steps: list[ImportStep] = []
 
     # Add steps based on what's present in storage_step_mappings
     if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:
         steps.append(HuggingFaceDownloadStep(registry_configs))
+
+    if ArtifactStorageImportStep.VERIFY in storage_step_mappings:
+        steps.append(HuggingFaceVerifyStep(artifact_verifier_ctx))
 
     if ArtifactStorageImportStep.ARCHIVE in storage_step_mappings:
         steps.append(HuggingFaceArchiveStep(transfer_manager))

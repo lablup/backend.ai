@@ -23,7 +23,11 @@ from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.logging import BraceStyleAdapter
 
 from .config.unified import StorageProxyUnifiedConfig
+from .context_types import ArtifactVerifierContext
 from .exception import InvalidVolumeError
+from .plugin import (
+    StorageArtifactVerifierPluginContext,
+)
 from .services.service import VolumeService
 from .storages.storage_pool import StoragePool
 from .types import VolumeInfo
@@ -96,6 +100,16 @@ class RootContext:
     # volume backend states
     backends: MutableMapping[str, type[AbstractVolume]]
     volumes: MutableMapping[str, AbstractVolume]
+    artifact_verifier_ctx: ArtifactVerifierContext
+
+    async def init_storage_artifact_verifier_plugin(self) -> None:
+        plugin_ctx = StorageArtifactVerifierPluginContext(self.etcd, self.local_config.model_dump())
+        await plugin_ctx.init()
+        plugins = {}
+        for plugin_name, plugin_instance in plugin_ctx.plugins.items():
+            log.info("Loading artifact verifier storage plugin: {0}", plugin_name)
+            plugins[plugin_name] = plugin_instance
+        self.artifact_verifier_ctx.load_verifiers(plugins)
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {name: info.to_dataclass() for name, info in self.local_config.volume.items()}

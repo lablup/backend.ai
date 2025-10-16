@@ -11,6 +11,7 @@ from typing import Any, Optional, cast, override
 
 import aiofiles
 
+from ai.backend.common.artifact_storage import AbstractStorage, StoragePoolProtocol
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import FileObjectData, ModelTarget
@@ -26,6 +27,7 @@ from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.unified import (
     ReservoirConfig,
 )
+from ai.backend.storage.context_types import ArtifactVerifierContext
 from ai.backend.storage.exception import (
     ArtifactRevisionEmptyError,
     ArtifactStorageEmptyError,
@@ -40,8 +42,8 @@ from ai.backend.storage.services.artifacts.types import (
     ImportPipeline,
     ImportStep,
     ImportStepContext,
+    VerifyStepResult,
 )
-from ai.backend.storage.storages.base import AbstractStorage
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool
 from ai.backend.storage.storages.vfs_storage import VFSStorage
@@ -186,6 +188,7 @@ class ReservoirServiceArgs:
     event_producer: EventProducer
     storage_pool: StoragePool
     reservoir_registry_configs: dict[str, ReservoirConfig]
+    artifact_verifier_ctx: ArtifactVerifierContext
 
 
 class ReservoirFileDownloadStreamReader(StreamReader):
@@ -244,6 +247,7 @@ class ReservoirService:
     _reservoir_registry_configs: dict[str, ReservoirConfig]
     _storage_pool: StoragePool
     _transfer_manager: StorageTransferManager
+    _artifact_verifier_ctx: ArtifactVerifierContext
 
     def __init__(self, args: ReservoirServiceArgs):
         self._background_task_manager = args.background_task_manager
@@ -251,6 +255,7 @@ class ReservoirService:
         self._reservoir_registry_configs = args.reservoir_registry_configs
         self._storage_pool = args.storage_pool
         self._transfer_manager = StorageTransferManager(args.storage_pool)
+        self._artifact_verifier_ctx = args.artifact_verifier_ctx
 
     async def import_model(
         self,
@@ -279,7 +284,6 @@ class ReservoirService:
                 model=model,
                 registry_name=registry_name,
                 storage_pool=self._storage_pool,
-                progress_reporter=reporter,
                 storage_step_mappings=storage_step_mappings,
                 step_metadata={},
             )
@@ -379,7 +383,7 @@ class ReservoirService:
 # Import Pipeline Steps
 
 
-class ReservoirDownloadStep(ImportStep[None]):
+class ReservoirDownloadStep(ImportStep):
     """Step to copy files from Reservoir (effectively direct copy to download storage)"""
 
     def __init__(
@@ -568,13 +572,15 @@ class ReservoirDownloadStep(ImportStep[None]):
             storage_name=download_storage_name,
             storage_pool=context.storage_pool,
             options=options,
-            progress_reporter=context.progress_reporter,
+            progress_reporter=None,
             key_prefix=model_prefix,
         )
 
         return downloaded_files, bytes_copied
 
-    def _get_s3_client(self, storage_pool: StoragePool, storage_name: str) -> tuple[S3Client, str]:
+    def _get_s3_client(
+        self, storage_pool: StoragePoolProtocol, storage_name: str
+    ) -> tuple[S3Client, str]:
         """Get S3 client for the specified storage"""
         # Get storage from pool and verify it's ObjectStorage type
         try:
@@ -609,7 +615,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         self,
         source_cfg: ReservoirConfig,
         storage_name: str,
-        storage_pool: StoragePool,
+        storage_pool: StoragePoolProtocol,
         options: BucketCopyOptions,
         progress_reporter: Optional[ProgressReporter],
         key_prefix: Optional[str] = None,
@@ -784,7 +790,39 @@ class ReservoirDownloadStep(ImportStep[None]):
             )
 
 
-class ReservoirArchiveStep(ImportStep[DownloadStepResult]):
+class ReservoirVerifyStep(ImportStep[DownloadStepResult]):
+    """Step to verify downloaded files in reservoir storage"""
+
+    _artifact_verifier_ctx: ArtifactVerifierContext
+
+    def __init__(self, artifact_verifier_ctx: ArtifactVerifierContext) -> None:
+        self._artifact_verifier_ctx = artifact_verifier_ctx
+
+    @property
+    def step_type(self) -> ArtifactStorageImportStep:
+        return ArtifactStorageImportStep.VERIFY
+
+    @override
+    async def execute(
+        self, context: ImportStepContext, input_data: DownloadStepResult
+    ) -> VerifyStepResult:
+        for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
+            log.info(f"Starting artifact verification using '{verifier_name}'")
+            await verifier.verify(context)
+            log.info(f"Artifact verification using '{verifier_name}' completed successfully")
+
+        return VerifyStepResult(
+            verified_files=input_data.downloaded_files,
+            storage_name=input_data.storage_name,
+            total_bytes=input_data.total_bytes,
+        )
+
+    @override
+    async def cleanup_stage(self, context: ImportStepContext) -> None:
+        pass
+
+
+class ReservoirArchiveStep(ImportStep[VerifyStepResult]):
     """Step to move downloaded files to archive storage"""
 
     def __init__(self, transfer_manager: StorageTransferManager) -> None:
@@ -795,7 +833,11 @@ class ReservoirArchiveStep(ImportStep[DownloadStepResult]):
         return ArtifactStorageImportStep.ARCHIVE
 
     @override
-    async def execute(self, context: ImportStepContext, input_data: DownloadStepResult) -> None:
+    async def execute(
+        self,
+        context: ImportStepContext,
+        input_data: VerifyStepResult,
+    ) -> None:
         download_storage = input_data.storage_name
         archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
 
@@ -813,7 +855,7 @@ class ReservoirArchiveStep(ImportStep[DownloadStepResult]):
 
         # Move each file from download storage to archive storage
         archieved_file_cnt = 0
-        for file_info, storage_key in input_data.downloaded_files:
+        for file_info, storage_key in input_data.verified_files:
             archieved_file_cnt += await self._transfer_manager.transfer_directory(
                 source_storage_name=download_storage,
                 dest_storage_name=archive_storage,
@@ -853,9 +895,10 @@ def create_reservoir_import_pipeline(
     registry_configs: dict[str, Any],
     storage_step_mappings: dict[ArtifactStorageImportStep, str],
     transfer_manager: StorageTransferManager,
+    artifact_verifier_ctx: ArtifactVerifierContext,
 ) -> ImportPipeline:
     """Create ImportPipeline for Reservoir based on storage step mappings."""
-    steps: list[ImportStep[Any]] = []
+    steps: list[ImportStep] = []
 
     # Add steps based on what's present in storage_step_mappings
     if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:
@@ -866,6 +909,9 @@ def create_reservoir_import_pipeline(
 
         download_storage = storage_pool.get_storage(download_storage_name)
         steps.append(ReservoirDownloadStep(registry_configs, download_storage))
+
+    if ArtifactStorageImportStep.VERIFY in storage_step_mappings:
+        steps.append(ReservoirVerifyStep(artifact_verifier_ctx))
 
     if ArtifactStorageImportStep.ARCHIVE in storage_step_mappings:
         steps.append(ReservoirArchiveStep(transfer_manager))

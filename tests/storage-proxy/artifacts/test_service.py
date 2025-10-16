@@ -216,7 +216,6 @@ def mock_import_step_context(
         model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
         registry_name="test_registry",
         storage_pool=mock_storage_pool,
-        progress_reporter=mock_progress_reporter,
         storage_step_mappings=storage_step_mappings,
         step_metadata={},
     )
@@ -648,7 +647,6 @@ class TestHuggingFaceDownloadStep:
             model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
             registry_name="test_registry",
             storage_pool=None,  # type: ignore
-            progress_reporter=None,
             storage_step_mappings={
                 ArtifactStorageImportStep.DOWNLOAD: "test_storage",
                 ArtifactStorageImportStep.ARCHIVE: "test_storage",
@@ -854,7 +852,7 @@ class TestReservoirDownloadStep:
                 storage_name="test_storage",
                 storage_pool=mock_import_step_context.storage_pool,
                 options=BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0),
-                progress_reporter=mock_import_step_context.progress_reporter,
+                progress_reporter=None,
                 key_prefix="models/",
             )
 
@@ -883,7 +881,7 @@ class TestReservoirDownloadStep:
                     storage_name="test_storage",
                     storage_pool=mock_import_step_context.storage_pool,
                     options=BucketCopyOptions(concurrency=1, progress_log_interval_bytes=0),
-                    progress_reporter=mock_import_step_context.progress_reporter,
+                    progress_reporter=None,
                     key_prefix="models/",
                 )
 

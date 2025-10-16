@@ -1,13 +1,13 @@
 import logging
 from typing import Optional, Self
 
+from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.config.unified import (
     StorageProxyUnifiedConfig,
 )
-from ai.backend.storage.storages.base import AbstractStorage
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.vfs_storage import VFSStorage
 
