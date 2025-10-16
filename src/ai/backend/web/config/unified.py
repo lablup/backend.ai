@@ -1198,7 +1198,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         Apollo Router configuration.
         """,
         validation_alias=AliasChoices("apollo_router", "apollo-router"),
-        serialization_alias="sapollo-router",
+        serialization_alias="apollo-router",
     )
     logging: LoggingConfig = Field(
         default_factory=LoggingConfig,
