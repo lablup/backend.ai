@@ -23,5 +23,5 @@ class ImageStatefulSource:
     async def list_agents_with_image(self, image_id: ImageID) -> set[str]:
         return await self._valkey_image.get_agents_for_image(image_id)
 
-    async def list_agents_with_images(self, image_ids: list[ImageID]) -> list[set[str]]:
+    async def list_agents_with_images(self, image_ids: list[ImageID]) -> dict[ImageID, set[str]]:
         return await self._valkey_image.get_agents_for_images(image_ids)

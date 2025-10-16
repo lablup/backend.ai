@@ -197,27 +197,27 @@ class ValkeyImageClient:
     async def get_agents_for_images(
         self,
         image_ids: list[ImageID],
-    ) -> list[set[str]]:
+    ) -> dict[ImageID, set[str]]:
         """
         Get all agents for multiple images.
 
         :param image_ids: List of image identifiers (UUID).
-        :return: List of agent ID sets, one for each image.
+        :return: Dictionary mapping each image ID to its set of agent IDs.
         """
         if not image_ids:
-            return []
+            return {}
 
         tx = self._create_batch()
         for image_id in image_ids:
             tx.smembers(str(image_id))
 
         results = await self._client.client.exec(tx, raise_on_error=True)
-        final_results: list[set[str]] = []
+        final_results: dict[ImageID, set[str]] = {}
         if not results:
             return final_results
-        for result in results:
+        for image_id, result in zip(image_ids, results):
             result = cast(set[bytes], result)
-            final_results.append({member.decode() for member in result})
+            final_results[image_id] = {member.decode() for member in result}
         return final_results
 
     @valkey_image_resilience.apply()
