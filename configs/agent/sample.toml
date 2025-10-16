@@ -6,6 +6,14 @@
 #
 # Generated automatically from the AgentUnifiedConfig schema.
 
+# Plugins configuration.
+# This field is injected at runtime based on etcd configuration.
+# It is not intended to be set in the configuration file.
+## plugins = "..."
+
+# Agent configuration.
+# If sub_agents field is populated, this field indicates the default values for
+# all subagents.
 [agent]
   # Backend type for the agent.
   # This determines how the agent interacts with the underlying infrastructure.
@@ -69,7 +77,7 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
+  ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
   # Blocked compute plugins
   ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
   # Allowed network plugins
@@ -91,12 +99,16 @@
   # Owner uid:gid of the mount directory
   ## mount-path-uid-gid = "root:root"
 
+  # Container lifecycle synchronization config
   [agent.sync-container-lifecycles]
     # Whether to enable container lifecycle synchronization
     enabled = true
     # Synchronization interval in seconds
     interval = 10.0
 
+# Container configuration.
+# If sub_agents field is populated, this field indicates the default values for
+# all subagents.
 [container]
   # Kernel user ID
   kernel-uid = -1
@@ -106,7 +118,10 @@
   bind-host = ""
   # Advertised host for containers
   ## advertised-host = "192.168.1.100"
-  # Port range for containers
+  # Port range for containers.
+  # If subagents are used, user must ensure that the port ranges don't overlap
+  # between the subagents, else it may cause subtle issues late into the
+  # agent's runtime.
   port-range = [ 30000, 31000,]
   # Statistics type
   ## stats-type = "docker"
@@ -126,13 +141,6 @@
   ## scratch-nfs-options = "rw,sync"
   # Alternative bridge network
   ## alternative-bridge = "br-backend"
-  # KRunner volumes configuration, mapping container names to host paths.
-  # This is used to specify volumes that should be mounted into containers
-  # when using the KRunner backend.
-  # This fields is filled by the agent at runtime based on the
-  # `krunner_volumes` configuration in the agent's environment.
-  # It is not intended to be set in the configuration file.
-  ## krunner-volumes = {  }
   # Whether to enable Docker Swarm mode.
   # This allows the agent to manage containers in a Docker Swarm cluster.
   # When enabled, the agent will use Docker Swarm APIs to manage containers,
@@ -140,44 +148,17 @@
   # This field is only used when backend is set to 'docker'.
   swarm-enabled = false
 
-[pyroscope]
-  # Whether to enable Pyroscope profiling
-  enabled = false
-  # Application name to use in Pyroscope
-  ## app-name = "backendai-agent"
-  # Address of the Pyroscope server
-  ## server-addr = "http://localhost:4040"
-  # Sampling rate for Pyroscope profiling
-  ## sample-rate = 10
+  # KRunner volumes configuration, mapping container names to host paths.
+  # This is used to specify volumes that should be mounted into containers
+  # when using the KRunner backend.
+  # This fields is filled by the agent at runtime based on the
+  # `krunner_volumes` configuration in the agent's environment.
+  # It is not intended to be set in the configuration file.
+  ## [container.krunner-volumes]
 
-[logging]
-  # The version used by logging.dictConfig().
-  version = 1
-  # The main log level to filter messages from all loggers.
-  level = "INFO"
-  # Disable the existing loggers when applying the config.
-  disable-existing-loggers = false
-  # The list of log drivers to activate.
-  drivers = [ "console",]
-  ## file = "{ FileConfig }"
-  ## logstash = "{ LogstashConfig }"
-  ## graylog = "{ GraylogConfig }"
-
-  # The mapping of log handler configurations.
-  [logging.handlers]
-
-  # The mapping of per-namespace logger configurations.
-  [logging.loggers]
-
-  [logging.console]
-    # Opt to print colorized log.
-    ## colored = true
-    # Determine verbosity of log.
-    format = "verbose"
-
-  # Override default log level for specific scope of package
-  [logging.pkg_ns]
-
+# Resource configuration.
+# If sub_agents field is populated, this field indicates the default values for
+# all subagents.
 [resource]
   # The number of CPU cores reserved for the operating system and the agent
   # service.
@@ -197,10 +178,90 @@
   # page/hugepage size (e.g., 2 MiB).
   memory-align-size = "16M"
   # Resource allocation order
-  allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
+  allocation-order = [ "cpu", "cuda", "mem", "rocm", "tpu",]
   # Affinity policy
   affinity-policy = "INTERLEAVED"
 
+# Pyroscope configuration
+[pyroscope]
+  # Whether to enable Pyroscope profiling
+  enabled = false
+  # Application name to use in Pyroscope
+  ## app-name = "backendai-agent"
+  # Address of the Pyroscope server
+  ## server-addr = "http://localhost:4040"
+  # Sampling rate for Pyroscope profiling
+  ## sample-rate = 10
+
+# Logging configuration
+[logging]
+  # The version used by logging.dictConfig().
+  version = 1
+  # The main log level to filter messages from all loggers.
+  level = "INFO"
+  # Disable the existing loggers when applying the config.
+  disable-existing-loggers = false
+  # The list of log drivers to activate.
+  drivers = [ "console",]
+
+  # The mapping of log handler configurations.
+  [logging.handlers]
+
+  # The mapping of per-namespace logger configurations.
+  [logging.loggers]
+
+  [logging.console]
+    # Opt to print colorized log.
+    ## colored = true
+    # Determine verbosity of log.
+    format = "verbose"
+
+  [logging.file]
+    # Path to store log.
+    path = "/var/log/backend.ai"
+    # Log file name.
+    filename = "wsproxy.log"
+    # Number of outdated log files to retain.
+    backup-count = 5
+    # Maximum size for a single log file.
+    ## rotation-size = "..."  # |     # min=0
+    # Determine verbosity of log.
+    format = "verbose"
+
+  [logging.logstash]
+    # Connection information of logstash node.
+    endpoint = { host = "127.0.0.1", port = 8001 }
+    # Protocol to communicate with logstash server.
+    protocol = "tcp"
+    # Use TLS to communicate with logstash server.
+    ssl-enabled = true
+    # Verify validity of TLS certificate when communicating with logstash.
+    ssl-verify = true
+
+  [logging.graylog]
+    # Graylog hostname.
+    host = "127.0.0.1"
+    # Graylog server port number.
+    port = 8000
+    # Log level.
+    level = "INFO"
+    # The custom source identifier. If not specified, fqdn will be used instead.
+    ## localname = "..."
+    # The fuly qualified domain name of the source.
+    ## fqdn = "..."
+    # Verify validity of TLS certificate when communicating with logstash.
+    ssl-verify = true
+    # Path to Root CA certificate file.
+    ## ca-certs = "/etc/ssl/ca.pem"
+    # Path to TLS private key file.
+    ## keyfile = "/etc/backend.ai/graylog/privkey.pem"
+    # Path to TLS certificate file.
+    ## certfile = "/etc/backend.ai/graylog/cert.pem"
+
+  # Override default log level for specific scope of package
+  [logging.pkg_ns]
+
+# OpenTelemetry configuration
 [otel]
   # Whether to enable OpenTelemetry
   enabled = false
@@ -209,10 +270,12 @@
   # OTLP endpoint for sending traces
   endpoint = "http://127.0.0.1:4317"
 
+# Service discovery configuration
 [service-discovery]
   # Type of service discovery to use
   type = "redis"
 
+# Debug configuration
 [debug]
   # Master switch for debug mode
   enabled = false
@@ -239,6 +302,7 @@
   # Whether to log Docker events
   log-docker-events = false
 
+  # Core dump configuration
   [debug.coredump]
     # Whether to enable core dump collection
     enabled = false
@@ -249,6 +313,7 @@
     # Maximum size limit for core dumps
     size-limit = "64M"
 
+# Etcd configuration
 [etcd]
   # Etcd namespace
   namespace = "local"
@@ -259,18 +324,21 @@
   # Etcd password
   ## password = "PASSWORD"
 
+# Container logs configuration
 [container-logs]
   # Maximum length of container logs
   max-length = "10M"
   # Chunk size for container logs
   chunk-size = "64K"
 
+# API configuration
 [api]
   # Image pull timeout in seconds
   ## pull-timeout = 7200.0  # min=0
   # Image push timeout in seconds
   ## push-timeout = 7200.0  # min=0
 
+# Kernel lifecycles configuration
 [kernel-lifecycles]
   # Number of init polling attempts
   init-polling-attempt = 10
@@ -278,3 +346,125 @@
   init-polling-timeout-sec = 60.0
   # Init timeout in seconds
   init-timeout-sec = 60.0
+
+# Redis configuration.
+# This field is injected at runtime based on etcd configuration.
+# It is not intended to be set in the other way.
+## [redis]
+
+# Configuration for any subagents.
+# The system only supports 2 or more subagents, as running only one
+# subagent is functionally equivalent to using the existing configuration
+# of defining agent configurations at a global level.
+# Any field populated in the subagent config will be treated as an
+# override to the global default values. Thus the global fields must still
+# be provided when defining subagents.
+[[sub-agents]]
+# Add multiple [[sub-agents]] sections as needed
+  # Agent config overrides for the individual subagent
+  [sub-agents.agent]
+    # Agent socket port
+    agent-sock-port = 6007
+    # Agent ID
+    ## id = "agent-001"
+    # Mount path for containers
+    ## mount-path = "/mnt/backend.ai"
+    # Whether to enable cohabiting storage proxy
+    cohabiting-storage-proxy = true
+    # Allowed compute plugins
+    ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
+    # Blocked compute plugins
+    ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
+    # Allowed network plugins
+    ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
+    # Blocked network plugins
+    ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
+    # Whether to force terminate abusing containers
+    force-terminate-abusing-containers = false
+    # Kernel creation concurrency
+    kernel-creation-concurrency = 4
+    # Whether to use experimental Redis event dispatcher
+    use-experimental-redis-event-dispatcher = false
+    # Docker mode detected based on kernel version (linuxkit/native)
+    ## docker-mode = "linuxkit"
+    # Owner uid:gid of the mount directory
+    ## mount-path-uid-gid = "root:root"
+
+    # Container lifecycle synchronization config
+    [sub-agents.agent.sync-container-lifecycles]
+      # Whether to enable container lifecycle synchronization
+      enabled = true
+      # Synchronization interval in seconds
+      interval = 10.0
+
+  # Agent config overrides for the individual subagent
+  [sub-agents.container]
+    # Kernel user ID
+    kernel-uid = -1
+    # Kernel group ID
+    kernel-gid = -1
+    # Bind host for containers
+    bind-host = ""
+    # Advertised host for containers
+    ## advertised-host = "192.168.1.100"
+    # Port range for containers.
+    # If subagents are used, user must ensure that the port ranges don't overlap
+    # between the subagents, else it may cause subtle issues late into the
+    # agent's runtime.
+    port-range = [ 30000, 31000,]
+    # Statistics type
+    ## stats-type = "cgroup"
+    # Sandbox type
+    sandbox-type = "docker"
+    # Jail arguments
+    jail-args = [ "--mount", "/tmp",]
+    # Scratch type
+    scratch-type = "hostdir"
+    # Scratch root directory
+    scratch-root = "scratches"
+    # Scratch size
+    scratch-size = 0
+    # Scratch NFS address
+    ## scratch-nfs-address = "192.168.1.100:/export"
+    # Scratch NFS options
+    ## scratch-nfs-options = "rw,sync"
+    # Alternative bridge network
+    ## alternative-bridge = "br-backend"
+    # Whether to enable Docker Swarm mode.
+    # This allows the agent to manage containers in a Docker Swarm cluster.
+    # When enabled, the agent will use Docker Swarm APIs to manage containers,
+    # networks, and services.
+    # This field is only used when backend is set to 'docker'.
+    swarm-enabled = false
+
+    # KRunner volumes configuration, mapping container names to host paths.
+    # This is used to specify volumes that should be mounted into containers
+    # when using the KRunner backend.
+    # This fields is filled by the agent at runtime based on the
+    # `krunner_volumes` configuration in the agent's environment.
+    # It is not intended to be set in the configuration file.
+    ## [sub-agents.container.krunner-volumes]
+
+  # Agent config overrides for the individual subagent
+  [sub-agents.resource]
+    # The number of CPU cores reserved for the operating system and the agent
+    # service.
+    reserved-cpu = 1
+    # The memory space reserved for the operating system and the agent service. It
+    # is subtracted from the reported main memory size and not available for user
+    # workload allocation. Depending on the memory-align-size option and system
+    # configuration, this may not be the exact value but have slightly less or more
+    # values within the memory-align-size.
+    reserved-mem = 1073741824
+    # The disk space reserved for the operating system and the agent service.
+    # Currently this value is unused. In future releases, it may be used to preserve
+    # the minimum disk space from the scratch disk allocation via loopback files.
+    reserved-disk = 8589934592
+    # The alignment of the reported main memory size to absorb tiny deviations from
+    # per-node firwmare/hardware settings. Recommended to be multiple of the
+    # page/hugepage size (e.g., 2 MiB).
+    memory-align-size = 16777216
+    # Resource allocation order
+    allocation-order = [ "cpu", "cuda", "mem", "rocm", "tpu",]
+    # Affinity policy
+    affinity-policy = 1
