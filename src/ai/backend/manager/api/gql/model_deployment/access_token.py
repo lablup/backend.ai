@@ -18,7 +18,7 @@ from ai.backend.manager.services.deployment.actions.access_token.create_access_t
 )
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class AccessTokenOrderBy:
     field: AccessTokenOrderField
     direction: OrderDirection = OrderDirection.DESC
@@ -27,12 +27,12 @@ class AccessTokenOrderBy:
 @strawberry.type
 class AccessToken(Node):
     id: NodeID[str]
-    token: str = strawberry.field(description="Added in 25.15.0: The access token.")
+    token: str = strawberry.field(description="Added in 25.16.0: The access token.")
     created_at: datetime = strawberry.field(
-        description="Added in 25.15.0: The creation timestamp of the access token."
+        description="Added in 25.16.0: The creation timestamp of the access token."
     )
     valid_until: datetime = strawberry.field(
-        description="Added in 25.15.0: The expiration timestamp of the access token."
+        description="Added in 25.16.0: The expiration timestamp of the access token."
     )
 
     @classmethod
@@ -48,7 +48,7 @@ class AccessToken(Node):
 AccessTokenEdge = Edge[AccessToken]
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class AccessTokenConnection(Connection[AccessToken]):
     count: int
 
@@ -60,10 +60,10 @@ class AccessTokenConnection(Connection[AccessToken]):
 @strawberry.input
 class CreateAccessTokenInput:
     model_deployment_id: ID = strawberry.field(
-        description="Added in 25.15.0: The ID of the model deployment for which the access token is created."
+        description="Added in 25.16.0: The ID of the model deployment for which the access token is created."
     )
     valid_until: datetime = strawberry.field(
-        description="Added in 25.15.0: The expiration timestamp of the access token."
+        description="Added in 25.16.0: The expiration timestamp of the access token."
     )
 
     def to_creator(self) -> "ModelDeploymentAccessTokenCreator":
@@ -78,7 +78,7 @@ class CreateAccessTokenPayload:
     access_token: AccessToken
 
 
-@strawberry.mutation(description="Added in 25.15.0")
+@strawberry.mutation(description="Added in 25.16.0")
 async def create_access_token(
     input: CreateAccessTokenInput, info: Info[StrawberryGQLContext]
 ) -> CreateAccessTokenPayload:

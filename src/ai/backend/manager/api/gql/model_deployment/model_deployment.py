@@ -98,22 +98,22 @@ from .model_revision import (
 DeploymentStatus = strawberry.enum(
     CommonDeploymentStatus,
     name="DeploymentStatus",
-    description="Added in 25.15.0. This enum represents the deployment status of a model deployment, indicating its current state.",
+    description="Added in 25.16.0. This enum represents the deployment status of a model deployment, indicating its current state.",
 )
 
 DeploymentStrategyType = strawberry.enum(
     CommonDeploymentStrategy,
     name="DeploymentStrategyType",
-    description="Added in 25.15.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
+    description="Added in 25.16.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
 )
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class DeploymentStrategy:
     type: DeploymentStrategyType
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class ReplicaState:
     _replica_ids: strawberry.Private[list[UUID]]
     desired_replica_count: int
@@ -148,7 +148,7 @@ class ReplicaState:
         )
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class ScalingRule:
     _scaling_rule_ids: strawberry.Private[list[UUID]]
 
@@ -167,7 +167,7 @@ class ScalingRule:
         return [AutoScalingRule.from_dataclass(rule) for rule in result.data]
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class ModelDeploymentMetadata:
     _project_id: strawberry.Private[UUID]
     _domain_name: strawberry.Private[str]
@@ -218,7 +218,7 @@ def _convert_gql_revision_ordering_to_repo_ordering(
     return AccessTokenOrderingOptions(order_by=repo_ordering)
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class ModelDeploymentNetworkAccess:
     _access_token_ids: strawberry.Private[Optional[list[UUID]]]
     endpoint_url: Optional[str] = None
@@ -289,7 +289,7 @@ class ModelDeploymentNetworkAccess:
 
 
 # Main ModelDeployment Type
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class ModelDeployment(Node):
     id: NodeID
     metadata: ModelDeploymentMetadata
@@ -406,13 +406,13 @@ class ModelDeployment(Node):
 
 
 # Filter Types
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class DeploymentStatusFilter:
     in_: Optional[list[DeploymentStatus]] = strawberry.field(name="in", default=None)
     equals: Optional[DeploymentStatus] = None
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class DeploymentFilter:
     name: Optional[StringFilter] = None
     status: Optional[DeploymentStatusFilter] = None
@@ -456,35 +456,35 @@ class DeploymentFilter:
         return repo_filter
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class DeploymentOrderBy:
     field: DeploymentOrderField
     direction: OrderDirection = OrderDirection.DESC
 
 
 # Payload Types
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class CreateModelDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class UpdateModelDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class DeleteModelDeploymentPayload:
     id: ID
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class DeploymentStatusChangedPayload:
     deployment: ModelDeployment
 
 
 # Input Types
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class ModelDeploymentMetadataInput:
     project_id: ID
     domain_name: str
@@ -492,7 +492,7 @@ class ModelDeploymentMetadataInput:
     tags: Optional[list[str]] = None
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class ModelDeploymentNetworkAccessInput:
     preferred_domain_name: Optional[str] = None
     open_to_public: bool = False
@@ -504,12 +504,12 @@ class ModelDeploymentNetworkAccessInput:
         )
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class DeploymentStrategyInput:
     type: DeploymentStrategyType
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class CreateModelDeploymentInput:
     metadata: ModelDeploymentMetadataInput
     network_access: ModelDeploymentNetworkAccessInput
@@ -541,7 +541,7 @@ class CreateModelDeploymentInput:
         )
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class UpdateModelDeploymentInput:
     id: ID
     open_to_public: Optional[bool] = None
@@ -569,7 +569,7 @@ class UpdateModelDeploymentInput:
         )
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class DeleteModelDeploymentInput:
     id: ID
 
@@ -578,7 +578,7 @@ ModelDeploymentEdge = Edge[ModelDeployment]
 
 
 # Connection types for Relay support
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class ModelDeploymentConnection(Connection[ModelDeployment]):
     count: int
 
@@ -658,7 +658,7 @@ async def resolve_deployments(
 
 
 # Resolvers
-@strawberry.field(description="Added in 25.15.0")
+@strawberry.field(description="Added in 25.16.0")
 async def deployments(
     info: Info[StrawberryGQLContext],
     filter: Optional[DeploymentFilter] = None,
@@ -685,7 +685,7 @@ async def deployments(
     )
 
 
-@strawberry.field(description="Added in 25.15.0")
+@strawberry.field(description="Added in 25.16.0")
 async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelDeployment]:
     """Get a specific deployment by ID."""
     _, deployment_id = resolve_global_id(id)
@@ -697,7 +697,7 @@ async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Model
     return deployment[0]
 
 
-@strawberry.mutation(description="Added in 25.15.0")
+@strawberry.mutation(description="Added in 25.16.0")
 async def create_model_deployment(
     input: CreateModelDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> "CreateModelDeploymentPayload":
@@ -716,7 +716,7 @@ async def create_model_deployment(
     return CreateModelDeploymentPayload(deployment=ModelDeployment.from_dataclass(result.data))
 
 
-@strawberry.mutation(description="Added in 25.15.0")
+@strawberry.mutation(description="Added in 25.16.0")
 async def update_model_deployment(
     input: UpdateModelDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> UpdateModelDeploymentPayload:
@@ -735,7 +735,7 @@ async def update_model_deployment(
     )
 
 
-@strawberry.mutation(description="Added in 25.15.0")
+@strawberry.mutation(description="Added in 25.16.0")
 async def delete_model_deployment(
     input: DeleteModelDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> DeleteModelDeploymentPayload:
@@ -752,7 +752,7 @@ async def delete_model_deployment(
     return DeleteModelDeploymentPayload(id=input.id)
 
 
-@strawberry.subscription(description="Added in 25.15.0")
+@strawberry.subscription(description="Added in 25.16.0")
 async def deployment_status_changed(
     deployment_id: ID, info: Info[StrawberryGQLContext]
 ) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:
@@ -763,18 +763,18 @@ async def deployment_status_changed(
         yield DeploymentStatusChangedPayload(deployment_id=deployment_id)
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class SyncReplicaInput:
     model_deployment_id: ID
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class SyncReplicaPayload:
     success: bool
 
 
 @strawberry.mutation(
-    description="Added in 25.15.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers"
+    description="Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers"
 )
 async def sync_replicas(
     input: SyncReplicaInput, info: Info[StrawberryGQLContext]
