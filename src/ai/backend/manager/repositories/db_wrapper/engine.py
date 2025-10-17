@@ -1,8 +1,8 @@
 from collections.abc import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
-
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+from .session import SessionWrapper
 
 
 class EngineWrapper:
@@ -11,10 +11,10 @@ class EngineWrapper:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def begin_session(self) -> AsyncGenerator[SASession, None]:
+    async def begin_session(self) -> AsyncGenerator[SessionWrapper, None]:
         async with self._db.begin_session() as session:
-            yield session
+            yield SessionWrapper(session)
 
-    async def begin_readonly_session(self) -> AsyncGenerator[SASession, None]:
+    async def begin_readonly_session(self) -> AsyncGenerator[SessionWrapper, None]:
         async with self._db.begin_readonly_session() as session:
-            yield session
+            yield SessionWrapper(session)

@@ -2,8 +2,8 @@ from collections.abc import AsyncGenerator
 from typing import Generic, Optional
 
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ..session import SessionWrapper
 from ..types import TRow
 
 
@@ -13,8 +13,8 @@ class Querier(Generic[TRow]):
     TRow: SQLAlchemy ORM model instance type.
     """
 
-    def __init__(self, db_session: SASession) -> None:
-        self._db_session = db_session
+    def __init__(self, session: SessionWrapper) -> None:
+        self._session = session
 
     async def query_many(self, stmt: sa.sql.Select) -> list[TRow]:
         """
@@ -23,7 +23,7 @@ class Querier(Generic[TRow]):
 
         Returns a list of ORM model instances.
         """
-        result = await self._db_session.scalars(stmt)
+        result = await self._session.db_session.scalars(stmt)
         return result.all()
 
     async def query_one(self, stmt: sa.sql.Select) -> Optional[TRow]:
@@ -33,7 +33,7 @@ class Querier(Generic[TRow]):
 
         Returns a single ORM model instance or None if no match is found.
         """
-        result = await self._db_session.scalar(stmt)
+        result = await self._session.db_session.scalar(stmt)
         return result
 
     async def stream(self, stmt: sa.sql.Select) -> AsyncGenerator[TRow]:
@@ -43,6 +43,6 @@ class Querier(Generic[TRow]):
 
         Yields ORM model instances.
         """
-        result = await self._db_session.stream_scalars(stmt)
+        result = await self._session.db_session.stream_scalars(stmt)
         async for row in result:
             yield row
