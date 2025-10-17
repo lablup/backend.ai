@@ -40,6 +40,21 @@ class AgentStatus(enum.Enum):
 
 
 @dataclass
+class AgentDataForHearbeatUpdate:
+    status: AgentStatus
+    status_changed: Optional[datetime]
+    scaling_group: str
+    available_slots: ResourceSlot
+    addr: str
+    public_host: Optional[str]
+    version: str
+    architecture: str
+    compute_plugins: list[str]
+    public_key: Optional[PublicKey]
+    auto_terminate_abusing_kernel: bool
+
+
+@dataclass
 class AgentData:
     id: AgentId
     status: AgentStatus
@@ -174,7 +189,7 @@ class UpsertResult:
 
     @classmethod
     def from_state_comparison(
-        cls, existing_data: Optional[AgentData], upsert_data: AgentHeartbeatUpsert
+        cls, existing_data: Optional[AgentDataForHearbeatUpdate], upsert_data: AgentHeartbeatUpsert
     ) -> Self:
         if existing_data is None:
             return cls(

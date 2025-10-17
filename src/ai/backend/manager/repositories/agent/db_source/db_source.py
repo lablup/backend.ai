@@ -81,7 +81,7 @@ class AgentDBSource:
                 .with_for_update()
             )
             row: Optional[AgentRow] = await session.scalar(query)
-            agent_data = row.to_data() if row is not None else None
+            agent_data = row.to_heartbeat_update_data() if row is not None else None
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
             stmt = pg_insert(agents).values(upsert_data.insert_fields)
