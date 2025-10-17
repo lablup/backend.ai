@@ -195,7 +195,7 @@ class TestAgentDBSource:
             schedulable=True,
             auto_terminate_abusing_kernel=False,
         )
-        mock_agent_row.to_data.return_value = mock_agent_data
+        mock_agent_row.to_heartbeat_update_data.return_value = mock_agent_data
 
         mock_db_session.scalar.side_effect = [
             mock_scaling_group,  # scaling group exists check
@@ -243,7 +243,7 @@ class TestAgentDBSource:
             schedulable=True,
             auto_terminate_abusing_kernel=False,
         )
-        mock_agent_row.to_data.return_value = mock_agent_data
+        mock_agent_row.to_heartbeat_update_data.return_value = mock_agent_data
 
         mock_db_session.scalar.side_effect = [
             mock_scaling_group,  # scaling group exists check
@@ -349,7 +349,7 @@ class TestAgentDBSource:
             schedulable=True,
             auto_terminate_abusing_kernel=False,
         )
-        mock_agent_row.to_data.return_value = mock_agent_data
+        mock_agent_row.to_heartbeat_update_data.return_value = mock_agent_data
 
         mock_db_session.scalar.side_effect = [
             mock_scaling_group,  # scaling group exists check
