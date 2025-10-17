@@ -13,6 +13,7 @@ import sys
 import textwrap
 from pathlib import Path
 from typing import (
+    Annotated,
     Any,
     Callable,
     Mapping,
@@ -23,7 +24,9 @@ from typing import (
 )
 
 from pydantic import (
+    AfterValidator,
     AliasChoices,
+    BeforeValidator,
     ConfigDict,
     Field,
     FilePath,
@@ -77,6 +80,43 @@ class ScratchType(enum.StrEnum):
     HOSTFILE = "hostfile"
     MEMORY = "memory"
     K8S_NFS = "k8s-nfs"
+
+
+def _parse_port_range(v: Any) -> tuple[int, int]:
+    if isinstance(v, (list, tuple)) and len(v) == 2:
+        return (int(v[0]), int(v[1]))
+    raise ValueError("port_range must be a tuple of two integers")
+
+
+def _validate_sandbox_type(sandbox_type: ContainerSandboxType) -> ContainerSandboxType:
+    # FIXME: Remove this after ARM64 support lands on Jail
+    if sandbox_type == ContainerSandboxType.JAIL:
+        current_arch = get_arch_name()
+        if current_arch != "x86_64":
+            raise ValueError(f"Jail sandbox is not supported on architecture {current_arch}")
+    return sandbox_type
+
+
+def _validate_stats_type(stats_type: StatModes) -> StatModes:
+    if stats_type == StatModes.CGROUP:
+        if os.getuid() != 0:
+            raise ValueError(
+                "Cannot use cgroup statistics collection mode unless the agent runs as root."
+            )
+    return stats_type
+
+
+def _validate_scratch_type(scratch_type: ScratchType) -> ScratchType:
+    if scratch_type == ScratchType.HOSTFILE:
+        if os.getuid() != 0:
+            raise ValueError("Cannot use hostfile scratch type unless the agent runs as root.")
+    return scratch_type
+
+
+PortRangeField = Annotated[tuple[int, int], BeforeValidator(_parse_port_range)]
+StatsTypeField = Annotated[StatModes, AfterValidator(_validate_stats_type)]
+SandboxTypeField = Annotated[ContainerSandboxType, AfterValidator(_validate_sandbox_type)]
+ScratchTypeField = Annotated[ScratchType, AfterValidator(_validate_scratch_type)]
 
 
 class AgentConfigValidationContext(BaseConfigValidationContext):
@@ -641,7 +681,7 @@ class AgentConfig(BaseConfigSchema):
         return rpc_listen_addr
 
 
-class AgentConfigOverridables(BaseConfigSchema):
+class OverridableAgentConfig(BaseConfigSchema):
     id: str = Field(
         description="Agent ID",
         examples=["agent-001"],
@@ -761,7 +801,6 @@ class ContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("kernel-gid", "kernel_gid"),
         serialization_alias="kernel-gid",
     )
-    # FIXME: Should this me marked as non-overridable?
     bind_host: str = Field(
         default="",
         description="Bind host for containers",
@@ -769,7 +808,6 @@ class ContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("bind-host", "bind_host", "kernel-host"),
         serialization_alias="bind-host",
     )
-    # FIXME: Should this me marked as non-overridable?
     advertised_host: Optional[str] = Field(
         default=None,
         description="Advertised host for containers",
@@ -777,9 +815,8 @@ class ContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("advertised-host", "advertised_host"),
         serialization_alias="advertised-host",
     )
-    # TODO: Ensure that the port_range does not overlap between subagents,
-    #   or share the port pool between subagents.
-    port_range: tuple[int, int] = Field(
+    # TODO: Add validator to ensure that the port_range does not overlap between subagents.
+    port_range: PortRangeField = Field(
         default=(30000, 31000),
         description=textwrap.dedent("""
         Port range for containers.
@@ -791,14 +828,14 @@ class ContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("port-range", "port_range"),
         serialization_alias="port-range",
     )
-    stats_type: Optional[StatModes] = Field(
+    stats_type: Optional[StatsTypeField] = Field(
         default=StatModes.DOCKER,
         description="Statistics type",
         examples=[item.value for item in StatModes],
         validation_alias=AliasChoices("stats-type", "stats_type"),
         serialization_alias="stats-type",
     )
-    sandbox_type: ContainerSandboxType = Field(
+    sandbox_type: SandboxTypeField = Field(
         default=ContainerSandboxType.DOCKER,
         description="Sandbox type",
         examples=[item.value for item in ContainerSandboxType],
@@ -812,7 +849,7 @@ class ContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("jail-args", "jail_args"),
         serialization_alias="jail-args",
     )
-    scratch_type: ScratchType = Field(
+    scratch_type: ScratchTypeField = Field(
         description="Scratch type",
         examples=[item.value for item in ScratchType],
         validation_alias=AliasChoices("scratch-type", "scratch_type"),
@@ -888,40 +925,124 @@ class ContainerConfig(BaseConfigSchema):
         arbitrary_types_allowed=True,
     )
 
-    @field_validator("port_range", mode="before")
-    @classmethod
-    def _parse_port_range(cls, v: Any) -> tuple[int, int]:
-        if isinstance(v, (list, tuple)) and len(v) == 2:
-            return (int(v[0]), int(v[1]))
-        raise ValueError("port_range must be a tuple of two integers")
 
-    @field_validator("sandbox_type", mode="after")
-    @classmethod
-    def _validate_sandbox_type(cls, sandbox_type: ContainerSandboxType) -> ContainerSandboxType:
-        # FIXME: Remove this after ARM64 support lands on Jail
-        if sandbox_type == ContainerSandboxType.JAIL:
-            current_arch = get_arch_name()
-            if current_arch != "x86_64":
-                raise ValueError(f"Jail sandbox is not supported on architecture {current_arch}")
-        return sandbox_type
+class OverridableContainerConfig(BaseConfigSchema):
+    kernel_uid: Optional[UserID] = Field(
+        default=None,
+        description="Kernel user ID",
+        examples=[1000, -1],
+        validation_alias=AliasChoices("kernel-uid", "kernel_uid"),
+        serialization_alias="kernel-uid",
+    )
+    # FIXME: Should this be marked as non-overridable?
+    kernel_gid: Optional[GroupID] = Field(
+        default=None,
+        description="Kernel group ID",
+        examples=[1000, -1],
+        validation_alias=AliasChoices("kernel-gid", "kernel_gid"),
+        serialization_alias="kernel-gid",
+    )
+    # TODO: Add validator to ensure that the port_range does not overlap between subagents.
+    port_range: Optional[PortRangeField] = Field(
+        default=None,
+        description=textwrap.dedent("""
+        Port range for containers.
+        If subagents are used, user must ensure that the port ranges don't overlap
+        between the subagents, else it may cause subtle issues late into the
+        agent's runtime.
+        """),
+        examples=[(30000, 31000)],
+        validation_alias=AliasChoices("port-range", "port_range"),
+        serialization_alias="port-range",
+    )
+    stats_type: Optional[StatsTypeField] = Field(
+        default=StatModes.DOCKER,
+        description="Statistics type",
+        examples=[item.value for item in StatModes],
+        validation_alias=AliasChoices("stats-type", "stats_type"),
+        serialization_alias="stats-type",
+    )
+    sandbox_type: Optional[SandboxTypeField] = Field(
+        default=None,
+        description="Sandbox type",
+        examples=[item.value for item in ContainerSandboxType],
+        validation_alias=AliasChoices("sandbox-type", "sandbox_type"),
+        serialization_alias="sandbox-type",
+    )
+    jail_args: Optional[list[str]] = Field(
+        default=None,
+        description="Jail arguments",
+        examples=[["--mount", "/tmp"]],
+        validation_alias=AliasChoices("jail-args", "jail_args"),
+        serialization_alias="jail-args",
+    )
+    # FIXME: Should this be marked as non-overridable?
+    scratch_type: Optional[ScratchTypeField] = Field(
+        default=None,
+        description="Scratch type",
+        examples=[item.value for item in ScratchType],
+        validation_alias=AliasChoices("scratch-type", "scratch_type"),
+        serialization_alias="scratch-type",
+    )
+    # FIXME: Should this be marked as non-overridable?
+    scratch_root: Optional[AutoDirectoryPath] = Field(
+        default=None,
+        description="Scratch root directory",
+        examples=["./scratches"],
+        validation_alias=AliasChoices("scratch-root", "scratch_root"),
+        serialization_alias="scratch-root",
+    )
+    # FIXME: Should this be marked as non-overridable?
+    scratch_size: Optional[BinarySizeField] = Field(
+        default=None,
+        description="Scratch size",
+        examples=["1G", "500M"],
+        validation_alias=AliasChoices("scratch-size", "scratch_size"),
+        serialization_alias="scratch-size",
+    )
+    # FIXME: Should this be marked as non-overridable?
+    scratch_nfs_address: Optional[str] = Field(
+        default=None,
+        description="Scratch NFS address",
+        examples=["192.168.1.100:/export"],
+        validation_alias=AliasChoices("scratch-nfs-address", "scratch_nfs_address"),
+        serialization_alias="scratch-nfs-address",
+    )
+    # FIXME: Should this be marked as non-overridable?
+    scratch_nfs_options: Optional[str] = Field(
+        default=None,
+        description="Scratch NFS options",
+        examples=["rw,sync"],
+        validation_alias=AliasChoices("scratch-nfs-options", "scratch_nfs_options"),
+        serialization_alias="scratch-nfs-options",
+    )
+    # FIXME: Should this be marked as non-overridable?
+    alternative_bridge: Optional[str] = Field(
+        default=None,
+        description="Alternative bridge network",
+        examples=["br-backend"],
+        validation_alias=AliasChoices("alternative-bridge", "alternative_bridge"),
+        serialization_alias="alternative-bridge",
+    )
+    # FIXME: Should this be marked as non-overridable?
+    swarm_enabled: Optional[bool] = Field(
+        default=None,
+        description=textwrap.dedent("""
+        Whether to enable Docker Swarm mode.
+        This allows the agent to manage containers in a Docker Swarm cluster.
+        When enabled, the agent will use Docker Swarm APIs to manage containers,
+        networks, and services.
+        This field is only used when backend is set to 'docker'.
+        """),
+        examples=[True, False],
+        validation_alias=AliasChoices("swarm-enabled", "swarm_enabled"),
+        serialization_alias="swarm-enabled",
+    )
 
-    @field_validator("stats_type", mode="after")
-    @classmethod
-    def _validate_stats_type(cls, stats_type: StatModes) -> StatModes:
-        if stats_type == StatModes.CGROUP:
-            if os.getuid() != 0:
-                raise ValueError(
-                    "Cannot use cgroup statistics collection mode unless the agent runs as root."
-                )
-        return stats_type
-
-    @field_validator("scratch_type", mode="after")
-    @classmethod
-    def _validate_scratch_type(cls, scratch_type: ScratchType) -> ScratchType:
-        if scratch_type == ScratchType.HOSTFILE:
-            if os.getuid() != 0:
-                raise ValueError("Cannot use hostfile scratch type unless the agent runs as root.")
-        return scratch_type
+    model_config = ConfigDict(
+        extra="allow",
+        arbitrary_types_allowed=True,
+    )
 
 
 class ResourceConfig(BaseConfigSchema):
@@ -1196,7 +1317,7 @@ class AgentSpecificConfig(BaseConfigSchema):
 
 
 class SubAgentConfig(BaseConfigSchema):
-    agent: AgentConfigOverridables | None = Field(
+    agent: OverridableAgentConfig | None = Field(
         default=None,
         description=textwrap.dedent("""
         Agent config overrides for the individual subagent.
@@ -1204,7 +1325,7 @@ class SubAgentConfig(BaseConfigSchema):
         Only override fields if necessary.
         """),
     )
-    container: ContainerConfig | None = Field(
+    container: OverridableContainerConfig | None = Field(
         default=None,
         description="Container config overrides for the individual subagent",
     )

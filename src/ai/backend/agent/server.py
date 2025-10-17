@@ -386,6 +386,9 @@ class AgentRPCServer(aobject):
         agent_cls: Type[AbstractAgent] = agent_mod.get_agent_cls()
         global_config = self.local_config.global_config
         agent_configs = self.local_config.agent_configs
+        # TODO: Remove once subagents are feature-complete.
+        if len(agent_configs) > 1:
+            raise NotImplementedError("Subagents are not feature-complete yet")
         async with asyncio.TaskGroup() as tg:
             tasks = [
                 tg.create_task(
