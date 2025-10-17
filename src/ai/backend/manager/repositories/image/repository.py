@@ -68,7 +68,7 @@ class ImageRepository:
         Returns an ImageData object.
         Raises Exception if the image cannot be resolved.
         """
-        return await self._db_source.resolve_image(identifiers)
+        return await self._db_source.fetch_image_by_identifiers(identifiers)
 
     @image_repository_resilience.apply()
     async def resolve_images_batch(
@@ -79,7 +79,7 @@ class ImageRepository:
         Returns a list of ImageData objects.
         More efficient than multiple individual resolve_image calls.
         """
-        return await self._db_source.resolve_images_batch(identifier_lists)
+        return await self._db_source.fetch_images_batch(identifier_lists)
 
     @image_repository_resilience.apply()
     async def get_images_by_canonicals(
@@ -88,7 +88,7 @@ class ImageRepository:
         status_filter: Optional[list[ImageStatus]] = None,
         requested_by_superadmin: bool = False,
     ) -> list[ImageWithAgentInstallStatus]:
-        images_data: list[ImageDataWithDetails] = await self._db_source.get_images_by_canonicals(
+        images_data: list[ImageDataWithDetails] = await self._db_source.query_images_by_canonicals(
             image_canonicals, status_filter
         )
 
@@ -126,7 +126,7 @@ class ImageRepository:
         status_filter: Optional[list[ImageStatus]] = None,
         requested_by_superadmin: bool = False,
     ) -> ImageWithAgentInstallStatus:
-        image_data: ImageDataWithDetails = await self._db_source.get_image_details_by_identifier(
+        image_data: ImageDataWithDetails = await self._db_source.query_image_details_by_identifier(
             identifier, status_filter
         )
         installed_agents = await self._stateful_source.get_agents_for_image(image_data.name)
@@ -150,7 +150,7 @@ class ImageRepository:
         status_filter: Optional[list[ImageStatus]] = None,
         requested_by_superadmin: bool = False,
     ) -> ImageWithAgentInstallStatus:
-        image_data: ImageDataWithDetails = await self._db_source.get_image_details_by_id(
+        image_data: ImageDataWithDetails = await self._db_source.query_image_details_by_id(
             image_id, load_aliases, status_filter
         )
         installed_agents = await self._stateful_source.get_agents_for_image(image_data.name)
@@ -176,7 +176,7 @@ class ImageRepository:
         Marks an image as deleted for a specific user.
         Raises ForgetImageActionGenericForbiddenError if the user does not own the image.
         """
-        return await self._db_source.soft_delete_user_image(identifiers, user_id)
+        return await self._db_source.mark_user_image_deleted(identifiers, user_id)
 
     @image_repository_resilience.apply()
     async def soft_delete_image_by_id(
@@ -189,7 +189,7 @@ class ImageRepository:
         Validates ownership by user_id before deletion.
         Raises ForgetImageActionGenericForbiddenError if the user does not own the image.
         """
-        return await self._db_source.soft_delete_image_by_id(image_id, user_id)
+        return await self._db_source.mark_image_deleted_by_id(image_id, user_id)
 
     @image_repository_resilience.apply()
     async def get_and_validate_image_ownership(
@@ -199,7 +199,7 @@ class ImageRepository:
         Gets an image by ID and validates ownership in a single operation.
         Raises ForgetImageActionGenericForbiddenError if image doesn't exist or user doesn't own it.
         """
-        return await self._db_source.get_and_validate_image_ownership(
+        return await self._db_source.validate_and_fetch_image_ownership(
             image_id, user_id, load_aliases
         )
 
@@ -207,15 +207,15 @@ class ImageRepository:
     async def add_image_alias(
         self, alias: str, image_canonical: str, architecture: str
     ) -> tuple[UUID, ImageAliasData]:
-        return await self._db_source.add_image_alias(alias, image_canonical, architecture)
+        return await self._db_source.insert_image_alias(alias, image_canonical, architecture)
 
     @image_repository_resilience.apply()
     async def get_image_alias(self, alias: str) -> ImageAliasData:
-        return await self._db_source.get_image_alias(alias)
+        return await self._db_source.query_image_alias(alias)
 
     @image_repository_resilience.apply()
     async def delete_image_alias(self, alias: str) -> tuple[UUID, ImageAliasData]:
-        return await self._db_source.delete_image_alias(alias)
+        return await self._db_source.remove_image_alias(alias)
 
     @image_repository_resilience.apply()
     async def scan_image_by_identifier(
@@ -225,17 +225,17 @@ class ImageRepository:
         Scans a single image by resolving it first and then scanning.
         Returns RescanImagesResult with the scanned image data.
         """
-        return await self._db_source.scan_image_by_identifier(image_canonical, architecture)
+        return await self._db_source.scan_and_upsert_image(image_canonical, architecture)
 
     @image_repository_resilience.apply()
     async def untag_image_from_registry(self, image_id: UUID) -> Optional[ImageData]:
-        return await self._db_source.untag_image_from_registry(image_id)
+        return await self._db_source.remove_tag_from_registry(image_id)
 
     @image_repository_resilience.apply()
     async def update_image_properties(
         self, target: str, architecture: str, properties_to_update: dict
     ) -> ImageData:
-        return await self._db_source.update_image_properties(
+        return await self._db_source.modify_image_properties(
             target, architecture, properties_to_update
         )
 
@@ -243,9 +243,7 @@ class ImageRepository:
     async def clear_image_custom_resource_limit(
         self, image_canonical: str, architecture: str
     ) -> ImageData:
-        return await self._db_source.clear_image_custom_resource_limit(
-            image_canonical, architecture
-        )
+        return await self._db_source.clear_image_resource_limits(image_canonical, architecture)
 
     @image_repository_resilience.apply()
     async def untag_image_from_registry_validated(self, image_id: UUID, user_id: UUID) -> ImageData:
@@ -253,7 +251,7 @@ class ImageRepository:
         Validates ownership and untags an image from registry in a single operation.
         Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
         """
-        return await self._db_source.untag_image_from_registry_validated(image_id, user_id)
+        return await self._db_source.remove_tag_from_registry_with_validation(image_id, user_id)
 
     @image_repository_resilience.apply()
     async def delete_image_with_aliases_validated(self, image_id: UUID, user_id: UUID) -> ImageData:
@@ -261,4 +259,4 @@ class ImageRepository:
         Deletes an image and all its aliases after validating ownership.
         Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
         """
-        return await self._db_source.delete_image_with_aliases_validated(image_id, user_id)
+        return await self._db_source.remove_image_and_aliases_with_validation(image_id, user_id)

@@ -46,27 +46,27 @@ class ImageDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def resolve_image(
+    async def fetch_image_by_identifiers(
         self, identifiers: list[ImageAlias | ImageRef | ImageIdentifier]
     ) -> ImageData:
         """
-        Resolves an image by its identifiers, which can be a combination of
+        Fetches an image from database by its identifiers, which can be a combination of
         ImageAlias, ImageRef, or ImageIdentifier.
         Returns an ImageData object.
-        Raises Exception if the image cannot be resolved.
+        Raises Exception if the image cannot be found.
         """
         async with self._db.begin_session() as session:
             row = await self._resolve_image(session, identifiers)
             data = row.to_dataclass()
         return data
 
-    async def resolve_images_batch(
+    async def fetch_images_batch(
         self, identifier_lists: list[list[ImageIdentifier]]
     ) -> list[ImageData]:
         """
-        Resolves multiple images by their identifiers in a single database session.
+        Fetches multiple images from database by their identifiers in a single database session.
         Returns a list of ImageData objects.
-        More efficient than multiple individual resolve_image calls.
+        More efficient than multiple individual fetch operations.
         """
         async with self._db.begin_session() as session:
             rows: list[ImageRow] = []
@@ -126,7 +126,7 @@ class ImageDBSource:
             raise ImageAliasNotFound(f"Image alias '{alias}' not found.")
         return image_alias_row
 
-    async def get_images_by_canonicals(
+    async def query_images_by_canonicals(
         self,
         canonicals: list[str],
         status_filter: Optional[list[ImageStatus]] = None,
@@ -144,7 +144,7 @@ class ImageDBSource:
             image_rows: list[ImageRow] = result.scalars().all()
             return [row.to_detailed_dataclass() for row in image_rows]
 
-    async def get_image_details_by_identifier(
+    async def query_image_details_by_identifier(
         self,
         identifier: ImageIdentifier,
         status_filter: Optional[list[ImageStatus]] = None,
@@ -164,7 +164,7 @@ class ImageDBSource:
         data = image_row.to_detailed_dataclass()
         return data
 
-    async def get_image_details_by_id(
+    async def query_image_details_by_id(
         self,
         image_id: UUID,
         load_aliases: bool = False,
@@ -180,13 +180,13 @@ class ImageDBSource:
             data = row.to_detailed_dataclass()
         return data
 
-    async def soft_delete_user_image(
+    async def mark_user_image_deleted(
         self,
         identifiers: list[ImageAlias | ImageRef | ImageIdentifier],
         user_id: UUID,
     ) -> ImageData:
         """
-        Marks an image as deleted for a specific user.
+        Marks an image record as deleted for a specific user in the database.
         Raises ForgetImageActionGenericForbiddenError if the user does not own the image.
         """
         async with self._db.begin_session() as session:
@@ -197,13 +197,13 @@ class ImageDBSource:
             data = row.to_dataclass()
         return data
 
-    async def soft_delete_image_by_id(
+    async def mark_image_deleted_by_id(
         self,
         image_id: UUID,
         user_id: UUID,
     ) -> ImageData:
         """
-        Marks an image as deleted by its ID.
+        Marks an image record as deleted by its ID in the database.
         Validates ownership by user_id before deletion.
         Raises ForgetImageActionGenericForbiddenError if the user does not own the image.
         """
@@ -213,11 +213,11 @@ class ImageDBSource:
             data = image_row.to_dataclass()
         return data
 
-    async def get_and_validate_image_ownership(
+    async def validate_and_fetch_image_ownership(
         self, image_id: UUID, user_id: UUID, load_aliases: bool = False
     ) -> ImageData:
         """
-        Gets an image by ID and validates ownership in a single operation.
+        Validates ownership and fetches an image from database by ID in a single operation.
         Raises ForgetImageActionGenericForbiddenError if image doesn't exist or user doesn't own it.
         """
         async with self._db.begin_session() as session:
@@ -227,7 +227,7 @@ class ImageDBSource:
             data = image_row.to_dataclass()
         return data
 
-    async def add_image_alias(
+    async def insert_image_alias(
         self, alias: str, image_canonical: str, architecture: str
     ) -> tuple[UUID, ImageAliasData]:
         try:
@@ -245,13 +245,13 @@ class ImageDBSource:
         except DBAPIError as e:
             raise AliasImageActionDBError(str(e))
 
-    async def get_image_alias(self, alias: str) -> ImageAliasData:
+    async def query_image_alias(self, alias: str) -> ImageAliasData:
         async with self._db.begin_session() as session:
             row = await self._get_image_alias_by_name(session, alias)
             data = ImageAliasData(id=row.id, alias=row.alias)
         return data
 
-    async def delete_image_alias(self, alias: str) -> tuple[UUID, ImageAliasData]:
+    async def remove_image_alias(self, alias: str) -> tuple[UUID, ImageAliasData]:
         async with self._db.begin_session() as session:
             existing_alias = await self._get_image_alias_by_name(session, alias)
             image_id = existing_alias.image_id
@@ -259,11 +259,11 @@ class ImageDBSource:
             await session.delete(existing_alias)
         return image_id, alias_data
 
-    async def scan_image_by_identifier(
+    async def scan_and_upsert_image(
         self, image_canonical: str, architecture: str
     ) -> RescanImagesResult:
         """
-        Scans a single image by resolving it first and then scanning.
+        Scans a single image and upserts it into the database.
         Returns RescanImagesResult with the scanned image data.
         """
 
@@ -291,7 +291,7 @@ class ImageDBSource:
 
         return result
 
-    async def untag_image_from_registry(self, image_id: UUID) -> ImageData:
+    async def remove_tag_from_registry(self, image_id: UUID) -> ImageData:
         async with self._db.begin_readonly_session() as session:
             image_row = await self._get_image_by_id(session, image_id, load_aliases=True)
             if not image_row:
@@ -300,7 +300,7 @@ class ImageDBSource:
             data = image_row.to_dataclass()
         return data
 
-    async def update_image_properties(
+    async def modify_image_properties(
         self, target: str, architecture: str, properties_to_update: dict
     ) -> ImageData:
         try:
@@ -319,7 +319,7 @@ class ImageDBSource:
         except (ValueError, DBAPIError):
             raise ModifyImageActionValueError
 
-    async def clear_image_custom_resource_limit(
+    async def clear_image_resource_limits(
         self, image_canonical: str, architecture: str
     ) -> ImageData:
         async with self._db.begin_session() as session:
@@ -330,9 +330,11 @@ class ImageDBSource:
             data = image_row.to_dataclass()
         return data
 
-    async def untag_image_from_registry_validated(self, image_id: UUID, user_id: UUID) -> ImageData:
+    async def remove_tag_from_registry_with_validation(
+        self, image_id: UUID, user_id: UUID
+    ) -> ImageData:
         """
-        Validates ownership and untags an image from registry in a single operation.
+        Validates ownership and removes an image registry tag in a single database operation.
         Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
         """
         async with self._db.begin_readonly_session() as session:
@@ -343,9 +345,11 @@ class ImageDBSource:
             data = image_row.to_dataclass()
         return data
 
-    async def delete_image_with_aliases_validated(self, image_id: UUID, user_id: UUID) -> ImageData:
+    async def remove_image_and_aliases_with_validation(
+        self, image_id: UUID, user_id: UUID
+    ) -> ImageData:
         """
-        Deletes an image and all its aliases after validating ownership.
+        Removes an image record and all its aliases from database after validating ownership.
         Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
         """
 
