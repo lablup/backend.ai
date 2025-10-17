@@ -26,8 +26,10 @@ from ai.backend.manager.errors.image import (
     ImageAliasNotFound,
     ImageNotFound,
     ModifyImageActionValueError,
+    PurgeImageActionByIdObjectDBError,
     RegistryNotFoundForImage,
 )
+from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.image import (
     ImageAliasRow,
     ImageIdentifier,
@@ -266,7 +268,6 @@ class ImageDBSource:
         Scans a single image by resolving it first and then scanning.
         Returns RescanImagesResult with the scanned image data.
         """
-        from ai.backend.manager.models.container_registry import ContainerRegistryRow
 
         async with self._db.begin_session() as session:
             # Resolve the image first
@@ -349,7 +350,6 @@ class ImageDBSource:
         Deletes an image and all its aliases after validating ownership.
         Raises ForgetImageActionGenericForbiddenError if user doesn't own the image.
         """
-        from ai.backend.manager.errors.image import PurgeImageActionByIdObjectDBError
 
         try:
             async with self._db.begin_session() as session:
