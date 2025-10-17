@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping
 from typing import ParamSpec, Self, TypeVar, cast
 
 from glide import Batch
@@ -197,12 +198,12 @@ class ValkeyImageClient:
     async def get_agents_for_images(
         self,
         image_ids: list[ImageID],
-    ) -> dict[ImageID, set[str]]:
+    ) -> Mapping[ImageID, set[str]]:
         """
         Get all agents for multiple images.
 
         :param image_ids: List of image identifiers (UUID).
-        :return: Dictionary mapping each image ID to its set of agent IDs.
+        :return: Mapping of image IDs to sets of agent IDs.
         """
         if not image_ids:
             return {}

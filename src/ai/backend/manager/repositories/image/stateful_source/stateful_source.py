@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 
 from ai.backend.common.types import ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -23,5 +24,5 @@ class ImageStatefulSource:
     async def list_agents_with_image(self, image_id: ImageID) -> set[str]:
         return await self._valkey_image.get_agents_for_image(image_id)
 
-    async def list_agents_with_images(self, image_ids: list[ImageID]) -> dict[ImageID, set[str]]:
+    async def list_agents_with_images(self, image_ids: list[ImageID]) -> Mapping[ImageID, set[str]]:
         return await self._valkey_image.get_agents_for_images(image_ids)
