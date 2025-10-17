@@ -51,7 +51,9 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
                     installed_image_ids
                 )
 
-                for item, installed_agents in zip(installed_items, agents_per_installed_items):
+                for item, installed_agents in zip(
+                    installed_items, agents_per_installed_items.values()
+                ):
                     formatted_installed_agents = " ".join(str(installed_agents))
                     if short:
                         displayed_items.append((
