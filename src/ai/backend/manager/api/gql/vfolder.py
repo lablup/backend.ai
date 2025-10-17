@@ -43,7 +43,7 @@ class ExtraVFolderMount(Node):
 ExtraVFolderMountEdge = Edge[ExtraVFolderMount]
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class ExtraVFolderMountConnection(Connection[ExtraVFolderMount]):
     count: int
 

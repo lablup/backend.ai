@@ -52,41 +52,41 @@ from .model_revision import (
 ReadinessStatus = strawberry.enum(
     CommonReadinessStatus,
     name="ReadinessStatus",
-    description="Added in 25.15.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.",
+    description="Added in 25.16.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.",
 )
 
 LivenessStatus = strawberry.enum(
     CommonLivenessStatus,
     name="LivenessStatus",
-    description="Added in 25.15.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.",
+    description="Added in 25.16.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.",
 )
 
 ActivenessStatus = strawberry.enum(
     CommonActivenessStatus,
     name="ActivenessStatus",
-    description="Added in 25.15.0. This enum represents the activeness status of a replica, indicating whether the deployment is currently active and able to serve requests.",
+    description="Added in 25.16.0. This enum represents the activeness status of a replica, indicating whether the deployment is currently active and able to serve requests.",
 )
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class ReadinessStatusFilter:
     in_: Optional[list[ReadinessStatus]] = strawberry.field(name="in", default=None)
     equals: Optional[ReadinessStatus] = None
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class LivenessStatusFilter:
     in_: Optional[list[LivenessStatus]] = strawberry.field(name="in", default=None)
     equals: Optional[LivenessStatus] = None
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class ActivenessStatusFilter:
     in_: Optional[list[ActivenessStatus]] = strawberry.field(name="in", default=None)
     equals: Optional[ActivenessStatus] = None
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class ReplicaFilter:
     readiness_status: Optional[ReadinessStatusFilter] = None
     liveness_status: Optional[LivenessStatusFilter] = None
@@ -151,13 +151,13 @@ class ReplicaFilter:
         return repo_filter
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(description="Added in 25.16.0")
 class ReplicaOrderBy:
     field: ReplicaOrderField
     direction: OrderDirection = OrderDirection.DESC
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class ModelReplica(Node):
     id: NodeID
     _session_id: strawberry.Private[UUID]
@@ -242,7 +242,7 @@ class ModelReplica(Node):
 ModelReplicaEdge = Edge[ModelReplica]
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class ModelReplicaConnection(Connection[ModelReplica]):
     count: int
 
@@ -265,12 +265,12 @@ class ModelReplicaConnection(Connection[ModelReplica]):
         return cls(count=len(nodes), edges=edges, page_info=page_info)
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(description="Added in 25.16.0")
 class ReplicaStatusChangedPayload:
     replica: ModelReplica
 
 
-@strawberry.field(description="Added in 25.15.0")
+@strawberry.field(description="Added in 25.16.0")
 async def replica(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelReplica]:
     """Get a specific replica by ID."""
     _, replica_id = resolve_global_id(id)
@@ -351,7 +351,7 @@ async def resolve_replicas(
     )
 
 
-@strawberry.field(description="Added in 25.15.0")
+@strawberry.field(description="Added in 25.16.0")
 async def replicas(
     info: Info[StrawberryGQLContext],
     filter: Optional[ReplicaFilter] = None,
@@ -376,7 +376,7 @@ async def replicas(
     )
 
 
-@strawberry.subscription(description="Added in 25.15.0")
+@strawberry.subscription(description="Added in 25.16.0")
 async def replica_status_changed(
     revision_id: ID,
 ) -> AsyncGenerator[ReplicaStatusChangedPayload, None]:

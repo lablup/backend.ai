@@ -36,29 +36,29 @@ class AutoScalingRule(Node):
     id: NodeID[str]
 
     metric_source: AutoScalingMetricSource = strawberry.field(
-        description="Added in 25.15.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"
+        description="Added in 25.16.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"
     )
     metric_name: str = strawberry.field()
 
     min_threshold: Optional[Decimal] = strawberry.field(
-        description="Added in 25.15.0: The minimum threshold for scaling (e.g. 0.5)"
+        description="Added in 25.16.0: The minimum threshold for scaling (e.g. 0.5)"
     )
     max_threshold: Optional[Decimal] = strawberry.field(
-        description="Added in 25.15.0: The maximum threshold for scaling (e.g. 21.0)"
+        description="Added in 25.16.0: The maximum threshold for scaling (e.g. 21.0)"
     )
 
     step_size: int = strawberry.field(
-        description="Added in 25.15.0: The step size for scaling (e.g. 1)."
+        description="Added in 25.16.0: The step size for scaling (e.g. 1)."
     )
     time_window: int = strawberry.field(
-        description="Added in 25.15.0: The time window (seconds) for scaling (e.g. 60)."
+        description="Added in 25.16.0: The time window (seconds) for scaling (e.g. 60)."
     )
 
     min_replicas: Optional[int] = strawberry.field(
-        description="Added in 25.15.0: The minimum number of replicas (e.g. 1)."
+        description="Added in 25.16.0: The minimum number of replicas (e.g. 1)."
     )
     max_replicas: Optional[int] = strawberry.field(
-        description="Added in 25.15.0: The maximum number of replicas (e.g. 10)."
+        description="Added in 25.16.0: The maximum number of replicas (e.g. 10)."
     )
 
     created_at: datetime
@@ -162,7 +162,7 @@ class DeleteAutoScalingRulePayload:
     id: ID
 
 
-@strawberry.mutation(description="Added in 25.15.0")
+@strawberry.mutation(description="Added in 25.16.0")
 async def create_auto_scaling_rule(
     input: CreateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> CreateAutoScalingRulePayload:
@@ -176,7 +176,7 @@ async def create_auto_scaling_rule(
     )
 
 
-@strawberry.mutation(description="Added in 25.15.0")
+@strawberry.mutation(description="Added in 25.16.0")
 async def update_auto_scaling_rule(
     input: UpdateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> UpdateAutoScalingRulePayload:
@@ -190,7 +190,7 @@ async def update_auto_scaling_rule(
     )
 
 
-@strawberry.mutation(description="Added in 25.15.0")
+@strawberry.mutation(description="Added in 25.16.0")
 async def delete_auto_scaling_rule(
     input: DeleteAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteAutoScalingRulePayload:
