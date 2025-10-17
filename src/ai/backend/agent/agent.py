@@ -1199,7 +1199,7 @@ class AbstractAgent(
                 },
                 images=zlib.compress(
                     msgpack.packb([
-                        (canonical, scanned_image.to_dict())
+                        (str(canonical), scanned_image.digest)
                         for canonical, scanned_image in self.images.items()
                     ])
                 ),

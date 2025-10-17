@@ -76,13 +76,9 @@ class AgentRepository:
 
     @agent_repository_resilience.apply()
     async def add_agent_to_images(self, agent_id: AgentId, images: bytes) -> None:
-        img: list[tuple[str, dict[str, str]]] = msgpack.unpackb(zlib.decompress(images))
-        scanned_images: list[ScannedImage] = [
-            ScannedImage.from_dict(data) for repo_tag, data in img
-        ]
-        images_data = await self._db_source.get_images_by_digest([
-            image.digest for image in scanned_images
-        ])
+        img: list[tuple[str, str]] = msgpack.unpackb(zlib.decompress(images))
+        image_digests = [digest for canonical, digest in img]
+        images_data = await self._db_source.get_images_by_digest(image_digests)
         image_ids: list[ImageID] = list(images_data.keys())
         with suppress_with_log(
             [Exception], message=f"Failed to cache agent: {agent_id} to images: {image_ids}"
