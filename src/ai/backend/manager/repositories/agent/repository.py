@@ -132,7 +132,7 @@ class AgentRepository:
 
         async with self._db_source._db.begin_readonly_session() as db_session:
             result = await db_session.scalars(stmt)
-            agent_rows = cast(list[AgentRow], result.all())
+            agent_rows = cast(list[AgentRow], result.unique().all())
             return [agent_row.to_data() for agent_row in agent_rows]
 
     @repository_decorator()
