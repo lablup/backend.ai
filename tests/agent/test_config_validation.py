@@ -13,6 +13,7 @@ from ai.backend.agent.config.unified import (
     AgentBackend,
     AgentConfig,
     AgentConfigValidationContext,
+    AgentGlobalConfig,
     AgentUnifiedConfig,
     ContainerConfig,
     ContainerSandboxType,
@@ -596,3 +597,402 @@ class TestAgentUnifiedConfigValidation:
         raw_config["agent"]["backend"] = AgentBackend.KUBERNETES
         config = AgentUnifiedConfig.model_validate(raw_config)
         assert config.agent.backend == AgentBackend.KUBERNETES
+
+
+class TestAgentUnifiedConfigSingleAgentMode:
+    @pytest.fixture
+    def default_raw_config(self) -> RawConfigT:
+        return {
+            "agent": {
+                "backend": AgentBackend.DOCKER,
+                "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
+            },
+            "container": {
+                "scratch-type": ScratchType.HOSTDIR,
+                "port-range": [30000, 31000],
+            },
+            "resource": {},
+            "etcd": {
+                "namespace": "test",
+                "addr": HostPortPair(host="127.0.0.1", port=2379),
+            },
+        }
+
+    def test_single_agent_mode_uses_global_config(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        config = AgentUnifiedConfig.model_validate(default_raw_config)
+
+        assert len(config.agent_configs) == 1
+        assert config.agent_configs[0].agent.backend == AgentBackend.DOCKER
+        assert config.agent_configs[0].container.port_range == (30000, 31000)
+
+    def test_single_agent_mode_rejects_single_subagent(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "sub-agents": [
+                {
+                    "agent": {"id": "agent-1"},
+                }
+            ],
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            AgentUnifiedConfig.model_validate(raw_config)
+
+        assert "should not be specified with only 1 subagent" in str(exc_info.value)
+
+    def test_global_config_property_returns_global_fields(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        config = AgentUnifiedConfig.model_validate(default_raw_config)
+        global_config = config.global_config
+
+        assert isinstance(global_config, AgentGlobalConfig)
+
+
+class TestSubAgentConfigValidation:
+    @pytest.fixture
+    def default_raw_config(self) -> RawConfigT:
+        return {
+            "agent": {
+                "backend": AgentBackend.DOCKER,
+                "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
+                "kernel-creation-concurrency": 4,
+            },
+            "container": {
+                "scratch-type": ScratchType.HOSTDIR,
+                "port-range": [30000, 31000],
+            },
+            "resource": {
+                "reserved-cpu": 1,
+            },
+            "etcd": {
+                "namespace": "test",
+                "addr": HostPortPair(host="127.0.0.1", port=2379),
+            },
+        }
+
+    def test_multiple_subagents_inherit_global_config(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "sub-agents": [
+                {"agent": {"id": "agent-1"}},
+                {"agent": {"id": "agent-2"}},
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert len(config.agent_configs) == 2
+        for agent_config in config.agent_configs:
+            assert agent_config.agent.backend == AgentBackend.DOCKER
+            assert agent_config.container.port_range == (30000, 31000)
+            assert agent_config.resource.reserved_cpu == 1
+
+    def test_subagent_overrides_agent_fields(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "sub-agents": [
+                {
+                    "agent": {
+                        "id": "agent-1",
+                        "kernel-creation-concurrency": 8,
+                    }
+                },
+                {"agent": {"id": "agent-2"}},
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert config.agent_configs[0].agent.id == "agent-1"
+        assert config.agent_configs[0].agent.kernel_creation_concurrency == 8
+        assert config.agent_configs[1].agent.id == "agent-2"
+        assert config.agent_configs[1].agent.kernel_creation_concurrency == 4
+
+    def test_subagent_overrides_container_port_range(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "sub-agents": [
+                {
+                    "agent": {"id": "agent-1"},
+                    "container": {"port-range": [31000, 32000]},
+                },
+                {
+                    "agent": {"id": "agent-2"},
+                    "container": {"port-range": [32000, 33000]},
+                },
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert config.agent_configs[0].container.port_range == (31000, 32000)
+        assert config.agent_configs[1].container.port_range == (32000, 33000)
+
+    def test_subagent_overrides_resource_config(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "sub-agents": [
+                {
+                    "agent": {"id": "agent-1"},
+                    "resource": {"reserved-cpu": 2},
+                },
+                {"agent": {"id": "agent-2"}},
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert config.agent_configs[0].resource.reserved_cpu == 2
+        assert config.agent_configs[1].resource.reserved_cpu == 1
+
+    def test_subagent_partial_override_preserves_other_fields(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "agent": {
+                **default_raw_config["agent"],
+                "allow-compute-plugins": {"plugin1", "plugin2"},
+            },
+            "sub-agents": [
+                {
+                    "agent": {
+                        "id": "agent-1",
+                        "kernel-creation-concurrency": 8,
+                    }
+                },
+                {
+                    "agent": {"id": "agent-2"},
+                },
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert config.agent_configs[0].agent.kernel_creation_concurrency == 8
+        assert config.agent_configs[0].agent.allow_compute_plugins == {"plugin1", "plugin2"}
+
+    def test_subagent_with_different_plugins(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "sub-agents": [
+                {
+                    "agent": {
+                        "id": "agent-1",
+                        "allow-compute-plugins": {"plugin1"},
+                    }
+                },
+                {
+                    "agent": {
+                        "id": "agent-2",
+                        "allow-compute-plugins": {"plugin2"},
+                    }
+                },
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert config.agent_configs[0].agent.allow_compute_plugins == {"plugin1"}
+        assert config.agent_configs[1].agent.allow_compute_plugins == {"plugin2"}
+
+    def test_subagent_validates_backend_specific_config(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "agent": {
+                "backend": AgentBackend.KUBERNETES,
+                "rpc-listen-addr": HostPortPair(host="127.0.0.1", port=6001),
+            },
+            "container": {
+                "scratch-type": "k8s-nfs",
+                "scratch-nfs-address": "nfs.example.com:/exports",
+                "scratch-nfs-options": "nfsvers=4.1",
+            },
+            "sub-agents": [
+                {"agent": {"id": "agent-1"}},
+                {"agent": {"id": "agent-2"}},
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert config.agent_configs[0].agent.backend == AgentBackend.KUBERNETES
+        assert config.agent_configs[1].agent.backend == AgentBackend.KUBERNETES
+
+    def test_multiple_subagents_with_mixed_overrides(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "sub-agents": [
+                {
+                    "agent": {
+                        "id": "agent-1",
+                        "kernel-creation-concurrency": 8,
+                    },
+                    "container": {"port-range": [31000, 32000]},
+                    "resource": {"reserved-cpu": 2},
+                },
+                {
+                    "agent": {
+                        "id": "agent-2",
+                    },
+                    "container": {"port-range": [32000, 33000]},
+                },
+                {
+                    "agent": {"id": "agent-3"},
+                },
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert len(config.agent_configs) == 3
+        assert config.agent_configs[0].agent.kernel_creation_concurrency == 8
+        assert config.agent_configs[0].resource.reserved_cpu == 2
+        assert config.agent_configs[1].agent.kernel_creation_concurrency == 4
+        assert config.agent_configs[1].resource.reserved_cpu == 1
+        assert config.agent_configs[2].agent.kernel_creation_concurrency == 4
+
+    def test_subagent_with_only_id_inherits_all_fields(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "agent": {
+                **default_raw_config["agent"],
+                "agent-sock-port": 6007,
+                "allow-compute-plugins": {"plugin1", "plugin2"},
+            },
+            "sub-agents": [
+                {"agent": {"id": "agent-1"}},
+                {"agent": {"id": "agent-2"}},
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        for agent_config in config.agent_configs:
+            assert agent_config.agent.backend == AgentBackend.DOCKER
+            assert agent_config.agent.kernel_creation_concurrency == 4
+            assert agent_config.agent.agent_sock_port == 6007
+            assert agent_config.agent.allow_compute_plugins == {"plugin1", "plugin2"}
+            assert agent_config.container.port_range == (30000, 31000)
+            assert agent_config.resource.reserved_cpu == 1
+
+    def test_subagent_with_empty_container_override_inherits_global(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "sub-agents": [
+                {
+                    "agent": {"id": "agent-1"},
+                    "container": {},
+                },
+                {"agent": {"id": "agent-2"}},
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert config.agent_configs[0].container.port_range == (30000, 31000)
+        assert config.agent_configs[0].container.scratch_type == ScratchType.HOSTDIR
+        assert config.agent_configs[1].container.port_range == (30000, 31000)
+        assert config.agent_configs[1].container.scratch_type == ScratchType.HOSTDIR
+
+    def test_subagent_with_empty_resource_override_inherits_global(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "resource": {
+                "reserved-cpu": 2,
+                "reserved-mem": "2G",
+                "reserved-disk": "10G",
+            },
+            "sub-agents": [
+                {
+                    "agent": {"id": "agent-1"},
+                    "resource": {},
+                },
+                {"agent": {"id": "agent-2"}},
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert config.agent_configs[0].resource.reserved_cpu == 2
+        assert config.agent_configs[1].resource.reserved_cpu == 2
+
+    def test_overridable_agent_config_defaults_when_not_in_global(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "sub-agents": [
+                {"agent": {"id": "agent-1"}},
+                {
+                    "agent": {
+                        "id": "agent-2",
+                        "allow-compute-plugins": {"plugin1"},
+                    },
+                },
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert config.agent_configs[0].agent.agent_sock_port == 6007
+        assert config.agent_configs[0].agent.force_terminate_abusing_containers is False
+        assert config.agent_configs[0].agent.use_experimental_redis_event_dispatcher is False
+        assert config.agent_configs[0].agent.allow_compute_plugins is None
+        assert config.agent_configs[0].agent.block_compute_plugins is None
+
+        assert config.agent_configs[1].agent.allow_compute_plugins == {"plugin1"}
+        assert config.agent_configs[1].agent.agent_sock_port == 6007
+
+    def test_overridable_container_config_defaults_when_not_in_global(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        raw_config = {
+            **default_raw_config,
+            "container": {
+                "scratch-type": ScratchType.HOSTDIR,
+                "port-range": [30000, 31000],
+            },
+            "sub-agents": [
+                {"agent": {"id": "agent-1"}},
+                {
+                    "agent": {"id": "agent-2"},
+                    "container": {"port-range": [32000, 33000]},
+                },
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        assert config.agent_configs[0].container.port_range == (30000, 31000)
+        assert config.agent_configs[0].container.scratch_type == ScratchType.HOSTDIR
+
+        assert config.agent_configs[1].container.port_range == (32000, 33000)
+        assert config.agent_configs[1].container.scratch_type == ScratchType.HOSTDIR
