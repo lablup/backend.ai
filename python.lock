@@ -25,6 +25,7 @@
 //     "aiomonitor~=0.7.0",
 //     "aioresponses>=0.7.3",
 //     "aiosqlite~=0.21.0",
+//     "aiotools~=2.2.2",
 //     "aiotusclient~=0.1.4",
 //     "alembic~=1.13.2",
 //     "appdirs~=1.4.4",
@@ -653,6 +654,26 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "363258304aca3e3233fcdb2c6314d6de1a9024c5988e728ab0d4633b63c58918",
+              "url": "https://files.pythonhosted.org/packages/8c/f0/848c334ef23fa183a890d81756e933be847f1890d3ee8e2219d6e3913748/aiotools-2.2.2-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "9bb3eaa1bc89e47b8e32c4cf6497849e2be9ec89bada8c752a86e542a46f82dc",
+              "url": "https://files.pythonhosted.org/packages/31/f9/bd622493a455dc5795fa5754acde12c230d342457b43183809f68c6b8968/aiotools-2.2.2.tar.gz"
+            }
+          ],
+          "project_name": "aiotools",
+          "requires_dists": [
+            "async-lru>=2.0.5"
+          ],
+          "requires_python": ">=3.11",
+          "version": "2.2.2"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "69dad8a1bfb66c811a537014bda44e06188621df36e75566b97c4aaf373a389b",
               "url": "https://files.pythonhosted.org/packages/7b/d2/004c9f673df74ff0455f381e898ad522b5fbc05a2b7b99420f1998702a58/aiotusclient-0.1.4-py3-none-any.whl"
             },
@@ -861,6 +882,26 @@
           ],
           "requires_python": ">=3.9",
           "version": "25.1.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "ab95404d8d2605310d345932697371a5f40def0487c03d6d0ad9138de52c9943",
+              "url": "https://files.pythonhosted.org/packages/03/49/d10027df9fce941cb8184e78a02857af36360d33e1721df81c5ed2179a1a/async_lru-2.0.5-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "481d52ccdd27275f42c43a928b4a50c3bfb2d67af4e78b170e3e0bb39c66e5bb",
+              "url": "https://files.pythonhosted.org/packages/b2/4d/71ec4d3939dc755264f680f6c2b4906423a304c3d18e96853f0a595dfe97/async_lru-2.0.5.tar.gz"
+            }
+          ],
+          "project_name": "async-lru",
+          "requires_dists": [
+            "typing_extensions>=4.0.0; python_version < \"3.11\""
+          ],
+          "requires_python": ">=3.9",
+          "version": "2.0.5"
         },
         {
           "artifacts": [
@@ -3089,13 +3130,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "bf13431d292ce34a25568586729a3b9deb07d112289b77350dc4c2340c2f34c1",
-              "url": "https://files.pythonhosted.org/packages/96/f2/5efda2a70d98288f4d94baba8489cd782d53772233c77351864bc754a146/jupyter_core-5.9.0-py3-none-any.whl"
+              "hash": "ebf87fdc6073d142e114c72c9e29a9d7ca03fad818c5d300ce2adc1fb0743407",
+              "url": "https://files.pythonhosted.org/packages/e7/e7/80988e32bf6f73919a113473a604f5a8f09094de312b9d52b79c2df7612b/jupyter_core-5.9.1-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5f8fba10cfc946fe1b4037e986458fc89430397207b21d741dc399d3d42951d4",
-              "url": "https://files.pythonhosted.org/packages/6f/0c/7b01e93e054555cbadf614f2ff10ea77aecbc8867831914d8a2c5868481a/jupyter_core-5.9.0.tar.gz"
+              "hash": "4d09aaff303b9566c3ce657f580bd089ff5c91f5f89cf7d8846c3cdf465b5508",
+              "url": "https://files.pythonhosted.org/packages/02/49/9d1284d0dc65e2c757b74c6687b6d319b02f822ad039e5c512df9194d9dd/jupyter_core-5.9.1.tar.gz"
             }
           ],
           "project_name": "jupyter-core",
@@ -3115,7 +3156,7 @@
             "traitlets>=5.3"
           ],
           "requires_python": ">=3.10",
-          "version": "5.9.0"
+          "version": "5.9.1"
         },
         {
           "artifacts": [
@@ -6853,38 +6894,38 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "a5c39f217ab3c663dc699c04cbd50c13813e31d917642d459fdcec07555cc553",
-              "url": "https://files.pythonhosted.org/packages/63/9a/0962b05b308494e3202d3f794a6e85abe471fe3cafdbcf95c2e8c713aabd/uvloop-0.21.0-cp313-cp313-musllinux_1_2_x86_64.whl"
+              "hash": "1f38ec5e3f18c8a10ded09742f7fb8de0108796eb673f30ce7762ce1b8550cad",
+              "url": "https://files.pythonhosted.org/packages/f8/ba/d69adbe699b768f6b29a5eec7b47dd610bd17a69de51b251126a801369ea/uvloop-0.22.1-cp313-cp313-musllinux_1_2_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "bfd55dfcc2a512316e65f16e503e9e450cab148ef11df4e4e679b5e8253a5281",
-              "url": "https://files.pythonhosted.org/packages/3f/8d/2cbef610ca21539f0f36e2b34da49302029e7c9f09acef0b1c3b5839412b/uvloop-0.21.0-cp313-cp313-macosx_10_13_universal2.whl"
+              "hash": "6c84bae345b9147082b17371e3dd5d42775bddce91f885499017f4607fdaf39f",
+              "url": "https://files.pythonhosted.org/packages/06/f0/18d39dbd1971d6d62c4629cc7fa67f74821b0dc1f5a77af43719de7936a7/uvloop-0.22.1.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "bd53ecc9a0f3d87ab847503c2e1552b690362e005ab54e8a48ba97da3924c0dc",
-              "url": "https://files.pythonhosted.org/packages/47/57/66f061ee118f413cd22a656de622925097170b9380b30091b78ea0c6ea75/uvloop-0.21.0-cp313-cp313-musllinux_1_2_aarch64.whl"
+              "hash": "0530a5fbad9c9e4ee3f2b33b148c6a64d47bbad8000ea63704fa8260f4cf728e",
+              "url": "https://files.pythonhosted.org/packages/15/c0/0be24758891ef825f2065cd5db8741aaddabe3e248ee6acc5e8a80f04005/uvloop-0.22.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5ee4d4ef48036ff6e5cfffb09dd192c7a5027153948d85b8da7ff705065bacc6",
-              "url": "https://files.pythonhosted.org/packages/50/94/0a687f39e78c4c1e02e3272c6b2ccdb4e0085fda3b8352fecd0410ccf915/uvloop-0.21.0-cp313-cp313-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "561577354eb94200d75aca23fbde86ee11be36b00e52a4eaf8f50fb0c86b7705",
+              "url": "https://files.pythonhosted.org/packages/89/8c/182a2a593195bfd39842ea68ebc084e20c850806117213f5a299dfc513d9/uvloop-0.22.1-cp313-cp313-macosx_10_13_universal2.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "787ae31ad8a2856fc4e7c095341cccc7209bd657d0e71ad0dc2ea83c4a6fa8af",
-              "url": "https://files.pythonhosted.org/packages/93/0d/b0038d5a469f94ed8f2b2fce2434a18396d8fbfb5da85a0a9781ebbdec14/uvloop-0.21.0-cp313-cp313-macosx_10_13_x86_64.whl"
+              "hash": "6e2ea3d6190a2968f4a14a23019d3b16870dd2190cd69c8180f7c632d21de68d",
+              "url": "https://files.pythonhosted.org/packages/b7/02/654426ce265ac19e2980bfd9ea6590ca96a56f10c76e63801a2df01c0486/uvloop-0.22.1-cp313-cp313-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3bf12b0fda68447806a7ad847bfa591613177275d35b6724b1ee573faa3704e3",
-              "url": "https://files.pythonhosted.org/packages/af/c0/854216d09d33c543f12a44b393c402e89a920b1a0a7dc634c42de91b9cf6/uvloop-0.21.0.tar.gz"
+              "hash": "1cdf5192ab3e674ca26da2eada35b288d2fa49fdd0f357a19f0e7c4e7d5077c8",
+              "url": "https://files.pythonhosted.org/packages/d2/14/e301ee96a6dc95224b6f1162cd3312f6d1217be3907b79173b06785f2fe7/uvloop-0.22.1-cp313-cp313-macosx_10_13_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "f3df876acd7ec037a3d005b3ab85a7e4110422e4d9c1571d4fc89b0fc41b6816",
-              "url": "https://files.pythonhosted.org/packages/d2/19/f5b78616566ea68edd42aacaf645adbf71fbd83fc52281fba555dc27e3f1/uvloop-0.21.0-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "bc5ef13bbc10b5335792360623cc378d52d7e62c2de64660616478c32cd0598e",
+              "url": "https://files.pythonhosted.org/packages/d2/53/8369e5219a5855869bcee5f4d317f6da0e2c669aecf0ef7d371e3d084449/uvloop-0.22.1-cp313-cp313-musllinux_1_2_aarch64.whl"
             }
           ],
           "project_name": "uvloop",
@@ -6892,17 +6933,17 @@
             "Cython~=3.0; extra == \"dev\"",
             "Sphinx~=4.1.2; extra == \"docs\"",
             "aiohttp>=3.10.5; extra == \"test\"",
-            "flake8~=5.0; extra == \"test\"",
+            "flake8~=6.1; extra == \"test\"",
             "mypy>=0.800; extra == \"test\"",
             "psutil; extra == \"test\"",
-            "pyOpenSSL~=23.0.0; extra == \"test\"",
-            "pycodestyle~=2.9.0; extra == \"test\"",
+            "pyOpenSSL~=25.3.0; extra == \"test\"",
+            "pycodestyle~=2.11.0; extra == \"test\"",
             "setuptools>=60; extra == \"dev\"",
-            "sphinx-rtd-theme~=0.5.2; extra == \"docs\"",
+            "sphinx_rtd_theme~=0.5.2; extra == \"docs\"",
             "sphinxcontrib-asyncio~=0.3.0; extra == \"docs\""
           ],
-          "requires_python": ">=3.8.0",
-          "version": "0.21.0"
+          "requires_python": ">=3.8.1",
+          "version": "0.22.1"
         },
         {
           "artifacts": [
@@ -7236,6 +7277,7 @@
     "aiomonitor~=0.7.0",
     "aioresponses>=0.7.3",
     "aiosqlite~=0.21.0",
+    "aiotools~=2.2.2",
     "aiotusclient~=0.1.4",
     "alembic~=1.13.2",
     "appdirs~=1.4.4",
