@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Optional, cast
 
 import attrs
 import graphene
+import graphene_federation
 import sqlalchemy as sa
 from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import GraphQLError, OperationType, Undefined
@@ -3384,3 +3385,11 @@ class GQLMetricMiddleware:
             )
             raise e
         return res
+
+
+graphene_schema = graphene_federation.build_schema(
+    query=Query,
+    mutation=Mutation,
+    auto_camelcase=False,
+    federation_version=graphene_federation.LATEST_VERSION,
+)

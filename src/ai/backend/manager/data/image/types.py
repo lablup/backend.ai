@@ -87,6 +87,8 @@ class ImageDataWithDetails:
     tags: list[KVPair]
     version: Optional[str]
     registry: str
+    registry_id: uuid.UUID
+    type: ImageType
     architecture: str
     is_local: bool
     status: ImageStatus
