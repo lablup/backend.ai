@@ -75,10 +75,7 @@ class AgentDBSource:
             await self._check_scaling_group_exists(session, upsert_data.metadata.scaling_group)
 
             query = (
-                sa.select(AgentRow)
-                .where(AgentRow.id == upsert_data.metadata.id)
-                .options(selectinload(AgentRow.kernels))
-                .with_for_update()
+                sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
             )
             row: Optional[AgentRow] = await session.scalar(query)
             agent_data = row.to_heartbeat_update_data() if row is not None else None
