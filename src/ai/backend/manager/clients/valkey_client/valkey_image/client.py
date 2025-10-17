@@ -18,7 +18,7 @@ from ai.backend.common.resilience import (
     RetryArgs,
     RetryPolicy,
 )
-from ai.backend.common.types import ImageCanonical, ImageID, ValkeyTarget
+from ai.backend.common.types import AgentId, ImageCanonical, ImageID, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -184,7 +184,7 @@ class ValkeyImageClient:
     async def get_agents_for_image(
         self,
         image_id: ImageID,
-    ) -> set[str]:
+    ) -> set[AgentId]:
         """
         Get all agents that have a specific image.
 
@@ -192,13 +192,13 @@ class ValkeyImageClient:
         :return: Set of agent IDs.
         """
         result = await self._client.client.smembers(str(image_id))
-        return {member.decode() for member in result}
+        return {AgentId(member.decode()) for member in result}
 
     @valkey_image_resilience.apply()
     async def get_agents_for_images(
         self,
         image_ids: list[ImageID],
-    ) -> Mapping[ImageID, set[str]]:
+    ) -> Mapping[ImageID, set[AgentId]]:
         """
         Get all agents for multiple images.
 
@@ -213,12 +213,12 @@ class ValkeyImageClient:
             tx.smembers(str(image_id))
 
         results = await self._client.client.exec(tx, raise_on_error=True)
-        final_results: dict[ImageID, set[str]] = {}
+        final_results: dict[ImageID, set[AgentId]] = {}
         if not results:
             return final_results
         for image_id, result in zip(image_ids, results):
             result = cast(set[bytes], result)
-            final_results[image_id] = {member.decode() for member in result}
+            final_results[image_id] = {AgentId(member.decode()) for member in result}
         return final_results
 
     @valkey_image_resilience.apply()

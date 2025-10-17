@@ -287,7 +287,7 @@ class Image(graphene.ObjectType):
         agent_ids = list(results.values())
 
         for idx, row in enumerate(rows):
-            installed_agents: list[str] = list(agent_ids[idx])
+            installed_agents: list[str] = [str(agent_id) for agent_id in agent_ids[idx]]
             yield cls.populate_row(ctx, row, installed_agents)
 
     @classmethod
@@ -503,7 +503,7 @@ class ImageNode(graphene.ObjectType):
         cls, ctx: GraphQueryContext, image_ids: Sequence[ImageID]
     ) -> list[set[AgentId]]:
         results = await ctx.valkey_image.get_agents_for_images(list(image_ids))
-        return [{AgentId(agent_id) for agent_id in agents} for agents in results.values()]
+        return list(results.values())
 
     async def resolve_installed(self, info: graphene.ResolveInfo) -> bool:
         graph_ctx: GraphQueryContext = info.context
