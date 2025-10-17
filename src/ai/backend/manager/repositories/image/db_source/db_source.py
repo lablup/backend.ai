@@ -22,7 +22,6 @@ from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
     AliasImageActionValueError,
     ForgetImageForbiddenError,
-    ForgetImageNotFoundError,
     ImageAliasNotFound,
     ImageNotFound,
     ModifyImageActionValueError,
@@ -92,14 +91,17 @@ class ImageDBSource:
         image_id: UUID,
         load_aliases: bool = False,
         status_filter: Optional[list[ImageStatus]] = None,
-    ) -> Optional[ImageRow]:
+    ) -> ImageRow:
         """
         Private method to get an image by ID using an existing session.
         Returns None if image is not found.
         """
-        return await ImageRow.get(
+        row = await ImageRow.get(
             session, image_id, load_aliases=load_aliases, filter_by_statuses=status_filter
         )
+        if row is None:
+            raise ImageNotFound()
+        return row
 
     async def _validate_image_ownership(
         self, session: SASession, image_id: UUID, user_id: UUID, load_aliases: bool = False
@@ -109,8 +111,6 @@ class ImageDBSource:
         Raises ForgetImageActionGenericForbiddenError if image doesn't exist or user doesn't own it.
         """
         image_row = await self._get_image_by_id(session, image_id, load_aliases)
-        if not image_row:
-            raise ForgetImageNotFoundError()
         if not image_row.is_owned_by(user_id):
             raise ForgetImageForbiddenError()
         return image_row
@@ -172,11 +172,9 @@ class ImageDBSource:
     ) -> ImageDataWithDetails:
         async with self._db.begin_session() as session:
             try:
-                row: Optional[ImageRow] = await self._get_image_by_id(
+                row: ImageRow = await self._get_image_by_id(
                     session, image_id, load_aliases, status_filter
                 )
-                if not row:
-                    raise ImageNotFound()
             except UnknownImageReference:
                 raise ImageNotFound()
             data = row.to_detailed_dataclass()
@@ -293,11 +291,11 @@ class ImageDBSource:
 
         return result
 
-    async def untag_image_from_registry(self, image_id: UUID) -> Optional[ImageData]:
+    async def untag_image_from_registry(self, image_id: UUID) -> ImageData:
         async with self._db.begin_readonly_session() as session:
             image_row = await self._get_image_by_id(session, image_id, load_aliases=True)
             if not image_row:
-                return None
+                raise ImageNotFound()
             await image_row.untag_image_from_registry(self._db, session)
             data = image_row.to_dataclass()
         return data
