@@ -11,7 +11,7 @@ from tabulate import tabulate
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.types import ImageAlias
+from ai.backend.common.types import ImageAlias, ImageID
 from ai.backend.logging import BraceStyleAdapter
 
 from ..data.image.types import ImageStatus
@@ -38,23 +38,23 @@ async def list_images(cli_ctx: CLIContext, short, installed_only):
             # NOTE: installed/installed_agents fields are no longer provided in CLI,
             #       until we finish the epic refactoring of image metadata db.
             if installed_only:
-                image_canonicals = [item.name for item in items]
-                installed_counts = await redis_conn_set.image.get_agent_counts_for_images(
-                    image_canonicals
-                )
-                installed_items = []
+                image_ids = [item.id for item in items]
+                installed_counts = await redis_conn_set.image.get_agent_counts_for_images(image_ids)
+                installed_items: list[ImageRow] = []
 
                 for item, installed_count in zip(items, installed_counts):
                     if installed_count > 0:
                         installed_items.append(item)
 
-                installed_canonicals = [item.name for item in installed_items]
+                installed_image_ids: list[ImageID] = [ImageID(item.id) for item in installed_items]
                 agents_per_installed_items = await redis_conn_set.image.get_agents_for_images(
-                    installed_canonicals
+                    installed_image_ids
                 )
 
-                for item, installed_agents in zip(installed_items, agents_per_installed_items):
-                    formatted_installed_agents = " ".join(installed_agents)
+                for item, installed_agents in zip(
+                    installed_items, agents_per_installed_items.values()
+                ):
+                    formatted_installed_agents = " ".join(str(installed_agents))
                     if short:
                         displayed_items.append((
                             item.image_ref.canonical,

@@ -45,12 +45,15 @@ from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
+    ImageDataWithDetails,
     ImageIdentifier,
     ImageLabelsData,
     ImageResourcesData,
     ImageStatus,
     ImageType,
+    KVPair,
     RescanImagesResult,
+    ResourceLimit,
 )
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
 
@@ -847,6 +850,36 @@ class ImageRow(Base):
             labels=ImageLabelsData(label_data=self.labels),
             resources=ImageResourcesData(resources_data=self.resources),
             status=self.status,
+        )
+
+    def to_detailed_dataclass(self) -> ImageDataWithDetails:
+        version, ptag_set = self.image_ref.tag_set
+        return ImageDataWithDetails(
+            id=self.id,
+            name=self.image,
+            namespace=self.image,
+            base_image_name=self.image_ref.name,
+            project=self.project,
+            humanized_name=self.image,
+            tag=self.tag,
+            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
+            version=version,
+            registry=self.registry,
+            architecture=self.architecture,
+            is_local=self.is_local,
+            digest=self.trimmed_digest or None,
+            labels=[KVPair(key=k, value=v) for k, v in self.labels.items()],
+            aliases=[alias_row.alias for alias_row in self.aliases],
+            size_bytes=self.size_bytes,
+            status=self.status,
+            resource_limits=[
+                ResourceLimit(key=k, min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
+                for k, v in self.resources.items()
+            ],
+            supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
+            # legacy
+            hash=self.trimmed_digest or None,
+            raw_labels=self.labels,
         )
 
     async def untag_image_from_registry(

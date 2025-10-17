@@ -10,7 +10,6 @@ import attrs
 import click
 
 from ai.backend.common import redis_helper
-from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import find_config_file
 from ai.backend.common.defs import (
@@ -24,6 +23,7 @@ from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import RedisConnectionInfo
 from ai.backend.logging import AbstractLogger, LocalLogger, LogLevel
+from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.unified import ManagerUnifiedConfig, RedisConfig

@@ -1,21 +1,22 @@
 import logging
 import zlib
 from collections.abc import Collection, Sequence
-from typing import cast
+from typing import Mapping, cast
 
 import sqlalchemy as sa
 from sqlalchemy.orm import contains_eager
 
 from ai.backend.common import msgpack
-from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, ImageCanonical, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
@@ -24,6 +25,7 @@ from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
+from ai.backend.manager.data.image.types import ImageDataWithDetails
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.kernel import KernelRow
@@ -73,13 +75,15 @@ class AgentRepository:
         return await self._db_source.get_by_id(agent_id)
 
     @agent_repository_resilience.apply()
-    async def add_agent_to_images(self, agent_id: AgentId, images) -> None:
-        images = msgpack.unpackb(zlib.decompress(images))
-        image_canonicals = set(img_info[0] for img_info in images)
+    async def add_agent_to_images(self, agent_id: AgentId, images: bytes) -> None:
+        img: list[tuple[str, str]] = msgpack.unpackb(zlib.decompress(images))
+        image_digests = [digest for canonical, digest in img]
+        images_data = await self._db_source.get_images_by_digest(image_digests)
+        image_ids: list[ImageID] = list(images_data.keys())
         with suppress_with_log(
-            [Exception], message=f"Failed to cache agent: {agent_id} to images: {image_canonicals}"
+            [Exception], message=f"Failed to cache agent: {agent_id} to images: {image_ids}"
         ):
-            await self._cache_source.set_agent_to_images(agent_id, list(image_canonicals))
+            await self._cache_source.set_agent_to_images(agent_id, image_ids)
 
     @agent_repository_resilience.apply()
     async def sync_agent_heartbeat(
@@ -120,15 +124,33 @@ class AgentRepository:
     async def update_agent_status(self, agent_id: AgentId, modifier: AgentStatusModifier) -> None:
         await self._db_source.update_agent_status(agent_id, modifier)
 
+    # For compatibility with redis key made with image canonical strings
+    # Use remove_agent_from_images instead of this if possible
     @agent_repository_resilience.apply()
-    async def remove_agent_from_images(
-        self, agent_id: AgentId, image_canonicals: list[str]
+    async def remove_agent_from_images_by_canonicals(
+        self, agent_id: AgentId, image_canonicals: list[ImageCanonical]
     ) -> None:
         with suppress_with_log(
             [Exception],
             message=f"Failed to remove agent: {agent_id} from images: {image_canonicals}",
         ):
-            await self._cache_source.remove_agent_from_images(agent_id, image_canonicals)
+            await self._cache_source.remove_agent_from_images_by_canonicals(
+                agent_id, image_canonicals
+            )
+
+    @agent_repository_resilience.apply()
+    async def remove_agent_from_images(
+        self, agent_id: AgentId, scanned_images: Mapping[ImageCanonical, ScannedImage]
+    ) -> None:
+        digest_list = [image.digest for image in scanned_images.values()]
+        images: dict[ImageID, ImageDataWithDetails] = await self._db_source.get_images_by_digest(
+            digest_list
+        )
+        with suppress_with_log(
+            [Exception],
+            message=f"Failed to remove agent: {agent_id} from images: {list(images.keys())}",
+        ):
+            await self._cache_source.remove_agent_from_images(agent_id, list(images.keys()))
 
     @agent_repository_resilience.apply()
     async def list_data(
