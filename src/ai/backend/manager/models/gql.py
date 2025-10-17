@@ -1022,7 +1022,7 @@ class Query(graphene.ObjectType):
 
     session_pending_queue = AsyncListConnectionField(
         SessionPendingQueueConnection,
-        description="Added in 25.15.0.",
+        description="Added in 25.13.0.",
         resource_group_id=graphene.String(required=True),
         offset=graphene.Int(
             description="Specifies how many items to skip before beginning to return result."

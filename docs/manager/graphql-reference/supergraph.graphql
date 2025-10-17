@@ -5261,7 +5261,7 @@ type Query
     last: Int
   ): ComputeSessionConnection @join__field(graph: GRAPHENE)
 
-  """Added in 25.15.0."""
+  """Added in 25.13.0."""
   session_pending_queue(
     resource_group_id: String!
 
