@@ -15,7 +15,7 @@ from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, 
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentDataExtended,
-    AgentDataForHearbeatUpdate,
+    AgentDataForHeartbeatUpdate,
     AgentStatus,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -155,8 +155,8 @@ class AgentRow(Base):
             kernels=[k.to_kernel_info() for k in kernel_rows],
         )
 
-    def to_heartbeat_update_data(self) -> AgentDataForHearbeatUpdate:
-        return AgentDataForHearbeatUpdate(
+    def to_heartbeat_update_data(self) -> AgentDataForHeartbeatUpdate:
+        return AgentDataForHeartbeatUpdate(
             status=self.status,
             status_changed=self.status_changed,
             scaling_group=self.scaling_group,

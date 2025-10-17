@@ -40,7 +40,7 @@ class AgentStatus(enum.Enum):
 
 
 @dataclass
-class AgentDataForHearbeatUpdate:
+class AgentDataForHeartbeatUpdate:
     status: AgentStatus
     status_changed: Optional[datetime]
     scaling_group: str
@@ -189,7 +189,7 @@ class UpsertResult:
 
     @classmethod
     def from_state_comparison(
-        cls, existing_data: Optional[AgentDataForHearbeatUpdate], upsert_data: AgentHeartbeatUpsert
+        cls, existing_data: Optional[AgentDataForHeartbeatUpdate], upsert_data: AgentHeartbeatUpsert
     ) -> Self:
         if existing_data is None:
             return cls(
