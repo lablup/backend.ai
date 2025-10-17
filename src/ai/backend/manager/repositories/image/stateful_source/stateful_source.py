@@ -19,8 +19,8 @@ class ImageStatefulSource:
     def __init__(self, valkey_image: ValkeyImageClient) -> None:
         self._valkey_image = valkey_image
 
-    async def get_agents_for_image(self, image_name: str) -> set[str]:
+    async def list_agents_with_image(self, image_name: str) -> set[str]:
         return await self._valkey_image.get_agents_for_image(image_name)
 
-    async def get_agents_for_images(self, image_names: list[str]) -> list[set[str]]:
+    async def list_agents_with_images(self, image_names: list[str]) -> list[set[str]]:
         return await self._valkey_image.get_agents_for_images(image_names)

@@ -95,7 +95,9 @@ class ImageRepository:
         installed_agents_for_images: list[set[str]] = []
 
         image_names = [image.name for image in images_data]
-        installed_agents_for_images = await self._stateful_source.get_agents_for_images(image_names)
+        installed_agents_for_images = await self._stateful_source.list_agents_with_images(
+            image_names
+        )
 
         # TODO: Handle mismatch in lengths more gracefully
         if len(installed_agents_for_images) != len(images_data):
@@ -129,7 +131,7 @@ class ImageRepository:
         image_data: ImageDataWithDetails = await self._db_source.query_image_details_by_identifier(
             identifier, status_filter
         )
-        installed_agents = await self._stateful_source.get_agents_for_image(image_data.name)
+        installed_agents = await self._stateful_source.list_agents_with_image(image_data.name)
         hide_agents = (
             False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )
@@ -153,7 +155,7 @@ class ImageRepository:
         image_data: ImageDataWithDetails = await self._db_source.query_image_details_by_id(
             image_id, load_aliases, status_filter
         )
-        installed_agents = await self._stateful_source.get_agents_for_image(image_data.name)
+        installed_agents = await self._stateful_source.list_agents_with_image(image_data.name)
         hide_agents = (
             False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )
