@@ -22,6 +22,7 @@ import sqlalchemy as sa
 import sqlalchemy.exc
 import trafaret as t
 from aiohttp import web
+from aiotools import cancel_and_wait
 from dateutil.tz import tzutc
 from pydantic import AliasChoices, Field
 from sqlalchemy.sql.expression import null, true
@@ -1680,10 +1681,8 @@ async def init(app: web.Application) -> None:
 
 async def shutdown(app: web.Application) -> None:
     app_ctx: PrivateContext = app["session.context"]
-    app_ctx.agent_lost_checker.cancel()
-    await app_ctx.agent_lost_checker
-    app_ctx.stats_task.cancel()
-    await app_ctx.stats_task
+    await cancel_and_wait(app_ctx.agent_lost_checker)
+    await cancel_and_wait(app_ctx.stats_task)
 
     await app_ctx.webhook_ptask_group.shutdown()
     await app_ctx.database_ptask_group.shutdown()
