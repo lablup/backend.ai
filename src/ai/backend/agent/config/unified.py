@@ -1338,19 +1338,21 @@ class SubAgentConfig(BaseConfigSchema):
         sub_agent_updates: dict[str, Any] = {}
         if self.agent is not None:
             agent_override_fields = self.agent.model_dump(include=self.agent.model_fields_set)
-            sub_agent_updates["agent"] = self.agent.model_copy(update=agent_override_fields)
+            sub_agent_updates["agent"] = default_config.agent.model_copy(
+                update=agent_override_fields
+            )
         if self.container is not None:
             container_override_fields = self.container.model_dump(
                 include=self.container.model_fields_set
             )
-            sub_agent_updates["container"] = self.container.model_copy(
+            sub_agent_updates["container"] = default_config.container.model_copy(
                 update=container_override_fields
             )
         if self.resource is not None:
             resource_override_fields = self.resource.model_dump(
                 include=self.resource.model_fields_set
             )
-            sub_agent_updates["resource"] = self.resource.model_copy(
+            sub_agent_updates["resource"] = default_config.resource.model_copy(
                 update=resource_override_fields
             )
         return default_config.model_copy(update=sub_agent_updates)

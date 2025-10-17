@@ -1254,7 +1254,7 @@ class AgentRPCServer(aobject):
     async def scan_gpu_alloc_map(self) -> Mapping[str, Any]:
         log.debug("rpc::scan_gpu_alloc_map()")
         # TODO: Client should pass in the agent ID to select the agent
-        scratch_root = self.default_agent.local_config.container.scratch_root
+        scratch_root = self._select_agent().local_config.container.scratch_root
         result = await scan_gpu_alloc_map(
             list(self.default_agent.kernel_registry.keys()), scratch_root
         )
