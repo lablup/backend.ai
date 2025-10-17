@@ -16,6 +16,7 @@ import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
+from sqlalchemy.orm import contains_eager
 
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.json import dump_json_str
@@ -50,6 +51,7 @@ from ..base import (
 from ..gql_models.kernel import ComputeContainer
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
 from ..group import AssocGroupUserRow
+from ..kernel import KernelRow
 from ..keypair import keypairs
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
@@ -737,7 +739,19 @@ class AgentSummary(graphene.ObjectType):
     ) -> Sequence[Optional[Self]]:
         query = (
             sa.select(AgentRow)
+            .select_from(
+                sa.join(
+                    AgentRow,
+                    KernelRow,
+                    sa.and_(
+                        AgentRow.id == KernelRow.agent,
+                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
+                    ),
+                    isouter=True,
+                )
+            )
             .where(AgentRow.id.in_(agent_ids))
+            .options(contains_eager(AgentRow.kernels))
             .order_by(
                 AgentRow.id,
             )
@@ -749,7 +763,7 @@ class AgentSummary(graphene.ObjectType):
         )
         async with graph_ctx.db.begin_readonly_session() as session:
             result = await session.scalars(query)
-            agent_list = result.all()
+            agent_list = result.unique().all()
             return [cls.from_data(agent.to_data()) for agent in agent_list]
 
     @classmethod
@@ -791,7 +805,23 @@ class AgentSummary(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[Self]:
-        query = sa.select(AgentRow).limit(limit).offset(offset)
+        query = (
+            sa.select(AgentRow)
+            .select_from(
+                sa.join(
+                    AgentRow,
+                    KernelRow,
+                    sa.and_(
+                        AgentRow.id == KernelRow.agent,
+                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
+                    ),
+                    isouter=True,
+                )
+            )
+            .options(contains_eager(AgentRow.kernels))
+            .limit(limit)
+            .offset(offset)
+        )
         query = await _append_sgroup_from_clause(
             graph_ctx, query, access_key, domain_name, scaling_group
         )
@@ -811,8 +841,10 @@ class AgentSummary(graphene.ObjectType):
                 AgentRow.id.asc(),
             )
         agent_ids: list[AgentId] = []
-        async with graph_ctx.db.begin_readonly() as conn:
-            async for row in await conn.stream(query):
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            result = await db_session.scalars(query)
+            rows = result.unique().all()
+            for row in rows:
                 agent_ids.append(row.id)
 
         list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
