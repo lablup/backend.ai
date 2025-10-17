@@ -1,25 +1,25 @@
 from collections.abc import Sequence
 from datetime import datetime
-from enum import StrEnum
 from typing import AsyncGenerator, Optional
 from uuid import UUID, uuid4
 
 import strawberry
-from aiotools import apartial
 from strawberry import ID, Info
-from strawberry.dataloader import DataLoader
-from strawberry.relay import Connection, Edge, Node, NodeID, PageInfo
+from strawberry.relay import Connection, Edge, Node, NodeID
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy as CommonDeploymentStrategy,
 )
 from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus as CommonDeploymentStatus,
 )
-from ai.backend.common.exception import ModelDeploymentUnavailableError
+from ai.backend.common.exception import ModelDeploymentNotFound, ModelDeploymentUnavailable
 from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
+    build_page_info,
+    build_pagination_options,
     resolve_global_id,
     to_global_id,
 )
@@ -28,15 +28,16 @@ from ai.backend.manager.api.gql.model_deployment.access_token import (
     AccessToken,
     AccessTokenConnection,
     AccessTokenEdge,
+    AccessTokenOrderBy,
 )
 from ai.backend.manager.api.gql.model_deployment.auto_scaling_rule import (
     AutoScalingRule,
 )
 from ai.backend.manager.api.gql.model_deployment.model_replica import (
-    ModelReplica,
     ModelReplicaConnection,
     ReplicaFilter,
     ReplicaOrderBy,
+    resolve_replicas,
 )
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -46,16 +47,33 @@ from ai.backend.manager.data.deployment.modifier import NewDeploymentModifier
 from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
+    DeploymentOrderField,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ReplicaSpec,
     ReplicaStateData,
 )
+from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.gql_models.domain import DomainNode
 from ai.backend.manager.models.gql_models.group import GroupNode
 from ai.backend.manager.models.gql_models.user import UserNode
-from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule_by_deployment_id import (
-    GetAutoScalingRulesByDeploymentIdAction,
+from ai.backend.manager.repositories.deployment.types.types import (
+    AccessTokenOrderingOptions,
+    DeploymentFilterOptions,
+    DeploymentOrderingOptions,
+    DeploymentStatusFilterType,
+)
+from ai.backend.manager.repositories.deployment.types.types import (
+    DeploymentStatusFilter as RepoDeploymentStatusFilter,
+)
+from ai.backend.manager.services.deployment.actions.access_token.list_access_tokens import (
+    ListAccessTokensAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.batch_load_auto_scaling_rules import (
+    BatchLoadAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.batch_load_deployments import (
+    BatchLoadDeploymentsAction,
 )
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
@@ -63,52 +81,40 @@ from ai.backend.manager.services.deployment.actions.create_deployment import (
 from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
 )
-from ai.backend.manager.services.deployment.actions.get_deployment import GetDeploymentAction
-from ai.backend.manager.services.deployment.actions.get_replicas_by_deployment_id import (
-    GetReplicasByDeploymentIdAction,
-)
 from ai.backend.manager.services.deployment.actions.list_deployments import ListDeploymentsAction
 from ai.backend.manager.services.deployment.actions.sync_replicas import SyncReplicaAction
 from ai.backend.manager.services.deployment.actions.update_deployment import UpdateDeploymentAction
-from ai.backend.manager.types import OptionalState, PaginationOptions, TriState
+from ai.backend.manager.types import OptionalState, TriState
 
 from .model_revision import (
     CreateModelRevisionInput,
     ModelRevision,
     ModelRevisionConnection,
-    ModelRevisionEdge,
     ModelRevisionFilter,
     ModelRevisionOrderBy,
+    resolve_revisions,
 )
 
 DeploymentStatus = strawberry.enum(
     CommonDeploymentStatus,
     name="DeploymentStatus",
-    description="Added in 25.13.0. This enum represents the deployment status of a model deployment, indicating its current state.",
+    description="Added in 25.16.0. This enum represents the deployment status of a model deployment, indicating its current state.",
 )
 
 DeploymentStrategyType = strawberry.enum(
     CommonDeploymentStrategy,
     name="DeploymentStrategyType",
-    description="Added in 25.13.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
+    description="Added in 25.16.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.",
 )
 
 
-@strawberry.enum(description="Added in 25.13.0")
-class DeploymentOrderField(StrEnum):
-    CREATED_AT = "CREATED_AT"
-    UPDATED_AT = "UPDATED_AT"
-    NAME = "NAME"
-
-
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.16.0")
 class DeploymentStrategy:
     type: DeploymentStrategyType
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.16.0")
 class ReplicaState:
-    _deployment_id: strawberry.Private[UUID]
     _replica_ids: strawberry.Private[list[UUID]]
     desired_replica_count: int
 
@@ -125,62 +131,43 @@ class ReplicaState:
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ModelReplicaConnection:
-        processor = info.context.processors.deployment
-        if processor is None:
-            raise ModelDeploymentUnavailableError(
-                "Model Deployment feature is unavailable. Please contact support."
-            )
+        final_filter = ReplicaFilter(ids_in=self._replica_ids)
+        if filter:
+            final_filter = ReplicaFilter(AND=[final_filter, filter])
 
-        result = await processor.get_replicas_by_deployment_id.wait_for_complete(
-            GetReplicasByDeploymentIdAction(
-                deployment_id=self._deployment_id,
-            )
+        return await resolve_replicas(
+            info=info,
+            filter=final_filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
         )
 
-        nodes = [ModelReplica.from_dataclass(data) for data in result.data]
 
-        edges = [Edge(node=node, cursor=str(node.id)) for node in nodes]
-
-        page_info = PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        )
-
-        return ModelReplicaConnection(count=len(nodes), edges=edges, page_info=page_info)
-
-
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.16.0")
 class ScalingRule:
-    _deployment_id: strawberry.Private[UUID]
     _scaling_rule_ids: strawberry.Private[list[UUID]]
 
     @strawberry.field
-    async def auto_scaling_rules(
-        parent: strawberry.Parent["ScalingRule"], info: Info[StrawberryGQLContext]
-    ) -> list[AutoScalingRule]:
+    async def auto_scaling_rules(self, info: Info[StrawberryGQLContext]) -> list[AutoScalingRule]:
         processor = info.context.processors.deployment
         if processor is None:
-            raise ModelDeploymentUnavailableError(
+            raise ModelDeploymentUnavailable(
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
-        result = await processor.get_auto_scaling_rules_by_deployment_id.wait_for_complete(
-            GetAutoScalingRulesByDeploymentIdAction(deployment_id=UUID(str(parent._deployment_id)))
+        result = await processor.batch_load_auto_scaling_rules.wait_for_complete(
+            BatchLoadAutoScalingRulesAction(auto_scaling_rule_ids=self._scaling_rule_ids)
         )
 
         return [AutoScalingRule.from_dataclass(rule) for rule in result.data]
 
-    @classmethod
-    def from_dataclass(cls, deployment_id: NodeID, scaling_rule_ids: list[UUID]) -> "ScalingRule":
-        return cls(
-            _deployment_id=deployment_id,
-            _scaling_rule_ids=scaling_rule_ids,
-        )
 
-
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.16.0")
 class ModelDeploymentMetadata:
     _project_id: strawberry.Private[UUID]
     _domain_name: strawberry.Private[str]
@@ -217,44 +204,83 @@ class ModelDeploymentMetadata:
         )
 
 
-@strawberry.type(description="Added in 25.13.0")
+def _convert_gql_revision_ordering_to_repo_ordering(
+    order_by: Optional[list[AccessTokenOrderBy]],
+) -> AccessTokenOrderingOptions:
+    if order_by is None or len(order_by) == 0:
+        return AccessTokenOrderingOptions()
+
+    repo_ordering = []
+    for order in order_by:
+        desc = order.direction == OrderDirection.DESC
+        repo_ordering.append((order.field, desc))
+
+    return AccessTokenOrderingOptions(order_by=repo_ordering)
+
+
+@strawberry.type(description="Added in 25.16.0")
 class ModelDeploymentNetworkAccess:
-    _deployment_id: strawberry.Private[UUID]
     _access_token_ids: strawberry.Private[Optional[list[UUID]]]
     endpoint_url: Optional[str] = None
     preferred_domain_name: Optional[str] = None
     open_to_public: bool = False
 
     @strawberry.field
-    async def access_tokens(self, info: Info[StrawberryGQLContext]) -> AccessTokenConnection:
+    async def access_tokens(
+        self,
+        info: Info[StrawberryGQLContext],
+        order_by: Optional[list[AccessTokenOrderBy]] = None,
+        before: Optional[str] = None,
+        after: Optional[str] = None,
+        first: Optional[int] = None,
+        last: Optional[int] = None,
+        limit: Optional[int] = None,
+        offset: Optional[int] = None,
+    ) -> AccessTokenConnection:
         """Resolve access tokens using dataloader."""
-        access_token_loader = DataLoader(
-            apartial(AccessToken.batch_load_by_deployment_ids, info.context)
-        )
-        token_nodes: list[AccessToken] = await access_token_loader.load(self._deployment_id)
+        repo_ordering = _convert_gql_revision_ordering_to_repo_ordering(order_by)
 
-        edges = [
-            AccessTokenEdge(node=token_node, cursor=str(token_node.id))
-            for token_node in token_nodes
-        ]
+        pagination_options = build_pagination_options(
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
+        )
+
+        processor = info.context.processors.deployment
+        if processor is None:
+            raise ModelDeploymentUnavailable(
+                "Model Deployment feature is unavailable. Please contact support."
+            )
+        action_result = await processor.list_access_tokens.wait_for_complete(
+            ListAccessTokensAction(
+                pagination=pagination_options,
+                ordering=repo_ordering,
+            )
+        )
+        edges = []
+        tokens = action_result.data
+        total_count = action_result.total_count
+
+        for token in tokens:
+            edges.append(
+                AccessTokenEdge(
+                    node=AccessToken.from_dataclass(token),
+                    cursor=to_global_id(AccessToken, token.id),
+                )
+            )
+
+        page_info = build_page_info(edges, total_count, pagination_options)
 
         return AccessTokenConnection(
-            count=len(edges),
-            edges=edges,
-            page_info=PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
+            count=total_count, edges=edges, page_info=page_info.to_strawberry_page_info()
         )
 
     @classmethod
-    def from_dataclass(
-        cls, data: DeploymentNetworkSpec, deployment_id: NodeID
-    ) -> "ModelDeploymentNetworkAccess":
+    def from_dataclass(cls, data: DeploymentNetworkSpec) -> "ModelDeploymentNetworkAccess":
         return cls(
-            _deployment_id=deployment_id,
             _access_token_ids=data.access_token_ids,
             endpoint_url=data.url,
             preferred_domain_name=data.preferred_domain_name,
@@ -263,7 +289,7 @@ class ModelDeploymentNetworkAccess:
 
 
 # Main ModelDeployment Type
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.16.0")
 class ModelDeployment(Node):
     id: NodeID
     metadata: ModelDeploymentMetadata
@@ -285,16 +311,12 @@ class ModelDeployment(Node):
     @strawberry.field
     async def scaling_rule(self, info: Info[StrawberryGQLContext]) -> ScalingRule:
         return ScalingRule(
-            _deployment_id=self.id,
             _scaling_rule_ids=self._scaling_rule_ids,
         )
 
     @strawberry.field
     async def replica_state(self, info: Info[StrawberryGQLContext]) -> ReplicaState:
-        _, deployment_id = resolve_global_id(self.id)
-
         return ReplicaState(
-            _deployment_id=UUID(deployment_id),
             desired_replica_count=self._replica_state_data.desired_replica_count,
             _replica_ids=self._replica_state_data.replica_ids,
         )
@@ -312,23 +334,20 @@ class ModelDeployment(Node):
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> ModelRevisionConnection:
-        """Resolve revision history with dataloader."""
-        replica_loader = DataLoader(apartial(ModelRevision.batch_load_by_ids, info.context))
-        revisions: list[ModelRevision] = await replica_loader.load(self._revision_history_ids)
+        final_filter = ModelRevisionFilter(ids_in=self._revision_history_ids)
+        if filter:
+            final_filter = ModelRevisionFilter(AND=[final_filter, filter])
 
-        edges = [
-            ModelRevisionEdge(node=revision, cursor=str(revision.id)) for revision in revisions
-        ]
-
-        return ModelRevisionConnection(
-            count=len(edges),
-            edges=edges,
-            page_info=PageInfo(
-                has_next_page=False,
-                has_previous_page=False,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
+        return await resolve_revisions(
+            info=info,
+            filter=final_filter,
+            order_by=order_by,
+            before=before,
+            after=after,
+            first=first,
+            last=last,
+            limit=limit,
+            offset=offset,
         )
 
     @classmethod
@@ -338,19 +357,23 @@ class ModelDeployment(Node):
         """Batch load deployments by their IDs."""
         processor = ctx.processors.deployment
         if processor is None:
-            raise ModelDeploymentUnavailableError(
+            raise ModelDeploymentUnavailable(
                 "Model Deployment feature is unavailable. Please contact support."
             )
 
+        result = await processor.batch_load_deployments.wait_for_complete(
+            BatchLoadDeploymentsAction(deployment_ids=list(deployment_ids))
+        )
+
+        deployment_map = {deployment.id: deployment for deployment in result.data}
         model_deployments = []
 
         for deployment_id in deployment_ids:
-            action_result = await processor.get_deployment.wait_for_complete(
-                GetDeploymentAction(deployment_id=deployment_id)
-            )
-            model_deployments.append(action_result.data)
+            if deployment_id not in deployment_map:
+                raise ModelDeploymentNotFound(f"Deployment with ID {deployment_id} not found")
+            model_deployments.append(cls.from_dataclass(deployment_map[deployment_id]))
 
-        return [cls.from_dataclass(deployment) for deployment in model_deployments if deployment]
+        return model_deployments
 
     @classmethod
     def from_dataclass(
@@ -370,14 +393,12 @@ class ModelDeployment(Node):
         return cls(
             id=ID(str(data.id)),
             metadata=metadata,
-            network_access=ModelDeploymentNetworkAccess.from_dataclass(
-                data.network_access, ID(str(data.id))
-            ),
+            network_access=ModelDeploymentNetworkAccess.from_dataclass(data.network_access),
             revision=ModelRevision.from_dataclass(data.revision) if data.revision else None,
             default_deployment_strategy=DeploymentStrategy(
                 type=DeploymentStrategyType(data.default_deployment_strategy)
             ),
-            _created_user_id=uuid4(),
+            _created_user_id=data.created_user_id,
             _revision_history_ids=data.revision_history_ids,
             _scaling_rule_ids=data.scaling_rule_ids,
             _replica_state_data=data.replica_state,
@@ -385,13 +406,13 @@ class ModelDeployment(Node):
 
 
 # Filter Types
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.16.0")
 class DeploymentStatusFilter:
     in_: Optional[list[DeploymentStatus]] = strawberry.field(name="in", default=None)
     equals: Optional[DeploymentStatus] = None
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.16.0")
 class DeploymentFilter:
     name: Optional[StringFilter] = None
     status: Optional[DeploymentStatusFilter] = None
@@ -404,36 +425,66 @@ class DeploymentFilter:
     OR: Optional[list["DeploymentFilter"]] = None
     NOT: Optional[list["DeploymentFilter"]] = None
 
+    def to_repo_filter(self) -> DeploymentFilterOptions:
+        repo_filter = DeploymentFilterOptions()
 
-@strawberry.input(description="Added in 25.13.0")
+        repo_filter.name = self.name
+        repo_filter.open_to_public = self.open_to_public
+        repo_filter.tags = self.tags
+        repo_filter.endpoint_url = self.endpoint_url
+        repo_filter.id = UUID(self.id) if self.id else None
+        if self.status:
+            if self.status.in_ is not None:
+                repo_filter.status = RepoDeploymentStatusFilter(
+                    type=DeploymentStatusFilterType.IN,
+                    values=[CommonDeploymentStatus(status) for status in self.status.in_],
+                )
+            elif self.status.equals is not None:
+                repo_filter.status = RepoDeploymentStatusFilter(
+                    type=DeploymentStatusFilterType.EQUALS,
+                    values=[CommonDeploymentStatus(self.status.equals)],
+                )
+
+        # Handle logical operations
+        if self.AND:
+            repo_filter.AND = [f.to_repo_filter() for f in self.AND]
+        if self.OR:
+            repo_filter.OR = [f.to_repo_filter() for f in self.OR]
+        if self.NOT:
+            repo_filter.NOT = [f.to_repo_filter() for f in self.NOT]
+
+        return repo_filter
+
+
+@strawberry.input(description="Added in 25.16.0")
 class DeploymentOrderBy:
     field: DeploymentOrderField
     direction: OrderDirection = OrderDirection.DESC
 
 
 # Payload Types
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.16.0")
 class CreateModelDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.16.0")
 class UpdateModelDeploymentPayload:
     deployment: ModelDeployment
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.16.0")
 class DeleteModelDeploymentPayload:
     id: ID
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.16.0")
 class DeploymentStatusChangedPayload:
     deployment: ModelDeployment
 
 
 # Input Types
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.16.0")
 class ModelDeploymentMetadataInput:
     project_id: ID
     domain_name: str
@@ -441,7 +492,7 @@ class ModelDeploymentMetadataInput:
     tags: Optional[list[str]] = None
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.16.0")
 class ModelDeploymentNetworkAccessInput:
     preferred_domain_name: Optional[str] = None
     open_to_public: bool = False
@@ -453,12 +504,12 @@ class ModelDeploymentNetworkAccessInput:
         )
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.16.0")
 class DeploymentStrategyInput:
     type: DeploymentStrategyType
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.16.0")
 class CreateModelDeploymentInput:
     metadata: ModelDeploymentMetadataInput
     network_access: ModelDeploymentNetworkAccessInput
@@ -467,16 +518,18 @@ class CreateModelDeploymentInput:
     initial_revision: CreateModelRevisionInput
 
     def to_creator(self) -> NewDeploymentCreator:
-        # TODO: Need to check the name generation logic
         name = self.metadata.name or f"deployment-{uuid4().hex[:8]}"
         tag = ",".join(self.metadata.tags) if self.metadata.tags else None
+        user_data = current_user()
+        if user_data is None:
+            raise UserNotFound("User not found in context")
         metadata_for_creator = DeploymentMetadata(
             name=name,
             domain=self.metadata.domain_name,
             project=UUID(str(self.metadata.project_id)),
             resource_group=self.initial_revision.resource_config.resource_group.name,
-            created_user=uuid4(),
-            session_owner=uuid4(),
+            created_user=user_data.user_id,
+            session_owner=user_data.user_id,
             created_at=None,
             tag=tag,
         )
@@ -488,7 +541,7 @@ class CreateModelDeploymentInput:
         )
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.16.0")
 class UpdateModelDeploymentInput:
     id: ID
     open_to_public: Optional[bool] = None
@@ -516,7 +569,7 @@ class UpdateModelDeploymentInput:
         )
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.16.0")
 class DeleteModelDeploymentInput:
     id: ID
 
@@ -525,13 +578,26 @@ ModelDeploymentEdge = Edge[ModelDeployment]
 
 
 # Connection types for Relay support
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.16.0")
 class ModelDeploymentConnection(Connection[ModelDeployment]):
     count: int
 
     def __init__(self, *args, count: int, **kwargs):
         super().__init__(*args, **kwargs)
         self.count = count
+
+
+def _convert_gql_deployment_ordering_to_repo(
+    order_by: Optional[list[DeploymentOrderBy]],
+) -> DeploymentOrderingOptions:
+    if order_by is None or len(order_by) == 0:
+        return DeploymentOrderingOptions()
+
+    repo_ordering = []
+    for order in order_by:
+        desc = order.direction == OrderDirection.DESC
+        repo_ordering.append((order.field, desc))
+    return DeploymentOrderingOptions(order_by=repo_ordering)
 
 
 async def resolve_deployments(
@@ -545,13 +611,30 @@ async def resolve_deployments(
     limit: Optional[int] = None,
     offset: Optional[int] = None,
 ) -> ModelDeploymentConnection:
+    repo_filter = None
+    if filter:
+        repo_filter = filter.to_repo_filter()
+
+    repo_ordering = _convert_gql_deployment_ordering_to_repo(order_by)
+
+    pagination_options = build_pagination_options(
+        before=before,
+        after=after,
+        first=first,
+        last=last,
+        limit=limit,
+        offset=offset,
+    )
+
     processor = info.context.processors.deployment
     if processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
     action_result = await processor.list_deployments.wait_for_complete(
-        ListDeploymentsAction(pagination=PaginationOptions())
+        ListDeploymentsAction(
+            pagination=pagination_options, ordering=repo_ordering, filters=repo_filter
+        )
     )
     edges = []
     for deployment in action_result.data:
@@ -560,23 +643,22 @@ async def resolve_deployments(
                 node=ModelDeployment.from_dataclass(deployment), cursor=str(deployment.id)
             )
         )
+    page_info = build_page_info(
+        edges=edges,
+        total_count=action_result.total_count,
+        pagination_options=pagination_options,
+    )
 
-    # Mock pagination info for demonstration purposes
     connection = ModelDeploymentConnection(
         count=action_result.total_count,
         edges=edges,
-        page_info=PageInfo(
-            has_next_page=False,
-            has_previous_page=False,
-            start_cursor="deployment-cursor-1",
-            end_cursor="deployment-cursor-3",
-        ),
+        page_info=page_info.to_strawberry_page_info(),
     )
     return connection
 
 
 # Resolvers
-@strawberry.field(description="Added in 25.13.0")
+@strawberry.field(description="Added in 25.16.0")
 async def deployments(
     info: Info[StrawberryGQLContext],
     filter: Optional[DeploymentFilter] = None,
@@ -603,17 +685,19 @@ async def deployments(
     )
 
 
-@strawberry.field(description="Added in 25.13.0")
+@strawberry.field(description="Added in 25.16.0")
 async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ModelDeployment]:
     """Get a specific deployment by ID."""
     _, deployment_id = resolve_global_id(id)
-    dataloader = DataLoader(apartial(ModelDeployment.batch_load_by_ids, info.context))
-    deployment: list[ModelDeployment] = await dataloader.load(deployment_id)
+    deployment_dataloader = info.context.dataloader_registry.get_loader(
+        ModelDeployment.batch_load_by_ids, info.context
+    )
+    deployment: list[ModelDeployment] = await deployment_dataloader.load(deployment_id)
 
     return deployment[0]
 
 
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.16.0")
 async def create_model_deployment(
     input: CreateModelDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> "CreateModelDeploymentPayload":
@@ -621,7 +705,7 @@ async def create_model_deployment(
 
     processor = info.context.processors.deployment
     if processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
 
@@ -632,7 +716,7 @@ async def create_model_deployment(
     return CreateModelDeploymentPayload(deployment=ModelDeployment.from_dataclass(result.data))
 
 
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.16.0")
 async def update_model_deployment(
     input: UpdateModelDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> UpdateModelDeploymentPayload:
@@ -640,7 +724,7 @@ async def update_model_deployment(
     _, deployment_id = resolve_global_id(input.id)
     deployment_processor = info.context.processors.deployment
     if deployment_processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
     action_result = await deployment_processor.update_deployment.wait_for_complete(
@@ -651,7 +735,7 @@ async def update_model_deployment(
     )
 
 
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.16.0")
 async def delete_model_deployment(
     input: DeleteModelDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> DeleteModelDeploymentPayload:
@@ -659,7 +743,7 @@ async def delete_model_deployment(
     _, deployment_id = resolve_global_id(input.id)
     deployment_processor = info.context.processors.deployment
     if deployment_processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
     _ = await deployment_processor.destroy_deployment.wait_for_complete(
@@ -668,7 +752,7 @@ async def delete_model_deployment(
     return DeleteModelDeploymentPayload(id=input.id)
 
 
-@strawberry.subscription(description="Added in 25.13.0")
+@strawberry.subscription(description="Added in 25.16.0")
 async def deployment_status_changed(
     deployment_id: ID, info: Info[StrawberryGQLContext]
 ) -> AsyncGenerator[DeploymentStatusChangedPayload, None]:
@@ -679,18 +763,18 @@ async def deployment_status_changed(
         yield DeploymentStatusChangedPayload(deployment_id=deployment_id)
 
 
-@strawberry.input(description="Added in 25.13.0")
+@strawberry.input(description="Added in 25.16.0")
 class SyncReplicaInput:
     model_deployment_id: ID
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.16.0")
 class SyncReplicaPayload:
     success: bool
 
 
 @strawberry.mutation(
-    description="Added in 25.13.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers"
+    description="Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers"
 )
 async def sync_replicas(
     input: SyncReplicaInput, info: Info[StrawberryGQLContext]
@@ -698,7 +782,7 @@ async def sync_replicas(
     _, deployment_id = resolve_global_id(input.model_deployment_id)
     deployment_processor = info.context.processors.deployment
     if deployment_processor is None:
-        raise ModelDeploymentUnavailableError(
+        raise ModelDeploymentUnavailable(
             "Model Deployment feature is unavailable. Please contact support."
         )
     await deployment_processor.sync_replicas.wait_for_complete(

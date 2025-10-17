@@ -3,6 +3,10 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.deployment.types import ModelReplicaData
+from ai.backend.manager.repositories.deployment.types.types import (
+    ModelReplicaFilterOptions,
+    ModelReplicaOrderingOptions,
+)
 from ai.backend.manager.services.deployment.actions.base import DeploymentBaseAction
 from ai.backend.manager.types import PaginationOptions
 
@@ -10,6 +14,8 @@ from ai.backend.manager.types import PaginationOptions
 @dataclass
 class ListReplicasAction(DeploymentBaseAction):
     pagination: PaginationOptions
+    ordering: Optional[ModelReplicaOrderingOptions] = None
+    filters: Optional[ModelReplicaFilterOptions] = None
 
     @override
     def entity_id(self) -> Optional[str]:

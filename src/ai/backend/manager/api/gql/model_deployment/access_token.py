@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from datetime import datetime
 from typing import Self
 from uuid import UUID
@@ -7,27 +6,33 @@ import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Connection, Edge, Node, NodeID
 
-from ai.backend.common.exception import ModelDeploymentUnavailableError
+from ai.backend.manager.api.gql.base import OrderDirection
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.data.deployment.access_token import ModelDeploymentAccessTokenCreator
-from ai.backend.manager.data.deployment.types import ModelDeploymentAccessTokenData
+from ai.backend.manager.data.deployment.types import (
+    AccessTokenOrderField,
+    ModelDeploymentAccessTokenData,
+)
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
 )
-from ai.backend.manager.services.deployment.actions.access_token.get_access_tokens_by_deployment_id import (
-    GetAccessTokensByDeploymentIdAction,
-)
+
+
+@strawberry.input(description="Added in 25.16.0")
+class AccessTokenOrderBy:
+    field: AccessTokenOrderField
+    direction: OrderDirection = OrderDirection.DESC
 
 
 @strawberry.type
 class AccessToken(Node):
     id: NodeID[str]
-    token: str = strawberry.field(description="Added in 25.13.0: The access token.")
+    token: str = strawberry.field(description="Added in 25.16.0: The access token.")
     created_at: datetime = strawberry.field(
-        description="Added in 25.13.0: The creation timestamp of the access token."
+        description="Added in 25.16.0: The creation timestamp of the access token."
     )
     valid_until: datetime = strawberry.field(
-        description="Added in 25.13.0: The expiration timestamp of the access token."
+        description="Added in 25.16.0: The expiration timestamp of the access token."
     )
 
     @classmethod
@@ -39,30 +44,11 @@ class AccessToken(Node):
             valid_until=data.valid_until,
         )
 
-    @classmethod
-    async def batch_load_by_deployment_ids(
-        cls, ctx: StrawberryGQLContext, deployment_ids: Sequence[UUID]
-    ) -> list[list[ModelDeploymentAccessTokenData]]:
-        """Batch load access tokens by deployment IDs."""
-        processor = ctx.processors.deployment
-        if processor is None:
-            raise ModelDeploymentUnavailableError(
-                "Model Deployment feature is unavailable. Please contact support."
-            )
-
-        results = []
-        for deployment_id in deployment_ids:
-            result = await processor.get_access_tokens_by_deployment_id.wait_for_complete(
-                GetAccessTokensByDeploymentIdAction(deployment_id=deployment_id)
-            )
-            results.append(result.data if result else [])
-        return results
-
 
 AccessTokenEdge = Edge[AccessToken]
 
 
-@strawberry.type(description="Added in 25.13.0")
+@strawberry.type(description="Added in 25.16.0")
 class AccessTokenConnection(Connection[AccessToken]):
     count: int
 
@@ -74,10 +60,10 @@ class AccessTokenConnection(Connection[AccessToken]):
 @strawberry.input
 class CreateAccessTokenInput:
     model_deployment_id: ID = strawberry.field(
-        description="Added in 25.13.0: The ID of the model deployment for which the access token is created."
+        description="Added in 25.16.0: The ID of the model deployment for which the access token is created."
     )
     valid_until: datetime = strawberry.field(
-        description="Added in 25.13.0: The expiration timestamp of the access token."
+        description="Added in 25.16.0: The expiration timestamp of the access token."
     )
 
     def to_creator(self) -> "ModelDeploymentAccessTokenCreator":
@@ -92,7 +78,7 @@ class CreateAccessTokenPayload:
     access_token: AccessToken
 
 
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.16.0")
 async def create_access_token(
     input: CreateAccessTokenInput, info: Info[StrawberryGQLContext]
 ) -> CreateAccessTokenPayload:

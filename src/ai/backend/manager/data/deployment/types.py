@@ -6,7 +6,7 @@ from decimal import Decimal
 from functools import lru_cache
 from pathlib import PurePosixPath
 from typing import Any, Optional
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import yarl
 
@@ -360,60 +360,21 @@ class ModelDeploymentData:
     access_token_ids: Optional[UUID] = None
 
 
-mock_revision_data_1 = ModelRevisionData(
-    id=uuid4(),
-    name="test-revision",
-    cluster_config=ClusterConfigData(
-        mode=ClusterMode.SINGLE_NODE,
-        size=1,
-    ),
-    resource_config=ResourceConfigData(
-        resource_group_name="default",
-        resource_slot=ResourceSlot.from_json({"cpu": 1, "memory": 1024}),
-    ),
-    model_mount_config=ModelMountConfigData(
-        vfolder_id=uuid4(),
-        mount_destination="/model",
-        definition_path="model-definition.yaml",
-    ),
-    model_runtime_config=ModelRuntimeConfigData(
-        runtime_variant=RuntimeVariant.VLLM,
-        inference_runtime_config={"tp_size": 2, "max_length": 1024},
-    ),
-    extra_vfolder_mounts=[
-        ExtraVFolderMountData(
-            vfolder_id=uuid4(),
-            mount_destination="/var",
-        ),
-        ExtraVFolderMountData(
-            vfolder_id=uuid4(),
-            mount_destination="/example",
-        ),
-    ],
-    image_id=uuid4(),
-    created_at=datetime.now(),
-)
+class DeploymentOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"
+    UPDATED_AT = "UPDATED_AT"
+    NAME = "NAME"
 
-mock_revision_data_2 = ModelRevisionData(
-    id=uuid4(),
-    name="test-revision-2",
-    cluster_config=ClusterConfigData(
-        mode=ClusterMode.MULTI_NODE,
-        size=1,
-    ),
-    resource_config=ResourceConfigData(
-        resource_group_name="default",
-        resource_slot=ResourceSlot.from_json({"cpu": 1, "memory": 1024}),
-    ),
-    model_mount_config=ModelMountConfigData(
-        vfolder_id=uuid4(),
-        mount_destination="/model",
-        definition_path="model-definition.yaml",
-    ),
-    model_runtime_config=ModelRuntimeConfigData(
-        runtime_variant=RuntimeVariant.NIM,
-        inference_runtime_config={"tp_size": 2, "max_length": 1024},
-    ),
-    image_id=uuid4(),
-    created_at=datetime.now(),
-)
+
+class ModelRevisionOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"
+    NAME = "NAME"
+
+
+class ReplicaOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"
+    ID = "ID"
+
+
+class AccessTokenOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"

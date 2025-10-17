@@ -9,9 +9,13 @@ from ai.backend.manager.services.deployment.actions.access_token.create_access_t
     CreateAccessTokenAction,
     CreateAccessTokenActionResult,
 )
-from ai.backend.manager.services.deployment.actions.access_token.get_access_tokens_by_deployment_id import (
-    GetAccessTokensByDeploymentIdAction,
-    GetAccessTokensByDeploymentIdActionResult,
+from ai.backend.manager.services.deployment.actions.access_token.list_access_tokens import (
+    ListAccessTokensAction,
+    ListAccessTokensActionResult,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.batch_load_auto_scaling_rules import (
+    BatchLoadAutoScalingRulesAction,
+    BatchLoadAutoScalingRulesActionResult,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
     CreateAutoScalingRuleAction,
@@ -21,13 +25,17 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_aut
     DeleteAutoScalingRuleAction,
     DeleteAutoScalingRuleActionResult,
 )
-from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule_by_deployment_id import (
-    GetAutoScalingRulesByDeploymentIdAction,
-    GetAutoScalingRulesByDeploymentIdActionResult,
-)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
     UpdateAutoScalingRuleActionResult,
+)
+from ai.backend.manager.services.deployment.actions.batch_load_deployments import (
+    BatchLoadDeploymentsAction,
+    BatchLoadDeploymentsActionResult,
+)
+from ai.backend.manager.services.deployment.actions.batch_load_replicas_by_revision_ids import (
+    BatchLoadReplicasByRevisionIdsAction,
+    BatchLoadReplicasByRevisionIdsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
@@ -41,18 +49,6 @@ from ai.backend.manager.services.deployment.actions.destroy_deployment import (
     DestroyDeploymentAction,
     DestroyDeploymentActionResult,
 )
-from ai.backend.manager.services.deployment.actions.get_deployment import (
-    GetDeploymentAction,
-    GetDeploymentActionResult,
-)
-from ai.backend.manager.services.deployment.actions.get_replicas_by_deployment_id import (
-    GetReplicasByDeploymentIdAction,
-    GetReplicasByDeploymentIdActionResult,
-)
-from ai.backend.manager.services.deployment.actions.get_replicas_by_revision_id import (
-    GetReplicasByRevisionIdAction,
-    GetReplicasByRevisionIdActionResult,
-)
 from ai.backend.manager.services.deployment.actions.list_deployments import (
     ListDeploymentsAction,
     ListDeploymentsActionResult,
@@ -64,6 +60,14 @@ from ai.backend.manager.services.deployment.actions.list_replicas import (
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
     AddModelRevisionAction,
     AddModelRevisionActionResult,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.batch_load_revisions import (
+    BatchLoadRevisionsAction,
+    BatchLoadRevisionsActionResult,
+)
+from ai.backend.manager.services.deployment.actions.model_revision.create_model_revision import (
+    CreateModelRevisionAction,
+    CreateModelRevisionActionResult,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.get_revision_by_deployment_id import (
     GetRevisionByDeploymentIdAction,
@@ -112,6 +116,10 @@ class DeploymentServiceProtocol(Protocol):
         self, action: DestroyDeploymentAction
     ) -> DestroyDeploymentActionResult: ...
 
+    async def batch_load_deployments(
+        self, action: BatchLoadDeploymentsAction
+    ) -> BatchLoadDeploymentsActionResult: ...
+
     async def create_auto_scaling_rule(
         self, action: CreateAutoScalingRuleAction
     ) -> CreateAutoScalingRuleActionResult: ...
@@ -128,23 +136,15 @@ class DeploymentServiceProtocol(Protocol):
         self, action: CreateAccessTokenAction
     ) -> CreateAccessTokenActionResult: ...
 
-    async def get_access_tokens_by_deployment_id(
-        self, action: GetAccessTokensByDeploymentIdAction
-    ) -> GetAccessTokensByDeploymentIdActionResult: ...
-
     async def sync_replicas(self, action: SyncReplicaAction) -> SyncReplicaActionResult: ...
 
     async def add_model_revision(
         self, action: AddModelRevisionAction
     ) -> AddModelRevisionActionResult: ...
 
-    async def get_auto_scaling_rules_by_deployment_id(
-        self, action: GetAutoScalingRulesByDeploymentIdAction
-    ) -> GetAutoScalingRulesByDeploymentIdActionResult: ...
-
-    async def get_replicas_by_deployment_id(
-        self, action: GetReplicasByDeploymentIdAction
-    ) -> GetReplicasByDeploymentIdActionResult: ...
+    async def batch_load_auto_scaling_rules(
+        self, action: BatchLoadAutoScalingRulesAction
+    ) -> BatchLoadAutoScalingRulesActionResult: ...
 
     async def get_revision_by_deployment_id(
         self, action: GetRevisionByDeploymentIdAction
@@ -158,18 +158,28 @@ class DeploymentServiceProtocol(Protocol):
         self, action: GetRevisionByIdAction
     ) -> GetRevisionByIdActionResult: ...
 
-    async def get_deployment(self, action: GetDeploymentAction) -> GetDeploymentActionResult: ...
-
     async def get_revisions_by_deployment_id(
         self, action: GetRevisionsByDeploymentIdAction
     ) -> GetRevisionsByDeploymentIdActionResult: ...
 
-    async def get_replicas_by_revision_id(
-        self, action: GetReplicasByRevisionIdAction
-    ) -> GetReplicasByRevisionIdActionResult: ...
+    async def batch_load_replicas_by_revision_ids(
+        self, action: BatchLoadReplicasByRevisionIdsAction
+    ) -> BatchLoadReplicasByRevisionIdsActionResult: ...
+
+    async def batch_load_revisions(
+        self, action: BatchLoadRevisionsAction
+    ) -> BatchLoadRevisionsActionResult: ...
 
     async def list_replicas(self, action: ListReplicasAction) -> ListReplicasActionResult: ...
     async def list_revisions(self, action: ListRevisionsAction) -> ListRevisionsActionResult: ...
+
+    async def create_model_revision(
+        self, action: CreateModelRevisionAction
+    ) -> CreateModelRevisionActionResult: ...
+
+    async def list_access_tokens(
+        self, action: ListAccessTokensAction
+    ) -> ListAccessTokensActionResult: ...
 
 
 class DeploymentProcessors(AbstractProcessorPackage):
@@ -191,34 +201,35 @@ class DeploymentProcessors(AbstractProcessorPackage):
         DeleteAutoScalingRuleAction, DeleteAutoScalingRuleActionResult
     ]
     create_access_token: ActionProcessor[CreateAccessTokenAction, CreateAccessTokenActionResult]
-    get_access_tokens_by_deployment_id: ActionProcessor[
-        GetAccessTokensByDeploymentIdAction, GetAccessTokensByDeploymentIdActionResult
-    ]
+    list_access_tokens: ActionProcessor[ListAccessTokensAction, ListAccessTokensActionResult]
     sync_replicas: ActionProcessor[SyncReplicaAction, SyncReplicaActionResult]
     add_model_revision: ActionProcessor[AddModelRevisionAction, AddModelRevisionActionResult]
-    get_auto_scaling_rules_by_deployment_id: ActionProcessor[
-        GetAutoScalingRulesByDeploymentIdAction, GetAutoScalingRulesByDeploymentIdActionResult
+    batch_load_auto_scaling_rules: ActionProcessor[
+        BatchLoadAutoScalingRulesAction, BatchLoadAutoScalingRulesActionResult
     ]
     get_revision_by_id: ActionProcessor[GetRevisionByIdAction, GetRevisionByIdActionResult]
-    get_replicas_by_deployment_id: ActionProcessor[
-        GetReplicasByDeploymentIdAction, GetReplicasByDeploymentIdActionResult
-    ]
+    batch_load_revisions: ActionProcessor[BatchLoadRevisionsAction, BatchLoadRevisionsActionResult]
     get_revision_by_deployment_id: ActionProcessor[
         GetRevisionByDeploymentIdAction, GetRevisionByDeploymentIdActionResult
     ]
     get_revision_by_replica_id: ActionProcessor[
         GetRevisionByReplicaIdAction, GetRevisionByReplicaIdActionResult
     ]
-    get_deployment: ActionProcessor[GetDeploymentAction, GetDeploymentActionResult]
     list_deployments: ActionProcessor[ListDeploymentsAction, ListDeploymentsActionResult]
+    batch_load_deployments: ActionProcessor[
+        BatchLoadDeploymentsAction, BatchLoadDeploymentsActionResult
+    ]
     get_revisions_by_deployment_id: ActionProcessor[
         GetRevisionsByDeploymentIdAction, GetRevisionsByDeploymentIdActionResult
     ]
-    get_replicas_by_revision_id: ActionProcessor[
-        GetReplicasByRevisionIdAction, GetReplicasByRevisionIdActionResult
+    batch_load_replicas_by_revision_ids: ActionProcessor[
+        BatchLoadReplicasByRevisionIdsAction, BatchLoadReplicasByRevisionIdsActionResult
     ]
     list_replicas: ActionProcessor[ListReplicasAction, ListReplicasActionResult]
     list_revisions: ActionProcessor[ListRevisionsAction, ListRevisionsActionResult]
+    create_model_revision: ActionProcessor[
+        CreateModelRevisionAction, CreateModelRevisionActionResult
+    ]
 
     def __init__(
         self, service: DeploymentServiceProtocol, action_monitors: list[ActionMonitor]
@@ -232,6 +243,9 @@ class DeploymentProcessors(AbstractProcessorPackage):
         self.delete_auto_scaling_rule = ActionProcessor(
             service.delete_auto_scaling_rule, action_monitors
         )
+        self.batch_load_deployments = ActionProcessor(
+            service.batch_load_deployments, action_monitors
+        )
         self.create_deployment = ActionProcessor(service.create_deployment, action_monitors)
         self.destroy_deployment = ActionProcessor(service.destroy_deployment, action_monitors)
         self.update_deployment = ActionProcessor(service.update_deployment, action_monitors)
@@ -239,30 +253,26 @@ class DeploymentProcessors(AbstractProcessorPackage):
             service.create_legacy_deployment, action_monitors
         )
         self.create_access_token = ActionProcessor(service.create_access_token, action_monitors)
-        self.get_access_tokens_by_deployment_id = ActionProcessor(
-            service.get_access_tokens_by_deployment_id, action_monitors
-        )
+        self.list_access_tokens = ActionProcessor(service.list_access_tokens, action_monitors)
         self.sync_replicas = ActionProcessor(service.sync_replicas, action_monitors)
         self.add_model_revision = ActionProcessor(service.add_model_revision, action_monitors)
-        self.get_auto_scaling_rules_by_deployment_id = ActionProcessor(
-            service.get_auto_scaling_rules_by_deployment_id, action_monitors
-        )
-        self.get_replicas_by_deployment_id = ActionProcessor(
-            service.get_replicas_by_deployment_id, action_monitors
+        self.batch_load_auto_scaling_rules = ActionProcessor(
+            service.batch_load_auto_scaling_rules, action_monitors
         )
         self.get_revision_by_replica_id = ActionProcessor(
             service.get_revision_by_replica_id, action_monitors
         )
         self.get_revision_by_id = ActionProcessor(service.get_revision_by_id, action_monitors)
-        self.get_deployment = ActionProcessor(service.get_deployment, action_monitors)
         self.get_revisions_by_deployment_id = ActionProcessor(
             service.get_revisions_by_deployment_id, action_monitors
         )
-        self.get_replicas_by_revision_id = ActionProcessor(
-            service.get_replicas_by_revision_id, action_monitors
+        self.batch_load_replicas_by_revision_ids = ActionProcessor(
+            service.batch_load_replicas_by_revision_ids, action_monitors
         )
         self.list_replicas = ActionProcessor(service.list_replicas, action_monitors)
         self.list_revisions = ActionProcessor(service.list_revisions, action_monitors)
+        self.create_model_revision = ActionProcessor(service.create_model_revision, action_monitors)
+        self.batch_load_revisions = ActionProcessor(service.batch_load_revisions, action_monitors)
 
     @override
     def supported_actions(self) -> list[ActionSpec]:
@@ -274,18 +284,19 @@ class DeploymentProcessors(AbstractProcessorPackage):
             UpdateDeploymentAction.spec(),
             DeleteAutoScalingRuleAction.spec(),
             CreateAccessTokenAction.spec(),
-            GetAccessTokensByDeploymentIdAction.spec(),
             SyncReplicaAction.spec(),
             AddModelRevisionAction.spec(),
-            GetAutoScalingRulesByDeploymentIdAction.spec(),
-            GetReplicasByDeploymentIdAction.spec(),
+            BatchLoadAutoScalingRulesAction.spec(),
             GetRevisionByDeploymentIdAction.spec(),
             GetRevisionByReplicaIdAction.spec(),
             GetRevisionByIdAction.spec(),
-            GetDeploymentAction.spec(),
             GetRevisionsByDeploymentIdAction.spec(),
-            GetReplicasByRevisionIdAction.spec(),
             ListRevisionsAction.spec(),
             ListReplicasAction.spec(),
             CreateLegacyDeploymentAction.spec(),
+            CreateModelRevisionAction.spec(),
+            BatchLoadRevisionsAction.spec(),
+            BatchLoadDeploymentsAction.spec(),
+            ListAccessTokensAction.spec(),
+            BatchLoadReplicasByRevisionIdsAction.spec(),
         ]
