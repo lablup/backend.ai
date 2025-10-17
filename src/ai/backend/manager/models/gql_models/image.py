@@ -29,6 +29,7 @@ from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.types import (
     AgentId,
     DispatchResult,
+    ImageID,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -281,11 +282,12 @@ class Image(graphene.ObjectType):
         ctx: GraphQueryContext,
         rows: List[ImageRow],
     ) -> AsyncIterator[Image]:
-        image_canonicals = [row.name for row in rows]
-        results = await ctx.valkey_image.get_agents_for_images(image_canonicals)
+        image_ids = [row.id for row in rows]
+        results = await ctx.valkey_image.get_agents_for_images(image_ids)
+        agent_ids = list(results.values())
 
         for idx, row in enumerate(rows):
-            installed_agents: List[str] = list(results[idx])
+            installed_agents: list[str] = [str(agent_id) for agent_id in agent_ids[idx]]
             yield cls.populate_row(ctx, row, installed_agents)
 
     @classmethod
@@ -498,17 +500,17 @@ class ImageNode(graphene.ObjectType):
 
     @classmethod
     async def _batch_load_installed_agents(
-        cls, ctx: GraphQueryContext, full_names: Sequence[str]
+        cls, ctx: GraphQueryContext, image_ids: Sequence[ImageID]
     ) -> list[set[AgentId]]:
-        results = await ctx.valkey_image.get_agents_for_images(list(full_names))
-        return [{AgentId(agent_id) for agent_id in agents} for agents in results]
+        results = await ctx.valkey_image.get_agents_for_images(list(image_ids))
+        return list(results.values())
 
     async def resolve_installed(self, info: graphene.ResolveInfo) -> bool:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, self._batch_load_installed_agents
         )
-        agent_ids = await loader.load(self._canonical)
+        agent_ids = await loader.load(self.row_id)
         agent_ids = cast(Optional[set[AgentId]], agent_ids)
         return agent_ids is not None and len(agent_ids) > 0
 

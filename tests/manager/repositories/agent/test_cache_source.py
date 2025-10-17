@@ -1,11 +1,12 @@
 from datetime import datetime
 from unittest.mock import AsyncMock
+from uuid import UUID
 
 import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, ImageID
 from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 
@@ -74,17 +75,17 @@ class TestAgentCacheSource:
     ) -> None:
         # Given
         agent_id = AgentId("agent-001")
-        images = [
-            "python:3.11-slim",
-            "tensorflow/tensorflow:latest",
-            "pytorch/pytorch:2.0-cuda",
+        image_ids = [
+            ImageID(UUID("00000000-0000-0000-0000-000000000000")),
+            ImageID(UUID("11111111-1111-1111-1111-111111111111")),
+            ImageID(UUID("22222222-2222-2222-2222-222222222222")),
         ]
 
         # When
-        await cache_source.set_agent_to_images(agent_id, images)
+        await cache_source.set_agent_to_images(agent_id, image_ids)
 
         # Then
-        mock_valkey_image.add_agent_to_images.assert_called_once_with(agent_id, images)
+        mock_valkey_image.add_agent_to_images.assert_called_once_with(agent_id, image_ids)
 
     @pytest.mark.asyncio
     async def test_set_agent_to_images_empty_list(
@@ -94,13 +95,13 @@ class TestAgentCacheSource:
     ) -> None:
         # Given
         agent_id = AgentId("agent-002")
-        images: list[str] = []
+        image_ids: list[ImageID] = []
 
         # When
-        await cache_source.set_agent_to_images(agent_id, images)
+        await cache_source.set_agent_to_images(agent_id, image_ids)
 
         # Then
-        mock_valkey_image.add_agent_to_images.assert_called_once_with(agent_id, images)
+        mock_valkey_image.add_agent_to_images.assert_called_once_with(agent_id, image_ids)
 
     @pytest.mark.asyncio
     async def test_set_agent_to_images_with_duplicates(
@@ -111,9 +112,9 @@ class TestAgentCacheSource:
         # Given
         agent_id = AgentId("agent-003")
         images = [
-            "ubuntu:22.04",
-            "ubuntu:22.04",  # duplicate
-            "alpine:latest",
+            ImageID(UUID("00000000-0000-0000-0000-000000000000")),
+            ImageID(UUID("00000000-0000-0000-0000-000000000000")),  # duplicate
+            ImageID(UUID("11111111-1111-1111-1111-111111111111")),
         ]
 
         # When
@@ -132,7 +133,10 @@ class TestAgentCacheSource:
         # Given
         agents = [AgentId(f"agent-{i:03d}") for i in range(5)]
         heartbeat_time = datetime.now(tzutc())
-        images = ["python:3.11", "node:18"]
+        image_ids = [
+            ImageID(UUID("00000000-0000-0000-0000-000000000000")),
+            ImageID(UUID("11111111-1111-1111-1111-111111111111")),
+        ]
 
         # When - simulate concurrent operations
         import asyncio
@@ -140,7 +144,7 @@ class TestAgentCacheSource:
         tasks = []
         for agent_id in agents:
             tasks.append(cache_source.update_agent_last_seen(agent_id, heartbeat_time))
-            tasks.append(cache_source.set_agent_to_images(agent_id, images))
+            tasks.append(cache_source.set_agent_to_images(agent_id, image_ids))
 
         await asyncio.gather(*tasks)
 
@@ -158,7 +162,7 @@ class TestAgentCacheSource:
         # Given
         agent_id = AgentId("agent-error")
         heartbeat_time = datetime.now(tzutc())
-        images = ["broken:image"]
+        image_ids = [ImageID(UUID("22222222-2222-2222-2222-222222222222"))]
 
         # Configure mocks to raise exceptions
         mock_valkey_live.update_agent_last_seen.side_effect = ConnectionError(
@@ -171,4 +175,4 @@ class TestAgentCacheSource:
             await cache_source.update_agent_last_seen(agent_id, heartbeat_time)
 
         with pytest.raises(TimeoutError):
-            await cache_source.set_agent_to_images(agent_id, images)
+            await cache_source.set_agent_to_images(agent_id, image_ids)

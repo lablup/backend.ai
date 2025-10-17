@@ -88,27 +88,19 @@ class ImageRepository:
         status_filter: Optional[list[ImageStatus]] = None,
         requested_by_superadmin: bool = False,
     ) -> list[ImageWithAgentInstallStatus]:
-        images_data: list[ImageDataWithDetails] = await self._db_source.query_images_by_canonicals(
+        images_data = await self._db_source.query_images_by_canonicals(
             image_canonicals, status_filter
         )
-
-        installed_agents_for_images: list[set[str]] = []
-
-        image_names = [image.name for image in images_data]
-        installed_agents_for_images = await self._stateful_source.list_agents_with_images(
-            image_names
-        )
-
-        # TODO: Handle mismatch in lengths more gracefully
-        if len(installed_agents_for_images) != len(images_data):
-            installed_agents_for_images = [set() for _ in images_data]
+        image_ids = list(images_data.keys())
+        installed_agents_for_images = await self._stateful_source.list_agents_with_images(image_ids)
 
         hide_agents = (
             False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )
 
         images_with_agent_install_status: list[ImageWithAgentInstallStatus] = []
-        for image, installed_agents in zip(images_data, installed_agents_for_images):
+        for image_id, image in images_data.items():
+            installed_agents = installed_agents_for_images.get(image_id, set())
             images_with_agent_install_status.append(
                 ImageWithAgentInstallStatus(
                     image=image,
@@ -131,7 +123,7 @@ class ImageRepository:
         image_data: ImageDataWithDetails = await self._db_source.query_image_details_by_identifier(
             identifier, status_filter
         )
-        installed_agents = await self._stateful_source.list_agents_with_image(image_data.name)
+        installed_agents = await self._stateful_source.list_agents_with_image(image_data.id)
         hide_agents = (
             False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )
@@ -155,7 +147,7 @@ class ImageRepository:
         image_data: ImageDataWithDetails = await self._db_source.query_image_details_by_id(
             image_id, load_aliases, status_filter
         )
-        installed_agents = await self._stateful_source.list_agents_with_image(image_data.name)
+        installed_agents = await self._stateful_source.list_agents_with_image(image_data.id)
         hide_agents = (
             False if requested_by_superadmin else self._config_provider.config.manager.hide_agents
         )

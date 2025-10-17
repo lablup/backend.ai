@@ -9,6 +9,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
+    AgentInstalledImagesRemoveEvent,
     AgentStartedEvent,
     AgentStatusHeartbeat,
     AgentTerminatedEvent,
@@ -30,6 +31,9 @@ from ai.backend.manager.services.agent.actions.mark_agent_exit import MarkAgentE
 from ai.backend.manager.services.agent.actions.mark_agent_running import MarkAgentRunningAction
 from ai.backend.manager.services.agent.actions.remove_agent_from_images import (
     RemoveAgentFromImagesAction,
+)
+from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canonicals import (
+    RemoveAgentFromImagesByCanonicalsAction,
 )
 from ai.backend.manager.services.processors import Processors
 
@@ -137,6 +141,8 @@ class AgentEventHandler:
             action=HandleHeartbeatAction(agent_id=source, agent_info=event.agent_info)
         )
 
+    # For compatibility with redis key made with image canonical strings
+    # Use remove_agent_from_images_by_id instead of this if possible
     async def handle_agent_images_remove(
         self,
         context: None,
@@ -144,9 +150,22 @@ class AgentEventHandler:
         event: AgentImagesRemoveEvent,
     ) -> None:
         processor = await self.get_processors()
+        await processor.agent.remove_agent_from_images_by_canonicals.wait_for_complete(
+            action=RemoveAgentFromImagesByCanonicalsAction(
+                agent_id=source, image_canonicals=event.image_canonicals
+            )
+        )
+
+    async def handle_agent_installed_images_remove(
+        self,
+        context: None,
+        source: AgentId,
+        event: AgentInstalledImagesRemoveEvent,
+    ) -> None:
+        processor = await self.get_processors()
         await processor.agent.remove_agent_from_images.wait_for_complete(
             action=RemoveAgentFromImagesAction(
-                agent_id=source, image_canonicals=event.image_canonicals
+                agent_id=source, scanned_images=dict(event.scanned_images)
             )
         )
 

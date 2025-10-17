@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.common.types import ImageAlias
+from ai.backend.common.types import ImageAlias, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
@@ -130,7 +130,7 @@ class ImageDBSource:
         self,
         canonicals: list[str],
         status_filter: Optional[list[ImageStatus]] = None,
-    ) -> list[ImageDataWithDetails]:
+    ) -> dict[ImageID, ImageDataWithDetails]:
         query = (
             sa.select(ImageRow)
             .where(ImageRow.name.in_(canonicals))
@@ -142,7 +142,7 @@ class ImageDBSource:
         async with self._db.begin_readonly_session() as session:
             result = await session.execute(query)
             image_rows: list[ImageRow] = result.scalars().all()
-            return [row.to_detailed_dataclass() for row in image_rows]
+            return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
 
     async def query_image_details_by_identifier(
         self,

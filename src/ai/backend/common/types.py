@@ -321,6 +321,9 @@ SecretKey = NewType("SecretKey", str)
 
 ClusterRole = NewType("ClusterRole", str)
 
+ImageID = NewType("ImageID", UUID)
+ImageCanonical = NewType("ImageCanonical", str)
+
 
 class ContainerStatus(enum.StrEnum):
     RUNNING = "running"

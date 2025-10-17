@@ -5,7 +5,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, NamedTuple, Optional
 
-from ai.backend.common.types import CIStrEnum
+from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.image import Resources
@@ -43,8 +43,8 @@ class ImageResourcesData:
 
 @dataclass
 class ImageData:
-    id: uuid.UUID = field(compare=False)
-    name: str
+    id: ImageID = field(compare=False)
+    name: ImageCanonical
     project: Optional[str]
     image: str
     created_at: Optional[datetime] = field(compare=False)
@@ -77,8 +77,8 @@ class ResourceLimit:
 
 @dataclass
 class ImageDataWithDetails:
-    id: uuid.UUID = field(compare=False)
-    name: str
+    id: ImageID = field(compare=False)
+    name: ImageCanonical
     namespace: str
     base_image_name: str
     project: str

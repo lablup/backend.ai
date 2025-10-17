@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping
 from typing import ParamSpec, Self, TypeVar, cast
 
 from glide import Batch
@@ -17,7 +18,7 @@ from ai.backend.common.resilience import (
     RetryArgs,
     RetryPolicy,
 )
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import AgentId, ImageCanonical, ImageID, ValkeyTarget
 from ai.backend.logging.utils import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -92,40 +93,62 @@ class ValkeyImageClient:
     async def add_agent_to_images(
         self,
         agent_id: str,
-        image_canonicals: list[str],
+        image_ids: list[ImageID],
     ) -> None:
         """
         Add an agent to multiple image sets.
 
         :param agent_id: The agent ID to add.
-        :param image_canonicals: List of image canonical names.
+        :param image_identifiers: List of image identifiers (canonical:arch).
+        """
+        if not image_ids:
+            return
+
+        tx = self._create_batch()
+        for image_id in image_ids:
+            tx.sadd(str(image_id), [agent_id])
+        await self._client.client.exec(tx, raise_on_error=True)
+
+    # For compatibility with redis key made with image canonical strings
+    # Use remove_agent_from_images instead of this if possible
+    @valkey_image_resilience.apply()
+    async def remove_agent_from_images_by_canonicals(
+        self,
+        agent_id: str,
+        image_canonicals: list[ImageCanonical],
+    ) -> None:
+        """
+        Remove an agent from multiple image sets.
+
+        :param agent_id: The agent ID to remove.
+        :param image_ids: List of image identifiers (Image ID).
         """
         if not image_canonicals:
             return
 
         tx = self._create_batch()
         for image_canonical in image_canonicals:
-            tx.sadd(image_canonical, [agent_id])
+            tx.srem(str(image_canonical), [agent_id])
         await self._client.client.exec(tx, raise_on_error=True)
 
     @valkey_image_resilience.apply()
     async def remove_agent_from_images(
         self,
         agent_id: str,
-        image_canonicals: list[str],
+        image_ids: list[ImageID],
     ) -> None:
         """
         Remove an agent from multiple image sets.
 
         :param agent_id: The agent ID to remove.
-        :param image_canonicals: List of image canonical names.
+        :param image_ids: List of image identifiers (Image ID).
         """
-        if not image_canonicals:
+        if not image_ids:
             return
 
         tx = self._create_batch()
-        for image_canonical in image_canonicals:
-            tx.srem(image_canonical, [agent_id])
+        for image_id in image_ids:
+            tx.srem(str(image_id), [agent_id])
         await self._client.client.exec(tx, raise_on_error=True)
 
     @valkey_image_resilience.apply()
@@ -160,61 +183,61 @@ class ValkeyImageClient:
     @valkey_image_resilience.apply()
     async def get_agents_for_image(
         self,
-        image_canonical: str,
-    ) -> set[str]:
+        image_id: ImageID,
+    ) -> set[AgentId]:
         """
         Get all agents that have a specific image.
 
-        :param image_canonical: The image canonical name.
+        :param image_id: The image identifier.
         :return: Set of agent IDs.
         """
-        result = await self._client.client.smembers(image_canonical)
-        return {member.decode() for member in result}
+        result = await self._client.client.smembers(str(image_id))
+        return {AgentId(member.decode()) for member in result}
 
     @valkey_image_resilience.apply()
     async def get_agents_for_images(
         self,
-        image_canonicals: list[str],
-    ) -> list[set[str]]:
+        image_ids: list[ImageID],
+    ) -> Mapping[ImageID, set[AgentId]]:
         """
         Get all agents for multiple images.
 
-        :param image_canonicals: List of image canonical names.
-        :return: List of agent ID sets, one for each image.
+        :param image_ids: List of image identifiers (UUID).
+        :return: Mapping of image IDs to sets of agent IDs.
         """
-        if not image_canonicals:
-            return []
+        if not image_ids:
+            return {}
 
         tx = self._create_batch()
-        for image_canonical in image_canonicals:
-            tx.smembers(image_canonical)
+        for image_id in image_ids:
+            tx.smembers(str(image_id))
 
         results = await self._client.client.exec(tx, raise_on_error=True)
-        final_results: list[set[str]] = []
+        final_results: dict[ImageID, set[AgentId]] = {}
         if not results:
             return final_results
-        for result in results:
+        for image_id, result in zip(image_ids, results):
             result = cast(set[bytes], result)
-            final_results.append({member.decode() for member in result})
+            final_results[image_id] = {AgentId(member.decode()) for member in result}
         return final_results
 
     @valkey_image_resilience.apply()
     async def get_agent_counts_for_images(
         self,
-        image_canonicals: list[str],
+        image_ids: list[ImageID],
     ) -> list[int]:
         """
         Get the count of agents for multiple images.
 
-        :param image_canonicals: List of image canonical names.
+        :param image_ids: List of image identifiers (canonical:arch).
         :return: List of agent counts, one for each image.
         """
-        if not image_canonicals:
+        if not image_ids:
             return []
 
         tx = self._create_batch()
-        for image_canonical in image_canonicals:
-            tx.scard(image_canonical)
+        for image_id in image_ids:
+            tx.scard(str(image_id))
 
         results = await self._client.client.exec(tx, raise_on_error=True)
         if not results:
