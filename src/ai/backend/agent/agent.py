@@ -793,6 +793,20 @@ class AbstractAgent(
     _active_pulls: dict[str, PullTaskInfo]  # key: image canonical name
     _active_creates: dict[KernelId, CreateTaskInfo]
 
+    @property
+    def known_kernel_ids(self) -> set[KernelId]:
+        return (
+            set(self.kernel_registry.keys())
+            | set(self.restarting_kernels.keys())
+            | set(self._pending_creation_tasks.keys())
+            | set(self._active_creates.keys())
+            | set(self._ongoing_destruction_tasks.keys())
+        )
+
+    @property
+    def known_image_names(self) -> set[str]:
+        return set(self.images.keys()) | set(self._active_pulls.keys())
+
     @contextmanager
     def track_pull(self, image: str) -> Generator[bool, None, None]:
         """Context manager to track pull operations."""

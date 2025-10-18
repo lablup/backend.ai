@@ -49,6 +49,13 @@ class _InlineTable(dict, InlineTableDict):
     pass
 
 
+def _is_runtime_injected_field(description: str) -> bool:
+    return (
+        "This field is injected at runtime" in description
+        or "not intended to be set in the configuration file" in description
+    )
+
+
 def _wrap_comment(text: str, prefix: str = "", width: int = 80) -> str:
     """Wrap text into multiline comment format."""
     lines = text.strip().split("\n")
@@ -122,7 +129,8 @@ def _dump_toml_scalar(
             case "BinarySize":
                 value = f"{BinarySize(value):s}".upper()
             case "HostPortPair":
-                value = {"host": value.host, "port": value.port}
+                if isinstance(value, HostPortPair):
+                    value = {"host": value.host, "port": value.port}
             case "EnumByValue":
                 assert ctx.annotation is not None
                 value = ctx.annotation(value).value
@@ -223,10 +231,9 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
 
         # Add description as comment if available
         description = field_info.get("description") or prop_schema.get("description")
+        is_runtime_field = False
         if description:
-            if "This field is injected at runtime" in description:
-                # Skip runtimme-generated fields.
-                return []
+            is_runtime_field = _is_runtime_injected_field(description)
             comment_lines = _wrap_comment(description)
             for line in comment_lines.split("\n"):
                 lines.append(f"{indent_str}{line}")
@@ -290,13 +297,20 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
         print(
             f"{indent_str}{prop_name} ({optional=}, {union=}, {default=}, {example=}, {annotation=})",
         )
+
+        # Runtime fields should always be commented out
+        if is_runtime_field:
+            line += "## "
+
         match value:
             case None:
                 # null does not exist in TOML, so just leave it as empty space
-                line += f"# {prop_name} ="
+                if not is_runtime_field:
+                    line += "# "
+                line += f"{prop_name} ="
             case _ if union:
                 assert isinstance(value, Sequence)
-                if not optional:
+                if not optional and not is_runtime_field:
                     line += "## "
                 line += f"{prop_name} = "
                 line += _dump_toml_scalar(value[0], example, fmt_ctx)
@@ -304,7 +318,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
                 line += "  # | "
                 line += " | ".join(_dump_toml_scalar(v, example, fmt_ctx) for v in value[1:])
             case _:
-                if optional:
+                if optional and not is_runtime_field:
                     line += "## "
                 # The default is likely to be None if optional.
                 # Take the example value as the placeholder.
@@ -332,8 +346,20 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
         # Group properties by type
         simple_props = {}
         object_props = {}
+        array_of_tables_props = {}
 
         for prop_name, prop_schema in properties.items():
+            original_prop_schema = prop_schema
+
+            # Handle anyOf (optional types) - unwrap to check the inner type
+            if "anyOf" in prop_schema:
+                # Check if this is an optional type (Type | None)
+                any_of_items = prop_schema["anyOf"]
+                non_null_items = [item for item in any_of_items if item != {"type": "null"}]
+                if len(non_null_items) == 1 and len(any_of_items) == 2:
+                    # This is an optional type - unwrap it to check if it's an object
+                    prop_schema = non_null_items[0]
+
             if "$ref" in prop_schema:
                 # Resolve reference
                 ref_path = prop_schema["$ref"].split("/")
@@ -345,12 +371,36 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
 
             prop_type = prop_schema.get("type", "")
 
-            if (prop_type == "object" or "properties" in prop_schema) and prop_schema[
+            # Check if this is an array of objects (array of tables in TOML)
+            if prop_type == "array" and "items" in prop_schema:
+                items_schema = prop_schema["items"]
+                # Resolve $ref in items if present
+                if "$ref" in items_schema:
+                    ref_path = items_schema["$ref"].split("/")
+                    if ref_path[0] == "#" and len(ref_path) > 1:
+                        resolved = schema
+                        for part in ref_path[1:]:
+                            resolved = resolved.get(part, {})
+                        items_schema = resolved
+
+                # Check if the items are objects (complex types)
+                if items_schema.get("type") == "object" or "properties" in items_schema:
+                    array_of_tables_props[prop_name] = (original_prop_schema, items_schema)
+                    continue
+
+            # Check if this is a complex object that should be expanded
+            if (prop_type == "object" or "properties" in prop_schema) and prop_schema.get(
                 "title"
-            ] != "HostPortPair":
+            ) != "HostPortPair":
+                # Preserve description from original schema if it was unwrapped
+                if "description" in original_prop_schema and "description" not in prop_schema:
+                    prop_schema = {
+                        **prop_schema,
+                        "description": original_prop_schema["description"],
+                    }
                 object_props[prop_name] = prop_schema
             else:
-                simple_props[prop_name] = prop_schema
+                simple_props[prop_name] = original_prop_schema
 
         # Add simple properties first
         processed_simple_props = []
@@ -360,7 +410,10 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
             )
             if prop_lines:
                 lines.extend(prop_lines)
-                processed_simple_props.append(prop_name)
+                # Exclude runtime-injected fields from the warning
+                description = prop_schema.get("description", "")
+                if not _is_runtime_injected_field(description):
+                    processed_simple_props.append(prop_name)
 
         if path == [] and processed_simple_props:
             # ref: https://github.com/toml-lang/toml/issues/984
@@ -368,26 +421,37 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
                 "The configuration schema CANNOT have simple fields in the root "
                 "without any section header according to the TOML specification. "
                 "Also, optional sections should be defined non-optional with explicit default factory. "
-                f"Please move or fix these fields/sections: {', '.join(simple_props.keys())}. "
+                f"Please move or fix these fields/sections: {', '.join(processed_simple_props)}. "
             )
 
         # Add object properties as sections
         for prop_name, prop_schema in object_props.items():
             indent_str = "  " * len(path)
 
+            # Check if this is a runtime-injected field
+            description = prop_schema.get("description", "")
+            is_runtime_field = _is_runtime_injected_field(description)
+
             if lines and lines[-1].strip():  # Add blank line before section
                 lines.append("")
 
             # Add section comment
-            if "description" in prop_schema:
-                comment_lines = _wrap_comment(prop_schema["description"], prefix=indent_str)
+            if description:
+                comment_lines = _wrap_comment(description, prefix=indent_str)
                 lines.extend(comment_lines.split("\n"))
 
-            # Add section header
+            # Add section header (commented out if runtime field)
             section_path = path + [prop_name]
-            section_header = f"{indent_str}[{'.'.join(section_path)}]"
+            if is_runtime_field:
+                section_header = f"{indent_str}## [{'.'.join(section_path)}]"
+            else:
+                section_header = f"{indent_str}[{'.'.join(section_path)}]"
             lines.append(section_header)
             print(section_header)
+
+            # Skip processing nested properties for runtime fields (just show as empty section)
+            if is_runtime_field:
+                continue
 
             # Process nested properties - try to get nested model class
             nested_model_cls = None
@@ -419,6 +483,62 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
 
             nested_lines = _process_schema(
                 prop_schema, path=section_path, parent_required=required, model_cls=nested_model_cls
+            )
+            lines.extend(nested_lines)
+
+        # Add array of tables properties using [[array.name]] syntax
+        for prop_name, (prop_schema, items_schema) in array_of_tables_props.items():
+            indent_str = "  " * len(path)
+
+            if lines and lines[-1].strip():  # Add blank line before section
+                lines.append("")
+
+            # Add array of tables comment
+            if "description" in prop_schema:
+                comment_lines = _wrap_comment(prop_schema["description"], prefix=indent_str)
+                lines.extend(comment_lines.split("\n"))
+
+            # Add array of tables header with double brackets [[array.name]]
+            section_path = path + [prop_name]
+            array_header = f"{indent_str}[[{'.'.join(section_path)}]]"
+            lines.append(array_header)
+            print(array_header)
+
+            # Add a comment about adding multiple entries
+            lines.append(
+                f"{indent_str}# Add multiple [[{'.'.join(section_path)}]] sections as needed"
+            )
+
+            # Process nested properties for the item schema
+            nested_model_cls = None
+            if model_cls and hasattr(model_cls, "model_fields"):
+                field_info = _get_field_info(model_cls, prop_name, indent=len(path))
+                if field_info:
+                    # Try to find the field and extract the item type from list annotation
+                    field = None
+                    if prop_name in model_cls.model_fields:
+                        field = model_cls.model_fields[prop_name]
+                    else:
+                        # Search by alias
+                        for finfo in model_cls.model_fields.values():
+                            if (
+                                hasattr(finfo, "serialization_alias")
+                                and finfo.serialization_alias == prop_name
+                            ):
+                                field = finfo
+                                break
+
+                    if field:
+                        if hasattr(field, "annotation") and hasattr(field.annotation, "__origin__"):
+                            # Handle generic types like list[SubAgentConfig]
+                            args = getattr(field.annotation, "__args__", ())
+                            if args and hasattr(args[0], "model_fields"):
+                                nested_model_cls = args[0]
+                        elif hasattr(field.annotation, "model_fields"):
+                            nested_model_cls = field.annotation
+
+            nested_lines = _process_schema(
+                items_schema, path=section_path, parent_required=[], model_cls=nested_model_cls
             )
             lines.extend(nested_lines)
 
