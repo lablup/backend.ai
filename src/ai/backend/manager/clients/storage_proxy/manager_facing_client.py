@@ -41,7 +41,10 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.clients.storage_proxy.base import StorageProxyHTTPClient
 from ai.backend.manager.defs import DEFAULT_CHUNK_SIZE
-from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
+from ai.backend.manager.errors.storage import (
+    StorageProxyConnectionError,
+    UnexpectedStorageProxyResponseError,
+)
 
 storage_proxy_client_resilience = Resilience(
     policies=[
@@ -77,7 +80,10 @@ class StorageProxyManagerFacingClient:
 
         :return: Response containing volume information
         """
-        return await self._client.request_with_response("GET", "volumes")
+        try:
+            return await self._client.request_with_response("GET", "volumes")
+        except aiohttp.ClientConnectionError as e:
+            raise StorageProxyConnectionError from e
 
     @storage_proxy_client_resilience.apply()
     async def create_folder(

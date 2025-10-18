@@ -28,6 +28,7 @@ from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
 )
 from ai.backend.manager.config.unified import VolumesConfig
 from ai.backend.manager.errors.storage import (
+    StorageProxyConnectionError,
     StorageProxyNotFound,
 )
 
@@ -177,7 +178,11 @@ class StorageSessionManager:
             proxy_name: str,
             client: StorageProxyManagerFacingClient,
         ) -> Iterable[tuple[str, VolumeInfo]]:
-            reply = await client.get_volumes()
+            try:
+                reply = await client.get_volumes()
+            except StorageProxyConnectionError:
+                log.warning("Failed to connect to storage proxy (name: {})", proxy_name)
+                return []
             return ((proxy_name, volume_data) for volume_data in reply["volumes"])
 
         for proxy_name, client in self._manager_facing_clients.items():
