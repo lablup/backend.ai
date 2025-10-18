@@ -667,12 +667,13 @@ async def get_role(request: web.Request, params: Any) -> web.Response:
         t.Key("domain"): t.String,
         t.Key("username"): t.String,
         t.Key("password"): t.String,
+        t.Key("sToken", default=None): t.String | t.Null,
     }).allow_extra("*")
 )
 async def authorize(request: web.Request, params: Any) -> web.StreamResponse:
     log.info("AUTH.AUTHORIZE(d:{0[domain]}, u:{0[username]}, passwd:****, type:{0[type]})", params)
     root_ctx: RootContext = request.app["_root.context"]
-    stoken = params.get("stoken") or params.get("sToken")
+    stoken = params.get("sToken") or params.get("stoken")
     action = AuthorizeAction(
         request=request,
         type=AuthTokenType(params["type"]),
