@@ -1,12 +1,23 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Generic, Protocol, TypeVar
+from typing import Generic, TypeVar
 
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.types import EntityType
 
+TUpdator = TypeVar("TUpdator")
 
-class BaseEntityData(ABC):
+
+class Row(ABC, Generic[TUpdator]):
+    @abstractmethod
+    def update_from_data(self, data: TUpdator) -> None:
+        raise NotImplementedError
+
+
+TRow = TypeVar("TRow", bound=Row)  # SQLAlchemy ORM model instance
+
+
+class EntityRBACData(ABC):
     @abstractmethod
     def entity_id(self) -> str:
         raise NotImplementedError
@@ -21,24 +32,22 @@ class BaseEntityData(ABC):
         raise NotImplementedError
 
 
-TBaseEntityData = TypeVar("TBaseEntityData", bound=BaseEntityData)
-TRow = TypeVar("TRow")  # SQLAlchemy ORM model instance
+TEntityRBACData = TypeVar("TEntityRBACData", bound=EntityRBACData)
 
 
 @dataclass
-class InsertData(Generic[TRow, TBaseEntityData]):
+class InsertData(Generic[TRow, TEntityRBACData]):
     row: TRow
-    entity_data: TBaseEntityData
-
-
-TUpdator = TypeVar("TUpdator", contravariant=True)
-
-
-class Updatable(Protocol[TUpdator]):
-    def update_from_data(self, data: TUpdator) -> None: ...
+    entity_data: TEntityRBACData
 
 
 @dataclass
-class DeleteData(Generic[TRow, TBaseEntityData]):
+class UpdateData(Generic[TRow, TUpdator]):
     row: TRow
-    entity_data: TBaseEntityData
+    updator: TUpdator
+
+
+@dataclass
+class DeleteData(Generic[TRow, TEntityRBACData]):
+    row: TRow
+    entity_data: TEntityRBACData

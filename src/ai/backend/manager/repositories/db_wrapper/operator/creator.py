@@ -5,21 +5,21 @@ from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 
 from ...permission_controller.role_manager import RoleManager
 from ..session import SessionWrapper
-from ..types import InsertData, TBaseEntityData, TRow
+from ..types import InsertData, TEntityRBACData, TRow
 
 
-class Creator(Generic[TRow, TBaseEntityData]):
+class Creator(Generic[TRow, TEntityRBACData]):
     """
     SQLAlchemy ORM creation wrapper.
     TRow: SQLAlchemy ORM model instance type.
-    TBaseEntityData: Type of the associated entity insert data.
+    TEntityRBACData: Type of the associated entity insert data.
     """
 
     def __init__(self, session: SessionWrapper) -> None:
         self._session = session
         self._role_manager = RoleManager()
 
-    async def add_one(self, data: InsertData[TRow, TBaseEntityData]) -> TRow:
+    async def add_one(self, data: InsertData[TRow, TEntityRBACData]) -> TRow:
         """
         Add a single row to the database and map its entity to the appropriate scope.
         `data`: InsertData object containing the row and associated entity data.
@@ -33,7 +33,7 @@ class Creator(Generic[TRow, TBaseEntityData]):
         )
         return data.row
 
-    async def add_many(self, data: Sequence[InsertData[TRow, TBaseEntityData]]) -> list[TRow]:
+    async def add_many(self, data: Sequence[InsertData[TRow, TEntityRBACData]]) -> list[TRow]:
         """
         Add multiple rows to the database and map their entities to the appropriate scopes.
         `data`: Sequence of InsertData objects containing the rows and associated entity data.
