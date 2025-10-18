@@ -353,6 +353,29 @@ class InstallReport(Static):
                 """
                     )
                 )
+            with TabPane("App-Proxy Coordinator", id="appproxy-coordinator"):
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./backend.ai app-proxy coordinator start-server --debug
+                ```
+                """
+                    )
+                )
+
+            with TabPane("App-Proxy Worker", id="appproxy-worker"):
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./backend.ai app-proxy worker start-server --debug
+                ```
+                """
+                    )
+                )
 
 
 class ModeMenu(Static):
