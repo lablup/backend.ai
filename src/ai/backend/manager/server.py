@@ -18,6 +18,7 @@ from collections.abc import (
     MutableMapping,
     Sequence,
 )
+from contextlib import AsyncExitStack
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from datetime import datetime
@@ -1440,32 +1441,29 @@ def build_root_app(
             processors_ctx,
             service_discovery_ctx,
         ]
+    shutdown_context_instances = []
 
-    async def _cleanup_context_wrapper(cctx, app: web.Application) -> AsyncIterator[None]:
+    async def _cleanup_context_wrapper(app: web.Application) -> AsyncIterator[None]:
         # aiohttp's cleanup contexts are just async generators, not async context managers.
-        cctx_instance = cctx(app["_root.context"])
-        app["_cctx_instances"].append(cctx_instance)
-        try:
-            async with cctx_instance:
-                yield
-        except Exception as e:
-            exc_info = (type(e), e, e.__traceback__)
-            log.error("Error initializing cleanup_contexts: {0}", cctx.__name__, exc_info=exc_info)
+        assert cleanup_contexts is not None
+        async with AsyncExitStack() as stack:
+            for cctx in cleanup_contexts:
+                cctx_instance = cctx(root_ctx)
+                if hasattr(cctx_instance, "shutdown"):
+                    shutdown_context_instances.append(cctx_instance)
+                await stack.enter_async_context(cctx_instance)
+            yield
 
-    async def _call_cleanup_context_shutdown_handlers(app: web.Application) -> None:
-        for cctx in app["_cctx_instances"]:
-            if hasattr(cctx, "shutdown"):
-                try:
-                    await cctx.shutdown()
-                except Exception:
-                    log.exception("error while shutting down a cleanup context")
+    async def _trigger_shutdown(app: web.Application) -> None:
+        # shutdown is triggered before cleanup, giving chances to close client connections first.
+        for cctx_instance in shutdown_context_instances:
+            try:
+                await cctx_instance.shutdown()
+            except Exception:
+                log.exception("error while shutting down a cleanup context")
 
-    app["_cctx_instances"] = []
-    app.on_shutdown.append(_call_cleanup_context_shutdown_handlers)
-    for cleanup_ctx in cleanup_contexts:
-        app.cleanup_ctx.append(
-            functools.partial(_cleanup_context_wrapper, cleanup_ctx),
-        )
+    app.on_shutdown.append(_trigger_shutdown)
+    app.cleanup_ctx.append(_cleanup_context_wrapper)
     cors = aiohttp_cors.setup(app, defaults=root_ctx.cors_options)
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", r"", hello))
