@@ -258,6 +258,14 @@ class SerializableCircuit(BaseModel):
     route_info: Annotated[list[RouteInfo], Field(description="List of kernel access information.")]
     session_ids: list[UUID]
 
+    static_address_id: Annotated[
+        UUID | None,
+        Field(
+            default=None,
+            description="ID of the static address allocated to this circuit, if any.",
+        ),
+    ]
+
     created_at: datetime
     updated_at: datetime
 
