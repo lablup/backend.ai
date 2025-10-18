@@ -52,6 +52,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.vfolder.types import (
+    VFolderCreateParams,
     VFolderData,
     VFolderInvitationState,
     VFolderOperationStatus,
@@ -496,6 +497,24 @@ class VFolderRow(Base):
             group=self.group,
             cloneable=self.cloneable,
             status=self.status,
+        )
+
+    @classmethod
+    def from_creator(cls, creator: VFolderCreateParams) -> Self:
+        return cls(
+            name=creator.name,
+            host=creator.host,
+            domain_name=creator.domain_name,
+            quota_scope_id=creator.quota_scope_id,
+            usage_mode=creator.usage_mode,
+            permission=creator.permission,
+            ownership_type=creator.ownership_type,
+            user=creator.user,
+            group=creator.group,
+            creator=creator.creator,
+            unmanaged_path=creator.unmanaged_path,
+            cloneable=creator.cloneable,
+            status=VFolderOperationStatus.READY,
         )
 
 
