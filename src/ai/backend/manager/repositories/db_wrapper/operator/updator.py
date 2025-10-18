@@ -4,13 +4,13 @@ from ai.backend.manager.data.permission.id import ObjectId, ScopeId
 
 from ...permission_controller.role_manager import RoleManager
 from ..session import SessionWrapper
-from ..types import TUpdator, Updatable
+from ..types import TRow, TUpdator, UpdateData
 
 
-class Updator(Generic[TUpdator]):
+class Updator(Generic[TRow, TUpdator]):
     """
     SQLAlchemy ORM update wrapper.
-    TUpdatable: SQLAlchemy ORM model instance type that supports updates.
+    TRow: SQLAlchemy ORM model instance type.
     TUpdator: Type of the data used to update the ORM model instance.
     """
 
@@ -18,15 +18,14 @@ class Updator(Generic[TUpdator]):
         self._session = session
         self._role_manager = RoleManager()
 
-    async def update(self, row: Updatable[TUpdator], data: TUpdator) -> Updatable[TUpdator]:
+    async def update(self, data: UpdateData[TRow, TUpdator]) -> TRow:
         """
         Update the provided row with the given data.
-        `row`: The ORM model instance to be updated.
-        `data`: The data used to update the ORM model instance.
+        `data`: UpdateData object containing the row and updator data.
         """
-        row.update_from_data(data)
+        data.row.update_from_data(data.updator)
         await self._session.db_session.flush()
-        return row
+        return data.row
 
     async def _map_entity_to_scope(
         self,
