@@ -570,7 +570,7 @@ class StorageProxyConfig(BaseConfigSchema):
         ),
         serialization_alias="use-experimental-redis-event-dispatcher",
     )
-    allow_auto_quota_scope_creation: bool = Field(
+    auto_quota_scope_creation: bool = Field(
         default=True,
         description="""
         Whether to allow automatic creation of quota scopes.
@@ -579,7 +579,7 @@ class StorageProxyConfig(BaseConfigSchema):
         """,
         examples=[True, False],
         validation_alias=AliasChoices(
-            "allow-auto-quota-scope-creation", "allow_auto_quota_scope_creation"
+            "allow-auto-quota-scope-creation", "auto_quota_scope_creation"
         ),
         serialization_alias="allow-auto-quota-scope-creation",
     )
