@@ -28,9 +28,11 @@ from ai.backend.logging import BraceStyleAdapter
 from .api.client import init_client_app
 from .api.manager import init_internal_app, init_manager_app
 from .config.unified import StorageProxyUnifiedConfig
+from .context_types import ArtifactVerifierContext
 from .exception import InvalidVolumeError
 from .plugin import (
     BasePluginContext,
+    StorageArtifactVerifierPluginContext,
     StorageClientWebappPluginContext,
     StorageManagerWebappPluginContext,
     StoragePluginContext,
@@ -124,6 +126,7 @@ class RootContext:
     watcher: WatcherClient | None
     metric_registry: CommonMetricRegistry
     background_task_manager: BackgroundTaskManager
+    artifact_verifier_ctx: ArtifactVerifierContext
 
     def __init__(
         self,
@@ -163,6 +166,7 @@ class RootContext:
         self.volume_pool = volume_pool
         self.storage_pool = storage_pool
         self.background_task_manager = background_task_manager
+        self.artifact_verifier_ctx = ArtifactVerifierContext()
 
     async def __aenter__(self) -> None:
         # TODO: Setup the apps outside of the context.
@@ -181,6 +185,7 @@ class RootContext:
             StorageClientWebappPluginContext(self.etcd, self.local_config.model_dump()),
             self.client_api_app,
         )
+        await self.init_storage_artifact_verifier_plugin()
 
     async def init_storage_plugin(self) -> None:
         plugin_ctx = StoragePluginContext(self.etcd, self.local_config.model_dump())
@@ -201,6 +206,15 @@ class RootContext:
             subapp, global_middlewares = await plugin_instance.create_app(self.cors_options)
             _init_subapp(plugin_name, root_app, subapp, global_middlewares)
         return plugin_ctx
+
+    async def init_storage_artifact_verifier_plugin(self) -> None:
+        plugin_ctx = StorageArtifactVerifierPluginContext(self.etcd, self.local_config.model_dump())
+        await plugin_ctx.init()
+        plugins = {}
+        for plugin_name, plugin_instance in plugin_ctx.plugins.items():
+            log.info("Loading artifact verifier storage plugin: {0}", plugin_name)
+            plugins[plugin_name] = plugin_instance
+        self.artifact_verifier_ctx.load_verifiers(plugins)
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {name: info.to_dataclass() for name, info in self.local_config.volume.items()}

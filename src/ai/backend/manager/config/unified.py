@@ -1848,7 +1848,12 @@ class ReservoirConfig(BaseConfigSchema):
     def _validate_required_steps(
         cls, v: dict[str, str], info: ValidationInfo
     ) -> dict[ArtifactStorageImportStep, str]:
-        _REQUIRED_STEPS = {ArtifactStorageImportStep.DOWNLOAD, ArtifactStorageImportStep.ARCHIVE}
+        # TODO: Make all steps required.
+        _REQUIRED_STEPS = {
+            ArtifactStorageImportStep.DOWNLOAD,
+            ArtifactStorageImportStep.VERIFY,
+            ArtifactStorageImportStep.ARCHIVE,
+        }
 
         # Get storage_name from the current model data being validated
         default_storage_name = info.data.get("storage_name", "RESERVOIR_STORAGE_NAME")
