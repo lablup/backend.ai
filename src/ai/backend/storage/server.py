@@ -297,6 +297,9 @@ async def server_main(
                 uid = local_config.storage_proxy.user
                 gid = local_config.storage_proxy.group
                 if uid is not None and gid is not None:
+                    tmp_path = Path("/tmp")
+                    for glide_socket in tmp_path.glob("glide-socket-*"):
+                        os.chown(glide_socket, uid, gid)
                     os.setgroups(
                         [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
                     )
