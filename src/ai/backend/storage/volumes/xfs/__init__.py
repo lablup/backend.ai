@@ -17,6 +17,7 @@ import aiofiles.os
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.exception import InvalidConfigError
 from ai.backend.common.lock import FileLock
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
@@ -307,7 +308,17 @@ class XfsVolume(BaseVolume):
             options=options,
         )
         self._lock_path = Path(self.config.get("lock_file_path", DEFAULT_LOCK_FILE))
-        self._lock_path.touch()
+        try:
+            self._lock_path.touch()
+        except OSError as e:
+            log.exception(
+                "Failed to create XFS backend lock file at {}: (Error: {})",
+                self._lock_path,
+                e,
+            )
+            raise InvalidConfigError(
+                f"Cannot create XFS backend lock file at {self._lock_path}"
+            ) from e
 
     async def init(self) -> None:
         self.project_registry = XfsProjectRegistry()
