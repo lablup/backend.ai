@@ -74,7 +74,7 @@ class VfolderRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-        self._role_manager = RoleManager()
+        self._role_manager = RoleManager.instance()
 
     @vfolder_repository_resilience.apply()
     async def get_by_id_validated(

@@ -60,7 +60,7 @@ class GroupRepository:
         self._db = db
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
-        self._role_manager = RoleManager()
+        self._role_manager = RoleManager.instance()
 
     async def _get_group_by_id(self, session: SASession, group_id: uuid.UUID) -> Optional[GroupRow]:
         """Private method to get a group by ID using an existing session."""

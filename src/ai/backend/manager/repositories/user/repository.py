@@ -67,7 +67,7 @@ class UserRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-        self._role_manager = RoleManager()
+        self._role_manager = RoleManager.instance()
 
     @user_repository_resilience.apply()
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:

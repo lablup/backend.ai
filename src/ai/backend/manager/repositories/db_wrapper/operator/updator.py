@@ -16,7 +16,7 @@ class Updator(Generic[TRow, TUpdator]):
 
     def __init__(self, session: SessionWrapper) -> None:
         self._session = session
-        self._role_manager = RoleManager()
+        self._role_manager = RoleManager.instance()
 
     async def update(self, data: UpdateData[TRow, TUpdator]) -> TRow:
         """

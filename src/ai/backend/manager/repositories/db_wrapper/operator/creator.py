@@ -17,7 +17,7 @@ class Creator(Generic[TRow, TEntityRBACData]):
 
     def __init__(self, session: SessionWrapper) -> None:
         self._session = session
-        self._role_manager = RoleManager()
+        self._role_manager = RoleManager.instance()
 
     async def add_one(self, data: InsertData[TRow, TEntityRBACData]) -> TRow:
         """
