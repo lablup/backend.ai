@@ -1581,9 +1581,14 @@ async def server_main(
 
     @asynccontextmanager
     async def webapp_ctx(root_app: web.Application) -> AsyncGenerator[None]:
-        ssl_ctx = None
+        root_ctx: RootContext = root_app["_root.context"]
+
         runner = web.AppRunner(root_app, keepalive_timeout=30.0)
+
+        internal_app = build_internal_app(root_ctx)
         internal_runner = web.AppRunner(internal_app, keepalive_timeout=30.0)
+
+        ssl_ctx = None
         if root_ctx.config_provider.config.manager.ssl_enabled:
             ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
             ssl_ctx.load_cert_chain(
@@ -1618,17 +1623,19 @@ async def server_main(
 
         public_metrics_port = root_ctx.config_provider.config.manager.public_metrics_port
         if public_metrics_port is not None:
-            _app = build_public_app(root_ctx, subapp_pkgs=global_subapp_pkgs_for_public_metrics_app)
-            _runner = web.AppRunner(_app, keepalive_timeout=30.0)
-            await _runner.setup()
-            _site = web.TCPSite(
-                _runner,
+            public_metric_app = build_public_app(
+                root_ctx, subapp_pkgs=global_subapp_pkgs_for_public_metrics_app
+            )
+            public_metric_runner = web.AppRunner(public_metric_app, keepalive_timeout=30.0)
+            await public_metric_runner.setup()
+            public_metric_site = web.TCPSite(
+                public_metric_runner,
                 service_addr.host,
                 public_metrics_port,
                 backlog=1024,
                 reuse_port=True,
             )
-            await _site.start()
+            await public_metric_site.start()
             log.info(
                 "started handling public metric API requests at {}:{}",
                 service_addr.host,
@@ -1643,7 +1650,6 @@ async def server_main(
     try:
         root_app = build_root_app(pidx, boostrap_config, subapp_pkgs=global_subapp_pkgs)
         root_ctx: RootContext = root_app["_root.context"]
-        internal_app = build_internal_app(root_ctx)
 
         await manager_init_stack.enter_async_context(aiomonitor_ctx())
         await manager_init_stack.enter_async_context(

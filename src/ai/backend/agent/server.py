@@ -1416,6 +1416,7 @@ async def server_main(
     # Run!
     stop_signal = yield
 
+    log.info("shutting down...")
     if agent_server is not None:
         agent_server.mark_stop_signal(stop_signal)
     await agent_init_stack.__aexit__(None, None, None)
