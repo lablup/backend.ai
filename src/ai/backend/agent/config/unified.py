@@ -755,15 +755,6 @@ class OverridableAgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("kernel-creation-concurrency", "kernel_creation_concurrency"),
         serialization_alias="kernel-creation-concurrency",
     )
-    use_experimental_redis_event_dispatcher: Optional[bool] = Field(
-        default=None,
-        description="Whether to use experimental Redis event dispatcher",
-        examples=[True, False],
-        validation_alias=AliasChoices(
-            "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
-        ),
-        serialization_alias="use-experimental-redis-event-dispatcher",
-    )
     sync_container_lifecycles: Optional[SyncContainerLifecyclesConfig] = Field(
         default=None,
         description="Container lifecycle synchronization config",
@@ -891,7 +882,6 @@ class ContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("alternative-bridge", "alternative_bridge"),
         serialization_alias="alternative-bridge",
     )
-    # FIXME: Should this be marked as non-overridable?
     krunner_volumes: Optional[Mapping[str, str]] = Field(
         default=None,
         description=textwrap.dedent("""
