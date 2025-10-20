@@ -1413,12 +1413,9 @@ async def server_main(
     _args: Sequence[Any],
 ) -> AsyncGenerator[None, signal.Signals]:
     local_config: AgentUnifiedConfig = _args[0]
-
     loop.set_debug(local_config.debug.asyncio)
-
     agent_server: AgentRPCServer | None = None
     agent_init_stack = AsyncExitStack()
-
     await agent_init_stack.__aenter__()
     try:
         monitor = await agent_init_stack.enter_async_context(aiomonitor_ctx(local_config, pidx))
@@ -1434,7 +1431,7 @@ async def server_main(
         agent_server = await agent_init_stack.enter_async_context(
             agent_server_ctx(local_config, etcd)
         )
-        monitor.console_locals["agent"] = agent_server
+        monitor.console_locals["agent_server"] = agent_server
 
         await agent_init_stack.enter_async_context(service_discovery_ctx(local_config, etcd))
         log.info("Started the agent service.")
