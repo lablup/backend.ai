@@ -701,7 +701,6 @@ class Context(metaclass=ABCMeta):
         with worker_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
-        self.log.write("insatll db 4 worker ---")
         # Alembic migration config
         alembic_cfg = self.copy_config("alembic-appproxy.ini")
         self.sed_in_place_multi(
@@ -988,8 +987,8 @@ class DevContext(Context):
             appproxy_api_secret=secrets.token_hex(32),
             appproxy_jwt_secret=secrets.token_hex(32),
             appproxy_permit_hash_secret=secrets.token_hex(32),
-            appproxy_coordinator_addr=ServerAddr(HostPortPair("127.0.0.1", 10200)),
-            appproxy_worker_addr=ServerAddr(HostPortPair("127.0.0.1", 10201)),
+            appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
+            appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
         )
 
         return InstallInfo(
