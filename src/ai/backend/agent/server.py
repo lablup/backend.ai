@@ -1409,6 +1409,7 @@ async def server_main(
         monitor.console_locals["agent"] = agent_server
 
         await agent_init_stack.enter_async_context(service_discovery_ctx())
+        log.info("Started the agent service.")
     except Exception:
         log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)

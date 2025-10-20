@@ -1676,6 +1676,8 @@ async def server_main(
             os.setgid(gid)
             os.setuid(uid)
             log.info("changed process uid and gid to {}:{}", uid, gid)
+
+        log.info("Started the manager service.")
     except Exception:
         log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)

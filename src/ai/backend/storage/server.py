@@ -323,119 +323,122 @@ async def api_ctx(
     etcd: AsyncEtcd,
     root_ctx: RootContext,
 ) -> AsyncGenerator[tuple[web.Application, web.Application, web.Application]]:
-    pid = os.getpid()
-    client_ssl_ctx = None
-    manager_ssl_ctx = None
-    if local_config.api.client.ssl_enabled:
-        client_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        client_ssl_ctx.load_cert_chain(
-            str(local_config.api.client.ssl_cert),
-            str(local_config.api.client.ssl_privkey),
-        )
-    if local_config.api.manager.ssl_enabled:
-        manager_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        manager_ssl_ctx.load_cert_chain(
-            str(local_config.api.manager.ssl_cert),
-            str(local_config.api.manager.ssl_privkey),
-        )
-
-    client_api_app = await init_client_app(root_ctx)
-    manager_api_app = await init_manager_app(root_ctx)
-    internal_api_app = init_internal_app()
-
-    async def _init_storage_plugin() -> StoragePluginContext:
+    @asynccontextmanager
+    async def _init_storage_plugin() -> AsyncGenerator[StoragePluginContext]:
         plugin_ctx = StoragePluginContext(etcd, local_config.model_dump())
         await plugin_ctx.init()
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
             log.info("Loading storage plugin: {0}", plugin_name)
             volume_cls = plugin_instance.get_volume_class()
             root_ctx.backends[plugin_name] = volume_cls
-        return plugin_ctx
+        yield plugin_ctx
+        await root_ctx.shutdown_volumes()
+        await plugin_ctx.cleanup()
 
+    @asynccontextmanager
     async def _init_storage_webapp_plugin(
         plugin_ctx: BasePluginContext, root_app: web.Application
-    ) -> BasePluginContext:
+    ) -> AsyncGenerator[BasePluginContext]:
+        pid = os.getpid()
         await plugin_ctx.init()
         for plugin_name, plugin_instance in plugin_ctx.plugins.items():
             if pid == 0:
                 log.info("Loading storage webapp plugin: {0}", plugin_name)
             subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)
             _init_subapp(plugin_name, root_app, subapp, global_middlewares)
-        return plugin_ctx
+        yield plugin_ctx
+        await plugin_ctx.cleanup()
 
-    storage_plugin_ctx = await _init_storage_plugin()
-    manager_webapp_plugin_ctx = await _init_storage_webapp_plugin(
-        StorageManagerWebappPluginContext(etcd, local_config.model_dump()),
-        manager_api_app,
-    )
-    client_webapp_plugin_ctx = await _init_storage_webapp_plugin(
-        StorageClientWebappPluginContext(etcd, local_config.model_dump()),
-        client_api_app,
-    )
-
-    client_api_runner = web.AppRunner(client_api_app)
-    manager_api_runner = web.AppRunner(manager_api_app)
-    internal_api_runner = web.AppRunner(internal_api_app)
-    await client_api_runner.setup()
-    await manager_api_runner.setup()
-    await internal_api_runner.setup()
-    client_service_addr = local_config.api.client.service_addr
-
-    manager_service_addr_config = local_config.api.manager.service_addr
-    manager_service_addr = CommonHostPortPair(
-        host=manager_service_addr_config.host,
-        port=manager_service_addr_config.port,
-    )
-    internal_addr = local_config.api.manager.internal_addr
-    client_api_site = web.TCPSite(
-        client_api_runner,
-        str(client_service_addr.host),
-        client_service_addr.port,
-        backlog=1024,
-        reuse_port=True,
-        ssl_context=client_ssl_ctx,
-    )
-    manager_api_site = web.TCPSite(
-        manager_api_runner,
-        str(manager_service_addr.host),
-        manager_service_addr.port,
-        backlog=1024,
-        reuse_port=True,
-        ssl_context=manager_ssl_ctx,
-    )
-    internal_api_site = web.TCPSite(
-        internal_api_runner,
-        str(internal_addr.host),
-        internal_addr.port,
-        backlog=1024,
-        reuse_port=True,
-    )
-    await client_api_site.start()
-    await manager_api_site.start()
-    await internal_api_site.start()
-    if _is_root():
-        uid = local_config.storage_proxy.user
-        gid = local_config.storage_proxy.group
-        if uid is not None and gid is not None:
-            os.setgroups(
-                [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
+    @asynccontextmanager
+    async def client_api_ctx() -> AsyncGenerator[web.Application]:
+        client_ssl_ctx = None
+        if local_config.api.client.ssl_enabled:
+            client_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            client_ssl_ctx.load_cert_chain(
+                str(local_config.api.client.ssl_cert),
+                str(local_config.api.client.ssl_privkey),
             )
-            os.setgid(gid)
-            os.setuid(uid)
-        log.info("Changed process uid:gid to {}:{}", uid, gid)
-    log.info("Started service.")
+        client_api_app = await init_client_app(root_ctx)
+        client_api_runner = web.AppRunner(client_api_app)
+        await client_api_runner.setup()
+        client_service_addr = local_config.api.client.service_addr
+        client_api_site = web.TCPSite(
+            client_api_runner,
+            str(client_service_addr.host),
+            client_service_addr.port,
+            backlog=1024,
+            reuse_port=True,
+            ssl_context=client_ssl_ctx,
+        )
+        await client_api_site.start()
+        yield client_api_app
+        await client_api_runner.cleanup()
 
-    yield client_api_app, manager_api_app, internal_api_app
+    @asynccontextmanager
+    async def manager_api_ctx() -> AsyncGenerator[web.Application]:
+        manager_ssl_ctx = None
+        if local_config.api.manager.ssl_enabled:
+            manager_ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            manager_ssl_ctx.load_cert_chain(
+                str(local_config.api.manager.ssl_cert),
+                str(local_config.api.manager.ssl_privkey),
+            )
+        manager_api_app = await init_manager_app(root_ctx)
+        manager_api_runner = web.AppRunner(manager_api_app)
+        await manager_api_runner.setup()
+        manager_service_addr_config = local_config.api.manager.service_addr
+        manager_service_addr = CommonHostPortPair(
+            host=manager_service_addr_config.host,
+            port=manager_service_addr_config.port,
+        )
+        manager_api_site = web.TCPSite(
+            manager_api_runner,
+            str(manager_service_addr.host),
+            manager_service_addr.port,
+            backlog=1024,
+            reuse_port=True,
+            ssl_context=manager_ssl_ctx,
+        )
+        await manager_api_site.start()
+        yield manager_api_app
+        await manager_api_runner.cleanup()
 
-    await manager_api_runner.cleanup()
-    await client_api_runner.cleanup()
-    await internal_api_runner.cleanup()
+    @asynccontextmanager
+    async def internal_api_ctx() -> AsyncGenerator[web.Application]:
+        internal_api_app = init_internal_app()
+        internal_api_runner = web.AppRunner(internal_api_app)
+        await internal_api_runner.setup()
+        internal_addr = local_config.api.manager.internal_addr
+        internal_api_site = web.TCPSite(
+            internal_api_runner,
+            str(internal_addr.host),
+            internal_addr.port,
+            backlog=1024,
+            reuse_port=True,
+        )
+        await internal_api_site.start()
+        yield internal_api_app
+        await internal_api_runner.cleanup()
 
-    for volume in root_ctx.volumes.values():
-        await volume.shutdown()
-    await storage_plugin_ctx.cleanup()
-    await manager_webapp_plugin_ctx.cleanup()
-    await client_webapp_plugin_ctx.cleanup()
+    api_init_stack = AsyncExitStack()
+    async with api_init_stack:
+        await api_init_stack.enter_async_context(_init_storage_plugin())
+        client_api_app = await api_init_stack.enter_async_context(client_api_ctx())
+        manager_api_app = await api_init_stack.enter_async_context(manager_api_ctx())
+        internal_api_app = await api_init_stack.enter_async_context(internal_api_ctx())
+        await api_init_stack.enter_async_context(
+            _init_storage_webapp_plugin(
+                StorageClientWebappPluginContext(etcd, local_config.model_dump()),
+                client_api_app,
+            )
+        )
+        await api_init_stack.enter_async_context(
+            _init_storage_webapp_plugin(
+                StorageManagerWebappPluginContext(etcd, local_config.model_dump()),
+                manager_api_app,
+            )
+        )
+        yield client_api_app, manager_api_app, internal_api_app
 
 
 @asynccontextmanager
@@ -566,15 +569,6 @@ async def server_main(
             pid=os.getpid(),
             pidx=pidx,
             node_id=local_config.storage_proxy.node_id,
-            volumes={
-                NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
-            },
-            backends={**DEFAULT_BACKENDS},
-            cors_options={
-                "*": aiohttp_cors.ResourceOptions(
-                    allow_credentials=False, expose_headers="*", allow_headers="*"
-                ),
-            },
             local_config=local_config,
             etcd=etcd,
             volume_pool=volume_pool,
@@ -584,6 +578,15 @@ async def server_main(
             event_dispatcher=event_dispatcher,
             watcher=watcher_client,
             metric_registry=metric_registry,
+            cors_options={
+                "*": aiohttp_cors.ResourceOptions(
+                    allow_credentials=False, expose_headers="*", allow_headers="*"
+                ),
+            },
+            backends={**DEFAULT_BACKENDS},
+            volumes={
+                NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
+            },
         )
         if pidx == 0:
             await check_latest(root_ctx)
@@ -601,6 +604,19 @@ async def server_main(
         await storage_init_stack.enter_async_context(
             service_discovery_ctx(local_config, etcd, redis_config)
         )
+
+        if _is_root():
+            uid = local_config.storage_proxy.user
+            gid = local_config.storage_proxy.group
+            if uid is not None and gid is not None:
+                os.setgroups(
+                    [g.gr_gid for g in grp.getgrall() if pwd.getpwuid(uid).pw_name in g.gr_mem],
+                )
+                os.setgid(gid)
+                os.setuid(uid)
+            log.info("Changed process uid:gid to {}:{}", uid, gid)
+
+        log.info("Started the storage-proxy service.")
     except Exception:
         log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)

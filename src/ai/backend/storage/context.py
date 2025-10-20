@@ -2,14 +2,13 @@ from __future__ import annotations
 
 import logging
 from collections.abc import MutableMapping
-from contextlib import asynccontextmanager as actxmgr
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     AsyncIterator,
     Final,
     Mapping,
-    Type,
 )
 
 import aiohttp_cors
@@ -77,14 +76,14 @@ class ServiceContext:
 
 @dataclass(slots=True)
 class RootContext:
-    volumes: dict[str, AbstractVolume]
+    # configuration context
     pid: int
     pidx: int
     node_id: str
     local_config: StorageProxyUnifiedConfig
     etcd: AsyncEtcd
-    # dsn: str | None
-    backends: MutableMapping[str, type[AbstractVolume]]
+
+    # internal services
     volume_pool: VolumePool
     storage_pool: StoragePool
     event_producer: EventProducer
@@ -94,10 +93,14 @@ class RootContext:
     background_task_manager: BackgroundTaskManager
     cors_options: Mapping[str, aiohttp_cors.ResourceOptions]
 
+    # volume backend states
+    backends: MutableMapping[str, type[AbstractVolume]]
+    volumes: MutableMapping[str, AbstractVolume]
+
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {name: info.to_dataclass() for name, info in self.local_config.volume.items()}
 
-    @actxmgr
+    @asynccontextmanager
     async def get_volume(self, name: str) -> AsyncIterator[AbstractVolume]:
         if name in self.volumes:
             yield self.volumes[name]
@@ -106,7 +109,7 @@ class RootContext:
                 volume_config = self.local_config.volume[name]
             except KeyError:
                 raise InvalidVolumeError(name)
-            volume_cls: Type[AbstractVolume] = self.backends[volume_config.backend]
+            volume_cls: type[AbstractVolume] = self.backends[volume_config.backend]
             volume_obj = volume_cls(
                 local_config=self.local_config.model_dump(by_alias=True),
                 mount_path=Path(volume_config.path),
@@ -121,3 +124,7 @@ class RootContext:
             self.volumes[name] = volume_obj
 
             yield volume_obj
+
+    async def shutdown_volumes(self) -> None:
+        for volume in self.volumes.values():
+            await volume.shutdown()
