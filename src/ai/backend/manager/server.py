@@ -1717,7 +1717,7 @@ async def server_main_logwrapper(
             async with server_main(loop, pidx, args):
                 yield
     except Exception:
-        traceback.print_exc()
+        traceback.print_exc(file=sys.stderr)
 
 
 @click.group(invoke_without_command=True)

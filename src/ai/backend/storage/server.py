@@ -10,6 +10,7 @@ import pwd
 import signal
 import ssl
 import sys
+import traceback
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 from pprint import pformat, pprint
@@ -113,9 +114,12 @@ async def server_main_logwrapper(
             "unpack_opts": DEFAULT_UNPACK_OPTS,
         },
     )
-    with logger:
-        async with server_main(loop, pidx, _args):
-            yield
+    try:
+        with logger:
+            async with server_main(loop, pidx, _args):
+                yield
+    except Exception:
+        traceback.print_exc(file=sys.stderr)
 
 
 @asynccontextmanager

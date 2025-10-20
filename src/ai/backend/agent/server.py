@@ -10,6 +10,7 @@ import signal
 import ssl
 import sys
 import time
+import traceback
 from collections import OrderedDict, defaultdict
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
@@ -1139,9 +1140,12 @@ async def server_main_logwrapper(
             "unpack_opts": msgpack.DEFAULT_UNPACK_OPTS,
         },
     )
-    with logger:
-        async with server_main(loop, pidx, _args):
-            yield
+    try:
+        with logger:
+            async with server_main(loop, pidx, _args):
+                yield
+    except Exception:
+        traceback.print_exc(file=sys.stderr)
 
 
 async def check_health(request: web.Request) -> web.Response:
