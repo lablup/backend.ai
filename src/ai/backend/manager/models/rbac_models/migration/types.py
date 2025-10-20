@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
-from ai.backend.manager.data.permission.types import GLOBAL_SCOPE_ID
+from ai.backend.manager.data.permission.types import GLOBAL_SCOPE_ID as ORIGINAL_GLOBAL_SCOPE_ID
 
 from .enums import RoleSource, RoleStatus, ScopeType
 
@@ -11,7 +11,7 @@ ROLE_NAME_PREFIX = "role_"
 ADMIN_ROLE_NAME_SUFFIX = "_admin"
 
 
-GLOBAL_SCOPE_ID = GLOBAL_SCOPE_ID
+GLOBAL_SCOPE_ID = ORIGINAL_GLOBAL_SCOPE_ID
 
 
 @dataclass
