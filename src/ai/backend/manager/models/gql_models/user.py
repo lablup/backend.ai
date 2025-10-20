@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -54,8 +55,8 @@ from ..base import (
     generate_sql_info_for_gql_connection,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
+from ..group import AssocGroupUserRow, GroupRow, groups
 from ..group import association_groups_users as agus
-from ..group import groups
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..user import (
@@ -86,6 +87,41 @@ __all__ = (
     "DeleteUser",
     "PurgeUser",
 )
+
+
+def _extract_project_name_filter(
+    filter_expr: str,
+) -> tuple[str | None, str | None]:
+    """
+    Extract project_name filter from filter expression using regex.
+    Returns (project_name_filter, remaining_filter) tuple.
+
+    Example:
+        "(email ilike '%u%')&(project_name ilike '%test%')&(status == 'active')"
+        -> ("project_name ilike '%test%'", "(email ilike '%u%')&(status == 'active')")
+    """
+    pattern = r"(\(?\s*project_name\s+(?:==|!=|>|>=|<|<=|contains|in|isnot|is|like|ilike)\s+(?:\"[^\"]*\"|'[^']*'|\[[^\]]*\]|[^\s)&|]+)\s*\)?)"
+
+    matches = list(re.finditer(pattern, filter_expr, re.IGNORECASE))
+    if not matches:
+        return None, filter_expr
+
+    match = matches[0]
+    project_name_part = match.group(1).strip()
+
+    if project_name_part.startswith("(") and project_name_part.endswith(")"):
+        project_name_part = project_name_part[1:-1].strip()
+
+    remaining = filter_expr[: match.start()] + filter_expr[match.end() :]
+
+    remaining = re.sub(r"^\s*[&|]\s*|\s*[&|]\s*$", "", remaining)
+    remaining = re.sub(r"[&|]\s*[&|]", lambda m: m.group(0)[0], remaining)
+    remaining = re.sub(r"\(\s*\)", "", remaining)
+    remaining = remaining.strip()
+
+    remaining_result: str | None = remaining if remaining and remaining != "()" else None
+
+    return project_name_part, remaining_result
 
 
 @graphene_federation.key("id")
@@ -216,6 +252,7 @@ class UserNode(graphene.ObjectType):
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
         "main_access_key": ("main_access_key", None),
+        "project_name": ("project_name", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -251,9 +288,30 @@ class UserNode(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
+
+        # Extract project_name filter if present
+        project_name_expr: str | None = None
+        user_filter_expr: str | None = filter_expr
+        project_name_filter_clause = None
+
+        if filter_expr is not None and "project_name" in filter_expr:
+            project_name_expr, user_filter_expr = _extract_project_name_filter(filter_expr)
+            if project_name_expr is not None:
+                project_name_fieldspec: Mapping[str, FieldSpecItem] = {
+                    "project_name": ("name", None),
+                }
+                project_filter_parser = QueryFilterParser(project_name_fieldspec)
+                project_name_filter_clause = project_filter_parser.parse_filter(
+                    GroupRow.__table__, project_name_expr
+                )
+
+        # Parse user filters (without project_name)
+        user_fieldspec = {
+            k: v for k, v in cls._queryfilter_fieldspec.items() if k != "project_name"
+        }
         _filter_arg = (
-            FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
-            if filter_expr is not None
+            FilterExprArg(user_filter_expr, QueryFilterParser(user_fieldspec))
+            if user_filter_expr is not None
             else None
         )
         _order_expr = (
@@ -264,7 +322,7 @@ class UserNode(graphene.ObjectType):
         (
             query,
             cnt_query,
-            _,
+            conditions,
             cursor,
             pagination_order,
             page_size,
@@ -280,6 +338,21 @@ class UserNode(graphene.ObjectType):
             before=before,
             last=last,
         )
+
+        if project_name_filter_clause is not None:
+            j = sa.join(
+                UserRow,
+                AssocGroupUserRow,
+                UserRow.uuid == AssocGroupUserRow.user_id,
+            ).join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id)
+
+            query = query.select_from(j).where(project_name_filter_clause).distinct()
+
+            cnt_query = sa.select(sa.func.count(sa.distinct(UserRow.uuid))).select_from(j)
+            cnt_query = cnt_query.where(project_name_filter_clause)
+            for cond in conditions:
+                cnt_query = cnt_query.where(cond)
+
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(graph_ctx, row) for row in user_rows]
