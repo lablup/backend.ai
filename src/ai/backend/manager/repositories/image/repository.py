@@ -187,8 +187,8 @@ class ImageRepository:
             image_id: ImageWithAgentInstallStatus(
                 image=image_info,
                 agent_install_status=ImageAgentInstallStatus(
-                    installed=bool(installed_agents.get(image_id, False)),
-                    agent_names=list(installed_agents.get(image_id, [])),
+                    installed=bool(installed_agents.get(image_id, set())),
+                    agent_names=list(installed_agents.get(image_id, set())),
                 ),
             )
             for image_id, image_info in image_data.items()
