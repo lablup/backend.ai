@@ -1537,16 +1537,20 @@ def main(
                 log_config = logging.getLogger("ai.backend.agent.config")
                 if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
-                if server_config.agent.event_loop == EventLoopType.UVLOOP:
-                    import uvloop
+                match server_config.agent.event_loop:
+                    case EventLoopType.UVLOOP:
+                        import uvloop
 
-                    uvloop.install()
-                    log.info("Using uvloop as the event loop backend")
+                        runner = uvloop.run
+                        log.info("Using uvloop as the event loop backend")
+                    case EventLoopType.ASYNCIO:
+                        runner = asyncio.run
                 aiotools.start_server(
                     server_main_logwrapper,
                     num_workers=1,
                     args=(server_config, log_endpoint),
                     wait_timeout=5.0,
+                    runner=runner,
                 )
                 log.info("exit.")
         finally:

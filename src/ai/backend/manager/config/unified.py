@@ -341,8 +341,8 @@ class DatabaseConfig(BaseConfigSchema):
 
 
 class EventLoopType(enum.StrEnum):
-    asyncio = "asyncio"
-    uvloop = "uvloop"
+    ASYNCIO = "asyncio"
+    UVLOOP = "uvloop"
 
 
 class DistributedLockType(enum.StrEnum):
@@ -623,7 +623,7 @@ class ManagerConfig(BaseConfigSchema):
         serialization_alias="ssl-privkey",
     )
     event_loop: EventLoopType = Field(
-        default=EventLoopType.asyncio,
+        default=EventLoopType.ASYNCIO,
         description="""
         Event loop implementation to use.
         'asyncio' is the Python standard library implementation.

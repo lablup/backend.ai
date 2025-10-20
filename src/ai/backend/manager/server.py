@@ -112,32 +112,33 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
-from ai.backend.manager.config.bootstrap import BootstrapConfig
-from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
-from ai.backend.manager.config.loader.etcd_loader import (
-    EtcdCommonConfigLoader,
-    EtcdManagerConfigLoader,
-)
-from ai.backend.manager.config.loader.legacy_etcd_loader import (
-    LegacyEtcdLoader,
-    LegacyEtcdVolumesLoader,
-)
-from ai.backend.manager.config.loader.loader_chain import LoaderChain
-from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
-from ai.backend.manager.config.loader.types import AbstractConfigLoader
-from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
-from ai.backend.manager.sokovan.deployment.deployment_controller import (
-    DeploymentController,
-    DeploymentControllerArgs,
-)
-from ai.backend.manager.sokovan.deployment.route.route_controller import (
-    RouteController,
-    RouteControllerArgs,
-)
 
 from . import __version__
 from .api.context import RootContext
+from .config.bootstrap import BootstrapConfig
+from .config.loader.config_overrider import ConfigOverrider
+from .config.loader.etcd_loader import (
+    EtcdCommonConfigLoader,
+    EtcdManagerConfigLoader,
+)
+from .config.loader.legacy_etcd_loader import (
+    LegacyEtcdLoader,
+    LegacyEtcdVolumesLoader,
+)
+from .config.loader.loader_chain import LoaderChain
+from .config.loader.toml_loader import TomlConfigLoader
+from .config.loader.types import AbstractConfigLoader
+from .config.provider import ManagerConfigProvider
+from .config.unified import EventLoopType
+from .config.watchers.etcd import EtcdConfigWatcher
+from .sokovan.deployment.deployment_controller import (
+    DeploymentController,
+    DeploymentControllerArgs,
+)
+from .sokovan.deployment.route.route_controller import (
+    RouteController,
+    RouteControllerArgs,
+)
 from .types import DistributedLockFactory, SMTPTriggerPolicy
 
 if TYPE_CHECKING:
@@ -1776,17 +1777,21 @@ def main(
                 log.info("runtime: {0}", env_info())
                 log_config = logging.getLogger("ai.backend.manager.config")
                 log_config.debug("debug mode enabled.")
-                if bootstrap_cfg.manager.event_loop == "uvloop":
-                    import uvloop
+                match bootstrap_cfg.manager.event_loop:
+                    case EventLoopType.UVLOOP:
+                        import uvloop
 
-                    uvloop.install()
-                    log.info("Using uvloop as the event loop backend")
+                        runner = uvloop.run
+                        log.info("Using uvloop as the event loop backend")
+                    case EventLoopType.ASYNCIO:
+                        runner = asyncio.run
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=bootstrap_cfg.manager.num_proc,
                         args=(bootstrap_cfg, discovered_cfg_path, log_endpoint, log_level),
                         wait_timeout=5.0,
+                        runner=runner,
                     )
                 finally:
                     log.info("terminated.")

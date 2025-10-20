@@ -25,7 +25,7 @@
 //     "aiomonitor~=0.7.0",
 //     "aioresponses>=0.7.3",
 //     "aiosqlite~=0.21.0",
-//     "aiotools~=2.2.2",
+//     "aiotools~=2.2.3",
 //     "aiotusclient~=0.1.4",
 //     "alembic~=1.13.2",
 //     "appdirs~=1.4.4",
@@ -654,13 +654,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "363258304aca3e3233fcdb2c6314d6de1a9024c5988e728ab0d4633b63c58918",
-              "url": "https://files.pythonhosted.org/packages/8c/f0/848c334ef23fa183a890d81756e933be847f1890d3ee8e2219d6e3913748/aiotools-2.2.2-py3-none-any.whl"
+              "hash": "f164eb41d17517d8d03da2715e827dd03a0aa99be48c9f7f4463f1129803e18e",
+              "url": "https://files.pythonhosted.org/packages/dc/23/73b496e20e1c615aaaa28fa016a2e1cfd802167632653945a853c7f46387/aiotools-2.2.3-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "9bb3eaa1bc89e47b8e32c4cf6497849e2be9ec89bada8c752a86e542a46f82dc",
-              "url": "https://files.pythonhosted.org/packages/31/f9/bd622493a455dc5795fa5754acde12c230d342457b43183809f68c6b8968/aiotools-2.2.2.tar.gz"
+              "hash": "cb6756db339dde5c9bb5091a4ee5fa25e577f074175f4f272c0b4e99e5d6f0de",
+              "url": "https://files.pythonhosted.org/packages/3b/82/c14fa975a4d9c3695d2fad07207a64bd9015ee53ee5cd488a7fc91ec6604/aiotools-2.2.3.tar.gz"
             }
           ],
           "project_name": "aiotools",
@@ -668,7 +668,7 @@
             "async-lru>=2.0.5"
           ],
           "requires_python": ">=3.11",
-          "version": "2.2.2"
+          "version": "2.2.3"
         },
         {
           "artifacts": [
@@ -7278,7 +7278,7 @@
     "aiomonitor~=0.7.0",
     "aioresponses>=0.7.3",
     "aiosqlite~=0.21.0",
-    "aiotools~=2.2.2",
+    "aiotools~=2.2.3",
     "aiotusclient~=0.1.4",
     "alembic~=1.13.2",
     "appdirs~=1.4.4",
