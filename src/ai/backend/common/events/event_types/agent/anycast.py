@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, Self, override
 
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     EventDomain,
@@ -13,6 +14,7 @@ from ai.backend.common.types import (
     AgentId,
     ContainerId,
     ContainerStatus,
+    ImageCanonical,
     KernelContainerId,
     KernelId,
 )
@@ -129,9 +131,11 @@ class AgentHeartbeatEvent(AgentOperationEvent):
         return "agent_heartbeat"
 
 
+# For compatibility with redis key made with image canonical strings
+# Use AgentInstalledImagesRemoveEvent instead of this if possible
 @dataclass
 class AgentImagesRemoveEvent(AgentOperationEvent):
-    image_canonicals: list[str]
+    image_canonicals: list[ImageCanonical]
 
     @override
     def serialize(self) -> tuple:
@@ -146,6 +150,31 @@ class AgentImagesRemoveEvent(AgentOperationEvent):
     @override
     def event_name(cls) -> str:
         return "agent_images_remove"
+
+
+@dataclass
+class AgentInstalledImagesRemoveEvent(AgentOperationEvent):
+    scanned_images: Mapping[ImageCanonical, ScannedImage]
+
+    @override
+    def serialize(self) -> tuple:
+        result = {}
+        for canonical, image in self.scanned_images.items():
+            result[str(canonical)] = image.to_dict()
+        return (result,)
+
+    @classmethod
+    @override
+    def deserialize(cls, value: tuple) -> Self:
+        result = {}
+        for canonical, image_data in value[0].items():
+            result[ImageCanonical(canonical)] = ScannedImage.from_dict(image_data)
+        return cls(result)
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "agent_installed_images_remove"
 
 
 @dataclass

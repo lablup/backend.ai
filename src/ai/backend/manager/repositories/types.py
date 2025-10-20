@@ -7,12 +7,12 @@ import sqlalchemy as sa
 from sqlalchemy.sql import Select
 from sqlalchemy.sql.elements import BooleanClauseList
 
-from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import InvalidCursorTypeError
 from ai.backend.manager.api.gql.base import resolve_global_id
+from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.base import DEFAULT_PAGE_SIZE, validate_connection_args
 from ai.backend.manager.models.gql_relay import ConnectionPaginationOrder

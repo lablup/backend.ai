@@ -45,12 +45,15 @@ from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageData,
+    ImageDataWithDetails,
     ImageIdentifier,
     ImageLabelsData,
     ImageResourcesData,
     ImageStatus,
     ImageType,
+    KVPair,
     RescanImagesResult,
+    ResourceLimit,
 )
 from ai.backend.manager.defs import INTRINSIC_SLOTS, INTRINSIC_SLOTS_MIN
 
@@ -549,6 +552,28 @@ class ImageRow(Base):
         return image_row
 
     @classmethod
+    def from_dataclass_with_details(cls, image_data: ImageDataWithDetails) -> Self:
+        image_row = ImageRow(
+            name=image_data.name,
+            project=image_data.project,
+            image=image_data.name,
+            tag=image_data.tag,
+            registry=image_data.registry,
+            registry_id=image_data.registry_id,
+            architecture=image_data.architecture,
+            config_digest=image_data.digest,
+            size_bytes=image_data.size_bytes,
+            is_local=image_data.is_local,
+            type=image_data.type,
+            accelerators=",".join(image_data.supported_accelerators),
+            labels={kv.key: kv.value for kv in image_data.labels},
+            resources={rl.key: {rl.min, rl.max} for rl in image_data.resource_limits},
+            status=image_data.status,
+        )
+        image_row.id = image_data.id
+        return image_row
+
+    @classmethod
     def from_optional_dataclass(cls, image_data: Optional[ImageData]) -> Optional[Self]:
         if image_data is None:
             return None
@@ -847,6 +872,38 @@ class ImageRow(Base):
             labels=ImageLabelsData(label_data=self.labels),
             resources=ImageResourcesData(resources_data=self.resources),
             status=self.status,
+        )
+
+    def to_detailed_dataclass(self) -> ImageDataWithDetails:
+        version, ptag_set = self.image_ref.tag_set
+        return ImageDataWithDetails(
+            id=self.id,
+            name=self.image,
+            namespace=self.image,
+            base_image_name=self.image_ref.name,
+            project=self.project,
+            humanized_name=self.image,
+            tag=self.tag,
+            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
+            version=version,
+            registry=self.registry,
+            registry_id=self.registry_id,
+            type=self.type,
+            architecture=self.architecture,
+            is_local=self.is_local,
+            digest=self.trimmed_digest or None,
+            labels=[KVPair(key=k, value=v) for k, v in self.labels.items()],
+            aliases=[alias_row.alias for alias_row in self.aliases],
+            size_bytes=self.size_bytes,
+            status=self.status,
+            resource_limits=[
+                ResourceLimit(key=k, min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
+                for k, v in self.resources.items()
+            ],
+            supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
+            # legacy
+            hash=self.trimmed_digest or None,
+            raw_labels=self.labels,
         )
 
     async def untag_image_from_registry(

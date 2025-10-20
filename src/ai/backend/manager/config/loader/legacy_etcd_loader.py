@@ -1,8 +1,9 @@
-import functools
+from __future__ import annotations
+
 import urllib
 from collections.abc import Mapping
 from contextvars import ContextVar
-from typing import Any, Optional, Sequence, TypeAlias, override
+from typing import Any, Optional, Sequence, override
 
 import aiotools
 import yarl
@@ -17,8 +18,7 @@ from ai.backend.manager.errors.common import ServerMisconfiguredError
 
 current_vfolder_types: ContextVar[list[str]] = ContextVar("current_vfolder_types")
 
-
-NestedStrKeyedDict: TypeAlias = "dict[str, Any | NestedStrKeyedDict]"
+type NestedStrKeyedDict = dict[str, Any | NestedStrKeyedDict]
 
 
 class LegacyEtcdLoader(AbstractConfigLoader):

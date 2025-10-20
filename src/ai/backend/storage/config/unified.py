@@ -570,6 +570,19 @@ class StorageProxyConfig(BaseConfigSchema):
         ),
         serialization_alias="use-experimental-redis-event-dispatcher",
     )
+    auto_quota_scope_creation: bool = Field(
+        default=True,
+        description="""
+        Whether to allow automatic creation of quota scopes.
+        If true, quota scopes will be created when creating VFolders in non-existent quota scopes.
+        If false, VFolder creation will fail if the quota scope does not exist.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices(
+            "allow-auto-quota-scope-creation", "auto_quota_scope_creation"
+        ),
+        serialization_alias="allow-auto-quota-scope-creation",
+    )
 
 
 class PresignedUploadConfig(BaseConfigSchema):

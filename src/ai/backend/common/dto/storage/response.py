@@ -166,3 +166,24 @@ class VFSDeleteResponse(BaseResponseModel):
     """Response for VFS file/directory delete operations."""
 
     filepath: str = Field(description="The path of the deleted file or directory.")
+
+
+class VFSFileInfo(BaseResponseModel):
+    """Information about a single file or directory in VFS storage."""
+
+    name: str = Field(description="Name of the file or directory.")
+    type: str = Field(description="Type of the entry: 'file' or 'directory'.")
+    size: Optional[int] = Field(
+        default=None, description="Size of the file in bytes (None for directories)."
+    )
+    modified: float = Field(description="Last modification time as Unix timestamp.")
+    created: float = Field(description="Creation time as Unix timestamp.")
+    path: str = Field(description="Relative path from the base directory.")
+
+
+class VFSListFilesResponse(BaseResponseModel):
+    """Response for VFS recursive file listing operations."""
+
+    files: list[VFSFileInfo] = Field(
+        default_factory=list, description="List of all files and directories found recursively."
+    )

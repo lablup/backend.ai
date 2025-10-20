@@ -49,7 +49,6 @@ from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyB
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
 )
-from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -115,6 +114,7 @@ from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__
 from .api.context import RootContext
+from .clients.valkey_client.valkey_image.client import ValkeyImageClient
 from .config.bootstrap import BootstrapConfig
 from .config.loader.config_overrider import ConfigOverrider
 from .config.loader.etcd_loader import (

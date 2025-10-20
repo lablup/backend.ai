@@ -24,6 +24,7 @@ from ruamel.yaml.error import YAMLError
 from sqlalchemy.orm import joinedload
 
 from ai.backend.common.config import model_definition_iv
+from ai.backend.common.exception import VFolderNotFoundError
 from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
@@ -395,6 +396,14 @@ class VirtualFolderNode(graphene.ObjectType):
             for vf in vfolder_rows
         ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs
+    ) -> "VirtualFolderNode":
+        vfolder_node = await VirtualFolderNode.get_node(info, self.id)
+        if vfolder_node is None:
+            raise VFolderNotFoundError(self.id)
+        return vfolder_node
 
 
 class VirtualFolderConnection(Connection):

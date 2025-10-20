@@ -585,14 +585,6 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
             raise InsufficientPrivilege(
                 "You are not allowed to manually assign agents for your session."
             )
-        agent_count = len(agent_list)
-        if params["cluster_mode"] == ClusterMode.MULTI_NODE:
-            if agent_count != params["cluster_size"]:
-                raise InvalidAPIParameters(
-                    "For multi-node cluster sessions, the number of manually assigned"
-                    " agents must be same to the cluster size. Note that you may specify"
-                    " duplicate agents in the list.",
-                )
 
     if params["domain"] is None:
         domain_name = request["user"]["domain_name"]

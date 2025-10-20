@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     Iterable,
-    List,
     Optional,
     Self,
     cast,
@@ -26,11 +24,10 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.bgtask import ProgressReporter
 from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
-from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import (
     AgentId,
     DispatchResult,
-    ImageAlias,
+    ImageID,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
@@ -59,6 +56,17 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
 )
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
+from ai.backend.manager.services.image.actions.get_all_images import GetAllImagesAction
+from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
+from ai.backend.manager.services.image.actions.get_image_by_identifier import (
+    GetImageByIdentifierAction,
+)
+from ai.backend.manager.services.image.actions.get_image_installed_agents import (
+    GetImageInstalledAgentsAction,
+)
+from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
+    GetImagesByCanonicalsAction,
+)
 from ai.backend.manager.services.image.actions.modify_image import (
     ImageModifier,
     ModifyImageAction,
@@ -76,9 +84,8 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
 from ai.backend.manager.services.image.types import ImageRefData
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...data.image.types import ImageStatus, ImageType
+from ...data.image.types import ImageStatus, ImageType, ImageWithAgentInstallStatus
 from ...defs import DEFAULT_IMAGE_ARCH
-from ...errors.image import ImageNotFound
 from ..base import (
     FilterExprArg,
     OrderExprArg,
@@ -193,70 +200,42 @@ class Image(graphene.ObjectType):
     raw_labels: dict[str, Any]
 
     @classmethod
-    def populate_row(
-        cls,
-        ctx: GraphQueryContext,
-        row: ImageRow,
-        installed_agents: List[str],
-    ) -> Image:
-        is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
-        hide_agents = False if is_superadmin else ctx.config_provider.config.manager.hide_agents
-        image_ref = row.image_ref
-        version, ptag_set = image_ref.tag_set
-        ret = cls(
-            id=row.id,
-            name=row.image,
-            namespace=row.image,
-            base_image_name=image_ref.name,
-            project=row.project,
-            humanized_name=row.image,
-            tag=row.tag,
-            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
-            version=version,
-            registry=row.registry,
-            architecture=row.architecture,
-            is_local=row.is_local,
-            digest=row.trimmed_digest or None,
-            labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
-            aliases=[alias_row.alias for alias_row in row.aliases],
-            size_bytes=row.size_bytes,
-            status=row.status,
+    def from_image_with_agent_install_status(cls, data: ImageWithAgentInstallStatus) -> Self:
+        result = cls(
+            id=data.image.id,
+            name=data.image.name,
+            namespace=data.image.namespace,
+            base_image_name=data.image.base_image_name,
+            project=data.image.project,
+            humanized_name=data.image.humanized_name,
+            tag=data.image.tag,
+            tags=[KVPair(key=kvpair.key, value=kvpair.value) for kvpair in data.image.tags],
+            version=data.image.version,
+            registry=data.image.registry,
+            architecture=data.image.architecture,
+            is_local=data.image.is_local,
+            digest=data.image.digest,
+            labels=[KVPair(key=kvpair.key, value=kvpair.value) for kvpair in data.image.labels],
+            aliases=data.image.aliases,
+            size_bytes=data.image.size_bytes,
+            status=data.image.status,
             resource_limits=[
-                ResourceLimit(key=k, min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
-                for k, v in row.resources.items()
+                ResourceLimit(
+                    key=resource_limit.key, min=resource_limit.min, max=resource_limit.max
+                )
+                for resource_limit in data.image.resource_limits
             ],
-            supported_accelerators=row.accelerators.split(",") if row.accelerators else ["*"],
-            installed=len(installed_agents) > 0,
-            installed_agents=installed_agents if not hide_agents else None,
+            supported_accelerators=data.image.supported_accelerators,
+            installed=data.agent_install_status.installed,
+            installed_agents=data.agent_install_status.agent_names
+            if data.agent_install_status.agent_names
+            else None,
             # legacy
-            hash=row.trimmed_digest or None,
+            hash=data.image.digest,
         )
-        ret.raw_labels = row.labels
-        return ret
-
-    @classmethod
-    async def from_row(
-        cls,
-        ctx: GraphQueryContext,
-        row: ImageRow,
-    ) -> Image:
-        # TODO: add architecture
-        _installed_agents = await ctx.valkey_image.get_agents_for_image(row.name)
-        installed_agents: List[str] = list(_installed_agents)
-        return cls.populate_row(ctx, row, installed_agents)
-
-    @classmethod
-    async def bulk_load(
-        cls,
-        ctx: GraphQueryContext,
-        rows: List[ImageRow],
-    ) -> AsyncIterator[Image]:
-        image_canonicals = [row.name for row in rows]
-        results = await ctx.valkey_image.get_agents_for_images(image_canonicals)
-
-        for idx, row in enumerate(rows):
-            installed_agents: List[str] = list(results[idx])
-            yield cls.populate_row(ctx, row, installed_agents)
+        # internal
+        result.raw_labels = data.image.raw_labels
+        return result
 
     @classmethod
     async def batch_load_by_canonical(
@@ -264,17 +243,18 @@ class Image(graphene.ObjectType):
         graph_ctx: GraphQueryContext,
         image_names: Sequence[str],
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
-    ) -> Sequence[Optional[Image]]:
-        query = (
-            sa.select(ImageRow)
-            .where(ImageRow.name.in_(image_names))
-            .options(selectinload(ImageRow.aliases))
+    ) -> list[Self]:
+        result = await graph_ctx.processors.image.get_images_by_canonicals.wait_for_complete(
+            GetImagesByCanonicalsAction(
+                image_canonicals=list(image_names),
+                user_role=graph_ctx.user["role"],
+                image_status=filter_by_statuses,
+            )
         )
-        if filter_by_statuses:
-            query = query.where(ImageRow.status.in_(filter_by_statuses))
-        async with graph_ctx.db.begin_readonly_session() as session:
-            result = await session.execute(query)
-            return [await Image.from_row(graph_ctx, row) for row in result.scalars().all()]
+        return [
+            cls.from_image_with_agent_install_status(img)
+            for img in result.images_with_agent_install_status
+        ]
 
     @classmethod
     async def batch_load_by_image_ref(
@@ -293,14 +273,14 @@ class Image(graphene.ObjectType):
         id: UUID,
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Image:
-        async with ctx.db.begin_readonly_session() as session:
-            row = await ImageRow.get(
-                session, id, load_aliases=True, filter_by_statuses=filter_by_statuses
+        result = await ctx.processors.image.get_image_by_id.wait_for_complete(
+            GetImageByIdAction(
+                image_id=id,
+                user_role=ctx.user["role"],
+                image_status=filter_by_statuses,
             )
-            if not row:
-                raise ImageNotFound
-
-            return await cls.from_row(ctx, row)
+        )
+        return cls.from_image_with_agent_install_status(result.image_with_agent_install_status)
 
     @classmethod
     async def load_item(
@@ -310,19 +290,14 @@ class Image(graphene.ObjectType):
         architecture: str,
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Image:
-        try:
-            async with ctx.db.begin_readonly_session() as session:
-                image_row = await ImageRow.resolve(
-                    session,
-                    [
-                        ImageIdentifier(reference, architecture),
-                        ImageAlias(reference),
-                    ],
-                    filter_by_statuses=filter_by_statuses,
-                )
-        except UnknownImageReference:
-            raise ImageNotFound
-        return await cls.from_row(ctx, image_row)
+        result = await ctx.processors.image.get_image_by_identifier.wait_for_complete(
+            GetImageByIdentifierAction(
+                image_identifier=ImageIdentifier(reference, architecture),
+                user_role=ctx.user["role"],
+                image_status=filter_by_statuses,
+            )
+        )
+        return cls.from_image_with_agent_install_status(result.image_with_agent_install_status)
 
     @classmethod
     async def load_all(
@@ -332,15 +307,12 @@ class Image(graphene.ObjectType):
         types: set[ImageLoadFilter] = set(),
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Sequence[Image]:
-        async with ctx.db.begin_readonly_session() as session:
-            rows = await ImageRow.list(
-                session, load_aliases=True, filter_by_statuses=filter_by_statuses
-            )
-        items: list[Image] = [
-            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, types)
-        ]
-
-        return items
+        result = await ctx.processors.image.get_all_images.wait_for_complete(
+            GetAllImagesAction(status_filter=filter_by_statuses)
+        )
+        all_items = [cls.from_image_with_agent_install_status(img) for img in result.data.values()]
+        filtered_items = [item for item in all_items if item.matches_filter(ctx, types)]
+        return filtered_items
 
     @staticmethod
     async def filter_allowed(
@@ -472,17 +444,20 @@ class ImageNode(graphene.ObjectType):
 
     @classmethod
     async def _batch_load_installed_agents(
-        cls, ctx: GraphQueryContext, full_names: Sequence[str]
+        cls, ctx: GraphQueryContext, image_ids: Sequence[ImageID]
     ) -> list[set[AgentId]]:
-        results = await ctx.valkey_image.get_agents_for_images(list(full_names))
-        return [{AgentId(agent_id) for agent_id in agents} for agents in results]
+        result = await ctx.processors.image.get_image_installed_agents.wait_for_complete(
+            GetImageInstalledAgentsAction(image_ids=list(image_ids))
+        )
+        installed_agent_ids_per_image: Mapping[ImageID, set[AgentId]] = result.data
+        return [installed_agent_ids_per_image.get(image_id, set()) for image_id in image_ids]
 
     async def resolve_installed(self, info: graphene.ResolveInfo) -> bool:
         graph_ctx: GraphQueryContext = info.context
         loader = graph_ctx.dataloader_manager.get_loader_by_func(
             graph_ctx, self._batch_load_installed_agents
         )
-        agent_ids = await loader.load(self._canonical)
+        agent_ids = await loader.load(self.row_id)
         agent_ids = cast(Optional[set[AgentId]], agent_ids)
         return agent_ids is not None and len(agent_ids) > 0
 
@@ -726,6 +701,20 @@ class ImageNode(graphene.ObjectType):
                     for row in image_rows
                 ]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    # TODO: Introduce access control logic considering scope and permission
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> "Image":
+        ctx: GraphQueryContext = info.context
+        _, image_id = AsyncNode.resolve_global_id(info, self.id)
+        action_result = await ctx.processors.image.get_image_by_id.wait_for_complete(
+            GetImageByIdAction(
+                image_id=UUID(image_id),
+                user_role=ctx.user["role"],
+                image_status=None,
+            )
+        )
+        image_data = action_result.image_with_agent_install_status.image
+        return ImageNode.from_row(ctx, ImageRow.from_dataclass_with_details(image_data))
 
 
 class ImageConnection(Connection):

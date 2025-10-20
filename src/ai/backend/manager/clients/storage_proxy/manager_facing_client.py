@@ -20,6 +20,7 @@ from ai.backend.common.dto.storage.request import (
     PresignedUploadObjectReq,
     ReservoirImportModelsReq,
     VFSDownloadFileReq,
+    VFSListFilesReq,
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
@@ -31,6 +32,7 @@ from ai.backend.common.dto.storage.response import (
     PresignedUploadObjectResponse,
     ReservoirImportModelsResponse,
     VFolderCloneResponse,
+    VFSListFilesResponse,
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -854,3 +856,23 @@ class StorageProxyManagerFacingClient:
             body=req.model_dump(by_alias=True),
         ) as response_stream:
             yield response_stream
+
+    @storage_proxy_client_resilience.apply()
+    async def list_vfs_files(
+        self,
+        storage_name: str,
+        req: VFSListFilesReq,
+    ) -> VFSListFilesResponse:
+        """
+        List files recursively in a VFS storage directory.
+
+        :param storage_name: Name of the VFS storage
+        :param req: VFS list files request
+        :return: Response containing list of files with metadata
+        """
+        resp = await self._client.request_with_response(
+            "GET",
+            f"v1/storages/vfs/{storage_name}/files",
+            body=req.model_dump(by_alias=True),
+        )
+        return VFSListFilesResponse.model_validate(resp)

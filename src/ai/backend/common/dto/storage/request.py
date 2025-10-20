@@ -329,3 +329,13 @@ class VFSDeleteFileReq(BaseRequestModel):
     """
 
     filepath: str = Field(description="The file path within VFS storage to delete.")
+
+
+class VFSListFilesReq(BaseRequestModel):
+    """
+    Data model for listing files recursively in VFS storage.
+    """
+
+    directory: str = Field(
+        description="The directory path within VFS storage to list files from.",
+    )

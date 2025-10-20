@@ -51,7 +51,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ReservoirVFSDownloadStreamReader(StreamReader):
-    """StreamReader that wraps ManagerHTTPClient VFS download stream."""
+    """StreamReader that wraps ManagerHTTPClient VFS download stream for individual files."""
 
     _client: ManagerHTTPClient
     _storage_name: str
@@ -76,7 +76,47 @@ class ReservoirVFSDownloadStreamReader(StreamReader):
 
     @override
     def content_type(self) -> Optional[str]:
-        return "application/x-tar"
+        # Guess content type from file extension
+        content_type, _ = mimetypes.guess_type(self._filepath)
+        return content_type or "application/octet-stream"
+
+
+class ReservoirVFSFileDownloader:
+    """Helper class to download individual files from VFS storage to local filesystem."""
+
+    _client: ManagerHTTPClient
+    _storage_name: str
+
+    def __init__(self, client: ManagerHTTPClient, storage_name: str):
+        self._client = client
+        self._storage_name = storage_name
+
+    async def download_file(self, remote_path: str, local_path: Path) -> int:
+        """
+        Download a single file from VFS storage to local filesystem.
+
+        Args:
+            remote_path: Path of the file in VFS storage
+            local_path: Local filesystem path to save the file
+
+        Returns:
+            Number of bytes downloaded
+        """
+        # Ensure parent directory exists
+        local_path.parent.mkdir(parents=True, exist_ok=True)
+
+        bytes_downloaded = 0
+        stream_reader = ReservoirVFSDownloadStreamReader(
+            self._client, self._storage_name, remote_path
+        )
+
+        async with aiofiles.open(local_path, "wb") as f:
+            async for chunk in stream_reader.read():
+                await f.write(chunk)
+                bytes_downloaded += len(chunk)
+
+        log.debug(f"Downloaded file: {remote_path} -> {local_path} ({bytes_downloaded} bytes)")
+        return bytes_downloaded
 
 
 class TarExtractor:
@@ -428,7 +468,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         model_prefix: str,
         dest_path: Path,
     ) -> int:
-        """Handle file downloads for VFS storage type using ManagerHTTPClient."""
+        """Handle file downloads for VFS storage type using individual file downloads."""
 
         # Use the pre-resolved download storage object
         storage = self._download_storage
@@ -464,15 +504,46 @@ class ReservoirDownloadStep(ImportStep[None]):
                     f"Reservoir registry storage name not configured: {context.registry_name}"
                 )
 
-            # Create stream reader that uses ManagerHTTPClient
-            data_stream = ReservoirVFSDownloadStreamReader(
-                client=manager_client,
-                storage_name=registry_config.storage_name,
-                filepath=model_prefix,
+            # Get list of all files in the model directory
+            log.debug(f"Listing files for model: {model_prefix}")
+            file_list_response = await manager_client.list_vfs_files(
+                storage_name=registry_config.storage_name, directory=model_prefix
             )
 
-            # Stream the file from reservoir VFS to target VFS storage
-            return await TarExtractor(data_stream).extract_to(dest_path)
+            files = file_list_response.files
+            if not files:
+                log.warning(f"No files found for model: {model_prefix}")
+                return 0
+
+            log.info(f"Found {len(files)} files to download for model: {model_prefix}")
+
+            # Create file downloader
+            downloader = ReservoirVFSFileDownloader(
+                client=manager_client, storage_name=registry_config.storage_name
+            )
+
+            # Download each file individually
+            total_bytes = 0
+            for file_info in files:
+                # Skip directories (they will be created automatically when files are downloaded)
+                if file_info.type == "directory":
+                    continue
+
+                remote_file_path = file_info.path
+                # Convert remote path to local path relative to dest_path
+                # Remove model_prefix from the beginning to get relative path within model
+                if remote_file_path.startswith(model_prefix):
+                    relative_path = remote_file_path[len(model_prefix) :].lstrip("/")
+                else:
+                    relative_path = remote_file_path
+
+                local_file_path = dest_path / relative_path
+                bytes_downloaded = await downloader.download_file(remote_file_path, local_file_path)
+                total_bytes += bytes_downloaded
+                log.debug(f"Downloaded: {remote_file_path} ({bytes_downloaded} bytes)")
+
+            log.info(f"VFS download completed: {model_prefix} -> {dest_path} ({total_bytes} bytes)")
+            return total_bytes
 
         except Exception as e:
             log.error(f"VFS download failed for {model_prefix}: {str(e)}")
@@ -699,19 +770,17 @@ class ReservoirDownloadStep(ImportStep[None]):
         return keys, size_map, total
 
     @override
-    async def cleanup_on_failure(self, context: ImportStepContext) -> None:
-        """Clean up failed files from download storage"""
+    async def cleanup_stage(self, context: ImportStepContext) -> None:
+        """Clean up files from download storage after successful transfer"""
         revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
         model_prefix = f"{context.model.model_id}/{revision}"
 
         try:
             await self._download_storage.delete_file(model_prefix)
-            log.info(
-                f"[cleanup] Removed failed reservoir copy from download storage: {model_prefix}"
-            )
+            log.info(f"[cleanup] Removed download files from reservoir storage: {model_prefix}")
         except Exception as e:
             log.warning(
-                f"[cleanup] Failed to cleanup reservoir copy from download storage: {model_prefix}: {str(e)}"
+                f"[cleanup] Failed to cleanup reservoir download storage: {model_prefix}: {str(e)}"
             )
 
 
@@ -759,20 +828,20 @@ class ReservoirArchiveStep(ImportStep[DownloadStepResult]):
         )
 
     @override
-    async def cleanup_on_failure(self, context: ImportStepContext) -> None:
-        """Clean up failed files from archive storage"""
+    async def cleanup_stage(self, context: ImportStepContext) -> None:
+        """Clean up files from archive storage on failure"""
         archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
         if not archive_storage:
             return
 
         # Delete entire model (cleaning up individual files is complex)
-        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+        revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
         model_prefix = f"{context.model.model_id}/{revision}"
 
         try:
             storage = context.storage_pool.get_storage(archive_storage)
             await storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed failed archive: {archive_storage}:{model_prefix}")
+            log.info(f"[cleanup] Removed archive files: {archive_storage}:{model_prefix}")
         except Exception as e:
             log.warning(
                 f"[cleanup] Failed to cleanup archive: {archive_storage}:{model_prefix}: {str(e)}"

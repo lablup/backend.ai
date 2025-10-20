@@ -1,16 +1,17 @@
 import zlib
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import UUID
 
 import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common import msgpack
 from ai.backend.common.auth import PublicKey
-from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
+from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
     AgentData,
@@ -112,7 +113,8 @@ class TestAgentRepository:
             region="us-west-1",
             scaling_group="default",
             available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
-            occupied_slots=ResourceSlot({}),
+            cached_occupied_slots=ResourceSlot({}),
+            actual_occupied_slots=ResourceSlot({}),
             addr="tcp://192.168.1.100:6001",
             architecture="x86_64",
             version="24.12.0",
@@ -146,16 +148,45 @@ class TestAgentRepository:
         # Given
         agent_id = AgentId("agent-001")
         images = [
-            ["python:3.11-slim", "tag1", {}],
-            ["tensorflow/tensorflow:latest", "tag2", {}],
-            ["pytorch/pytorch:2.0-cuda", "tag3", {}],
+            (
+                "python:3.11-slim",
+                {
+                    "canonical": "python:3.11-slim",
+                    "digest": "sha256:abc123",
+                },
+            ),
+            (
+                "tensorflow/tensorflow:latest",
+                {
+                    "canonical": "tensorflow/tensorflow:latest",
+                    "digest": "sha256:def456",
+                },
+            ),
+            (
+                "pytorch/pytorch:2.0-cuda",
+                {
+                    "canonical": "pytorch/pytorch:2.0-cuda",
+                    "digest": "sha256:ghi789",
+                },
+            ),
+        ]
+        image_ids = [
+            UUID("00000000-0000-0000-0000-000000000000"),
+            UUID("11111111-1111-1111-1111-111111111111"),
+            UUID("22222222-2222-2222-2222-222222222222"),
         ]
         compressed_images = zlib.compress(msgpack.packb(images))
 
         # Patch the cache_source directly
-        with patch.object(
-            agent_repository._cache_source, "set_agent_to_images", new_callable=AsyncMock
-        ) as mock_set:
+        with (
+            patch.object(
+                agent_repository._cache_source, "set_agent_to_images", new_callable=AsyncMock
+            ) as mock_set,
+            patch.object(
+                agent_repository._db_source, "get_images_by_digest", new_callable=AsyncMock
+            ) as mock_get_images,
+        ):
+            mock_get_images.return_value = {image_id: None for image_id in image_ids}
             # When
             await agent_repository.add_agent_to_images(agent_id, compressed_images)
 
@@ -164,9 +195,9 @@ class TestAgentRepository:
             call_args = mock_set.call_args[0]
             assert call_args[0] == agent_id
             assert set(call_args[1]) == {
-                "python:3.11-slim",
-                "tensorflow/tensorflow:latest",
-                "pytorch/pytorch:2.0-cuda",
+                UUID("00000000-0000-0000-0000-000000000000"),
+                UUID("11111111-1111-1111-1111-111111111111"),
+                UUID("22222222-2222-2222-2222-222222222222"),
             }
 
     @pytest.mark.asyncio
@@ -176,14 +207,26 @@ class TestAgentRepository:
     ) -> None:
         # Given
         agent_id = AgentId("agent-error")
-        images = [["broken:image", "tag", {}]]
+        images = [
+            (
+                "broken:image",
+                {"canonical": "broken:image", "digest": "sha256:broken"},
+            )
+        ]
+        image_ids = [UUID("33333333-3333-3333-3333-333333333333")]
         compressed_images = zlib.compress(msgpack.packb(images))
 
         # Patch the cache_source to raise an exception
-        with patch.object(
-            agent_repository._cache_source, "set_agent_to_images", new_callable=AsyncMock
-        ) as mock_set:
+        with (
+            patch.object(
+                agent_repository._cache_source, "set_agent_to_images", new_callable=AsyncMock
+            ) as mock_set,
+            patch.object(
+                agent_repository._db_source, "get_images_by_digest", new_callable=AsyncMock
+            ) as mock_get_images,
+        ):
             mock_set.side_effect = Exception("Cache error")
+            mock_get_images.return_value = {image_id: None for image_id in image_ids}
 
             # When - should not raise exception (suppressed with log)
             await agent_repository.add_agent_to_images(agent_id, compressed_images)

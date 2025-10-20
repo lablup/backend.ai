@@ -137,7 +137,7 @@ class ProjectNotFound(BackendAIError, web.HTTPNotFound):
     error_title = "Project not found."
 
     def __init__(self, project_id: Optional[Union[str, Any]] = None) -> None:
-        self._project_id = project_id
+        super().__init__(f"Project not found: {project_id}")
 
     @classmethod
     def error_code(cls) -> ErrorCode:

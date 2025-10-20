@@ -11,6 +11,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
@@ -18,6 +19,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.exception import GroupNotFoundError
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
 from ai.backend.manager.models.rbac import ProjectScope
@@ -81,6 +83,7 @@ __all__ = (
 )
 
 
+@graphene_federation.key("id")
 class GroupNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -231,6 +234,8 @@ class GroupNode(graphene.ObjectType):
         query = sa.select(GroupRow).where(GroupRow.id == group_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_row = (await db_session.scalars(query)).first()
+            if group_row is None:
+                raise GroupNotFoundError()
             return cls.from_row(graph_ctx, group_row)
 
     @classmethod
@@ -298,6 +303,9 @@ class GroupNode(graphene.ObjectType):
                 result = [cls.from_row(graph_ctx, row) for row in group_rows]
 
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> GroupNode:
+        return await GroupNode.get_node(info, self.id)
 
 
 class GroupConnection(Connection):
