@@ -1616,7 +1616,11 @@ def _build_sql_stmt_from_connection_args(
 
     if filter_expr is not None:
         condition_parser = filter_expr.parser
-        conditions.append(condition_parser.parse_filter(orm_class, filter_expr.expr))
+        conditions.append(
+            condition_parser.parse_filter(
+                orm_class, filter_expr.expr, exclude_fields=filter_expr.exclude_fields
+            )
+        )
 
     for cond in conditions:
         stmt = stmt.where(cond)
@@ -1647,7 +1651,11 @@ def _build_sql_stmt_from_sql_arg(
 
     if filter_expr is not None:
         condition_parser = filter_expr.parser
-        conditions.append(condition_parser.parse_filter(orm_class, filter_expr.expr))
+        conditions.append(
+            condition_parser.parse_filter(
+                orm_class, filter_expr.expr, exclude_fields=filter_expr.exclude_fields
+            )
+        )
 
     if limit is not None:
         stmt = stmt.limit(limit)
@@ -1672,6 +1680,7 @@ class GraphQLConnectionSQLInfo(NamedTuple):
 class FilterExprArg(NamedTuple):
     expr: str
     parser: QueryFilterParser
+    exclude_fields: Optional[set[str]] = None
 
 
 class OrderExprArg(NamedTuple):
