@@ -939,7 +939,27 @@ class AgentRPCServer(aobject):
         kid = KernelId(UUID(kernel_id))
         agent = self._find_agent(kernel_id=kid)
         if agent is None:
-            return None
+            log.warning(
+                "rpc::destroy_kernel(k:{0}) kernel not found in any agent registry, "
+                "sending ALREADY_TERMINATED event to stop manager retries.",
+                kernel_id,
+            )
+            if not suppress_events:
+                sid = SessionId(UUID(session_id))
+                await self.default_agent.anycast_and_broadcast_event(
+                    KernelTerminatedAnycastEvent(
+                        kid,
+                        sid,
+                        reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                    ),
+                    KernelTerminatedBroadcastEvent(
+                        kid,
+                        sid,
+                        reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                    ),
+                )
+            done.set_result(None)
+            return await done
         await agent.inject_container_lifecycle_event(
             kid,
             SessionId(UUID(session_id)),
@@ -963,7 +983,13 @@ class AgentRPCServer(aobject):
             for container_id, kernel_id in container_kernel_ids
         ]
         kids = [container_kernel_id.kernel_id for container_kernel_id in cid_kids]
-        agent = self._find_agent(kernel_id=kids, throw_error=True)
+        agent = self._find_agent(kernel_id=kids)
+        if agent is None:
+            log.info(
+                "rpc::purge_containers() kernels not found in any agent registry (already purged): {0}",
+                str_kernel_ids,
+            )
+            return PurgeContainersResp()
         asyncio.create_task(agent.purge_containers(cid_kids))
         return PurgeContainersResp()
 
