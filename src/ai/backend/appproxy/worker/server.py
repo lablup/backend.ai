@@ -425,8 +425,7 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     timer = aiotools.create_timer(_heartbeat, root_ctx.local_config.proxy_worker.heartbeat_period)
     yield
-    timer.cancel()
-    await timer
+    await aiotools.cancel_and_wait(timer)
     await deregister_worker(root_ctx, str(uuid.uuid4()))
 
 
@@ -437,8 +436,7 @@ async def inference_metric_collection_ctx(root_ctx: RootContext) -> AsyncIterato
         root_ctx.local_config.proxy_worker.inference_metric_collection_interval,
     )
     yield
-    timer.cancel()
-    await timer
+    await aiotools.cancel_and_wait(timer)
 
 
 @asynccontextmanager
