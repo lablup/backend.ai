@@ -1181,17 +1181,25 @@ def build_root_server() -> web.Application:
     return app
 
 
-@aiotools.server_context
-async def server_main(
-    loop: asyncio.AbstractEventLoop,
+@asynccontextmanager
+async def aiomonitor_ctx(
+    local_config: AgentUnifiedConfig,
     pidx: int,
-    _args: Sequence[Any],
-) -> AsyncGenerator[None, signal.Signals]:
-    local_config: AgentUnifiedConfig = _args[0]
-
-    # Start aiomonitor.
-    # Port is set by config (default=50200).
-    loop.set_debug(local_config.debug.asyncio)
+) -> AsyncIterator[aiomonitor.Monitor]:
+    """
+    Starts aiomonitor.
+    """
+    # Port is set by config where the defaults are:
+    # termui_port = 38200 + pidx
+    # webui_port = 39200 + pidx
+    loop = asyncio.get_running_loop()
+    monitor = aiomonitor.Monitor(
+        loop,
+        termui_port=local_config.agent.aiomonitor_termui_port + pidx,
+        webui_port=local_config.agent.aiomonitor_webui_port + pidx,
+        console_enabled=False,
+        hook_task_factory=local_config.debug.enhanced_aiomonitor_task_info,
+    )
     Profiler(
         pyroscope_args=PyroscopeArgs(
             enabled=local_config.pyroscope.enabled,
@@ -1201,214 +1209,234 @@ async def server_main(
         )
     )
 
+    monitor.prompt = "monitor (agent) >>> "
+    monitor.console_locals["local_config"] = local_config
+    aiomon_started = False
+    try:
+        monitor.start()
+        aiomon_started = True
+    except Exception as e:
+        log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
+    yield monitor
+    if aiomon_started:
+        monitor.close()
+
+
+@asynccontextmanager
+async def etcd_ctx(local_config: AgentUnifiedConfig) -> AsyncGenerator[AsyncEtcd]:
+    etcd_credentials = None
+    if local_config.etcd.user and local_config.etcd.password:
+        etcd_credentials = {
+            "user": local_config.etcd.user,
+            "password": local_config.etcd.password,
+        }
+    scope_prefix_map = {
+        ConfigScopes.GLOBAL: "",
+        ConfigScopes.SGROUP: f"sgroup/{local_config.agent.scaling_group}",
+        ConfigScopes.NODE: f"nodes/agents/{local_config.agent.id}",
+    }
+    etcd_config_data = local_config.etcd.to_dataclass()
+    etcd = AsyncEtcd(
+        [addr.to_legacy() for addr in etcd_config_data.addrs],
+        local_config.etcd.namespace,
+        scope_prefix_map,
+        credentials=etcd_credentials,
+    )
+    yield etcd
+    await etcd.close()
+
+
+async def prepare_krunner_volumes(local_config: AgentUnifiedConfig) -> None:
+    log.info("Preparing kernel runner environments...")
+    kernel_mod = importlib.import_module(
+        f"ai.backend.agent.{local_config.agent.backend.value}.kernel",
+    )
+    krunner_volumes: Mapping[str, str] = await kernel_mod.prepare_krunner_env(
+        local_config.model_dump(by_alias=True)
+    )  # type: ignore
+    # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
+    log.info("Kernel runner environments: {}", [*krunner_volumes.keys()])
+    local_config.container.krunner_volumes = krunner_volumes
+
+
+async def auto_detect_agent_identity(local_config: AgentUnifiedConfig) -> AgentUnifiedConfig:
+    # Update agent id and instance type if not set
+    agent_updates = {}
+    if not local_config.agent.id:
+        agent_updates["id"] = await identity.get_instance_id()
+    if not local_config.agent.instance_type:
+        agent_updates["instance_type"] = await identity.get_instance_type()
+
+    if agent_updates:
+        new_agent_config = local_config.agent.model_copy(update=agent_updates)
+        local_config = local_config.model_copy(update={"agent": new_agent_config})
+    return local_config
+
+
+async def auto_detect_agent_network(
+    local_config: AgentUnifiedConfig,
+    etcd: AsyncEtcd,
+) -> AgentUnifiedConfig:
+    rpc_addr = local_config.agent.rpc_listen_addr
+    if not rpc_addr.host:
+        _subnet_hint = await etcd.get("config/network/subnet/agent")
+        subnet_hint = None
+        if _subnet_hint is not None:
+            subnet_hint = ip_network(_subnet_hint)
+        log.debug("auto-detecting agent host")
+        new_rpc_addr = HostPortPair(
+            await identity.get_instance_ip(subnet_hint),
+            rpc_addr.port,
+        )
+        new_agent_config = local_config.agent.model_copy(update={"rpc_listen_addr": new_rpc_addr})
+        local_config = local_config.model_copy(update={"agent": new_agent_config})
+    # Handle container bind-host configuration
+    if not local_config.container.bind_host:
+        log.debug(
+            "auto-detecting `container.bind-host` from container subnet config "
+            "and agent.rpc-listen-addr"
+        )
+        local_config.container.bind_host = await get_subnet_ip(
+            etcd,
+            "container",
+            fallback_addr=local_config.agent.rpc_listen_addr.host,
+        )
+    log.info("Agent external IP: {}", local_config.agent.rpc_listen_addr.host)
+    log.info("Container external IP: {}", local_config.container.bind_host)
+    # Update region if not set
+    if not local_config.agent.region:
+        local_config.agent.region = await identity.get_instance_region()
+    log.info(
+        "Node ID: {0} (machine-type: {1}, host: {2})",
+        local_config.agent.id,
+        local_config.agent.instance_type,
+        rpc_addr.host,
+    )
+    return local_config
+
+
+@asynccontextmanager
+async def agent_server_ctx(
+    local_config: AgentUnifiedConfig, etcd: AsyncEtcd
+) -> AsyncGenerator[AgentRPCServer]:
+    global agent_server
+    agent_server = await AgentRPCServer.new(
+        etcd,
+        local_config,
+        skip_detect_manager=local_config.agent.skip_manager_detection,
+    )
+    app = build_root_server()
+    runner = web.AppRunner(app)
+    await runner.setup()
+    service_addr = HostPortPair(
+        local_config.agent.service_addr.host, local_config.agent.service_addr.port
+    )
+    ssl_ctx = None
+
+    if local_config.agent.ssl_enabled:
+        ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        ssl_ctx.load_cert_chain(
+            str(local_config.agent.ssl_cert),
+            str(local_config.agent.ssl_key),
+        )
+    site = web.TCPSite(
+        runner,
+        str(service_addr.host),
+        service_addr.port,
+        backlog=1024,
+        reuse_port=True,
+        ssl_context=ssl_ctx,
+    )
+    await site.start()
+    log.info("started serving HTTP at {}", service_addr)
+    async with agent_server:
+        yield agent_server
+
+
+@asynccontextmanager
+async def service_discovery_ctx(
+    local_config: AgentUnifiedConfig, etcd: AsyncEtcd
+) -> AsyncGenerator[None]:
+    assert agent_server is not None, (
+        "agent_server must be initialized before the service discovery subsystem."
+    )
+    announce_addr = HostPortPair(
+        local_config.agent.announce_addr.host, local_config.agent.announce_addr.port
+    )
+    sd_type = ServiceDiscoveryType(local_config.service_discovery.type)
+    service_discovery: ServiceDiscovery
+    match sd_type:
+        case ServiceDiscoveryType.ETCD:
+            service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
+        case ServiceDiscoveryType.REDIS:
+            await agent_server.read_agent_config()
+            if not local_config.redis:
+                raise ConfigurationError({"server_main": "Redis runtime configuration is missing."})
+            valkey_profile_target = local_config.redis.to_valkey_profile_target()
+            live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
+            service_discovery = await RedisServiceDiscovery.create(
+                args=RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
+            )
+    sd_loop = ServiceDiscoveryLoop(
+        sd_type,
+        service_discovery,
+        ServiceMetadata(
+            display_name=f"agent-{local_config.agent.id}",
+            service_group="agent",
+            version=VERSION,
+            endpoint=ServiceEndpoint(
+                address=str(announce_addr),
+                port=announce_addr.port,
+                protocol="http",
+                prometheus_address=str(announce_addr),
+            ),
+        ),
+    )
+    if local_config.otel.enabled:
+        meta = sd_loop.metadata
+        otel_spec = OpenTelemetrySpec(
+            service_id=meta.id,
+            service_name=meta.service_group,
+            service_version=meta.version,
+            log_level=local_config.otel.log_level,
+            endpoint=local_config.otel.endpoint,
+        )
+        BraceStyleAdapter.apply_otel(otel_spec)
+    yield
+    sd_loop.close()
+
+
+@aiotools.server_context
+async def server_main(
+    loop: asyncio.AbstractEventLoop,
+    pidx: int,
+    _args: Sequence[Any],
+) -> AsyncGenerator[None, signal.Signals]:
+    local_config: AgentUnifiedConfig = _args[0]
+
+    loop.set_debug(local_config.debug.asyncio)
+
     agent_server: AgentRPCServer | None = None
     agent_init_stack = AsyncExitStack()
 
-    @asynccontextmanager
-    async def aiomonitor_ctx() -> AsyncIterator[aiomonitor.Monitor]:
-        monitor = aiomonitor.Monitor(
-            loop,
-            termui_port=local_config.agent.aiomonitor_termui_port + pidx,
-            webui_port=local_config.agent.aiomonitor_webui_port + pidx,
-            console_enabled=False,
-            hook_task_factory=local_config.debug.enhanced_aiomonitor_task_info,
-        )
-
-        monitor.prompt = "monitor (agent) >>> "
-        monitor.console_locals["local_config"] = local_config
-        aiomon_started = False
-        try:
-            monitor.start()
-            aiomon_started = True
-        except Exception as e:
-            log.warning(
-                "aiomonitor could not start but skipping this error to continue", exc_info=e
-            )
-        yield monitor
-        if aiomon_started:
-            monitor.close()
-
-    @asynccontextmanager
-    async def etcd_ctx() -> AsyncGenerator[AsyncEtcd]:
-        etcd_credentials = None
-        if local_config.etcd.user and local_config.etcd.password:
-            etcd_credentials = {
-                "user": local_config.etcd.user,
-                "password": local_config.etcd.password,
-            }
-        scope_prefix_map = {
-            ConfigScopes.GLOBAL: "",
-            ConfigScopes.SGROUP: f"sgroup/{local_config.agent.scaling_group}",
-            ConfigScopes.NODE: f"nodes/agents/{local_config.agent.id}",
-        }
-        etcd_config_data = local_config.etcd.to_dataclass()
-        etcd = AsyncEtcd(
-            [addr.to_legacy() for addr in etcd_config_data.addrs],
-            local_config.etcd.namespace,
-            scope_prefix_map,
-            credentials=etcd_credentials,
-        )
-        yield etcd
-        await etcd.close()
-
-    @asynccontextmanager
-    async def service_discovery_ctx() -> AsyncGenerator[None]:
-        assert agent_server is not None, (
-            "agent_server must be initialized before the service discovery subsystem."
-        )
-        announce_addr = HostPortPair(
-            local_config.agent.announce_addr.host, local_config.agent.announce_addr.port
-        )
-        sd_type = ServiceDiscoveryType(local_config.service_discovery.type)
-        service_discovery: ServiceDiscovery
-        match sd_type:
-            case ServiceDiscoveryType.ETCD:
-                service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(etcd))
-            case ServiceDiscoveryType.REDIS:
-                await agent_server.read_agent_config()
-                if not local_config.redis:
-                    raise ConfigurationError({
-                        "server_main": "Redis runtime configuration is missing."
-                    })
-                valkey_profile_target = local_config.redis.to_valkey_profile_target()
-                live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
-                service_discovery = await RedisServiceDiscovery.create(
-                    args=RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
-                )
-        sd_loop = ServiceDiscoveryLoop(
-            sd_type,
-            service_discovery,
-            ServiceMetadata(
-                display_name=f"agent-{local_config.agent.id}",
-                service_group="agent",
-                version=VERSION,
-                endpoint=ServiceEndpoint(
-                    address=str(announce_addr),
-                    port=announce_addr.port,
-                    protocol="http",
-                    prometheus_address=str(announce_addr),
-                ),
-            ),
-        )
-        if local_config.otel.enabled:
-            meta = sd_loop.metadata
-            otel_spec = OpenTelemetrySpec(
-                service_id=meta.id,
-                service_name=meta.service_group,
-                service_version=meta.version,
-                log_level=local_config.otel.log_level,
-                endpoint=local_config.otel.endpoint,
-            )
-            BraceStyleAdapter.apply_otel(otel_spec)
-        yield
-        sd_loop.close()
-
-    @asynccontextmanager
-    async def agent_server_ctx() -> AsyncGenerator[AgentRPCServer]:
-        global agent_server
-        agent_server = await AgentRPCServer.new(
-            etcd,
-            local_config,
-            skip_detect_manager=local_config.agent.skip_manager_detection,
-        )
-        app = build_root_server()
-        runner = web.AppRunner(app)
-        await runner.setup()
-        service_addr = HostPortPair(
-            local_config.agent.service_addr.host, local_config.agent.service_addr.port
-        )
-        ssl_ctx = None
-
-        if local_config.agent.ssl_enabled:
-            ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-            ssl_ctx.load_cert_chain(
-                str(local_config.agent.ssl_cert),
-                str(local_config.agent.ssl_key),
-            )
-        site = web.TCPSite(
-            runner,
-            str(service_addr.host),
-            service_addr.port,
-            backlog=1024,
-            reuse_port=True,
-            ssl_context=ssl_ctx,
-        )
-        await site.start()
-        log.info("started serving HTTP at {}", service_addr)
-        async with agent_server:
-            yield agent_server
-
     await agent_init_stack.__aenter__()
     try:
-        monitor = await agent_init_stack.enter_async_context(aiomonitor_ctx())
+        monitor = await agent_init_stack.enter_async_context(aiomonitor_ctx(local_config, pidx))
+        await prepare_krunner_volumes(local_config)
+        local_config = await auto_detect_agent_identity(local_config)
 
-        log.info("Preparing kernel runner environments...")
-        kernel_mod = importlib.import_module(
-            f"ai.backend.agent.{local_config.agent.backend.value}.kernel",
-        )
-        krunner_volumes: Mapping[str, str] = await kernel_mod.prepare_krunner_env(
-            local_config.model_dump(by_alias=True)
-        )  # type: ignore
-        # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
-        log.info("Kernel runner environments: {}", [*krunner_volumes.keys()])
-        # Update agent id and instance type if not set
-        agent_updates = {}
-        if not local_config.agent.id:
-            agent_updates["id"] = await identity.get_instance_id()
-        if not local_config.agent.instance_type:
-            agent_updates["instance_type"] = await identity.get_instance_type()
-        local_config.container.krunner_volumes = krunner_volumes
-
-        if agent_updates:
-            new_agent_config = local_config.agent.model_copy(update=agent_updates)
-            local_config = local_config.model_copy(update={"agent": new_agent_config})
-
-        etcd = await agent_init_stack.enter_async_context(etcd_ctx())
-
-        rpc_addr = local_config.agent.rpc_listen_addr
-        if not rpc_addr.host:
-            _subnet_hint = await etcd.get("config/network/subnet/agent")
-            subnet_hint = None
-            if _subnet_hint is not None:
-                subnet_hint = ip_network(_subnet_hint)
-            log.debug("auto-detecting agent host")
-            new_rpc_addr = HostPortPair(
-                await identity.get_instance_ip(subnet_hint),
-                rpc_addr.port,
-            )
-            new_agent_config = local_config.agent.model_copy(
-                update={"rpc_listen_addr": new_rpc_addr}
-            )
-            local_config = local_config.model_copy(update={"agent": new_agent_config})
-        # Handle container bind-host configuration
-        if not local_config.container.bind_host:
-            log.debug(
-                "auto-detecting `container.bind-host` from container subnet config "
-                "and agent.rpc-listen-addr"
-            )
-            local_config.container.bind_host = await get_subnet_ip(
-                etcd,
-                "container",
-                fallback_addr=local_config.agent.rpc_listen_addr.host,
-            )
-        log.info("Agent external IP: {}", local_config.agent.rpc_listen_addr.host)
-        log.info("Container external IP: {}", local_config.container.bind_host)
-        # Update region if not set
-        if not local_config.agent.region:
-            local_config.agent.region = await identity.get_instance_region()
-        log.info(
-            "Node ID: {0} (machine-type: {1}, host: {2})",
-            local_config.agent.id,
-            local_config.agent.instance_type,
-            rpc_addr.host,
-        )
+        # etcd's scope-prefix map depends on the auto-detected identity info.
+        etcd = await agent_init_stack.enter_async_context(etcd_ctx(local_config))
+        local_config = await auto_detect_agent_network(local_config, etcd)
         local_config.plugins = await etcd.get_prefix_dict("config/plugins/accelerator")
 
         # Start RPC server.
-        agent_server = await agent_init_stack.enter_async_context(agent_server_ctx())
+        agent_server = await agent_init_stack.enter_async_context(
+            agent_server_ctx(local_config, etcd)
+        )
         monitor.console_locals["agent"] = agent_server
 
-        await agent_init_stack.enter_async_context(service_discovery_ctx())
+        await agent_init_stack.enter_async_context(service_discovery_ctx(local_config, etcd))
         log.info("Started the agent service.")
     except Exception:
         log.exception("Server initialization failure; triggering shutdown...")

@@ -1554,7 +1554,9 @@ async def server_main(
 
     @asynccontextmanager
     async def aiomonitor_ctx() -> AsyncIterator[aiomonitor.Monitor]:
-        # Port is set by config (default=50100 + pidx).
+        # Port is set by config where the defaults are:
+        # termui_port = 38100 + pidx
+        # webui_port = 39100 + pidx
         m = aiomonitor.Monitor(
             loop,
             termui_port=boostrap_config.manager.aiomonitor_termui_port + pidx,

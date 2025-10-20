@@ -123,6 +123,9 @@ async def aiomonitor_ctx(
     local_config: StorageProxyUnifiedConfig,
     pidx: int,
 ) -> AsyncGenerator[aiomonitor.Monitor]:
+    # Port is set by config where the defaults are:
+    # termui_port = 38300 + pidx
+    # webui_port = 39300 + pidx
     loop = asyncio.get_running_loop()
     m = aiomonitor.Monitor(
         loop,
@@ -419,8 +422,7 @@ async def api_ctx(
         yield internal_api_app
         await internal_api_runner.cleanup()
 
-    api_init_stack = AsyncExitStack()
-    async with api_init_stack:
+    async with AsyncExitStack() as api_init_stack:
         await api_init_stack.enter_async_context(_init_storage_plugin())
         client_api_app = await api_init_stack.enter_async_context(client_api_ctx())
         manager_api_app = await api_init_stack.enter_async_context(manager_api_ctx())
