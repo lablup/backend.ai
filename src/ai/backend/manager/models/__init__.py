@@ -7,6 +7,8 @@ from . import association_artifacts_storages as _association_artifacts_storages
 from . import association_container_registries_groups as _association_container_registries_groups
 from . import audit_log as _auditlog
 from . import container_registry as _container_registry
+from . import deployment_route as _deployment_route
+from . import deployment_state as _deployment_state
 from . import domain as _domain
 from . import dotfile as _dotfile
 from . import endpoint as _endpoint
@@ -18,6 +20,10 @@ from . import huggingface_registry as _huggingface_registry
 from . import image as _image
 from . import kernel as _kernel
 from . import keypair as _keypair
+from . import model_deployment as _model_deployment
+from . import model_deployment_auto_scaling_rules as _model_deployment_auto_scaling_rules
+from . import model_deployment_tokens as _model_deployment_tokens
+from . import model_revision as _model_revision
 from . import network as _network
 from . import object_storage as _object_storage
 from . import rbac as _rbac
@@ -63,6 +69,12 @@ __all__ = (
     *_object_storage.__all__,
     *_user.__all__,
     *_vfolder.__all__,
+    *_model_deployment.__all__,
+    *_model_revision.__all__,
+    *_deployment_route.__all__,
+    *_model_deployment_auto_scaling_rules.__all__,
+    *_model_deployment_tokens.__all__,
+    *_deployment_state.__all__,
     *_dotfile.__all__,
     *_rbac.__all__,
     *_rbac_models.__all__,
@@ -123,3 +135,9 @@ from .gql_models.agent import *  # noqa
 from .gql_models.kernel import *  # noqa
 from .gql_models.session import *  # noqa
 from .reservoir_registry import *  # noqa
+from .model_deployment import *  # noqa
+from .model_revision import *  # noqa
+from .deployment_route import *  # noqa
+from .model_deployment_auto_scaling_rules import *  # noqa
+from .model_deployment_tokens import *  # noqa
+from .deployment_state import *  # noqa
