@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Mapping
 from typing import Optional, cast
 from uuid import UUID
 
@@ -179,6 +180,13 @@ class ImageDBSource:
                 raise ImageNotFound()
             data = row.to_detailed_dataclass()
         return data
+
+    async def query_all_images(
+        self, status_filter: Optional[list[ImageStatus]] = None
+    ) -> Mapping[ImageID, ImageDataWithDetails]:
+        async with self._db.begin_readonly_session() as session:
+            rows = await ImageRow.list(session, load_aliases=True, filter_by_statuses=status_filter)
+            return {ImageID(row.id): row.to_detailed_dataclass() for row in rows}
 
     async def mark_user_image_deleted(
         self,

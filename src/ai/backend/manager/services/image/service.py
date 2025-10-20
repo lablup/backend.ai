@@ -33,6 +33,10 @@ from ai.backend.manager.services.image.actions.forget_image_by_id import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.get_all_images import (
+    GetAllImagesAction,
+    GetAllImagesActionResult,
+)
 from ai.backend.manager.services.image.actions.get_image_by_id import (
     GetImageByIdAction,
     GetImageByIdActionResult,
@@ -40,6 +44,10 @@ from ai.backend.manager.services.image.actions.get_image_by_id import (
 from ai.backend.manager.services.image.actions.get_image_by_identifier import (
     GetImageByIdentifierAction,
     GetImageByIdentifierActionResult,
+)
+from ai.backend.manager.services.image.actions.get_image_installed_agents import (
+    GetImageInstalledAgentsAction,
+    GetImageInstalledAgentsActionResult,
 )
 from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
     GetImagesByCanonicalsAction,
@@ -123,6 +131,17 @@ class ImageService:
         return GetImageByIdentifierActionResult(
             image_with_agent_install_status=image_with_agent_install_status
         )
+
+    async def get_image_installed_agents(
+        self, action: GetImageInstalledAgentsAction
+    ) -> GetImageInstalledAgentsActionResult:
+        image_ids = action.image_ids
+        agent_counts_per_image = await self._image_repository.get_image_installed_agents(image_ids)
+        return GetImageInstalledAgentsActionResult(data=agent_counts_per_image)
+
+    async def get_all_images(self, action: GetAllImagesAction) -> GetAllImagesActionResult:
+        images = await self._image_repository.get_all_images(status_filter=action.status_filter)
+        return GetAllImagesActionResult(data=images)
 
     async def get_image_by_id(self, action: GetImageByIdAction) -> GetImageByIdActionResult:
         image_with_agent_install_status: ImageWithAgentInstallStatus = (
