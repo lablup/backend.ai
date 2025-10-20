@@ -71,23 +71,13 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__ as VERSION
-from .api.client import init_client_app
-from .api.manager import init_internal_app, init_manager_app
-from .bgtask.registry import BgtaskHandlerRegistryCreator
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import EventLoopType, StorageProxyUnifiedConfig
-from .context import DEFAULT_BACKENDS
-from .plugin import (
-    StorageClientWebappPluginContext,
-    StorageManagerWebappPluginContext,
-    StoragePluginContext,
-)
-from .volumes.noop import init_noop_volume
-from .volumes.pool import VolumePool
 from .watcher import WatcherClient
 
 if TYPE_CHECKING:
     from .context import RootContext
+    from .volumes.pool import VolumePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -185,6 +175,8 @@ async def bgtask_ctx(
     event_producer: EventProducer,
     volume_pool: VolumePool,
 ) -> AsyncGenerator[BackgroundTaskManager]:
+    from .bgtask.registry import BgtaskHandlerRegistryCreator
+
     redis_profile_target = redis_config.to_redis_profile_target()
     valkey_client = await ValkeyBgtaskClient.create(
         redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target(),
@@ -312,6 +304,8 @@ async def volume_ctx(
     event_dispatcher: EventDispatcher,
     event_producer: EventProducer,
 ) -> AsyncGenerator[VolumePool]:
+    from .volumes.pool import VolumePool
+
     volume_pool = await VolumePool.create(
         local_config=local_config,
         etcd=etcd,
@@ -330,6 +324,14 @@ async def api_ctx(
     etcd: AsyncEtcd,
     root_ctx: RootContext,
 ) -> AsyncGenerator[tuple[web.Application, web.Application, web.Application]]:
+    from .api.client import init_client_app
+    from .api.manager import init_internal_app, init_manager_app
+    from .plugin import (
+        StorageClientWebappPluginContext,
+        StorageManagerWebappPluginContext,
+        StoragePluginContext,
+    )
+
     @asynccontextmanager
     async def _init_storage_plugin() -> AsyncGenerator[StoragePluginContext]:
         plugin_ctx = StoragePluginContext(etcd, local_config.model_dump())
@@ -542,9 +544,10 @@ async def server_main(
     pidx: int,
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
-    from .context import RootContext
+    from .context import DEFAULT_BACKENDS, RootContext
     from .migration import check_latest
     from .storages.storage_pool import StoragePool
+    from .volumes.noop import init_noop_volume
 
     local_config: StorageProxyUnifiedConfig = _args[0]
     loop.set_debug(local_config.debug.asyncio)
