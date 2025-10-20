@@ -9,6 +9,9 @@ class ScopeId:
     scope_type: ScopeType
     scope_id: str
 
+    def __hash__(self) -> int:
+        return hash((self.scope_type, self.scope_id))
+
     @classmethod
     def from_str(cls, val: str) -> Self:
         scope_type, _, scope_id = val.partition(":")
@@ -22,6 +25,9 @@ class ScopeId:
 class ObjectId:
     entity_type: EntityType
     entity_id: str
+
+    def __hash__(self) -> int:
+        return hash((self.entity_type, self.entity_id))
 
     @classmethod
     def from_str(cls, val: str) -> Self:

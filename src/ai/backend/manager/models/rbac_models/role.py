@@ -16,6 +16,7 @@ from sqlalchemy.orm import (
 from ai.backend.manager.data.permission.role import (
     RoleCreateInput,
     RoleData,
+    RoleDataWithPermissions,
 )
 from ai.backend.manager.data.permission.status import (
     RoleStatus,
@@ -91,6 +92,20 @@ class RoleRow(Base):
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
             description=self.description,
+        )
+
+    def to_data_with_permissions(self) -> RoleDataWithPermissions:
+        return RoleDataWithPermissions(
+            id=self.id,
+            name=self.name,
+            source=self.source,
+            status=self.status,
+            created_at=self.created_at,
+            updated_at=self.updated_at,
+            deleted_at=self.deleted_at,
+            description=self.description,
+            permission_groups=[pg_row.to_data() for pg_row in self.permission_group_rows],
+            object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
         )
 
     @classmethod

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 
 from ai.backend.manager.data.permission.status import (
@@ -54,7 +56,7 @@ class OperationType(enum.StrEnum):
         return OriginalOperationType(self.value)
 
     @classmethod
-    def owner_operations(cls) -> set["OperationType"]:
+    def owner_operations(cls) -> set[OperationType]:
         """
         Returns a set of operations that are considered owner operations.
         Owner operations are those that allow full control over an entity.
@@ -62,7 +64,7 @@ class OperationType(enum.StrEnum):
         return {op for op in cls}
 
     @classmethod
-    def admin_operations(cls) -> set["OperationType"]:
+    def admin_operations(cls) -> set[OperationType]:
         """
         Returns a set of operations that are considered admin operations.
         Admin operations are those that allow management of entities, including creation and deletion.
@@ -70,7 +72,7 @@ class OperationType(enum.StrEnum):
         return {op for op in cls}
 
     @classmethod
-    def member_operations(cls) -> set["OperationType"]:
+    def member_operations(cls) -> set[OperationType]:
         """
         Returns a set of operations that are considered member operations.
         Member operations are those that allow read access.
@@ -84,6 +86,8 @@ class ScopeType(enum.StrEnum):
     DOMAIN = "domain"
     PROJECT = "project"
     USER = "user"
+
+    GLOBAL = "global"
 
     def to_original(self) -> OriginalScopeType:
         return OriginalScopeType(self.value)
