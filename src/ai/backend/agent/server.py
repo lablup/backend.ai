@@ -1445,8 +1445,8 @@ async def server_main(
 def main(
     cli_ctx: click.Context,
     config_path: Path | None,
+    debug: bool,
     log_level: LogLevel,
-    debug: bool = False,
 ) -> int:
     """Start the agent service as a foreground process."""
     if debug:
