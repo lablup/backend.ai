@@ -234,7 +234,7 @@ async def event_ctx(
     redis_config: RedisConfig,
     pidx: int,
     metric_registry: CommonMetricRegistry,
-) -> AsyncGenerator[tuple[EventProducer, EventDispatcher]]:
+) -> AsyncGenerator[tuple[EventDispatcher, EventProducer]]:
     redis_profile_target = redis_config.to_redis_profile_target()
     mq = await _make_message_queue(
         local_config,
@@ -262,7 +262,7 @@ async def event_ctx(
     )
     await event_dispatcher.start()
 
-    yield event_producer, event_dispatcher
+    yield event_dispatcher, event_producer
 
     await event_producer.close()
     await event_dispatcher.close()
@@ -302,8 +302,8 @@ async def watcher_ctx(
 async def volume_ctx(
     local_config: StorageProxyUnifiedConfig,
     etcd: AsyncEtcd,
-    event_producer: EventProducer,
     event_dispatcher: EventDispatcher,
+    event_producer: EventProducer,
 ) -> AsyncGenerator[VolumePool]:
     volume_pool = await VolumePool.create(
         local_config=local_config,
@@ -544,15 +544,14 @@ async def server_main(
         metric_registry = CommonMetricRegistry()
         monitor = await storage_init_stack.enter_async_context(aiomonitor_ctx(local_config, pidx))
         etcd = await storage_init_stack.enter_async_context(etcd_ctx(local_config))
-
         redis_config = await storage_init_stack.enter_async_context(redis_ctx(etcd, pidx))
-        event_producer, event_dispatcher = await storage_init_stack.enter_async_context(
+        event_dispatcher, event_producer = await storage_init_stack.enter_async_context(
             event_ctx(local_config, redis_config, pidx, metric_registry)
         )
 
         # Create StoragePool with both object storage and VFS storage
         volume_pool = await storage_init_stack.enter_async_context(
-            volume_ctx(local_config, etcd, event_producer, event_dispatcher)
+            volume_ctx(local_config, etcd, event_dispatcher, event_producer)
         )
         storage_pool = StoragePool.from_config(local_config)
 
