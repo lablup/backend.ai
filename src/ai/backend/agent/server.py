@@ -384,7 +384,6 @@ class AgentRPCServer(aobject):
         backend = self.local_config.agent.backend
         agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
         agent_cls: Type[AbstractAgent] = agent_mod.get_agent_cls()
-        global_config = self.local_config.global_config
         agent_configs = self.local_config.agent_configs
         # TODO: Remove once subagents are feature-complete.
         if len(agent_configs) > 1:
@@ -394,8 +393,7 @@ class AgentRPCServer(aobject):
                 tg.create_task(
                     agent_cls.new(
                         self.etcd,
-                        global_config=global_config,
-                        agent_config=agent_config,
+                        agent_config,
                         stats_monitor=self.stats_monitor,
                         error_monitor=self.error_monitor,
                         agent_public_key=self.rpc_auth_agent_public_key,

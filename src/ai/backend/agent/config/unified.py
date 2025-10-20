@@ -1334,7 +1334,7 @@ class SubAgentConfig(BaseConfigSchema):
         description="Resource config overrides for the individual subagent",
     )
 
-    def with_default(self, default_config: AgentSpecificConfig) -> AgentSpecificConfig:
+    def with_default(self, default_config: AgentUnifiedConfig) -> AgentUnifiedConfig:
         sub_agent_updates: dict[str, Any] = {}
         if self.agent is not None:
             agent_override_fields = self.agent.model_dump(include=self.agent.model_fields_set)
@@ -1385,7 +1385,7 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
         return AgentGlobalConfig.model_construct(**self.model_dump())
 
     @property
-    def agent_configs(self) -> Sequence[AgentSpecificConfig]:
+    def agent_configs(self) -> Sequence[AgentUnifiedConfig]:
         return self._for_each_agent(lambda x: x)
 
     @staticmethod
@@ -1471,7 +1471,7 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
         self._for_each_agent(validate)
         return self
 
-    def _for_each_agent(self, func: Callable[[AgentSpecificConfig], R]) -> list[R]:
+    def _for_each_agent(self, func: Callable[[AgentUnifiedConfig], R]) -> list[R]:
         agents = [sub_agent.with_default(self) for sub_agent in self.sub_agents]
         if not agents:
             agents.append(self)
