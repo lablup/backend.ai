@@ -126,7 +126,7 @@
 //     "types-toml",
 //     "types-tqdm",
 //     "typing_extensions~=4.11",
-//     "uvloop~=0.21; sys_platform != \"Windows\"",
+//     "uvloop~=0.22.1; sys_platform != \"Windows\"",
 //     "valkey-glide~=2.0.1",
 //     "yarl~=1.19.0",
 //     "zipstream-new~=1.1.8"
@@ -2992,19 +2992,19 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "9deba5723312380e77435581c6bf4935c94cbfab9b1ed33ef8d238ea168eb760",
-              "url": "https://files.pythonhosted.org/packages/2c/e1/e6716421ea10d38022b952c159d5161ca1193197fb744506875fbb87ea7b/iniconfig-2.1.0-py3-none-any.whl"
+              "hash": "f631c04d2c48c52b84d0d0549c99ff3859c98df65b3101406327ecc7d53fbf12",
+              "url": "https://files.pythonhosted.org/packages/cb/b1/3846dd7f199d53cb17f49cba7e651e9ce294d8497c8c150530ed11865bb8/iniconfig-2.3.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3abbd2e30b36733fee78f9c7f7308f2d0050e88f0087fd25c2645f63c773e1c7",
-              "url": "https://files.pythonhosted.org/packages/f2/97/ebf4da567aa6827c909642694d71c9fcf53e5b504f2d96afea02718862f3/iniconfig-2.1.0.tar.gz"
+              "hash": "c76315c77db068650d49c5b56314774a7804df16fee4402c1f19d6d15d8c4730",
+              "url": "https://files.pythonhosted.org/packages/72/34/14ca021ce8e5dfedc35312d08ba8bf51fdd999c576889fc2c24cb97f4f10/iniconfig-2.3.0.tar.gz"
             }
           ],
           "project_name": "iniconfig",
           "requires_dists": [],
-          "requires_python": ">=3.8",
-          "version": "2.1.0"
+          "requires_python": ">=3.10",
+          "version": "2.3.0"
         },
         {
           "artifacts": [
@@ -4614,33 +4614,33 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "7d4a113425c037300de3ac8b331637293da9be9713855c4fc9d2d97436d7259d",
-              "url": "https://files.pythonhosted.org/packages/f4/58/c4f976234bf6d4737bc8c02a81192f045c307b72cf39c9e5c5a2d78927f6/psutil-7.1.0-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
+              "hash": "146a704f224fb2ded2be3da5ac67fc32b9ea90c45b51676f9114a6ac45616967",
+              "url": "https://files.pythonhosted.org/packages/dc/af/c13d360c0adc6f6218bf9e2873480393d0f729c8dd0507d171f53061c0d3/psutil-7.1.1-cp36-abi3-manylinux_2_17_aarch64.manylinux2014_aarch64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "5d007560c8c372efdff9e4579c2846d71de737e4605f611437255e81efcca2c5",
-              "url": "https://files.pythonhosted.org/packages/38/61/f76959fba841bf5b61123fbf4b650886dc4094c6858008b5bf73d9057216/psutil-7.1.0-cp36-abi3-macosx_11_0_arm64.whl"
+              "hash": "92ebc58030fb054fa0f26c3206ef01c31c29d67aee1367e3483c16665c25c8d2",
+              "url": "https://files.pythonhosted.org/packages/3d/3c/b56076bb35303d0733fc47b110a1c9cce081a05ae2e886575a3587c1ee76/psutil-7.1.1-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "76168cef4397494250e9f4e73eb3752b146de1dd950040b29186d0cce1d5ca13",
-              "url": "https://files.pythonhosted.org/packages/46/62/ce4051019ee20ce0ed74432dd73a5bb087a6704284a470bb8adff69a0932/psutil-7.1.0-cp36-abi3-macosx_10_9_x86_64.whl"
+              "hash": "8fa59d7b1f01f0337f12cd10dbd76e4312a4d3c730a4fedcbdd4e5447a8b8460",
+              "url": "https://files.pythonhosted.org/packages/51/30/f97f8fb1f9ecfbeae4b5ca738dcae66ab28323b5cfbc96cb5565f3754056/psutil-7.1.1-cp36-abi3-macosx_10_9_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "22e4454970b32472ce7deaa45d045b34d3648ce478e26a04c7e858a0a6e75ff3",
-              "url": "https://files.pythonhosted.org/packages/88/7a/37c99d2e77ec30d63398ffa6a660450b8a62517cabe44b3e9bae97696e8d/psutil-7.1.0-cp36-abi3-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
+              "hash": "2a95104eae85d088891716db676f780c1404fc15d47fde48a46a5d61e8f5ad2c",
+              "url": "https://files.pythonhosted.org/packages/7b/98/b8d1f61ebf35f4dbdbaabadf9208282d8adc820562f0257e5e6e79e67bf2/psutil-7.1.1-cp36-abi3-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "8c70e113920d51e89f212dd7be06219a9b88014e63a4cec69b684c327bc474e3",
-              "url": "https://files.pythonhosted.org/packages/9d/de/04c8c61232f7244aa0a4b9a9fbd63a89d5aeaf94b2fc9d1d16e2faa5cbb0/psutil-7.1.0-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "092b6350145007389c1cfe5716050f02030a05219d90057ea867d18fe8d372fc",
+              "url": "https://files.pythonhosted.org/packages/89/fc/889242351a932d6183eec5df1fc6539b6f36b6a88444f1e63f18668253aa/psutil-7.1.1.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "655708b3c069387c8b77b072fc429a57d0e214221d01c0a772df7dfedcb3bcd2",
-              "url": "https://files.pythonhosted.org/packages/b3/31/4723d756b59344b643542936e37a31d1d3204bcdc42a7daa8ee9eb06fb50/psutil-7.1.0.tar.gz"
+              "hash": "98629cd8567acefcc45afe2f4ba1e9290f579eacf490a917967decce4b74ee9b",
+              "url": "https://files.pythonhosted.org/packages/f0/4a/b8015d7357fefdfe34bc4a3db48a107bae4bad0b94fb6eb0613f09a08ada/psutil-7.1.1-cp36-abi3-manylinux_2_12_i686.manylinux2010_i686.manylinux_2_17_i686.manylinux2014_i686.whl"
             }
           ],
           "project_name": "psutil",
@@ -4674,6 +4674,7 @@
             "sphinx; extra == \"dev\"",
             "toml-sort; extra == \"dev\"",
             "twine; extra == \"dev\"",
+            "validate-pyproject[all]; extra == \"dev\"",
             "virtualenv; extra == \"dev\"",
             "vulture; extra == \"dev\"",
             "wheel; (os_name == \"nt\" and platform_python_implementation != \"PyPy\") and extra == \"dev\"",
@@ -4683,7 +4684,7 @@
             "wmi; (os_name == \"nt\" and platform_python_implementation != \"PyPy\") and extra == \"test\""
           ],
           "requires_python": ">=3.6",
-          "version": "7.1.0"
+          "version": "7.1.1"
         },
         {
           "artifacts": [
@@ -7378,7 +7379,7 @@
     "types-toml",
     "types-tqdm",
     "typing_extensions~=4.11",
-    "uvloop~=0.21; sys_platform != \"Windows\"",
+    "uvloop~=0.22.1; sys_platform != \"Windows\"",
     "valkey-glide~=2.0.1",
     "yarl~=1.19.0",
     "zipstream-new~=1.1.8"

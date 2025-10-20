@@ -93,7 +93,7 @@ treelib~=1.7.0
 typeguard~=4.3
 typing_extensions~=4.11
 textual~=0.79.1
-uvloop~=0.21; sys_platform != "Windows"  # 0.18 breaks the API and adds Python 3.12 support
+uvloop~=0.22.1; sys_platform != "Windows"
 valkey-glide~=2.0.1
 yarl~=1.19.0
 zipstream-new~=1.1.8
