@@ -366,3 +366,54 @@ async def test_fieldspec(virtual_user_db) -> None:
             sa.select([users.c.name, users.c.age]).select_from(users),
             't1 == "XYZ"',
         )
+
+
+@pytest.mark.asyncio
+async def test_exclude_fields(virtual_user_db) -> None:
+    """Test that exclude_fields parameter properly excludes fields from SQL generation."""
+    conn, users = virtual_user_db
+    parser = QueryFilterParser({
+        "name": ("name", None),
+        "age": ("age", None),
+        "excluded_field": ("excluded_field", None),
+    })
+
+    # Test parsing with excluded field - should not raise error and should filter by other fields
+    sa_query = parser.append_filter(
+        sa.select([users.c.name, users.c.age]).select_from(users),
+        '(name == "tester") & (age == 30) & (excluded_field == "ignored")',
+        exclude_fields={"excluded_field"},
+    )
+    actual_ret = list(await conn.execute(sa_query))
+    # Should only match by name and age, ignoring the excluded_field condition
+    test_ret = [("tester", 30)]
+    assert test_ret == actual_ret
+
+    # Test with multiple excluded fields
+    parser2 = QueryFilterParser({
+        "name": ("name", None),
+        "age": ("age", None),
+        "field1": ("field1", None),
+        "field2": ("field2", None),
+    })
+
+    sa_query = parser2.append_filter(
+        sa.select([users.c.name, users.c.age]).select_from(users),
+        '(name == "tester") & (field1 == "x") & (field2 == "y")',
+        exclude_fields={"field1", "field2"},
+    )
+    actual_ret = list(await conn.execute(sa_query))
+    # Should only match by name, ignoring both excluded fields
+    test_ret = [("tester", 30)]
+    assert test_ret == actual_ret
+
+    # Test with parse_filter method
+    where_clause = parser.parse_filter(
+        users,
+        '(name == "tester") & (excluded_field == "ignored")',
+        exclude_fields={"excluded_field"},
+    )
+    sa_query = sa.select([users.c.name, users.c.age]).select_from(users).where(where_clause)
+    actual_ret = list(await conn.execute(sa_query))
+    test_ret = [("tester", 30)]
+    assert test_ret == actual_ret

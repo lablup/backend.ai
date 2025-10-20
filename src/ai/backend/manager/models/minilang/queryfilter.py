@@ -61,10 +61,16 @@ WhereClauseType: TypeAlias = (
 
 
 class QueryFilterTransformer(Transformer):
-    def __init__(self, sa_table: sa.Table, fieldspec: Optional[FieldSpecType] = None) -> None:
+    def __init__(
+        self,
+        sa_table: sa.Table,
+        fieldspec: Optional[FieldSpecType] = None,
+        exclude_fields: Optional[set[str]] = None,
+    ) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._fieldspec = fieldspec
+        self._exclude_fields = exclude_fields or set()
 
     def string(self, token: list[Token]) -> str:
         s = token[0]
@@ -112,6 +118,11 @@ class QueryFilterTransformer(Transformer):
         children: list[Token] = args[0]
         col_name = children[0].value
         op = children[1].value
+
+        # If this field is excluded, return a neutral condition that won't affect the query
+        if col_name in self._exclude_fields:
+            return sa.true()
+
         val = self._transform_val(col_name, op, children[2])
 
         def build_expr(op: str, col, val):
@@ -220,10 +231,28 @@ class QueryFilterParser:
         self,
         table,
         filter_expr: str,
+        *,
+        exclude_fields: Optional[set[str]] = None,
     ) -> WhereClauseType:
+        """
+        Parse filter expression and build WHERE clause.
+
+        Args:
+            table: SQLAlchemy table to parse against
+            filter_expr: Filter expression string
+            exclude_fields: Optional set of field names to exclude from parsing.
+                          Fields in this set will be ignored during parsing.
+
+        Returns:
+            WHERE clause for SQLAlchemy query
+        """
         try:
             ast = self._parser.parse(filter_expr)
-            where_clause = QueryFilterTransformer(table, self._fieldspec).transform(ast)
+            # Pass exclude_fields to transformer so it can skip generating SQL for them
+            # but keep them in fieldspec for validation
+            where_clause = QueryFilterTransformer(table, self._fieldspec, exclude_fields).transform(
+                ast
+            )
         except LarkError as e:
             raise ValueError(f"Query filter parsing error: {e}")
         return where_clause
@@ -232,10 +261,20 @@ class QueryFilterParser:
         self,
         sa_query: FilterableSQLQuery,
         filter_expr: str,
+        *,
+        exclude_fields: Optional[set[str]] = None,
     ) -> FilterableSQLQuery:
         """
         Parse the given filter expression and build the where clause based on the first target table from
         the given SQLAlchemy query object.
+
+        Args:
+            sa_query: SQLAlchemy query object
+            filter_expr: Filter expression string
+            exclude_fields: Optional set of field names to exclude from parsing
+
+        Returns:
+            Updated SQLAlchemy query with WHERE clause
         """
         if isinstance(sa_query, sa.sql.Select):
             table = sa_query.froms[0]
@@ -245,7 +284,7 @@ class QueryFilterParser:
             table = sa_query.table
         else:
             raise ValueError("Unsupported SQLAlchemy query object type")
-        where_clause = self.parse_filter(table, filter_expr)
+        where_clause = self.parse_filter(table, filter_expr, exclude_fields=exclude_fields)
         final_query = sa_query.where(where_clause)
         assert final_query is not None
         return final_query
