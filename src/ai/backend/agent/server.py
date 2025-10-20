@@ -694,14 +694,29 @@ class AgentRPCServer(aobject):
                 kernel_id = set(kernel_id)
             else:
                 kernel_id = {kernel_id}
-            agents = [agent for agent in agents if kernel_id <= agent.known_kernel_ids]
+            agents = [
+                agent
+                for agent in agents
+                if kernel_id
+                <= (
+                    set(agent.kernel_registry.keys())
+                    | set(agent.restarting_kernels.keys())
+                    | set(agent._pending_creation_tasks.keys())
+                    | set(agent._active_creates.keys())
+                    | set(agent._ongoing_destruction_tasks.keys())
+                )
+            ]
 
         if image_name is not None:
             if isinstance(image_name, str):
                 image_name = {image_name}
             else:
                 image_name = set(image_name)
-            agents = [agent for agent in agents if image_name <= agent.known_image_names]
+            agents = [
+                agent
+                for agent in agents
+                if image_name <= (set(agent.images.keys()) | set(agent._active_pulls.keys()))
+            ]
 
         match agents:
             case []:
