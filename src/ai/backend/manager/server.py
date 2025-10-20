@@ -1647,8 +1647,8 @@ async def server_main(
                 log.info("changed process uid and gid to {}:{}", uid, gid)
             log.info("started handling API requests at {}", service_addr)
         except Exception:
-            log.exception("Server initialization failure")
-            loop.call_soon(os.kill, 0, signal.SIGINT)
+            log.exception("Server initialization failure; triggering shutdown...")
+            loop.call_later(0.2, os.kill, 0, signal.SIGINT)
 
         yield
 
