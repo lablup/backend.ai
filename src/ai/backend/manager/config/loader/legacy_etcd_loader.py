@@ -138,7 +138,6 @@ class LegacyEtcdLoader(AbstractConfigLoader):
 
     @aiotools.lru_cache(maxsize=1, expire_after=2.0)
     async def get_manager_status(self) -> ManagerStatus:
-        functools.lru_cache()
         status = await self._etcd.get("manager/status")
         if status is None:
             return ManagerStatus.TERMINATED
