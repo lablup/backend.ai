@@ -13,6 +13,13 @@ from ai.backend.manager.services.image.actions.base import ImageAction
 
 @dataclass
 class GetAllImagesAction(ImageAction):
+    """
+    Action to retrieve all images, optionally filtered by their status.
+    Args:
+        status_filter: If provided, only images with a status in this list will be returned.
+            If None, images of all statuses will be included.
+    """
+
     status_filter: Optional[list[ImageStatus]]
 
     @override
