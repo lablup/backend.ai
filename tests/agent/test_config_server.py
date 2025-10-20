@@ -13,6 +13,18 @@ from ai.backend.common.validators import BinarySize
 RawConfigT = dict[str, Any]
 
 
+def create_mock_agent() -> Mock:
+    mock_agent = Mock()
+    mock_agent.kernel_registry = {}
+    mock_agent.restarting_kernels = {}
+    mock_agent._pending_creation_tasks = {}
+    mock_agent._active_creates = {}
+    mock_agent._ongoing_destruction_tasks = {}
+    mock_agent.images = {}
+    mock_agent._active_pulls = {}
+    return mock_agent
+
+
 @pytest.fixture
 def mock_agent_server(single_agent_config: AgentUnifiedConfig) -> AgentRPCServer:
     server = object.__new__(AgentRPCServer)
@@ -160,10 +172,9 @@ class TestAgentRPCServerMultiAgentMode:
 
     def test_find_agent_by_kernel_id_single_match(self, mock_agent_server: AgentRPCServer) -> None:
         kernel_id = KernelId(uuid4())
-        mock_agent1 = Mock()
-        mock_agent1.known_kernel_ids = {kernel_id}
-        mock_agent2 = Mock()
-        mock_agent2.known_kernel_ids = set()
+        mock_agent1 = create_mock_agent()
+        mock_agent1.kernel_registry = {kernel_id: Mock()}
+        mock_agent2 = create_mock_agent()
 
         mock_agent_server.agents = {
             AgentId("agent-1"): mock_agent1,
@@ -178,10 +189,8 @@ class TestAgentRPCServerMultiAgentMode:
         self, mock_agent_server: AgentRPCServer
     ) -> None:
         kernel_id = KernelId(uuid4())
-        mock_agent1 = Mock()
-        mock_agent1.known_kernel_ids = set()
-        mock_agent2 = Mock()
-        mock_agent2.known_kernel_ids = set()
+        mock_agent1 = create_mock_agent()
+        mock_agent2 = create_mock_agent()
 
         mock_agent_server.agents = {
             AgentId("agent-1"): mock_agent1,
@@ -196,10 +205,8 @@ class TestAgentRPCServerMultiAgentMode:
         self, mock_agent_server: AgentRPCServer
     ) -> None:
         kernel_id = KernelId(uuid4())
-        mock_agent1 = Mock()
-        mock_agent1.known_kernel_ids = set()
-        mock_agent2 = Mock()
-        mock_agent2.known_kernel_ids = set()
+        mock_agent1 = create_mock_agent()
+        mock_agent2 = create_mock_agent()
 
         mock_agent_server.agents = {
             AgentId("agent-1"): mock_agent1,
@@ -213,10 +220,10 @@ class TestAgentRPCServerMultiAgentMode:
         self, mock_agent_server: AgentRPCServer
     ) -> None:
         kernel_id = KernelId(uuid4())
-        mock_agent1 = Mock()
-        mock_agent1.known_kernel_ids = {kernel_id}
-        mock_agent2 = Mock()
-        mock_agent2.known_kernel_ids = {kernel_id}
+        mock_agent1 = create_mock_agent()
+        mock_agent1.kernel_registry = {kernel_id: Mock()}
+        mock_agent2 = create_mock_agent()
+        mock_agent2.kernel_registry = {kernel_id: Mock()}
 
         mock_agent_server.agents = {
             AgentId("agent-1"): mock_agent1,
@@ -227,12 +234,9 @@ class TestAgentRPCServerMultiAgentMode:
             mock_agent_server._find_agent(kernel_id=kernel_id, throw_error=False)
 
     def test_find_agent_by_image_name_single_match(self, mock_agent_server: AgentRPCServer) -> None:
-        mock_agent1 = Mock()
-        mock_agent1.known_kernel_ids = set()
-        mock_agent1.known_image_names = {"test-image"}
-        mock_agent2 = Mock()
-        mock_agent2.known_kernel_ids = set()
-        mock_agent2.known_image_names = set()
+        mock_agent1 = create_mock_agent()
+        mock_agent1.images = {"test-image": Mock()}
+        mock_agent2 = create_mock_agent()
 
         mock_agent_server.agents = {
             AgentId("agent-1"): mock_agent1,
@@ -246,10 +250,10 @@ class TestAgentRPCServerMultiAgentMode:
     def test_find_agent_by_multiple_kernel_ids(self, mock_agent_server: AgentRPCServer) -> None:
         kernel_id1 = KernelId(uuid4())
         kernel_id2 = KernelId(uuid4())
-        mock_agent1 = Mock()
-        mock_agent1.known_kernel_ids = {kernel_id1, kernel_id2}
-        mock_agent2 = Mock()
-        mock_agent2.known_kernel_ids = {kernel_id1}
+        mock_agent1 = create_mock_agent()
+        mock_agent1.kernel_registry = {kernel_id1: Mock(), kernel_id2: Mock()}
+        mock_agent2 = create_mock_agent()
+        mock_agent2.kernel_registry = {kernel_id1: Mock()}
 
         mock_agent_server.agents = {
             AgentId("agent-1"): mock_agent1,
@@ -266,12 +270,11 @@ class TestAgentRPCServerMultiAgentMode:
         self, mock_agent_server: AgentRPCServer
     ) -> None:
         kernel_id = KernelId(uuid4())
-        mock_agent1 = Mock()
-        mock_agent1.known_kernel_ids = {kernel_id}
-        mock_agent1.known_image_names = {"test-image"}
-        mock_agent2 = Mock()
-        mock_agent2.known_kernel_ids = {kernel_id}
-        mock_agent2.known_image_names = set()
+        mock_agent1 = create_mock_agent()
+        mock_agent1.kernel_registry = {kernel_id: Mock()}
+        mock_agent1.images = {"test-image": Mock()}
+        mock_agent2 = create_mock_agent()
+        mock_agent2.kernel_registry = {kernel_id: Mock()}
 
         mock_agent_server.agents = {
             AgentId("agent-1"): mock_agent1,
