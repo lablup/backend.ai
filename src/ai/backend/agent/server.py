@@ -426,7 +426,6 @@ class AgentRPCServer(aobject):
                 for agent_config in agent_configs
             ]
         agents = [task.result() for task in tasks]
-        # TODO: Is there a better way of choosing a default agent?
         self._default_agent_id = agents[0].id
         self.agents = {agent.id: agent for agent in agents}
 
@@ -506,7 +505,6 @@ class AgentRPCServer(aobject):
 
         try:
             if self.agents:
-                # TODO: Is it acceptable to flatten out kernels and allocs across multiple subagents?
                 snapshot = {
                     "registry": {
                         str(kern_id): _ensure_serializable(kern.__getstate__())
@@ -840,7 +838,7 @@ class AgentRPCServer(aobject):
         Delegates to agent's check_and_pull method which handles tracking.
         """
         log.debug("rpc::check_and_pull(images:{})", list(image_configs.keys()))
-        # TODO: Client should pass in the agent ID to select the agent
+        # TODO(BA-2607): Client should pass in the agent ID to select the agent
         return await self._select_agent().check_and_pull(image_configs)
 
     @rpc_function
@@ -865,7 +863,7 @@ class AgentRPCServer(aobject):
             )
             kernel_id = KernelId(UUID(raw_kernel_id))
             kernel_config = cast(KernelCreationConfig, raw_config)
-            # TODO: Client should pass in the agent ID to select the agent
+            # TODO(BA-2607): Client should pass in the agent ID to select the agent
             agent = self._select_agent()
             coros.append(
                 agent.create_kernel(
@@ -1142,7 +1140,7 @@ class AgentRPCServer(aobject):
         registry_conf: ImageRegistry,
     ) -> dict[str, Any]:
         log.info("rpc::push_image(c:{})", image_ref.canonical)
-        # TODO: Client should pass in the agent ID to select the agent
+        # TODO(BA-2607): Client should pass in the agent ID to select the agent
         agent = self._select_agent()
         bgtask_mgr = agent.background_task_manager
 
@@ -1243,7 +1241,7 @@ class AgentRPCServer(aobject):
     @collect_error
     async def create_local_network(self, network_name: str) -> None:
         log.debug("rpc::create_local_network(name:{})", network_name)
-        # TODO: Client should pass in the agent ID to select the agent
+        # TODO(BA-2607): Client should pass in the agent ID to select the agent
         agent = self._select_agent()
         return await agent.create_local_network(network_name)
 
@@ -1251,7 +1249,7 @@ class AgentRPCServer(aobject):
     @collect_error
     async def destroy_local_network(self, network_name: str) -> None:
         log.debug("rpc::destroy_local_network(name:{})", network_name)
-        # TODO: Client should pass in the agent ID to select the agent
+        # TODO(BA-2607): Client should pass in the agent ID to select the agent
         agent = self._select_agent()
         return await agent.destroy_local_network(network_name)
 
@@ -1259,7 +1257,7 @@ class AgentRPCServer(aobject):
     @collect_error
     async def reset_agent(self):
         log.debug("rpc::reset()")
-        # TODO: Client should pass in the agent ID to select the agent
+        # TODO(BA-2607): Client should pass in the agent ID to select the agent
         agent = self._select_agent()
         kernel_ids = tuple(agent.kernel_registry.keys())
         tasks = []
@@ -1278,21 +1276,21 @@ class AgentRPCServer(aobject):
     @collect_error
     async def assign_port(self):
         log.debug("rpc::assign_port()")
-        # TODO: Client should pass in the agent ID to select the agent
+        # TODO(BA-2607): Client should pass in the agent ID to select the agent
         return self._select_agent().port_pool.pop()
 
     @rpc_function
     @collect_error
     async def release_port(self, port_no: int):
         log.debug("rpc::release_port(port_no:{})", port_no)
-        # TODO: Client should pass in the agent ID to select the agent
+        # TODO(BA-2607): Client should pass in the agent ID to select the agent
         self._select_agent().port_pool.add(port_no)
 
     @rpc_function
     @collect_error
     async def scan_gpu_alloc_map(self) -> Mapping[str, Any]:
         log.debug("rpc::scan_gpu_alloc_map()")
-        # TODO: Client should pass in the agent ID to select the agent
+        # TODO(BA-2607): Client should pass in the agent ID to select the agent
         scratch_root = self._select_agent().local_config.container.scratch_root
         result = await scan_gpu_alloc_map(
             list(self.default_agent.kernel_registry.keys()), scratch_root

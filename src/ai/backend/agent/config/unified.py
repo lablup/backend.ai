@@ -806,7 +806,6 @@ class ContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("advertised-host", "advertised_host"),
         serialization_alias="advertised-host",
     )
-    # TODO: Add validator to ensure that the port_range does not overlap between subagents.
     port_range: PortRangeField = Field(
         default=(30000, 31000),
         description=textwrap.dedent("""
@@ -924,7 +923,6 @@ class OverridableContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("kernel-uid", "kernel_uid"),
         serialization_alias="kernel-uid",
     )
-    # FIXME: Should this be marked as non-overridable?
     kernel_gid: Optional[GroupID] = Field(
         default=None,
         description="Kernel group ID",
@@ -932,7 +930,6 @@ class OverridableContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("kernel-gid", "kernel_gid"),
         serialization_alias="kernel-gid",
     )
-    # TODO: Add validator to ensure that the port_range does not overlap between subagents.
     port_range: Optional[PortRangeField] = Field(
         default=None,
         description=textwrap.dedent("""
@@ -966,7 +963,6 @@ class OverridableContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("jail-args", "jail_args"),
         serialization_alias="jail-args",
     )
-    # FIXME: Should this be marked as non-overridable?
     scratch_type: Optional[ScratchTypeField] = Field(
         default=None,
         description="Scratch type",
@@ -974,7 +970,6 @@ class OverridableContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("scratch-type", "scratch_type"),
         serialization_alias="scratch-type",
     )
-    # FIXME: Should this be marked as non-overridable?
     scratch_root: Optional[AutoDirectoryPath] = Field(
         default=None,
         description="Scratch root directory",
@@ -982,7 +977,6 @@ class OverridableContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("scratch-root", "scratch_root"),
         serialization_alias="scratch-root",
     )
-    # FIXME: Should this be marked as non-overridable?
     scratch_size: Optional[BinarySizeField] = Field(
         default=None,
         description="Scratch size",
@@ -990,7 +984,6 @@ class OverridableContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("scratch-size", "scratch_size"),
         serialization_alias="scratch-size",
     )
-    # FIXME: Should this be marked as non-overridable?
     scratch_nfs_address: Optional[str] = Field(
         default=None,
         description="Scratch NFS address",
@@ -998,7 +991,6 @@ class OverridableContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("scratch-nfs-address", "scratch_nfs_address"),
         serialization_alias="scratch-nfs-address",
     )
-    # FIXME: Should this be marked as non-overridable?
     scratch_nfs_options: Optional[str] = Field(
         default=None,
         description="Scratch NFS options",
@@ -1006,7 +998,6 @@ class OverridableContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("scratch-nfs-options", "scratch_nfs_options"),
         serialization_alias="scratch-nfs-options",
     )
-    # FIXME: Should this be marked as non-overridable?
     alternative_bridge: Optional[str] = Field(
         default=None,
         description="Alternative bridge network",
@@ -1014,7 +1005,6 @@ class OverridableContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("alternative-bridge", "alternative_bridge"),
         serialization_alias="alternative-bridge",
     )
-    # FIXME: Should this be marked as non-overridable?
     swarm_enabled: Optional[bool] = Field(
         default=None,
         description=textwrap.dedent("""
