@@ -332,7 +332,6 @@ async def api_ctx(
             volume_cls = plugin_instance.get_volume_class()
             root_ctx.backends[plugin_name] = volume_cls
         yield plugin_ctx
-        await root_ctx.shutdown_volumes()
         await plugin_ctx.cleanup()
 
     @asynccontextmanager
@@ -439,6 +438,9 @@ async def api_ctx(
             )
         )
         yield client_api_app, manager_api_app, internal_api_app
+
+        # volume instances are lazily initialized upon their first usage by the API layers.
+        await root_ctx.shutdown_volumes()
 
 
 @asynccontextmanager
