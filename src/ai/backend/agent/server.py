@@ -11,6 +11,7 @@ import ssl
 import sys
 import time
 from collections import OrderedDict, defaultdict
+from collections.abc import Iterator
 from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
@@ -117,6 +118,7 @@ from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
 
 from . import __version__ as VERSION
+from .agent import AbstractAgent
 from .config.unified import (
     AgentConfigValidationContext,
     AgentUnifiedConfig,
@@ -126,8 +128,10 @@ from .config.unified import (
     KernelLifecyclesConfig,
 )
 from .exception import ResourceError
+from .kernel import AbstractKernel
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from .types import (
+    AgentBackend,
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
@@ -136,7 +140,7 @@ from .types import (
 from .utils import get_subnet_ip
 
 if TYPE_CHECKING:
-    from .agent import AbstractAgent
+    from .docker.metadata.server import MetadataServer
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -275,6 +279,24 @@ class RPCFunctionRegistryV2:
         return _inner
 
 
+class AggregateKernelRegistry(Mapping[KernelId, AbstractKernel]):
+    def __init__(self, agents: Mapping[AgentId, AbstractAgent]) -> None:
+        self._agents = agents
+
+    def __getitem__(self, kernel_id: KernelId) -> AbstractKernel:
+        for agent in self._agents.values():
+            if kernel_id in agent.kernel_registry:
+                return agent.kernel_registry[kernel_id]
+        raise KeyError(kernel_id)
+
+    def __iter__(self) -> Iterator[KernelId]:
+        for agent in self._agents.values():
+            yield from agent.kernel_registry.keys()
+
+    def __len__(self) -> int:
+        return sum(len(agent.kernel_registry) for agent in self._agents.values())
+
+
 def _collect_metrics(observer: RPCMetricObserver, method_name: str) -> Callable:
     def decorator(meth: Callable) -> Callable[[AgentRPCServer, RPCMessage], Any]:
         @functools.wraps(meth)
@@ -316,6 +338,7 @@ class AgentRPCServer(aobject):
     rpc_server: Peer
     rpc_addr: str
     agent_addr: str
+    metadata_server: Optional[MetadataServer]
 
     _stop_signal: signal.Signals
     debug_server_task: asyncio.Task
@@ -332,6 +355,7 @@ class AgentRPCServer(aobject):
         self.local_config = local_config
         self.skip_detect_manager = skip_detect_manager
         self._stop_signal = signal.SIGTERM
+        self.metadata_server = None
 
     async def __ainit__(self) -> None:
         # Start serving requests.
@@ -405,6 +429,21 @@ class AgentRPCServer(aobject):
         # TODO: Is there a better way of choosing a default agent?
         self._default_agent_id = agents[0].id
         self.agents = {agent.id: agent for agent in agents}
+
+        if backend == AgentBackend.DOCKER:
+            from .docker.agent import DockerAgent
+            from .docker.metadata.server import MetadataServer
+
+            combined_registry = AggregateKernelRegistry(self.agents)
+            self.metadata_server = await MetadataServer.new(
+                self.local_config,
+                self.etcd,
+                combined_registry,
+            )
+
+            for agent in self.agents.values():
+                assert isinstance(agent, DockerAgent)
+                agent.metadata_server = self.metadata_server
 
         rpc_addr = self.local_config.agent.rpc_listen_addr
         self.rpc_server = Peer(
@@ -602,6 +641,8 @@ class AgentRPCServer(aobject):
             await self.debug_server_task
         for agent in self.agents.values():
             await agent.shutdown(self._stop_signal)
+        if self.metadata_server is not None:
+            await self.metadata_server.cleanup()
         await self.stats_monitor.cleanup()
         await self.error_monitor.cleanup()
 

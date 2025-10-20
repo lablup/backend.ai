@@ -1298,7 +1298,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     monitor_docker_task: asyncio.Task
     agent_sockpath: Path
     agent_sock_task: asyncio.Task
-    metadata_server: MetadataServer
+    metadata_server: Optional[MetadataServer]
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: Optional[str]
     checked_invalid_images: Set[str]
@@ -1324,6 +1324,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             agent_public_key=agent_public_key,
         )
         self.checked_invalid_images = set()
+        # MetadataServer must be shared across all instances of DockerAgent.
+        # metadata_server must be initialized and later set using .assign_metadata_server().
+        self.metadata_server = None
 
     async def __ainit__(self) -> None:
         async with closing_async(Docker()) as docker:
@@ -1398,12 +1401,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self.monitor_docker_task = asyncio.create_task(self.monitor_docker_events())
         self.docker_ptask_group = aiotools.PersistentTaskGroup()
 
-        self.metadata_server = await MetadataServer.new(
-            self.local_config,
-            self.etcd,
-            self.kernel_registry,
-        )
-        await self.metadata_server.start_server()
         # For legacy accelerator plugins
         self.docker = Docker()
 
@@ -1415,6 +1412,9 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             allowlist=self.local_config.agent.allow_network_plugins,
             blocklist=self.local_config.agent.block_network_plugins,
         )
+
+    def assign_metadata_server(self, metadata_server: MetadataServer) -> None:
+        self.metadata_server = metadata_server
 
     async def shutdown(self, stop_signal: signal.Signals):
         # Stop handling agent sock.
@@ -1432,7 +1432,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 self.monitor_docker_task.cancel()
                 await self.monitor_docker_task
 
-        await self.metadata_server.cleanup()
         if self.docker:
             await self.docker.close()
 
