@@ -693,6 +693,13 @@ class Context(metaclass=ABCMeta):
             data = tomlkit.load(fp)
             data["redis"]["host"] = halfstack.redis_addr.face.host  # type: ignore
             data["redis"]["port"] = halfstack.redis_addr.face.port  # type: ignore
+            data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
+                f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"
+            )
+            data["proxy_worker"]["api_bind_addr"] = {  # type: ignore[index]
+                "host": service.appproxy_worker_addr.bind.host,
+                "port": service.appproxy_worker_addr.bind.port,
+            }
             data["proxy_worker"]["port_proxy"]["bind_port"] = service.appproxy_worker_addr.bind.port  # type: ignore[index]
             data["proxy_worker"]["port_proxy"]["bind_host"] = service.appproxy_worker_addr.bind.host  # type: ignore[index]
             data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
