@@ -665,23 +665,23 @@ class Context(metaclass=ABCMeta):
 
         with coord_conf.open("r") as fp:
             data = tomlkit.load(fp)
-            data["db"]["type"] = "postgresql"
-            data["db"]["name"] = "appproxy"
-            data["db"]["user"] = "appproxy"
-            data["db"]["password"] = "develove"
-            data["db"]["pool_size"] = 8
-            data["db"]["max_overflow"] = 64
-            data["db"]["addr"]["host"] = halfstack.postgres_addr.face.host
-            data["db"]["addr"]["port"] = halfstack.postgres_addr.face.port
-            data["redis"]["host"] = halfstack.redis_addr.face.host
-            data["redis"]["port"] = halfstack.redis_addr.face.port
-            data["secrets"]["api_secret"] = service.appproxy_api_secret
-            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret
-            data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret
-            data["proxy_coordinator"]["bind_addr"]["host"] = (
+            data["db"]["type"] = "postgresql"  # type: ignore[index]
+            data["db"]["name"] = "appproxy"  # type: ignore[index]
+            data["db"]["user"] = "appproxy"  # type: ignore[index]
+            data["db"]["password"] = "develove"  # type: ignore[index]
+            data["db"]["pool_size"] = 8  # type: ignore[index]
+            data["db"]["max_overflow"] = 64  # type: ignore[index]
+            data["db"]["addr"]["host"] = halfstack.postgres_addr.face.host  # type: ignore[index]
+            data["db"]["addr"]["port"] = halfstack.postgres_addr.face.port  # type: ignore[index]
+            data["redis"]["host"] = halfstack.redis_addr.face.host  # type: ignore[index]
+            data["redis"]["port"] = halfstack.redis_addr.face.port  # type: ignore[index]
+            data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
+            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
+            data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+            data["proxy_coordinator"]["bind_addr"]["host"] = (  # type: ignore[index]
                 service.appproxy_coordinator_addr.bind.host
             )
-            data["proxy_coordinator"]["bind_addr"]["port"] = (
+            data["proxy_coordinator"]["bind_addr"]["port"] = (  # type: ignore[index]
                 service.appproxy_coordinator_addr.bind.port
             )
         with coord_conf.open("w") as fp:
@@ -691,13 +691,13 @@ class Context(metaclass=ABCMeta):
         worker_conf = self.copy_config("app-proxy-worker.toml")
         with worker_conf.open("r") as fp:
             data = tomlkit.load(fp)
-            data["redis"]["host"] = halfstack.redis_addr.face.host
-            data["redis"]["port"] = halfstack.redis_addr.face.port
-            data["proxy_worker"]["port_proxy"]["bind_port"] = service.appproxy_worker_addr.bind.port
-            data["proxy_worker"]["port_proxy"]["bind_host"] = service.appproxy_worker_addr.bind.host
-            data["secrets"]["api_secret"] = service.appproxy_api_secret
-            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret
-            data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret
+            data["redis"]["host"] = halfstack.redis_addr.face.host  # type: ignore[index]
+            data["redis"]["port"] = halfstack.redis_addr.face.port  # type: ignore[index]
+            data["proxy_worker"]["port_proxy"]["bind_port"] = service.appproxy_worker_addr.bind.port  # type: ignore[index]
+            data["proxy_worker"]["port_proxy"]["bind_host"] = service.appproxy_worker_addr.bind.host  # type: ignore[index]
+            data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
+            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
+            data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
         with worker_conf.open("w") as fp:
             tomlkit.dump(data, fp)
 
