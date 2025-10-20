@@ -77,7 +77,7 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
+  ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
   # Blocked compute plugins
   ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
   # Allowed network plugins
@@ -374,7 +374,7 @@
     # Whether to enable cohabiting storage proxy
     ## cohabiting-storage-proxy = true
     # Allowed compute plugins
-    ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
+    ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
     # Blocked compute plugins
     ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
     # Allowed network plugins
@@ -402,30 +402,26 @@
   # Container config overrides for the individual subagent
   [sub-agents.container]
     # Kernel user ID
-    kernel-uid = -1
+    ## kernel-uid = 1000
     # Kernel group ID
-    kernel-gid = -1
-    # Bind host for containers
-    bind-host = ""
-    # Advertised host for containers
-    ## advertised-host = "192.168.1.100"
+    ## kernel-gid = 1000
     # Port range for containers.
     # If subagents are used, user must ensure that the port ranges don't overlap
     # between the subagents, else it may cause subtle issues late into the
     # agent's runtime.
-    port-range = [ 30000, 31000,]
+    ## port-range = [ 30000, 31000,]
     # Statistics type
     ## stats-type = "cgroup"
     # Sandbox type
-    sandbox-type = "docker"
+    ## sandbox-type = "docker"
     # Jail arguments
-    jail-args = [ "--mount", "/tmp",]
+    ## jail-args = [ "--mount", "/tmp",]
     # Scratch type
-    scratch-type = "hostdir"
+    ## scratch-type = "hostdir"
     # Scratch root directory
-    scratch-root = "scratches"
+    ## scratch-root = "./scratches"
     # Scratch size
-    scratch-size = 0
+    ## scratch-size = "1G"
     # Scratch NFS address
     ## scratch-nfs-address = "192.168.1.100:/export"
     # Scratch NFS options
@@ -437,15 +433,7 @@
     # When enabled, the agent will use Docker Swarm APIs to manage containers,
     # networks, and services.
     # This field is only used when backend is set to 'docker'.
-    swarm-enabled = false
-
-    # KRunner volumes configuration, mapping container names to host paths.
-    # This is used to specify volumes that should be mounted into containers
-    # when using the KRunner backend.
-    # This fields is filled by the agent at runtime based on the
-    # `krunner_volumes` configuration in the agent's environment.
-    # It is not intended to be set in the configuration file.
-    ## [sub-agents.container.krunner-volumes]
+    ## swarm-enabled = true
 
   # Resource config overrides for the individual subagent
   [sub-agents.resource]
