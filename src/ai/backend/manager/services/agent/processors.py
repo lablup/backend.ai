@@ -31,6 +31,10 @@ from ai.backend.manager.services.agent.actions.remove_agent_from_images import (
     RemoveAgentFromImagesAction,
     RemoveAgentFromImagesActionResult,
 )
+from ai.backend.manager.services.agent.actions.remove_agent_from_images_by_canonicals import (
+    RemoveAgentFromImagesByCanonicalsAction,
+    RemoveAgentFromImagesByCanonicalsActionResult,
+)
 from ai.backend.manager.services.agent.actions.sync_agent_registry import (
     SyncAgentRegistryAction,
     SyncAgentRegistryActionResult,
@@ -63,6 +67,9 @@ class AgentProcessors(AbstractProcessorPackage):
     handle_heartbeat: ActionProcessor[HandleHeartbeatAction, HandleHeartbeatActionResult]
     mark_agent_exit: ActionProcessor[MarkAgentExitAction, MarkAgentExitActionResult]
     mark_agent_running: ActionProcessor[MarkAgentRunningAction, MarkAgentRunningActionResult]
+    remove_agent_from_images_by_canonicals: ActionProcessor[
+        RemoveAgentFromImagesByCanonicalsAction, RemoveAgentFromImagesByCanonicalsActionResult
+    ]
     remove_agent_from_images: ActionProcessor[
         RemoveAgentFromImagesAction, RemoveAgentFromImagesActionResult
     ]
@@ -78,6 +85,9 @@ class AgentProcessors(AbstractProcessorPackage):
         self.handle_heartbeat = ActionProcessor(service.handle_heartbeat, action_monitors)
         self.mark_agent_exit = ActionProcessor(service.mark_agent_exit, action_monitors)
         self.mark_agent_running = ActionProcessor(service.mark_agent_running, action_monitors)
+        self.remove_agent_from_images_by_canonicals = ActionProcessor(
+            service.remove_agent_from_images_by_canonicals, action_monitors
+        )
         self.remove_agent_from_images = ActionProcessor(
             service.remove_agent_from_images, action_monitors
         )
@@ -93,4 +103,6 @@ class AgentProcessors(AbstractProcessorPackage):
             RecalculateUsageAction.spec(),
             GetTotalResourcesAction.spec(),
             HandleHeartbeatAction.spec(),
+            RemoveAgentFromImagesAction.spec(),
+            RemoveAgentFromImagesByCanonicalsAction.spec(),
         ]

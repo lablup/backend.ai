@@ -12,7 +12,9 @@ from ai.backend.manager.types import PaginationOptions, TriState
 
 
 class DelegateScanArtifactsReq(BaseRequestModel):
-    delegator_reservoir_id: Optional[uuid.UUID] = Field(default=None, description="")
+    delegator_reservoir_id: Optional[uuid.UUID] = Field(
+        default=None, description="ID of the reservoir registry to delegate the scan request to"
+    )
     delegatee_target: Optional[DelegateeTarget] = Field(
         default=None,
         description="The unique identifier of the target reservoir to delegate the scan.",
@@ -99,6 +101,19 @@ class GetArtifactRevisionReadmeReq(BaseRequestModel):
 
 class RejectArtifactRevisionReq(BaseRequestModel):
     artifact_revision_id: uuid.UUID = Field(description="The artifact revision ID to reject.")
+
+
+class DelegateImportArtifactsReq(BaseRequestModel):
+    artifact_revision_ids: list[uuid.UUID] = Field(
+        description="List of artifact revision IDs to delegate the import request."
+    )
+    delegator_reservoir_id: Optional[uuid.UUID] = Field(
+        default=None, description="ID of the reservoir registry to delegate the import request to"
+    )
+    delegatee_target: Optional[DelegateeTarget] = Field(
+        default=None,
+    )
+    artifact_type: Optional[ArtifactType]
 
 
 class ImportArtifactsReq(BaseRequestModel):

@@ -50,15 +50,17 @@ class StoragePool:
         # Add Storage instances
         for storage_name, artifact_storage_config in config.artifact_storages.items():
             match artifact_storage_config.storage_type:
-                case ArtifactStorageType.VFS:
-                    if artifact_storage_config.vfs is None:
+                case ArtifactStorageType.VFS_STORAGE:
+                    if artifact_storage_config.vfs_storage is None:
                         raise InvalidConfigError(
-                            "vfs config is required when storage_type is 'vfs'"
+                            "vfs_storage config is required when storage_type is 'vfs_storage'"
                         )
                     log.info(
-                        f"Adding VFS storage: {storage_name} ({artifact_storage_config.vfs.base_path})"
+                        f"Adding VFS storage: {storage_name} ({artifact_storage_config.vfs_storage.base_path})"
                     )
-                    storages[storage_name] = VFSStorage(storage_name, artifact_storage_config.vfs)
+                    storages[storage_name] = VFSStorage(
+                        storage_name, artifact_storage_config.vfs_storage
+                    )
 
                 case ArtifactStorageType.OBJECT_STORAGE:
                     if artifact_storage_config.object_storage is None:

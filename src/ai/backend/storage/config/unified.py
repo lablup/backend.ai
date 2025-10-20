@@ -570,6 +570,19 @@ class StorageProxyConfig(BaseConfigSchema):
         ),
         serialization_alias="use-experimental-redis-event-dispatcher",
     )
+    auto_quota_scope_creation: bool = Field(
+        default=True,
+        description="""
+        Whether to allow automatic creation of quota scopes.
+        If true, quota scopes will be created when creating VFolders in non-existent quota scopes.
+        If false, VFolder creation will fail if the quota scope does not exist.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices(
+            "allow-auto-quota-scope-creation", "auto_quota_scope_creation"
+        ),
+        serialization_alias="allow-auto-quota-scope-creation",
+    )
 
 
 class PresignedUploadConfig(BaseConfigSchema):
@@ -838,6 +851,55 @@ class ReservoirConfig(BaseConfigSchema):
         serialization_alias="object-storage-region",
     )
 
+    manager_endpoint: Optional[str] = Field(
+        default=None,
+        description="""
+        Custom endpoint for the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        examples=["https://manager.reservoir.ai"],
+        validation_alias=AliasChoices("manager-endpoint", "manager_endpoint"),
+        serialization_alias="manager-endpoint",
+    )
+    manager_access_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Access key for authenticating with the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        validation_alias=AliasChoices("manager-access-key", "manager_access_key"),
+        serialization_alias="manager-access-key",
+    )
+    manager_secret_key: Optional[str] = Field(
+        default=None,
+        description="""
+        Secret key for authenticating with the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        validation_alias=AliasChoices("manager-secret-key", "manager_secret_key"),
+        serialization_alias="manager-secret-key",
+    )
+    manager_api_version: Optional[str] = Field(
+        default=None,
+        description="""
+        API version for the reservoir manager API.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        examples=["v1"],
+        validation_alias=AliasChoices("manager-api-version", "manager_api_version"),
+        serialization_alias="manager-api-version",
+    )
+    storage_name: Optional[str] = Field(
+        default=None,
+        description="""
+        Name of the object storage configuration to use with the reservoir registry.
+        Required if the remote reservoir registry use vfs storage.
+        """,
+        examples=["s3-storage", "vfs-storage"],
+        validation_alias=AliasChoices("storage-name", "storage_name"),
+        serialization_alias="storage-name",
+    )
+
 
 class LegacyReservoirConfig(ReservoirConfig):
     registry_type: Literal["reservoir"] = Field(
@@ -866,7 +928,7 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
         validation_alias=AliasChoices("object-storage", "object_storage"),
         serialization_alias="object-storage",
     )
-    vfs: Optional[VFSStorageConfig] = Field(
+    vfs_storage: Optional[VFSStorageConfig] = Field(
         default=None,
         description="""
         VFS storage configuration.
@@ -881,8 +943,8 @@ class ArtifactRegistryStorageConfig(BaseConfigSchema):
                     raise InvalidConfigError(
                         "object_storage config is required when storage_type is 'object_storage'"
                     )
-            case ArtifactStorageType.VFS:
-                if self.vfs is None:
+            case ArtifactStorageType.VFS_STORAGE:
+                if self.vfs_storage is None:
                     raise InvalidConfigError("vfs config is required when storage_type is 'vfs'")
             case ArtifactStorageType.GIT_LFS:
                 raise GenericNotImplementedError("git_lfs is not supported yet")

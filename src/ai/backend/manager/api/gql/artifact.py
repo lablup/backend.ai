@@ -35,11 +35,15 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.artifact.types import DelegateeTarget as DelegateeTargetData
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
-from ai.backend.manager.errors.api import NotImplementedAPI
-from ai.backend.manager.errors.artifact import ArtifactScanLimitExceededError
+from ai.backend.manager.errors.artifact import (
+    ArtifactImportDelegationError,
+    ArtifactScanLimitExceededError,
+)
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
     ArtifactOrderingOptions,
+    ArtifactRemoteStatusFilter,
+    ArtifactRemoteStatusFilterType,
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
     ArtifactStatusFilter,
@@ -60,6 +64,9 @@ from ai.backend.manager.services.artifact_revision.actions.cancel_import import 
 from ai.backend.manager.services.artifact_revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
 )
+from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
+    DelegateImportArtifactRevisionBatchAction,
+)
 from ai.backend.manager.services.artifact_revision.actions.get import GetArtifactRevisionAction
 from ai.backend.manager.services.artifact_revision.actions.import_revision import (
     ImportArtifactRevisionAction,
@@ -73,7 +80,16 @@ from ai.backend.manager.types import PaginationOptions, TriState
 from .artifact_registry_meta import ArtifactRegistryMeta
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Filter options for artifacts based on various criteria such as type, name, registry,
+    source, and availability status.
+
+    Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+    """)
+)
 class ArtifactFilter:
     type: Optional[list[ArtifactType]] = None
     name: Optional[StringFilter] = None
@@ -106,21 +122,50 @@ class ArtifactFilter:
         return repo_filter
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Specifies the field and direction for ordering artifacts in queries.
+    """)
+)
 class ArtifactOrderBy:
     field: ArtifactOrderField
     direction: OrderDirection = OrderDirection.ASC
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Filter for artifact revision status. Supports exact match or inclusion in a list of statuses.
+    """)
+)
 class ArtifactRevisionStatusFilter:
     in_: Optional[list[ArtifactStatus]] = strawberry.field(name="in", default=None)
     equals: Optional[ArtifactStatus] = None
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(description="Added in 25.16.0")
+class ArtifactRevisionRemoteStatusFilter:
+    in_: Optional[list[ArtifactRemoteStatus]] = strawberry.field(name="in", default=None)
+    equals: Optional[ArtifactRemoteStatus] = None
+
+
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Filter options for artifact revisions based on status, version, artifact ID, and file size.
+
+    Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+    """)
+)
 class ArtifactRevisionFilter:
     status: Optional[ArtifactRevisionStatusFilter] = None
+    remote_status: Optional[ArtifactRevisionRemoteStatusFilter] = strawberry.field(
+        default=None, description="Added in 25.16.0"
+    )
     version: Optional[StringFilter] = None
     artifact_id: Optional[ID] = None
     size: Optional[IntFilter] = None
@@ -147,6 +192,17 @@ class ArtifactRevisionFilter:
                     type=ArtifactStatusFilterType.EQUALS, values=[self.status.equals]
                 )
 
+        # Handle remote_status filter using ArtifactRevisionRemoteStatusFilter
+        if self.remote_status:
+            if self.remote_status.in_:
+                repo_filter.remote_status_filter = ArtifactRemoteStatusFilter(
+                    type=ArtifactRemoteStatusFilterType.IN, values=self.remote_status.in_
+                )
+            elif self.remote_status.equals:
+                repo_filter.remote_status_filter = ArtifactRemoteStatusFilter(
+                    type=ArtifactRemoteStatusFilterType.EQUALS, values=[self.remote_status.equals]
+                )
+
         # Pass StringFilter directly for processing in repository
         repo_filter.version_filter = self.version
 
@@ -164,13 +220,28 @@ class ArtifactRevisionFilter:
         return repo_filter
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Specifies the field and direction for ordering artifact revisions in queries.
+    """)
+)
 class ArtifactRevisionOrderBy:
     field: ArtifactRevisionOrderField
     direction: OrderDirection = OrderDirection.ASC
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Input for scanning artifacts from external registries (HuggingFace, Reservoir).
+
+    Discovers available artifacts and registers their metadata in the system.
+    Artifacts remain in SCANNED status until explicitly imported via import_artifacts.
+    """)
+)
 class ScanArtifactsInput:
     registry_id: Optional[ID] = None
     limit: int = strawberry.field(
@@ -180,7 +251,16 @@ class ScanArtifactsInput:
     search: Optional[str] = None
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Input for importing scanned artifact revisions from external registries.
+
+    Downloads artifact files from the external source and transitions them through:
+    SCANNED → PULLING → PULLED → AVAILABLE status progression.
+    """)
+)
 class ImportArtifactsInput:
     artifact_revision_ids: list[ID]
 
@@ -236,50 +316,133 @@ class DelegateImportArtifactsInput:
     artifact_revision_ids: list[ID] = strawberry.field(
         description="List of artifact revision IDs of delegatee artifact registry"
     )
+    delegator_reservoir_id: Optional[ID] = strawberry.field(
+        default=None, description="ID of the reservoir registry to delegate the import request to"
+    )
+    artifact_type: Optional[ArtifactType] = strawberry.field(default=None)
+    delegatee_target: Optional[DelegateeTarget] = strawberry.field(default=None)
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Input for updating artifact metadata properties.
+
+    Modifies artifact metadata such as readonly status and description.
+    This operation does not affect the actual artifact files or revisions.
+    """)
+)
 class UpdateArtifactInput:
     artifact_id: ID
     readonly: Optional[bool] = UNSET
+    description: Optional[str] = UNSET
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Input for canceling an in-progress artifact import operation.
+
+    Stops the download process and reverts the artifact revision status back to SCANNED.
+    """)
+)
 class CancelArtifactInput:
     artifact_revision_id: ID
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Input for cleaning up stored artifact revision data.
+
+    Removes downloaded files from storage and transitions the artifact revision
+    back to SCANNED status, freeing up storage space.
+    """)
+)
 class CleanupArtifactRevisionsInput:
     artifact_revision_ids: list[ID]
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Input for soft-deleting artifacts from the system.
+
+    Marks artifacts as deleted without permanently removing them.
+    Deleted artifacts can be restored using restore_artifacts.
+    """)
+)
 class DeleteArtifactsInput:
     artifact_ids: list[ID]
 
 
-@strawberry.input(description="Added in 25.15.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Input for restoring previously deleted artifacts.
+
+    Reverses the soft-delete operation, making the artifacts available again.
+    """)
+)
 class RestoreArtifactsInput:
     artifact_ids: list[ID]
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Input for approving an artifact revision.
+
+    Admin-only operation to approve artifact revisions for general use.
+    """)
+)
 class ApproveArtifactInput:
     artifact_revision_id: ID
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Input for rejecting an artifact revision.
+
+    Admin-only operation to reject artifact revisions, preventing their use.
+    """)
+)
 class RejectArtifactInput:
     artifact_revision_id: ID
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Input for subscribing to artifact status change notifications.
+
+    Used with artifact_status_changed subscription to receive real-time updates
+    when artifact revision statuses change.
+    """)
+)
 class ArtifactStatusChangedInput:
     artifact_revision_ids: list[ID]
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Specifies a target model for scanning operations.
+
+    Used to identify specific models in external registries for detailed scanning.
+    If revision is not specified, defaults to 'main' revision.
+    """)
+)
 class ModelTarget:
     model_id: str
     revision: Optional[str] = None
@@ -288,20 +451,55 @@ class ModelTarget:
         return ModelTargetData(model_id=self.model_id, revision=self.revision)
 
 
-@strawberry.input(description="Added in 25.14.0")
+@strawberry.input(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Input for batch scanning of specific models from external registries.
+
+    Scans multiple specified models and retrieves detailed information including
+    README content and file sizes. This operation performs immediate detailed scanning
+    unlike the general scan_artifacts which only retrieves basic metadata.
+    """)
+)
 class ScanArtifactModelsInput:
     models: list[ModelTarget]
     registry_id: Optional[uuid.UUID] = None
 
 
 # Object Types
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Information about the source or registry of an artifact.
+
+    Contains the name and URL of the registry where the artifact is stored or originates from.
+    """)
+)
 class SourceInfo:
     name: Optional[str]
     url: Optional[str]
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    An artifact represents AI models, packages, images, or other resources that can be
+    stored, managed, and used within Backend.AI.
+
+    Artifacts are discovered through scanning external registries and,
+    can have multiple revisions.
+
+    Each artifact contains metadata and references to its source registry.
+
+    Key concepts:
+    - Type: MODEL, PACKAGE, or IMAGE
+    - Availability: ALIVE (available), DELETED (soft-deleted)
+    - Source: Original external registry where it was discovered
+    """)
+)
 class Artifact(Node):
     id: NodeID[str]
     name: str
@@ -360,7 +558,22 @@ class Artifact(Node):
         )
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    A specific version/revision of an artifact containing the actual file data.
+
+    Artifact revisions progress through different statuses:
+    - SCANNED: Discovered in external registry, metadata only
+    - PULLING: Currently downloading from external source
+    - PULLED: Downloaded to temporary storage
+    - AVAILABLE: Ready for use by users
+
+    Contains version information, file size, README content, and timestamps.
+    Most HuggingFace models only have a 'main' revision.
+    """)
+)
 class ArtifactRevision(Node):
     id: NodeID[str]
     status: ArtifactStatus
@@ -416,7 +629,15 @@ ArtifactEdge = Edge[Artifact]
 ArtifactRevisionEdge = Edge[ArtifactRevision]
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Paginated connection for artifacts with total count information.
+
+    Used for relay-style pagination with cursor-based navigation.
+    """)
+)
 class ArtifactConnection(Connection[Artifact]):
     count: int
 
@@ -425,7 +646,15 @@ class ArtifactConnection(Connection[Artifact]):
         self.count = count
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Paginated connection for artifact revisions with total count information.
+
+    Used for relay-style pagination with cursor-based navigation.
+    """)
+)
 class ArtifactRevisionConnection(Connection[ArtifactRevision]):
     count: int
 
@@ -434,14 +663,32 @@ class ArtifactRevisionConnection(Connection[ArtifactRevision]):
         self.count = count
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Payload for artifact import progress subscription events.
+
+    Provides real-time updates during the artifact import process,
+    including progress percentage and current status.
+    """)
+)
 class ArtifactImportProgressUpdatedPayload:
     artifact_id: ID
     progress: float
     status: ArtifactStatus
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Response payload for artifact scanning operations.
+
+    Contains the list of artifacts discovered during scanning of external registries.
+    These artifacts are registered with SCANNED status and can be imported for actual use.
+    """)
+)
 class ScanArtifactsPayload:
     artifacts: list[Artifact]
 
@@ -461,14 +708,32 @@ class DelegateScanArtifactsPayload:
     )
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Represents a background task for importing an artifact revision.
+
+    Contains the task ID for monitoring progress and the associated artifact revision
+    being imported from external registries.
+    """)
+)
 class ArtifactRevisionImportTask:
     task_id: ID
     artifact_revision: ArtifactRevision
 
 
 # Mutation Payloads
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Response payload for artifact import operations.
+
+    Contains the imported artifact revisions and their associated background tasks.
+    Tasks can be monitored to track the import progress from SCANNED to AVAILABLE status.
+    """)
+)
 class ImportArtifactsPayload:
     artifact_revisions: ArtifactRevisionConnection
     tasks: list[ArtifactRevisionImportTask]
@@ -492,47 +757,123 @@ class DelegateImportArtifactsPayload:
     )
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Response payload for artifact update operations.
+
+    Returns the updated artifact with modified metadata properties.
+    """)
+)
 class UpdateArtifactPayload:
     artifact: Artifact
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Response payload for artifact revision cleanup operations.
+
+    Contains the cleaned artifact revisions that have had their stored data removed,
+    transitioning them back to SCANNED status to free storage space.
+    """)
+)
 class CleanupArtifactRevisionsPayload:
     artifact_revisions: ArtifactRevisionConnection
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Response payload for artifact revision approval operations.
+
+    Contains the approved artifact revision. Admin-only operation.
+    """)
+)
 class ApproveArtifactPayload:
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Response payload for artifact revision rejection operations.
+
+    Contains the rejected artifact revision. Admin-only operation.
+    """)
+)
 class RejectArtifactPayload:
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Response payload for canceling artifact import operations.
+
+    Contains the artifact revision whose import was canceled,
+    reverting its status back to SCANNED.
+    """)
+)
 class CancelImportArtifactPayload:
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Payload for artifact status change subscription events.
+
+    Provides real-time notifications when artifact revision statuses change
+    during import, cleanup, or other operations.
+    """)
+)
 class ArtifactStatusChangedPayload:
     artifact_revision: ArtifactRevision
 
 
-@strawberry.type(description="Added in 25.14.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Response payload for batch model scanning operations.
+
+    Contains the artifact revisions discovered during detailed scanning of specific models,
+    including README content and file size information.
+    """)
+)
 class ScanArtifactModelsPayload:
     artifact_revision: ArtifactRevisionConnection
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Response payload for artifact deletion operations.
+
+    Contains the artifacts that were soft-deleted. These can be restored later.
+    """)
+)
 class DeleteArtifactsPayload:
     artifacts: list[Artifact]
 
 
-@strawberry.type(description="Added in 25.15.0")
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Response payload for artifact restoration operations.
+
+    Contains the artifacts that were restored from soft-deleted state.
+    """)
+)
 class RestoreArtifactsPayload:
     artifacts: list[Artifact]
 
@@ -785,7 +1126,20 @@ async def resolve_artifact_revisions(
 
 
 # Query Fields
-@strawberry.field(description="Added in 25.14.0")
+@strawberry.field(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Query artifacts with optional filtering, ordering, and pagination.
+
+    Returns artifacts that are available in the system, discovered through scanning
+    external registries like HuggingFace or Reservoir. By default, only shows
+    ALIVE (non-deleted) artifacts.
+
+    Use filters to narrow down results by type, name, registry, or availability.
+    Supports cursor-based pagination for efficient browsing of large datasets.
+    """)
+)
 async def artifacts(
     info: Info[StrawberryGQLContext],
     filter: Optional[ArtifactFilter] = ArtifactFilter(availability=[ArtifactAvailability.ALIVE]),
@@ -812,7 +1166,16 @@ async def artifacts(
     return artifacts
 
 
-@strawberry.field(description="Added in 25.14.0")
+@strawberry.field(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Retrieve a specific artifact by its ID.
+
+    Returns detailed information about the artifact including its metadata,
+    registry information, and availability status.
+    """)
+)
 async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifact]:
     action_result = await info.context.processors.artifact.get.wait_for_complete(
         GetArtifactAction(
@@ -832,7 +1195,19 @@ async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Optional[Artifac
     )
 
 
-@strawberry.field(description="Added in 25.14.0")
+@strawberry.field(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Query artifact revisions with optional filtering, ordering, and pagination.
+
+    Returns specific versions/revisions of artifacts. Each revision represents
+    a specific version of an artifact with its own status, file data, and metadata.
+
+    Use filters to find revisions by status, version, or artifact ID.
+    Supports cursor-based pagination for efficient browsing.
+    """)
+)
 async def artifact_revisions(
     info: Info[StrawberryGQLContext],
     filter: Optional[ArtifactRevisionFilter] = None,
@@ -857,7 +1232,16 @@ async def artifact_revisions(
     )
 
 
-@strawberry.field(description="Added in 25.14.0")
+@strawberry.field(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Retrieve a specific artifact revision by its ID.
+
+    Returns detailed information about the revision including its status,
+    version, file size, and README content.
+    """)
+)
 async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Optional[ArtifactRevision]:
     action_result = await info.context.processors.artifact_revision.get.wait_for_complete(
         GetArtifactRevisionAction(
@@ -868,7 +1252,19 @@ async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> Optiona
     return ArtifactRevision.from_dataclass(action_result.revision)
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Scan external registries to discover available artifacts.
+
+    Searches HuggingFace or Reservoir registries for artifacts matching the specified
+    criteria and registers them in the system with SCANNED status. The artifacts
+    become available for import but are not downloaded until explicitly imported.
+
+    This is the first step in the artifact workflow: Scan → Import → Use.
+    """)
+)
 async def scan_artifacts(
     input: ScanArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ScanArtifactsPayload:
@@ -899,7 +1295,19 @@ async def scan_artifacts(
 
 
 # Mutations
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Import scanned artifact revisions from external registries.
+
+    Downloads the actual files for the specified artifact revisions, transitioning
+    them from SCANNED → PULLING → PULLED → AVAILABLE status.
+
+    Returns background tasks that can be monitored for import progress.
+    Once AVAILABLE, artifacts can be used by users in their sessions.
+    """)
+)
 async def import_artifacts(
     input: ImportArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> ImportArtifactsPayload:
@@ -1010,17 +1418,80 @@ async def delegate_scan_artifacts(
 async def delegate_import_artifacts(
     input: DelegateImportArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DelegateImportArtifactsPayload:
-    raise NotImplementedAPI("This mutation is not implemented yet.")
+    imported_artifacts = []
+    tasks = []
+
+    action_result = await info.context.processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
+        DelegateImportArtifactRevisionBatchAction(
+            delegator_reservoir_id=uuid.UUID(input.delegator_reservoir_id)
+            if input.delegator_reservoir_id
+            else None,
+            delegatee_target=input.delegatee_target.to_dataclass()
+            if input.delegatee_target
+            else None,
+            artifact_type=input.artifact_type,
+            artifact_revision_ids=[
+                uuid.UUID(revision_id) for revision_id in input.artifact_revision_ids
+            ],
+        )
+    )
+    artifact_revisions = [
+        ArtifactRevision.from_dataclass(result) for result in action_result.result
+    ]
+    imported_artifacts.extend(artifact_revisions)
+
+    if len(artifact_revisions) != len(action_result.task_ids):
+        raise ArtifactImportDelegationError(
+            "Mismatch between artifact revisions and task IDs returned"
+        )
+
+    for task_id, artifact_revision in zip(action_result.task_ids, artifact_revisions, strict=True):
+        tasks.append(
+            ArtifactRevisionImportTask(
+                task_id=ID(str(task_id)),
+                artifact_revision=artifact_revision,
+            )
+        )
+
+    edges = [
+        ArtifactRevisionEdge(node=artifact, cursor=to_global_id(ArtifactRevisionEdge, artifact.id))
+        for artifact in imported_artifacts
+    ]
+
+    artifacts_connection = ArtifactRevisionConnection(
+        count=len(imported_artifacts),
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=False,
+            has_previous_page=False,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+    )
+
+    return DelegateImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Update artifact metadata properties.
+
+    Modifies artifact metadata such as readonly status and description.
+    This operation does not affect the actual artifact files or revisions.
+    """)
+)
 async def update_artifact(
     input: UpdateArtifactInput, info: Info[StrawberryGQLContext]
 ) -> UpdateArtifactPayload:
     action_result = await info.context.processors.artifact.update.wait_for_complete(
         UpdateArtifactAction(
             artifact_id=uuid.UUID(input.artifact_id),
-            modifier=ArtifactModifier(readonly=TriState.from_graphql(input.readonly)),
+            modifier=ArtifactModifier(
+                readonly=TriState.from_graphql(input.readonly),
+                description=TriState.from_graphql(input.description),
+            ),
         )
     )
 
@@ -1039,7 +1510,19 @@ async def update_artifact(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Clean up stored artifact revision data to free storage space.
+
+    Removes the downloaded files for the specified artifact revisions and
+    transitions them back to SCANNED status. The metadata remains, allowing
+    the artifacts to be re-imported later if needed.
+
+    Use this operation to manage storage usage by removing unused artifacts.
+    """)
+)
 async def cleanup_artifact_revisions(
     input: CleanupArtifactRevisionsInput, info: Info[StrawberryGQLContext]
 ) -> CleanupArtifactRevisionsPayload:
@@ -1072,7 +1555,16 @@ async def cleanup_artifact_revisions(
     return CleanupArtifactRevisionsPayload(artifact_revisions=artifacts_connection)
 
 
-@strawberry.mutation(description="Added in 25.15.0")
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Soft-delete artifacts from the system.
+
+    Marks artifacts as deleted without permanently removing them.
+    Deleted artifacts can be restored using the restore_artifacts mutation.
+    """)
+)
 async def delete_artifacts(
     input: DeleteArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DeleteArtifactsPayload:
@@ -1095,7 +1587,16 @@ async def delete_artifacts(
     return DeleteArtifactsPayload(artifacts=artifacts)
 
 
-@strawberry.mutation(description="Added in 25.15.0")
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.15.0.
+
+    Restore previously deleted artifacts.
+
+    Reverses the soft-delete operation, making the artifacts available again
+    for use in the system.
+    """)
+)
 async def restore_artifacts(
     input: RestoreArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> RestoreArtifactsPayload:
@@ -1118,7 +1619,16 @@ async def restore_artifacts(
     return RestoreArtifactsPayload(artifacts=artifacts)
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Cancel an in-progress artifact import operation.
+
+    Stops the download process for the specified artifact revision and
+    reverts its status back to SCANNED. The partially downloaded data is cleaned up.
+    """)
+)
 async def cancel_import_artifact(
     input: CancelArtifactInput, info: Info[StrawberryGQLContext]
 ) -> CancelImportArtifactPayload:
@@ -1134,7 +1644,16 @@ async def cancel_import_artifact(
 
 
 # TODO: Make this available when only having super-admin privileges
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Approve an artifact revision for general use.
+
+    Admin-only operation to approve artifact revisions, typically used
+    in environments with approval workflows for artifact deployment.
+    """)
+)
 async def approve_artifact_revision(
     input: ApproveArtifactInput, info: Info[StrawberryGQLContext]
 ) -> ApproveArtifactPayload:
@@ -1149,7 +1668,16 @@ async def approve_artifact_revision(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Reject an artifact revision, preventing its use.
+
+    Admin-only operation to reject artifact revisions, typically used
+    in environments with approval workflows for artifact deployment.
+    """)
+)
 async def reject_artifact_revision(
     input: RejectArtifactInput, info: Info[StrawberryGQLContext]
 ) -> RejectArtifactPayload:
@@ -1164,7 +1692,17 @@ async def reject_artifact_revision(
     )
 
 
-@strawberry.mutation(description="Added in 25.14.0")
+@strawberry.mutation(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Perform detailed scanning of specific models.
+
+    Unlike the general scan_artifacts operation, this performs immediate detailed
+    scanning of specified models including README content and file sizes.
+    Returns artifact revisions with complete metadata ready for use.
+    """)
+)
 async def scan_artifact_models(
     input: ScanArtifactModelsInput, info: Info[StrawberryGQLContext]
 ) -> ScanArtifactModelsPayload:
@@ -1199,7 +1737,17 @@ async def scan_artifact_models(
 
 
 # Subscriptions
-@strawberry.subscription(description="Added in 25.14.0")
+@strawberry.subscription(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Subscribe to real-time artifact status change notifications.
+
+    Receives updates when artifact revision statuses change during import,
+    cleanup, or other operations. Useful for building reactive UIs that
+    show live progress of artifact operations.
+    """)
+)
 async def artifact_status_changed(
     input: ArtifactStatusChangedInput,
 ) -> AsyncGenerator[ArtifactStatusChangedPayload, None]:
@@ -1209,7 +1757,17 @@ async def artifact_status_changed(
         yield ArtifactStatusChangedPayload(artifact=Artifact())
 
 
-@strawberry.subscription(description="Added in 25.14.0")
+@strawberry.subscription(
+    description=dedent_strip("""
+    Added in 25.14.0.
+
+    Subscribe to real-time artifact import progress updates.
+
+    Receives progress notifications during artifact import operations,
+    including percentage completed and current status. Useful for displaying
+    progress bars and real-time import status to users.
+    """)
+)
 async def artifact_import_progress_updated(
     artifact_revision_id: ID,
 ) -> AsyncGenerator[ArtifactImportProgressUpdatedPayload, None]:

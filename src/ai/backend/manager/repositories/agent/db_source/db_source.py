@@ -3,9 +3,10 @@ from typing import TYPE_CHECKING, Optional
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.orm import selectinload
 
 from ai.backend.common.exception import AgentNotFound
-from ai.backend.common.types import AgentId
+from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
@@ -14,9 +15,11 @@ from ai.backend.manager.data.agent.types import (
     AgentStatus,
     UpsertResult,
 )
+from ai.backend.manager.data.image.types import ImageDataWithDetails
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models import agents
 from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -33,6 +36,19 @@ class AgentDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+
+    async def get_images_by_digest(self, digests: list[str]) -> dict[ImageID, ImageDataWithDetails]:
+        async with self._db.begin_readonly_session() as db_session:
+            query = (
+                sa.select(ImageRow)
+                .where(ImageRow.config_digest.in_(digests))
+                .options(selectinload(ImageRow.aliases))
+            )
+            results: list[ImageRow] = (await db_session.scalars(query)).all()
+            images_data: dict[ImageID, ImageDataWithDetails] = {}
+            for image_row in results:
+                images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()
+            return images_data
 
     async def get_by_id(self, agent_id: AgentId) -> AgentData:
         async with self._db.begin_readonly_session() as db_session:
@@ -62,7 +78,7 @@ class AgentDBSource:
                 sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
             )
             row: Optional[AgentRow] = await session.scalar(query)
-            agent_data = row.to_data() if row is not None else None
+            agent_data = row.to_heartbeat_update_data() if row is not None else None
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
             stmt = pg_insert(agents).values(upsert_data.insert_fields)

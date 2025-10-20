@@ -187,11 +187,12 @@ async def gather_prometheus_inference_measures(
 
 async def gather_inference_measures(circuit: Circuit) -> list[InferenceMeasurement] | None:
     assert isinstance(circuit.app_info, InferenceAppInfo)
+    measures: list[InferenceMeasurement] = []
+
     match circuit.app_info.runtime_variant:
         case RuntimeVariant.VLLM:
             raw_measures = await gather_prometheus_inference_measures(circuit.route_info)
 
-            measures: list[InferenceMeasurement] = []
             for measure in raw_measures:
                 if not measure.key.startswith("vllm:"):
                     continue
@@ -206,6 +207,36 @@ async def gather_inference_measures(circuit: Circuit) -> list[InferenceMeasureme
             return measures
         case RuntimeVariant.HUGGINGFACE_TGI:
             return await gather_prometheus_inference_measures(circuit.route_info)
+        case RuntimeVariant.SGLANG:
+            raw_measures = await gather_prometheus_inference_measures(circuit.route_info)
+
+            for measure in raw_measures:
+                if not measure.key.startswith("sglang:"):
+                    continue
+                measures.append(
+                    InferenceMeasurement(
+                        key=MetricKey(measure.key.replace("sglang:", "sglang_")),
+                        type=MetricTypes.GAUGE,
+                        per_app=measure.per_app,
+                        per_replica=measure.per_replica,
+                    )
+                )
+            return measures
+        case RuntimeVariant.MODULAR_MAX:
+            raw_measures = await gather_prometheus_inference_measures(circuit.route_info)
+
+            for measure in raw_measures:
+                if not measure.key.startswith("max:"):
+                    continue
+                measures.append(
+                    InferenceMeasurement(
+                        key=MetricKey(measure.key.replace("max:", "max_")),
+                        type=MetricTypes.GAUGE,
+                        per_app=measure.per_app,
+                        per_replica=measure.per_replica,
+                    )
+                )
+            return measures
         case _:
             return None
 

@@ -133,9 +133,9 @@ class ErrorDomain(enum.StrEnum):
     API = "api"
     ARTIFACT = "artifact"
     ARTIFACT_REGISTRY = "artifact-registry"
-    ARTIFACT_REVISION = "artifact-revision"
     ARTIFACT_ASSOCIATION = "artifact-association"
     OBJECT_STORAGE = "object-storage"
+    VFS_STORAGE = "vfs-storage"
     STORAGE_NAMESPACE = "storage-namespace"
     PLUGIN = "plugin"
     BGTASK = "bgtask"
@@ -157,6 +157,7 @@ class ErrorDomain(enum.StrEnum):
     ROUTE = "route"
     DOTFILE = "dotfile"
     VFOLDER = "vfolder"
+    QUOTA_SCOPE = "quota-scope"
     VFOLDER_INVITATION = "vfolder-invitation"
     MODEL_SERVICE = "model-service"
     MODEL_DEPLOYMENT = "model-deployment"
@@ -289,6 +290,27 @@ class ErrorCode:
     def __str__(self) -> str:
         return f"{self.domain}_{self.operation}_{self.error_detail}"
 
+    @classmethod
+    def from_str(cls, code_str: str) -> Self:
+        """
+        Parses an error code string and returns an ErrorCode instance.
+
+        :param code_str: The error code string to parse.
+        :return: An ErrorCode instance.
+        :raises InvalidErrorCode: If the code_str is not in the correct format.
+        """
+        parts = code_str.split("_")
+        if len(parts) != 3:
+            raise InvalidErrorCode(f"Invalid error code format: {code_str}")
+        domain_str, operation_str, error_detail_str = parts
+        try:
+            domain = ErrorDomain(domain_str)
+            operation = ErrorOperation(operation_str)
+            error_detail = ErrorDetail(error_detail_str)
+        except ValueError as e:
+            raise InvalidErrorCode(f"Invalid error code value. Err: {e}") from e
+        return cls(domain=domain, operation=operation, error_detail=error_detail)
+
 
 class BackendAIError(web.HTTPError, ABC):
     """
@@ -361,6 +383,19 @@ class BackendAIError(web.HTTPError, ABC):
         For example, "kernel_create_invalid-image" or "kernel_create_timeout".
         """
         raise NotImplementedError("Subclasses must implement error_code() method.")
+
+
+class InvalidErrorCode(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/invalid-error-code"
+    error_title = "Invalid error code in the raised exception."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
 
 
 class MalformedRequestBody(BackendAIError, web.HTTPBadRequest):
@@ -600,6 +635,19 @@ class GenericNotImplementedError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/object-storage-bucket-not-found"
+    error_title = "Object Storage Bucket Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.OBJECT_STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class InvalidConfigError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/invalid-configuration"
     error_title = "Invalid Configuration"
@@ -634,6 +682,71 @@ class AgentNotFound(BackendAIError, web.HTTPNotFound):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/scaling-group-not-found"
+    error_title = "Scaling Group Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class VFolderNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/vfolder-not-found"
+    error_title = "Virtual Folder Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class UserNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/user-not-found"
+    error_title = "User Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class GroupNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/group-not-found"
+    error_title = "Project Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class DomainNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/domain-not-found"
+    error_title = "Domain Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )

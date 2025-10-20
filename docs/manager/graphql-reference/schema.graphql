@@ -633,7 +633,7 @@ type ImageNode implements Node @key(fields: "id") {
   type: ImageType
 }
 
-type KVPair {
+type KVPair @shareable {
   key: String
   value: String
 }
@@ -644,7 +644,7 @@ to support integers outside the range of a signed 32-bit integer.
 """
 scalar BigInt
 
-type ResourceLimit {
+type ResourceLimit @shareable {
   key: String
   min: String
   max: String @deprecated(reason: "Deprecated since 25.14.0. The max slot limit validation has been removed as it was deemed obsolete.")
@@ -689,7 +689,7 @@ type AgentSummaryList implements PaginatedList {
 }
 
 """Added in 24.12.0."""
-type DomainNode implements Node {
+type DomainNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
   name: String
@@ -920,7 +920,7 @@ type Domain {
   scaling_groups: [String]
 }
 
-type GroupNode implements Node {
+type GroupNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -1551,7 +1551,7 @@ type VirtualFolderPermission implements Item {
 }
 
 """Added in 24.09.0."""
-type ComputeSessionNode implements Node {
+type ComputeSessionNode implements Node @key(fields: "id") {
   """The ID of the object"""
   id: ID!
 
@@ -2253,7 +2253,7 @@ type ServiceConfigEdge {
   cursor: String!
 }
 
-union _Entity = ImageNode | ScalingGroupNode | UserNode | VirtualFolderNode | EndpointToken | EndpointAutoScalingRuleNode
+union _Entity = ImageNode | DomainNode | ScalingGroupNode | GroupNode | UserNode | VirtualFolderNode | ComputeSessionNode | EndpointToken | EndpointAutoScalingRuleNode
 
 scalar _Any
 

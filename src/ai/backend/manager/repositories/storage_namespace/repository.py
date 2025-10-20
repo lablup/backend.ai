@@ -1,5 +1,4 @@
 import uuid
-from typing import Dict, List
 
 import sqlalchemy as sa
 
@@ -11,8 +10,8 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.object_storage_namespace.creator import StorageNamespaceCreator
-from ai.backend.manager.data.object_storage_namespace.types import StorageNamespaceData
+from ai.backend.manager.data.storage_namespace.creator import StorageNamespaceCreator
+from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -123,7 +122,7 @@ class StorageNamespaceRepository:
             return [row.to_dataclass() for row in rows]
 
     @storage_namespace_repository_resilience.apply()
-    async def get_all_namespaces_by_storage(self) -> Dict[uuid.UUID, List[str]]:
+    async def get_all_namespaces_by_storage(self) -> dict[uuid.UUID, list[str]]:
         """
         Get all namespaces grouped by storage ID.
 
@@ -135,7 +134,7 @@ class StorageNamespaceRepository:
             result = await db_session.execute(query)
             rows = result.all()
 
-            namespaces_by_storage: Dict[uuid.UUID, List[str]] = {}
+            namespaces_by_storage: dict[uuid.UUID, list[str]] = {}
             for row in rows:
                 storage_id = row.storage_id
                 namespace = row.namespace

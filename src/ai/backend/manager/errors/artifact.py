@@ -176,3 +176,42 @@ class ArtifactScanLimitExceededError(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
+
+
+class ArtifactImportBadRequestError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/artifact-bad-import-request"
+    error_title = "Artifact Bad Import Request"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class ArtifactImportDelegationError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/artifact-import-delegation-failed"
+    error_title = "Artifact Import Delegation Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class RemoteReservoirArtifactImportError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/remote-reservoir-artifact-import-error"
+    error_title = "Remote Reservoir Artifact Import Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

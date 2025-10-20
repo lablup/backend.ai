@@ -79,9 +79,27 @@ class ImportArtifactsResponse(BaseResponseModel):
     tasks: list[ArtifactRevisionImportTask]
 
 
+class DelegateImportArtifactsResponse(BaseResponseModel):
+    tasks: list[ArtifactRevisionImportTask]
+
+
 class UpdateArtifactResponse(BaseResponseModel):
     artifact: ArtifactData
 
 
 class GetArtifactRevisionReadmeResponse(BaseResponseModel):
     readme: Optional[str]
+
+
+class VFSStorage(BaseModel):
+    name: str
+    base_path: str
+    host: str
+
+
+class GetVFSStorageResponse(BaseResponseModel):
+    storage: VFSStorage
+
+
+class ListVFSStorageResponse(BaseResponseModel):
+    storages: list[VFSStorage]

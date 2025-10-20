@@ -19,6 +19,10 @@ from ai.backend.manager.services.artifact_revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
     CleanupArtifactRevisionActionResult,
 )
+from ai.backend.manager.services.artifact_revision.actions.delegate_import_revision_batch import (
+    DelegateImportArtifactRevisionBatchAction,
+    DelegateImportArtifactRevisionBatchActionResult,
+)
 from ai.backend.manager.services.artifact_revision.actions.disassociate_with_storage import (
     DisassociateWithStorageAction,
     DisassociateWithStorageActionResult,
@@ -57,6 +61,9 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
     import_revision: ActionProcessor[
         ImportArtifactRevisionAction, ImportArtifactRevisionActionResult
     ]
+    delegate_import_revision_batch: ActionProcessor[
+        DelegateImportArtifactRevisionBatchAction, DelegateImportArtifactRevisionBatchActionResult
+    ]
     cancel_import: ActionProcessor[CancelImportAction, CancelImportActionResult]
     cleanup: ActionProcessor[CleanupArtifactRevisionAction, CleanupArtifactRevisionActionResult]
     associate_with_storage: ActionProcessor[
@@ -75,6 +82,9 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
         self.approve = ActionProcessor(service.approve, action_monitors)
         self.reject = ActionProcessor(service.reject, action_monitors)
         self.import_revision = ActionProcessor(service.import_revision, action_monitors)
+        self.delegate_import_revision_batch = ActionProcessor(
+            service.delegate_import_revision_batch, action_monitors
+        )
         self.cancel_import = ActionProcessor(service.cancel_import, action_monitors)
         self.cleanup = ActionProcessor(service.cleanup, action_monitors)
         self.associate_with_storage = ActionProcessor(
@@ -97,4 +107,5 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
             CleanupArtifactRevisionAction.spec(),
             AssociateWithStorageAction.spec(),
             DisassociateWithStorageAction.spec(),
+            DelegateImportArtifactRevisionBatchAction.spec(),
         ]

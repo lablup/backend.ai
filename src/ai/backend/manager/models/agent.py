@@ -12,7 +12,12 @@ from sqlalchemy.orm import joinedload, load_only, relationship, selectinload, wi
 from sqlalchemy.sql.expression import false, true
 
 from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, SlotTypes
-from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended, AgentStatus
+from ai.backend.manager.data.agent.types import (
+    AgentData,
+    AgentDataExtended,
+    AgentDataForHeartbeatUpdate,
+    AgentStatus,
+)
 from ai.backend.manager.data.kernel.types import KernelStatus
 
 from .base import (
@@ -89,6 +94,20 @@ class AgentRow(Base):
     kernels = relationship("KernelRow", back_populates="agent_row")
     scaling_group_row = relationship("ScalingGroupRow", back_populates="agents")
 
+    def actual_occupied_slots(self) -> ResourceSlot:
+        resource_occupied_kernel_rows = cast(
+            list[KernelRow],
+            [
+                kernel
+                for kernel in self.kernels
+                if kernel.status in KernelStatus.resource_occupied_statuses()
+            ],
+        )
+        actual_occupied_slots = sum(
+            (kernel.occupied_slots for kernel in resource_occupied_kernel_rows), ResourceSlot()
+        )
+        return actual_occupied_slots
+
     def to_data(self) -> AgentData:
         return AgentData(
             id=self.id,
@@ -98,7 +117,8 @@ class AgentRow(Base):
             scaling_group=self.scaling_group,
             schedulable=self.schedulable,
             available_slots=self.available_slots,
-            occupied_slots=self.occupied_slots,
+            cached_occupied_slots=self.occupied_slots,
+            actual_occupied_slots=self.actual_occupied_slots(),
             addr=self.addr,
             public_host=self.public_host,
             first_contact=self.first_contact,
@@ -120,7 +140,8 @@ class AgentRow(Base):
             scaling_group=self.scaling_group,
             schedulable=self.schedulable,
             available_slots=self.available_slots,
-            occupied_slots=self.occupied_slots,
+            cached_occupied_slots=self.occupied_slots,
+            actual_occupied_slots=self.actual_occupied_slots(),
             addr=self.addr,
             public_host=self.public_host,
             first_contact=self.first_contact,
@@ -132,6 +153,21 @@ class AgentRow(Base):
             auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
             known_slot_types=known_slot_types,
             kernels=[k.to_kernel_info() for k in kernel_rows],
+        )
+
+    def to_heartbeat_update_data(self) -> AgentDataForHeartbeatUpdate:
+        return AgentDataForHeartbeatUpdate(
+            status=self.status,
+            status_changed=self.status_changed,
+            scaling_group=self.scaling_group,
+            available_slots=self.available_slots,
+            addr=self.addr,
+            public_host=self.public_host,
+            version=self.version,
+            architecture=self.architecture,
+            compute_plugins=self.compute_plugins,
+            public_key=self.public_key,
+            auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
         )
 
     @classmethod

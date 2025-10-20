@@ -10,12 +10,16 @@ from dateutil.tz import tzutc
 from ai.backend.common.auth.utils import generate_signature
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.dto.request import (
+    DelegateImportArtifactsReq,
     DelegateScanArtifactsReq,
     SearchArtifactsReq,
 )
 from ai.backend.manager.dto.response import (
+    DelegateImportArtifactsResponse,
     DelegateScanArtifactsResponse,
     GetArtifactRevisionReadmeResponse,
+    GetVFSStorageResponse,
+    ListVFSStorageResponse,
     SearchArtifactsResponse,
 )
 
@@ -81,6 +85,14 @@ class ReservoirRegistryClient:
         )
         return DelegateScanArtifactsResponse.model_validate(resp)
 
+    async def delegate_import_artifacts(
+        self, req: DelegateImportArtifactsReq
+    ) -> DelegateImportArtifactsResponse:
+        resp = await self._request(
+            "POST", "/artifact-registries/delegation/import", json=req.model_dump(mode="json")
+        )
+        return DelegateImportArtifactsResponse.model_validate(resp)
+
     async def search_artifacts(self, req: SearchArtifactsReq) -> SearchArtifactsResponse:
         resp = await self._request(
             "POST", "/artifact-registries/search", json=req.model_dump(mode="json")
@@ -92,3 +104,11 @@ class ReservoirRegistryClient:
     ) -> GetArtifactRevisionReadmeResponse:
         resp = await self._request("GET", f"/artifacts/revisions/{artifact_revision_id}/readme")
         return GetArtifactRevisionReadmeResponse.model_validate(resp)
+
+    async def get_vfs_storage(self, storage_name: str) -> GetVFSStorageResponse:
+        resp = await self._request("GET", f"/vfs-storages/{storage_name}")
+        return GetVFSStorageResponse.model_validate(resp)
+
+    async def list_vfs_storages(self) -> ListVFSStorageResponse:
+        resp = await self._request("GET", "/vfs-storages")
+        return ListVFSStorageResponse.model_validate(resp)

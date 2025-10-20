@@ -16,6 +16,48 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.16.0rc2 (2025-10-15)
+
+### Features
+* Add support for Modular MAX and SGLang runtime variants ([#6237](https://github.com/lablup/backend.ai/issues/6237))
+* Add GraphQL subscription `backgroundTaskEvents` for real-time background task events ([#6243](https://github.com/lablup/backend.ai/issues/6243))
+
+### Fixes
+* Cleanup previous stages' files in artifact import pipeline ([#6251](https://github.com/lablup/backend.ai/issues/6251))
+* `ReservoirDownloadStep` fails with connection reset error when artifact size is too large in `vfs_storage` type remote reservoir registry ([#6254](https://github.com/lablup/backend.ai/issues/6254))
+
+### Documentation Updates
+* Add `Artifact` API descriptions ([#6104](https://github.com/lablup/backend.ai/issues/6104))
+* Add `Artifact` concept documentation ([#6105](https://github.com/lablup/backend.ai/issues/6105))
+
+
+## 25.16.0rc1 (2025-10-14)
+
+### Features
+* Add resilience framework with Policy interface and Resilience executor for composable fault-tolerance patterns ([#6203](https://github.com/lablup/backend.ai/issues/6203))
+* Applied resilience framework to all Valkey clients with ContextVar-based operation tracking, replacing legacy decorators with composable policies ([#6205](https://github.com/lablup/backend.ai/issues/6205))
+* Apply resilience framework (MetricPolicy + RetryPolicy with exponential backoff) to all manager repositories for improved observability and fault tolerance ([#6210](https://github.com/lablup/backend.ai/issues/6210))
+* Apply Resilience framework to agent client with exponential backoff retry policy for improved reliability in agent RPC communications ([#6211](https://github.com/lablup/backend.ai/issues/6211))
+* Apply Resilience framework to appproxy (wsproxy) client with exponential backoff retry policy for improved reliability in app proxy communications ([#6213](https://github.com/lablup/backend.ai/issues/6213))
+* Apply Resilience framework to storage proxy client with exponential backoff retry policy for improved reliability in storage proxy communications ([#6214](https://github.com/lablup/backend.ai/issues/6214))
+* Implement `delegate_import` GQL mutation to trigger remote reservoir registry import ([#6221](https://github.com/lablup/backend.ai/issues/6221))
+* Implement periodic polling and synchronization for remote reservoir ([#6222](https://github.com/lablup/backend.ai/issues/6222))
+* Introduce artifact import pipeline to enable customizable storage configuration for each stage ([#6223](https://github.com/lablup/backend.ai/issues/6223))
+* Add `vfs_storages` DB table, and GQL model and mutations ([#6229](https://github.com/lablup/backend.ai/issues/6229))
+* Replace Apollo Router with Hive Router (MIT License) to enable GQL Subscription support in federated environments without licensing fees, and add GQL Subscription support in webserver and backend for real-time updates ([#6234](https://github.com/lablup/backend.ai/issues/6234))
+* Support artifact download from the reservoir registry's `vfs_storage` ([#6236](https://github.com/lablup/backend.ai/issues/6236))
+* Add GraphQL subscription `schedulingEventsBySession` for real-time session scheduling events ([#6239](https://github.com/lablup/backend.ai/issues/6239))
+
+### Improvements
+* Integrate Pydantic validators with Agent server configuration ([#6172](https://github.com/lablup/backend.ai/issues/6172))
+
+### Fixes
+* Raise correct exception in `SessionTransitionData.main_kernel` ([#6202](https://github.com/lablup/backend.ai/issues/6202))
+* Fix race conditions in test container port allocation by using dynamic port assignment ([#6207](https://github.com/lablup/backend.ai/issues/6207))
+* Fix logging directory not auto-generated ([#6225](https://github.com/lablup/backend.ai/issues/6225))
+* Clients can now correctly fetch null quota scopes when a scope does not exist, instead of encountering an error ([#6227](https://github.com/lablup/backend.ai/issues/6227))
+
+
 ## 25.15.0 (2025-10-02)
 
 ### Features

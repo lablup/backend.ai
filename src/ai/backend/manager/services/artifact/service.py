@@ -35,6 +35,7 @@ from ai.backend.manager.dto.response import (
     DelegateScanArtifactsResponse,
     SearchArtifactsResponse,
 )
+from ai.backend.manager.errors.artifact import ArtifactRevisionNotFoundError
 from ai.backend.manager.errors.artifact_registry import (
     ArtifactRegistryBadScanRequestError,
     RemoteReservoirScanError,
@@ -47,6 +48,7 @@ from ai.backend.manager.repositories.object_storage.repository import ObjectStor
 from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
+from ai.backend.manager.repositories.vfs_storage.repository import VFSStorageRepository
 from ai.backend.manager.services.artifact.actions.delegate_scan import (
     DelegateScanArtifactsAction,
     DelegateScanArtifactsActionResult,
@@ -108,6 +110,7 @@ class ArtifactService:
     _artifact_repository: ArtifactRepository
     _artifact_registry_repository: ArtifactRegistryRepository
     _object_storage_repository: ObjectStorageRepository
+    _vfs_storage_repository: VFSStorageRepository
     _huggingface_registry_repository: HuggingFaceRepository
     _reservoir_registry_repository: ReservoirRegistryRepository
     _storage_manager: StorageSessionManager
@@ -118,6 +121,7 @@ class ArtifactService:
         artifact_repository: ArtifactRepository,
         artifact_registry_repository: ArtifactRegistryRepository,
         object_storage_repository: ObjectStorageRepository,
+        vfs_storage_repository: VFSStorageRepository,
         huggingface_registry_repository: HuggingFaceRepository,
         reservoir_registry_repository: ReservoirRegistryRepository,
         storage_manager: StorageSessionManager,
@@ -126,17 +130,26 @@ class ArtifactService:
         self._artifact_repository = artifact_repository
         self._artifact_registry_repository = artifact_registry_repository
         self._object_storage_repository = object_storage_repository
+        self._vfs_storage_repository = vfs_storage_repository
         self._huggingface_registry_repository = huggingface_registry_repository
         self._reservoir_registry_repository = reservoir_registry_repository
         self._storage_manager = storage_manager
         self._config_provider = config_provider
 
+    async def _get_storage_client(self, storage_name: str):
+        """Get storage client by trying object_storage first, then vfs_storage as fallback"""
+        try:
+            storage = await self._object_storage_repository.get_by_name(storage_name)
+            return self._storage_manager.get_manager_facing_client(storage.host)
+        except Exception:
+            vfs_storage = await self._vfs_storage_repository.get_by_name(storage_name)
+            return self._storage_manager.get_manager_facing_client(vfs_storage.host)
+
     async def scan(self, action: ScanArtifactsAction) -> ScanArtifactsActionResult:
         reservoir_config = self._config_provider.config.reservoir
-        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
 
         # TODO: Abstract remote registry client layer (scan, import)
-        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+        storage_proxy_client = await self._get_storage_client(reservoir_config.storage_name)
 
         registry_meta = await self._resolve_artifact_registry_meta(
             action.artifact_type, action.registry_id
@@ -151,7 +164,6 @@ class ArtifactService:
                 huggingface_registry_data = (
                     await self._huggingface_registry_repository.get_registry_data_by_id(registry_id)
                 )
-                storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
 
                 if not (action.limit and action.order):
                     raise ArtifactRegistryBadScanRequestError(
@@ -245,6 +257,20 @@ class ArtifactService:
                                 )
                                 readme = None
 
+                            # Determine remote_status based on remote artifact status
+                            # This allows delegate_import operations to be tracked properly
+                            remote_status = None
+                            try:
+                                # Try to get existing local revision to check current remote_status
+                                # If remote artifact is AVAILABLE and we were tracking it, update remote_status
+                                if response_revision.status == ArtifactStatus.AVAILABLE:
+                                    remote_status = ArtifactRemoteStatus.AVAILABLE
+                                if response_revision.status == ArtifactStatus.FAILED:
+                                    remote_status = ArtifactRemoteStatus.FAILED
+                            except ArtifactRevisionNotFoundError:
+                                # New artifact revision - no remote_status to track
+                                pass
+
                             # Create full revision data with readme
                             full_revision = ArtifactRevisionData(
                                 id=response_revision.id,
@@ -253,7 +279,7 @@ class ArtifactService:
                                 readme=readme,
                                 size=response_revision.size,
                                 status=response_revision.status,
-                                remote_status=None,
+                                remote_status=remote_status,
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
                             )
@@ -301,10 +327,9 @@ class ArtifactService:
         This action scans and returns all metadata, including readme, size, and other information
         """
         reservoir_config = self._config_provider.config.reservoir
-        storage = await self._object_storage_repository.get_by_name(reservoir_config.storage_name)
 
         # TODO: Abstract remote registry client layer (scan, import)
-        storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
+        storage_proxy_client = await self._get_storage_client(reservoir_config.storage_name)
 
         registry_meta = await self._resolve_artifact_registry_meta(
             action.artifact_type, action.registry_id
@@ -319,7 +344,6 @@ class ArtifactService:
                 huggingface_registry_data = (
                     await self._huggingface_registry_repository.get_registry_data_by_id(registry_id)
                 )
-                storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
 
                 if not (action.limit and action.order):
                     raise ArtifactRegistryBadScanRequestError(
@@ -413,6 +437,17 @@ class ArtifactService:
                                 )
                                 readme = None
 
+                            # Determine remote_status based on remote artifact status
+                            # This allows delegate_import operations to be tracked properly
+                            remote_status = None
+                            try:
+                                # If remote artifact is AVAILABLE and we were tracking it, update remote_status
+                                if response_revision.status == ArtifactStatus.AVAILABLE:
+                                    remote_status = ArtifactRemoteStatus.AVAILABLE
+                            except ArtifactRevisionNotFoundError:
+                                # New artifact revision - no remote_status to track
+                                pass
+
                             # Create full revision data with readme
                             full_revision = ArtifactRevisionData(
                                 id=response_revision.id,
@@ -421,7 +456,7 @@ class ArtifactService:
                                 readme=readme,
                                 size=response_revision.size,
                                 status=response_revision.status,
-                                remote_status=None,
+                                remote_status=remote_status,
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
                             )
@@ -627,7 +662,7 @@ class ArtifactService:
         self, action: DelegateScanArtifactsAction
     ) -> DelegateScanArtifactsActionResult:
         # If this is a leaf node, perform local scan instead of delegation
-        if self._config_provider.config.reservoir.is_delegation_leaf:
+        if not self._config_provider.config.reservoir.use_delegation:
             registry_id = None
             if action.delegatee_target:
                 registry_id = action.delegatee_target.target_registry_id

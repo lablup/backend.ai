@@ -168,20 +168,19 @@ services:
       - "4317" # otlp grpc
 
   backendai-half-apollo-router:
-    image: ghcr.io/apollographql/router:v1.61.9
+    image: ghcr.io/graphql-hive/gateway:latest
     restart: unless-stopped
     networks:
       - half
     ports:
       - "4000:4000"
+    command: ["supergraph"]
+    environment:
+      - HOST=0.0.0.0
+      - PORT=4000
     volumes:
-      - ./configs/graphql:/etc/graphql
-      - ./docs/manager/graphql-reference:/etc/schemas
-    command:
-      - "--config"
-      - "/etc/graphql/router.yaml"
-      - "--supergraph"
-      - "/etc/schemas/supergraph.graphql"
+      - ./docs/manager/graphql-reference/supergraph.graphql:/gateway/supergraph.graphql:ro
+      - ./configs/graphql/gateway.config.ts:/gateway/gateway.config.ts:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

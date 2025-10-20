@@ -181,9 +181,24 @@ async def web_handler(
     api_endpoint: Optional[str] = None,
     http_headers_to_forward_extra: Iterable[str] | None = None,
 ) -> web.StreamResponse:
+    # Check if this is a WebSocket upgrade request (for GraphQL subscriptions)
+    if (
+        frontend_rqst.headers.get("Upgrade", "").lower() == "websocket"
+        and "upgrade" in frontend_rqst.headers.get("Connection", "").lower()
+    ):
+        return await websocket_handler(
+            frontend_rqst,
+            is_anonymous=is_anonymous,
+            api_endpoint=api_endpoint,
+        )
+
     stats: WebStats = frontend_rqst.app["stats"]
     stats.active_proxy_api_handlers.add(asyncio.current_task())  # type: ignore
-    path = frontend_rqst.match_info.get("path", "")
+    path = frontend_rqst.match_info.get("path", None)
+    if path is None:
+        request_path = frontend_rqst.path
+        if request_path.startswith("/func"):
+            path = request_path.removeprefix("/func")
     if is_anonymous:
         api_session = await asyncio.shield(get_anonymous_session(frontend_rqst, api_endpoint))
     else:
@@ -379,11 +394,18 @@ async def web_plugin_handler(
 
 
 async def websocket_handler(
-    request, *, is_anonymous=False, api_endpoint: Optional[str] = None
+    request: web.Request, *, is_anonymous=False, api_endpoint: Optional[str] = None
 ) -> web.StreamResponse:
+    if api_endpoint:
+        if api_endpoint.startswith("http://"):
+            api_endpoint = api_endpoint.replace("http://", "ws://", 1)
     stats: WebStats = request.app["stats"]
     stats.active_proxy_websocket_handlers.add(asyncio.current_task())  # type: ignore
-    path = request.match_info["path"]
+    path = request.match_info.get("path", None)
+    if path is None:
+        request_path = request.path
+        if request_path.startswith("/func"):
+            path = request_path.removeprefix("/func")
     session = await get_session(request)
     app = request.query.get("app")
 
@@ -418,13 +440,18 @@ async def websocket_handler(
                 content_type=request.content_type,
                 override_api_version=request_api_version,
             )
-            async with api_request.connect_websocket() as up_conn:
-                down_conn = web.WebSocketResponse()
+            # Extract WebSocket subprotocols from client request (e.g., graphql-ws for GraphQL subscriptions)
+            protocols_header: str = request.headers.get("Sec-WebSocket-Protocol", "")
+            protocols = tuple([p.strip() for p in protocols_header.split(",") if p.strip()])
+            async with api_request.connect_websocket(protocols=protocols) as up_conn:
+                down_conn = web.WebSocketResponse(protocols=protocols)
                 await down_conn.prepare(request)
                 web_socket_proxy = WebSocketProxy(up_conn.raw_websocket, down_conn)
                 await web_socket_proxy.proxy()
                 if should_save_session:
                     storage = request.get(STORAGE_KEY)
+                    if storage is None:
+                        raise RuntimeError("Session storage is not available in the request.")
                     config = cast(WebServerUnifiedConfig, request.app["config"])
                     extension_sec = config.session.login_session_extension_sec
                     await storage.save_session(request, down_conn, session, extension_sec)

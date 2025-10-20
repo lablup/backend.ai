@@ -19,6 +19,8 @@ from ai.backend.common.dto.storage.request import (
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
     ReservoirImportModelsReq,
+    VFSDownloadFileReq,
+    VFSListFilesReq,
 )
 from ai.backend.common.dto.storage.response import (
     HuggingFaceImportModelsResponse,
@@ -30,6 +32,7 @@ from ai.backend.common.dto.storage.response import (
     PresignedUploadObjectResponse,
     ReservoirImportModelsResponse,
     VFolderCloneResponse,
+    VFSListFilesResponse,
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -833,3 +836,43 @@ class StorageProxyManagerFacingClient:
             f"v1/storages/s3/{storage_name}/buckets/{bucket_name}/object",
             body=req.model_dump(by_alias=True),
         )
+
+    @actxmgr
+    async def download_vfs_file_streaming(
+        self,
+        storage_name: str,
+        req: VFSDownloadFileReq,
+    ) -> AsyncIterator[aiohttp.ClientResponse]:
+        """
+        Download a file from VFS storage using streaming.
+
+        :param storage_name: Name of the VFS storage
+        :param req: VFS download file request
+        :return: Streaming response from the storage proxy
+        """
+        async with self._client.request_stream_response(
+            "POST",
+            f"v1/storages/vfs/{storage_name}/download",
+            body=req.model_dump(by_alias=True),
+        ) as response_stream:
+            yield response_stream
+
+    @storage_proxy_client_resilience.apply()
+    async def list_vfs_files(
+        self,
+        storage_name: str,
+        req: VFSListFilesReq,
+    ) -> VFSListFilesResponse:
+        """
+        List files recursively in a VFS storage directory.
+
+        :param storage_name: Name of the VFS storage
+        :param req: VFS list files request
+        :return: Response containing list of files with metadata
+        """
+        resp = await self._client.request_with_response(
+            "GET",
+            f"v1/storages/vfs/{storage_name}/files",
+            body=req.model_dump(by_alias=True),
+        )
+        return VFSListFilesResponse.model_validate(resp)

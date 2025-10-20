@@ -14,6 +14,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
     AgentImagesRemoveEvent,
+    AgentInstalledImagesRemoveEvent,
     AgentStartedEvent,
     AgentStatusHeartbeat,
     AgentTerminatedEvent,
@@ -24,6 +25,7 @@ from ai.backend.common.events.event_types.artifact.anycast import (
     ModelMetadataFetchDoneEvent,
 )
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
+    DoPullReservoirRegistryEvent,
     DoScanReservoirRegistryEvent,
 )
 from ai.backend.common.events.event_types.bgtask.broadcast import (
@@ -217,7 +219,9 @@ class Dispatchers:
             args.repositories.artifact_registry.repository,
             args.repositories.reservoir_registry.repository,
             args.repositories.object_storage.repository,
+            args.repositories.vfs_storage.repository,
             args.storage_manager,
+            args.config_provider,
         )
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
@@ -283,6 +287,11 @@ class Dispatchers:
         evd.consume(AgentTerminatedEvent, None, self._agent_event_handler.handle_agent_terminated)
         evd.consume(
             AgentImagesRemoveEvent, None, self._agent_event_handler.handle_agent_images_remove
+        )
+        evd.consume(
+            AgentInstalledImagesRemoveEvent,
+            None,
+            self._agent_event_handler.handle_agent_installed_images_remove,
         )
         evd.consume(
             AgentErrorEvent,
@@ -588,6 +597,11 @@ class Dispatchers:
             DoScanReservoirRegistryEvent,
             None,
             self._artifact_registry_event_handler.handle_artifact_registry_scan,
+        )
+        evd.consume(
+            DoPullReservoirRegistryEvent,
+            None,
+            self._artifact_registry_event_handler.handle_artifact_registry_pull,
         )
 
     def _dispatch_idle_check_events(

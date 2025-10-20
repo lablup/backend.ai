@@ -27,6 +27,12 @@ def _get_association_object_storage_join_cond():
     return ObjectStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
 
 
+def _get_association_vfs_storage_join_cond():
+    from .vfs_storage import VFSStorageRow
+
+    return VFSStorageRow.id == foreign(AssociationArtifactsStorageRow.storage_namespace_id)
+
+
 class AssociationArtifactsStorageRow(Base):
     """
     Association table for linking artifacts to storage namespace.
@@ -62,4 +68,13 @@ class AssociationArtifactsStorageRow(Base):
         "ObjectStorageRow",
         back_populates="association_artifacts_storages_rows",
         primaryjoin=_get_association_object_storage_join_cond,
+        overlaps="vfs_storage_row",
+    )
+
+    # only valid when storage_type is "vfs"
+    vfs_storage_row = relationship(
+        "VFSStorageRow",
+        back_populates="association_artifacts_storages_rows",
+        primaryjoin=_get_association_vfs_storage_join_cond,
+        overlaps="object_storage_row",
     )

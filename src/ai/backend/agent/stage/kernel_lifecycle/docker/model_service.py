@@ -139,6 +139,12 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
                 return await self._get_model_definition_from_tgi(model_folder, image_command)
             case RuntimeVariant.NIM:
                 return await self._get_model_definition_from_nim(model_folder, image_command)
+            case RuntimeVariant.SGLANG:
+                return await self._get_model_definition_from_sglang(model_folder, image_command)
+            case RuntimeVariant.MODULAR_MAX:
+                return await self._get_model_definition_from_modular_max(
+                    model_folder, image_command
+                )
             case RuntimeVariant.CMD:
                 return await self._get_model_definition_from_cmd(model_folder, image_command)
             case RuntimeVariant.CUSTOM:
@@ -208,6 +214,50 @@ class ModelServiceProvisioner(Provisioner[ModelServiceSpec, ModelServiceResult])
             return ModelDefinition(models=[_model])  # type: ignore[arg-type,list-item]
         except ValidationError as e:
             raise InvalidModelConfigurationError(f"Invalid model definition for NIM: {e}") from e
+
+    async def _get_model_definition_from_sglang(
+        self, model_folder: VFolderMount, image_command: Optional[str]
+    ) -> ModelDefinition:
+        _model = {
+            "name": "sglang-model",
+            "model_path": model_folder.kernel_path.as_posix(),
+            "service": {
+                "start_command": image_command,
+                "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.SGLANG].port,
+                "health_check": {
+                    "path": MODEL_SERVICE_RUNTIME_PROFILES[
+                        RuntimeVariant.SGLANG
+                    ].health_check_endpoint,
+                },
+            },
+        }
+        try:
+            return ModelDefinition(models=[_model])  # type: ignore[arg-type,list-item]
+        except ValidationError as e:
+            raise InvalidModelConfigurationError(f"Invalid model definition for SGLang: {e}") from e
+
+    async def _get_model_definition_from_modular_max(
+        self, model_folder: VFolderMount, image_command: Optional[str]
+    ) -> ModelDefinition:
+        _model = {
+            "name": "max-model",
+            "model_path": model_folder.kernel_path.as_posix(),
+            "service": {
+                "start_command": image_command,
+                "port": MODEL_SERVICE_RUNTIME_PROFILES[RuntimeVariant.MODULAR_MAX].port,
+                "health_check": {
+                    "path": MODEL_SERVICE_RUNTIME_PROFILES[
+                        RuntimeVariant.MODULAR_MAX
+                    ].health_check_endpoint,
+                },
+            },
+        }
+        try:
+            return ModelDefinition(models=[_model])  # type: ignore[arg-type,list-item]
+        except ValidationError as e:
+            raise InvalidModelConfigurationError(
+                f"Invalid model definition for Modular MAX: {e}"
+            ) from e
 
     async def _get_model_definition_from_cmd(
         self, model_folder: VFolderMount, image_command: Optional[str]

@@ -38,6 +38,19 @@ class KernelNotReady(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class InvalidSessionId(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-session-id"
+    error_title = "Invalid session ID format."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SESSION,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class SessionNotFound(ObjectNotFound):
     object_name = "session"
 

@@ -9,13 +9,13 @@ from typing import TYPE_CHECKING, Any, Optional, cast
 
 import attrs
 import graphene
+import graphene_federation
 import sqlalchemy as sa
 from graphene.types.inputobjecttype import set_input_object_type_default_value
 from graphql import GraphQLError, OperationType, Undefined
 from graphql.type import GraphQLField
 from sqlalchemy.orm import joinedload, selectinload
 
-from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -26,6 +26,7 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.metrics.metric import GraphQLMetricObserver
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.gql_models.audit_log import (
     AuditLogConnection,
@@ -3384,3 +3385,11 @@ class GQLMetricMiddleware:
             )
             raise e
         return res
+
+
+graphene_schema = graphene_federation.build_schema(
+    query=Query,
+    mutation=Mutation,
+    auto_camelcase=False,
+    federation_version=graphene_federation.LATEST_VERSION,
+)

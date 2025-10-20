@@ -37,6 +37,7 @@ class ArtifactRemoteStatus(enum.StrEnum):
 
     SCANNED = "SCANNED"
     AVAILABLE = "AVAILABLE"
+    FAILED = "FAILED"
 
 
 class ArtifactAvailability(enum.StrEnum):
@@ -86,6 +87,7 @@ class ArtifactRevisionResponseData:
     version: str
     size: Optional[int]
     status: ArtifactStatus
+    remote_status: Optional[ArtifactRemoteStatus]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
 
@@ -97,6 +99,7 @@ class ArtifactRevisionResponseData:
             version=data.version,
             size=data.size,
             status=data.status,
+            remote_status=data.remote_status,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

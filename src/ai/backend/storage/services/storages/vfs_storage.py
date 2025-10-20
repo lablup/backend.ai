@@ -1,7 +1,9 @@
 import logging
 
 from ai.backend.common.dto.storage.response import (
+    VFSFileInfo,
     VFSFileMetaResponse,
+    VFSListFilesResponse,
 )
 from ai.backend.common.types import StreamReader
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -66,7 +68,7 @@ class VFSStorageService:
             VFSFileMetaResponse with file metadata
         """
         storage = self._resolve_storage(storage_name)
-        return await storage.get_object_info(filepath)
+        return await storage.get_file_info(filepath)
 
     async def delete_file(self, storage_name: str, filepath: str) -> None:
         """
@@ -77,9 +79,9 @@ class VFSStorageService:
             filepath: Path to the file/directory to delete
         """
         storage = self._resolve_storage(storage_name)
-        await storage.delete_object(filepath)
+        await storage.delete_file(filepath)
 
-    async def list_files(self, storage_name: str, directory: str) -> list[dict]:
+    async def list_files(self, storage_name: str, directory: str) -> list[VFSFileInfo]:
         """
         List files and directories in a directory.
 
@@ -92,6 +94,20 @@ class VFSStorageService:
         """
         storage = self._resolve_storage(storage_name)
         return await storage.list_directory(directory)
+
+    async def list_files_recursive(self, storage_name: str, directory: str) -> VFSListFilesResponse:
+        """
+        Recursively list all files in a directory and its subdirectories.
+
+        Args:
+            storage_name: Name of the VFS storage configuration
+            directory: Directory path to start listing from
+
+        Returns:
+            VFSListFilesResponse containing all files found recursively
+        """
+        storage = self._resolve_storage(storage_name)
+        return await storage.list_files_recursive(directory)
 
     async def create_directory(self, storage_name: str, directory: str) -> None:
         """

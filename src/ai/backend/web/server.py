@@ -810,6 +810,7 @@ async def server_main(
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
         supergraph_handler = partial(web_handler, api_endpoint=str(config.apollo_router.endpoint))
+        cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
 
     cors.add(app.router.add_route("HEAD", "/func/{path:.*$}", web_handler))

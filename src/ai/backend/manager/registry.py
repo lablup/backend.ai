@@ -57,7 +57,6 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
-from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
@@ -66,7 +65,6 @@ from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageR
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import (
-    AgentImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
@@ -155,6 +153,7 @@ from ai.backend.manager.clients.appproxy.types import (
     SessionTagsModel,
     TagsModel,
 )
+from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -3112,11 +3111,6 @@ class AgentRegistry:
         # noop for performance reasons
         pass
 
-    async def handle_agent_images_remove(
-        self, agent_id: AgentId, image_canonicals: list[str]
-    ) -> None:
-        await self.valkey_image.remove_agent_from_images(agent_id, image_canonicals)
-
     async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
         await self.valkey_live.remove_agent_last_seen(agent_id)
 
@@ -4083,14 +4077,6 @@ async def handle_batch_result(
     )
 
     await invoke_session_callback(context, source, event)
-
-
-async def handle_agent_images_remove(
-    context: AgentRegistry,
-    source: AgentId,
-    event: AgentImagesRemoveEvent,
-) -> None:
-    await context.handle_agent_images_remove(source, event.image_canonicals)
 
 
 async def handle_agent_lifecycle(

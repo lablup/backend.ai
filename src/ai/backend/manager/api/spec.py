@@ -89,7 +89,10 @@ GRAPHIQL_V2_HTML = """
     ></script>
 
     <script>
-      const fetcher = GraphiQL.createFetcher({ url: '../../admin/gql/strawberry' });
+      const fetcher = GraphiQL.createFetcher({
+        url: 'http://0.0.0.0:8090/func/admin/gql',
+        subscriptionUrl: 'ws://0.0.0.0:8090/func/admin/gql'
+      });
 
       ReactDOM.render(
         React.createElement(GraphiQL, { fetcher: fetcher }),

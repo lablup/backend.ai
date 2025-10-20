@@ -42,6 +42,7 @@ from ai.backend.manager.repositories.user_resource_policy.repositories import (
     UserResourcePolicyRepositories,
 )
 from ai.backend.manager.repositories.vfolder.repositories import VfolderRepositories
+from ai.backend.manager.repositories.vfs_storage.repositories import VFSStorageRepositories
 
 
 @dataclass
@@ -66,6 +67,7 @@ class Repositories:
     user_resource_policy: UserResourcePolicyRepositories
     vfolder: VfolderRepositories
     object_storage: ObjectStorageRepositories
+    vfs_storage: VFSStorageRepositories
     huggingface_registry: HuggingFaceRegistryRepositories
     artifact: ArtifactRepositories
     artifact_registry: ArtifactRegistryRepositories
@@ -93,6 +95,7 @@ class Repositories:
         user_resource_policy_repositories = UserResourcePolicyRepositories.create(args)
         vfolder_repositories = VfolderRepositories.create(args)
         object_storage_repositories = ObjectStorageRepositories.create(args)
+        vfs_storage_repositories = VFSStorageRepositories.create(args)
         artifact_repositories = ArtifactRepositories.create(args)
         huggingface_registry_repositories = HuggingFaceRegistryRepositories.create(args)
         artifact_registries = ArtifactRegistryRepositories.create(args)
@@ -119,6 +122,7 @@ class Repositories:
             user_resource_policy=user_resource_policy_repositories,
             vfolder=vfolder_repositories,
             object_storage=object_storage_repositories,
+            vfs_storage=vfs_storage_repositories,
             huggingface_registry=huggingface_registry_repositories,
             artifact=artifact_repositories,
             artifact_registry=artifact_registries,

@@ -49,7 +49,6 @@ from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyB
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
 )
-from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -69,6 +68,7 @@ from ai.backend.common.defs import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
+    DoPullReservoirRegistryEvent,
     DoScanReservoirRegistryEvent,
 )
 from ai.backend.common.events.fetcher import EventFetcher
@@ -111,6 +111,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
 from ai.backend.manager.config.loader.etcd_loader import (
@@ -263,6 +264,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".groupconfig",
     ".logs",
     ".object_storage",
+    ".vfs_storage",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -1063,14 +1065,23 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     task_specs = root_ctx.sokovan_orchestrator.create_task_specs()
 
     # Rescan reservoir registry periodically
-    task_specs.append(
-        EventTaskSpec(
-            name="reservoir_registry_scan",
-            event_factory=lambda: DoScanReservoirRegistryEvent(),
-            interval=3600,  # 1 hour
-            initial_delay=0,
+    if root_ctx.config_provider.config.reservoir.use_delegation:
+        task_specs.append(
+            EventTaskSpec(
+                name="reservoir_registry_scan",
+                event_factory=lambda: DoScanReservoirRegistryEvent(),
+                interval=600,  # 10 minutes
+                initial_delay=0,
+            )
         )
-    )
+        task_specs.append(
+            EventTaskSpec(
+                name="reservoir_registry_pull",
+                event_factory=lambda: DoPullReservoirRegistryEvent(),
+                interval=600,  # 10 minutes
+                initial_delay=0,
+            )
+        )
 
     # Create event producer tasks from specs
     leader_tasks: list[PeriodicTask] = [

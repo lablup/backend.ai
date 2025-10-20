@@ -94,7 +94,8 @@ class TestAgentDBSource:
             region="us-west-1",
             scaling_group="default",
             available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
-            occupied_slots=ResourceSlot({}),
+            cached_occupied_slots=ResourceSlot({}),
+            actual_occupied_slots=ResourceSlot({}),
             addr="tcp://192.168.1.100:6001",
             architecture="x86_64",
             version="24.12.0",
@@ -181,7 +182,8 @@ class TestAgentDBSource:
             region="us-west-1",
             scaling_group="default",
             available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
-            occupied_slots=ResourceSlot({}),
+            cached_occupied_slots=ResourceSlot({}),
+            actual_occupied_slots=ResourceSlot({}),
             addr="tcp://192.168.1.100:6001",
             architecture="x86_64",
             version="24.12.0",
@@ -193,7 +195,7 @@ class TestAgentDBSource:
             schedulable=True,
             auto_terminate_abusing_kernel=False,
         )
-        mock_agent_row.to_data.return_value = mock_agent_data
+        mock_agent_row.to_heartbeat_update_data.return_value = mock_agent_data
 
         mock_db_session.scalar.side_effect = [
             mock_scaling_group,  # scaling group exists check
@@ -228,7 +230,8 @@ class TestAgentDBSource:
             region="us-west-1",
             scaling_group="default",
             available_slots=ResourceSlot({SlotName("cpu"): 8.0}),
-            occupied_slots=ResourceSlot({}),
+            cached_occupied_slots=ResourceSlot({}),
+            actual_occupied_slots=ResourceSlot({}),
             addr="tcp://192.168.1.100:6001",
             architecture="x86_64",
             version="24.12.0",
@@ -240,7 +243,7 @@ class TestAgentDBSource:
             schedulable=True,
             auto_terminate_abusing_kernel=False,
         )
-        mock_agent_row.to_data.return_value = mock_agent_data
+        mock_agent_row.to_heartbeat_update_data.return_value = mock_agent_data
 
         mock_db_session.scalar.side_effect = [
             mock_scaling_group,  # scaling group exists check
@@ -333,7 +336,8 @@ class TestAgentDBSource:
                 SlotName("cuda.shares"): 4.0,
                 # Note: no rocm.device slot
             }),
-            occupied_slots=ResourceSlot({}),
+            cached_occupied_slots=ResourceSlot({}),
+            actual_occupied_slots=ResourceSlot({}),
             addr="tcp://192.168.1.101:6001",
             architecture="x86_64",
             version="24.12.0",
@@ -345,7 +349,7 @@ class TestAgentDBSource:
             schedulable=True,
             auto_terminate_abusing_kernel=False,
         )
-        mock_agent_row.to_data.return_value = mock_agent_data
+        mock_agent_row.to_heartbeat_update_data.return_value = mock_agent_data
 
         mock_db_session.scalar.side_effect = [
             mock_scaling_group,  # scaling group exists check
