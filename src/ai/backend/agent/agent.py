@@ -888,6 +888,8 @@ class AbstractAgent(
                 "AbstractAgent.__ainit__": "Redis runtime configuration is not set."
             })
 
+        self.local_config.agent.image_commit_path.mkdir(parents=True, exist_ok=True)
+
         redis_profile_target = self.local_config.redis.to_redis_profile_target()
         stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
         mq = await self._make_message_queue(stream_redis_target)
@@ -2276,7 +2278,7 @@ class AbstractAgent(
         """
         ipc_base_path = self.local_config.agent.ipc_base_path
         var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.local_instance_id}.dat"
+        last_registry_file = f"last_registry.{self.id}.dat"
         if os.path.isfile(ipc_base_path / last_registry_file):
             shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
         try:
@@ -3745,7 +3747,7 @@ class AbstractAgent(
         if (not force) and (now <= self.last_registry_written_time + 60):
             return  # don't save too frequently
         var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.local_instance_id}.dat"
+        last_registry_file = f"last_registry.{self.id}.dat"
         try:
             with open(var_base_path / last_registry_file, "wb") as f:
                 pickle.dump(self.kernel_registry, f)
