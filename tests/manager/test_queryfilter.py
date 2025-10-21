@@ -417,3 +417,77 @@ async def test_exclude_fields(virtual_user_db) -> None:
     actual_ret = list(await conn.execute(sa_query))
     test_ret = [("tester", 30)]
     assert test_ret == actual_ret
+
+    # Test OR operation with excluded fields - this tests the fix for the TODO issue
+    # where (excluded_field == "x") | (name == "tester") should NOT become always true
+    sa_query = parser.append_filter(
+        sa.select([users.c.name, users.c.age]).select_from(users),
+        '(excluded_field == "x") | (name == "tester")',
+        exclude_fields={"excluded_field"},
+    )
+    actual_ret = list(await conn.execute(sa_query))
+    # Should only match by name, NOT return all rows
+    test_ret = [("tester", 30)]
+    assert test_ret == actual_ret
+
+    # Test OR with both sides excluded - should return no rows (sa.false())
+    sa_query = parser2.append_filter(
+        sa.select([users.c.name, users.c.age]).select_from(users),
+        '(field1 == "x") | (field2 == "y")',
+        exclude_fields={"field1", "field2"},
+    )
+    actual_ret = list(await conn.execute(sa_query))
+    test_ret = []  # Should return no rows
+    assert test_ret == actual_ret
+
+    # Test AND with both sides excluded - should return all rows (sa.true())
+    sa_query = parser2.append_filter(
+        sa.select([users.c.name, users.c.age]).select_from(users),
+        '(field1 == "x") & (field2 == "y")',
+        exclude_fields={"field1", "field2"},
+    )
+    actual_ret = list(await conn.execute(sa_query))
+    # Should return all rows since both conditions are excluded (neutral for AND)
+    assert len(actual_ret) == 4
+
+
+def test_has_field() -> None:
+    """Test the has_field method to avoid false positives from naive substring matching."""
+    parser = QueryFilterParser({
+        "project_name": ("project_name", None),
+        "name": ("name", None),
+    })
+
+    # Test: field exists in filter expression
+    assert parser.has_field('project_name == "test"', "project_name") is True
+
+    # Test: field in complex expression
+    assert (
+        parser.has_field('(project_name ilike "test") & (name != "user")', "project_name") is True
+    )
+    assert (
+        parser.has_field('(project_name ilike "test") | (name != "user")', "project_name") is True
+    )
+
+    # Test: field does NOT exist (false positive case from naive substring matching)
+    # "project_name" appears in string literal but not as an actual field
+    assert parser.has_field('name == "my_project_name_tag"', "project_name") is False
+
+    # Test: field does not exist at all
+    assert parser.has_field('name == "test"', "project_name") is False
+
+    # Test: multiple occurrences of the field
+    assert parser.has_field('project_name == "a" | project_name == "b"', "project_name") is True
+
+    # Test: invalid filter expression - should return False
+    assert parser.has_field("invalid!!!syntax", "project_name") is False
+    assert parser.has_field("", "project_name") is False
+
+    # Test: deeply nested expression - should not cause RecursionError
+    # Build a deeply nested expression: ((((name == "x") & (name == "y")) & ...) & ...)
+    deep_expr = 'name == "x"'
+    for i in range(100):  # Create 100 levels of nesting
+        deep_expr = f'({deep_expr} & name == "y{i}")'
+    # Should work without RecursionError
+    assert parser.has_field(deep_expr, "name") is True
+    assert parser.has_field(deep_expr, "project_name") is False
