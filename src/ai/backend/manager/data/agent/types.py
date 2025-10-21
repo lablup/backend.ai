@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING, Any, Optional, Self, override
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
-from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 
 if TYPE_CHECKING:
+    from ai.backend.manager.models.minilang.ordering import QueryOrderParser
     from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 
 from ..kernel.types import KernelInfo
