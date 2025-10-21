@@ -118,8 +118,7 @@ class ScopeType(enum.StrEnum):
     DOMAIN = "domain"
     PROJECT = "project"
     USER = "user"
-
-    GLOBAL = "global"  # Global scope
+    GLOBAL = "global"
 
 
 GLOBAL_SCOPE_ID = "global"

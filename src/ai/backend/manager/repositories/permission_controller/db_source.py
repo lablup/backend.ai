@@ -8,11 +8,9 @@ from sqlalchemy.orm import contains_eager, selectinload
 
 from ...data.permission.id import ObjectId, ScopeId
 from ...data.permission.role import (
-    ObjectPermissionSet,
     RoleCreateInput,
     RoleDeleteInput,
     RoleUpdateInput,
-    ScopePermissionSet,
     UserRoleAssignmentInput,
 )
 from ...data.permission.status import (
@@ -147,51 +145,6 @@ class PermissionDBSource:
             result = await db_session.scalars(stmt)
             return result.all()
 
-    async def get_scope_permissions(
-        self,
-        user_id: uuid.UUID,
-        scope_id: ScopeId,
-    ) -> ScopePermissionSet:
-        role_query = (
-            sa.select(RoleRow)
-            .select_from(
-                sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id).join(
-                    PermissionGroupRow, RoleRow.id == PermissionGroupRow.role_id
-                )
-            )
-            .where(
-                sa.and_(
-                    RoleRow.status == RoleStatus.ACTIVE,
-                    UserRoleRow.user_id == user_id,
-                    sa.or_(
-                        PermissionGroupRow.scope_type == ScopeType.GLOBAL,
-                        PermissionGroupRow.scope_id == scope_id.scope_id,
-                    ),
-                )
-            )
-            .options(
-                contains_eager(RoleRow.permission_group_rows).options(
-                    selectinload(PermissionGroupRow.permission_rows)
-                )
-            )
-        )
-        async with self._db.begin_readonly_session() as db_session:
-            role_rows = await db_session.scalars(role_query)
-            role_rows = cast(list[RoleRow], role_rows.all())
-
-            scope_permissions: set[OperationType] = set()
-            global_permissions: Optional[set[OperationType]] = None
-            for role in role_rows:
-                for pg in role.permission_group_rows:
-                    if pg.parsed_scope_id() != scope_id:
-                        continue
-                    if pg.scope_type == ScopeType.GLOBAL:
-                        global_permissions = {perm.operation for perm in pg.permission_rows}
-                    else:
-                        scope_permissions |= {perm.operation for perm in pg.permission_rows}
-
-        return ScopePermissionSet(scope_id, scope_permissions, global_permissions)
-
     async def check_scope_permission_exist(
         self,
         user_id: uuid.UUID,
@@ -199,7 +152,7 @@ class PermissionDBSource:
         operation: OperationType,
     ) -> bool:
         role_query = (
-            sa.select(sa.func.count())
+            sa.select(sa.func.exist())
             .select_from(
                 sa.join(UserRoleRow, RoleRow.id == UserRoleRow.role_id)
                 .join(PermissionGroupRow, RoleRow.id == PermissionGroupRow.role_id)
@@ -223,9 +176,8 @@ class PermissionDBSource:
             )
         )
         async with self._db.begin_readonly_session() as db_session:
-            count_result = await db_session.scalar(role_query)
-            count_result = cast(int, count_result)
-            return count_result > 0
+            result = await db_session.scalar(role_query)
+            return result
 
     def _make_query_statement_for_object_permission(
         self,
@@ -263,68 +215,6 @@ class PermissionDBSource:
                 contains_eager(RoleRow.object_permission_rows),
             )
         )
-
-    async def get_object_permissions(
-        self,
-        user_id: uuid.UUID,
-        object_id: ObjectId,
-    ) -> ObjectPermissionSet:
-        role_query = self._make_query_statement_for_object_permission(user_id, [object_id])
-        async with self._db.begin_readonly_session() as db_session:
-            role_rows = await db_session.scalars(role_query)
-            role_rows = cast(list[RoleRow], role_rows.all())
-
-            object_permissions: set[OperationType] = set()
-            mapped_scopes: dict[ScopeId, set[OperationType]] = {}
-            global_permissions: Optional[set[OperationType]] = None
-            for role in role_rows:
-                for op in role.object_permission_rows:
-                    if op.object_id() == object_id:
-                        object_permissions.add(op.operation)
-                for pg in role.permission_group_rows:
-                    if pg.scope_type == ScopeType.GLOBAL:
-                        global_permissions = {perm.operation for perm in pg.permission_rows}
-                    else:
-                        mapped_scopes[pg.parsed_scope_id()] = {
-                            perm.operation for perm in pg.permission_rows
-                        }
-
-        return ObjectPermissionSet(object_id, object_permissions, mapped_scopes, global_permissions)
-
-    async def get_batch_object_permissions(
-        self,
-        user_id: uuid.UUID,
-        object_ids: Iterable[ObjectId],
-    ) -> dict[ObjectId, ObjectPermissionSet]:
-        role_query = self._make_query_statement_for_object_permission(user_id, object_ids)
-        async with self._db.begin_readonly_session() as db_session:
-            role_rows = await db_session.scalars(role_query)
-            role_rows = cast(list[RoleRow], role_rows.all())
-
-            result: dict[ObjectId, ObjectPermissionSet] = {}
-            for role in role_rows:
-                for op in role.object_permission_rows:
-                    object_id = op.object_id()
-                    if object_id not in result:
-                        result[object_id] = ObjectPermissionSet(object_id, set(), {}, None)
-                    result[object_id].object_permissions.add(op.operation)
-                for pg in role.permission_group_rows:
-                    global_permissions: Optional[set[OperationType]] = None
-                    mapped_scopes: dict[ScopeId, set[OperationType]] = {}
-                    if pg.scope_type == ScopeType.GLOBAL:
-                        global_permissions = {perm.operation for perm in pg.permission_rows}
-                    else:
-                        mapped_scopes = {
-                            pg.parsed_scope_id(): {perm.operation for perm in pg.permission_rows}
-                        }
-                    for object in pg.mapped_entities:
-                        object_id = object.object_id()
-                        if object_id not in result:
-                            result[object_id] = ObjectPermissionSet(object_id, set(), {}, None)
-                        if global_permissions is not None:
-                            result[object_id].global_permissions = global_permissions
-                        result[object_id].mapped_scopes.update(mapped_scopes)
-        return result
 
     def _make_query_statement_for_object_permissions(
         self,

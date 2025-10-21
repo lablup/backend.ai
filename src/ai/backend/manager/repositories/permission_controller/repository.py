@@ -11,7 +11,6 @@ from ai.backend.common.resilience.resilience import Resilience
 from ...data.permission.id import ObjectId
 from ...data.permission.role import (
     BatchEntityPermissionCheckInput,
-    ObjectPermissionSet,
     RoleCreateInput,
     RoleData,
     RoleDeleteInput,
@@ -20,7 +19,6 @@ from ...data.permission.role import (
     SingleEntityPermissionCheckInput,
     UserRoleAssignmentInput,
 )
-from ...data.permission.types import OperationType
 from ...models.utils import ExtendedAsyncSAEngine
 from .db_source import PermissionDBSource
 
@@ -105,21 +103,6 @@ class PermissionControllerRepository:
         return await self._db_source.check_scope_permission_exist(
             data.user_id, data.target_scope_id, data.operation
         )
-
-    def _determine_permission_from_set(
-        self, permission_set: ObjectPermissionSet, requested_operation: OperationType
-    ) -> bool:
-        if (
-            permission_set.global_permissions is not None
-            and requested_operation in permission_set.global_permissions
-        ):
-            return True
-        if requested_operation in permission_set.object_permissions:
-            return True
-        for scope_perms in permission_set.mapped_scopes.values():
-            if requested_operation in scope_perms:
-                return True
-        return False
 
     @permission_controller_repository_resilience.apply()
     async def check_permission_of_entities(
