@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any, Optional, Self, override
 
@@ -92,10 +92,10 @@ class AgentFetchConditions:
     offset: Optional[int]
     filter_parser: Optional["QueryFilterParser"]
     order_parser: Optional["QueryOrderParser"]
-    scaling_group: Optional[str] = None
-    status: list[AgentStatus] = field(default_factory=list)
-    filter: Optional[str] = None
-    order: Optional[str] = None
+    scaling_group: Optional[str]
+    status: list[AgentStatus]
+    filter: Optional[str]
+    order: Optional[str]
 
 
 @dataclass
