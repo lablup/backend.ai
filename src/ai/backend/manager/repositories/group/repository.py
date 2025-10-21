@@ -54,13 +54,14 @@ class GroupRepository:
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        role_manager: RoleManager,
         config_provider: ManagerConfigProvider,
         valkey_stat_client: ValkeyStatClient,
     ) -> None:
         self._db = db
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
-        self._role_manager = RoleManager.instance()
+        self._role_manager = role_manager
 
     async def _get_group_by_id(self, session: SASession, group_id: uuid.UUID) -> Optional[GroupRow]:
         """Private method to get a group by ID using an existing session."""

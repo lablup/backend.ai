@@ -20,10 +20,13 @@ from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.types import PaginationOptions
 
+from .permission_controller.role_manager import RoleManager
+
 
 @dataclass
 class RepositoryArgs:
     db: ExtendedAsyncSAEngine
+    role_manager: RoleManager
     storage_manager: "StorageSessionManager"
     config_provider: "ManagerConfigProvider"
     valkey_stat_client: "ValkeyStatClient"

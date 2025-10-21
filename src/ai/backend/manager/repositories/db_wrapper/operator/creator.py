@@ -15,9 +15,9 @@ class Creator(Generic[TRow, TEntityRBACData]):
     TEntityRBACData: Type of the associated entity insert data.
     """
 
-    def __init__(self, session: SessionWrapper) -> None:
+    def __init__(self, session: SessionWrapper, role_manager: RoleManager) -> None:
         self._session = session
-        self._role_manager = RoleManager.instance()
+        self._role_manager = role_manager
 
     async def add_one(self, data: InsertData[TRow, TEntityRBACData]) -> TRow:
         """

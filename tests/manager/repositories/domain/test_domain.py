@@ -38,13 +38,11 @@ class TestDomainRepository:
     ) -> DomainRepository:
         """Create DomainRepository instance with real database"""
 
-        repo = DomainRepository(db=database_engine)
-
         # Create mock for _role_manager
         mock_role_manager = MagicMock()
         mock_role_manager.create_system_role = AsyncMock(return_value=None)
-        repo._role_manager = mock_role_manager
 
+        repo = DomainRepository(db=database_engine, role_manager=mock_role_manager)
         return repo
 
     @pytest.fixture

@@ -60,12 +60,6 @@ class RoleManager:
     def __init__(self) -> None:
         pass
 
-    @classmethod
-    def instance(cls) -> Self:
-        if cls._instance is None:
-            cls._instance = cls()
-        return cls._instance
-
     async def create_system_role(
         self, db_session: SASession, data: ScopeSystemRoleData
     ) -> RoleData:

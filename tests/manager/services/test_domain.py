@@ -57,8 +57,12 @@ from .utils import ScenarioBase
 
 @pytest.fixture
 def processors(database_fixture, database_engine) -> DomainProcessors:
+    # Create mock for _role_manager
+    mock_role_manager = MagicMock()
+    mock_role_manager.create_system_role = AsyncMock(return_value=None)
     repository_args = RepositoryArgs(
         db=database_engine,
+        role_manager=mock_role_manager,
         storage_manager=MagicMock(),  # Not used by DomainRepositories
         config_provider=MagicMock(),  # Not used by DomainRepositories
         valkey_stat_client=MagicMock(),  # Not used by DomainRepositories
@@ -68,10 +72,6 @@ def processors(database_fixture, database_engine) -> DomainProcessors:
     )
     domain_repositories = DomainRepositories.create(repository_args)
 
-    # Create mock for _role_manager
-    mock_role_manager = MagicMock()
-    mock_role_manager.create_system_role = AsyncMock(return_value=None)
-    domain_repositories.repository._role_manager = mock_role_manager
     domain_service = DomainService(
         repository=domain_repositories.repository,
         admin_repository=domain_repositories.admin_repository,

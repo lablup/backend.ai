@@ -11,7 +11,7 @@ class VfolderRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = VfolderRepository(args.db)
+        repository = VfolderRepository(args.db, args.role_manager)
 
         return cls(
             repository=repository,

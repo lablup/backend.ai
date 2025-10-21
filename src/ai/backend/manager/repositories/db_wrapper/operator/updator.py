@@ -14,9 +14,9 @@ class Updator(Generic[TRow, TUpdator]):
     TUpdator: Type of the data used to update the ORM model instance.
     """
 
-    def __init__(self, session: SessionWrapper) -> None:
+    def __init__(self, session: SessionWrapper, role_manager: RoleManager) -> None:
         self._session = session
-        self._role_manager = RoleManager.instance()
+        self._role_manager = role_manager
 
     async def update(self, data: UpdateData[TRow, TUpdator]) -> TRow:
         """

@@ -57,9 +57,9 @@ class DomainRepository:
     _db: ExtendedAsyncSAEngine
     _role_manager: RoleManager
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, role_manager: RoleManager) -> None:
         self._db = db
-        self._role_manager = RoleManager.instance()
+        self._role_manager = role_manager
 
     @domain_repository_resilience.apply()
     async def create_domain_validated(self, creator: DomainCreator) -> DomainData:

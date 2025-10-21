@@ -13,7 +13,7 @@ class DomainRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = DomainRepository(args.db)
+        repository = DomainRepository(args.db, args.role_manager)
         admin_repository = AdminDomainRepository(args.db)
 
         return cls(
