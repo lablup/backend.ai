@@ -1926,10 +1926,11 @@ type ScanArtifactsPayload {
 
 """Added in 25.15.0. Scheduling event broadcast payload"""
 type SchedulingBroadcastEventPayload {
-  sessionId: ID!
-  creationId: String!
   statusTransition: SchedulingStatus!
   reason: String!
+
+  """The session associated with this event"""
+  session: ComputeSessionNode!
 }
 
 """Status of session scheduling transitions"""

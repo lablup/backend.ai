@@ -13,6 +13,7 @@ from ai.backend.common.events.hub.propagators.bypass import AsyncBypassPropagato
 from ai.backend.common.events.types import EventDomain
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.session import Session
 from ai.backend.manager.errors.kernel import InvalidSessionId
 
 if TYPE_CHECKING:
@@ -48,8 +49,7 @@ class SchedulingBroadcastEventPayload:
     Represents a status transition during session scheduling.
     """
 
-    session_id: strawberry.ID
-    creation_id: str
+    _session_id: strawberry.Private[strawberry.ID]
     status_transition: SchedulingStatus
     reason: str
 
@@ -64,11 +64,15 @@ class SchedulingBroadcastEventPayload:
             status_enum = SchedulingStatus.ERROR
 
         return cls(
-            session_id=strawberry.ID(str(event.session_id)),
-            creation_id=event.creation_id,
+            _session_id=strawberry.ID(str(event.session_id)),
             status_transition=status_enum,
             reason=event.reason,
         )
+
+    @strawberry.field(description="The session associated with this event")
+    def session(self, info: Info[StrawberryGQLContext]) -> Session:
+        """Resolve the session node for this event via GraphQL Federation."""
+        return Session(id=self._session_id)
 
 
 @strawberry.subscription(
