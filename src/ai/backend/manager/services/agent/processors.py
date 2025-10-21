@@ -107,6 +107,8 @@ class AgentProcessors(AbstractProcessorPackage):
     @override
     def supported_actions(self) -> list[ActionSpec]:
         return [
+            GetAgentCountAction.spec(),
+            GetAgentsAction.spec(),
             SyncAgentRegistryAction.spec(),
             GetWatcherStatusAction.spec(),
             WatcherAgentStartAction.spec(),
