@@ -15,6 +15,34 @@
 # If agents field is populated, this field indicates the default values for all
 # agents.
 [agent]
+  # Agent ID
+  ## id = "agent-001"
+  # Agent socket port
+  agent-sock-port = 6007
+  # Base path for IPC
+  ipc-base-path = "/tmp/backend.ai/ipc"
+  # Base path for variable data
+  var-base-path = "var/lib/backend.ai"
+  # Scaling group name
+  scaling-group = "default"
+  # Scaling group type
+  scaling-group-type = "compute"
+  # Allowed compute plugins
+  ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
+  # Blocked compute plugins
+  ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
+  # Allowed network plugins
+  ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
+  # Blocked network plugins
+  ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
+  # Path for image commit
+  image-commit-path = "tmp/backend.ai/commit"
+  # Path for abuse reports
+  ## abuse-report-path = "/var/log/backend.ai/abuse"
+  # Whether to force terminate abusing containers
+  force-terminate-abusing-containers = false
+  # Kernel creation concurrency
+  kernel-creation-concurrency = 4
   # Backend type for the agent.
   # This determines how the agent interacts with the underlying infrastructure.
   # Available options are:
@@ -40,14 +68,6 @@
   ## rpc-auth-manager-public-key = "/path/to/public.key"
   # Path to RPC auth agent keypair
   ## rpc-auth-agent-keypair = "/path/to/keypair.key"
-  # Agent socket port
-  agent-sock-port = 6007
-  # Agent ID
-  ## id = "agent-001"
-  # Base path for IPC
-  ipc-base-path = "/tmp/backend.ai/ipc"
-  # Base path for variable data
-  var-base-path = "var/lib/backend.ai"
   # Mount path for containers
   ## mount-path = "/mnt/backend.ai"
   # Whether to enable cohabiting storage proxy
@@ -58,10 +78,6 @@
   ## region = "us-east-1"
   # Instance type
   ## instance-type = "m5.large"
-  # Scaling group name
-  scaling-group = "default"
-  # Scaling group type
-  scaling-group-type = "compute"
   # Path to PID file
   pid-file = "/dev/null"
   # Event loop type
@@ -76,22 +92,6 @@
   metadata-server-bind-host = "0.0.0.0"
   # Metadata server port
   metadata-server-port = 40128
-  # Allowed compute plugins
-  ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
-  # Blocked compute plugins
-  ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
-  # Allowed network plugins
-  ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
-  # Blocked network plugins
-  ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
-  # Path for image commit
-  image-commit-path = "tmp/backend.ai/commit"
-  # Path for abuse reports
-  ## abuse-report-path = "/var/log/backend.ai/abuse"
-  # Whether to force terminate abusing containers
-  force-terminate-abusing-containers = false
-  # Kernel creation concurrency
-  kernel-creation-concurrency = 4
   # Whether to use experimental Redis event dispatcher
   use-experimental-redis-event-dispatcher = false
   # Docker mode detected based on kernel version (linuxkit/native)
@@ -114,10 +114,6 @@
   kernel-uid = -1
   # Kernel group ID
   kernel-gid = -1
-  # Bind host for containers
-  bind-host = ""
-  # Advertised host for containers
-  ## advertised-host = "192.168.1.100"
   # Port range for containers.
   # If multiple agents are used, user must ensure that the port ranges
   # do not overlap between the agent, else it may cause subtle issues
@@ -147,6 +143,10 @@
   # networks, and services.
   # This field is only used when backend is set to 'docker'.
   swarm-enabled = false
+  # Bind host for containers
+  bind-host = ""
+  # Advertised host for containers
+  ## advertised-host = "192.168.1.100"
 
   # KRunner volumes configuration, mapping container names to host paths.
   # This is used to specify volumes that should be mounted into containers
@@ -368,29 +368,33 @@
   # Only override fields if necessary.
   [agents.agent]
     # Agent ID
-    id = "agent-001"
+    ## id = "agent-001"
     # Agent socket port
-    ## agent-sock-port = 6007  # min=1024 max=65535
-    # Mount path for containers
-    ## mount-path = "/mnt/backend.ai"
-    # Whether to enable cohabiting storage proxy
-    ## cohabiting-storage-proxy = true
+    agent-sock-port = 6007
+    # Base path for IPC
+    ipc-base-path = "/tmp/backend.ai/ipc"
+    # Base path for variable data
+    var-base-path = "var/lib/backend.ai"
+    # Scaling group name
+    scaling-group = "default"
+    # Scaling group type
+    scaling-group-type = "compute"
     # Allowed compute plugins
-    ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
+    ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
     # Blocked compute plugins
     ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
     # Allowed network plugins
     ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
     # Blocked network plugins
     ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
+    # Path for image commit
+    image-commit-path = "tmp/backend.ai/commit"
+    # Path for abuse reports
+    ## abuse-report-path = "/var/log/backend.ai/abuse"
     # Whether to force terminate abusing containers
-    ## force-terminate-abusing-containers = true
+    force-terminate-abusing-containers = false
     # Kernel creation concurrency
-    ## kernel-creation-concurrency = 4  # min=1 max=32
-    # Docker mode detected based on kernel version (linuxkit/native)
-    ## docker-mode = "linuxkit"
-    # Owner uid:gid of the mount directory
-    ## mount-path-uid-gid = "root:root"
+    kernel-creation-concurrency = 4
 
     # Container lifecycle synchronization config
     [agents.agent.sync-container-lifecycles]
@@ -402,26 +406,26 @@
   # Container config overrides for the individual agent
   [agents.container]
     # Kernel user ID
-    ## kernel-uid = 1000
+    kernel-uid = -1
     # Kernel group ID
-    ## kernel-gid = 1000
+    kernel-gid = -1
     # Port range for containers.
     # If multiple agents are used, user must ensure that the port ranges
     # do not overlap between the agent, else it may cause subtle issues
     # late into the agent's runtime.
-    ## port-range = [ 30000, 31000,]
+    port-range = [ 30000, 31000,]
     # Statistics type
     ## stats-type = "cgroup"
     # Sandbox type
-    ## sandbox-type = "docker"
+    sandbox-type = "docker"
     # Jail arguments
-    ## jail-args = [ "--mount", "/tmp",]
+    jail-args = [ "--mount", "/tmp",]
     # Scratch type
-    ## scratch-type = "hostdir"
+    scratch-type = "hostdir"
     # Scratch root directory
-    ## scratch-root = "./scratches"
+    scratch-root = "scratches"
     # Scratch size
-    ## scratch-size = "1G"
+    scratch-size = 0
     # Scratch NFS address
     ## scratch-nfs-address = "192.168.1.100:/export"
     # Scratch NFS options
@@ -433,7 +437,7 @@
     # When enabled, the agent will use Docker Swarm APIs to manage containers,
     # networks, and services.
     # This field is only used when backend is set to 'docker'.
-    ## swarm-enabled = true
+    swarm-enabled = false
 
   # Resource config overrides for the individual agent
   [agents.resource]
