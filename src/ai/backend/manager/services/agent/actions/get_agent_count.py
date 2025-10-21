@@ -17,7 +17,7 @@ class GetAgentCountAction(AgentAction):
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "get_agents"
+        return "get_agent_count"
 
 
 @dataclass
