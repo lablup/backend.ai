@@ -26,7 +26,13 @@ from ai.backend.common.types import (
     HardwareMetadata,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended, AgentFetchConditions
+from ai.backend.manager.data.agent.types import (
+    AgentData,
+    AgentDataExtended,
+    AgentFetchConditions,
+    FilterCondition,
+    OrderCondition,
+)
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 from ai.backend.manager.services.agent.actions.get_agent_count import GetAgentCountAction
@@ -495,17 +501,21 @@ class Agent(graphene.ObjectType):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
         elif isinstance(raw_status, AgentStatus):
             status_list = [raw_status]
+        filter_condition = None
+        if filter is not None:
+            filter_condition = FilterCondition(
+                filter_expr=filter,
+                filter_parser=QueryFilterParser(cls._queryfilter_fieldspec),
+            )
         result = await graph_ctx.processors.agent.get_agent_count.wait_for_complete(
             GetAgentCountAction(
                 conditions=AgentFetchConditions(
                     limit=None,
                     offset=None,
-                    filter_parser=QueryFilterParser(cls._queryfilter_fieldspec),
-                    order_parser=None,
+                    filter=filter_condition,
+                    order=None,
                     status=status_list,
                     scaling_group=scaling_group,
-                    filter=filter,
-                    order=None,
                 )
             )
         )
@@ -524,17 +534,27 @@ class Agent(graphene.ObjectType):
         order: Optional[str] = None,
     ) -> Sequence[Agent]:
         agent_status = [AgentStatus[s] for s in raw_status.split(",")] if raw_status else []
+        filter_condition = None
+        if filter is not None:
+            filter_condition = FilterCondition(
+                filter_expr=filter,
+                filter_parser=QueryFilterParser(cls._queryfilter_fieldspec),
+            )
+        order_condition = None
+        if order is not None:
+            order_condition = OrderCondition(
+                order_expr=order,
+                order_parser=QueryOrderParser(cls._queryorder_colmap),
+            )
         result = await graph_ctx.processors.agent.get_agents.wait_for_complete(
             GetAgentsAction(
                 conditions=AgentFetchConditions(
                     limit=limit,
                     offset=offset,
-                    filter_parser=QueryFilterParser(cls._queryfilter_fieldspec) if filter else None,
-                    order_parser=QueryOrderParser(cls._queryorder_colmap) if order else None,
                     status=agent_status,
                     scaling_group=scaling_group,
-                    filter=filter,
-                    order=order,
+                    filter=filter_condition,
+                    order=order_condition,
                 )
             )
         )
@@ -555,8 +575,6 @@ class Agent(graphene.ObjectType):
                 conditions=AgentFetchConditions(
                     limit=None,
                     offset=None,
-                    filter_parser=None,
-                    order_parser=None,
                     status=status,
                     scaling_group=scaling_group,
                     filter=None,

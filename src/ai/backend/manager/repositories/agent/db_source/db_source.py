@@ -44,10 +44,12 @@ class AgentDBSource:
             query = query.where(AgentRow.scaling_group == conditions.scaling_group)
         if len(conditions.status) > 0:
             query = query.where(AgentRow.status.in_(conditions.status))
-        if conditions.filter is not None and conditions.filter_parser is not None:
-            query = conditions.filter_parser.append_filter(query, conditions.filter)
-        if conditions.order is not None and conditions.order_parser is not None:
-            query = conditions.order_parser.append_ordering(query, conditions.order)
+        if conditions.filter is not None:
+            filter_parser = conditions.filter.filter_parser
+            query = filter_parser.append_filter(query, conditions.filter.filter_expr)
+        if conditions.order is not None:
+            order_parser = conditions.order.order_parser
+            query = order_parser.append_ordering(query, conditions.order.order_expr)
         else:
             query = query.order_by(
                 AgentRow.status.asc(), AgentRow.scaling_group.asc(), AgentRow.id.asc()

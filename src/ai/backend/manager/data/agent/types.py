@@ -87,15 +87,25 @@ class AgentDataExtended(AgentData):
 
 
 @dataclass
+class FilterCondition:
+    filter_expr: str
+    filter_parser: "QueryFilterParser"
+
+
+@dataclass
+class OrderCondition:
+    order_expr: str
+    order_parser: "QueryOrderParser"
+
+
+@dataclass
 class AgentFetchConditions:
     limit: Optional[int]
     offset: Optional[int]
-    filter_parser: Optional["QueryFilterParser"]
-    order_parser: Optional["QueryOrderParser"]
+    filter: Optional[FilterCondition]
+    order: Optional[OrderCondition]
     scaling_group: Optional[str]
     status: list[AgentStatus]
-    filter: Optional[str]
-    order: Optional[str]
 
 
 @dataclass
