@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
     Iterable,
-    List,
     Optional,
     Self,
     cast,
@@ -58,9 +56,13 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageAction,
 )
 from ai.backend.manager.services.image.actions.forget_image_by_id import ForgetImageByIdAction
+from ai.backend.manager.services.image.actions.get_all_images import GetAllImagesAction
 from ai.backend.manager.services.image.actions.get_image_by_id import GetImageByIdAction
 from ai.backend.manager.services.image.actions.get_image_by_identifier import (
     GetImageByIdentifierAction,
+)
+from ai.backend.manager.services.image.actions.get_image_installed_agents import (
+    GetImageInstalledAgentsAction,
 )
 from ai.backend.manager.services.image.actions.get_images_by_canonicals import (
     GetImagesByCanonicalsAction,
@@ -199,7 +201,7 @@ class Image(graphene.ObjectType):
 
     @classmethod
     def from_image_with_agent_install_status(cls, data: ImageWithAgentInstallStatus) -> Self:
-        return cls(
+        result = cls(
             id=data.image.id,
             name=data.image.name,
             namespace=data.image.namespace,
@@ -230,65 +232,10 @@ class Image(graphene.ObjectType):
             else None,
             # legacy
             hash=data.image.digest,
-            # internal
-            raw_labels=data.image.raw_labels,
         )
-
-    @classmethod
-    def populate_row(
-        cls,
-        ctx: GraphQueryContext,
-        row: ImageRow,
-        installed_agents: List[str],
-    ) -> Image:
-        is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
-        hide_agents = False if is_superadmin else ctx.config_provider.config.manager.hide_agents
-        image_ref = row.image_ref
-        version, ptag_set = image_ref.tag_set
-        ret = cls(
-            id=row.id,
-            name=row.image,
-            namespace=row.image,
-            base_image_name=image_ref.name,
-            project=row.project,
-            humanized_name=row.image,
-            tag=row.tag,
-            tags=[KVPair(key=k, value=v) for k, v in ptag_set.items()],
-            version=version,
-            registry=row.registry,
-            architecture=row.architecture,
-            is_local=row.is_local,
-            digest=row.trimmed_digest or None,
-            labels=[KVPair(key=k, value=v) for k, v in row.labels.items()],
-            aliases=[alias_row.alias for alias_row in row.aliases],
-            size_bytes=row.size_bytes,
-            status=row.status,
-            resource_limits=[
-                ResourceLimit(key=k, min=v.get("min", Decimal(0)), max=Decimal("Infinity"))
-                for k, v in row.resources.items()
-            ],
-            supported_accelerators=row.accelerators.split(",") if row.accelerators else ["*"],
-            installed=len(installed_agents) > 0,
-            installed_agents=installed_agents if not hide_agents else None,
-            # legacy
-            hash=row.trimmed_digest or None,
-        )
-        ret.raw_labels = row.labels
-        return ret
-
-    @classmethod
-    async def bulk_load(
-        cls,
-        ctx: GraphQueryContext,
-        rows: List[ImageRow],
-    ) -> AsyncIterator[Image]:
-        image_ids = [row.id for row in rows]
-        results = await ctx.valkey_image.get_agents_for_images(image_ids)
-        agent_ids = list(results.values())
-
-        for idx, row in enumerate(rows):
-            installed_agents: list[str] = [str(agent_id) for agent_id in agent_ids[idx]]
-            yield cls.populate_row(ctx, row, installed_agents)
+        # internal
+        result.raw_labels = data.image.raw_labels
+        return result
 
     @classmethod
     async def batch_load_by_canonical(
@@ -360,15 +307,12 @@ class Image(graphene.ObjectType):
         types: set[ImageLoadFilter] = set(),
         filter_by_statuses: Optional[list[ImageStatus]] = [ImageStatus.ALIVE],
     ) -> Sequence[Image]:
-        async with ctx.db.begin_readonly_session() as session:
-            rows = await ImageRow.list(
-                session, load_aliases=True, filter_by_statuses=filter_by_statuses
-            )
-        items: list[Image] = [
-            item async for item in cls.bulk_load(ctx, rows) if item.matches_filter(ctx, types)
-        ]
-
-        return items
+        result = await ctx.processors.image.get_all_images.wait_for_complete(
+            GetAllImagesAction(status_filter=filter_by_statuses)
+        )
+        all_items = [cls.from_image_with_agent_install_status(img) for img in result.data.values()]
+        filtered_items = [item for item in all_items if item.matches_filter(ctx, types)]
+        return filtered_items
 
     @staticmethod
     async def filter_allowed(
@@ -502,8 +446,11 @@ class ImageNode(graphene.ObjectType):
     async def _batch_load_installed_agents(
         cls, ctx: GraphQueryContext, image_ids: Sequence[ImageID]
     ) -> list[set[AgentId]]:
-        results = await ctx.valkey_image.get_agents_for_images(list(image_ids))
-        return list(results.values())
+        result = await ctx.processors.image.get_image_installed_agents.wait_for_complete(
+            GetImageInstalledAgentsAction(image_ids=list(image_ids))
+        )
+        installed_agent_ids_per_image: Mapping[ImageID, set[AgentId]] = result.data
+        return [installed_agent_ids_per_image.get(image_id, set()) for image_id in image_ids]
 
     async def resolve_installed(self, info: graphene.ResolveInfo) -> bool:
         graph_ctx: GraphQueryContext = info.context
