@@ -50,7 +50,7 @@ class AgentDBSource:
             query = conditions.order_parser.append_ordering(query, conditions.order)
         else:
             query = query.order_by(
-                AgentRow.status.asc(), AgentRow.id.asc(), AgentRow.scaling_group.asc()
+                AgentRow.status.asc(), AgentRow.scaling_group.asc(), AgentRow.id.asc()
             )
         async with self._db.begin_readonly_session() as db_session:
             result = await db_session.scalars(query)
