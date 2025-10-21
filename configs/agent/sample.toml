@@ -77,7 +77,7 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
+  ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
   # Blocked compute plugins
   ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
   # Allowed network plugins
@@ -178,7 +178,7 @@
   # page/hugepage size (e.g., 2 MiB).
   memory-align-size = "16M"
   # Resource allocation order
-  allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
+  allocation-order = [ "cpu", "cuda", "mem", "rocm", "tpu",]
   # Affinity policy
   affinity-policy = "INTERLEAVED"
 
@@ -374,7 +374,7 @@
     # Whether to enable cohabiting storage proxy
     ## cohabiting-storage-proxy = true
     # Allowed compute plugins
-    ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
+    ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
     # Blocked compute plugins
     ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
     # Allowed network plugins
@@ -385,8 +385,6 @@
     ## force-terminate-abusing-containers = true
     # Kernel creation concurrency
     ## kernel-creation-concurrency = 4  # min=1 max=32
-    # Whether to use experimental Redis event dispatcher
-    ## use-experimental-redis-event-dispatcher = true
     # Docker mode detected based on kernel version (linuxkit/native)
     ## docker-mode = "linuxkit"
     # Owner uid:gid of the mount directory
@@ -455,6 +453,6 @@
     # page/hugepage size (e.g., 2 MiB).
     memory-align-size = 16777216
     # Resource allocation order
-    allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
+    allocation-order = [ "cpu", "cuda", "mem", "rocm", "tpu",]
     # Affinity policy
     affinity-policy = 1

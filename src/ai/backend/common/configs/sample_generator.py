@@ -143,6 +143,8 @@ def _dump_toml_scalar(
             .strip()
             .split(" = ", 1)[1]
         )
+    if isinstance(value, (list, tuple, set, frozenset)):
+        value = sorted(value)
     return toml.dumps({"x": value}).strip().split(" = ", 1)[1]
 
 
