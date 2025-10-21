@@ -498,7 +498,7 @@ class AgentRPCServer(aobject):
                 redis_config_dict["addr"] = f"{addr.host}:{addr.port}"
 
         redis_config = RedisConfig.model_validate(redis_config_dict)
-        self.local_config.redis = redis_config
+        self.local_config = self.local_config.with_changes(redis=redis_config)
 
         # Fill up vfolder configs from etcd and store as separate attributes
         # TODO: Integrate vfolder_config into local_config
@@ -527,12 +527,10 @@ class AgentRPCServer(aobject):
                 )
 
                 # Update local config with parsed values
-                self.local_config = self.local_config.model_copy(
-                    update={
-                        "api": api_config,
-                        "container_logs": container_logs_config,
-                        "kernel_lifecycles": kernel_lifecycles_config,
-                    }
+                self.local_config = self.local_config.with_changes(
+                    api=api_config,
+                    container_logs=container_logs_config,
+                    kernel_lifecycles=kernel_lifecycles_config,
                 )
             except Exception as e:
                 log.warning("etcd: agent-config error: {}", e)
@@ -560,13 +558,8 @@ class AgentRPCServer(aobject):
                     )
 
                 if container_updates:
-                    # Create new container config with updated values
-                    new_container_config = self.local_config.container.model_copy(
-                        update=container_updates
-                    )
-                    # Create new full config with updated container section
-                    self.local_config = self.local_config.model_copy(
-                        update={"container": new_container_config}
+                    self.local_config = self.local_config.with_updates(
+                        container_update=container_updates
                     )
         except Exception as e:
             log.warning("etcd: container-config error: {}".format(e))
@@ -603,10 +596,9 @@ class AgentRPCServer(aobject):
         with open(cfg_src_path, "w") as f:
             tomlkit.dump(data, f)
         # Update local config with new scaling group
-        new_agent_config = self.local_config.agent.model_copy(
-            update={"scaling_group": scaling_group}
+        self.local_config = self.local_config.with_updates(
+            agent_update={"scaling_group": scaling_group}
         )
-        self.local_config = self.local_config.model_copy(update={"agent": new_agent_config})
         log.info("rpc::update_scaling_group()")
 
     @rpc_function
@@ -1091,7 +1083,9 @@ class AgentRPCServer(aobject):
         tasks = []
         for kernel_id in kernel_ids:
             try:
-                task = asyncio.ensure_future(self.agent.destroy_kernel(kernel_id, "agent-reset"))
+                task = asyncio.ensure_future(
+                    self.agent.destroy_kernel(kernel_id, ContainerId("agent-reset"))
+                )
                 tasks.append(task)
             except Exception:
                 await self.error_monitor.capture_exception()
@@ -1221,20 +1215,18 @@ async def server_main(
     )
     krunner_volumes: Mapping[str, str] = await kernel_mod.prepare_krunner_env(
         local_config.model_dump(by_alias=True)
-    )  # type: ignore
+    )
+    local_config = local_config.with_updates(container_update={"krunner_volumes": krunner_volumes})
     # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
     log.info("Kernel runner environments: {}", [*krunner_volumes.keys()])
+
     # Update agent id and instance type if not set
     agent_updates = {}
     if not local_config.agent.id:
         agent_updates["id"] = await identity.get_instance_id()
     if not local_config.agent.instance_type:
         agent_updates["instance_type"] = await identity.get_instance_type()
-    local_config.container.krunner_volumes = krunner_volumes
-
-    if agent_updates:
-        new_agent_config = local_config.agent.model_copy(update=agent_updates)
-        local_config = local_config.model_copy(update={"agent": new_agent_config})
+    local_config = local_config.with_updates(agent_update=agent_updates)
 
     etcd_credentials = None
     if local_config.etcd.user and local_config.etcd.password:
@@ -1266,31 +1258,33 @@ async def server_main(
             await identity.get_instance_ip(subnet_hint),
             rpc_addr.port,
         )
-        new_agent_config = local_config.agent.model_copy(update={"rpc_listen_addr": new_rpc_addr})
-        local_config = local_config.model_copy(update={"agent": new_agent_config})
+        local_config = local_config.with_updates(agent_update={"rpc_listen_addr": new_rpc_addr})
     # Handle container bind-host configuration
     if not local_config.container.bind_host:
         log.debug(
             "auto-detecting `container.bind-host` from container subnet config "
             "and agent.rpc-listen-addr"
         )
-        local_config.container.bind_host = await get_subnet_ip(
+        bind_host = await get_subnet_ip(
             etcd,
             "container",
             fallback_addr=local_config.agent.rpc_listen_addr.host,
         )
+        local_config = local_config.with_updates(container_update={"bind_host": bind_host})
     log.info("Agent external IP: {}", local_config.agent.rpc_listen_addr.host)
     log.info("Container external IP: {}", local_config.container.bind_host)
     # Update region if not set
     if not local_config.agent.region:
-        local_config.agent.region = await identity.get_instance_region()
+        region = await identity.get_instance_region()
+        local_config = local_config.with_updates(agent_update={"region": region})
     log.info(
         "Node ID: {0} (machine-type: {1}, host: {2})",
         local_config.agent.id,
         local_config.agent.instance_type,
         rpc_addr.host,
     )
-    local_config.plugins = await etcd.get_prefix_dict("config/plugins/accelerator")
+    plugins = await etcd.get_prefix_dict("config/plugins/accelerator")
+    local_config = local_config.with_changes(plugins=plugins)
 
     # Start RPC server.
     global agent_instance
@@ -1304,12 +1298,8 @@ async def server_main(
     app = build_root_server()
     runner = web.AppRunner(app)
     await runner.setup()
-    service_addr = HostPortPair(
-        local_config.agent.service_addr.host, local_config.agent.service_addr.port
-    )
-    announce_addr = HostPortPair(
-        local_config.agent.announce_addr.host, local_config.agent.announce_addr.port
-    )
+    service_addr = local_config.agent.service_addr.to_legacy()
+    announce_addr = local_config.agent.announce_addr.to_legacy()
     ssl_ctx = None
     sd_type = ServiceDiscoveryType(local_config.service_discovery.type)
 
