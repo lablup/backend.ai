@@ -1744,11 +1744,11 @@ class Query(graphene.ObjectType):
         else:
             raise InvalidAPIParameters("Unknown client role")
         return [
-            ImageNode.from_legacy_image(i)
-            for i in items
+            ImageNode.from_legacy_image(item)
+            for item in items
             # access scope to each customized image has already been
             # evaluated at Image.load_all()
-            if "ai.backend.customized-image.owner" in i.raw_labels
+            if item.is_customized_image
         ]
 
     @staticmethod
