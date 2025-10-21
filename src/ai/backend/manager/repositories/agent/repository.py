@@ -87,11 +87,6 @@ class AgentRepository:
             await self._cache_source.set_agent_to_images(agent_id, image_ids)
 
     @agent_repository_resilience.apply()
-    async def count_agents_by_condition(self, conditions: AgentFetchConditions) -> int:
-        agent_ids = await self._db_source.fetch_agent_ids_by_condition(conditions)
-        return len(agent_ids)
-
-    @agent_repository_resilience.apply()
     async def fetch_agent_ids_by_condition(self, conditions: AgentFetchConditions) -> list[AgentId]:
         agent_ids = await self._db_source.fetch_agent_ids_by_condition(conditions)
         return agent_ids

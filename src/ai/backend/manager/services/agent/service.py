@@ -149,8 +149,8 @@ class AgentService:
         return GetAgentsActionResult(agents=result)
 
     async def get_agent_count(self, action: GetAgentCountAction) -> GetAgentCountActionResult:
-        count = await self._agent_repository.count_agents_by_condition(action.conditions)
-        return GetAgentCountActionResult(count=count)
+        agent_ids = await self._agent_repository.fetch_agent_ids_by_condition(action.conditions)
+        return GetAgentCountActionResult(count=len(agent_ids))
 
     async def sync_agent_registry(
         self, action: SyncAgentRegistryAction
