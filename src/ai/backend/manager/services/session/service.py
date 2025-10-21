@@ -304,6 +304,23 @@ class SessionService:
         if image_visibility != CustomizedImageVisibilityScope.USER:
             raise InvalidAPIParameters(f"Unsupported visibility scope {image_visibility}")
 
+        # check if user has passed its limit of customized image count
+        existing_image_count = await self._session_repository.get_customized_image_count(
+            image_visibility.value, str(image_owner_id)
+        )
+        customized_image_count_limit = action.max_customized_image_count
+        if customized_image_count_limit <= existing_image_count:
+            raise QuotaExceeded(
+                extra_msg=(
+                    "You have reached your customized image count quota. "
+                    f"(current: {existing_image_count}, limit: {customized_image_count_limit})"
+                ),
+                extra_data={
+                    "limit": customized_image_count_limit,
+                    "current": existing_image_count,
+                },
+            )
+
         session = await self._session_repository.get_session_with_group(
             session_name,
             owner_access_key,
@@ -351,21 +368,6 @@ class SessionService:
             new_canonical = (
                 f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
             )
-
-            # check if user has passed its limit of customized image count
-            existing_image_count = await self._session_repository.get_customized_image_count(
-                image_visibility.value, str(image_owner_id)
-            )
-
-            customized_image_count_limit = action.max_customized_image_count
-            if customized_image_count_limit <= existing_image_count:
-                raise QuotaExceeded(
-                    extra_msg="You have reached your customized image count quota",
-                    extra_data={
-                        "limit": customized_image_count_limit,
-                        "current": existing_image_count,
-                    },
-                )
 
             # check if image with same name exists and reuse ID it if is
             existing_row = await self._session_repository.get_existing_customized_image(
