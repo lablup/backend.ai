@@ -1297,8 +1297,7 @@ class AgentSpecificConfig(BaseConfigSchema):
 
 
 class SubAgentConfig(BaseConfigSchema):
-    agent: OverridableAgentConfig | None = Field(
-        default=None,
+    agent: OverridableAgentConfig = Field(
         description=textwrap.dedent("""
         Agent config overrides for the individual subagent.
         All fields except Agent ID are by default optional.
@@ -1422,6 +1421,16 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
                 "Please use the default single agent mode if only 1 agent is needed."
             )
 
+        return sub_agents
+
+    @field_validator("sub_agents", mode="after")
+    @classmethod
+    def _validate_sub_agent_id_uniqueness(
+        cls, sub_agents: list[SubAgentConfig]
+    ) -> list[SubAgentConfig]:
+        sub_agent_ids = {sub_agent.agent.id for sub_agent in sub_agents}
+        if len(sub_agent_ids) != len(sub_agents):
+            raise ValueError("Duplicate subagent IDs found!")
         return sub_agents
 
     @model_validator(mode="after")
