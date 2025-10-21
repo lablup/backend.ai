@@ -132,7 +132,7 @@ class SessionAlreadyExists(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class QuotaExceeded(BackendAIError, web.HTTPPreconditionFailed):
+class QuotaExceeded(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/quota-exceeded"
     error_title = "You have reached your resource limit."
 
