@@ -1118,7 +1118,7 @@ class AgentRPCServer(aobject):
         log.info("rpc::start_service(k:{0}, app:{1})", kernel_id, service)
         kid = KernelId(UUID(kernel_id))
         agent = self._find_agent(kernel_id=kid, throw_error=True)
-        return await agent.start_service(KernelId(UUID(kernel_id)), service, opts)
+        return await agent.start_service(kid, service, opts)
 
     @rpc_function
     @collect_error
@@ -1131,10 +1131,7 @@ class AgentRPCServer(aobject):
         log.debug("rpc::get_commit_status(k:{})", kernel_id)
         kid = KernelId(UUID(kernel_id))
         agent = self._find_agent(kernel_id=kid, throw_error=True)
-        status: CommitStatus = await agent.get_commit_status(
-            KernelId(UUID(kernel_id)),
-            subdir,
-        )
+        status: CommitStatus = await agent.get_commit_status(kid, subdir)
         return {
             "kernel": kernel_id,
             "status": status.value,
@@ -1245,7 +1242,7 @@ class AgentRPCServer(aobject):
         log.info("rpc::upload_file(k:{0}, fn:{1})", kernel_id, filename)
         kid = KernelId(UUID(kernel_id))
         agent = self._find_agent(kernel_id=kid, throw_error=True)
-        await agent.accept_file(KernelId(UUID(kernel_id)), filename, filedata)
+        await agent.accept_file(kid, filename, filedata)
 
     @rpc_function
     @collect_error
