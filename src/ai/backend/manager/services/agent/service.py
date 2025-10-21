@@ -22,8 +22,17 @@ from ai.backend.manager.data.agent.types import (
     UpsertResult,
 )
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.agent.query import QueryConditions
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.services.agent.actions.get_agent_count import (
+    GetAgentCountAction,
+    GetAgentCountActionResult,
+)
+from ai.backend.manager.services.agent.actions.get_agents import (
+    GetAgentsAction,
+    GetAgentsActionResult,
+)
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -127,6 +136,21 @@ class AgentService:
             "addr": addr,
             "token": token,
         }
+
+    async def get_agents(self, action: GetAgentsAction) -> GetAgentsActionResult:
+        agent_ids = await self._agent_repository.fetch_agent_ids_by_condition(action.conditions)
+        condition = [QueryConditions.by_ids(agent_ids)]
+        agent_data = await self._agent_repository.list_extended_data(condition)
+
+        list_order = {agent_id: index for index, agent_id in enumerate(agent_ids)}
+        result = {
+            agent.id: agent for agent in sorted(agent_data, key=lambda agent: list_order[agent.id])
+        }
+        return GetAgentsActionResult(agents=result)
+
+    async def get_agent_count(self, action: GetAgentCountAction) -> GetAgentCountActionResult:
+        count = await self._agent_repository.count_agents_by_condition(action.conditions)
+        return GetAgentCountActionResult(count=count)
 
     async def sync_agent_registry(
         self, action: SyncAgentRegistryAction

@@ -33,6 +33,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
+from ai.backend.manager.services.agent.actions.get_agents import AgentFetchConditions
 
 from .query import QueryCondition, QueryOrder
 
@@ -84,6 +85,16 @@ class AgentRepository:
             [Exception], message=f"Failed to cache agent: {agent_id} to images: {image_ids}"
         ):
             await self._cache_source.set_agent_to_images(agent_id, image_ids)
+
+    @agent_repository_resilience.apply()
+    async def count_agents_by_condition(self, conditions: AgentFetchConditions) -> int:
+        agent_ids = await self._db_source.fetch_agent_ids_by_condition(conditions)
+        return len(agent_ids)
+
+    @agent_repository_resilience.apply()
+    async def fetch_agent_ids_by_condition(self, conditions: AgentFetchConditions) -> list[AgentId]:
+        agent_ids = await self._db_source.fetch_agent_ids_by_condition(conditions)
+        return agent_ids
 
     @agent_repository_resilience.apply()
     async def sync_agent_heartbeat(

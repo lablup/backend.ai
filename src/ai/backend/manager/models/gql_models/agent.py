@@ -26,9 +26,11 @@ from ai.backend.common.types import (
     HardwareMetadata,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended
+from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended, AgentFetchConditions
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
+from ai.backend.manager.services.agent.actions.get_agent_count import GetAgentCountAction
+from ai.backend.manager.services.agent.actions.get_agents import GetAgentsAction
 
 from ..agent import (
     ADMIN_PERMISSIONS,
@@ -488,21 +490,26 @@ class Agent(graphene.ObjectType):
         raw_status: Optional[str | AgentStatus] = None,
         filter: Optional[str] = None,
     ) -> int:
+        status_list: list[AgentStatus] = []
         if isinstance(raw_status, str):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
         elif isinstance(raw_status, AgentStatus):
             status_list = [raw_status]
-        query = sa.select([sa.func.count()]).select_from(agents)
-        if scaling_group is not None:
-            query = query.where(agents.c.scaling_group == scaling_group)
-        if raw_status is not None:
-            query = query.where(agents.c.status.in_(status_list))
-        if filter is not None:
-            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
-            query = qfparser.append_filter(query, filter)
-        async with graph_ctx.db.begin_readonly() as conn:
-            result = await conn.execute(query)
-            return result.scalar()
+        result = await graph_ctx.processors.agent.get_agent_count.wait_for_complete(
+            GetAgentCountAction(
+                conditions=AgentFetchConditions(
+                    limit=None,
+                    offset=None,
+                    filter_parser=QueryFilterParser(cls._queryfilter_fieldspec),
+                    order_parser=None,
+                    status=status_list,
+                    scaling_group=scaling_group,
+                    filter=filter,
+                    order=None,
+                )
+            )
+        )
+        return result.count
 
     @classmethod
     async def load_slice(
@@ -516,38 +523,23 @@ class Agent(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[Agent]:
-        if isinstance(raw_status, str):
-            status_list = [AgentStatus[s] for s in raw_status.split(",")]
-        elif isinstance(raw_status, AgentStatus):
-            status_list = [raw_status]
-        query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
-        if scaling_group is not None:
-            query = query.where(agents.c.scaling_group == scaling_group)
-        if raw_status is not None:
-            query = query.where(agents.c.status.in_(status_list))
-        if filter is not None:
-            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
-            query = qfparser.append_filter(query, filter)
-        if order is not None:
-            qoparser = QueryOrderParser(cls._queryorder_colmap)
-            query = qoparser.append_ordering(query, order)
-        else:
-            query = query.order_by(
-                agents.c.status.asc(),
-                agents.c.scaling_group.asc(),
-                agents.c.id.asc(),
+        agent_status = [AgentStatus[s] for s in raw_status.split(",")] if raw_status else []
+        result = await graph_ctx.processors.agent.get_agents.wait_for_complete(
+            GetAgentsAction(
+                conditions=AgentFetchConditions(
+                    limit=limit,
+                    offset=offset,
+                    filter_parser=QueryFilterParser(cls._queryfilter_fieldspec) if filter else None,
+                    order_parser=QueryOrderParser(cls._queryorder_colmap) if order else None,
+                    status=agent_status,
+                    scaling_group=scaling_group,
+                    filter=filter,
+                    order=order,
+                )
             )
-        agent_ids: list[AgentId] = []
-        async with graph_ctx.db.begin_readonly() as conn:
-            async for row in await conn.stream(query):
-                agent_ids.append(row.id)
-        list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
-        condition = [QueryConditions.by_ids(agent_ids)]
-        agent_list = await graph_ctx.agent_repository.list_extended_data(condition)
-        return [
-            cls.from_extended_data(agent)
-            for agent in sorted(agent_list, key=lambda obj: list_order[obj.id])
-        ]
+        )
+
+        return [cls.from_extended_data(agent) for agent in result.agents.values()]
 
     @classmethod
     async def load_all(
@@ -557,14 +549,23 @@ class Agent(graphene.ObjectType):
         scaling_group: Optional[str] = None,
         raw_status: Optional[str] = None,
     ) -> Sequence[Agent]:
-        conditions = []
-        if scaling_group is not None:
-            conditions.append(QueryConditions.by_scaling_group(scaling_group))
-        if raw_status is not None:
-            conditions.append(QueryConditions.by_statuses([AgentStatus[raw_status]]))
+        status = [AgentStatus[raw_status]] if raw_status is not None else []
+        result = await graph_ctx.processors.agent.get_agents.wait_for_complete(
+            GetAgentsAction(
+                conditions=AgentFetchConditions(
+                    limit=None,
+                    offset=None,
+                    filter_parser=None,
+                    order_parser=None,
+                    status=status,
+                    scaling_group=scaling_group,
+                    filter=None,
+                    order=None,
+                )
+            )
+        )
 
-        agent_list = await graph_ctx.agent_repository.list_extended_data(conditions)
-        return [cls.from_extended_data(agent) for agent in agent_list]
+        return [cls.from_extended_data(agent) for agent in result.agents.values()]
 
     @classmethod
     async def batch_load(

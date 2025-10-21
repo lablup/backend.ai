@@ -2,13 +2,17 @@ from __future__ import annotations
 
 import enum
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Optional, Self, override
+from typing import TYPE_CHECKING, Any, Optional, Self, override
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
+from ai.backend.manager.models.minilang.ordering import QueryOrderParser
+
+if TYPE_CHECKING:
+    from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 
 from ..kernel.types import KernelInfo
 
@@ -80,6 +84,18 @@ class AgentData:
 class AgentDataExtended(AgentData):
     known_slot_types: Mapping[SlotName, SlotTypes]
     kernels: list[KernelInfo]
+
+
+@dataclass
+class AgentFetchConditions:
+    limit: Optional[int]
+    offset: Optional[int]
+    filter_parser: Optional["QueryFilterParser"]
+    order_parser: Optional["QueryOrderParser"]
+    scaling_group: Optional[str] = None
+    status: list[AgentStatus] = field(default_factory=list)
+    filter: Optional[str] = None
+    order: Optional[str] = None
 
 
 @dataclass

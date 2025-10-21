@@ -22,6 +22,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.services.agent.actions.get_agents import AgentFetchConditions
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -36,6 +37,25 @@ class AgentDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+
+    async def fetch_agent_ids_by_condition(self, conditions: AgentFetchConditions) -> list[AgentId]:
+        query = sa.select(AgentRow.id).limit(conditions.limit).offset(conditions.offset)
+        if conditions.scaling_group is not None:
+            query = query.where(AgentRow.scaling_group == conditions.scaling_group)
+        if len(conditions.status) > 0:
+            query = query.where(AgentRow.status.in_(conditions.status))
+        if conditions.filter is not None and conditions.filter_parser is not None:
+            query = conditions.filter_parser.append_filter(query, conditions.filter)
+        if conditions.order is not None and conditions.order_parser is not None:
+            query = conditions.order_parser.append_ordering(query, conditions.order)
+        else:
+            query = query.order_by(
+                AgentRow.status.asc(), AgentRow.id.asc(), AgentRow.scaling_group.asc()
+            )
+        async with self._db.begin_readonly_session() as db_session:
+            result = await db_session.scalars(query)
+            agent_ids: list[AgentId] = [AgentId(agent_id) for agent_id in result.all()]
+            return agent_ids
 
     async def get_images_by_digest(self, digests: list[str]) -> dict[ImageID, ImageDataWithDetails]:
         async with self._db.begin_readonly_session() as db_session:
