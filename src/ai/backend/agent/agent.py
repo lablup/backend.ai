@@ -1517,6 +1517,9 @@ class AbstractAgent(
         }
         self.port_pool = original_port_pool
 
+    def update_scaling_group(self, scaling_group: str) -> None:
+        self.local_config.update(agent_update={"scaling_group": scaling_group})
+
     async def purge_containers(self, containers: Iterable[ContainerKernelId]) -> None:
         tasks = [self._purge_container(container) for container in containers]
         await asyncio.gather(*tasks, return_exceptions=True)
