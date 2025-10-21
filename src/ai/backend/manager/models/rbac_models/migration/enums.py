@@ -81,6 +81,16 @@ class OperationType(enum.StrEnum):
             cls.READ,
         }
 
+    @classmethod
+    def monitor_operations(cls) -> set[OperationType]:
+        """
+        Returns a set of operations that are considered monitor operations.
+        Monitor operations are those that allow read access.
+        """
+        return {
+            cls.READ,
+        }
+
 
 class ScopeType(enum.StrEnum):
     DOMAIN = "domain"
