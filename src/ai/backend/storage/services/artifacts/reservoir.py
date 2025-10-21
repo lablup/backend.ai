@@ -806,9 +806,15 @@ class ReservoirVerifyStep(ImportStep[DownloadStepResult]):
     async def execute(
         self, context: ImportStepContext, input_data: DownloadStepResult
     ) -> VerifyStepResult:
+        verify_path = context.storage_step_mappings.get(ArtifactStorageImportStep.VERIFY)
         for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
             log.info(f"Starting artifact verification using '{verifier_name}'")
-            await verifier.verify(context)
+            # TODO: Copy files first before verify if needed
+            revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
+            model_prefix = f"{context.model.model_id}/{revision}"
+            dst_path = Path(f"{verify_path}") / f"{model_prefix}"
+
+            await verifier.verify(dst_path, context)
             log.info(f"Artifact verification using '{verifier_name}' completed successfully")
 
         return VerifyStepResult(

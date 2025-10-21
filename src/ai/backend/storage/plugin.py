@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from pathlib import Path
 from typing import TYPE_CHECKING, Iterator, Optional
 
 from aiohttp import web
@@ -23,7 +24,7 @@ class AbstractStoragePlugin(AbstractPlugin, metaclass=ABCMeta):
 
 class AbstractArtifactVerifierPlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
-    async def verify(self, context: ImportStepContext) -> None:
+    async def verify(self, artifact_path: Path, context: ImportStepContext) -> None:
         raise NotImplementedError
 
 
