@@ -49,6 +49,10 @@ class _InlineTable(dict, InlineTableDict):
     pass
 
 
+def _is_runtime_field(description: str) -> bool:
+    return "at runtime" in description
+
+
 def _wrap_comment(text: str, prefix: str = "", width: int = 80) -> str:
     """Wrap text into multiline comment format."""
     lines = text.strip().split("\n")
@@ -122,7 +126,7 @@ def _dump_toml_scalar(
             case "BinarySize":
                 value = f"{BinarySize(value):s}".upper()
             case "HostPortPair":
-                value = {"host": value.host, "port": value.port}
+                value = {"host": value["host"], "port": value["port"]}
             case "EnumByValue":
                 assert ctx.annotation is not None
                 value = ctx.annotation(value).value
@@ -193,7 +197,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
                     try:
                         factory_instance = field.default_factory()  # type: ignore
                         if isinstance(factory_instance, BaseModel):
-                            field_info["default"] = factory_instance.model_dump()
+                            field_info["default"] = factory_instance.model_dump(mode="python")
                         else:
                             field_info["default"] = factory_instance
                     except Exception:
@@ -224,7 +228,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
         # Add description as comment if available
         description = field_info.get("description") or prop_schema.get("description")
         if description:
-            if "This field is injected at runtime" in description:
+            if _is_runtime_field(description):
                 # Skip runtimme-generated fields.
                 return []
             comment_lines = _wrap_comment(description)
@@ -332,8 +336,20 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
         # Group properties by type
         simple_props = {}
         object_props = {}
+        array_of_tables_props = {}
 
         for prop_name, prop_schema in properties.items():
+            original_prop_schema = prop_schema
+
+            # Handle anyOf (optional types) - unwrap to check the inner type
+            if "anyOf" in prop_schema:
+                # Check if this is an optional type (Type | None)
+                any_of_items = prop_schema["anyOf"]
+                non_null_items = [item for item in any_of_items if item != {"type": "null"}]
+                if len(non_null_items) == 1 and len(any_of_items) == 2:
+                    # This is an optional type - unwrap it to check if it's an object
+                    prop_schema = non_null_items[0]
+
             if "$ref" in prop_schema:
                 # Resolve reference
                 ref_path = prop_schema["$ref"].split("/")
@@ -345,12 +361,36 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
 
             prop_type = prop_schema.get("type", "")
 
-            if (prop_type == "object" or "properties" in prop_schema) and prop_schema[
+            # Check if this is an array of objects (array of tables in TOML)
+            if prop_type == "array" and "items" in prop_schema:
+                items_schema = prop_schema["items"]
+                # Resolve $ref in items if present
+                if "$ref" in items_schema:
+                    ref_path = items_schema["$ref"].split("/")
+                    if ref_path[0] == "#" and len(ref_path) > 1:
+                        resolved = schema
+                        for part in ref_path[1:]:
+                            resolved = resolved.get(part, {})
+                        items_schema = resolved
+
+                # Check if the items are objects (complex types)
+                if items_schema.get("type") == "object" or "properties" in items_schema:
+                    array_of_tables_props[prop_name] = (original_prop_schema, items_schema)
+                    continue
+
+            # Check if this is a complex object that should be expanded
+            if (prop_type == "object" or "properties" in prop_schema) and prop_schema.get(
                 "title"
-            ] != "HostPortPair":
+            ) != "HostPortPair":
+                # Preserve description from original schema if it was unwrapped
+                if "description" in original_prop_schema and "description" not in prop_schema:
+                    prop_schema = {
+                        **prop_schema,
+                        "description": original_prop_schema["description"],
+                    }
                 object_props[prop_name] = prop_schema
             else:
-                simple_props[prop_name] = prop_schema
+                simple_props[prop_name] = original_prop_schema
 
         # Add simple properties first
         processed_simple_props = []
@@ -360,6 +400,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
             )
             if prop_lines:
                 lines.extend(prop_lines)
+                # Exclude runtime-injected fields from the warning
                 processed_simple_props.append(prop_name)
 
         if path == [] and processed_simple_props:
@@ -368,19 +409,25 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
                 "The configuration schema CANNOT have simple fields in the root "
                 "without any section header according to the TOML specification. "
                 "Also, optional sections should be defined non-optional with explicit default factory. "
-                f"Please move or fix these fields/sections: {', '.join(simple_props.keys())}. "
+                f"Please move or fix these fields/sections: {', '.join(processed_simple_props)}. "
             )
 
         # Add object properties as sections
         for prop_name, prop_schema in object_props.items():
             indent_str = "  " * len(path)
 
+            # Skip if this is a runtime-injected field
+            description = prop_schema.get("description", "")
+            if _is_runtime_field(description):
+                continue
+
             if lines and lines[-1].strip():  # Add blank line before section
                 lines.append("")
 
             # Add section comment
-            if "description" in prop_schema:
-                comment_lines = _wrap_comment(prop_schema["description"], prefix=indent_str)
+            description = prop_schema.get("description", "")
+            if description:
+                comment_lines = _wrap_comment(description, prefix=indent_str)
                 lines.extend(comment_lines.split("\n"))
 
             # Add section header
@@ -419,6 +466,67 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
 
             nested_lines = _process_schema(
                 prop_schema, path=section_path, parent_required=required, model_cls=nested_model_cls
+            )
+            lines.extend(nested_lines)
+
+        # Add array of tables properties using [[array.name]] syntax
+        for prop_name, (prop_schema, items_schema) in array_of_tables_props.items():
+            indent_str = "  " * len(path)
+
+            # Skip if this is a runtime-injected field
+            description = prop_schema.get("description", "")
+            if _is_runtime_field(description):
+                continue
+
+            if lines and lines[-1].strip():  # Add blank line before section
+                lines.append("")
+
+            # Add array of tables comment
+            if description:
+                comment_lines = _wrap_comment(description, prefix=indent_str)
+                lines.extend(comment_lines.split("\n"))
+
+            # Add array of tables header with double brackets [[array.name]]
+            section_path = path + [prop_name]
+            array_header = f"{indent_str}[[{'.'.join(section_path)}]]"
+            lines.append(array_header)
+            print(array_header)
+
+            # Add a comment about adding multiple entries
+            lines.append(
+                f"{indent_str}# Add multiple [[{'.'.join(section_path)}]] sections as needed"
+            )
+
+            # Process nested properties for the item schema
+            nested_model_cls = None
+            if model_cls and hasattr(model_cls, "model_fields"):
+                field_info = _get_field_info(model_cls, prop_name, indent=len(path))
+                if field_info:
+                    # Try to find the field and extract the item type from list annotation
+                    field = None
+                    if prop_name in model_cls.model_fields:
+                        field = model_cls.model_fields[prop_name]
+                    else:
+                        # Search by alias
+                        for finfo in model_cls.model_fields.values():
+                            if (
+                                hasattr(finfo, "serialization_alias")
+                                and finfo.serialization_alias == prop_name
+                            ):
+                                field = finfo
+                                break
+
+                    if field:
+                        if hasattr(field, "annotation") and hasattr(field.annotation, "__origin__"):
+                            # Handle generic types like list[SubAgentConfig]
+                            args = getattr(field.annotation, "__args__", ())
+                            if args and hasattr(args[0], "model_fields"):
+                                nested_model_cls = args[0]
+                        elif hasattr(field.annotation, "model_fields"):
+                            nested_model_cls = field.annotation
+
+            nested_lines = _process_schema(
+                items_schema, path=section_path, parent_required=[], model_cls=nested_model_cls
             )
             lines.extend(nested_lines)
 

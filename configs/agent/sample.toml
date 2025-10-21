@@ -6,6 +6,7 @@
 #
 # Generated automatically from the AgentUnifiedConfig schema.
 
+# Agent configuration
 [agent]
   # Backend type for the agent.
   # This determines how the agent interacts with the underlying infrastructure.
@@ -91,12 +92,14 @@
   # Owner uid:gid of the mount directory
   ## mount-path-uid-gid = "root:root"
 
+  # Container lifecycle synchronization config
   [agent.sync-container-lifecycles]
     # Whether to enable container lifecycle synchronization
     enabled = true
     # Synchronization interval in seconds
     interval = 10.0
 
+# Container configuration
 [container]
   # Kernel user ID
   kernel-uid = -1
@@ -126,13 +129,6 @@
   ## scratch-nfs-options = "rw,sync"
   # Alternative bridge network
   ## alternative-bridge = "br-backend"
-  # KRunner volumes configuration, mapping container names to host paths.
-  # This is used to specify volumes that should be mounted into containers
-  # when using the KRunner backend.
-  # This fields is filled by the agent at runtime based on the
-  # `krunner_volumes` configuration in the agent's environment.
-  # It is not intended to be set in the configuration file.
-  ## krunner-volumes = {  }
   # Whether to enable Docker Swarm mode.
   # This allows the agent to manage containers in a Docker Swarm cluster.
   # When enabled, the agent will use Docker Swarm APIs to manage containers,
@@ -140,6 +136,7 @@
   # This field is only used when backend is set to 'docker'.
   swarm-enabled = false
 
+# Pyroscope configuration
 [pyroscope]
   # Whether to enable Pyroscope profiling
   enabled = false
@@ -150,6 +147,7 @@
   # Sampling rate for Pyroscope profiling
   ## sample-rate = 10
 
+# Logging configuration
 [logging]
   # The version used by logging.dictConfig().
   version = 1
@@ -159,9 +157,6 @@
   disable-existing-loggers = false
   # The list of log drivers to activate.
   drivers = [ "console",]
-  ## file = "{ FileConfig }"
-  ## logstash = "{ LogstashConfig }"
-  ## graylog = "{ GraylogConfig }"
 
   # The mapping of log handler configurations.
   [logging.handlers]
@@ -175,9 +170,52 @@
     # Determine verbosity of log.
     format = "verbose"
 
+  [logging.file]
+    # Path to store log.
+    path = "/var/log/backend.ai"
+    # Log file name.
+    filename = "wsproxy.log"
+    # Number of outdated log files to retain.
+    backup-count = 5
+    # Maximum size for a single log file.
+    ## rotation-size = "..."  # |     # min=0
+    # Determine verbosity of log.
+    format = "verbose"
+
+  [logging.logstash]
+    # Connection information of logstash node.
+    endpoint = { host = "127.0.0.1", port = 8001 }
+    # Protocol to communicate with logstash server.
+    protocol = "tcp"
+    # Use TLS to communicate with logstash server.
+    ssl-enabled = true
+    # Verify validity of TLS certificate when communicating with logstash.
+    ssl-verify = true
+
+  [logging.graylog]
+    # Graylog hostname.
+    host = "127.0.0.1"
+    # Graylog server port number.
+    port = 8000
+    # Log level.
+    level = "INFO"
+    # The custom source identifier. If not specified, fqdn will be used instead.
+    ## localname = "..."
+    # The fuly qualified domain name of the source.
+    ## fqdn = "..."
+    # Verify validity of TLS certificate when communicating with logstash.
+    ssl-verify = true
+    # Path to Root CA certificate file.
+    ## ca-certs = "/etc/ssl/ca.pem"
+    # Path to TLS private key file.
+    ## keyfile = "/etc/backend.ai/graylog/privkey.pem"
+    # Path to TLS certificate file.
+    ## certfile = "/etc/backend.ai/graylog/cert.pem"
+
   # Override default log level for specific scope of package
   [logging.pkg_ns]
 
+# Resource configuration
 [resource]
   # The number of CPU cores reserved for the operating system and the agent
   # service.
@@ -201,6 +239,7 @@
   # Affinity policy
   affinity-policy = "INTERLEAVED"
 
+# OpenTelemetry configuration
 [otel]
   # Whether to enable OpenTelemetry
   enabled = false
@@ -209,10 +248,12 @@
   # OTLP endpoint for sending traces
   endpoint = "http://127.0.0.1:4317"
 
+# Service discovery configuration
 [service-discovery]
   # Type of service discovery to use
   type = "redis"
 
+# Debug configuration
 [debug]
   # Master switch for debug mode
   enabled = false
@@ -239,6 +280,7 @@
   # Whether to log Docker events
   log-docker-events = false
 
+  # Core dump configuration
   [debug.coredump]
     # Whether to enable core dump collection
     enabled = false
@@ -249,6 +291,7 @@
     # Maximum size limit for core dumps
     size-limit = "64M"
 
+# Etcd configuration
 [etcd]
   # Etcd namespace
   namespace = "local"
@@ -259,12 +302,14 @@
   # Etcd password
   ## password = "PASSWORD"
 
+# Container logs configuration
 [container-logs]
   # Maximum length of container logs
   max-length = "10M"
   # Chunk size for container logs
   chunk-size = "64K"
 
+# API configuration
 [api]
   # Image pull timeout in seconds
   ## pull-timeout = 7200.0  # min=0
@@ -273,6 +318,7 @@
   # Image push timeout in seconds
   ## push-timeout = 7200.0  # min=0
 
+# Kernel lifecycles configuration
 [kernel-lifecycles]
   # Number of init polling attempts
   init-polling-attempt = 10
