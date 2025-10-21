@@ -20,6 +20,7 @@ from strawberry.aiohttp.views import GraphQLView
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.auth import AuthorizationFailed
 
 from ..api.gql.schema import schema as strawberry_schema
 from ..errors.api import GraphQLError as BackendGQLError
@@ -55,6 +56,14 @@ class CustomGraphQLView(GraphQLView):
 
         Supports both query/mutation via POST and subscriptions via WebSocket.
         """
+
+    async def __call__(self, request: web.Request) -> web.StreamResponse:
+        """
+        Check authorization before processing GraphQL requests.
+        """
+        if request.get("is_authorized", False):
+            return await super().__call__(request)
+        raise AuthorizationFailed("Unauthorized access")
 
     async def get_context(  # type: ignore[override]
         self, request: web.Request, response: web.Response | web.WebSocketResponse
