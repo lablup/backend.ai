@@ -253,7 +253,10 @@ class UserNode(graphene.ObjectType):
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
 
-        has_project_filter = filter_expr is not None and "project_name" in filter_expr
+        has_project_filter = False
+        if filter_expr is not None:
+            temp_parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            has_project_filter = temp_parser.has_field(filter_expr, "project_name")
 
         project_name_filter_clause = None
         if has_project_filter:

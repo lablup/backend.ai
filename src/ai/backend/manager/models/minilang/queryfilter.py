@@ -114,14 +114,15 @@ class QueryFilterTransformer(Transformer):
             val = self._transform_val_leaf(col_name, op, value)
         return val
 
-    def binary_expr(self, *args) -> sa.sql.elements.BinaryExpression:
+    def binary_expr(self, *args) -> sa.sql.elements.BinaryExpression | None:
         children: list[Token] = args[0]
         col_name = children[0].value
         op = children[1].value
 
-        # If this field is excluded, return a neutral condition that won't affect the query
+        # If this field is excluded, return None as a sentinel value
+        # The combine_expr will handle None appropriately for AND/OR operations
         if col_name in self._exclude_fields:
-            return sa.true()
+            return None
 
         val = self._transform_val(col_name, op, children[2])
 
@@ -211,9 +212,25 @@ class QueryFilterTransformer(Transformer):
         op = children[1].value
         expr1 = children[0]
         expr2 = children[2]
+
+        # Handle None operands (excluded fields) to preserve logical identity
         if op == "&":
+            # For AND: if one side is None, return the other (None & x = x)
+            if expr1 is None and expr2 is None:
+                return sa.true()  # Both excluded -> neutral for AND
+            if expr1 is None:
+                return expr2
+            if expr2 is None:
+                return expr1
             return sa.and_(expr1, expr2)
         elif op == "|":
+            # For OR: if one side is None, return the other (None | x = x)
+            if expr1 is None and expr2 is None:
+                return sa.false()  # Both excluded -> neutral for OR
+            if expr1 is None:
+                return expr2
+            if expr2 is None:
+                return expr1
             return sa.or_(expr1, expr2)
         return args
 
@@ -226,6 +243,42 @@ class QueryFilterParser:
     def __init__(self, fieldspec: Optional[FieldSpecType] = None) -> None:
         self._fieldspec = fieldspec
         self._parser = _parser
+
+    def has_field(self, filter_expr: str, field_name: str) -> bool:
+        """
+        Check if a filter expression contains a specific field name by parsing the AST.
+
+        This method avoids false positives from naive substring matching (e.g.,
+        "project_name" appearing in string literals like "my_project_name_tag").
+
+        Uses iterative traversal instead of recursion to avoid RecursionError
+        with deeply nested filter expressions.
+
+        Args:
+            filter_expr: Filter expression string to parse
+            field_name: Field name to search for
+
+        Returns:
+            True if the field is actually referenced in the filter expression
+        """
+        try:
+            ast = self._parser.parse(filter_expr)
+
+            # Use iterative BFS/DFS traversal to avoid recursion depth issues
+            stack: list[Tree | Token] = [ast]
+            while stack:
+                node = stack.pop()
+                if isinstance(node, Token):
+                    # Check if this is a field name token (CNAME)
+                    if node.type == "CNAME" and node.value == field_name:
+                        return True
+                elif isinstance(node, Tree):
+                    # Add all children to the stack for processing
+                    stack.extend(node.children)
+            return False
+        except LarkError:
+            # If parsing fails, return False to avoid unnecessary operations
+            return False
 
     def parse_filter(
         self,
