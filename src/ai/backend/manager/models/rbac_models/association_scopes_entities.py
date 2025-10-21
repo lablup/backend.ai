@@ -51,9 +51,6 @@ class AssociationScopesEntitiesRow(Base):
     )
 
     def object_id(self) -> ObjectId:
-        """
-        Convert the association to a tuple of ScopeId and ObjectId.
-        """
         return ObjectId(entity_type=self.entity_type, entity_id=self.entity_id)
 
     def parsed_scope_id(self) -> ScopeId:

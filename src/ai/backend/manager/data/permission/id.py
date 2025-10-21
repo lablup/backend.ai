@@ -4,7 +4,7 @@ from typing import Self
 from .types import EntityType, ScopeType
 
 
-@dataclass
+@dataclass(frozen=True)
 class ScopeId:
     scope_type: ScopeType
     scope_id: str
@@ -18,7 +18,7 @@ class ScopeId:
         return f"{self.scope_type}:{self.scope_id}"
 
 
-@dataclass
+@dataclass(frozen=True)
 class ObjectId:
     entity_type: EntityType
     entity_id: str
