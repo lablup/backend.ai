@@ -491,24 +491,25 @@ class Context(metaclass=ABCMeta):
         Path(self.install_info.service_config.agent_var_base_path).mkdir(
             parents=True, exist_ok=True
         )
-        if accelerator == Accelerator.CUDA:
-            plugin_list = ['"ai.backend.accelerator.cuda_open"']
-        elif accelerator in (
-            Accelerator.CUDA_MOCK,
-            Accelerator.CUDA_MIG_MOCK,
-            Accelerator.ROCM_MOCK,
-        ):
-            plugin_list = ['"ai.backend.accelerator.mock"']
-        else:
-            plugin_list = []
+        if accelerator is not None:
+            if accelerator == Accelerator.CUDA:
+                plugin_list = ['"ai.backend.accelerator.cuda_open"']
+            elif accelerator in (
+                Accelerator.CUDA_MOCK,
+                Accelerator.CUDA_MIG_MOCK,
+                Accelerator.ROCM_MOCK,
+            ):
+                plugin_list = ['"ai.backend.accelerator.mock"']
+            else:
+                plugin_list = []
 
-        self.sed_in_place(
-            toml_path,
-            re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.M),
-            f"allow-compute-plugins = [{', '.join(plugin_list)}]",
-        )
+            self.sed_in_place(
+                toml_path,
+                re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.M),
+                f"allow-compute-plugins = [{', '.join(plugin_list)}]",
+            )
 
-        await self._configure_mock_accelerator(accelerator)
+            await self._configure_mock_accelerator(accelerator)
 
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -1167,6 +1168,24 @@ class PackageContext(Context):
             vpane.remove()
         self.log_header("Installing databases (halfstack)...")
         await self.install_halfstack()
+
+    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
+        """
+        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
+        """
+        mapping = {
+            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
+            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
+            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
+        }
+
+        src = mapping.get(accelerator)
+        if not src:
+            return
+
+        dst = Path("mock-accelerator.toml")
+        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
+        shutil.copy(src, dst)
 
     async def configure(self) -> None:
         self.log_header("Configuring manager...")

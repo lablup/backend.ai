@@ -412,7 +412,7 @@ class ModeMenu(Static):
         self._mode = mode
         self.install_variable = InstallVariable(
             public_facing_address=args.public_facing_address,
-            accelerator=Accelerator(args.accelerator or Accelerator.NONE.value),
+            accelerator=Accelerator(args.accelerator) if args.accelerator is not None else None,
         )
 
     def compose(self) -> ComposeResult:
@@ -537,7 +537,7 @@ class InstallerApp(App):
                 show_guide=False,
                 non_interactive=False,
                 public_facing_address="127.0.0.1",
-                accelerator=Accelerator.NONE.value,
+                accelerator=None,
             )
         self._args = args
 
@@ -624,7 +624,7 @@ class InstallerApp(App):
 @click.option(
     "--accelerator",
     type=click.Choice([a.value for a in Accelerator], case_sensitive=False),
-    default=Accelerator.NONE.value,
+    default=None,
     show_default=True,
     help="Select accelerator plugin (cuda, cuda_mock, cuda_mig_mock, rocm_mock, none)",
 )

@@ -4,7 +4,7 @@ import dataclasses
 import enum
 from datetime import datetime
 from pathlib import Path
-from typing import cast
+from typing import Optional, cast
 
 from pydantic import BaseModel, Field
 from rich.console import ConsoleRenderable, RichCast
@@ -53,7 +53,7 @@ class CliArgs:
     show_guide: bool
     non_interactive: bool
     public_facing_address: str
-    accelerator: str = "none"
+    accelerator: Optional[str] = None
 
 
 class PrerequisiteError(RichCast, Exception):
@@ -90,7 +90,6 @@ class Accelerator(enum.StrEnum):
     CUDA_MOCK = "cuda_mock"
     CUDA_MIG_MOCK = "cuda_mig_mock"
     ROCM_MOCK = "rocm_mock"
-    NONE = "none"
 
 
 class InstallInfo(BaseModel):
@@ -100,7 +99,7 @@ class InstallInfo(BaseModel):
     base_path: Path
     halfstack_config: HalfstackConfig
     service_config: ServiceConfig
-    accelerator: Accelerator = Accelerator.NONE
+    accelerator: Optional[Accelerator] = None
 
 
 @dataclasses.dataclass()
@@ -179,4 +178,4 @@ class ServiceConfig:
 @dataclasses.dataclass
 class InstallVariable:
     public_facing_address: str = "127.0.0.1"
-    accelerator: Accelerator = Accelerator.NONE
+    accelerator: Optional[Accelerator] = None
