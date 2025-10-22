@@ -811,7 +811,7 @@ class ContainerConfig(BaseConfigSchema):
         description=textwrap.dedent("""
         Port range for containers.
         If multiple agents are used, user must ensure that the port ranges
-        don't overlap between the agent, else it may cause subtle issues
+        do not overlap between the agent, else it may cause subtle issues
         late into the agent's runtime.
         """),
         examples=[(30000, 31000)],
@@ -935,7 +935,7 @@ class OverridableContainerConfig(BaseConfigSchema):
         description=textwrap.dedent("""
         Port range for containers.
         If multiple agents are used, user must ensure that the port ranges
-        don't overlap between the agent, else it may cause subtle issues
+        do not overlap between the agent, else it may cause subtle issues
         late into the agent's runtime.
          """),
         examples=[(30000, 31000)],
@@ -1061,7 +1061,7 @@ class ResourceConfig(BaseConfigSchema):
         default=BinarySize.finite_from_str("16M"),
         description=(
             "The alignment of the reported main memory size to absorb tiny deviations "
-            "from per-node firwmare/hardware settings. "
+            "from per-node firmware/hardware settings. "
             "Recommended to be multiple of the page/hugepage size (e.g., 2 MiB)."
         ),
         examples=["2M", "32M"],
