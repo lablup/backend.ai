@@ -316,7 +316,7 @@ class StorageProxyConnectionError(BackendAIError, web.HTTPServiceUnavailable):
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.REQUEST,
-            error_detail=ErrorDetail.UNREACHABLE,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
 
 
