@@ -600,6 +600,7 @@ class AgentRPCServer(aobject):
         self.local_config = self.local_config.with_updates(
             agent_update={"scaling_group": scaling_group}
         )
+        self.agent.update_scaling_group(scaling_group)
         log.info("rpc::update_scaling_group()")
 
     @rpc_function
