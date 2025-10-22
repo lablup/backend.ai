@@ -154,8 +154,6 @@ deeplearning_sample_volume = VolumeInfo(
     "ro",
 )
 
-agent_server: AgentRPCServer
-
 
 async def get_extra_volumes(docker, lang):
     avail_volumes = (await docker.volumes.list())["Volumes"]
@@ -1327,7 +1325,6 @@ async def auto_detect_agent_network(
 async def agent_server_ctx(
     local_config: AgentUnifiedConfig, etcd: AsyncEtcd
 ) -> AsyncGenerator[AgentRPCServer]:
-    global agent_server
     agent_server = await AgentRPCServer.new(
         etcd,
         local_config,
@@ -1363,11 +1360,10 @@ async def agent_server_ctx(
 
 @asynccontextmanager
 async def service_discovery_ctx(
-    local_config: AgentUnifiedConfig, etcd: AsyncEtcd
+    local_config: AgentUnifiedConfig,
+    etcd: AsyncEtcd,
+    agent_server: AgentRPCServer,
 ) -> AsyncGenerator[None]:
-    assert agent_server is not None, (
-        "agent_server must be initialized before the service discovery subsystem."
-    )
     announce_addr = HostPortPair(
         local_config.agent.announce_addr.host, local_config.agent.announce_addr.port
     )
@@ -1443,7 +1439,9 @@ async def server_main(
         )
         monitor.console_locals["agent_server"] = agent_server
 
-        await agent_init_stack.enter_async_context(service_discovery_ctx(local_config, etcd))
+        await agent_init_stack.enter_async_context(
+            service_discovery_ctx(local_config, etcd, agent_server)
+        )
         log.info("Started the agent service.")
     except Exception:
         log.exception("Server initialization failure; triggering shutdown...")
