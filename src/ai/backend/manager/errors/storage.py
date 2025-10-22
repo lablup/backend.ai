@@ -307,6 +307,19 @@ class StorageProxyNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
+class StorageProxyConnectionError(BackendAIError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/storage-proxy-connection-error"
+    error_title = "Failed to connect to storage proxy."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.UNREACHABLE,
+        )
+
+
 class UnexpectedStorageProxyResponseError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/unexpected-storage-proxy-response"
     error_title = "Unexpected response from storage proxy."
