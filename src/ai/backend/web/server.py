@@ -700,8 +700,10 @@ async def redis_ctx(
         max_age=config.session.max_age,
     )
     setup_session(app, redis_storage)
-    yield
-    await valkey_session_client.close()
+    try:
+        yield
+    finally:
+        await valkey_session_client.close()
 
 
 @asynccontextmanager
@@ -861,8 +863,10 @@ async def webapp_ctx(
         ssl_context=ssl_ctx,
     )
     await site.start()
-    yield app
-    await runner.cleanup()
+    try:
+        yield app
+    finally:
+        await runner.cleanup()
 
 
 @asynccontextmanager
@@ -907,11 +911,11 @@ async def server_main(
     except Exception:
         log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
-
-    yield
-
-    log.info("shutting down...")
-    await web_init_stack.__aexit__(None, None, None)
+    try:
+        yield
+    finally:
+        log.info("shutting down...")
+        await web_init_stack.__aexit__(None, None, None)
 
 
 @click.command()

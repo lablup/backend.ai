@@ -144,16 +144,20 @@ async def aiomonitor_ctx(
         aiomon_started = True
     except Exception as e:
         log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
-    yield m
-    if aiomon_started:
-        m.close()
+    try:
+        yield m
+    finally:
+        if aiomon_started:
+            m.close()
 
 
 @asynccontextmanager
 async def etcd_ctx(local_config: StorageProxyUnifiedConfig) -> AsyncGenerator[AsyncEtcd]:
     etcd = make_etcd(local_config)
-    yield etcd
-    await etcd.close()
+    try:
+        yield etcd
+    finally:
+        await etcd.close()
 
 
 @asynccontextmanager
@@ -192,9 +196,10 @@ async def bgtask_ctx(
         server_id=local_config.storage_proxy.node_id,
     )
 
-    yield bgtask_mgr
-
-    await valkey_client.close()
+    try:
+        yield bgtask_mgr
+    finally:
+        await valkey_client.close()
 
 
 async def _make_message_queue(
@@ -260,11 +265,11 @@ async def event_ctx(
         safe_print_redis_config(redis_config),
     )
     await event_dispatcher.start()
-
-    yield event_dispatcher, event_producer
-
-    await event_producer.close()
-    await event_dispatcher.close()
+    try:
+        yield event_dispatcher, event_producer
+    finally:
+        await event_producer.close()
+        await event_dispatcher.close()
 
 
 @asynccontextmanager
@@ -290,11 +295,11 @@ async def watcher_ctx(
         await watcher_client.init()
     else:
         watcher_client = None
-
-    yield watcher_client
-
-    if watcher_client is not None:
-        await watcher_client.close()
+    try:
+        yield watcher_client
+    finally:
+        if watcher_client is not None:
+            await watcher_client.close()
 
 
 @asynccontextmanager
@@ -312,10 +317,10 @@ async def volume_ctx(
         event_dispatcher=event_dispatcher,
         event_producer=event_producer,
     )
-
-    yield volume_pool
-
-    await volume_pool.shutdown()
+    try:
+        yield volume_pool
+    finally:
+        await volume_pool.shutdown()
 
 
 @asynccontextmanager
@@ -340,8 +345,10 @@ async def api_ctx(
             log.info("Loading storage plugin: {0}", plugin_name)
             volume_cls = plugin_instance.get_volume_class()
             root_ctx.backends[plugin_name] = volume_cls
-        yield plugin_ctx
-        await plugin_ctx.cleanup()
+        try:
+            yield plugin_ctx
+        finally:
+            await plugin_ctx.cleanup()
 
     @asynccontextmanager
     async def _init_storage_webapp_plugin(
@@ -354,8 +361,10 @@ async def api_ctx(
                 log.info("Loading storage webapp plugin: {0}", plugin_name)
             subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)
             _init_subapp(plugin_name, root_app, subapp, global_middlewares)
-        yield plugin_ctx
-        await plugin_ctx.cleanup()
+        try:
+            yield plugin_ctx
+        finally:
+            await plugin_ctx.cleanup()
 
     @asynccontextmanager
     async def client_api_ctx() -> AsyncGenerator[web.Application]:
@@ -379,8 +388,10 @@ async def api_ctx(
             ssl_context=client_ssl_ctx,
         )
         await client_api_site.start()
-        yield client_api_app
-        await client_api_runner.cleanup()
+        try:
+            yield client_api_app
+        finally:
+            await client_api_runner.cleanup()
 
     @asynccontextmanager
     async def manager_api_ctx() -> AsyncGenerator[web.Application]:
@@ -408,8 +419,10 @@ async def api_ctx(
             ssl_context=manager_ssl_ctx,
         )
         await manager_api_site.start()
-        yield manager_api_app
-        await manager_api_runner.cleanup()
+        try:
+            yield manager_api_app
+        finally:
+            await manager_api_runner.cleanup()
 
     @asynccontextmanager
     async def internal_api_ctx() -> AsyncGenerator[web.Application]:
@@ -425,8 +438,10 @@ async def api_ctx(
             reuse_port=True,
         )
         await internal_api_site.start()
-        yield internal_api_app
-        await internal_api_runner.cleanup()
+        try:
+            yield internal_api_app
+        finally:
+            await internal_api_runner.cleanup()
 
     async with AsyncExitStack() as api_init_stack:
         await api_init_stack.enter_async_context(_init_storage_plugin())
@@ -445,10 +460,11 @@ async def api_ctx(
                 manager_api_app,
             )
         )
-        yield client_api_app, manager_api_app, internal_api_app
-
-        # volume instances are lazily initialized upon their first usage by the API layers.
-        await root_ctx.shutdown_volumes()
+        try:
+            yield client_api_app, manager_api_app, internal_api_app
+        finally:
+            # volume instances are lazily initialized upon their first usage by the API layers.
+            await root_ctx.shutdown_volumes()
 
 
 @asynccontextmanager
@@ -506,10 +522,10 @@ async def service_discovery_ctx(
             endpoint=local_config.otel.endpoint,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
-
-    yield
-
-    sd_loop.close()
+    try:
+        yield
+    finally:
+        sd_loop.close()
 
 
 async def _on_prepare(request: web.Request, response: web.StreamResponse) -> None:
@@ -631,11 +647,11 @@ async def server_main(
     except Exception:
         log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
-
-    yield
-
-    log.info("Shutting down...")
-    await storage_init_stack.__aexit__(None, None, None)
+    try:
+        yield
+    finally:
+        log.info("Shutting down...")
+        await storage_init_stack.__aexit__(None, None, None)
 
 
 @click.group(invoke_without_command=True)

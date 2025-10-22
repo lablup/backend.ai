@@ -442,8 +442,10 @@ async def exception_middleware(
 @asynccontextmanager
 async def etcd_ctx(root_ctx: RootContext, etcd_config: EtcdConfigData) -> AsyncIterator[None]:
     root_ctx.etcd = AsyncEtcd.initialize(etcd_config)
-    yield
-    await root_ctx.etcd.close()
+    try:
+        yield
+    finally:
+        await root_ctx.etcd.close()
 
 
 @asynccontextmanager
@@ -482,17 +484,17 @@ async def config_provider_ctx(
     etcd_watcher = EtcdConfigWatcher(root_ctx.etcd)
 
     config_provider: Optional[ManagerConfigProvider] = None
-    try:
-        config_provider = await ManagerConfigProvider.create(
-            unified_config_loader,
-            etcd_watcher,
-            legacy_etcd_loader,
-        )
-        root_ctx.config_provider = config_provider
+    config_provider = await ManagerConfigProvider.create(
+        unified_config_loader,
+        etcd_watcher,
+        legacy_etcd_loader,
+    )
+    root_ctx.config_provider = config_provider
 
-        if config_provider.config.debug.enabled and root_ctx.pidx == 0:
-            print("== Manager configuration ==", file=sys.stderr)
-            print(pformat(config_provider.config), file=sys.stderr)
+    if config_provider.config.debug.enabled and root_ctx.pidx == 0:
+        print("== Manager configuration ==", file=sys.stderr)
+        print(pformat(config_provider.config), file=sys.stderr)
+    try:
         yield root_ctx.config_provider
     finally:
         if config_provider:
@@ -519,8 +521,10 @@ async def webapp_plugin_ctx(root_app: web.Application) -> AsyncIterator[None]:
             log.info("Loading webapp plugin: {0}", plugin_name)
         subapp, global_middlewares = await plugin_instance.create_app(root_ctx.cors_options)
         _init_subapp(plugin_name, root_app, subapp, global_middlewares)
-    yield
-    await plugin_ctx.cleanup()
+    try:
+        yield
+    finally:
+        await plugin_ctx.cleanup()
 
 
 @asynccontextmanager
@@ -585,14 +589,16 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.valkey_live.get_server_time()
     # ValkeyImageClient has its own connection handling
     # No need to ping it separately as it's already connected
-    yield
-    await root_ctx.valkey_container_log.close()
-    await root_ctx.valkey_image.close()
-    await root_ctx.valkey_stat.close()
-    await root_ctx.valkey_live.close()
-    await root_ctx.valkey_stream.close()
-    await root_ctx.valkey_schedule.close()
-    await root_ctx.valkey_bgtask.close()
+    try:
+        yield
+    finally:
+        await root_ctx.valkey_container_log.close()
+        await root_ctx.valkey_image.close()
+        await root_ctx.valkey_stat.close()
+        await root_ctx.valkey_live.close()
+        await root_ctx.valkey_stream.close()
+        await root_ctx.valkey_schedule.close()
+        await root_ctx.valkey_bgtask.close()
 
 
 @asynccontextmanager
@@ -705,8 +711,10 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @asynccontextmanager
 async def event_hub_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.event_hub = EventHub()
-    yield
-    await root_ctx.event_hub.shutdown()
+    try:
+        yield
+    finally:
+        await root_ctx.event_hub.shutdown()
 
 
 @asynccontextmanager
@@ -749,15 +757,19 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             endpoint=root_ctx.config_provider.config.otel.endpoint,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
-    yield
-    root_ctx.sd_loop.close()
+    try:
+        yield
+    finally:
+        root_ctx.sd_loop.close()
 
 
 @asynccontextmanager
 async def message_queue_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.message_queue = await _make_message_queue(root_ctx)
-    yield
-    await root_ctx.message_queue.close()
+    try:
+        yield
+    finally:
+        await root_ctx.message_queue.close()
 
 
 @asynccontextmanager
@@ -768,9 +780,11 @@ async def event_producer_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         source=AGENTID_MANAGER,
         log_events=root_ctx.config_provider.config.debug.log_events,
     )
-    yield
-    await root_ctx.event_producer.close()
-    await asyncio.sleep(0.2)
+    try:
+        yield
+    finally:
+        await root_ctx.event_producer.close()
+        await asyncio.sleep(0.2)
 
 
 @asynccontextmanager
@@ -807,8 +821,10 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     dispatchers.dispatch(root_ctx.event_dispatcher)
     await root_ctx.event_dispatcher.start()
-    yield
-    await root_ctx.event_dispatcher.close()
+    try:
+        yield
+    finally:
+        await root_ctx.event_dispatcher.close()
 
 
 async def _make_message_queue(
@@ -852,8 +868,10 @@ async def idle_checker_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.distributed_lock_factory,
     )
     await root_ctx.idle_checker_host.start()
-    yield
-    await root_ctx.idle_checker_host.shutdown()
+    try:
+        yield
+    finally:
+        await root_ctx.idle_checker_host.shutdown()
 
 
 @asynccontextmanager
@@ -861,8 +879,10 @@ async def storage_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.storage import StorageSessionManager
 
     root_ctx.storage_manager = StorageSessionManager(root_ctx.config_provider.config.volumes)
-    yield
-    await root_ctx.storage_manager.aclose()
+    try:
+        yield
+    finally:
+        await root_ctx.storage_manager.aclose()
 
 
 @asynccontextmanager
@@ -900,8 +920,10 @@ async def network_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         blocklist=root_ctx.config_provider.config.manager.disabled_plugins,
     )
     log.info("NetworkPluginContext initialized with plugins: {}", list(ctx.plugins.keys()))
-    yield
-    await ctx.cleanup()
+    try:
+        yield
+    finally:
+        await ctx.cleanup()
 
 
 @asynccontextmanager
@@ -923,8 +945,10 @@ async def hook_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     if hook_result.status != PASSED:
         raise RuntimeError("Could not activate the manager instance.")
-    yield
-    await ctx.cleanup()
+    try:
+        yield
+    finally:
+        await ctx.cleanup()
 
 
 @asynccontextmanager
@@ -939,8 +963,10 @@ async def event_dispatcher_plugin_ctx(root_ctx: RootContext) -> AsyncIterator[No
         allowlist=root_ctx.config_provider.config.manager.allowed_plugins,
         blocklist=root_ctx.config_provider.config.manager.disabled_plugins,
     )
-    yield
-    await ctx.cleanup()
+    try:
+        yield
+    finally:
+        await ctx.cleanup()
 
 
 @asynccontextmanager
@@ -1008,8 +1034,10 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
     )
     await root_ctx.registry.init()
-    yield
-    await root_ctx.registry.shutdown()
+    try:
+        yield
+    finally:
+        await root_ctx.registry.shutdown()
 
 
 @asynccontextmanager
@@ -1026,8 +1054,10 @@ async def sched_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.valkey_stat,
         root_ctx.repositories.schedule.repository,
     )
-    yield
-    await root_ctx.scheduler_dispatcher.close()
+    try:
+        yield
+    finally:
+        await root_ctx.scheduler_dispatcher.close()
 
 
 @asynccontextmanager
@@ -1097,10 +1127,11 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.leader_election.start()
     log.info(f"Leader election started for server {server_id}")
 
-    yield
-
-    # Cleanup leader election
-    await root_ctx.leader_election.stop()
+    try:
+        yield
+    finally:
+        # Cleanup leader election
+        await root_ctx.leader_election.stop()
 
 
 @asynccontextmanager
@@ -1203,10 +1234,12 @@ async def monitoring_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         init_success = True
         root_ctx.error_monitor = ectx
         root_ctx.stats_monitor = sctx
-    yield
-    if init_success:
-        await sctx.cleanup()
-        await ectx.cleanup()
+    try:
+        yield
+    finally:
+        if init_success:
+            await sctx.cleanup()
+            await ectx.cleanup()
 
 
 @asynccontextmanager
@@ -1578,9 +1611,11 @@ async def server_main(
                 "aiomonitor could not start but skipping this error to continue",
                 exc_info=e,
             )
-        yield m
-        if aiomon_started:
-            m.close()
+        try:
+            yield m
+        finally:
+            if aiomon_started:
+                m.close()
 
     @asynccontextmanager
     async def webapp_ctx(root_app: web.Application) -> AsyncGenerator[None]:
@@ -1645,9 +1680,10 @@ async def server_main(
                 public_metrics_port,
             )
 
-        yield
-
-        await runner.cleanup()
+        try:
+            yield
+        finally:
+            await runner.cleanup()
 
     await manager_init_stack.__aenter__()
     try:
@@ -1684,10 +1720,11 @@ async def server_main(
         log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
 
-    yield
-
-    log.info("shutting down...")
-    await manager_init_stack.__aexit__(None, None, None)
+    try:
+        yield
+    finally:
+        log.info("shutting down...")
+        await manager_init_stack.__aexit__(None, None, None)
 
 
 @aiotools.server_context

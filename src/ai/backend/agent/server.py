@@ -1221,9 +1221,11 @@ async def aiomonitor_ctx(
         aiomon_started = True
     except Exception as e:
         log.warning("aiomonitor could not start but skipping this error to continue", exc_info=e)
-    yield monitor
-    if aiomon_started:
-        monitor.close()
+    try:
+        yield monitor
+    finally:
+        if aiomon_started:
+            monitor.close()
 
 
 @asynccontextmanager
@@ -1246,8 +1248,10 @@ async def etcd_ctx(local_config: AgentUnifiedConfig) -> AsyncGenerator[AsyncEtcd
         scope_prefix_map,
         credentials=etcd_credentials,
     )
-    yield etcd
-    await etcd.close()
+    try:
+        yield etcd
+    finally:
+        await etcd.close()
 
 
 async def prepare_krunner_volumes(local_config: AgentUnifiedConfig) -> None:
@@ -1406,8 +1410,10 @@ async def service_discovery_ctx(
             endpoint=local_config.otel.endpoint,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
-    yield
-    sd_loop.close()
+    try:
+        yield
+    finally:
+        sd_loop.close()
 
 
 @aiotools.server_context
@@ -1444,12 +1450,14 @@ async def server_main(
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
 
     # Run!
-    stop_signal = yield
-
-    log.info("shutting down...")
-    if agent_server is not None:
-        agent_server.mark_stop_signal(stop_signal)
-    await agent_init_stack.__aexit__(None, None, None)
+    stop_signal = signal.SIGTERM  # default termination signal
+    try:
+        stop_signal = yield
+    finally:
+        log.info("shutting down...")
+        if agent_server is not None:
+            agent_server.mark_stop_signal(stop_signal)
+        await agent_init_stack.__aexit__(None, None, None)
 
 
 @click.group(invoke_without_command=True)

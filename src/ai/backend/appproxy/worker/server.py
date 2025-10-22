@@ -256,16 +256,16 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     last_used_time_marker_task = asyncio.create_task(last_used_time_marker(root_ctx))
     request_counter_marker_task = asyncio.create_task(request_counter_marker(root_ctx))
+    try:
+        yield
+    finally:
+        last_used_time_marker_task.cancel()
+        await last_used_time_marker_task
+        request_counter_marker_task.cancel()
+        await request_counter_marker_task
 
-    yield
-
-    last_used_time_marker_task.cancel()
-    await last_used_time_marker_task
-    request_counter_marker_task.cancel()
-    await request_counter_marker_task
-
-    await root_ctx.valkey_live.close()
-    await root_ctx.valkey_stat.close()
+        await root_ctx.valkey_live.close()
+        await root_ctx.valkey_stat.close()
 
 
 async def _make_message_queue(
@@ -316,12 +316,12 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         event_observer=root_ctx.metrics.event,
     )
     await root_ctx.event_dispatcher.start()
-
-    yield
-
-    await root_ctx.event_producer.close()
-    await asyncio.sleep(0.2)
-    await root_ctx.event_dispatcher.close()
+    try:
+        yield
+    finally:
+        await root_ctx.event_producer.close()
+        await asyncio.sleep(0.2)
+        await root_ctx.event_dispatcher.close()
 
 
 @asynccontextmanager
@@ -336,9 +336,11 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             AppProxyCircuitRemovedEvent,
         )
     ]
-    yield
-    for handler in handlers:
-        root_ctx.event_dispatcher.unsubscribe(handler)
+    try:
+        yield
+    finally:
+        for handler in handlers:
+            root_ctx.event_dispatcher.unsubscribe(handler)
 
 
 @asynccontextmanager
@@ -374,15 +376,17 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             log.error("Unsupported protocol {}", root_ctx.local_config.proxy_worker.protocol)
     await root_ctx.proxy_frontend.start()
     log.debug("started proxy protocol {}", root_ctx.proxy_frontend.__class__.__name__)
-    yield
-    await root_ctx.proxy_frontend.terminate_all_circuits()
     try:
-        await root_ctx.proxy_frontend.stop()
-    except CleanupError as ee:
-        if all([isinstance(e, asyncio.CancelledError) for e in ee.exceptions]):
-            raise asyncio.CancelledError()
-        else:
-            raise ee
+        yield
+    finally:
+        await root_ctx.proxy_frontend.terminate_all_circuits()
+        try:
+            await root_ctx.proxy_frontend.stop()
+        except CleanupError as ee:
+            if all([isinstance(e, asyncio.CancelledError) for e in ee.exceptions]):
+                raise asyncio.CancelledError()
+            else:
+                raise ee
 
 
 @asynccontextmanager
@@ -424,9 +428,11 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             log.warning("Failed to ping coordinator: {}", str(e))
 
     timer = aiotools.create_timer(_heartbeat, root_ctx.local_config.proxy_worker.heartbeat_period)
-    yield
-    await aiotools.cancel_and_wait(timer)
-    await deregister_worker(root_ctx, str(uuid.uuid4()))
+    try:
+        yield
+    finally:
+        await aiotools.cancel_and_wait(timer)
+        await deregister_worker(root_ctx, str(uuid.uuid4()))
 
 
 @asynccontextmanager
@@ -435,8 +441,10 @@ async def inference_metric_collection_ctx(root_ctx: RootContext) -> AsyncIterato
         functools.partial(collect_inference_metric, root_ctx),
         root_ctx.local_config.proxy_worker.inference_metric_collection_interval,
     )
-    yield
-    await aiotools.cancel_and_wait(timer)
+    try:
+        yield
+    finally:
+        await aiotools.cancel_and_wait(timer)
 
 
 @asynccontextmanager
@@ -485,8 +493,10 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             endpoint=root_ctx.local_config.otel.endpoint,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
-    yield
-    sd_loop.close()
+    try:
+        yield
+    finally:
+        sd_loop.close()
 
 
 async def metrics(request: web.Request) -> web.Response:
@@ -742,9 +752,11 @@ async def server_main(
             log.warning(
                 "aiomonitor could not start but skipping this error to continue", exc_info=e
             )
-        yield
-        if aiomon_started:
-            m.close()
+        try:
+            yield
+        finally:
+            if aiomon_started:
+                m.close()
 
     @asynccontextmanager
     async def webapp_ctx() -> AsyncGenerator[None]:
@@ -770,8 +782,10 @@ async def server_main(
             ssl_context=ssl_ctx,
         )
         await site.start()
-        yield
-        await runner.cleanup()
+        try:
+            yield
+        finally:
+            await runner.cleanup()
 
     worker_init_stack = AsyncExitStack()
     await worker_init_stack.__aenter__()
@@ -793,11 +807,11 @@ async def server_main(
     except Exception:
         log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
-
-    yield
-
-    log.info("shutting down...")
-    await worker_init_stack.__aexit__(None, None, None)
+    try:
+        yield
+    finally:
+        log.info("shutting down...")
+        await worker_init_stack.__aexit__(None, None, None)
 
 
 @aiotools.server_context

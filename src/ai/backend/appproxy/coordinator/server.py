@@ -257,13 +257,13 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         human_readable_name="appproxy-schedule",
     )
     log.info("ValkeyScheduleClient initialized for health status updates")
-
-    yield
-
-    await root_ctx.valkey_live.close()
-    await root_ctx.core_valkey_live.close()
-    await root_ctx.valkey_schedule.close()
-    await root_ctx.redis_lock.close()
+    try:
+        yield
+    finally:
+        await root_ctx.valkey_live.close()
+        await root_ctx.core_valkey_live.close()
+        await root_ctx.valkey_schedule.close()
+        await root_ctx.redis_lock.close()
 
 
 async def _make_message_queue(
@@ -339,12 +339,12 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     )
     await root_ctx.event_dispatcher.start()
     await root_ctx.core_event_dispatcher.start()
-
-    yield
-
-    await root_ctx.event_producer.close()
-    await root_ctx.core_event_producer.close()
-    await asyncio.sleep(0.2)
+    try:
+        yield
+    finally:
+        await root_ctx.event_producer.close()
+        await root_ctx.core_event_producer.close()
+        await asyncio.sleep(0.2)
 
 
 @asynccontextmanager
@@ -478,9 +478,11 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         on_route_update_event,
         name="proxy-coordinator",
     )
-    yield
-    root_ctx.event_dispatcher.unconsume(worker_lost_handler)
-    root_ctx.core_event_dispatcher.unconsume(endpoint_route_update_handler)
+    try:
+        yield
+    finally:
+        root_ctx.event_dispatcher.unconsume(worker_lost_handler)
+        root_ctx.core_event_dispatcher.unconsume(endpoint_route_update_handler)
 
 
 @asynccontextmanager
@@ -539,12 +541,12 @@ async def health_check_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         task_name="health_check_task",
     )
     await health_check_timer.join()
-
-    yield
-
-    await health_check_timer.leave()
-    root_ctx.event_dispatcher.unconsume(health_check_evh)
-    await health_engine.stop()
+    try:
+        yield
+    finally:
+        await health_check_timer.leave()
+        root_ctx.event_dispatcher.unconsume(health_check_evh)
+        await health_engine.stop()
 
 
 @asynccontextmanager
@@ -624,10 +626,11 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
         task_name="check_unused_port_task",
     )
     await unused_port_collection_timer.join()
-
-    yield
-    await unused_port_collection_timer.leave()
-    root_ctx.event_dispatcher.unconsume(unused_port_collection_evh)
+    try:
+        yield
+    finally:
+        await unused_port_collection_timer.leave()
+        root_ctx.event_dispatcher.unconsume(unused_port_collection_evh)
 
 
 @asynccontextmanager
@@ -679,8 +682,10 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             endpoint=root_ctx.local_config.otel.endpoint,
         )
         BraceStyleAdapter.apply_otel(otel_spec)
-    yield
-    sd_loop.close()
+    try:
+        yield
+    finally:
+        sd_loop.close()
 
 
 @asynccontextmanager
@@ -921,9 +926,11 @@ async def server_main(
             log.warning(
                 "aiomonitor could not start but skipping this error to continue", exc_info=e
             )
-        yield
-        if aiomon_started:
-            m.close()
+        try:
+            yield
+        finally:
+            if aiomon_started:
+                m.close()
 
     @asynccontextmanager
     async def webapp_ctx() -> AsyncGenerator[None]:
@@ -949,8 +956,10 @@ async def server_main(
             ssl_context=ssl_ctx,
         )
         await site.start()
-        yield
-        await runner.cleanup()
+        try:
+            yield
+        finally:
+            await runner.cleanup()
 
     proxy_init_stack = AsyncExitStack()
     await proxy_init_stack.__aenter__()
@@ -973,11 +982,11 @@ async def server_main(
     except Exception:
         log.exception("Server initialization failure; triggering shutdown...")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
-
-    yield
-
-    log.info("shutting down...")
-    await proxy_init_stack.__aexit__(None, None, None)
+    try:
+        yield
+    finally:
+        log.info("shutting down...")
+        await proxy_init_stack.__aexit__(None, None, None)
 
 
 @aiotools.server_context
