@@ -363,7 +363,7 @@ class DebugConfig(BaseConfigSchema):
         return context.debug
 
 
-class AgentConfig(BaseConfigSchema):
+class CommonAgentConfig(BaseConfigSchema):
     backend: AgentBackend = Field(
         description=textwrap.dedent("""
         Backend type for the agent.
@@ -438,34 +438,6 @@ class AgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("rpc-auth-agent-keypair", "rpc_auth_agent_keypair"),
         serialization_alias="rpc-auth-agent-keypair",
     )
-    agent_sock_port: int = Field(
-        default=6007,
-        ge=1024,
-        le=65535,
-        description="Agent socket port",
-        examples=[6007],
-        validation_alias=AliasChoices("agent-sock-port", "agent_sock_port"),
-        serialization_alias="agent-sock-port",
-    )
-    id: Optional[str] = Field(
-        default=None,
-        description="Agent ID",
-        examples=["agent-001"],
-    )
-    ipc_base_path: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
-        description="Base path for IPC",
-        examples=["/tmp/backend.ai/ipc"],
-        validation_alias=AliasChoices("ipc-base-path", "ipc_base_path"),
-        serialization_alias="ipc-base-path",
-    )
-    var_base_path: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("./var/lib/backend.ai"),
-        description="Base path for variable data",
-        examples=["./var/lib/backend.ai"],
-        validation_alias=AliasChoices("var-base-path", "var_base_path"),
-        serialization_alias="var-base-path",
-    )
     mount_path: Optional[AutoDirectoryPath] = Field(
         default=None,
         description="Mount path for containers",
@@ -498,20 +470,6 @@ class AgentConfig(BaseConfigSchema):
         examples=["m5.large"],
         validation_alias=AliasChoices("instance-type", "instance_type"),
         serialization_alias="instance-type",
-    )
-    scaling_group: str = Field(
-        default="default",
-        description="Scaling group name",
-        examples=["default", "gpu-group"],
-        validation_alias=AliasChoices("scaling-group", "scaling_group"),
-        serialization_alias="scaling-group",
-    )
-    scaling_group_type: ResourceGroupType = Field(
-        default=ResourceGroupType.COMPUTE,
-        description="Scaling group type",
-        examples=[item.value for item in ResourceGroupType],
-        validation_alias=AliasChoices("scaling-group-type", "scaling_group_type"),
-        serialization_alias="scaling-group-type",
     )
     pid_file: Path = Field(
         default=Path(os.devnull),
@@ -569,6 +527,94 @@ class AgentConfig(BaseConfigSchema):
         examples=[40128],
         validation_alias=AliasChoices("metadata-server-port", "metadata_server_port"),
         serialization_alias="metadata-server-port",
+    )
+    use_experimental_redis_event_dispatcher: bool = Field(
+        default=False,
+        description="Whether to use experimental Redis event dispatcher",
+        examples=[True, False],
+        validation_alias=AliasChoices(
+            "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
+        ),
+        serialization_alias="use-experimental-redis-event-dispatcher",
+    )
+    docker_mode: Optional[str] = Field(
+        default=None,
+        description="Docker mode detected based on kernel version (linuxkit/native)",
+        examples=["linuxkit", "native"],
+        validation_alias=AliasChoices("docker-mode", "docker_mode"),
+        serialization_alias="docker-mode",
+    )
+    mount_path_uid_gid: Optional[str] = Field(
+        default=None,
+        description="Owner uid:gid of the mount directory",
+        examples=["root:root", "bai:bai"],
+        validation_alias=AliasChoices("mount-path-uid-gid", "mount_path_uid_gid"),
+        serialization_alias="mount-path-uid-gid",
+    )
+
+    def real_mount_path(self, directory_path: str) -> Path:
+        if self.mount_path is None:
+            return Path("./", directory_path)
+        return Path(self.mount_path, directory_path)
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+
+    @field_validator("rpc_listen_addr", mode="after")
+    @classmethod
+    def _validate_rpc_listen_addr(cls, rpc_listen_addr: HostPortPair) -> HostPortPair:
+        try:
+            rpc_host = ipaddress.ip_address(rpc_listen_addr.host)
+        except ValueError:
+            return rpc_listen_addr
+        if rpc_host.is_link_local:
+            raise ValueError("Cannot use link-local IP address as the RPC listening host.")
+        return rpc_listen_addr
+
+
+class OverridableAgentConfig(BaseConfigSchema):
+    id: Optional[str] = Field(
+        default=None,
+        description="Agent ID",
+        examples=["agent-001"],
+    )
+    agent_sock_port: int = Field(
+        default=6007,
+        ge=1024,
+        le=65535,
+        description="Agent socket port",
+        examples=[6007],
+        validation_alias=AliasChoices("agent-sock-port", "agent_sock_port"),
+        serialization_alias="agent-sock-port",
+    )
+    ipc_base_path: AutoDirectoryPath = Field(
+        default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
+        description="Base path for IPC",
+        examples=["/tmp/backend.ai/ipc"],
+        validation_alias=AliasChoices("ipc-base-path", "ipc_base_path"),
+        serialization_alias="ipc-base-path",
+    )
+    var_base_path: AutoDirectoryPath = Field(
+        default=AutoDirectoryPath("./var/lib/backend.ai"),
+        description="Base path for variable data",
+        examples=["./var/lib/backend.ai"],
+        validation_alias=AliasChoices("var-base-path", "var_base_path"),
+        serialization_alias="var-base-path",
+    )
+    scaling_group: str = Field(
+        default="default",
+        description="Scaling group name",
+        examples=["default", "gpu-group"],
+        validation_alias=AliasChoices("scaling-group", "scaling_group"),
+        serialization_alias="scaling-group",
+    )
+    scaling_group_type: ResourceGroupType = Field(
+        default=ResourceGroupType.COMPUTE,
+        description="Scaling group type",
+        examples=[item.value for item in ResourceGroupType],
+        validation_alias=AliasChoices("scaling-group-type", "scaling_group_type"),
+        serialization_alias="scaling-group-type",
     )
     allow_compute_plugins: Optional[set[str]] = Field(
         default=None,
@@ -630,168 +676,23 @@ class AgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("kernel-creation-concurrency", "kernel_creation_concurrency"),
         serialization_alias="kernel-creation-concurrency",
     )
-    use_experimental_redis_event_dispatcher: bool = Field(
-        default=False,
-        description="Whether to use experimental Redis event dispatcher",
-        examples=[True, False],
-        validation_alias=AliasChoices(
-            "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
-        ),
-        serialization_alias="use-experimental-redis-event-dispatcher",
-    )
     sync_container_lifecycles: SyncContainerLifecyclesConfig = Field(
         default_factory=SyncContainerLifecyclesConfig,
         description="Container lifecycle synchronization config",
         validation_alias=AliasChoices("sync-container-lifecycles", "sync_container_lifecycles"),
         serialization_alias="sync-container-lifecycles",
     )
-    docker_mode: Optional[str] = Field(
-        default=None,
-        description="Docker mode detected based on kernel version (linuxkit/native)",
-        examples=["linuxkit", "native"],
-        validation_alias=AliasChoices("docker-mode", "docker_mode"),
-        serialization_alias="docker-mode",
-    )
-    mount_path_uid_gid: Optional[str] = Field(
-        default=None,
-        description="Owner uid:gid of the mount directory",
-        examples=["root:root", "bai:bai"],
-        validation_alias=AliasChoices("mount-path-uid-gid", "mount_path_uid_gid"),
-        serialization_alias="mount-path-uid-gid",
-    )
-
-    def real_mount_path(self, directory_path: str) -> Path:
-        if self.mount_path is None:
-            return Path("./", directory_path)
-        return Path(self.mount_path, directory_path)
 
     model_config = ConfigDict(
         extra="allow",
     )
 
-    @field_validator("rpc_listen_addr", mode="after")
-    @classmethod
-    def _validate_rpc_listen_addr(cls, rpc_listen_addr: HostPortPair) -> HostPortPair:
-        try:
-            rpc_host = ipaddress.ip_address(rpc_listen_addr.host)
-        except ValueError:
-            return rpc_listen_addr
-        if rpc_host.is_link_local:
-            raise ValueError("Cannot use link-local IP address as the RPC listening host.")
-        return rpc_listen_addr
+
+class AgentConfig(CommonAgentConfig, OverridableAgentConfig):
+    pass
 
 
-class OverridableAgentConfig(BaseConfigSchema):
-    id: str = Field(
-        description="Agent ID",
-        examples=["agent-001"],
-    )
-    agent_sock_port: Optional[int] = Field(
-        default=None,
-        ge=1024,
-        le=65535,
-        description="Agent socket port",
-        examples=[6007],
-        validation_alias=AliasChoices("agent-sock-port", "agent_sock_port"),
-        serialization_alias="agent-sock-port",
-    )
-    mount_path: Optional[AutoDirectoryPath] = Field(
-        default=None,
-        description="Mount path for containers",
-        examples=["/mnt/backend.ai"],
-        validation_alias=AliasChoices("mount-path", "mount_path"),
-        serialization_alias="mount-path",
-    )
-    cohabiting_storage_proxy: Optional[bool] = Field(
-        default=None,
-        description="Whether to enable cohabiting storage proxy",
-        examples=[True, False],
-        validation_alias=AliasChoices("cohabiting-storage-proxy", "cohabiting_storage_proxy"),
-        serialization_alias="cohabiting-storage-proxy",
-    )
-    allow_compute_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Allowed compute plugins",
-        examples=[{"ai.backend.activator.agent", "ai.backend.accelerator.cuda_open"}],
-        validation_alias=AliasChoices("allow-compute-plugins", "allow_compute_plugins"),
-        serialization_alias="allow-compute-plugins",
-    )
-    block_compute_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Blocked compute plugins",
-        examples=[{"ai.backend.accelerator.mock"}],
-        validation_alias=AliasChoices("block-compute-plugins", "block_compute_plugins"),
-        serialization_alias="block-compute-plugins",
-    )
-    allow_network_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Allowed network plugins",
-        examples=[{"ai.backend.manager.network.overlay"}],
-        validation_alias=AliasChoices("allow-network-plugins", "allow_network_plugins"),
-        serialization_alias="allow-network-plugins",
-    )
-    block_network_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Blocked network plugins",
-        examples=[{"ai.backend.manager.network.overlay"}],
-        validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
-        serialization_alias="block-network-plugins",
-    )
-    force_terminate_abusing_containers: Optional[bool] = Field(
-        default=None,
-        description="Whether to force terminate abusing containers",
-        examples=[True, False],
-        validation_alias=AliasChoices(
-            "force-terminate-abusing-containers", "force_terminate_abusing_containers"
-        ),
-        serialization_alias="force-terminate-abusing-containers",
-    )
-    kernel_creation_concurrency: Optional[int] = Field(
-        default=None,
-        ge=1,
-        le=32,
-        description="Kernel creation concurrency",
-        examples=[4, 8],
-        validation_alias=AliasChoices("kernel-creation-concurrency", "kernel_creation_concurrency"),
-        serialization_alias="kernel-creation-concurrency",
-    )
-    sync_container_lifecycles: Optional[SyncContainerLifecyclesConfig] = Field(
-        default=None,
-        description="Container lifecycle synchronization config",
-        validation_alias=AliasChoices("sync-container-lifecycles", "sync_container_lifecycles"),
-        serialization_alias="sync-container-lifecycles",
-    )
-    docker_mode: Optional[str] = Field(
-        default=None,
-        description="Docker mode detected based on kernel version (linuxkit/native)",
-        examples=["linuxkit", "native"],
-        validation_alias=AliasChoices("docker-mode", "docker_mode"),
-        serialization_alias="docker-mode",
-    )
-    mount_path_uid_gid: Optional[str] = Field(
-        default=None,
-        description="Owner uid:gid of the mount directory",
-        examples=["root:root", "bai:bai"],
-        validation_alias=AliasChoices("mount-path-uid-gid", "mount_path_uid_gid"),
-        serialization_alias="mount-path-uid-gid",
-    )
-
-
-class ContainerConfig(BaseConfigSchema):
-    kernel_uid: UserID = Field(
-        default=UserID(-1),
-        description="Kernel user ID",
-        examples=[1000, -1],
-        validation_alias=AliasChoices("kernel-uid", "kernel_uid"),
-        serialization_alias="kernel-uid",
-    )
-    kernel_gid: GroupID = Field(
-        default=GroupID(-1),
-        description="Kernel group ID",
-        examples=[1000, -1],
-        validation_alias=AliasChoices("kernel-gid", "kernel_gid"),
-        serialization_alias="kernel-gid",
-    )
+class CommonContainerConfig(BaseConfigSchema):
     bind_host: str = Field(
         default="",
         description="Bind host for containers",
@@ -806,6 +707,42 @@ class ContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("advertised-host", "advertised_host"),
         serialization_alias="advertised-host",
     )
+    krunner_volumes: Optional[Mapping[str, str]] = Field(
+        default=None,
+        description=textwrap.dedent("""
+        KRunner volumes configuration, mapping container names to host paths.
+        This is used to specify volumes that should be mounted into containers
+        when using the KRunner backend.
+        This fields is filled by the agent at runtime based on the
+        `krunner_volumes` configuration in the agent's environment.
+        It is not intended to be set in the configuration file.
+        """),
+        examples=[],
+        validation_alias=AliasChoices("krunner-volumes", "krunner_volumes"),
+        serialization_alias="krunner-volumes",
+    )
+
+    model_config = ConfigDict(
+        extra="allow",
+        arbitrary_types_allowed=True,
+    )
+
+
+class OverridableContainerConfig(BaseConfigSchema):
+    kernel_uid: UserID = Field(
+        default=UserID(-1),
+        description="Kernel user ID",
+        examples=[1000, -1],
+        validation_alias=AliasChoices("kernel-uid", "kernel_uid"),
+        serialization_alias="kernel-uid",
+    )
+    kernel_gid: GroupID = Field(
+        default=GroupID(-1),
+        description="Kernel group ID",
+        examples=[1000, -1],
+        validation_alias=AliasChoices("kernel-gid", "kernel_gid"),
+        serialization_alias="kernel-gid",
+    )
     port_range: PortRangeField = Field(
         default=(30000, 31000),
         description=textwrap.dedent("""
@@ -813,7 +750,7 @@ class ContainerConfig(BaseConfigSchema):
         If multiple agents are used, user must ensure that the port ranges
         do not overlap between the agent, else it may cause subtle issues
         late into the agent's runtime.
-        """),
+         """),
         examples=[(30000, 31000)],
         validation_alias=AliasChoices("port-range", "port_range"),
         serialization_alias="port-range",
@@ -840,6 +777,7 @@ class ContainerConfig(BaseConfigSchema):
         serialization_alias="jail-args",
     )
     scratch_type: ScratchTypeField = Field(
+        default=ScratchType.HOSTDIR,
         description="Scratch type",
         examples=[item.value for item in ScratchType],
         validation_alias=AliasChoices("scratch-type", "scratch_type"),
@@ -859,7 +797,6 @@ class ContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("scratch-size", "scratch_size"),
         serialization_alias="scratch-size",
     )
-
     scratch_nfs_address: Optional[str] = Field(
         default=None,
         description="Scratch NFS address",
@@ -880,20 +817,6 @@ class ContainerConfig(BaseConfigSchema):
         examples=["br-backend"],
         validation_alias=AliasChoices("alternative-bridge", "alternative_bridge"),
         serialization_alias="alternative-bridge",
-    )
-    krunner_volumes: Optional[Mapping[str, str]] = Field(
-        default=None,
-        description=textwrap.dedent("""
-        KRunner volumes configuration, mapping container names to host paths.
-        This is used to specify volumes that should be mounted into containers
-        when using the KRunner backend.
-        This fields is filled by the agent at runtime based on the
-        `krunner_volumes` configuration in the agent's environment.
-        It is not intended to be set in the configuration file.
-        """),
-        examples=[],
-        validation_alias=AliasChoices("krunner-volumes", "krunner_volumes"),
-        serialization_alias="krunner-volumes",
     )
     swarm_enabled: bool = Field(
         default=False,
@@ -915,114 +838,8 @@ class ContainerConfig(BaseConfigSchema):
     )
 
 
-class OverridableContainerConfig(BaseConfigSchema):
-    kernel_uid: Optional[UserID] = Field(
-        default=None,
-        description="Kernel user ID",
-        examples=[1000, -1],
-        validation_alias=AliasChoices("kernel-uid", "kernel_uid"),
-        serialization_alias="kernel-uid",
-    )
-    kernel_gid: Optional[GroupID] = Field(
-        default=None,
-        description="Kernel group ID",
-        examples=[1000, -1],
-        validation_alias=AliasChoices("kernel-gid", "kernel_gid"),
-        serialization_alias="kernel-gid",
-    )
-    port_range: Optional[PortRangeField] = Field(
-        default=None,
-        description=textwrap.dedent("""
-        Port range for containers.
-        If multiple agents are used, user must ensure that the port ranges
-        do not overlap between the agent, else it may cause subtle issues
-        late into the agent's runtime.
-         """),
-        examples=[(30000, 31000)],
-        validation_alias=AliasChoices("port-range", "port_range"),
-        serialization_alias="port-range",
-    )
-    stats_type: Optional[StatsTypeField] = Field(
-        default=StatModes.DOCKER,
-        description="Statistics type",
-        examples=[item.value for item in StatModes],
-        validation_alias=AliasChoices("stats-type", "stats_type"),
-        serialization_alias="stats-type",
-    )
-    sandbox_type: Optional[SandboxTypeField] = Field(
-        default=None,
-        description="Sandbox type",
-        examples=[item.value for item in ContainerSandboxType],
-        validation_alias=AliasChoices("sandbox-type", "sandbox_type"),
-        serialization_alias="sandbox-type",
-    )
-    jail_args: Optional[list[str]] = Field(
-        default=None,
-        description="Jail arguments",
-        examples=[["--mount", "/tmp"]],
-        validation_alias=AliasChoices("jail-args", "jail_args"),
-        serialization_alias="jail-args",
-    )
-    scratch_type: Optional[ScratchTypeField] = Field(
-        default=None,
-        description="Scratch type",
-        examples=[item.value for item in ScratchType],
-        validation_alias=AliasChoices("scratch-type", "scratch_type"),
-        serialization_alias="scratch-type",
-    )
-    scratch_root: Optional[AutoDirectoryPath] = Field(
-        default=None,
-        description="Scratch root directory",
-        examples=["./scratches"],
-        validation_alias=AliasChoices("scratch-root", "scratch_root"),
-        serialization_alias="scratch-root",
-    )
-    scratch_size: Optional[BinarySizeField] = Field(
-        default=None,
-        description="Scratch size",
-        examples=["1G", "500M"],
-        validation_alias=AliasChoices("scratch-size", "scratch_size"),
-        serialization_alias="scratch-size",
-    )
-    scratch_nfs_address: Optional[str] = Field(
-        default=None,
-        description="Scratch NFS address",
-        examples=["192.168.1.100:/export"],
-        validation_alias=AliasChoices("scratch-nfs-address", "scratch_nfs_address"),
-        serialization_alias="scratch-nfs-address",
-    )
-    scratch_nfs_options: Optional[str] = Field(
-        default=None,
-        description="Scratch NFS options",
-        examples=["rw,sync"],
-        validation_alias=AliasChoices("scratch-nfs-options", "scratch_nfs_options"),
-        serialization_alias="scratch-nfs-options",
-    )
-    alternative_bridge: Optional[str] = Field(
-        default=None,
-        description="Alternative bridge network",
-        examples=["br-backend"],
-        validation_alias=AliasChoices("alternative-bridge", "alternative_bridge"),
-        serialization_alias="alternative-bridge",
-    )
-    swarm_enabled: Optional[bool] = Field(
-        default=None,
-        description=textwrap.dedent("""
-        Whether to enable Docker Swarm mode.
-        This allows the agent to manage containers in a Docker Swarm cluster.
-        When enabled, the agent will use Docker Swarm APIs to manage containers,
-        networks, and services.
-        This field is only used when backend is set to 'docker'.
-        """),
-        examples=[True, False],
-        validation_alias=AliasChoices("swarm-enabled", "swarm_enabled"),
-        serialization_alias="swarm-enabled",
-    )
-
-    model_config = ConfigDict(
-        extra="allow",
-        arbitrary_types_allowed=True,
-    )
+class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
+    pass
 
 
 class ResourceConfig(BaseConfigSchema):
