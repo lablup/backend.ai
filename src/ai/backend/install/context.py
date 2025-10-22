@@ -503,13 +503,15 @@ class Context(metaclass=ABCMeta):
             else:
                 plugin_list = []
 
-            self.sed_in_place(
-                toml_path,
-                re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.M),
-                f"allow-compute-plugins = [{', '.join(plugin_list)}]",
-            )
-
             await self._configure_mock_accelerator(accelerator)
+        else:
+            plugin_list = []
+
+        self.sed_in_place(
+            toml_path,
+            re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.M),
+            f"allow-compute-plugins = [{', '.join(plugin_list)}]",
+        )
 
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
