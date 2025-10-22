@@ -40,8 +40,8 @@ except IOError:
 
 
 class EventLoopType(enum.StrEnum):
-    asyncio = "asyncio"
-    uvloop = "uvloop"
+    ASYNCIO = "asyncio"
+    UVLOOP = "uvloop"
 
 
 class VolumeInfoConfig(BaseConfigSchema):
@@ -439,7 +439,7 @@ class StorageProxyConfig(BaseConfigSchema):
         serialization_alias="pid-file",
     )
     event_loop: EventLoopType = Field(
-        default=EventLoopType.asyncio,
+        default=EventLoopType.ASYNCIO,
         description="""
         Event loop implementation to use.
         'asyncio' is the standard library implementation.

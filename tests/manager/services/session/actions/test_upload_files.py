@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from aiohttp import MultipartReader
+from aiohttp.multipart import BodyPartReader
 
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.services.session.actions.upload_files import (
@@ -43,11 +44,23 @@ def mock_upload_file_rpc(mocker):
 @pytest.fixture
 def mock_simple_file_reader():
     """Mock a MultipartReader with simple files"""
+
+    # Create a mock file class that inherits from BodyPartReader
+    # so it passes isinstance() check in upload_files()
+    class MockBodyPartReader(BodyPartReader):
+        def __init__(self, filename: str):
+            # Skip BodyPartReader.__init__ to avoid complex dependencies
+            self._filename = filename
+
+        @property
+        def filename(self) -> str:
+            """Override the filename property to return our custom value"""
+            return self._filename
+
     mock_reader = MagicMock()
 
-    # Create a simple test file
-    mock_file = MagicMock()
-    mock_file.filename = "test_file.txt"
+    # Create a simple test file that is an instance of BodyPartReader
+    mock_file = MockBodyPartReader("test_file.txt")
     mock_file.read_chunk = AsyncMock(
         side_effect=[b"test content", b""]
     )  # First call returns content, second returns empty
@@ -71,12 +84,23 @@ def mock_simple_file_reader():
 @pytest.fixture
 def mock_too_many_files_reader():
     """Mock a MultipartReader with too many files"""
+
+    # Create a mock file class that inherits from BodyPartReader
+    class MockBodyPartReader(BodyPartReader):
+        def __init__(self, filename: str):
+            # Skip BodyPartReader.__init__ to avoid complex dependencies
+            self._filename = filename
+
+        @property
+        def filename(self) -> str:
+            """Override the filename property to return our custom value"""
+            return self._filename
+
     mock_reader = MagicMock()
 
     async def mock_next():
         for i in range(21):  # More than 20 files
-            mock_file = MagicMock()
-            mock_file.filename = f"file_{i}.txt"
+            mock_file = MockBodyPartReader(f"file_{i}.txt")
             mock_file.read_chunk = AsyncMock(return_value=b"small content")
             mock_file.decode = MagicMock(return_value="content")
             yield mock_file

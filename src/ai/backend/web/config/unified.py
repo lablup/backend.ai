@@ -1024,17 +1024,19 @@ class LicenseConfig(BaseConfigSchema):
 
 
 class EventLoopType(enum.StrEnum):
-    asyncio = "asyncio"
-    uvloop = "uvloop"
+    ASYNCIO = "asyncio"
+    UVLOOP = "uvloop"
 
 
 class WebServerConfig(BaseConfigSchema):
     event_loop: EventLoopType = Field(
-        default=EventLoopType.uvloop,
+        default=EventLoopType.UVLOOP,
         description="""
-        Event loop type.
+        Event loop implementation to use.
+        'asyncio' is the Python standard library implementation.
+        'uvloop' is a faster alternative but may have compatibility issues with some libraries.
         """,
-        examples=["asyncio", "uvloop"],
+        examples=[item.value for item in EventLoopType],
         validation_alias=AliasChoices("event_loop", "event-loop"),
         serialization_alias="event-loop",
     )

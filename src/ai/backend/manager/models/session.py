@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -1329,9 +1330,9 @@ class SessionRow(Base):
 
         if isinstance(session_reference, list):
             query_list = [
-                aiotools.apartial(
+                partial(
                     _match_sessions_by_id,
-                    session_id_or_list=session_reference,
+                    session_id_or_list=[SessionId(item) for item in session_reference],
                     allow_prefix=False,
                 )
             ]

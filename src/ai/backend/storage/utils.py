@@ -12,8 +12,6 @@ from aiohttp import web
 from ai.backend.common.json import dump_json_str
 from ai.backend.logging import BraceStyleAdapter
 
-from .volumes.types import LoggingInternalMeta
-
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
@@ -137,6 +135,8 @@ async def log_manager_api_entry_new(
     name: str,
     params: Any,
 ) -> None:
+    from .volumes.types import LoggingInternalMeta
+
     if params is None:
         log.info(
             "ManagerAPI::{}()",
@@ -161,6 +161,8 @@ async def log_client_api_entry(
     name: str,
     params: Any,
 ) -> None:
+    from .volumes.types import LoggingInternalMeta
+
     if params is None:
         log.info(
             "ClientFacingAPI::{}()",

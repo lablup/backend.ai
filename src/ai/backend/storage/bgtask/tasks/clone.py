@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Self, override
+from typing import TYPE_CHECKING, Any, Self, override
 
 from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskArgs,
@@ -18,7 +20,8 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
 
-from ...volumes.pool import VolumePool
+if TYPE_CHECKING:
+    from ...volumes.pool import VolumePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
