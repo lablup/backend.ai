@@ -113,6 +113,7 @@ class GroupNode(graphene.ObjectType):
 
     queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
         "id": ("id", None),
+        "row_id": ("id", None),
         "name": ("name", None),
         "is_active": ("is_active", None),
         "created_at": ("created_at", dtparse),
@@ -123,6 +124,7 @@ class GroupNode(graphene.ObjectType):
 
     queryorder_colmap: Mapping[str, OrderSpecItem] = {
         "id": ("id", None),
+        "row_id": ("id", None),
         "name": ("name", None),
         "is_active": ("is_active", None),
         "created_at": ("created_at", None),
