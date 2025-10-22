@@ -105,7 +105,10 @@ class SessionHook(AbstractSessionHook):
                         session.main_kernel.agent_id,
                         order_key=str(session.session_id),
                     )
-                    await agent_client.destroy_local_network(network_id)
+                    await agent_client.destroy_local_network(
+                        network_id,
+                        session.main_kernel.agent_id,
+                    )
                 except Exception:
                     log.exception(f"Failed to destroy the agent-local network {network_id}")
             case ClusterMode.MULTI_NODE:

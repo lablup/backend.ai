@@ -150,6 +150,7 @@ class TestTerminateSessions:
             str(session_id),
             "USER_REQUESTED",
             suppress_events=False,
+            agent_id=agent_id,
         )
 
     async def test_terminate_sessions_multiple_kernels(
@@ -203,6 +204,7 @@ class TestTerminateSessions:
                 str(session_id),
                 "FORCED_TERMINATION",
                 suppress_events=False,
+                agent_id=agent_ids[i],
             )
 
     async def test_terminate_sessions_partial_failure(
