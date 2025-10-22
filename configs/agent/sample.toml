@@ -120,7 +120,7 @@
   ## advertised-host = "192.168.1.100"
   # Port range for containers.
   # If multiple agents are used, user must ensure that the port ranges
-  # don't overlap between the agent, else it may cause subtle issues
+  # do not overlap between the agent, else it may cause subtle issues
   # late into the agent's runtime.
   port-range = [ 30000, 31000,]
   # Statistics type
@@ -174,7 +174,7 @@
   # the minimum disk space from the scratch disk allocation via loopback files.
   reserved-disk = "8G"
   # The alignment of the reported main memory size to absorb tiny deviations from
-  # per-node firwmare/hardware settings. Recommended to be multiple of the
+  # per-node firmware/hardware settings. Recommended to be multiple of the
   # page/hugepage size (e.g., 2 MiB).
   memory-align-size = "16M"
   # Resource allocation order
@@ -407,7 +407,7 @@
     ## kernel-gid = 1000
     # Port range for containers.
     # If multiple agents are used, user must ensure that the port ranges
-    # don't overlap between the agent, else it may cause subtle issues
+    # do not overlap between the agent, else it may cause subtle issues
     # late into the agent's runtime.
     ## port-range = [ 30000, 31000,]
     # Statistics type
@@ -451,7 +451,7 @@
     # the minimum disk space from the scratch disk allocation via loopback files.
     reserved-disk = 8589934592
     # The alignment of the reported main memory size to absorb tiny deviations from
-    # per-node firwmare/hardware settings. Recommended to be multiple of the
+    # per-node firmware/hardware settings. Recommended to be multiple of the
     # page/hugepage size (e.g., 2 MiB).
     memory-align-size = 16777216
     # Resource allocation order
