@@ -3,7 +3,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional
+from typing import TYPE_CHECKING, NamedTuple, Optional
 
 from ai.backend.common.types import CIStrEnum, ImageCanonical, ImageID
 
@@ -100,7 +100,6 @@ class ImageDataWithDetails:
     size_bytes: int = field(default=0)
     # legacy
     hash: Optional[str] = field(default=None)
-    raw_labels: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Optional
 from uuid import UUID
 
@@ -7,7 +8,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import ImageAlias
+from ai.backend.common.types import AgentId, ImageAlias, ImageID
 from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.image.types import (
@@ -159,6 +160,39 @@ class ImageRepository:
                 agent_names=[] if hide_agents else list(installed_agents),
             ),
         )
+
+    @image_repository_resilience.apply()
+    async def get_image_installed_agents(
+        self, image_ids: list[ImageID]
+    ) -> Mapping[ImageID, set[AgentId]]:
+        """
+        Returns the set of installed agents for each image ID in the input list.
+        The result is a dictionary mapping ImageID to the set of installed agents.
+        """
+        return await self._stateful_source.list_agents_with_images(image_ids)
+
+    @image_repository_resilience.apply()
+    async def get_all_images(
+        self, status_filter: Optional[list[ImageStatus]] = None
+    ) -> Mapping[ImageID, ImageWithAgentInstallStatus]:
+        """
+        Retrieves all images from the database, optionally filtered by status.
+        Returns a mapping of ImageID to ImageWithAgentInstallStatus.
+        """
+        image_data = await self._db_source.query_all_images(status_filter)
+        installed_agents = await self._stateful_source.list_agents_with_images(
+            list(image_data.keys())
+        )
+        return {
+            image_id: ImageWithAgentInstallStatus(
+                image=image_info,
+                agent_install_status=ImageAgentInstallStatus(
+                    installed=bool(installed_agents.get(image_id, set())),
+                    agent_names=list(installed_agents.get(image_id, set())),
+                ),
+            )
+            for image_id, image_info in image_data.items()
+        }
 
     @image_repository_resilience.apply()
     async def soft_delete_user_image(

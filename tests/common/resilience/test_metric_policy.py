@@ -41,7 +41,7 @@ class TestMetricPolicy:
         assert call_kwargs["domain"] == DomainType.CLIENT
         assert call_kwargs["layer"] == LayerType.AGENT_CLIENT
         assert call_kwargs["operation"] == "successful_operation"
-        assert call_kwargs["success"] is True
+        assert call_kwargs["exception"] is None
         assert call_kwargs["duration"] > 0
 
     @pytest.mark.asyncio
@@ -73,7 +73,7 @@ class TestMetricPolicy:
         assert call_kwargs["domain"] == DomainType.CLIENT
         assert call_kwargs["layer"] == LayerType.AGENT_CLIENT
         assert call_kwargs["operation"] == "failing_operation"
-        assert call_kwargs["success"] is False
+        assert call_kwargs["exception"] is not None
         assert call_kwargs["duration"] > 0
 
     @pytest.mark.asyncio

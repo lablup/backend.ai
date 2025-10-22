@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Mapping
 from typing import Optional
 
 from ai.backend.common.exception import BackendAIError
@@ -7,7 +8,9 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 
+from ...data.permission.id import ObjectId
 from ...data.permission.role import (
+    BatchEntityPermissionCheckInput,
     RoleCreateInput,
     RoleData,
     RoleDeleteInput,
@@ -97,13 +100,19 @@ class PermissionControllerRepository:
 
     @permission_controller_repository_resilience.apply()
     async def check_permission_in_scope(self, data: ScopePermissionCheckInput) -> bool:
-        target_scope_id = data.target_scope_id
-        role_rows = await self._db_source.get_user_roles(data.user_id)
-        for role in role_rows:
-            for permission_group in role.permission_group_rows:
-                if permission_group.parsed_scope_id() != target_scope_id:
-                    continue
-                for permission in permission_group.permission_rows:
-                    if permission.operation == data.operation:
-                        return True
-        return False
+        return await self._db_source.check_scope_permission_exist(
+            data.user_id, data.target_scope_id, data.operation
+        )
+
+    @permission_controller_repository_resilience.apply()
+    async def check_permission_of_entities(
+        self,
+        data: BatchEntityPermissionCheckInput,
+    ) -> Mapping[ObjectId, bool]:
+        """
+        Check if the user has the requested operation permission on the given entity IDs.
+        Returns a mapping of entity ID to a boolean indicating permission.
+        """
+        return await self._db_source.check_batch_object_permission_exist(
+            data.user_id, data.target_object_ids, data.operation
+        )
