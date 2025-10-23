@@ -248,7 +248,7 @@
   # page/hugepage size (e.g., 2 MiB).
   memory-align-size = "16M"
   # Resource allocation order
-  allocation-order = [ "cpu", "cuda", "mem", "rocm", "tpu",]
+  allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
   # Affinity policy
   affinity-policy = "INTERLEAVED"
 

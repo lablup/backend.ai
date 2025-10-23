@@ -143,7 +143,7 @@ def _dump_toml_scalar(
             .strip()
             .split(" = ", 1)[1]
         )
-    if isinstance(value, (list, tuple, set, frozenset)):
+    if isinstance(value, (set, frozenset)):
         value = sorted(value)
     return toml.dumps({"x": value}).strip().split(" = ", 1)[1]
 
@@ -203,7 +203,7 @@ def _generate_sample_config(model_class: Type[BaseModel]) -> str:
                     try:
                         factory_instance = field.default_factory()  # type: ignore
                         if isinstance(factory_instance, BaseModel):
-                            field_info["default"] = factory_instance.model_dump()
+                            field_info["default"] = factory_instance.model_dump(mode="python")
                         else:
                             field_info["default"] = factory_instance
                     except Exception:
