@@ -77,6 +77,23 @@ class KernelStatus(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
+    def terminatable_statuses(cls) -> frozenset["KernelStatus"]:
+        """Return statuses that can transition to TERMINATING."""
+        return frozenset(
+            status
+            for status in cls
+            if status
+            not in (
+                cls.PENDING,
+                cls.TERMINATING,
+                cls.TERMINATED,
+                cls.CANCELLED,
+                cls.ERROR,
+            )
+        )
+
+    @classmethod
+    @lru_cache(maxsize=1)
     def terminal_statuses(cls) -> frozenset["KernelStatus"]:
         """
         Returns a set of kernel statuses that are considered terminal.
