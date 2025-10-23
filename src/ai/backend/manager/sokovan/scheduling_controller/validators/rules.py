@@ -84,6 +84,10 @@ class SessionTypeRule(SessionValidatorRule):
         context: SessionCreationContext,
         allowed_groups: list[AllowedScalingGroup],
     ) -> None:
+        if spec.scaling_group is None:
+            # Should have been resolved already
+            return
+
         for sg in allowed_groups:
             if sg.name == spec.scaling_group:
                 allowed_session_types = sg.scheduler_opts.allowed_session_types
@@ -91,6 +95,9 @@ class SessionTypeRule(SessionValidatorRule):
                     raise InvalidAPIParameters(
                         f"Session type {spec.session_type} is not allowed in scaling group {sg.name}"
                     )
+                return
+
+        raise InvalidAPIParameters(f"Scaling group {spec.scaling_group} is not accessible")
 
 
 class ServicePortRule(SessionValidatorRule):

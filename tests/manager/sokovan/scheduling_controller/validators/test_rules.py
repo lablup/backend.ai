@@ -340,6 +340,24 @@ class TestSessionTypeRule:
             rule.validate(spec, basic_context, allowed_groups)
         assert "not allowed in scaling group" in str(exc_info.value)
 
+    def test_empty_allowed_groups(
+        self,
+        basic_context: SessionCreationContext,
+        session_spec_factory: Callable[..., SessionCreationSpec],
+    ) -> None:
+        """Test with empty allowed groups list."""
+        rule = SessionTypeRule()
+
+        spec = session_spec_factory(
+            session_type=SessionTypes.INTERACTIVE,
+            scaling_group="any-sg",
+        )
+
+        # Should raise - no allowed groups available
+        with pytest.raises(InvalidAPIParameters) as exc_info:
+            rule.validate(spec, basic_context, [])
+        assert "not accessible" in str(exc_info.value)
+
 
 class TestServicePortRule:
     """Test cases for ServicePortRule."""
