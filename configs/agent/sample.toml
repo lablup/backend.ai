@@ -11,7 +11,9 @@
 # It is not intended to be set in the configuration file.
 ## plugins = "..."
 
-# Agent configuration
+# Agent configuration.
+# If agents field is populated, this field indicates the default values for all
+# agents.
 [agent]
   # Backend type for the agent.
   # This determines how the agent interacts with the underlying infrastructure.
@@ -75,7 +77,7 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
+  ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
   # Blocked compute plugins
   ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
   # Allowed network plugins
@@ -104,7 +106,9 @@
     # Synchronization interval in seconds
     interval = 10.0
 
-# Container configuration
+# Container configuration.
+# If agents field is populated, this field indicates the default values for all
+# agents.
 [container]
   # Kernel user ID
   kernel-uid = -1
@@ -114,7 +118,10 @@
   bind-host = ""
   # Advertised host for containers
   ## advertised-host = "192.168.1.100"
-  # Port range for containers
+  # Port range for containers.
+  # If multiple agents are used, user must ensure that the port ranges
+  # do not overlap between the agent, else it may cause subtle issues
+  # late into the agent's runtime.
   port-range = [ 30000, 31000,]
   # Statistics type
   ## stats-type = "docker"
@@ -148,6 +155,32 @@
   # `krunner_volumes` configuration in the agent's environment.
   # It is not intended to be set in the configuration file.
   ## [container.krunner-volumes]
+
+# Resource configuration.
+# If agents field is populated, this field indicates the default values for all
+# agents.
+[resource]
+  # The number of CPU cores reserved for the operating system and the agent
+  # service.
+  reserved-cpu = 1
+  # The memory space reserved for the operating system and the agent service. It
+  # is subtracted from the reported main memory size and not available for user
+  # workload allocation. Depending on the memory-align-size option and system
+  # configuration, this may not be the exact value but have slightly less or more
+  # values within the memory-align-size.
+  reserved-mem = "1G"
+  # The disk space reserved for the operating system and the agent service.
+  # Currently this value is unused. In future releases, it may be used to preserve
+  # the minimum disk space from the scratch disk allocation via loopback files.
+  reserved-disk = "8G"
+  # The alignment of the reported main memory size to absorb tiny deviations from
+  # per-node firmware/hardware settings. Recommended to be multiple of the
+  # page/hugepage size (e.g., 2 MiB).
+  memory-align-size = "16M"
+  # Resource allocation order
+  allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
+  # Affinity policy
+  affinity-policy = "INTERLEAVED"
 
 # Pyroscope configuration
 [pyroscope]
@@ -228,30 +261,6 @@
   # Override default log level for specific scope of package
   [logging.pkg_ns]
 
-# Resource configuration
-[resource]
-  # The number of CPU cores reserved for the operating system and the agent
-  # service.
-  reserved-cpu = 1
-  # The memory space reserved for the operating system and the agent service. It
-  # is subtracted from the reported main memory size and not available for user
-  # workload allocation. Depending on the memory-align-size option and system
-  # configuration, this may not be the exact value but have slightly less or more
-  # values within the memory-align-size.
-  reserved-mem = "1G"
-  # The disk space reserved for the operating system and the agent service.
-  # Currently this value is unused. In future releases, it may be used to preserve
-  # the minimum disk space from the scratch disk allocation via loopback files.
-  reserved-disk = "8G"
-  # The alignment of the reported main memory size to absorb tiny deviations from
-  # per-node firwmare/hardware settings. Recommended to be multiple of the
-  # page/hugepage size (e.g., 2 MiB).
-  memory-align-size = "16M"
-  # Resource allocation order
-  allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
-  # Affinity policy
-  affinity-policy = "INTERLEAVED"
-
 # OpenTelemetry configuration
 [otel]
   # Whether to enable OpenTelemetry
@@ -326,6 +335,8 @@
 [api]
   # Image pull timeout in seconds
   ## pull-timeout = 7200.0  # min=0
+  # Image commit timeout in seconds
+  ## commit-timeout = 7200.0  # min=0
   # Image push timeout in seconds
   ## push-timeout = 7200.0  # min=0
 
@@ -342,3 +353,108 @@
 # This field is injected at runtime based on etcd configuration.
 # It is not intended to be set in the other way.
 ## [redis]
+
+# Configuration overrides for multiple agents.
+# Use this field only to define 2 or more agents, as defining only one
+# agent using this field is redundant. Use the fields agent, container,
+# and resource to define the configuration at a global level.
+# Any field populated in the agents config will be treated as an
+# override to the global default values. Thus the global fields must still
+# be provided when defining multiple agents.
+[[agents]]
+# Add multiple [[agents]] sections as needed
+  # Agent config overrides for the individual agent.
+  # All fields except Agent ID are by default optional.
+  # Only override fields if necessary.
+  [agents.agent]
+    # Agent ID
+    id = "agent-001"
+    # Agent socket port
+    ## agent-sock-port = 6007  # min=1024 max=65535
+    # Mount path for containers
+    ## mount-path = "/mnt/backend.ai"
+    # Whether to enable cohabiting storage proxy
+    ## cohabiting-storage-proxy = true
+    # Allowed compute plugins
+    ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
+    # Blocked compute plugins
+    ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
+    # Allowed network plugins
+    ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
+    # Blocked network plugins
+    ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
+    # Whether to force terminate abusing containers
+    ## force-terminate-abusing-containers = true
+    # Kernel creation concurrency
+    ## kernel-creation-concurrency = 4  # min=1 max=32
+    # Docker mode detected based on kernel version (linuxkit/native)
+    ## docker-mode = "linuxkit"
+    # Owner uid:gid of the mount directory
+    ## mount-path-uid-gid = "root:root"
+
+    # Container lifecycle synchronization config
+    [agents.agent.sync-container-lifecycles]
+      # Whether to enable container lifecycle synchronization
+      enabled = true
+      # Synchronization interval in seconds
+      interval = 10.0
+
+  # Container config overrides for the individual agent
+  [agents.container]
+    # Kernel user ID
+    ## kernel-uid = 1000
+    # Kernel group ID
+    ## kernel-gid = 1000
+    # Port range for containers.
+    # If multiple agents are used, user must ensure that the port ranges
+    # do not overlap between the agent, else it may cause subtle issues
+    # late into the agent's runtime.
+    ## port-range = [ 30000, 31000,]
+    # Statistics type
+    ## stats-type = "cgroup"
+    # Sandbox type
+    ## sandbox-type = "docker"
+    # Jail arguments
+    ## jail-args = [ "--mount", "/tmp",]
+    # Scratch type
+    ## scratch-type = "hostdir"
+    # Scratch root directory
+    ## scratch-root = "./scratches"
+    # Scratch size
+    ## scratch-size = "1G"
+    # Scratch NFS address
+    ## scratch-nfs-address = "192.168.1.100:/export"
+    # Scratch NFS options
+    ## scratch-nfs-options = "rw,sync"
+    # Alternative bridge network
+    ## alternative-bridge = "br-backend"
+    # Whether to enable Docker Swarm mode.
+    # This allows the agent to manage containers in a Docker Swarm cluster.
+    # When enabled, the agent will use Docker Swarm APIs to manage containers,
+    # networks, and services.
+    # This field is only used when backend is set to 'docker'.
+    ## swarm-enabled = true
+
+  # Resource config overrides for the individual agent
+  [agents.resource]
+    # The number of CPU cores reserved for the operating system and the agent
+    # service.
+    reserved-cpu = 1
+    # The memory space reserved for the operating system and the agent service. It
+    # is subtracted from the reported main memory size and not available for user
+    # workload allocation. Depending on the memory-align-size option and system
+    # configuration, this may not be the exact value but have slightly less or more
+    # values within the memory-align-size.
+    reserved-mem = 1073741824
+    # The disk space reserved for the operating system and the agent service.
+    # Currently this value is unused. In future releases, it may be used to preserve
+    # the minimum disk space from the scratch disk allocation via loopback files.
+    reserved-disk = 8589934592
+    # The alignment of the reported main memory size to absorb tiny deviations from
+    # per-node firmware/hardware settings. Recommended to be multiple of the
+    # page/hugepage size (e.g., 2 MiB).
+    memory-align-size = 16777216
+    # Resource allocation order
+    allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
+    # Affinity policy
+    affinity-policy = 1
