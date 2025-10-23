@@ -12,6 +12,7 @@ from typing import Optional, override
 import aiofiles
 import aiofiles.os
 
+from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.dto.storage.response import (
     PresignedDownloadObjectResponse,
     PresignedUploadObjectResponse,
@@ -29,7 +30,6 @@ from ai.backend.storage.exception import (
     ObjectInfoFetchError,
     StorageBucketFileNotFoundError,
 )
-from ai.backend.storage.storages.base import AbstractStorage
 from ai.backend.storage.utils import normalize_filepath
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore

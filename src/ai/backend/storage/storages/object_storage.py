@@ -1,6 +1,7 @@
 import mimetypes
 from typing import override
 
+from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.dto.storage.response import (
     ObjectMetaResponse,
     PresignedDownloadObjectResponse,
@@ -22,7 +23,6 @@ from ai.backend.storage.exception import (
     PresignedUploadURLGenerationError,
     StorageBucketFileNotFoundError,
 )
-from ai.backend.storage.storages.base import AbstractStorage
 
 
 class ObjectStorage(AbstractStorage):
