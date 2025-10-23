@@ -45,6 +45,7 @@ from .validators import (
     MountNameValidationRule,
     ScalingGroupAccessRule,
     ServicePortRule,
+    SessionTypeRule,
     SessionValidator,
 )
 
@@ -101,6 +102,7 @@ class SchedulingController:
         validator_rules = [
             ContainerLimitRule(),
             ScalingGroupAccessRule(),
+            SessionTypeRule(),
             ServicePortRule(),
             ClusterValidationRule(),
             MountNameValidationRule(),

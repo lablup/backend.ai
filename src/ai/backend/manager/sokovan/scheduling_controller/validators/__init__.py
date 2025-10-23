@@ -8,6 +8,7 @@ from .rules import (
     ResourceLimitRule,
     ScalingGroupAccessRule,
     ServicePortRule,
+    SessionTypeRule,
 )
 from .validator import SessionValidator
 
@@ -16,6 +17,7 @@ __all__ = [
     "SessionValidatorRule",
     "ContainerLimitRule",
     "ScalingGroupAccessRule",
+    "SessionTypeRule",
     "ServicePortRule",
     "ResourceLimitRule",
     "ClusterValidationRule",
