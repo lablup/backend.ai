@@ -10,6 +10,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.errors.artifact import ArtifactNotApproved, ArtifactReadonly
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.object_storage import ObjectStorageOperationNotSupported
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.object_storage.repository import ObjectStorageRepository
@@ -120,7 +121,10 @@ class ObjectStorageService:
         )
 
         reservoir_config = self._config_provider.config.reservoir
-        storage_name = reservoir_config.storage_name
+        if reservoir_config is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
+
+        storage_name = reservoir_config.archive_storage
 
         # Only object storage is supported for presigned URLs
         if reservoir_config.config.storage_type != "object_storage":
@@ -170,7 +174,10 @@ class ObjectStorageService:
         )
 
         reservoir_config = self._config_provider.config.reservoir
-        storage_name = reservoir_config.storage_name
+        if reservoir_config is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
+
+        storage_name = reservoir_config.archive_storage
 
         # Only object storage is supported for presigned URLs
         if reservoir_config.config.storage_type != "object_storage":

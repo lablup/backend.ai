@@ -23,6 +23,7 @@ from ai.backend.manager.data.artifact.types import (
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
 from ai.backend.manager.errors.artifact_registry import ReservoirConnectionError
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactRemoteStatusFilter,
@@ -110,7 +111,11 @@ class ArtifactRegistryEventHandler:
         """
 
         reservoir_config = self._config_provider.config.reservoir
-        storage = await self._resolve_storage_data(reservoir_config.storage_name)
+        if reservoir_config is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
+
+        storage = await self._resolve_storage_data(reservoir_config.archive_storage)
+        # TODO: Current structure does not cover cases where different storages have different hosts.
         storage_proxy_client = self._storage_manager.get_manager_facing_client(storage.host)
 
         # Get all reservoir registries
@@ -189,8 +194,7 @@ class ArtifactRegistryEventHandler:
                         import_req = ReservoirImportModelsReq(
                             models=models,
                             registry_name=reservoir_registry_data.name,
-                            storage_name=reservoir_config.storage_name,
-                            storage_step_mappings=reservoir_config.storage_step_selection,
+                            storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
                         )
 
                         # Call storage proxy import API
