@@ -938,6 +938,14 @@ class APIConfig(BaseConfigSchema):
         validation_alias=AliasChoices("pull-timeout", "pull_timeout"),
         serialization_alias="pull-timeout",
     )
+    commit_timeout: Optional[float] = Field(
+        default=None,
+        ge=0,
+        description="Image commit timeout in seconds",
+        examples=[7200.0, 3600.0],
+        validation_alias=AliasChoices("commit-timeout", "commit_timeout"),
+        serialization_alias="commit-timeout",
+    )
     push_timeout: Optional[float] = Field(
         default=None,
         ge=0,
