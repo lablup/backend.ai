@@ -127,7 +127,6 @@ from ai.backend.manager.config.loader.toml_loader import TomlConfigLoader
 from ai.backend.manager.config.loader.types import AbstractConfigLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.watchers.etcd import EtcdConfigWatcher
-from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
@@ -1067,10 +1066,8 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     # Rescan reservoir registry periodically
     reservoir_config = root_ctx.config_provider.config.reservoir
-    if reservoir_config is None:
-        raise ServerMisconfiguredError("Reservoir configuration is missing.")
 
-    if reservoir_config.use_delegation:
+    if reservoir_config and reservoir_config.use_delegation:
         task_specs.append(
             EventTaskSpec(
                 name="reservoir_registry_scan",
