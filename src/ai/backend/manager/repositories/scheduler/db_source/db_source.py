@@ -759,7 +759,7 @@ class ScheduleDBSource:
     async def _mark_sessions_as_terminating(
         self, db_sess: SASession, session_ids: list[SessionId], reason: str, now: datetime
     ) -> list[SessionId]:
-        """Mark resource-occupying sessions and their kernels as terminating."""
+        """Mark terminatable sessions and their kernels as terminating."""
         # Mark sessions as terminating
         terminating_stmt = (
             sa.update(SessionRow)
@@ -775,7 +775,7 @@ class ScheduleDBSource:
             .where(
                 sa.and_(
                     SessionRow.id.in_(session_ids),
-                    SessionRow.status.in_(SessionStatus.resource_occupied_statuses()),
+                    SessionRow.status.in_(SessionStatus.terminatable_statuses()),
                 )
             )
             .returning(SessionRow.id)
@@ -796,7 +796,12 @@ class ScheduleDBSource:
                         {KernelStatus.TERMINATING.name: now.isoformat()},
                     ),
                 )
-                .where(KernelRow.session_id.in_(terminating_sessions))
+                .where(
+                    sa.and_(
+                        KernelRow.session_id.in_(terminating_sessions),
+                        KernelRow.status.in_(KernelStatus.terminatable_statuses()),
+                    )
+                )
             )
 
         return terminating_sessions
