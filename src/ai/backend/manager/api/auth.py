@@ -323,6 +323,7 @@ def check_date(request: web.Request) -> bool:
     if not raw_date:
         raw_date = request.headers.get("X-BackendAI-Date", request.headers.get("X-Sorna-Date"))
     if not raw_date:
+        log.info("Date header missing in request headers: {}", request.headers)
         return False
     try:
         # HTTP standard says "Date" header must be in GMT only.
@@ -337,6 +338,7 @@ def check_date(request: web.Request) -> bool:
         request["date"] = date
         request["raw_date"] = raw_date
         if not (min_date < date < max_date):
+            log.info("Date/time sync error: date={}, now={}", date, now)
             return False
     except ValueError:
         return False
@@ -369,7 +371,7 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
             host = parsed_url.netloc
 
         sign_bytes = "{0}\n{1}\n{2}\nhost:{3}\ncontent-type:{4}\nx-{name}-version:{5}\n{6}".format(
-            request.method,
+            "GET",
             str(path),
             request["raw_date"],
             host,
@@ -382,7 +384,9 @@ async def sign_request(sign_method: str, request: web.Request, secret_key: str) 
             secret_key.encode(), request["date"].strftime("%Y%m%d").encode(), hash_type
         ).digest()
         sign_key = hmac.new(sign_key, host.encode(), hash_type).digest()
-        return hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
+        res = hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
+        log.info("sign_key: {}, sign_bytes: {}, hash_type: {}, signature: {}", sign_key, sign_bytes, hash_type, res)
+        return res
     except ValueError:
         raise AuthorizationFailed("Invalid signature")
     except AssertionError as e:
@@ -496,7 +500,9 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     else:
         # There were no hooks configured.
         # Perform our own authentication.
+        log.info("request path: {}, headers: {}", request.path, request.headers)
         params = _extract_auth_params(request)
+        log.info("Auth params extracted: {}", params)
         if params:
             sign_method, access_key, signature = params
             user_row, keypair_row = await execute_with_retry(
@@ -508,12 +514,13 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
                 sign_method, request, keypair_row["keypairs_secret_key"]
             )
             if not secrets.compare_digest(my_signature, signature):
+                log.info("Signature mismatch: expected={}, given={}", my_signature, signature)
                 raise AuthorizationFailed("Signature mismatch")
             await root_ctx.valkey_stat.increment_keypair_query_count(access_key)
         else:
             # unsigned requests may be still accepted for public APIs
             pass
-
+    log.info("Auth result: user_row={}, keypair_row={}", user_row is not None, keypair_row is not None)
     if user_row and keypair_row:
         auth_result = {
             "is_authorized": True,

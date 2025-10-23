@@ -285,6 +285,7 @@ class ComputeSessionNode(graphene.ObjectType):
         info: graphene.ResolveInfo,
         id: str,
     ) -> Optional[Self]:
+        print(f"ComputeSessionNode.get_node called with id: {id}")
         graphene_ctx: GraphQueryContext = info.context
         _, raw_session_id = AsyncNode.resolve_global_id(info, id)
         async with graphene_ctx.db.begin_readonly_session() as db_session:

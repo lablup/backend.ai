@@ -41,6 +41,7 @@ def generate_signature(
     sign_key = hmac.new(sign_key, hostname.encode(), hash_type).digest()
 
     signature = hmac.new(sign_key, sign_bytes, hash_type).hexdigest()
+    print(f"sign_key: {sign_key}, sign_bytes: {sign_bytes}, hash_type: {hash_type}, signature: {signature}")
     headers = {
         "Authorization": "BackendAI signMethod=HMAC-{}, credential={}:{}".format(
             hash_type.upper(),

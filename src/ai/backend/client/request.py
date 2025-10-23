@@ -381,8 +381,7 @@ class Request:
         self.date = datetime.now(tzutc())
         assert self.date is not None
         self.headers["Date"] = self.date.isoformat()
-        # websocket is always a "binary" stream.
-        self.content_type = "application/octet-stream"
+        self.content_type = "application/json"
 
         def _ws_ctx_builder():
             full_url = self._build_url()

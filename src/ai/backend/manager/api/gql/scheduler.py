@@ -107,6 +107,8 @@ async def scheduling_events_by_session(
     except (ValueError, AttributeError) as e:
         log.warning(f"Invalid session ID format: {session_id}")
         raise InvalidSessionId(f"Invalid session ID format: {session_id}") from e
+    mock_session_id = "822ba464-e9cc-40f4-8acf-7a7df5ce83bf"
+    yield SchedulingBroadcastEventPayload(_session_id=strawberry.ID(mock_session_id), status_transition=SchedulingStatus.TERMINATED, reason="Mock event for testing purposes.")
 
     event_hub = info.context.event_hub
     propagator = AsyncBypassPropagator()

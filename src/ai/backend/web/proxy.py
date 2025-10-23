@@ -180,6 +180,7 @@ async def web_handler(
     is_anonymous: bool = False,
     api_endpoint: Optional[str] = None,
     http_headers_to_forward_extra: Iterable[str] | None = None,
+    content_type_override: Optional[str] = None,
 ) -> web.StreamResponse:
     # Check if this is a WebSocket upgrade request (for GraphQL subscriptions)
     if (
@@ -190,6 +191,7 @@ async def web_handler(
             frontend_rqst,
             is_anonymous=is_anonymous,
             api_endpoint=api_endpoint,
+            content_type_override=content_type_override,
         )
 
     stats: WebStats = frontend_rqst.app["stats"]
@@ -248,6 +250,8 @@ async def web_handler(
                     continue
                 if (value := frontend_rqst.headers.get(key)) is not None:
                     backend_rqst.headers[key] = value
+            if content_type_override is not None:
+                backend_rqst.headers["Content-Type"] = content_type_override
             async with backend_rqst.fetch() as backend_resp:
                 frontend_resp_hdrs = {
                     key: value
@@ -394,7 +398,8 @@ async def web_plugin_handler(
 
 
 async def websocket_handler(
-    request: web.Request, *, is_anonymous=False, api_endpoint: Optional[str] = None
+    request: web.Request, *, is_anonymous=False, api_endpoint: Optional[str] = None,
+    content_type_override: Optional[str] = None,
 ) -> web.StreamResponse:
     if api_endpoint:
         if api_endpoint.startswith("http://"):
@@ -437,7 +442,7 @@ async def websocket_handler(
                 path,
                 request.content,
                 params=request.query,
-                content_type=request.content_type,
+                content_type=request.content_type if content_type_override is None else content_type_override,
                 override_api_version=request_api_version,
             )
             # Extract WebSocket subprotocols from client request (e.g., graphql-ws for GraphQL subscriptions)

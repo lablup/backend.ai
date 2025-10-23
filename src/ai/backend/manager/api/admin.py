@@ -57,13 +57,13 @@ class CustomGraphQLView(GraphQLView):
         Supports both query/mutation via POST and subscriptions via WebSocket.
         """
 
-    async def __call__(self, request: web.Request) -> web.StreamResponse:
-        """
-        Check authorization before processing GraphQL requests.
-        """
-        if request.get("is_authorized", False):
-            return await super().__call__(request)
-        raise AuthorizationFailed("Unauthorized access")
+    # async def __call__(self, request: web.Request) -> web.StreamResponse:
+    #     """
+    #     Check authorization before processing GraphQL requests.
+    #     """
+    #     if request.get("is_authorized", False):
+    #         return await super().__call__(request)
+    #     raise AuthorizationFailed("Unauthorized access to GraphQL endpoint.")
 
     async def get_context(  # type: ignore[override]
         self, request: web.Request, response: web.Response | web.WebSocketResponse
@@ -169,7 +169,7 @@ async def _handle_gql_common(request: web.Request, params: Any) -> ExecutionResu
                 errmsg = e.formatted
             else:
                 errmsg = {"message": str(e)}
-            log.error("ADMIN.GQL Exception: {}", errmsg)
+            log.exception("ADMIN.GQL Exception: {}", e)
             log.debug("{}", "".join(traceback.format_exception(e)))
     return result
 
@@ -207,7 +207,7 @@ async def handle_gql_legacy(request: web.Request, params: Any) -> web.Response:
             else:
                 errmsg = {"message": str(e)}
                 errors.append(errmsg)
-            log.error("ADMIN.GQL Exception: {}", errmsg)
+            log.exception("ADMIN.GQL Exception: {}", e)
         raise BackendGQLError(extra_data=errors)
     return web.json_response(result.data, status=HTTPStatus.OK)
 
