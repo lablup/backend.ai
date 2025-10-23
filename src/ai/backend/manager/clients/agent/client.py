@@ -405,14 +405,14 @@ class AgentClient:
 
     # Scaling group management
     @agent_client_resilience.apply()
-    async def update_scaling_group(self, scaling_group: str) -> None:
+    async def update_scaling_group(self, scaling_group: str, agent_id: AgentId) -> None:
         """Update scaling group on the agent."""
         async with self._with_connection() as rpc:
-            await rpc.call.update_scaling_group(scaling_group)
+            await rpc.call.update_scaling_group(scaling_group, agent_id)
 
     # Local configuration management
     @agent_client_resilience.apply()
-    async def get_local_config(self) -> Mapping[str, str]:
+    async def get_local_config(self, agent_id: AgentId) -> Mapping[str, str]:
         """Get local configuration from the agent."""
         async with self._with_connection() as rpc:
-            return await rpc.call.get_local_config()
+            return await rpc.call.get_local_config(agent_id)

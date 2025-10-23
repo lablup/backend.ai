@@ -687,6 +687,46 @@ class OverridableAgentConfig(BaseConfigSchema):
         extra="allow",
     )
 
+    def with_derived_fields(
+        self,
+        default_agent: AgentConfig,
+        agent_idx: int,
+    ) -> OverridableAgentConfig:
+        if self.id is None and default_agent.id is None:
+            return self
+
+        agent_id = self.id if self.id is not None else f"{default_agent.id}-{agent_idx}"
+
+        if "ipc_base_path" in self.model_fields_set:
+            ipc_base_path = self.ipc_base_path
+        else:
+            ipc_base_path = default_agent.ipc_base_path / agent_id
+
+        if "var_base_path" in self.model_fields_set:
+            var_base_path = self.var_base_path
+        else:
+            var_base_path = default_agent.var_base_path / agent_id
+
+        if "image_commit_path" in self.model_fields_set:
+            image_commit_path = self.image_commit_path
+        else:
+            image_commit_path = default_agent.image_commit_path / agent_id
+
+        if default_agent.abuse_report_path is None or "abuse_report_path" in self.model_fields_set:
+            abuse_report_path = self.abuse_report_path
+        else:
+            abuse_report_path = default_agent.abuse_report_path / agent_id
+
+        return self.model_copy(
+            update={
+                "id": agent_id,
+                "ipc_base_path": ipc_base_path,
+                "var_base_path": var_base_path,
+                "image_commit_path": image_commit_path,
+                "abuse_report_path": abuse_report_path,
+            }
+        )
+
 
 class AgentConfig(CommonAgentConfig, OverridableAgentConfig):
     pass
@@ -1138,10 +1178,16 @@ class AgentOverrideConfig(BaseConfigSchema):
         description="Resource config overrides for the individual agent",
     )
 
-    def construct_unified_config(self, *, default: AgentUnifiedConfig) -> AgentUnifiedConfig:
+    def construct_unified_config(
+        self,
+        *,
+        default: AgentUnifiedConfig,
+        agent_idx: int,
+    ) -> AgentUnifiedConfig:
         agent_updates: dict[str, Any] = {}
         if self.agent is not None:
-            agent_override_fields = self.agent.model_dump(include=self.agent.model_fields_set)
+            agent = self.agent.with_derived_fields(default.agent, agent_idx)
+            agent_override_fields = agent.model_dump(include=agent.model_fields_set)
             agent_updates["agent"] = default.agent.model_copy(update=agent_override_fields)
         if self.container is not None:
             container_override_fields = self.container.model_dump(
@@ -1178,8 +1224,19 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
     )
 
     @property
+    def agent_common(self) -> CommonAgentConfig:
+        return self.agent
+
+    @property
+    def agent_default(self) -> OverridableAgentConfig:
+        return self.agent
+
+    @property
     def agent_configs(self) -> Sequence[AgentUnifiedConfig]:
-        return self._for_each_agent(lambda x: x)
+        agent_configs = self._for_each_agent(lambda x: x)
+        if not agent_configs:
+            raise ValueError("There must be at least one agent config")
+        return agent_configs
 
     def with_updates(
         self,
@@ -1265,7 +1322,10 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
         return self
 
     def _for_each_agent(self, func: Callable[[AgentUnifiedConfig], R]) -> list[R]:
-        agents = [agent.construct_unified_config(default=self) for agent in self.agents]
+        agents = [
+            agent.construct_unified_config(default=self, agent_idx=i)
+            for i, agent in enumerate(self.agents)
+        ]
         if not agents:
             agents.append(self)
 

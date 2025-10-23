@@ -2172,7 +2172,7 @@ class AgentRegistry:
     async def update_scaling_group(self, id, scaling_group) -> None:
         agent = await self.get_instance(id, agents.c.addr)
         agent_client = self._get_agent_client(agent["id"])
-        await agent_client.update_scaling_group(scaling_group)
+        await agent_client.update_scaling_group(scaling_group, agent_client.agent_id)
 
     async def settle_agent_alloc(
         self,
@@ -3563,7 +3563,7 @@ class AgentRegistry:
         agent_addr: str,
     ) -> Mapping[str, str]:
         agent_client = self._get_agent_client(agent_id)
-        return await agent_client.get_local_config()
+        return await agent_client.get_local_config(agent_id)
 
     async def purge_images(self, agent_id: AgentId, request: PurgeImagesReq) -> PurgeImagesResp:
         agent_client = self._get_agent_client(agent_id)

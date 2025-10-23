@@ -29,8 +29,9 @@ ctnr = "container"
 
 @pytest.fixture
 async def arpcs_no_ainit(test_id, redis_container):
-    etcd = Dummy()
-    etcd.get_prefix = None
+    etcd_client_registry = Dummy()
+    etcd_client_registry.global_etcd = Dummy()
+    etcd_client_registry.global_etcd.get_prefix = None
 
     # Create a minimal pydantic config for testing
     config = AgentUnifiedConfig(
@@ -40,14 +41,18 @@ async def arpcs_no_ainit(test_id, redis_container):
         etcd=EtcdConfig(namespace="test", addr=HostPortPair(host="127.0.0.1", port=2379)),
     )
 
-    ars = AgentRPCServer(etcd=etcd, local_config=config, skip_detect_manager=True)
+    ars = AgentRPCServer(
+        etcd_client_registry=etcd_client_registry, local_config=config, skip_detect_manager=True
+    )
     yield ars
 
 
 @pytest.mark.asyncio
 async def test_read_agent_config_container_invalid01(arpcs_no_ainit, mocker):
     inspect_mock = AsyncMock(return_value={"a": 1, "b": 2})
-    mocker.patch.object(arpcs_no_ainit.etcd, "get_prefix", new=inspect_mock)
+    mocker.patch.object(
+        arpcs_no_ainit.etcd_client_registry.global_etcd, "get_prefix", new=inspect_mock
+    )
     await arpcs_no_ainit.read_agent_config_container()
     # Check that kernel-gid and kernel-uid are still at their default values (converted from -1)
     assert (
@@ -61,7 +66,9 @@ async def test_read_agent_config_container_invalid01(arpcs_no_ainit, mocker):
 @pytest.mark.asyncio
 async def test_read_agent_config_container_invalid02(arpcs_no_ainit, mocker):
     inspect_mock = AsyncMock(return_value={})
-    mocker.patch.object(arpcs_no_ainit.etcd, "get_prefix", new=inspect_mock)
+    mocker.patch.object(
+        arpcs_no_ainit.etcd_client_registry.global_etcd, "get_prefix", new=inspect_mock
+    )
     await arpcs_no_ainit.read_agent_config_container()
     # Check that kernel-gid and kernel-uid are still at their default values (converted from -1)
     assert (
@@ -75,7 +82,9 @@ async def test_read_agent_config_container_invalid02(arpcs_no_ainit, mocker):
 @pytest.mark.asyncio
 async def test_read_agent_config_container_1valid(arpcs_no_ainit, mocker):
     inspect_mock = AsyncMock(return_value={kgid: 10})
-    mocker.patch.object(arpcs_no_ainit.etcd, "get_prefix", new=inspect_mock)
+    mocker.patch.object(
+        arpcs_no_ainit.etcd_client_registry.global_etcd, "get_prefix", new=inspect_mock
+    )
     await arpcs_no_ainit.read_agent_config_container()
 
     assert arpcs_no_ainit.local_config.container.kernel_gid.real == 10
@@ -87,7 +96,9 @@ async def test_read_agent_config_container_1valid(arpcs_no_ainit, mocker):
 @pytest.mark.asyncio
 async def test_read_agent_config_container_2valid(arpcs_no_ainit, mocker):
     inspect_mock = AsyncMock(return_value={kgid: 10, kuid: 20})
-    mocker.patch.object(arpcs_no_ainit.etcd, "get_prefix", new=inspect_mock)
+    mocker.patch.object(
+        arpcs_no_ainit.etcd_client_registry.global_etcd, "get_prefix", new=inspect_mock
+    )
     await arpcs_no_ainit.read_agent_config_container()
 
     assert arpcs_no_ainit.local_config.container.kernel_gid.real == 10

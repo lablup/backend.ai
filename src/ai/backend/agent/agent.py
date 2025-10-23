@@ -888,6 +888,8 @@ class AbstractAgent(
                 "AbstractAgent.__ainit__": "Redis runtime configuration is not set."
             })
 
+        self.local_config.agent.image_commit_path.mkdir(parents=True, exist_ok=True)
+
         redis_profile_target = self.local_config.redis.to_redis_profile_target()
         stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
         mq = await self._make_message_queue(stream_redis_target)
