@@ -16,6 +16,24 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.1 (2025-10-23)
+
+### Features
+* Container commit timeout can now be customized through configuration settings ([#6346](https://github.com/lablup/backend.ai/issues/6346))
+
+### Fixes
+* Raise correct exception in `SessionTransitionData.main_kernel` ([#6202](https://github.com/lablup/backend.ai/issues/6202))
+* Fix logging directory not auto-generated ([#6225](https://github.com/lablup/backend.ai/issues/6225))
+* Decoupled agent batch loading resolvers that previously depended on the `from_row` function. ([#6280](https://github.com/lablup/backend.ai/issues/6280))
+* Fix a permission issue where Storage Proxy would fail to access its glide socket after changing process uid/gid. Users running Storage Proxy with non-root credentials will no longer encounter "Permission Denied" errors during startup. ([#6284](https://github.com/lablup/backend.ai/issues/6284))
+* Fix an issue where the Storage Proxy would unnecessarily attempt to create an XFS backend lockfile at `/tmp/backendai-xfs-file-lock` even when XFS storage was not configured. This could cause permission errors if the Storage Proxy lacked access to the `/tmp` directory, preventing the service from starting properly. ([#6285](https://github.com/lablup/backend.ai/issues/6285))
+* Improve the performance of VFolder queries by optimizing group lookups, resulting in faster VFolder detail panel popups and quicker session creation page loading ([#6300](https://github.com/lablup/backend.ai/issues/6300))
+* Session commits now fail immediately with a clear error when attempting to exceed quota limits. This improves user experience by providing faster feedback instead of attempting a commit that would ultimately fail ([#6304](https://github.com/lablup/backend.ai/issues/6304))
+* Fix model service extra mounts in client SDK to omit unset mount `type` fields, ensuring compatibility with the manager API ([#6347](https://github.com/lablup/backend.ai/issues/6347))
+* Prevent re-terminating sessions already in terminal states ([#6353](https://github.com/lablup/backend.ai/issues/6353))
+* Session type validation is now properly enforced when creating sessions within scaling groups ([#6354](https://github.com/lablup/backend.ai/issues/6354))
+
+
 ## 25.15.0 (2025-10-02)
 
 ### Features
