@@ -15,6 +15,7 @@ from collections.abc import Mapping
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Final, FrozenSet, Optional, Tuple, cast, override
 
+import aiohttp
 import janus
 import pkg_resources
 from aiodocker.docker import Docker, DockerVolume
@@ -230,6 +231,13 @@ class DockerKernel(AbstractKernel):
                         log.debug("tagging image as {}:{}", repo, tag)
                     else:
                         repo, tag = None, None
+                    # TODO:
+                    # - After aiodocker supports commit() timeout, set timeout there
+                    # - Impl Docker client wrapper
+                    commit_timeout = aiohttp.ClientTimeout(
+                        total=self.agent_config["api"]["commit-timeout"]
+                    )
+                    docker.session._timeout = commit_timeout
                     response: Mapping[str, Any] = await container.commit(
                         changes=changes or None,
                         repository=repo,
