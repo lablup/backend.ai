@@ -1,6 +1,6 @@
 """Validator rules for session creation."""
 
-from typing import Mapping
+from typing import Mapping, override
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.service_ports import parse_service_ports
@@ -20,9 +20,11 @@ from .base import SessionValidatorRule
 class ContainerLimitRule(SessionValidatorRule):
     """Validates cluster size against resource policy limits."""
 
+    @override
     def name(self) -> str:
         return "container_limit"
 
+    @override
     def validate(
         self,
         spec: SessionCreationSpec,
@@ -39,9 +41,11 @@ class ContainerLimitRule(SessionValidatorRule):
 class ScalingGroupAccessRule(SessionValidatorRule):
     """Validates that the scaling group is accessible."""
 
+    @override
     def name(self) -> str:
         return "scaling_group_access"
 
+    @override
     def validate(
         self,
         spec: SessionCreationSpec,
@@ -66,12 +70,37 @@ class ScalingGroupAccessRule(SessionValidatorRule):
         raise InvalidAPIParameters(f"Scaling group {spec.scaling_group} is not accessible")
 
 
+class SessionTypeRule(SessionValidatorRule):
+    """Validates session type compatibility with scaling group."""
+
+    @override
+    def name(self) -> str:
+        return "session_type"
+
+    @override
+    def validate(
+        self,
+        spec: SessionCreationSpec,
+        context: SessionCreationContext,
+        allowed_groups: list[AllowedScalingGroup],
+    ) -> None:
+        for sg in allowed_groups:
+            if sg.name == spec.scaling_group:
+                allowed_session_types = sg.scheduler_opts.allowed_session_types
+                if spec.session_type not in allowed_session_types:
+                    raise InvalidAPIParameters(
+                        f"Session type {spec.session_type} is not allowed in scaling group {sg.name}"
+                    )
+
+
 class ServicePortRule(SessionValidatorRule):
     """Validates preopen ports against service ports."""
 
+    @override
     def name(self) -> str:
         return "service_port"
 
+    @override
     def validate(
         self,
         spec: SessionCreationSpec,
@@ -138,12 +167,14 @@ class ServicePortRule(SessionValidatorRule):
 class ResourceLimitRule(SessionValidatorRule):
     """Validates requested resources against image limits."""
 
+    @override
     def name(self) -> str:
         return "resource_limit"
 
     def __init__(self, known_slot_types: Mapping[SlotName, SlotTypes] | None = None):
         self._known_slot_types = known_slot_types
 
+    @override
     def validate(
         self,
         spec: SessionCreationSpec,
