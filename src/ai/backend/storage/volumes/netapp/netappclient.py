@@ -58,6 +58,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import enum
+import logging
 import uuid
 from collections.abc import Iterable
 from pathlib import Path
@@ -74,6 +75,8 @@ from typing import (
 )
 
 import aiohttp
+
+from ai.backend.logging import BraceStyleAdapter
 
 from ...exception import NetAppClientError
 from ...types import QuotaConfig, QuotaUsage
@@ -120,6 +123,9 @@ class QTreeInfo(TypedDict):
     security_style: NotRequired[str]
     export_policy: NotRequired[dict[str, Any]]
     statistics: NotRequired[dict[str, Any]]
+
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class NetAppClient:
@@ -571,9 +577,19 @@ class NetAppClient:
                 raise NetAppClientError(
                     f"Quota report not found for the volume {volume_id} and the qtree {qtree_name}"
                 )
+            used_bytes = records[0]["space"]["used"]["total"]
+            limit_bytes = records[0]["space"]["hard_limit"]
+            if used_bytes < 0 or limit_bytes < 0:
+                log.warning(
+                    "Used bytes < 0 ({}) or limit bytes < 0 ({}) for quota rule in NetApp ONTAP with volume ID {} and qtree {}",
+                    used_bytes,
+                    limit_bytes,
+                    volume_id,
+                    qtree_name,
+                )
             return QuotaUsage(
-                used_bytes=records[0]["space"]["used"]["total"],
-                limit_bytes=records[0]["space"]["hard_limit"],
+                used_bytes=used_bytes,
+                limit_bytes=limit_bytes,
             )
 
     async def get_qos_policies(self) -> List[Mapping[str, Any]]:

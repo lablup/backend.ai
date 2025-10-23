@@ -217,6 +217,13 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         # By default, report command displays the sizes in the 1 KiB unit.
         used_bytes = int(used_kbs) * 1024
         hard_limit_bytes = int(hard_limit_kbs) * 1024
+        if used_bytes < 0 or hard_limit_bytes < 0:
+            log.warning(
+                "Used bytes < 0 ({}) or limit bytes < 0 ({}) for quota scope {} in XFS",
+                used_bytes,
+                hard_limit_bytes,
+                quota_scope_id,
+            )
         return QuotaUsage(used_bytes, hard_limit_bytes)
 
     async def update_quota_scope(

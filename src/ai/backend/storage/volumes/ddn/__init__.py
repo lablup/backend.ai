@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from pathlib import Path
 from subprocess import CalledProcessError
 from typing import Any, Final, FrozenSet, Mapping
@@ -8,6 +9,7 @@ import aiofiles.os
 
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 
 from ...exception import QuotaScopeAlreadyExists, QuotaScopeNotFoundError
 from ...subproc import run
@@ -26,6 +28,9 @@ def _byte_to_kilobyte(byte: int) -> int:
 
 def _kilobyte_to_byte(kilobyte: int) -> int:
     return kilobyte * 1024
+
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class EXAScalerQuotaModel(BaseQuotaModel):
@@ -110,9 +115,15 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                     if raw_used_bytes.endswith("*"):
                         raw_used_bytes = raw_used_bytes[:-1]
                     used_bytes = _kilobyte_to_byte(int(raw_used_bytes))
-                    return QuotaUsage(
-                        used_bytes=used_bytes, limit_bytes=_kilobyte_to_byte(hard_limit)
-                    )
+                    limit_bytes = _kilobyte_to_byte(hard_limit)
+                    if used_bytes < 0 or limit_bytes < 0:
+                        log.warning(
+                            "Used bytes < 0 ({}) or limit bytes < 0 ({}) for quota scope in EXAScaler with project ID {}",
+                            used_bytes,
+                            limit_bytes,
+                            pid,
+                        )
+                    return QuotaUsage(used_bytes=used_bytes, limit_bytes=limit_bytes)
                 if Path(words[0]) == qspath:
                     next_line_is_quota = True
                     continue
