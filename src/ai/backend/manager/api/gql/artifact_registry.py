@@ -11,6 +11,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.errors.api import NotImplementedAPI
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.services.artifact_registry.actions.common.get_meta import (
     GetArtifactRegistryMetaAction,
 )
@@ -29,6 +30,8 @@ async def default_artifact_registry(
     artifact_type: ArtifactType, info: Info[StrawberryGQLContext]
 ) -> Optional[ArtifactRegistry]:
     artifact_registry_cfg = info.context.config_provider.config.artifact_registry
+    if artifact_registry_cfg is None:
+        raise ServerMisconfiguredError("Artifact registry configuration is missing.")
 
     registry_name: Optional[str] = None
     match artifact_type:
