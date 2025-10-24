@@ -19,7 +19,6 @@ def processors(
 ) -> UserProcessors:
     """Create UserProcessors instance with real dependencies for integration testing"""
     agent_registry, _, _, _, _, _, _ = registry_ctx
-    user_repository = UserRepository(db=database_engine)
 
     # Mock the _role_manager with all required methods
     mock_role_manager = MagicMock()
@@ -28,9 +27,9 @@ def processors(
     mock_role_manager.create_system_role = AsyncMock(return_value=mock_role)
     mock_role_manager.map_user_to_role = AsyncMock(return_value=None)
     mock_role_manager.map_entity_to_scope = AsyncMock(return_value=None)
-    user_repository._role_manager = mock_role_manager
 
-    admin_user_repository = AdminUserRepository(db=database_engine)
+    user_repository = UserRepository(db=database_engine, role_manager=mock_role_manager)
+    admin_user_repository = AdminUserRepository(db=database_engine, role_manager=mock_role_manager)
 
     # Use minimal mocks only for dependencies that are not core to user operations
     storage_manager_mock = MagicMock(spec=StorageSessionManager)

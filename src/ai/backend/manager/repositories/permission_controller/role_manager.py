@@ -1,7 +1,7 @@
 import logging
 import uuid
 from collections.abc import Iterable, Mapping
-from typing import Protocol
+from typing import Optional, Protocol, Self
 
 import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
@@ -55,6 +55,8 @@ class ScopeSystemRoleData(Protocol):
 
 
 class RoleManager:
+    _instance: Optional[Self] = None
+
     def __init__(self) -> None:
         pass
 

@@ -13,8 +13,8 @@ class UserRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = UserRepository(args.db)
-        admin_repository = AdminUserRepository(args.db)
+        repository = UserRepository(args.db, args.role_manager)
+        admin_repository = AdminUserRepository(args.db, args.role_manager)
 
         return cls(
             repository=repository,

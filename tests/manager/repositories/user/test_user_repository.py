@@ -44,7 +44,13 @@ class TestUserRepository:
     @pytest.fixture
     def user_repository(self, mock_db_engine):
         """Create UserRepository instance with mocked database"""
-        return UserRepository(db=mock_db_engine)
+        mock_role_manager = MagicMock()
+        mock_role = MagicMock()
+        mock_role.id = uuid.uuid4()
+        mock_role_manager.create_system_role = AsyncMock(return_value=mock_role)
+        mock_role_manager.map_user_to_role = AsyncMock(return_value=None)
+        mock_role_manager.map_entity_to_scope = AsyncMock(return_value=None)
+        return UserRepository(db=mock_db_engine, role_manager=mock_role_manager)
 
     @pytest.fixture
     def sample_user_row(self):

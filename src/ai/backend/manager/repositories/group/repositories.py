@@ -13,7 +13,9 @@ class GroupRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        repository = GroupRepository(args.db, args.config_provider, args.valkey_stat_client)
+        repository = GroupRepository(
+            args.db, args.role_manager, args.config_provider, args.valkey_stat_client
+        )
         admin_repository = AdminGroupRepository(args.db, args.storage_manager)
 
         return cls(

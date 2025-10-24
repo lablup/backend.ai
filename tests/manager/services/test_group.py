@@ -57,18 +57,17 @@ def mock_action_monitor() -> ActionMonitor:
 def processors(
     database_fixture, database_engine, service_mock_args, mock_action_monitor
 ) -> GroupProcessors:
-    group_repository = GroupRepository(
-        db=database_engine,
-        config_provider=service_mock_args["config_provider"],
-        valkey_stat_client=service_mock_args["valkey_stat_client"],
-    )
-
     # Mock the _role_manager with all required methods
     mock_role_manager = MagicMock()
     mock_role_manager.create_system_role = AsyncMock(return_value=None)
-    group_repository._role_manager = mock_role_manager
     admin_group_repository = AdminGroupRepository(
         db=database_engine, storage_manager=service_mock_args["storage_manager"]
+    )
+    group_repository = GroupRepository(
+        db=database_engine,
+        role_manager=mock_role_manager,
+        config_provider=service_mock_args["config_provider"],
+        valkey_stat_client=service_mock_args["valkey_stat_client"],
     )
     group_repositories = GroupRepositories(
         repository=group_repository, admin_repository=admin_group_repository

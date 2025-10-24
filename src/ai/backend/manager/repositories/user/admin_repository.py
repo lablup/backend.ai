@@ -41,6 +41,8 @@ from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection
 from ai.backend.manager.models.vfolder import vfolder_permissions, vfolders
 
+from ..permission_controller.role_manager import RoleManager
+
 user_repository_resilience = Resilience(
     policies=[
         MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.USER_REPOSITORY)),
@@ -64,8 +66,9 @@ class AdminUserRepository:
 
     _db: ExtendedAsyncSAEngine
 
-    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, role_manager: RoleManager) -> None:
         self._db = db
+        self._role_manager = role_manager
 
     @user_repository_resilience.apply()
     async def purge_user_force(self, email: str) -> None:
@@ -197,7 +200,7 @@ class AdminUserRepository:
         from ai.backend.manager.repositories.user.repository import UserRepository
 
         # Create a temporary UserRepository instance to reuse the statistics logic
-        user_repo = UserRepository(self._db)
+        user_repo = UserRepository(self._db, self._role_manager)
         return await user_repo._get_time_binned_monthly_stats(None, valkey_stat_client)
 
     async def _get_user_by_email(self, session: SASession, email: str) -> Optional[UserRow]:
