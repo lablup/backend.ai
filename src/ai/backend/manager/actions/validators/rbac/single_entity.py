@@ -6,6 +6,7 @@ from ai.backend.manager.actions.action.single_entity import BaseSingleEntityActi
 from ai.backend.manager.data.permission.id import ObjectId
 from ai.backend.manager.data.permission.role import SingleEntityPermissionCheckInput
 from ai.backend.manager.data.permission.types import EntityType
+from ai.backend.manager.errors.rbac import RBACForbidden
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -29,7 +30,7 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
         if user is None:
             raise UserNotFound("User not found in context")
 
-        await self._repository.check_permission_of_entity(
+        is_valid = await self._repository.check_permission_of_entity(
             SingleEntityPermissionCheckInput(
                 user_id=user.user_id,
                 operation=action.permission_operation_type(),
@@ -39,3 +40,8 @@ class SingleEntityActionRBACValidator(SingleEntityActionValidator):
                 ),
             )
         )
+        if not is_valid:
+            raise RBACForbidden(
+                "User does not have permission to perform this action on the specified entity "
+                f"({entity_type.value}:{entity_id})"
+            )

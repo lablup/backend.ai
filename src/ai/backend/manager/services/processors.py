@@ -12,6 +12,7 @@ from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.manager.actions.monitors.monitor import ActionMonitor
 from ai.backend.manager.actions.types import AbstractProcessorPackage, ActionSpec
+from ai.backend.manager.actions.validator.args import ValidatorArgs
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.idle import IdleCheckerHost
@@ -318,6 +319,8 @@ class Services:
 @dataclass
 class ProcessorArgs:
     service_args: ServiceArgs
+    action_monitors: list[ActionMonitor]
+    action_validator_args: ValidatorArgs
 
 
 @dataclass
@@ -349,61 +352,65 @@ class Processors(AbstractProcessorPackage):
     storage_namespace: StorageNamespaceProcessors
 
     @classmethod
-    def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
+    def create(cls, args: ProcessorArgs) -> Self:
         services = Services.create(args.service_args)
-        agent_processors = AgentProcessors(services.agent, action_monitors)
-        domain_processors = DomainProcessors(services.domain, action_monitors)
-        group_processors = GroupProcessors(services.group, action_monitors)
-        user_processors = UserProcessors(services.user, action_monitors)
-        image_processors = ImageProcessors(services.image, action_monitors)
+        agent_processors = AgentProcessors(services.agent, args.action_monitors)
+        domain_processors = DomainProcessors(services.domain, args.action_monitors)
+        group_processors = GroupProcessors(services.group, args.action_monitors)
+        user_processors = UserProcessors(services.user, args.action_monitors)
+        image_processors = ImageProcessors(services.image, args.action_monitors)
         container_registry_processors = ContainerRegistryProcessors(
-            services.container_registry, action_monitors
+            services.container_registry, args.action_monitors
         )
-        vfolder_processors = VFolderProcessors(services.vfolder, action_monitors)
-        vfolder_file_processors = VFolderFileProcessors(services.vfolder_file, action_monitors)
+        vfolder_processors = VFolderProcessors(
+            services.vfolder, args.action_monitors, args.action_validator_args
+        )
+        vfolder_file_processors = VFolderFileProcessors(services.vfolder_file, args.action_monitors)
         vfolder_invite_processors = VFolderInviteProcessors(
-            services.vfolder_invite, action_monitors
+            services.vfolder_invite, args.action_monitors
         )
-        session_processors = SessionProcessors(services.session, action_monitors)
+        session_processors = SessionProcessors(services.session, args.action_monitors)
         keypair_resource_policy_processors = KeypairResourcePolicyProcessors(
-            services.keypair_resource_policy, action_monitors
+            services.keypair_resource_policy, args.action_monitors
         )
         user_resource_policy_processors = UserResourcePolicyProcessors(
-            services.user_resource_policy, action_monitors
+            services.user_resource_policy, args.action_monitors
         )
         project_resource_policy_processors = ProjectResourcePolicyProcessors(
-            services.project_resource_policy, action_monitors
+            services.project_resource_policy, args.action_monitors
         )
         resource_preset_processors = ResourcePresetProcessors(
-            services.resource_preset, action_monitors
+            services.resource_preset, args.action_monitors
         )
-        model_serving_processors = ModelServingProcessors(services.model_serving, action_monitors)
+        model_serving_processors = ModelServingProcessors(
+            services.model_serving, args.action_monitors
+        )
         model_serving_auto_scaling_processors = ModelServingAutoScalingProcessors(
-            services.model_serving_auto_scaling, action_monitors
+            services.model_serving_auto_scaling, args.action_monitors
         )
         utilization_metric_processors = UtilizationMetricProcessors(
-            services.utilization_metric, action_monitors
+            services.utilization_metric, args.action_monitors
         )
-        auth = AuthProcessors(services.auth, action_monitors)
+        auth = AuthProcessors(services.auth, args.action_monitors)
         object_storage_processors = ObjectStorageProcessors(
-            services.object_storage, action_monitors
+            services.object_storage, args.action_monitors
         )
-        vfs_storage_processors = VFSStorageProcessors(services.vfs_storage, action_monitors)
-        artifact_processors = ArtifactProcessors(services.artifact, action_monitors)
+        vfs_storage_processors = VFSStorageProcessors(services.vfs_storage, args.action_monitors)
+        artifact_processors = ArtifactProcessors(services.artifact, args.action_monitors)
         artifact_registry_processors = ArtifactRegistryProcessors(
-            services.artifact_registry, action_monitors
+            services.artifact_registry, args.action_monitors
         )
         artifact_revision_processors = ArtifactRevisionProcessors(
-            services.artifact_revision, action_monitors
+            services.artifact_revision, args.action_monitors
         )
 
         # Initialize deployment processors if service is available
         deployment_processors = None
         if services.deployment is not None:
-            deployment_processors = DeploymentProcessors(services.deployment, action_monitors)
+            deployment_processors = DeploymentProcessors(services.deployment, args.action_monitors)
 
         storage_namespace_processors = StorageNamespaceProcessors(
-            services.storage_namespace, action_monitors
+            services.storage_namespace, args.action_monitors
         )
 
         return cls(
