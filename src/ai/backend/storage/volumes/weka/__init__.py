@@ -74,7 +74,7 @@ class WekaQuotaModel(BaseQuotaModel):
         limit_bytes = quota.hard_limit if quota.hard_limit is not None else -1
         if used_bytes < 0 or limit_bytes < 0:
             log.warning(
-                "Data from Weka API negative values in used_bytes({}) or limit_bytes({}) for quota scope {}: \n response from Weka API = {}",
+                "Data from Weka API negative values in used_bytes({}) or limit_bytes({}) for quota scope {}: response from Weka API = {}",
                 used_bytes,
                 limit_bytes,
                 quota_scope_id,

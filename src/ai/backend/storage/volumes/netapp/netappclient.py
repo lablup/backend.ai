@@ -581,7 +581,7 @@ class NetAppClient:
             limit_bytes = records[0]["space"]["hard_limit"]
             if used_bytes < 0 or limit_bytes < 0:
                 log.warning(
-                    "Data from NetApp API negative values in used_bytes({}) or limit_bytes({}) for svm id {}, volume id {}, qtree name {}: \n response from NetApp API = {}",
+                    "Data from NetApp API negative values in used_bytes({}) or limit_bytes({}) for svm id {}, volume id {}, qtree name {}: response from NetApp API = {}",
                     used_bytes,
                     limit_bytes,
                     svm_id,
