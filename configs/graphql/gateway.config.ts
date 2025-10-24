@@ -69,11 +69,6 @@ export const gatewayConfig = defineConfig({
       options: {
         subscriptions: {
           kind: 'ws',
-          options: {
-            connectionParams: {
-              token: '{context.headers.authorization}'
-            }
-          } satisfies WSTransportOptions
         }
       }
     }
