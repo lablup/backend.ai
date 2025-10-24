@@ -26,9 +26,21 @@ from ai.backend.common.types import (
     HardwareMetadata,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended
+from ai.backend.manager.data.agent.ast_converter import AgentFilterConverter
+from ai.backend.manager.data.agent.order_parser import AgentOrderConverter
+from ai.backend.manager.data.agent.types import (
+    AgentData,
+    AgentDataExtended,
+    AgentFetchConditions,
+    AgentFilter,
+    AgentStatusFilter,
+)
+from ai.backend.manager.data.base import StringFilter
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
+from ai.backend.manager.services.agent.actions.get_agent_count import GetAgentCountAction
+from ai.backend.manager.services.agent.actions.get_agents import GetAgentsAction
 
 from ..agent import (
     ADMIN_PERMISSIONS,
@@ -54,7 +66,7 @@ from ..group import AssocGroupUserRow
 from ..kernel import KernelRow
 from ..keypair import keypairs
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ..minilang.queryfilter import FieldSpecItem
 from ..rbac import (
     ScopeType,
 )
@@ -488,21 +500,49 @@ class Agent(graphene.ObjectType):
         raw_status: Optional[str | AgentStatus] = None,
         filter: Optional[str] = None,
     ) -> int:
+        status_list: list[AgentStatus] = []
         if isinstance(raw_status, str):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
         elif isinstance(raw_status, AgentStatus):
             status_list = [raw_status]
-        query = sa.select([sa.func.count()]).select_from(agents)
-        if scaling_group is not None:
-            query = query.where(agents.c.scaling_group == scaling_group)
-        if raw_status is not None:
-            query = query.where(agents.c.status.in_(status_list))
+        agent_filter = None
         if filter is not None:
-            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
-            query = qfparser.append_filter(query, filter)
-        async with graph_ctx.db.begin_readonly() as conn:
-            result = await conn.execute(query)
-            return result.scalar()
+            filter_converter = AgentFilterConverter()
+            agent_filter = filter_converter.execute(filter)
+
+        scaling_group_filter_condition = None
+        if scaling_group is not None:
+            scaling_group_filter_condition = StringFilter(equals=scaling_group)
+
+        status_filter_condition = None
+        if len(status_list) > 0:
+            status_filter_condition = AgentStatusFilter(in_=status_list)
+
+        additional_filter = None
+        if scaling_group_filter_condition is not None or status_filter_condition is not None:
+            additional_filter = AgentFilter(
+                scaling_group=scaling_group_filter_condition, status=status_filter_condition
+            )
+
+        if additional_filter is not None:
+            if agent_filter is not None:
+                # Since we do not know what filters may already exist inside agent_filter's AND,
+                # we use the approach of adding agent_filter to additional_filter.
+                agent_filter = additional_filter.add_AND_filter(agent_filter)
+            else:
+                agent_filter = additional_filter
+
+        result = await graph_ctx.processors.agent.get_agent_count.wait_for_complete(
+            GetAgentCountAction(
+                conditions=AgentFetchConditions(
+                    limit=None,
+                    offset=None,
+                    filter=agent_filter,
+                    order_by=[],
+                )
+            )
+        )
+        return result.count
 
     @classmethod
     async def load_slice(
@@ -516,38 +556,51 @@ class Agent(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[Agent]:
-        if isinstance(raw_status, str):
-            status_list = [AgentStatus[s] for s in raw_status.split(",")]
-        elif isinstance(raw_status, AgentStatus):
-            status_list = [raw_status]
-        query = sa.select([agents]).select_from(agents).limit(limit).offset(offset)
-        if scaling_group is not None:
-            query = query.where(agents.c.scaling_group == scaling_group)
-        if raw_status is not None:
-            query = query.where(agents.c.status.in_(status_list))
+        agent_filter = None
         if filter is not None:
-            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
-            query = qfparser.append_filter(query, filter)
+            filter_converter = AgentFilterConverter()
+            agent_filter = filter_converter.execute(filter)
+
+        agent_order_by_list = []
         if order is not None:
-            qoparser = QueryOrderParser(cls._queryorder_colmap)
-            query = qoparser.append_ordering(query, order)
-        else:
-            query = query.order_by(
-                agents.c.status.asc(),
-                agents.c.scaling_group.asc(),
-                agents.c.id.asc(),
+            order_converter = AgentOrderConverter()
+            agent_order_by_list = order_converter.execute(order)
+
+        scaling_group_filter_condition = None
+        if scaling_group is not None:
+            scaling_group_filter_condition = StringFilter(equals=scaling_group)
+
+        status_filter_condition = None
+        status_list = [AgentStatus[s] for s in raw_status.split(",")] if raw_status else []
+        if len(status_list) > 0:
+            status_filter_condition = AgentStatusFilter(in_=status_list)
+
+        additional_filter = None
+        if scaling_group_filter_condition is not None or status_filter_condition is not None:
+            additional_filter = AgentFilter(
+                scaling_group=scaling_group_filter_condition, status=status_filter_condition
             )
-        agent_ids: list[AgentId] = []
-        async with graph_ctx.db.begin_readonly() as conn:
-            async for row in await conn.stream(query):
-                agent_ids.append(row.id)
-        list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
-        condition = [QueryConditions.by_ids(agent_ids)]
-        agent_list = await graph_ctx.agent_repository.list_extended_data(condition)
-        return [
-            cls.from_extended_data(agent)
-            for agent in sorted(agent_list, key=lambda obj: list_order[obj.id])
-        ]
+
+        if additional_filter is not None:
+            if agent_filter is not None:
+                # Since we do not know what filters may already exist inside agent_filter's AND,
+                # we use the approach of adding agent_filter to additional_filter.
+                agent_filter = additional_filter.add_AND_filter(agent_filter)
+            else:
+                agent_filter = additional_filter
+
+        result = await graph_ctx.processors.agent.get_agents.wait_for_complete(
+            GetAgentsAction(
+                conditions=AgentFetchConditions(
+                    limit=limit,
+                    offset=offset,
+                    filter=agent_filter,
+                    order_by=agent_order_by_list,
+                )
+            )
+        )
+
+        return [cls.from_extended_data(agent) for agent in result.agents.values()]
 
     @classmethod
     async def load_all(
@@ -557,14 +610,33 @@ class Agent(graphene.ObjectType):
         scaling_group: Optional[str] = None,
         raw_status: Optional[str] = None,
     ) -> Sequence[Agent]:
-        conditions = []
+        scaling_group_filter_condition = None
         if scaling_group is not None:
-            conditions.append(QueryConditions.by_scaling_group(scaling_group))
-        if raw_status is not None:
-            conditions.append(QueryConditions.by_statuses([AgentStatus[raw_status]]))
+            scaling_group_filter_condition = StringFilter(equals=scaling_group)
 
-        agent_list = await graph_ctx.agent_repository.list_extended_data(conditions)
-        return [cls.from_extended_data(agent) for agent in agent_list]
+        status_filter_condition = None
+        status_list = [AgentStatus[s] for s in raw_status.split(",")] if raw_status else []
+        if len(status_list) > 0:
+            status_filter_condition = AgentStatusFilter(in_=status_list)
+
+        agent_filter = None
+        if scaling_group_filter_condition is not None or status_filter_condition is not None:
+            agent_filter = AgentFilter(
+                scaling_group=scaling_group_filter_condition, status=status_filter_condition
+            )
+
+        result = await graph_ctx.processors.agent.get_agents.wait_for_complete(
+            GetAgentsAction(
+                conditions=AgentFetchConditions(
+                    limit=None,
+                    offset=None,
+                    filter=agent_filter,
+                    order_by=[],
+                )
+            )
+        )
+
+        return [cls.from_extended_data(agent) for agent in result.agents.values()]
 
     @classmethod
     async def batch_load(

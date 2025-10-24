@@ -22,8 +22,21 @@ from ai.backend.manager.data.agent.types import (
     UpsertResult,
 )
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.agent.query import QueryConditions
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.agent.types import (
+    AgentFilterOptions,
+    AgentOrderingOptions,
+)
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.services.agent.actions.get_agent_count import (
+    GetAgentCountAction,
+    GetAgentCountActionResult,
+)
+from ai.backend.manager.services.agent.actions.get_agents import (
+    GetAgentsAction,
+    GetAgentsActionResult,
+)
 from ai.backend.manager.services.agent.actions.get_total_resources import (
     GetTotalResourcesAction,
     GetTotalResourcesActionResult,
@@ -127,6 +140,32 @@ class AgentService:
             "addr": addr,
             "token": token,
         }
+
+    async def get_agents(self, action: GetAgentsAction) -> GetAgentsActionResult:
+        agent_ids = await self._agent_repository.fetch_agent_ids_by_condition(
+            filter_options=AgentFilterOptions.from_data_filter(action.conditions.filter),
+            ordering_options=AgentOrderingOptions.from_data_ordering(action.conditions.order_by),
+            limit=action.conditions.limit,
+            offset=action.conditions.offset,
+        )
+
+        condition = [QueryConditions.by_ids(agent_ids)]
+        agent_data = await self._agent_repository.list_extended_data(condition)
+
+        list_order = {agent_id: index for index, agent_id in enumerate(agent_ids)}
+        result = {
+            agent.id: agent for agent in sorted(agent_data, key=lambda agent: list_order[agent.id])
+        }
+        return GetAgentsActionResult(agents=result)
+
+    async def get_agent_count(self, action: GetAgentCountAction) -> GetAgentCountActionResult:
+        agent_ids = await self._agent_repository.fetch_agent_ids_by_condition(
+            filter_options=AgentFilterOptions.from_data_filter(action.conditions.filter),
+            ordering_options=AgentOrderingOptions.from_data_ordering(action.conditions.order_by),
+            limit=action.conditions.limit,
+            offset=action.conditions.offset,
+        )
+        return GetAgentCountActionResult(count=len(agent_ids))
 
     async def sync_agent_registry(
         self, action: SyncAgentRegistryAction

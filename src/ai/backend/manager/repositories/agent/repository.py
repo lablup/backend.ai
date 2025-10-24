@@ -1,7 +1,7 @@
 import logging
 import zlib
 from collections.abc import Collection, Sequence
-from typing import Mapping, cast
+from typing import Mapping, Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy.orm import contains_eager
@@ -32,6 +32,7 @@ from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
+from ai.backend.manager.repositories.agent.types import AgentFilterOptions, AgentOrderingOptions
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 
 from .query import QueryCondition, QueryOrder
@@ -84,6 +85,22 @@ class AgentRepository:
             [Exception], message=f"Failed to cache agent: {agent_id} to images: {image_ids}"
         ):
             await self._cache_source.set_agent_to_images(agent_id, image_ids)
+
+    @agent_repository_resilience.apply()
+    async def fetch_agent_ids_by_condition(
+        self,
+        filter_options: Optional[AgentFilterOptions],
+        ordering_options: AgentOrderingOptions,
+        limit: Optional[int],
+        offset: Optional[int],
+    ) -> list[AgentId]:
+        agent_ids = await self._db_source.fetch_agent_ids_by_condition(
+            filter_options=filter_options,
+            ordering_options=ordering_options,
+            limit=limit,
+            offset=offset,
+        )
+        return agent_ids
 
     @agent_repository_resilience.apply()
     async def sync_agent_heartbeat(
