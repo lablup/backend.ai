@@ -5,7 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, Optional, TypeVar
 
 from lark import Tree
 from lark.lexer import Token
@@ -14,6 +14,45 @@ from ai.backend.manager.models.minilang.queryfilter import _parser as parser
 
 TFilterField = TypeVar("TFilterField", bound=StrEnum)
 TFilter = TypeVar("TFilter")
+
+
+@dataclass
+class StringFilter:
+    contains: Optional[str] = None
+    starts_with: Optional[str] = None
+    ends_with: Optional[str] = None
+    equals: Optional[str] = None
+    not_equals: Optional[str] = None
+
+    i_contains: Optional[str] = None
+    i_starts_with: Optional[str] = None
+    i_ends_with: Optional[str] = None
+    i_equals: Optional[str] = None
+    i_not_equals: Optional[str] = None
+
+    def apply_to_column(self, column):
+        """Apply this string filter to a SQLAlchemy column"""
+        if self.equals:
+            return column == self.equals
+        elif self.i_equals:
+            return column.ilike(self.i_equals)
+        elif self.not_equals:
+            return column != self.not_equals
+        elif self.i_not_equals:
+            return ~column.ilike(self.i_not_equals)
+        elif self.starts_with:
+            return column.like(f"{self.starts_with}%")
+        elif self.i_starts_with:
+            return column.ilike(f"{self.i_starts_with}%")
+        elif self.ends_with:
+            return column.like(f"%{self.ends_with}")
+        elif self.i_ends_with:
+            return column.ilike(f"%{self.i_ends_with}")
+        elif self.contains:
+            return column.like(f"%{self.contains}%")
+        elif self.i_contains:
+            return column.ilike(f"%{self.i_contains}%")
+        return None
 
 
 class BaseFilterOperator(StrEnum):

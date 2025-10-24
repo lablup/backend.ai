@@ -5,8 +5,8 @@ from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
-from ai.backend.manager.api.gql.base import StringFilter
 from ai.backend.manager.data.agent.types import AgentOrderField, AgentStatus
+from ai.backend.manager.data.base import StringFilter
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.agent.types import AgentFilter, AgentOrderBy
@@ -94,7 +94,6 @@ class AgentFilterOptions:
         filter_options = cls()
 
         # Convert field-specific filters
-        # StringFilter fields can be directly copied since they're already StringFilter objects
         if filter.id is not None:
             filter_options.id = filter.id
 

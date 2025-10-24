@@ -9,12 +9,11 @@ from typing import TYPE_CHECKING, Any, Optional, Self, override
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
+from ai.backend.manager.data.base import StringFilter
 
 from ..base import FilterGroup, LeafFilterCondition
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.base import StringFilter
-
     from ..kernel.types import KernelInfo
 
 
@@ -149,16 +148,16 @@ class AgentFilter:
     """
 
     # Field-specific filters using StringFilter for flexible string matching
-    id: Optional["StringFilter"] = None  # type: ignore
+    id: Optional[StringFilter] = None
     status: Optional[AgentStatusFilter] = None
     status_changed: Optional[datetime] = None
-    region: Optional["StringFilter"] = None  # type: ignore
-    scaling_group: Optional["StringFilter"] = None  # type: ignore
+    region: Optional[StringFilter] = None
+    scaling_group: Optional[StringFilter] = None
     schedulable: Optional[bool] = None
-    addr: Optional["StringFilter"] = None  # type: ignore
+    addr: Optional[StringFilter] = None
     first_contact: Optional[datetime] = None
     lost_at: Optional[datetime] = None
-    version: Optional["StringFilter"] = None  # type: ignore
+    version: Optional[StringFilter] = None
 
     # Logical operations (nested filters)
     AND: Optional[list["AgentFilter"]] = None

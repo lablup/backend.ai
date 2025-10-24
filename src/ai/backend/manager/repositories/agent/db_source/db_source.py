@@ -49,7 +49,6 @@ class AgentFilterApplier(BaseFilterApplier[AgentFilterOptions]):
         """Apply AgentFilterOptions to SQL statement and return conditions."""
         conditions = []
 
-        # Apply field-specific filters with StringFilter support
         if filters.id is not None:
             id_condition = filters.id.apply_to_column(AgentRow.id)
             if id_condition is not None:

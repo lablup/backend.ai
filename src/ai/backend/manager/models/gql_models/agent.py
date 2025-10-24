@@ -35,6 +35,7 @@ from ai.backend.manager.data.agent.types import (
     AgentFilter,
     AgentStatusFilter,
 )
+from ai.backend.manager.data.base import StringFilter
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
@@ -499,8 +500,6 @@ class Agent(graphene.ObjectType):
         raw_status: Optional[str | AgentStatus] = None,
         filter: Optional[str] = None,
     ) -> int:
-        from ai.backend.manager.api.gql.base import StringFilter
-
         status_list: list[AgentStatus] = []
         if isinstance(raw_status, str):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
@@ -557,8 +556,6 @@ class Agent(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[Agent]:
-        from ai.backend.manager.api.gql.base import StringFilter
-
         agent_filter = None
         if filter is not None:
             filter_converter = AgentFilterConverter()
@@ -613,8 +610,6 @@ class Agent(graphene.ObjectType):
         scaling_group: Optional[str] = None,
         raw_status: Optional[str] = None,
     ) -> Sequence[Agent]:
-        from ai.backend.manager.api.gql.base import StringFilter
-
         scaling_group_filter_condition = None
         if scaling_group is not None:
             scaling_group_filter_condition = StringFilter(equals=scaling_group)
