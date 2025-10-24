@@ -61,10 +61,16 @@ WhereClauseType: TypeAlias = (
 
 
 class QueryFilterTransformer(Transformer):
-    def __init__(self, sa_table: sa.Table, fieldspec: Optional[FieldSpecType] = None) -> None:
+    def __init__(
+        self,
+        sa_table: sa.Table,
+        fieldspec: Optional[FieldSpecType] = None,
+        exclude_fields: Optional[set[str]] = None,
+    ) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._fieldspec = fieldspec
+        self._exclude_fields = exclude_fields or set()
 
     def string(self, token: list[Token]) -> str:
         s = token[0]
@@ -108,10 +114,16 @@ class QueryFilterTransformer(Transformer):
             val = self._transform_val_leaf(col_name, op, value)
         return val
 
-    def binary_expr(self, *args) -> sa.sql.elements.BinaryExpression:
+    def binary_expr(self, *args) -> sa.sql.elements.BinaryExpression | None:
         children: list[Token] = args[0]
         col_name = children[0].value
         op = children[1].value
+
+        # If this field is excluded, return None as a sentinel value
+        # The combine_expr will handle None appropriately for AND/OR operations
+        if col_name in self._exclude_fields:
+            return None
+
         val = self._transform_val(col_name, op, children[2])
 
         def build_expr(op: str, col, val):
@@ -200,9 +212,25 @@ class QueryFilterTransformer(Transformer):
         op = children[1].value
         expr1 = children[0]
         expr2 = children[2]
+
+        # Handle None operands (excluded fields) to preserve logical identity
         if op == "&":
+            # For AND: if one side is None, return the other (None & x = x)
+            if expr1 is None and expr2 is None:
+                return sa.true()  # Both excluded -> neutral for AND
+            if expr1 is None:
+                return expr2
+            if expr2 is None:
+                return expr1
             return sa.and_(expr1, expr2)
         elif op == "|":
+            # For OR: if one side is None, return the other (None | x = x)
+            if expr1 is None and expr2 is None:
+                return sa.false()  # Both excluded -> neutral for OR
+            if expr1 is None:
+                return expr2
+            if expr2 is None:
+                return expr1
             return sa.or_(expr1, expr2)
         return args
 
@@ -216,14 +244,68 @@ class QueryFilterParser:
         self._fieldspec = fieldspec
         self._parser = _parser
 
+    def has_field(self, filter_expr: str, field_name: str) -> bool:
+        """
+        Check if a filter expression contains a specific field name by parsing the AST.
+
+        This method avoids false positives from naive substring matching (e.g.,
+        "project_name" appearing in string literals like "my_project_name_tag").
+
+        Uses iterative traversal instead of recursion to avoid RecursionError
+        with deeply nested filter expressions.
+
+        Args:
+            filter_expr: Filter expression string to parse
+            field_name: Field name to search for
+
+        Returns:
+            True if the field is actually referenced in the filter expression
+        """
+        try:
+            ast = self._parser.parse(filter_expr)
+
+            # Use iterative BFS/DFS traversal to avoid recursion depth issues
+            stack: list[Tree | Token] = [ast]
+            while stack:
+                node = stack.pop()
+                if isinstance(node, Token):
+                    # Check if this is a field name token (CNAME)
+                    if node.type == "CNAME" and node.value == field_name:
+                        return True
+                elif isinstance(node, Tree):
+                    # Add all children to the stack for processing
+                    stack.extend(node.children)
+            return False
+        except LarkError:
+            # If parsing fails, return False to avoid unnecessary operations
+            return False
+
     def parse_filter(
         self,
         table,
         filter_expr: str,
+        *,
+        exclude_fields: Optional[set[str]] = None,
     ) -> WhereClauseType:
+        """
+        Parse filter expression and build WHERE clause.
+
+        Args:
+            table: SQLAlchemy table to parse against
+            filter_expr: Filter expression string
+            exclude_fields: Optional set of field names to exclude from parsing.
+                          Fields in this set will be ignored during parsing.
+
+        Returns:
+            WHERE clause for SQLAlchemy query
+        """
         try:
             ast = self._parser.parse(filter_expr)
-            where_clause = QueryFilterTransformer(table, self._fieldspec).transform(ast)
+            # Pass exclude_fields to transformer so it can skip generating SQL for them
+            # but keep them in fieldspec for validation
+            where_clause = QueryFilterTransformer(table, self._fieldspec, exclude_fields).transform(
+                ast
+            )
         except LarkError as e:
             raise ValueError(f"Query filter parsing error: {e}")
         return where_clause
@@ -232,10 +314,20 @@ class QueryFilterParser:
         self,
         sa_query: FilterableSQLQuery,
         filter_expr: str,
+        *,
+        exclude_fields: Optional[set[str]] = None,
     ) -> FilterableSQLQuery:
         """
         Parse the given filter expression and build the where clause based on the first target table from
         the given SQLAlchemy query object.
+
+        Args:
+            sa_query: SQLAlchemy query object
+            filter_expr: Filter expression string
+            exclude_fields: Optional set of field names to exclude from parsing
+
+        Returns:
+            Updated SQLAlchemy query with WHERE clause
         """
         if isinstance(sa_query, sa.sql.Select):
             table = sa_query.froms[0]
@@ -245,7 +337,7 @@ class QueryFilterParser:
             table = sa_query.table
         else:
             raise ValueError("Unsupported SQLAlchemy query object type")
-        where_clause = self.parse_filter(table, filter_expr)
+        where_clause = self.parse_filter(table, filter_expr, exclude_fields=exclude_fields)
         final_query = sa_query.where(where_clause)
         assert final_query is not None
         return final_query

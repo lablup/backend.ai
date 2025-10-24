@@ -54,8 +54,8 @@ from ..base import (
     generate_sql_info_for_gql_connection,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
+from ..group import AssocGroupUserRow, GroupRow, groups
 from ..group import association_groups_users as agus
-from ..group import groups
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..user import (
@@ -216,6 +216,7 @@ class UserNode(graphene.ObjectType):
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
         "main_access_key": ("main_access_key", None),
+        "project_name": ("project_name", None),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -251,8 +252,34 @@ class UserNode(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
+
+        has_project_filter = False
+        if filter_expr is not None:
+            temp_parser = QueryFilterParser(cls._queryfilter_fieldspec)
+            has_project_filter = temp_parser.has_field(filter_expr, "project_name")
+
+        project_name_filter_clause = None
+        if has_project_filter:
+            project_fieldspec: Mapping[str, FieldSpecItem] = {
+                "project_name": ("name", None),
+            }
+            project_filter_parser = QueryFilterParser(project_fieldspec)
+            user_fields = set(cls._queryfilter_fieldspec.keys())
+            user_fields.discard("project_name")
+            try:
+                project_name_filter_clause = project_filter_parser.parse_filter(
+                    GroupRow.__table__, cast(str, filter_expr), exclude_fields=user_fields
+                )
+            except ValueError:
+                # If parsing fails, ignore project_name filter
+                pass
+
         _filter_arg = (
-            FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
+            FilterExprArg(
+                filter_expr,
+                QueryFilterParser(cls._queryfilter_fieldspec),
+                exclude_fields={"project_name"},
+            )
             if filter_expr is not None
             else None
         )
@@ -264,7 +291,7 @@ class UserNode(graphene.ObjectType):
         (
             query,
             cnt_query,
-            _,
+            conditions,
             cursor,
             pagination_order,
             page_size,
@@ -280,6 +307,21 @@ class UserNode(graphene.ObjectType):
             before=before,
             last=last,
         )
+
+        if project_name_filter_clause is not None:
+            j = sa.join(
+                UserRow,
+                AssocGroupUserRow,
+                UserRow.uuid == AssocGroupUserRow.user_id,
+            ).join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id)
+
+            query = query.select_from(j).where(project_name_filter_clause).distinct()
+
+            cnt_query = sa.select(sa.func.count(sa.distinct(UserRow.uuid))).select_from(j)
+            cnt_query = cnt_query.where(project_name_filter_clause)
+            for cond in conditions:
+                cnt_query = cnt_query.where(cond)
+
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(graph_ctx, row) for row in user_rows]
