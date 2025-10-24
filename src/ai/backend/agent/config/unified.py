@@ -438,6 +438,20 @@ class CommonAgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("rpc-auth-agent-keypair", "rpc_auth_agent_keypair"),
         serialization_alias="rpc-auth-agent-keypair",
     )
+    ipc_base_path: AutoDirectoryPath = Field(
+        default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
+        description="Base path for IPC",
+        examples=["/tmp/backend.ai/ipc"],
+        validation_alias=AliasChoices("ipc-base-path", "ipc_base_path"),
+        serialization_alias="ipc-base-path",
+    )
+    var_base_path: AutoDirectoryPath = Field(
+        default=AutoDirectoryPath("./var/lib/backend.ai"),
+        description="Base path for variable data",
+        examples=["./var/lib/backend.ai"],
+        validation_alias=AliasChoices("var-base-path", "var_base_path"),
+        serialization_alias="var-base-path",
+    )
     mount_path: Optional[AutoDirectoryPath] = Field(
         default=None,
         description="Mount path for containers",
@@ -528,6 +542,20 @@ class CommonAgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("metadata-server-port", "metadata_server_port"),
         serialization_alias="metadata-server-port",
     )
+    image_commit_path: AutoDirectoryPath = Field(
+        default=AutoDirectoryPath("./tmp/backend.ai/commit"),
+        description="Path for image commit",
+        examples=["./tmp/backend.ai/commit"],
+        validation_alias=AliasChoices("image-commit-path", "image_commit_path"),
+        serialization_alias="image-commit-path",
+    )
+    abuse_report_path: Optional[Path] = Field(
+        default=None,
+        description="Path for abuse reports",
+        examples=["/var/log/backend.ai/abuse"],
+        validation_alias=AliasChoices("abuse-report-path", "abuse_report_path"),
+        serialization_alias="abuse-report-path",
+    )
     use_experimental_redis_event_dispatcher: bool = Field(
         default=False,
         description="Whether to use experimental Redis event dispatcher",
@@ -588,20 +616,6 @@ class OverridableAgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("agent-sock-port", "agent_sock_port"),
         serialization_alias="agent-sock-port",
     )
-    ipc_base_path: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
-        description="Base path for IPC",
-        examples=["/tmp/backend.ai/ipc"],
-        validation_alias=AliasChoices("ipc-base-path", "ipc_base_path"),
-        serialization_alias="ipc-base-path",
-    )
-    var_base_path: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("./var/lib/backend.ai"),
-        description="Base path for variable data",
-        examples=["./var/lib/backend.ai"],
-        validation_alias=AliasChoices("var-base-path", "var_base_path"),
-        serialization_alias="var-base-path",
-    )
     scaling_group: str = Field(
         default="default",
         description="Scaling group name",
@@ -643,20 +657,6 @@ class OverridableAgentConfig(BaseConfigSchema):
         examples=[{"ai.backend.manager.network.overlay"}],
         validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
         serialization_alias="block-network-plugins",
-    )
-    image_commit_path: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("./tmp/backend.ai/commit"),
-        description="Path for image commit",
-        examples=["./tmp/backend.ai/commit"],
-        validation_alias=AliasChoices("image-commit-path", "image_commit_path"),
-        serialization_alias="image-commit-path",
-    )
-    abuse_report_path: Optional[Path] = Field(
-        default=None,
-        description="Path for abuse reports",
-        examples=["/var/log/backend.ai/abuse"],
-        validation_alias=AliasChoices("abuse-report-path", "abuse_report_path"),
-        serialization_alias="abuse-report-path",
     )
     force_terminate_abusing_containers: bool = Field(
         default=False,
@@ -1138,7 +1138,12 @@ class AgentOverrideConfig(BaseConfigSchema):
         description="Resource config overrides for the individual agent",
     )
 
-    def construct_unified_config(self, *, default: AgentUnifiedConfig) -> AgentUnifiedConfig:
+    def construct_unified_config(
+        self,
+        *,
+        default: AgentUnifiedConfig,
+        agent_idx: int,
+    ) -> AgentUnifiedConfig:
         agent_updates: dict[str, Any] = {}
         if self.agent is not None:
             agent_override_fields = self.agent.model_dump(include=self.agent.model_fields_set)
@@ -1178,8 +1183,19 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
     )
 
     @property
+    def agent_common(self) -> CommonAgentConfig:
+        return self.agent
+
+    @property
+    def agent_default(self) -> OverridableAgentConfig:
+        return self.agent
+
+    @property
     def agent_configs(self) -> Sequence[AgentUnifiedConfig]:
-        return self._for_each_agent(lambda x: x)
+        agent_configs = self._for_each_agent(lambda x: x)
+        if not agent_configs:
+            raise ValueError("There must be at least one agent config")
+        return agent_configs
 
     def with_updates(
         self,
@@ -1265,7 +1281,10 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
         return self
 
     def _for_each_agent(self, func: Callable[[AgentUnifiedConfig], R]) -> list[R]:
-        agents = [agent.construct_unified_config(default=self) for agent in self.agents]
+        agents = [
+            agent.construct_unified_config(default=self, agent_idx=i)
+            for i, agent in enumerate(self.agents)
+        ]
         if not agents:
             agents.append(self)
 
