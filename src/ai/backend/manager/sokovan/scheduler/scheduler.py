@@ -662,13 +662,7 @@ class Scheduler:
             agent_client = self._agent_pool.get_agent_client(agent_id)
 
             # Call agent's destroy_kernel RPC method with correct parameters
-            await agent_client.destroy_kernel(
-                kernel_id,
-                session_id,
-                reason,
-                suppress_events=False,
-                agent_id=agent_id,
-            )
+            await agent_client.destroy_kernel(kernel_id, session_id, reason, suppress_events=False)
             return KernelTerminationResult(
                 kernel_id=kernel_id,
                 agent_id=agent_id,
@@ -962,7 +956,7 @@ class Scheduler:
         pull_tasks: list[Awaitable[Mapping[str, str]]] = []
         for agent_id, agent_images in agent_image_configs.items():
             agent_client = self._agent_pool.get_agent_client(agent_id)
-            pull_tasks.append(agent_client.check_and_pull(agent_images, agent_id))
+            pull_tasks.append(agent_client.check_and_pull(agent_images))
 
         if pull_tasks:
             await asyncio.gather(*pull_tasks, return_exceptions=True)
@@ -1223,7 +1217,6 @@ class Scheduler:
                         kernel_configs,
                         cluster_info,
                         kernel_image_refs,
-                        agent_id,
                     )
                 )
 
@@ -1273,7 +1266,7 @@ class Scheduler:
                     first_kernel.agent_id, order_key=str(session.session_id)
                 )
                 try:
-                    await agent_client.create_local_network(network_name, first_kernel.agent_id)
+                    await agent_client.create_local_network(network_name)
                 except Exception:
                     log.exception(f"Failed to create agent-local network {network_name}")
                     raise
@@ -1327,7 +1320,7 @@ class Scheduler:
                     agent_client = self._agent_pool.get_agent_client(
                         kernel.agent_id, order_key=str(session.session_id)
                     )
-                    port = await agent_client.assign_port(kernel.agent_id)
+                    port = await agent_client.assign_port()
                     # Extract host from agent_addr
                     agent_addr = kernel.agent_addr or ""
                     agent_host = (
@@ -1442,7 +1435,7 @@ class Scheduler:
             pulling_status = {}
             for image in images:
                 try:
-                    is_pulling = await agent_client.check_pulling(image, agent_id)
+                    is_pulling = await agent_client.check_pulling(image)
                     pulling_status[image] = is_pulling
                 except Exception as e:
                     log.warning(
@@ -1607,10 +1600,7 @@ class Scheduler:
                     agent_client = self._agent_pool.get_agent_client(kernel.agent_id)
                     try:
                         # Check if kernel is being created or already exists
-                        is_active = await agent_client.check_creating(
-                            str(kernel.kernel_id),
-                            kernel.agent_id,
-                        )
+                        is_active = await agent_client.check_creating(str(kernel.kernel_id))
                         if is_active:
                             any_active = True
                             break
