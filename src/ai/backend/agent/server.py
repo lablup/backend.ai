@@ -229,7 +229,6 @@ class RPCFunctionRegistry:
                     kwargs = request.body["kwargs"]
 
                     bound = sig.bind(self_, *args, **kwargs)
-                    bound.apply_defaults()
                     agent_id = bound.arguments.get("agent_id", self_._default_agent_id)
 
                     return await meth(
@@ -277,7 +276,6 @@ class RPCFunctionRegistryV2:
                     kwargs = request.body["kwargs"]
 
                     bound = sig.bind(self_, *args, **kwargs)
-                    bound.apply_defaults()
                     agent_id = bound.arguments.get("agent_id", self_._default_agent_id)
 
                     res = await meth(
@@ -1447,12 +1445,12 @@ async def server_main(
     log.info("Kernel runner environments: {}", [*krunner_volumes.keys()])
 
     # Update agent id and instance type if not set
-    agent_update = {}
+    agent_updates = {}
     if not local_config.agent_default.id:
-        agent_update["id"] = await identity.get_instance_id()
+        agent_updates["id"] = await identity.get_instance_id()
     if not local_config.agent_common.instance_type:
-        agent_update["instance_type"] = await identity.get_instance_type()
-    local_config = local_config.with_updates(agent_update=agent_update)
+        agent_updates["instance_type"] = await identity.get_instance_type()
+    local_config = local_config.with_updates(agent_update=agent_updates)
 
     etcd_client_registry = EtcdClientRegistry(local_config.etcd.to_dataclass())
     global_etcd = etcd_client_registry.global_etcd
@@ -1489,7 +1487,7 @@ async def server_main(
         local_config = local_config.with_updates(agent_update={"region": region})
     log.info(
         "Node ID: {0} (machine-type: {1}, host: {2})",
-        local_config.agent_default.id,
+        local_config.agent_default.id,  # defaults to instance id
         local_config.agent_common.instance_type,
         rpc_addr.host,
     )
