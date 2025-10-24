@@ -118,14 +118,11 @@ class EXAScalerQuotaModel(BaseQuotaModel):
                     limit_bytes = _kilobyte_to_byte(hard_limit)
                     if used_bytes < 0 or limit_bytes < 0:
                         log.warning(
-                            "Subprocess lfs quota returned negative values in used_bytes or limit_bytes \n Line: {} \n",
-                            line,
-                        )
-                        log.warning(
-                            "Used bytes < 0 ({}) or limit bytes < 0 ({}) for quota scope in EXAScaler with project ID {}",
+                            "Subprocess lfs quota returned negative values in used_bytes({}) or limit_bytes({}), pid: {} \n Line: {} \n",
                             used_bytes,
                             limit_bytes,
                             pid,
+                            line,
                         )
                     return QuotaUsage(used_bytes=used_bytes, limit_bytes=limit_bytes)
                 if Path(words[0]) == qspath:
