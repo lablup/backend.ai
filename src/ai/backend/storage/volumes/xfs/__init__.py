@@ -218,11 +218,11 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         hard_limit_bytes = int(hard_limit_kbs) * 1024
         if used_bytes < 0 or hard_limit_bytes < 0:
             log.warning(
-                "Negative values in used_bytes or limit_bytes for quota scope {} in XFS: \n report line = {}, \n used_bytes = {}, \n limit_bytes = {}",
-                quota_scope_id,
-                report,
+                "Negative values in used_bytes({}) or limit_bytes({}) for quota scope {} in XFS: \n report line = {}",
                 used_bytes,
                 hard_limit_bytes,
+                quota_scope_id,
+                report,
             )
         return QuotaUsage(used_bytes, hard_limit_bytes)
 

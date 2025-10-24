@@ -81,7 +81,7 @@ class GPFSQuotaModel(BaseQuotaModel):
         )
         custom_defined_quotas = [q for q in quotas if not q.isDefaultQuota]
         if len(custom_defined_quotas) == 0:
-            log.warning("No custom defined quotas found for quota scope %s in GPFS", quota_scope_id)
+            log.warning("No custom defined quotas found for quota scope {} in GPFS", quota_scope_id)
             return QuotaUsage(-1, -1)
         quota_info = custom_defined_quotas[0]
         # The units are kilobytes (ref: )
@@ -89,11 +89,11 @@ class GPFSQuotaModel(BaseQuotaModel):
         limit_bytes = quota_info.blockLimit * 1024 if quota_info.blockLimit is not None else -1
         if used_bytes < 0 or limit_bytes < 0:
             log.warning(
-                "Data from GPFS API negative values in used_bytes or limit_bytes for quota scope {}: \n response from GPFS API = {}, \n used_bytes = {}, \n limit_bytes = {}",
-                quota_scope_id,
-                quota_info.to_json(),
+                "Data from GPFS API negative values in used_bytes ({}) or limit_bytes ({}) for quota scope {}: \n response from GPFS API = {}",
                 used_bytes,
                 limit_bytes,
+                quota_scope_id,
+                quota_info.to_json(),
             )
         return QuotaUsage(
             used_bytes=used_bytes,

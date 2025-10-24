@@ -82,11 +82,11 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
             limit_bytes = data["thresholds"]["hard"]
             if used_bytes < 0 or limit_bytes < 0:
                 log.warning(
-                    "Data from OneFS API negative values in used_bytes or limit_bytes for quota scope {}: \n response from OneFS API = {}, \n used_bytes = {}, \n limit_bytes = {}",
-                    quota_scope_id,
-                    data,
+                    "Data from OneFS API negative values in used_bytes({}) or limit_bytes({}) for quota scope {}: \n response from OneFS API = {}",
                     used_bytes,
                     limit_bytes,
+                    quota_scope_id,
+                    data,
                 )
             return QuotaUsage(
                 used_bytes=used_bytes,
