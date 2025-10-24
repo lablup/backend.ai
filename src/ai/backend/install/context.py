@@ -256,6 +256,43 @@ class Context(metaclass=ABCMeta):
         async with self.etcd_ctx() as etcd:
             return await etcd.get_prefix(key, scope=ConfigScopes.GLOBAL)
 
+    async def install_rover_cli(self) -> None:
+        sudo = " ".join(self.docker_sudo)
+
+        check_cmd = await asyncio.create_subprocess_shell(
+            "command -v rover >/dev/null 2>&1",
+        )
+        rc = await check_cmd.wait()
+        if rc == 0:
+            version_proc = await asyncio.create_subprocess_shell(
+                "rover --version",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            stdout, _ = await version_proc.communicate()
+            self.log.write(f"Rover CLI is already installed: {stdout.decode().strip()}")
+            return
+
+        await self.run_shell(
+            f"{sudo} curl -sSL https://rover.apollo.dev/nix/latest | sh",
+            cwd=str(Path.home()),
+        )
+
+        rover_bin = Path.home() / ".rover" / "bin"
+        os.environ["PATH"] = f"{rover_bin}:{os.environ['PATH']}"
+        os.environ["APOLLO_ELV2_LICENSE"] = "accept"
+
+        rover_settings = (
+            "\n# Apollo Rover Settings\n"
+            'export PATH="$HOME/.rover/bin:$PATH"\n'
+            "export APOLLO_ELV2_LICENSE=accept\n"
+        )
+        for profile in [".bashrc", ".profile", ".zshrc"]:
+            profile_path = Path.home() / profile
+            if profile_path.exists():
+                with open(profile_path, "a") as f:
+                    f.write(rover_settings)
+
     async def install_halfstack(self) -> None:
         self.log_header("Installing halfstack...")
         dst_compose_path = self.copy_config("docker-compose.yml")
@@ -290,6 +327,8 @@ class Context(metaclass=ABCMeta):
             cwd=self.install_info.base_path,
         )
 
+        self.log.write("install rover cli ..")
+        await self.install_rover_cli()
     async def load_fixtures(self) -> None:
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
 
