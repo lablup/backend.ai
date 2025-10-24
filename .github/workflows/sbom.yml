@@ -13,7 +13,7 @@ jobs:
     - name: Generate the SBOM report
       uses: CycloneDX/gh-python-generate-sbom@v2
     - name: Upload the SBOM report
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: SBOM report
         path: ./bom.xml
