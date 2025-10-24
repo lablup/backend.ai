@@ -490,7 +490,7 @@ class AgentRPCServer(aobject):
         log.info("started handling RPC requests at {}", rpc_addr)
 
         debug_socket_path = (
-            self.local_config.agent_default.ipc_base_path / "agent-registry-snapshot.sock"
+            self.local_config.agent_common.ipc_base_path / "agent-registry-snapshot.sock"
         )
         server = await asyncio.start_unix_server(
             self.status_snapshot_request_handler, debug_socket_path.as_posix()
@@ -585,7 +585,7 @@ class AgentRPCServer(aobject):
         manager_instances = await global_etcd.get_prefix("nodes/manager")
         if not manager_instances:
             log.warning("watching etcd to wait for the manager being available")
-            async with aclosing(global_etcd.watch_prefix("nodes/manager")) as agen:
+            async with aclosing(global_etcd.watch_prefix("nodes/manager")) as agen:  # type: ignore
                 async for ev in agen:
                     match ev:
                         case QueueSentinel.CLOSED | QueueSentinel.TIMEOUT:
@@ -1669,7 +1669,7 @@ def main(
 
     if not is_invoked_subcommand:
         server_config.agent_common.pid_file.write_text(str(os.getpid()))
-        ipc_base_path = server_config.agent_default.ipc_base_path
+        ipc_base_path = server_config.agent_common.ipc_base_path
         log_sockpath = ipc_base_path / f"agent-logger-{os.getpid()}.sock"
         log_sockpath.parent.mkdir(parents=True, exist_ok=True)
         log_endpoint = f"ipc://{log_sockpath}"

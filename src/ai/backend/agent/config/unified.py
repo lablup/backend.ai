@@ -438,6 +438,20 @@ class CommonAgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("rpc-auth-agent-keypair", "rpc_auth_agent_keypair"),
         serialization_alias="rpc-auth-agent-keypair",
     )
+    ipc_base_path: AutoDirectoryPath = Field(
+        default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
+        description="Base path for IPC",
+        examples=["/tmp/backend.ai/ipc"],
+        validation_alias=AliasChoices("ipc-base-path", "ipc_base_path"),
+        serialization_alias="ipc-base-path",
+    )
+    var_base_path: AutoDirectoryPath = Field(
+        default=AutoDirectoryPath("./var/lib/backend.ai"),
+        description="Base path for variable data",
+        examples=["./var/lib/backend.ai"],
+        validation_alias=AliasChoices("var-base-path", "var_base_path"),
+        serialization_alias="var-base-path",
+    )
     mount_path: Optional[AutoDirectoryPath] = Field(
         default=None,
         description="Mount path for containers",
@@ -528,6 +542,20 @@ class CommonAgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("metadata-server-port", "metadata_server_port"),
         serialization_alias="metadata-server-port",
     )
+    image_commit_path: AutoDirectoryPath = Field(
+        default=AutoDirectoryPath("./tmp/backend.ai/commit"),
+        description="Path for image commit",
+        examples=["./tmp/backend.ai/commit"],
+        validation_alias=AliasChoices("image-commit-path", "image_commit_path"),
+        serialization_alias="image-commit-path",
+    )
+    abuse_report_path: Optional[Path] = Field(
+        default=None,
+        description="Path for abuse reports",
+        examples=["/var/log/backend.ai/abuse"],
+        validation_alias=AliasChoices("abuse-report-path", "abuse_report_path"),
+        serialization_alias="abuse-report-path",
+    )
     use_experimental_redis_event_dispatcher: bool = Field(
         default=False,
         description="Whether to use experimental Redis event dispatcher",
@@ -588,20 +616,6 @@ class OverridableAgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("agent-sock-port", "agent_sock_port"),
         serialization_alias="agent-sock-port",
     )
-    ipc_base_path: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
-        description="Base path for IPC",
-        examples=["/tmp/backend.ai/ipc"],
-        validation_alias=AliasChoices("ipc-base-path", "ipc_base_path"),
-        serialization_alias="ipc-base-path",
-    )
-    var_base_path: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("./var/lib/backend.ai"),
-        description="Base path for variable data",
-        examples=["./var/lib/backend.ai"],
-        validation_alias=AliasChoices("var-base-path", "var_base_path"),
-        serialization_alias="var-base-path",
-    )
     scaling_group: str = Field(
         default="default",
         description="Scaling group name",
@@ -644,20 +658,6 @@ class OverridableAgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
         serialization_alias="block-network-plugins",
     )
-    image_commit_path: AutoDirectoryPath = Field(
-        default=AutoDirectoryPath("./tmp/backend.ai/commit"),
-        description="Path for image commit",
-        examples=["./tmp/backend.ai/commit"],
-        validation_alias=AliasChoices("image-commit-path", "image_commit_path"),
-        serialization_alias="image-commit-path",
-    )
-    abuse_report_path: Optional[Path] = Field(
-        default=None,
-        description="Path for abuse reports",
-        examples=["/var/log/backend.ai/abuse"],
-        validation_alias=AliasChoices("abuse-report-path", "abuse_report_path"),
-        serialization_alias="abuse-report-path",
-    )
     force_terminate_abusing_containers: bool = Field(
         default=False,
         description="Whether to force terminate abusing containers",
@@ -686,46 +686,6 @@ class OverridableAgentConfig(BaseConfigSchema):
     model_config = ConfigDict(
         extra="allow",
     )
-
-    def with_derived_fields(
-        self,
-        default_agent: AgentConfig,
-        agent_idx: int,
-    ) -> OverridableAgentConfig:
-        if self.id is None and default_agent.id is None:
-            return self
-
-        agent_id = self.id if self.id is not None else f"{default_agent.id}-{agent_idx}"
-
-        if "ipc_base_path" in self.model_fields_set:
-            ipc_base_path = self.ipc_base_path
-        else:
-            ipc_base_path = default_agent.ipc_base_path / agent_id
-
-        if "var_base_path" in self.model_fields_set:
-            var_base_path = self.var_base_path
-        else:
-            var_base_path = default_agent.var_base_path / agent_id
-
-        if "image_commit_path" in self.model_fields_set:
-            image_commit_path = self.image_commit_path
-        else:
-            image_commit_path = default_agent.image_commit_path / agent_id
-
-        if default_agent.abuse_report_path is None or "abuse_report_path" in self.model_fields_set:
-            abuse_report_path = self.abuse_report_path
-        else:
-            abuse_report_path = default_agent.abuse_report_path / agent_id
-
-        return self.model_copy(
-            update={
-                "id": agent_id,
-                "ipc_base_path": ipc_base_path,
-                "var_base_path": var_base_path,
-                "image_commit_path": image_commit_path,
-                "abuse_report_path": abuse_report_path,
-            }
-        )
 
 
 class AgentConfig(CommonAgentConfig, OverridableAgentConfig):
@@ -1186,8 +1146,7 @@ class AgentOverrideConfig(BaseConfigSchema):
     ) -> AgentUnifiedConfig:
         agent_updates: dict[str, Any] = {}
         if self.agent is not None:
-            agent = self.agent.with_derived_fields(default.agent, agent_idx)
-            agent_override_fields = agent.model_dump(include=agent.model_fields_set)
+            agent_override_fields = self.agent.model_dump(include=self.agent.model_fields_set)
             agent_updates["agent"] = default.agent.model_copy(update=agent_override_fields)
         if self.container is not None:
             container_override_fields = self.container.model_dump(

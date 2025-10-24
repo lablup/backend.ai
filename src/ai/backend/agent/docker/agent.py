@@ -1372,10 +1372,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.gwbridge_subnet = None
         ipc_base_path = self.local_config.agent.ipc_base_path
         (ipc_base_path / "container").mkdir(parents=True, exist_ok=True)
-        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.local_instance_id}.sock"
+        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.id}.sock"
         # Workaround for Docker Desktop for Mac's UNIX socket mount failure with virtiofs
         if sys.platform != "darwin":
-            socket_relay_name = f"backendai-socket-relay.{self.local_instance_id}"
+            socket_relay_name = f"backendai-socket-relay.{self.id}"
             socket_relay_container = PersistentServiceContainer(
                 "backendai-socket-relay:latest",
                 {
