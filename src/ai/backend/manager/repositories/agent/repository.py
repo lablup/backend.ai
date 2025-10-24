@@ -93,16 +93,12 @@ class AgentRepository:
         ordering_options: AgentOrderingOptions,
         limit: Optional[int],
         offset: Optional[int],
-        scaling_group: Optional[str],
-        status_list: list,
     ) -> list[AgentId]:
         agent_ids = await self._db_source.fetch_agent_ids_by_condition(
             filter_options=filter_options,
             ordering_options=ordering_options,
             limit=limit,
             offset=offset,
-            scaling_group=scaling_group,
-            status_list=status_list,
         )
         return agent_ids
 

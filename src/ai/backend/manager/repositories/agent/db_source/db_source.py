@@ -1,4 +1,5 @@
 import logging
+from dataclasses import fields, is_dataclass
 from typing import TYPE_CHECKING, Any, Optional, override
 
 import sqlalchemy as sa
@@ -37,6 +38,48 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
+
+
+def _format_dataclass_for_debug(obj: Any, indent: int = 0) -> str:
+    """Format a dataclass for debugging output."""
+
+    if obj is None:
+        return "None"
+
+    if not is_dataclass(obj):
+        return repr(obj)
+
+    lines = [f"{obj.__class__.__name__}("]
+    indent_str = "  " * (indent + 1)
+
+    for field in fields(obj):
+        field_value = getattr(obj, field.name)
+
+        # Handle nested dataclasses
+        if is_dataclass(field_value):
+            formatted_value = _format_dataclass_for_debug(field_value, indent + 1)
+        # Handle lists
+        elif isinstance(field_value, list):
+            if not field_value:
+                formatted_value = "[]"
+            elif is_dataclass(field_value[0]) if field_value else False:
+                items = [_format_dataclass_for_debug(item, indent + 1) for item in field_value]
+                formatted_value = (
+                    "[\n"
+                    + indent_str
+                    + "  "
+                    + f",\n{indent_str}  ".join(items)
+                    + f"\n{indent_str}]"
+                )
+            else:
+                formatted_value = repr(field_value)
+        else:
+            formatted_value = repr(field_value)
+
+        lines.append(f"{indent_str}{field.name}={formatted_value}")
+
+    lines.append("  " * indent + ")")
+    return "\n".join(lines)
 
 
 class AgentFilterApplier(BaseFilterApplier[AgentFilterOptions]):
@@ -146,30 +189,10 @@ class AgentDBSource:
         ordering_options: AgentOrderingOptions,
         limit: Optional[int],
         offset: Optional[int],
-        scaling_group: Optional[str],
-        status_list: list[AgentStatus],
     ) -> list[AgentId]:
-        from ai.backend.manager.api.gql.base import StringFilter
-        from ai.backend.manager.repositories.agent.types import (
-            AgentStatusFilter,
-            AgentStatusFilterType,
-        )
-
-        # Build combined filter options with scaling_group and status_list
+        # Use the provided filter options directly
         combined_filter = filter_options or AgentFilterOptions()
-
-        # Create additional filters for scaling_group and status_list
-        if scaling_group is not None:
-            # Merge with existing scaling_group filter or create new one
-            if combined_filter.scaling_group is None:
-                combined_filter.scaling_group = StringFilter(equals=scaling_group)
-        if len(status_list) > 0:
-            # Merge with existing status filter or create new one
-            if combined_filter.status is None:
-                combined_filter.status = AgentStatusFilter(
-                    type=AgentStatusFilterType.IN, values=status_list
-                )
-
+        print(_format_dataclass_for_debug(combined_filter))
         # Create pagination options
         pagination = PaginationOptions(
             offset=OffsetBasedPaginationOptions(offset=offset or 0, limit=limit)

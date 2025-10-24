@@ -165,6 +165,12 @@ class AgentFilter:
     OR: Optional[list["AgentFilter"]] = None
     NOT: Optional[list["AgentFilter"]] = None
 
+    def add_AND_filter(self, filter: AgentFilter) -> Self:
+        if self.AND is None:
+            self.AND = []
+        self.AND.append(filter)
+        return self
+
 
 @dataclass
 class AgentOrderBy:
@@ -182,8 +188,6 @@ class AgentFetchConditions:
     offset: Optional[int]
     filter: Optional[AgentFilter]
     order_by: list[AgentOrderBy]
-    scaling_group: Optional[str]
-    status: list[AgentStatus]
 
 
 @dataclass

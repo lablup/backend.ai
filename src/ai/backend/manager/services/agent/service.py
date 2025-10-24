@@ -147,8 +147,6 @@ class AgentService:
             ordering_options=AgentOrderingOptions.from_data_ordering(action.conditions.order_by),
             limit=action.conditions.limit,
             offset=action.conditions.offset,
-            scaling_group=action.conditions.scaling_group,
-            status_list=action.conditions.status,
         )
 
         condition = [QueryConditions.by_ids(agent_ids)]
@@ -166,8 +164,6 @@ class AgentService:
             ordering_options=AgentOrderingOptions.from_data_ordering(action.conditions.order_by),
             limit=action.conditions.limit,
             offset=action.conditions.offset,
-            scaling_group=action.conditions.scaling_group,
-            status_list=action.conditions.status,
         )
         return GetAgentCountActionResult(count=len(agent_ids))
 

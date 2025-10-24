@@ -32,6 +32,8 @@ from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentDataExtended,
     AgentFetchConditions,
+    AgentFilter,
+    AgentStatusFilter,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
@@ -497,6 +499,8 @@ class Agent(graphene.ObjectType):
         raw_status: Optional[str | AgentStatus] = None,
         filter: Optional[str] = None,
     ) -> int:
+        from ai.backend.manager.api.gql.base import StringFilter
+
         status_list: list[AgentStatus] = []
         if isinstance(raw_status, str):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
@@ -506,6 +510,29 @@ class Agent(graphene.ObjectType):
         if filter is not None:
             filter_converter = AgentFilterConverter()
             agent_filter = filter_converter.execute(filter)
+
+        scaling_group_filter_condition = None
+        if scaling_group is not None:
+            scaling_group_filter_condition = StringFilter(equals=scaling_group)
+
+        status_filter_condition = None
+        if len(status_list) > 0:
+            status_filter_condition = AgentStatusFilter(in_=status_list)
+
+        additional_filter = None
+        if scaling_group_filter_condition is not None or status_filter_condition is not None:
+            additional_filter = AgentFilter(
+                scaling_group=scaling_group_filter_condition, status=status_filter_condition
+            )
+
+        if additional_filter is not None:
+            if agent_filter is not None:
+                # Since we do not know what filters may already exist inside agent_filter's AND,
+                # we use the approach of adding agent_filter to additional_filter.
+                agent_filter = additional_filter.add_AND_filter(agent_filter)
+            else:
+                agent_filter = additional_filter
+
         result = await graph_ctx.processors.agent.get_agent_count.wait_for_complete(
             GetAgentCountAction(
                 conditions=AgentFetchConditions(
@@ -513,8 +540,6 @@ class Agent(graphene.ObjectType):
                     offset=None,
                     filter=agent_filter,
                     order_by=[],
-                    status=status_list,
-                    scaling_group=scaling_group,
                 )
             )
         )
@@ -532,6 +557,8 @@ class Agent(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[Agent]:
+        from ai.backend.manager.api.gql.base import StringFilter
+
         agent_filter = None
         if filter is not None:
             filter_converter = AgentFilterConverter()
@@ -542,13 +569,34 @@ class Agent(graphene.ObjectType):
             order_converter = AgentOrderConverter()
             agent_order_by_list = order_converter.execute(order)
 
+        scaling_group_filter_condition = None
+        if scaling_group is not None:
+            scaling_group_filter_condition = StringFilter(equals=scaling_group)
+
+        status_filter_condition = None
+        status_list = [AgentStatus[s] for s in raw_status.split(",")] if raw_status else []
+        if len(status_list) > 0:
+            status_filter_condition = AgentStatusFilter(in_=status_list)
+
+        additional_filter = None
+        if scaling_group_filter_condition is not None or status_filter_condition is not None:
+            additional_filter = AgentFilter(
+                scaling_group=scaling_group_filter_condition, status=status_filter_condition
+            )
+
+        if additional_filter is not None:
+            if agent_filter is not None:
+                # Since we do not know what filters may already exist inside agent_filter's AND,
+                # we use the approach of adding agent_filter to additional_filter.
+                agent_filter = additional_filter.add_AND_filter(agent_filter)
+            else:
+                agent_filter = additional_filter
+
         result = await graph_ctx.processors.agent.get_agents.wait_for_complete(
             GetAgentsAction(
                 conditions=AgentFetchConditions(
                     limit=limit,
                     offset=offset,
-                    status=[AgentStatus[s] for s in raw_status.split(",")] if raw_status else [],
-                    scaling_group=scaling_group,
                     filter=agent_filter,
                     order_by=agent_order_by_list,
                 )
@@ -565,15 +613,29 @@ class Agent(graphene.ObjectType):
         scaling_group: Optional[str] = None,
         raw_status: Optional[str] = None,
     ) -> Sequence[Agent]:
-        status = [AgentStatus[raw_status]] if raw_status is not None else []
+        from ai.backend.manager.api.gql.base import StringFilter
+
+        scaling_group_filter_condition = None
+        if scaling_group is not None:
+            scaling_group_filter_condition = StringFilter(equals=scaling_group)
+
+        status_filter_condition = None
+        status_list = [AgentStatus[s] for s in raw_status.split(",")] if raw_status else []
+        if len(status_list) > 0:
+            status_filter_condition = AgentStatusFilter(in_=status_list)
+
+        agent_filter = None
+        if scaling_group_filter_condition is not None or status_filter_condition is not None:
+            agent_filter = AgentFilter(
+                scaling_group=scaling_group_filter_condition, status=status_filter_condition
+            )
+
         result = await graph_ctx.processors.agent.get_agents.wait_for_complete(
             GetAgentsAction(
                 conditions=AgentFetchConditions(
                     limit=None,
                     offset=None,
-                    status=status,
-                    scaling_group=scaling_group,
-                    filter=None,
+                    filter=agent_filter,
                     order_by=[],
                 )
             )
