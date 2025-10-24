@@ -19,7 +19,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common.exception import GroupNotFoundError
+from ai.backend.common.exception import GroupNotFound
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.group.types import GroupCreator, GroupData, GroupModifier
 from ai.backend.manager.models.rbac import ProjectScope
@@ -235,7 +235,7 @@ class GroupNode(graphene.ObjectType):
         async with graph_ctx.db.begin_readonly_session() as db_session:
             group_row = (await db_session.scalars(query)).first()
             if group_row is None:
-                raise GroupNotFoundError()
+                raise GroupNotFound(f"Group not found: {group_id}")
             return cls.from_row(graph_ctx, group_row)
 
     @classmethod

@@ -20,7 +20,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
-from ai.backend.common.exception import UserNotFoundError
+from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.data.user.types import (
     UserCreator,
     UserData,
@@ -193,7 +193,7 @@ class UserNode(graphene.ObjectType):
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_row = (await db_session.scalars(query)).first()
             if user_row is None:
-                raise UserNotFoundError()
+                raise UserNotFound(f"User not found: {user_id}")
             return cls.from_row(graph_ctx, user_row)
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
