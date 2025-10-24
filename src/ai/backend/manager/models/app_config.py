@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import enum
 import logging
 from typing import Sequence
 
@@ -8,7 +7,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.app_config.types import AppConfigData
+from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigScopeType
 
 from .base import Base
 
@@ -19,12 +18,6 @@ __all__: Sequence[str] = (
     "AppConfigScopeType",
     "AppConfigRow",
 )
-
-
-class AppConfigScopeType(enum.StrEnum):
-    DOMAIN = "domain"
-    PROJECT = "project"
-    USER = "user"
 
 
 class AppConfigRow(Base):

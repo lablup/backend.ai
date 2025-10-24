@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import enum
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, override
 
-from ai.backend.manager.models.app_config import AppConfigScopeType
 from ai.backend.manager.types import Creator, OptionalState, PartialModifier
+
+
+class AppConfigScopeType(enum.StrEnum):
+    DOMAIN = "domain"
+    PROJECT = "project"
+    USER = "user"
 
 
 @dataclass
