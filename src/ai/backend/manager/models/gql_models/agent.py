@@ -805,9 +805,24 @@ class AgentSummary(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[Self]:
+        query = sa.select(AgentRow)
+
+        if raw_status is not None:
+            query = query.where(AgentRow.status == AgentStatus[raw_status])
+        if filter is not None:
+            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
+            query = qfparser.append_filter(query, filter)
+        if order is not None:
+            qoparser = QueryOrderParser(cls._queryorder_colmap)
+            query = qoparser.append_ordering(query, order)
+        else:
+            query = query.order_by(
+                AgentRow.status.asc(),
+                AgentRow.scaling_group.asc(),
+                AgentRow.id.asc(),
+            )
         query = (
-            sa.select(AgentRow)
-            .select_from(
+            query.select_from(
                 sa.join(
                     AgentRow,
                     KernelRow,
@@ -825,21 +840,6 @@ class AgentSummary(graphene.ObjectType):
         query = await _append_sgroup_from_clause(
             graph_ctx, query, access_key, domain_name, scaling_group
         )
-
-        if raw_status is not None:
-            query = query.where(AgentRow.status == AgentStatus[raw_status])
-        if filter is not None:
-            qfparser = QueryFilterParser(cls._queryfilter_fieldspec)
-            query = qfparser.append_filter(query, filter)
-        if order is not None:
-            qoparser = QueryOrderParser(cls._queryorder_colmap)
-            query = qoparser.append_ordering(query, order)
-        else:
-            query = query.order_by(
-                AgentRow.status.asc(),
-                AgentRow.scaling_group.asc(),
-                AgentRow.id.asc(),
-            )
         agent_ids: list[AgentId] = []
         async with graph_ctx.db.begin_readonly_session() as db_session:
             result = await db_session.scalars(query)
