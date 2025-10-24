@@ -23,6 +23,9 @@ from ai.backend.manager.repositories.keypair_resource_policy.repositories import
 from ai.backend.manager.repositories.metric.repositories import MetricRepositories
 from ai.backend.manager.repositories.model_serving.repositories import ModelServingRepositories
 from ai.backend.manager.repositories.object_storage.repositories import ObjectStorageRepositories
+from ai.backend.manager.repositories.permission_controller.repository import (
+    PermissionControllerRepository,
+)
 from ai.backend.manager.repositories.project_resource_policy.repositories import (
     ProjectResourcePolicyRepositories,
 )
@@ -72,6 +75,7 @@ class Repositories:
     artifact: ArtifactRepositories
     artifact_registry: ArtifactRegistryRepositories
     storage_namespace: StorageNamespaceRepositories
+    permission_controller: PermissionControllerRepository
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -100,6 +104,7 @@ class Repositories:
         huggingface_registry_repositories = HuggingFaceRegistryRepositories.create(args)
         artifact_registries = ArtifactRegistryRepositories.create(args)
         storage_namespace_repositories = StorageNamespaceRepositories.create(args)
+        permission_controller_repository = PermissionControllerRepository.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -127,4 +132,5 @@ class Repositories:
             artifact=artifact_repositories,
             artifact_registry=artifact_registries,
             storage_namespace=storage_namespace_repositories,
+            permission_controller=permission_controller_repository,
         )

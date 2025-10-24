@@ -1,6 +1,6 @@
 import uuid
 from collections.abc import Mapping
-from typing import Optional
+from typing import Optional, Self
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -20,6 +20,7 @@ from ...data.permission.role import (
     UserRoleAssignmentInput,
 )
 from ...models.utils import ExtendedAsyncSAEngine
+from ..types import RepositoryArgs
 from .db_source import PermissionDBSource
 
 permission_controller_repository_resilience = Resilience(
@@ -46,6 +47,12 @@ class PermissionControllerRepository:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db_source = PermissionDBSource(db)
+
+    @classmethod
+    def create(cls, args: RepositoryArgs) -> Self:
+        return cls(
+            db=args.db,
+        )
 
     @permission_controller_repository_resilience.apply()
     async def create_role(self, data: RoleCreateInput) -> RoleData:
@@ -79,27 +86,20 @@ class PermissionControllerRepository:
 
     @permission_controller_repository_resilience.apply()
     async def check_permission_of_entity(self, data: SingleEntityPermissionCheckInput) -> bool:
-        target_object_id = data.target_object_id
-        roles = await self._db_source.get_user_roles(data.user_id)
-        associated_scopes = await self._db_source.get_entity_mapped_scopes(target_object_id)
-        associated_scopes_set = set([row.parsed_scope_id() for row in associated_scopes])
-        for role in roles:
-            for object_perm in role.object_permission_rows:
-                if object_perm.operation != data.operation:
-                    continue
-                if object_perm.object_id() == target_object_id:
-                    return True
-
-            for permission_group in role.permission_group_rows:
-                if permission_group.parsed_scope_id() not in associated_scopes_set:
-                    continue
-                for permission in permission_group.permission_rows:
-                    if permission.operation == data.operation:
-                        return True
-        return False
+        """
+        Check if the user has the requested operation permission on the given entity.
+        Returns True if the permission exists, False otherwise.
+        """
+        return await self._db_source.check_object_permission_exist(
+            data.user_id, data.target_object_id, data.operation
+        )
 
     @permission_controller_repository_resilience.apply()
     async def check_permission_in_scope(self, data: ScopePermissionCheckInput) -> bool:
+        """
+        Check if the user has the requested operation permission in the given scope.
+        Returns True if the permission exists, False otherwise.
+        """
         return await self._db_source.check_scope_permission_exist(
             data.user_id, data.target_scope_id, data.operation
         )
