@@ -24,6 +24,10 @@ from ai.backend.manager.data.agent.types import (
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.query import QueryConditions
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.agent.types import (
+    AgentFilterOptions,
+    AgentOrderingOptions,
+)
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.services.agent.actions.get_agent_count import (
     GetAgentCountAction,
@@ -138,7 +142,15 @@ class AgentService:
         }
 
     async def get_agents(self, action: GetAgentsAction) -> GetAgentsActionResult:
-        agent_ids = await self._agent_repository.fetch_agent_ids_by_condition(action.conditions)
+        agent_ids = await self._agent_repository.fetch_agent_ids_by_condition(
+            filter_options=AgentFilterOptions.from_data_filter(action.conditions.filter),
+            ordering_options=AgentOrderingOptions.from_data_ordering(action.conditions.order_by),
+            limit=action.conditions.limit,
+            offset=action.conditions.offset,
+            scaling_group=action.conditions.scaling_group,
+            status_list=action.conditions.status,
+        )
+
         condition = [QueryConditions.by_ids(agent_ids)]
         agent_data = await self._agent_repository.list_extended_data(condition)
 
@@ -149,7 +161,14 @@ class AgentService:
         return GetAgentsActionResult(agents=result)
 
     async def get_agent_count(self, action: GetAgentCountAction) -> GetAgentCountActionResult:
-        agent_ids = await self._agent_repository.fetch_agent_ids_by_condition(action.conditions)
+        agent_ids = await self._agent_repository.fetch_agent_ids_by_condition(
+            filter_options=AgentFilterOptions.from_data_filter(action.conditions.filter),
+            ordering_options=AgentOrderingOptions.from_data_ordering(action.conditions.order_by),
+            limit=action.conditions.limit,
+            offset=action.conditions.offset,
+            scaling_group=action.conditions.scaling_group,
+            status_list=action.conditions.status,
+        )
         return GetAgentCountActionResult(count=len(agent_ids))
 
     async def sync_agent_registry(

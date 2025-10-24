@@ -26,14 +26,15 @@ from ai.backend.common.types import (
     HardwareMetadata,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.data.agent.ast_converter import AgentFilterConverter
+from ai.backend.manager.data.agent.order_parser import AgentOrderConverter
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentDataExtended,
     AgentFetchConditions,
-    FilterCondition,
-    OrderCondition,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 from ai.backend.manager.services.agent.actions.get_agent_count import GetAgentCountAction
 from ai.backend.manager.services.agent.actions.get_agents import GetAgentsAction
@@ -62,7 +63,7 @@ from ..group import AssocGroupUserRow
 from ..kernel import KernelRow
 from ..keypair import keypairs
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
-from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
+from ..minilang.queryfilter import FieldSpecItem
 from ..rbac import (
     ScopeType,
 )
@@ -501,19 +502,17 @@ class Agent(graphene.ObjectType):
             status_list = [AgentStatus[s] for s in raw_status.split(",")]
         elif isinstance(raw_status, AgentStatus):
             status_list = [raw_status]
-        filter_condition = None
+        agent_filter = None
         if filter is not None:
-            filter_condition = FilterCondition(
-                filter_expr=filter,
-                filter_parser=QueryFilterParser(cls._queryfilter_fieldspec),
-            )
+            filter_converter = AgentFilterConverter()
+            agent_filter = filter_converter.execute(filter)
         result = await graph_ctx.processors.agent.get_agent_count.wait_for_complete(
             GetAgentCountAction(
                 conditions=AgentFetchConditions(
                     limit=None,
                     offset=None,
-                    filter=filter_condition,
-                    order=None,
+                    filter=agent_filter,
+                    order_by=[],
                     status=status_list,
                     scaling_group=scaling_group,
                 )
@@ -533,28 +532,25 @@ class Agent(graphene.ObjectType):
         filter: Optional[str] = None,
         order: Optional[str] = None,
     ) -> Sequence[Agent]:
-        agent_status = [AgentStatus[s] for s in raw_status.split(",")] if raw_status else []
-        filter_condition = None
+        agent_filter = None
         if filter is not None:
-            filter_condition = FilterCondition(
-                filter_expr=filter,
-                filter_parser=QueryFilterParser(cls._queryfilter_fieldspec),
-            )
-        order_condition = None
+            filter_converter = AgentFilterConverter()
+            agent_filter = filter_converter.execute(filter)
+
+        agent_order_by_list = []
         if order is not None:
-            order_condition = OrderCondition(
-                order_expr=order,
-                order_parser=QueryOrderParser(cls._queryorder_colmap),
-            )
+            order_converter = AgentOrderConverter()
+            agent_order_by_list = order_converter.execute(order)
+
         result = await graph_ctx.processors.agent.get_agents.wait_for_complete(
             GetAgentsAction(
                 conditions=AgentFetchConditions(
                     limit=limit,
                     offset=offset,
-                    status=agent_status,
+                    status=[AgentStatus[s] for s in raw_status.split(",")] if raw_status else [],
                     scaling_group=scaling_group,
-                    filter=filter_condition,
-                    order=order_condition,
+                    filter=agent_filter,
+                    order_by=agent_order_by_list,
                 )
             )
         )
@@ -578,7 +574,7 @@ class Agent(graphene.ObjectType):
                     status=status,
                     scaling_group=scaling_group,
                     filter=None,
-                    order=None,
+                    order_by=[],
                 )
             )
         )

@@ -622,6 +622,22 @@ class RuntimeVariantNotSupportedError(BackendAIError, web.HTTPBadRequest):
         )
 
 
+class AgentOrderingFieldNotSupportedError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/agent-ordering-field-not-supported"
+    error_title = "Agent Ordering Field Not Supported"
+
+    def __init__(self, field_name: str) -> None:
+        super().__init__(extra_msg=f"Agent ordering field '{field_name}' is not supported.")
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.LIST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
 class GenericNotImplementedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/not-implemented"
     error_title = "Not Implemented"
