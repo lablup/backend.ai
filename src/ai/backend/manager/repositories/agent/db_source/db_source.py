@@ -1,5 +1,4 @@
 import logging
-from dataclasses import fields, is_dataclass
 from typing import TYPE_CHECKING, Any, Optional, override
 
 import sqlalchemy as sa
@@ -38,48 +37,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
-
-
-def _format_dataclass_for_debug(obj: Any, indent: int = 0) -> str:
-    """Format a dataclass for debugging output."""
-
-    if obj is None:
-        return "None"
-
-    if not is_dataclass(obj):
-        return repr(obj)
-
-    lines = [f"{obj.__class__.__name__}("]
-    indent_str = "  " * (indent + 1)
-
-    for field in fields(obj):
-        field_value = getattr(obj, field.name)
-
-        # Handle nested dataclasses
-        if is_dataclass(field_value):
-            formatted_value = _format_dataclass_for_debug(field_value, indent + 1)
-        # Handle lists
-        elif isinstance(field_value, list):
-            if not field_value:
-                formatted_value = "[]"
-            elif is_dataclass(field_value[0]) if field_value else False:
-                items = [_format_dataclass_for_debug(item, indent + 1) for item in field_value]
-                formatted_value = (
-                    "[\n"
-                    + indent_str
-                    + "  "
-                    + f",\n{indent_str}  ".join(items)
-                    + f"\n{indent_str}]"
-                )
-            else:
-                formatted_value = repr(field_value)
-        else:
-            formatted_value = repr(field_value)
-
-        lines.append(f"{indent_str}{field.name}={formatted_value}")
-
-    lines.append("  " * indent + ")")
-    return "\n".join(lines)
 
 
 class AgentFilterApplier(BaseFilterApplier[AgentFilterOptions]):
@@ -190,15 +147,12 @@ class AgentDBSource:
         limit: Optional[int],
         offset: Optional[int],
     ) -> list[AgentId]:
-        # Use the provided filter options directly
         combined_filter = filter_options or AgentFilterOptions()
-        print(_format_dataclass_for_debug(combined_filter))
-        # Create pagination options
+
         pagination = PaginationOptions(
             offset=OffsetBasedPaginationOptions(offset=offset or 0, limit=limit)
         )
 
-        # Initialize the generic query builder with agent-specific components
         agent_query_builder = GenericQueryBuilder[
             AgentRow, AgentData, AgentFilterOptions, AgentOrderingOptions
         ](
@@ -209,7 +163,6 @@ class AgentDBSource:
             cursor_type_name="Agent",
         )
 
-        # Build query using the generic query builder
         querybuild_result = agent_query_builder.build_pagination_queries(
             pagination=pagination,
             ordering=ordering_options,
