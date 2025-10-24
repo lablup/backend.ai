@@ -1,0 +1,116 @@
+name: ticket-issue-number-sync
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  ticket-issue-number-sync:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Extract JIRA ticket number from PR title
+      id: extract_ticket
+      run: |
+        # Extract JIRA ticket number from PR title (e.g., "fix(BA-1234): aaaa" -> "BA-1234")
+        TITLE="${{ github.event.pull_request.title }}"
+        echo "PR Title: $TITLE"
+
+        # Extract ticket number using regex pattern BA-XXXX format
+        TICKET_NUMBER=$(echo "$TITLE" | grep -oE 'BA-[0-9]+' | head -1)
+
+        if [ -n "$TICKET_NUMBER" ]; then
+          echo "Extracted ticket: $TICKET_NUMBER"
+          echo "ticket_number=$TICKET_NUMBER" >> $GITHUB_OUTPUT
+          echo "has_ticket=true" >> $GITHUB_OUTPUT
+        else
+          echo "No JIRA ticket number found in PR title"
+          echo "has_ticket=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Get GitHub Issue URL from JIRA
+      if: steps.extract_ticket.outputs.has_ticket == 'true'
+      id: get_jira_issue
+      env:
+        JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+        JIRA_USERNAME: ${{ secrets.JIRA_USERNAME }}
+        JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+      run: |
+        TICKET_NUMBER="${{ steps.extract_ticket.outputs.ticket_number }}"
+        echo "Fetching GitHub Issue URL for JIRA ticket: $TICKET_NUMBER"
+
+        # Get ticket information through JIRA API
+        JIRA_RESPONSE=$(curl -s -u "$JIRA_USERNAME:$JIRA_API_TOKEN" \
+          -H "Accept: application/json" \
+          "$JIRA_BASE_URL/rest/api/3/issue/$TICKET_NUMBER")
+
+        echo "JIRA API Response: $JIRA_RESPONSE"
+
+        # Extract issue number from GitHub Issue URL field
+        # Find field that exactly matches "GitHub Issue URL" in JIRA
+        GITHUB_ISSUE_URL=$(echo "$JIRA_RESPONSE" | jq -r '.fields | to_entries[] | select(.key == "GitHub Issue URL") | .value' 2>/dev/null | head -1)
+
+        # Fail immediately if GitHub Issue URL is not found
+        if [ -z "$GITHUB_ISSUE_URL" ] || [ "$GITHUB_ISSUE_URL" = "null" ]; then
+          echo "No GitHub Issue URL found in JIRA ticket"
+          exit 1
+        fi
+
+        echo "Found GitHub Issue URL: $GITHUB_ISSUE_URL"
+        # Extract GitHub issue number (e.g., https://github.com/owner/repo/issues/123 -> 123)
+        GITHUB_ISSUE_NUMBER=$(echo "$GITHUB_ISSUE_URL" | grep -oE '/issues/[0-9]+' | grep -oE '[0-9]+' | head -1)
+
+        if [ -n "$GITHUB_ISSUE_NUMBER" ]; then
+          echo "Extracted GitHub Issue Number: $GITHUB_ISSUE_NUMBER"
+          echo "github_issue_number=$GITHUB_ISSUE_NUMBER" >> $GITHUB_OUTPUT
+          echo "has_github_issue=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Could not extract issue number from GitHub Issue URL: $GITHUB_ISSUE_URL"
+          echo "Please verify the GitHub Issue URL format is correct."
+          exit 1
+        fi
+
+    - name: Update PR body with resolves clause
+      if: steps.extract_ticket.outputs.has_ticket == 'true' && steps.get_jira_issue.outputs.has_github_issue == 'true'
+      env:
+        TICKET_NUMBER: ${{ steps.extract_ticket.outputs.ticket_number }}
+        GITHUB_ISSUE_NUMBER: ${{ steps.get_jira_issue.outputs.github_issue_number }}
+      run: |
+        echo "Using GitHub issue number: $GITHUB_ISSUE_NUMBER from JIRA"
+
+        # Get current PR body
+        PR_BODY=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/pulls/${{ github.event.pull_request.number }}" | \
+          jq -r '.body // ""')
+
+        echo "Current PR body: $PR_BODY"
+
+        # Check if PR body already contains resolves clause
+        if echo "$PR_BODY" | grep -qi "resolves #"; then
+          echo "PR body already contains resolves clause, skipping update"
+          exit 0
+        fi
+
+        # Generate resolves clause
+        RESOLVES_CLAUSE="resolves #$GITHUB_ISSUE_NUMBER ($TICKET_NUMBER)"
+        echo "Generated resolves clause: $RESOLVES_CLAUSE"
+
+        # Create new PR body
+        if [ -n "$PR_BODY" ]; then
+          NEW_BODY=$(printf "%s\n\n%s" "$PR_BODY" "$RESOLVES_CLAUSE")
+        else
+          NEW_BODY="$RESOLVES_CLAUSE"
+        fi
+
+        # Update PR body
+        curl -s -X PATCH \
+          -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          -H "Content-Type: application/json" \
+          "https://api.github.com/repos/${{ github.repository_owner }}/${{ github.event.repository.name }}/pulls/${{ github.event.pull_request.number }}" \
+          -d "{\"body\": $(echo "$NEW_BODY" | jq -R -s .)}"
+
+        echo "✅ Added resolves clause: $RESOLVES_CLAUSE"
