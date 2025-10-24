@@ -581,11 +581,13 @@ class NetAppClient:
             limit_bytes = records[0]["space"]["hard_limit"]
             if used_bytes < 0 or limit_bytes < 0:
                 log.warning(
-                    "Used bytes < 0 ({}) or limit bytes < 0 ({}) for quota rule in NetApp ONTAP with volume ID {} and qtree {}",
-                    used_bytes,
-                    limit_bytes,
+                    "Data from NetApp API negative values in used_bytes or limit_bytes for svm id {}, volume id {}, qtree name {}: \n response from NetApp API = {}, \n used_bytes = {}, \n limit_bytes = {}",
+                    svm_id,
                     volume_id,
                     qtree_name,
+                    data,
+                    used_bytes,
+                    limit_bytes,
                 )
             return QuotaUsage(
                 used_bytes=used_bytes,

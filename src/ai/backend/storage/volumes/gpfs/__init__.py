@@ -89,10 +89,11 @@ class GPFSQuotaModel(BaseQuotaModel):
         limit_bytes = quota_info.blockLimit * 1024 if quota_info.blockLimit is not None else -1
         if used_bytes < 0 or limit_bytes < 0:
             log.warning(
-                "Used bytes < 0 ({}) or limit bytes < 0 ({}) for quota scope {} in GPFS",
+                "Data from GPFS API negative values in used_bytes or limit_bytes for quota scope {}: \n response from GPFS API = {}, \n used_bytes = {}, \n limit_bytes = {}",
+                quota_scope_id,
+                quota_info.to_json(),
                 used_bytes,
                 limit_bytes,
-                quota_scope_id,
             )
         return QuotaUsage(
             used_bytes=used_bytes,

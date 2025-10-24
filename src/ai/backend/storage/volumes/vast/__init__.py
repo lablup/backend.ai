@@ -175,10 +175,11 @@ class VASTQuotaModel(BaseQuotaModel):
             return None
         if quota.used_capacity < 0 or quota.hard_limit < 0:
             log.warning(
-                "Used bytes < 0 ({}) or limit bytes < 0 ({}) for quota scope {} in VAST",
+                "Data from VAST API negative values in used_bytes or limit_bytes for quota scope {}: \n response from VAST API = {}, \n used_bytes = {}, \n limit_bytes = {}",
+                quota_scope_id,
+                quota,
                 quota.used_capacity,
                 quota.hard_limit,
-                quota_scope_id,
             )
         return QuotaUsage(
             used_bytes=quota.used_capacity,
