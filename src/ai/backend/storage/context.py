@@ -43,6 +43,7 @@ from .volumes.cephfs import CephFSVolume
 from .volumes.ddn import EXAScalerFSVolume
 from .volumes.dellemc import DellEMCOneFSVolume
 from .volumes.gpfs import GPFSVolume
+from .volumes.hammerspace.volume import HammerspaceVolume
 from .volumes.netapp import NetAppVolume
 from .volumes.noop import NoopVolume, init_noop_volume
 from .volumes.pool import VolumePool
@@ -72,6 +73,7 @@ DEFAULT_BACKENDS: Mapping[str, Type[AbstractVolume]] = {
     VASTVolume.name: VASTVolume,
     EXAScalerFSVolume.name: EXAScalerFSVolume,
     NoopVolume.name: NoopVolume,
+    HammerspaceVolume.name: HammerspaceVolume,
 }
 
 
