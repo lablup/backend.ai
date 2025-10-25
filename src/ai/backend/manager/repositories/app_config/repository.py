@@ -95,8 +95,6 @@ class AppConfigRepository:
         Invalidates cache after update.
         """
         result = await self._db_source.upsert_config(scope_type, scope_id, modifier)
-
-        # Invalidate cache
         await self._cache_source.invalidate_config(scope_type, scope_id)
 
         return result
@@ -112,9 +110,5 @@ class AppConfigRepository:
         Invalidates cache after deletion.
         """
         result = await self._db_source.delete_config(scope_type, scope_id)
-
-        # Invalidate cache
-        if result:
-            await self._cache_source.invalidate_config(scope_type, scope_id)
-
+        await self._cache_source.invalidate_config(scope_type, scope_id)
         return result

@@ -161,11 +161,19 @@ class AppConfigDBSource:
                     )
                 )
                 .values(**fields_to_update)
-                .returning(AppConfigRow)
             )
-            row = result.scalar_one_or_none()
 
-            if row:
+            if result.rowcount > 0:
+                # Fetch updated row
+                fetch_result = await db_sess.execute(
+                    sa.select(AppConfigRow).where(
+                        sa.and_(
+                            AppConfigRow.scope_type == scope_type,
+                            AppConfigRow.scope_id == scope_id,
+                        )
+                    )
+                )
+                row = fetch_result.scalar_one()
                 return row.to_data()
 
             # If not exists, create new with the modifier's values

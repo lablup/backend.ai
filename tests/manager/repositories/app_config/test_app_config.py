@@ -10,17 +10,30 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import BinarySize, ValkeyTarget
 from ai.backend.manager.data.app_config.types import (
     AppConfigCreator,
     AppConfigModifier,
 )
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.models.app_config import AppConfigScopeType
 from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.user import UserRow, UserStatus
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.app_config import AppConfigRepository
 from ai.backend.manager.types import OptionalState
+
+
+def create_test_password_info(password: str) -> PasswordInfo:
+    """Create a PasswordInfo object for testing with default PBKDF2 algorithm."""
+    return PasswordInfo(
+        password=password,
+        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        rounds=100_000,
+        salt_size=32,
+    )
 
 
 class TestAppConfigRepository:
@@ -54,10 +67,41 @@ class TestAppConfigRepository:
                 await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
 
     @pytest.fixture
+    async def test_resource_policy_name(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[str, None]:
+        """Create test resource policy and return policy name"""
+        policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
+
+        async with database_engine.begin_session() as db_sess:
+            policy = UserResourcePolicyRow(
+                name=policy_name,
+                max_vfolder_count=10,
+                max_quota_scope_size=BinarySize.from_str("10GiB"),
+                max_session_count_per_model_session=5,
+                max_customized_image_count=3,
+            )
+            db_sess.add(policy)
+            await db_sess.flush()
+
+        try:
+            yield policy_name
+        finally:
+            # Cleanup
+            async with database_engine.begin_session() as db_sess:
+                await db_sess.execute(
+                    sa.delete(UserResourcePolicyRow).where(
+                        UserResourcePolicyRow.name == policy_name
+                    )
+                )
+
+    @pytest.fixture
     async def test_user_id(
         self,
         database_engine: ExtendedAsyncSAEngine,
         test_domain_name: str,
+        test_resource_policy_name: str,
     ) -> AsyncGenerator[str, None]:
         """Create test user and return user UUID string"""
         user_uuid = uuid.uuid4()
@@ -68,11 +112,13 @@ class TestAppConfigRepository:
                 uuid=user_uuid,
                 username=f"testuser-{user_uuid.hex[:8]}",
                 email=f"test-{user_uuid.hex[:8]}@example.com",
-                password="hashed_password",
+                password=create_test_password_info("test_password"),
                 need_password_change=False,
                 status=UserStatus.ACTIVE,
                 status_info="active",
                 domain_name=test_domain_name,
+                role=UserRole.USER,
+                resource_policy=test_resource_policy_name,
             )
             db_sess.add(user)
             await db_sess.flush()
