@@ -1,0 +1,2975 @@
+{
+  "$defs": {
+    "APIConfig": {
+      "properties": {
+        "allow_origins": {
+          "default": "*",
+          "description": "\n        CORS allow-origins setting.\n        Use '*' to allow all origins, or specify comma-separated domain patterns.\n        Important for browser-based clients connecting to the API.\n        ",
+          "examples": [
+            "*",
+            "https://example.com"
+          ],
+          "title": "Allow Origins",
+          "type": "string"
+        },
+        "allow_graphql_schema_introspection": {
+          "default": false,
+          "description": "\n        Whether to allow GraphQL schema introspection.\n        Useful for development and debugging, but should be disabled in production.\n        When disabled, GraphQL tools like GraphiQL won't be able to explore the schema.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Allow Graphql Schema Introspection",
+          "type": "boolean"
+        },
+        "allow_openapi_schema_introspection": {
+          "default": false,
+          "description": "\n        Whether to allow OpenAPI schema introspection.\n        Useful for development and debugging, but should be disabled in production.\n        When disabled, Swagger UI and similar tools won't work.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Allow Openapi Schema Introspection",
+          "type": "boolean"
+        },
+        "max_gql_query_depth": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Maximum depth of GraphQL queries allowed.\n        Limits the complexity of queries to prevent abuse.\n        Set to None to disable the limit.\n        ",
+          "examples": [
+            null,
+            10,
+            15
+          ],
+          "title": "Max Gql Query Depth"
+        },
+        "max_gql_connection_page_size": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Maximum page size for GraphQL connection fields.\n        Controls how many items can be retrieved in a single request.\n        Set to None to use the default page size.\n        ",
+          "examples": [
+            null,
+            100,
+            500
+          ],
+          "title": "Max Gql Connection Page Size"
+        },
+        "resources": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResourcesConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Resource visibility settings.\n        Controls how resources are shared and visible between users and groups.\n        ",
+          "examples": [
+            null,
+            {
+              "group_resource_visibility": true
+            }
+          ]
+        }
+      },
+      "title": "APIConfig",
+      "type": "object"
+    },
+    "ActionMonitorsConfig": {
+      "properties": {
+        "subscribed-actions": {
+          "default": [],
+          "description": "\n        List of action types to subscribe to for monitoring.\n        ",
+          "examples": [
+            [
+              "session:create_from_params",
+              "session:create_cluster"
+            ]
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Subscribed-Actions",
+          "type": "array"
+        },
+        "reporter": {
+          "description": "\n        Name of the reporter to use for sending notifications.\n        This should match the name of a configured reporter.\n        ",
+          "examples": [
+            "smtp",
+            "audit_log"
+          ],
+          "title": "Reporter",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reporter"
+      ],
+      "title": "ActionMonitorsConfig",
+      "type": "object"
+    },
+    "ArtifactRegistryConfig": {
+      "properties": {
+        "model-registry": {
+          "description": "\n        Name of the Model registry configuration.\n        Used to identify this registry in the system.\n        ",
+          "examples": [
+            "model-registry"
+          ],
+          "title": "Model-Registry",
+          "type": "string"
+        }
+      },
+      "required": [
+        "model-registry"
+      ],
+      "title": "ArtifactRegistryConfig",
+      "type": "object"
+    },
+    "ArtifactStorageImportStep": {
+      "enum": [
+        "download",
+        "verify",
+        "archive"
+      ],
+      "title": "ArtifactStorageImportStep",
+      "type": "string"
+    },
+    "AuthConfig": {
+      "properties": {
+        "max_password_age": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Maximum password age before requiring a change.\n        Format is a duration string like \"90d\" for 90 days.\n        Set to None to disable password expiration.\n        ",
+          "examples": [
+            null,
+            "90d",
+            "180d"
+          ],
+          "title": "Max Password Age"
+        },
+        "password-hash-algorithm": {
+          "$ref": "#/$defs/PasswordHashAlgorithm",
+          "default": "pbkdf2_sha256",
+          "description": "\n        The password hashing algorithm to use for new passwords.\n        Supported algorithms: bcrypt, sha256, sha3_256, pbkdf2_sha256, pbkdf2_sha3_256.\n        Existing passwords with different algorithms will be gradually migrated.\n        ",
+          "examples": [
+            "bcrypt",
+            "sha256",
+            "sha3_256",
+            "pbkdf2_sha256",
+            "pbkdf2_sha3_256"
+          ]
+        },
+        "password-hash-rounds": {
+          "default": 600000,
+          "description": "\n        The number of rounds (iterations) for the password hashing algorithm.\n        Higher values are more secure but slower.\n        - bcrypt: valid range is 4-31 (will be automatically capped at 31)\n        - pbkdf2_sha256: recommended 100,000+ (default 100,000)\n        - sha256/sha3_256: any positive integer (100,000 may be too high for these)\n        The value will be automatically adjusted to fit the algorithm's constraints.\n        ",
+          "examples": [
+            12,
+            100000,
+            600000
+          ],
+          "maximum": 2000000,
+          "minimum": 1,
+          "title": "Password-Hash-Rounds",
+          "type": "integer"
+        },
+        "password-hash-salt-size": {
+          "default": 32,
+          "description": "\n        The size of the salt in bytes for password hashing.\n        Larger salts provide better protection against rainbow table attacks.\n        - Minimum: 16 bytes (128 bits)\n        - Default: 32 bytes (256 bits) - recommended for most use cases\n        - Maximum: 256 bytes (2048 bits)\n        Note: bcrypt manages its own salt internally, so this setting doesn't apply to bcrypt.\n        ",
+          "examples": [
+            16,
+            32,
+            64
+          ],
+          "maximum": 256,
+          "minimum": 16,
+          "title": "Password-Hash-Salt-Size",
+          "type": "integer"
+        }
+      },
+      "title": "AuthConfig",
+      "type": "object"
+    },
+    "ConsoleConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "colored": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Opt to print colorized log.",
+          "examples": [
+            true
+          ],
+          "title": "Colored"
+        },
+        "format": {
+          "$ref": "#/$defs/LogFormat",
+          "default": "verbose",
+          "description": "Determine verbosity of log."
+        }
+      },
+      "title": "ConsoleConfig",
+      "type": "object"
+    },
+    "DatabaseConfig": {
+      "properties": {
+        "type": {
+          "const": "postgresql",
+          "default": "postgresql",
+          "description": "\n        Type of the database system to use.\n        Currently, only PostgreSQL is supported as the main database backend.\n        ",
+          "examples": [
+            "postgresql"
+          ],
+          "title": "Type",
+          "type": "string"
+        },
+        "addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "127.0.0.1",
+            "port": 5432
+          },
+          "description": "\n        Network address and port of the database server.\n        Default is the standard PostgreSQL port on localhost.\n        "
+        },
+        "name": {
+          "default": "DB_NAME",
+          "description": "\n        Database name to use.\n        This database must exist and be accessible by the configured user.\n        Length must be between 2 and 64 characters due to database naming constraints.\n        ",
+          "examples": [
+            "backend"
+          ],
+          "maxLength": 64,
+          "minLength": 2,
+          "title": "Name",
+          "type": "string"
+        },
+        "user": {
+          "default": "DB_USER",
+          "description": "\n        Username for authenticating with the database.\n        This user must have sufficient privileges for all database operations.\n        ",
+          "examples": [
+            "postgres"
+          ],
+          "title": "User",
+          "type": "string"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Password for authenticating with the database.\n        Can be a direct password string or an environment variable name.\n        For security, using environment variables is recommended in production.\n        ",
+          "examples": [
+            "develove",
+            "DB_PASSWORD"
+          ],
+          "title": "Password"
+        },
+        "pool-size": {
+          "default": 8,
+          "description": "\n        Size of the database connection pool.\n        Determines how many concurrent database connections to maintain.\n        Should be tuned based on expected load and database server capacity.\n        ",
+          "examples": [
+            1,
+            8
+          ],
+          "minimum": 1,
+          "title": "Pool-Size",
+          "type": "integer"
+        },
+        "pool-recycle": {
+          "default": -1,
+          "description": "\n        Maximum lifetime of a connection in seconds before it's recycled.\n        Set to -1 to disable connection recycling.\n        Useful to handle cases where database connections are closed by the server after inactivity.\n        ",
+          "examples": [
+            -1,
+            50
+          ],
+          "minimum": -1,
+          "title": "Pool-Recycle",
+          "type": "number"
+        },
+        "pool-pre-ping": {
+          "default": false,
+          "description": "\n        Whether to test connections with a lightweight ping before using them.\n        Helps detect stale connections before they cause application errors.\n        Adds a small overhead but improves reliability.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Pool-Pre-Ping",
+          "type": "boolean"
+        },
+        "max-overflow": {
+          "default": 64,
+          "description": "\n        Maximum number of additional connections to create beyond the pool_size.\n        Set to -1 for unlimited overflow connections.\n        These connections are created temporarily when pool_size is insufficient.\n        ",
+          "examples": [
+            -1,
+            64
+          ],
+          "minimum": -1,
+          "title": "Max-Overflow",
+          "type": "integer"
+        },
+        "lock-conn-timeout": {
+          "default": 0,
+          "description": "\n        Timeout in seconds for acquiring a connection from the pool.\n        0 means wait indefinitely.\n        If connections cannot be acquired within this time, an exception is raised.\n        ",
+          "examples": [
+            0,
+            30
+          ],
+          "minimum": 0,
+          "title": "Lock-Conn-Timeout",
+          "type": "number"
+        }
+      },
+      "title": "DatabaseConfig",
+      "type": "object"
+    },
+    "DebugConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "\n        Master switch for debug mode.\n        When enabled, activates various debugging features.\n        Should be disabled in production for security and performance.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "asyncio": {
+          "default": false,
+          "description": "\n        Whether to enable asyncio debug mode.\n        Helps detect problems like coroutines never awaited or excessive event loop delays.\n        Adds significant overhead, use only during development.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Asyncio",
+          "type": "boolean"
+        },
+        "enhanced-aiomonitor-task-info": {
+          "default": false,
+          "description": "\n        Enable enhanced task information in aiomonitor.\n        Provides more detailed information about running asyncio tasks.\n        Useful for debugging complex async issues, but adds overhead.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enhanced-Aiomonitor-Task-Info",
+          "type": "boolean"
+        },
+        "log-events": {
+          "default": false,
+          "description": "\n        Whether to log all internal events.\n        When enabled, all events passing through the system will be logged.\n        Very verbose, but useful for debugging event-related issues.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Log-Events",
+          "type": "boolean"
+        },
+        "log-scheduler-ticks": {
+          "default": false,
+          "description": "\n        Whether to log scheduler ticks.\n        Provides detailed logs about the scheduler's internal operations.\n        Useful for debugging scheduling issues, but generates many log entries.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Log-Scheduler-Ticks",
+          "type": "boolean"
+        },
+        "periodic-sync-stats": {
+          "default": false,
+          "description": "\n        Whether to periodically synchronize and log system statistics.\n        When enabled, regularly collects and logs performance metrics.\n        Helpful for monitoring system behavior over time.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Periodic-Sync-Stats",
+          "type": "boolean"
+        }
+      },
+      "title": "DebugConfig",
+      "type": "object"
+    },
+    "DistributedLockType": {
+      "enum": [
+        "filelock",
+        "pg_advisory",
+        "redlock",
+        "etcd",
+        "etcetra"
+      ],
+      "title": "DistributedLockType",
+      "type": "string"
+    },
+    "DockerConfig": {
+      "properties": {
+        "image": {
+          "$ref": "#/$defs/DockerImageConfig",
+          "description": "\n        Docker image management settings.\n        Controls how the manager handles Docker images.\n        "
+        }
+      },
+      "title": "DockerConfig",
+      "type": "object"
+    },
+    "DockerImageAutoPullPolicy": {
+      "enum": [
+        "digest",
+        "tag",
+        "none"
+      ],
+      "title": "DockerImageAutoPullPolicy",
+      "type": "string"
+    },
+    "DockerImageConfig": {
+      "properties": {
+        "auto_pull": {
+          "$ref": "#/$defs/DockerImageAutoPullPolicy",
+          "default": "digest",
+          "description": "\n        Policy for automatically pulling Docker images.\n        'digest': Pull if image digest has changed (most secure)\n        'tag': Pull if image tag has changed\n        'none': Never pull automatically (manual control)\n        ",
+          "examples": [
+            "digest",
+            "tag",
+            "none"
+          ]
+        }
+      },
+      "title": "DockerImageConfig",
+      "type": "object"
+    },
+    "DockerRegistryConfig": {
+      "properties": {
+        "ssl-verify": {
+          "default": true,
+          "description": "\n        Deprecated: Whether to verify SSL certificates when connecting to Docker registries.\n        Disabling this is not recommended except for testing with self-signed certificates.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Ssl-Verify",
+          "type": "boolean"
+        }
+      },
+      "title": "DockerRegistryConfig",
+      "type": "object"
+    },
+    "EtcdConfig": {
+      "properties": {
+        "namespace": {
+          "default": "ETCD_NAMESPACE",
+          "description": "\n        Namespace prefix for etcd keys used by Backend.AI.\n        Allows multiple Backend.AI clusters to share the same etcd cluster.\n        All Backend.AI related keys will be stored under this namespace.\n        ",
+          "examples": [
+            "local",
+            "backend"
+          ],
+          "title": "Namespace",
+          "type": "string"
+        },
+        "addr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+            },
+            {
+              "items": {
+                "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+              },
+              "type": "array"
+            }
+          ],
+          "default": {
+            "host": "127.0.0.1",
+            "port": 2379
+          },
+          "description": "\n        Network address of the etcd server.\n        Default is the standard etcd port on localhost.\n        In production, should point to one or more etcd instance endpoint(s).\n        ",
+          "examples": [
+            {
+              "host": "127.0.0.1",
+              "port": 2379
+            },
+            [
+              {
+                "host": "127.0.0.4",
+                "port": 2379
+              },
+              {
+                "host": "127.0.0.5",
+                "port": 2379
+              }
+            ]
+          ],
+          "title": "Addr"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Username for authenticating with etcd.\n        Optional if etcd doesn't require authentication.\n        Should be set along with password for secure deployments.\n        ",
+          "examples": [
+            "backend",
+            "manager"
+          ],
+          "title": "User"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Password for authenticating with etcd.\n        Optional if etcd doesn't require authentication.\n        Can be a direct password or environment variable reference.\n        ",
+          "examples": [
+            "develove",
+            "ETCD_PASSWORD"
+          ],
+          "title": "Password"
+        }
+      },
+      "title": "EtcdConfig",
+      "type": "object"
+    },
+    "EventLoopType": {
+      "enum": [
+        "asyncio",
+        "uvloop"
+      ],
+      "title": "EventLoopType",
+      "type": "string"
+    },
+    "FileConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "path": {
+          "description": "Path to store log.",
+          "examples": [
+            "/var/log/backend.ai"
+          ],
+          "title": "Path",
+          "type": "string"
+        },
+        "filename": {
+          "description": "Log file name.",
+          "examples": [
+            "wsproxy.log"
+          ],
+          "title": "Filename",
+          "type": "string"
+        },
+        "backup-count": {
+          "default": 5,
+          "description": "Number of outdated log files to retain.",
+          "title": "Backup-Count",
+          "type": "integer"
+        },
+        "rotation-size": {
+          "anyOf": [
+            {
+              "pattern": "^\\s*(\\d*\\.?\\d+)\\s*(\\w+)?",
+              "type": "string"
+            },
+            {
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "description": "Maximum size for a single log file.",
+          "title": "Rotation-Size"
+        },
+        "format": {
+          "$ref": "#/$defs/LogFormat",
+          "default": "verbose",
+          "description": "Determine verbosity of log."
+        }
+      },
+      "required": [
+        "path",
+        "filename"
+      ],
+      "title": "FileConfig",
+      "type": "object"
+    },
+    "GraylogConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "host": {
+          "description": "Graylog hostname.",
+          "examples": [
+            "127.0.0.1"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "description": "Graylog server port number.",
+          "examples": [
+            8000
+          ],
+          "title": "Port",
+          "type": "integer"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "Log level."
+        },
+        "localname": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The custom source identifier. If not specified, fqdn will be used instead.",
+          "title": "Localname"
+        },
+        "fqdn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The fuly qualified domain name of the source.",
+          "title": "Fqdn"
+        },
+        "ssl-verify": {
+          "default": true,
+          "description": "Verify validity of TLS certificate when communicating with logstash.",
+          "title": "Ssl-Verify",
+          "type": "boolean"
+        },
+        "ca-certs": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to Root CA certificate file.",
+          "examples": [
+            "/etc/ssl/ca.pem"
+          ],
+          "title": "Ca-Certs"
+        },
+        "keyfile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to TLS private key file.",
+          "examples": [
+            "/etc/backend.ai/graylog/privkey.pem"
+          ],
+          "title": "Keyfile"
+        },
+        "certfile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to TLS certificate file.",
+          "examples": [
+            "/etc/backend.ai/graylog/cert.pem"
+          ],
+          "title": "Certfile"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "title": "GraylogConfig",
+      "type": "object"
+    },
+    "HangToleranceConfig": {
+      "properties": {
+        "threshold": {
+          "$ref": "#/$defs/HangToleranceThresholdConfig",
+          "description": "\n        Threshold settings for detecting hung sessions.\n        Defines timeouts for different session states.\n        "
+        }
+      },
+      "title": "HangToleranceConfig",
+      "type": "object"
+    },
+    "HangToleranceThresholdConfig": {
+      "properties": {
+        "PREPARING": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Maximum time a session can stay in PREPARING state before considered hung.\n        Format is a duration string like \"10m\" for 10 minutes.\n        Controls when the system will attempt recovery actions.\n        ",
+          "examples": [
+            null,
+            "10m",
+            "30m"
+          ],
+          "title": "Preparing"
+        },
+        "TERMINATING": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Maximum time a session can stay in TERMINATING state before considered hung.\n        Format is a duration string like \"10m\" for 10 minutes.\n        Controls when the system will force-terminate the session.\n        ",
+          "examples": [
+            null,
+            "10m",
+            "30m"
+          ],
+          "title": "Terminating"
+        }
+      },
+      "title": "HangToleranceThresholdConfig",
+      "type": "object"
+    },
+    "IdleCheckerConfig": {
+      "properties": {
+        "enabled": {
+          "default": "",
+          "description": "\n        Enabled idle checkers.\n        Comma-separated list of checker names.\n        ",
+          "examples": [
+            "network_timeout",
+            "utilization"
+          ],
+          "title": "Enabled",
+          "type": "string"
+        },
+        "app_streaming_packet_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "default": "PT5M",
+          "description": "\n        Timeout for app-streaming TCP connections.\n        Controls how long the system waits before considering a connection idle.\n        ",
+          "examples": [
+            "5m",
+            "10m"
+          ],
+          "title": "App Streaming Packet Timeout"
+        },
+        "checkers": {
+          "additionalProperties": true,
+          "description": "\n        Idle checkers configurations.\n        ",
+          "examples": [
+            {
+              "initial-grace-period": "5m",
+              "network_timeout": {
+                "threshold": "10m"
+              },
+              "thresholds-check-operator": "and",
+              "time-window": "12h",
+              "utilization": {
+                "resource-thresholds": {
+                  "cpu_util": {
+                    "average": 30
+                  },
+                  "cuda_mem": {
+                    "average": 30
+                  },
+                  "cuda_util": {
+                    "average": 30
+                  },
+                  "mem": {
+                    "average": 30
+                  }
+                }
+              }
+            }
+          ],
+          "title": "Checkers",
+          "type": "object"
+        }
+      },
+      "title": "IdleCheckerConfig",
+      "type": "object"
+    },
+    "InterContainerNetworkConfig": {
+      "properties": {
+        "default_driver": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "overlay",
+          "description": "\n        Default network driver for inter-container communication.\n        'overlay' is typically used for multi-host networking.\n        Container communication performance depends on this setting.\n        ",
+          "examples": [
+            "overlay",
+            null
+          ],
+          "title": "Default Driver"
+        },
+        "enabled": {
+          "default": false,
+          "description": "\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "plugin": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        ",
+          "title": "Plugin"
+        }
+      },
+      "title": "InterContainerNetworkConfig",
+      "type": "object"
+    },
+    "LogDriver": {
+      "enum": [
+        "console",
+        "logstash",
+        "file",
+        "graylog"
+      ],
+      "title": "LogDriver",
+      "type": "string"
+    },
+    "LogFormat": {
+      "enum": [
+        "simple",
+        "verbose"
+      ],
+      "title": "LogFormat",
+      "type": "string"
+    },
+    "LogHandlerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "class": {
+          "description": "The class name of the log handler.",
+          "title": "Class",
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "The log level to filter messages from this handler."
+        }
+      },
+      "required": [
+        "class"
+      ],
+      "title": "LogHandlerConfig",
+      "type": "object"
+    },
+    "LogLevel": {
+      "enum": [
+        "CRITICAL",
+        "ERROR",
+        "WARNING",
+        "INFO",
+        "DEBUG",
+        "TRACE",
+        "NOTSET"
+      ],
+      "title": "LogLevel",
+      "type": "string"
+    },
+    "LoggerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "handlers": {
+          "description": "The name of handlers receiving messages from this logger.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Handlers",
+          "type": "array"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "The log level to filter messages from this logger."
+        },
+        "propagate": {
+          "default": true,
+          "description": "Whether to propagate messages to pre-existing loggers.",
+          "title": "Propagate",
+          "type": "boolean"
+        }
+      },
+      "title": "LoggerConfig",
+      "type": "object"
+    },
+    "LoggingConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "version": {
+          "default": 1,
+          "description": "The version used by logging.dictConfig().",
+          "title": "Version",
+          "type": "integer"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "The main log level to filter messages from all loggers."
+        },
+        "disable-existing-loggers": {
+          "default": false,
+          "description": "Disable the existing loggers when applying the config.",
+          "title": "Disable-Existing-Loggers",
+          "type": "boolean"
+        },
+        "handlers": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/LogHandlerConfig"
+              },
+              {
+                "$ref": "#/$defs/RelayLogHandlerConfig"
+              }
+            ]
+          },
+          "description": "The mapping of log handler configurations.",
+          "title": "Handlers",
+          "type": "object"
+        },
+        "loggers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LoggerConfig"
+          },
+          "description": "The mapping of per-namespace logger configurations.",
+          "title": "Loggers",
+          "type": "object"
+        },
+        "drivers": {
+          "default": [
+            "console"
+          ],
+          "description": "The list of log drivers to activate.",
+          "items": {
+            "$ref": "#/$defs/LogDriver"
+          },
+          "title": "Drivers",
+          "type": "array"
+        },
+        "console": {
+          "$ref": "#/$defs/ConsoleConfig",
+          "default": {
+            "colored": null,
+            "format": "verbose"
+          }
+        },
+        "file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FileConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "logstash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LogstashConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "graylog": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GraylogConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "pkg_ns": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LogLevel"
+          },
+          "default": {
+            "": "WARNING",
+            "ai.backend": "INFO",
+            "tests": "DEBUG"
+          },
+          "description": "Override default log level for specific scope of package",
+          "title": "Pkg Ns",
+          "type": "object"
+        }
+      },
+      "title": "LoggingConfig",
+      "type": "object"
+    },
+    "LogstashConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "endpoint": {
+          "$ref": "#/$defs/ai__backend__logging__config__HostPortPair",
+          "description": "Connection information of logstash node.",
+          "examples": [
+            {
+              "host": "127.0.0.1",
+              "port": 8001
+            }
+          ]
+        },
+        "protocol": {
+          "$ref": "#/$defs/LogstashProtocol",
+          "default": "tcp",
+          "description": "Protocol to communicate with logstash server."
+        },
+        "ssl-enabled": {
+          "default": true,
+          "description": "Use TLS to communicate with logstash server.",
+          "title": "Ssl-Enabled",
+          "type": "boolean"
+        },
+        "ssl-verify": {
+          "default": true,
+          "description": "Verify validity of TLS certificate when communicating with logstash.",
+          "title": "Ssl-Verify",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "endpoint"
+      ],
+      "title": "LogstashConfig",
+      "type": "object"
+    },
+    "LogstashProtocol": {
+      "enum": [
+        "zmq.push",
+        "zmq.pub",
+        "tcp",
+        "udp"
+      ],
+      "title": "LogstashProtocol",
+      "type": "string"
+    },
+    "ManagerConfig": {
+      "properties": {
+        "ipc-base-path": {
+          "default": "/tmp/backend.ai/ipc",
+          "description": "\n        Base directory path for inter-process communication files.\n        Used for Unix domain sockets and other IPC mechanisms.\n        This directory must be writable by the manager process.\n        In production, consider using /var/run/backend.ai/ipc instead.\n        ",
+          "examples": [
+            "/var/run/backend.ai/ipc"
+          ],
+          "title": "Ipc-Base-Path",
+          "type": "string"
+        },
+        "num-proc": {
+          "default": 10,
+          "description": "\n        Number of worker processes to spawn for the manager.\n        Defaults to the number of CPU cores available.\n        For optimal performance, set this to match your CPU core count.\n        ",
+          "examples": [
+            1,
+            4
+          ],
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Num-Proc",
+          "type": "integer"
+        },
+        "id": {
+          "default": "i-SH-macbook.local",
+          "description": "\n        Unique identifier for this manager instance.\n        Used to distinguish between multiple manager instances in a cluster.\n        By default, uses the hostname with an 'i-' prefix.\n        Must be unique across all managers in the same Backend.AI cluster.\n        ",
+          "examples": [
+            "i-manager123"
+          ],
+          "title": "Id",
+          "type": "string"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 502,
+          "description": "\n        User ID (UID) under which the manager process runs.\n        If not specified, defaults to the UID of the server.py file.\n        Important for proper file permissions when creating files/sockets.\n        ",
+          "examples": [
+            502
+          ],
+          "title": "User"
+        },
+        "group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 20,
+          "description": "\n        Group ID (GID) under which the manager process runs.\n        If not specified, defaults to the GID of the server.py file.\n        Important for proper file permissions when creating files/sockets.\n        ",
+          "examples": [
+            20
+          ],
+          "title": "Group"
+        },
+        "service-addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "0.0.0.0",
+            "port": 8080
+          },
+          "description": "\n        Network address and port where the manager service will listen.\n        Default is all interfaces (0.0.0.0) on port 8080.\n        For private deployments, consider using 127.0.0.1 instead.\n        "
+        },
+        "announce-addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "127.0.0.1",
+            "port": 5432
+          },
+          "description": "\n        Address and port to announce to other components.\n        This is used for service discovery and should be accessible by other components.\n        "
+        },
+        "announce-internal-addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "host.docker.internal",
+            "port": 18080
+          },
+          "description": "\n        Address and port to announce for internal API requests.\n        This is used for service discovery and should be accessible by other components.\n        "
+        },
+        "internal-addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "0.0.0.0",
+            "port": 18080
+          },
+          "description": "\n        Set the internal hostname/port to accept internal API requests.\n        "
+        },
+        "rpc-auth-manager-keypair": {
+          "default": "fixtures/manager/manager.key_secret",
+          "description": "\n        Path to the keypair file used for RPC authentication.\n        This file contains key pairs used for secure communication between manager components.\n        In production, should be stored in a secure location with restricted access.\n        ",
+          "format": "path",
+          "title": "Rpc-Auth-Manager-Keypair",
+          "type": "string"
+        },
+        "heartbeat-timeout": {
+          "default": 40.0,
+          "description": "\n        Timeout in seconds for agent heartbeat checks.\n        If an agent doesn't respond within this time, it's considered offline.\n        Should be set higher than the agent's heartbeat interval.\n        ",
+          "minimum": 1.0,
+          "title": "Heartbeat-Timeout",
+          "type": "number"
+        },
+        "secret": {
+          "description": "\n        Secret key for manager authentication and signing.\n        Used for securing API tokens and inter-service communication.\n        Should be a strong random string in production environments.\n        If not provided, one will be generated automatically (not recommended for clusters).\n        ",
+          "examples": [
+            "XXXXXXXXXXXXXX"
+          ],
+          "title": "Secret",
+          "type": "string"
+        },
+        "ssl-enabled": {
+          "default": false,
+          "description": "\n        Whether to enable SSL/TLS for secure API communication.\n        Strongly recommended for production deployments exposed to networks.\n        Requires valid certificate and private key when enabled.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Ssl-Enabled",
+          "type": "boolean"
+        },
+        "ssl-cert": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Path to the SSL certificate file.\n        Required if `ssl_enabled` is True.\n        Should be a PEM-formatted certificate file, either self-signed or from a CA.\n        ",
+          "examples": [
+            "fixtures/manager/manager.crt"
+          ],
+          "title": "Ssl-Cert"
+        },
+        "ssl-privkey": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Path to the SSL private key file.\n        Required if `ssl_enabled` is True.\n        Should be a PEM-formatted private key corresponding to the certificate.\n        ",
+          "examples": [
+            "fixtures/manager/manager.key"
+          ],
+          "title": "Ssl-Privkey"
+        },
+        "event-loop": {
+          "$ref": "#/$defs/EventLoopType",
+          "default": "asyncio",
+          "description": "\n        Event loop implementation to use.\n        'asyncio' is the Python standard library implementation.\n        'uvloop' is a faster alternative but may have compatibility issues with some libraries.\n        ",
+          "examples": [
+            "asyncio",
+            "uvloop"
+          ]
+        },
+        "distributed-lock": {
+          "$ref": "#/$defs/DistributedLockType",
+          "default": "pg_advisory",
+          "description": "\n        Distributed lock mechanism to coordinate multiple manager instances.\n        - filelock: Simple file-based locks (not suitable for distributed deployments)\n        - pg_advisory: PostgreSQL advisory locks (default, good for small/medium clusters)\n        - redlock: Redis-based distributed locking (good for large clusters)\n        - etcd: etcd-based locks (good for large clusters with etcd)\n        - etcetra: etcd v3 API-compatible distributed locking\n        ",
+          "examples": [
+            "filelock",
+            "pg_advisory",
+            "redlock",
+            "etcd",
+            "etcetra"
+          ]
+        },
+        "pg-advisory-config": {
+          "additionalProperties": true,
+          "default": {},
+          "description": "\n        Configuration for PostgreSQL advisory locks.\n        This is used when distributed_lock is set to pg_advisory.\n        ",
+          "examples": [
+            {}
+          ],
+          "title": "Pg-Advisory-Config",
+          "type": "object"
+        },
+        "filelock-config": {
+          "additionalProperties": true,
+          "default": {},
+          "description": "\n        Configuration for file-based locks.\n        This is used when distributed_lock is set to filelock.\n        ",
+          "examples": [
+            {}
+          ],
+          "title": "Filelock-Config",
+          "type": "object"
+        },
+        "redlock-config": {
+          "additionalProperties": true,
+          "default": {
+            "lock_retry_interval": 1.0
+          },
+          "description": "\n        Configuration for Redis-based distributed locking.\n        This is used when distributed_lock is set to redlock.\n        ",
+          "examples": [
+            {
+              "lock_retry_interval": 1.0
+            }
+          ],
+          "title": "Redlock-Config",
+          "type": "object"
+        },
+        "etcdlock-config": {
+          "additionalProperties": true,
+          "default": {},
+          "description": "\n        Configuration for etcd-based distributed locking.\n        This is used when distributed_lock is set to etcd.\n        ",
+          "examples": [
+            {}
+          ],
+          "title": "Etcdlock-Config",
+          "type": "object"
+        },
+        "session-schedule-lock-lifetime": {
+          "default": 30,
+          "description": "\n        Maximum lifetime in seconds for session scheduling locks.\n        If scheduling takes longer than this, locks will be automatically released.\n        Prevents deadlocks in case a manager fails during scheduling.\n        ",
+          "examples": [
+            30.0,
+            60.0
+          ],
+          "title": "Session-Schedule-Lock-Lifetime",
+          "type": "number"
+        },
+        "session-check-precondition-lock-lifetime": {
+          "default": 30,
+          "description": "\n        Maximum lifetime in seconds for session precondition check locks.\n        Controls how long the manager can hold a lock while checking if a session can be created.\n        Should be balanced to prevent both deadlocks and race conditions.\n        ",
+          "examples": [
+            30.0,
+            60.0
+          ],
+          "title": "Session-Check-Precondition-Lock-Lifetime",
+          "type": "number"
+        },
+        "session-start-lock-lifetime": {
+          "default": 30,
+          "description": "\n        Maximum lifetime in seconds for session start locks.\n        Controls how long the manager can hold a lock while starting a session.\n        Longer values are safer but may block other managers longer on failure.\n        ",
+          "examples": [
+            30.0,
+            60.0
+          ],
+          "title": "Session-Start-Lock-Lifetime",
+          "type": "number"
+        },
+        "pid-file": {
+          "default": "/dev/null",
+          "description": "\n        Path to the file where the manager process ID will be written.\n        Useful for service management and monitoring.\n        Set to /dev/null by default to disable this feature.\n        ",
+          "examples": [
+            "/var/run/manager.pid"
+          ],
+          "format": "path",
+          "title": "Pid-File",
+          "type": "string"
+        },
+        "allowed-plugins": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of explicitly allowed plugins to load.\n        If specified, only these plugins will be loaded, even if others are installed.\n        Useful for controlling exactly which plugins are active.\n        Leave as None to load all available plugins except those in disabled_plugins.\n        ",
+          "examples": [
+            [
+              "example.plugin.what.you.want"
+            ]
+          ],
+          "title": "Allowed-Plugins"
+        },
+        "disabled-plugins": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of plugins to explicitly disable.\n        These plugins won't be loaded even if they're installed.\n        Useful for disabling problematic or unwanted plugins without uninstalling them.\n        ",
+          "examples": [
+            [
+              "example.plugin.what.you.want"
+            ]
+          ],
+          "title": "Disabled-Plugins"
+        },
+        "hide-agents": {
+          "default": false,
+          "description": "\n        Whether to hide detailed agent information in API responses.\n        When enabled, agent details are obscured in user-facing APIs.\n        Useful for security in multi-tenant environments.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Hide-Agents",
+          "type": "boolean"
+        },
+        "agent-selection-resource-priority": {
+          "default": [
+            "cuda",
+            "rocm",
+            "tpu",
+            "cpu",
+            "mem"
+          ],
+          "description": "\n        Priority order for resources when selecting agents for compute sessions.\n        Determines which resources are considered more important during scheduling.\n        Default prioritizes GPU resources (CUDA, ROCm) over CPU and memory.\n        ",
+          "examples": [
+            [
+              "cuda",
+              "rocm",
+              "tpu",
+              "cpu",
+              "mem"
+            ]
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Agent-Selection-Resource-Priority",
+          "type": "array"
+        },
+        "importer-image": {
+          "default": "lablup/importer:manylinux2010",
+          "description": "\n        Deprecated: Container image used for the importer service.\n        The importer handles tasks like installing additional packages.\n        Should be compatible with the Backend.AI environment.\n        ",
+          "examples": [
+            "lablup/importer:manylinux2010"
+          ],
+          "title": "Importer-Image",
+          "type": "string"
+        },
+        "max-wsmsg-size": {
+          "default": 16777216,
+          "description": "\n        Maximum WebSocket message size in bytes.\n        Controls the largest message that can be sent over WebSocket connections.\n        Default is 16 MiB, which should be sufficient for most use cases.\n        Increase for applications that need to transfer larger data chunks.\n        ",
+          "examples": [
+            16777216,
+            33554432
+          ],
+          "title": "Max-Wsmsg-Size",
+          "type": "integer"
+        },
+        "aiomonitor-port": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Deprecated: Port for the aiomonitor terminal UI.\n        Use `aiomonitor_termui_port` instead.\n        ",
+          "examples": [
+            38100,
+            38200
+          ],
+          "title": "Aiomonitor-Port"
+        },
+        "aiomonitor-termui-port": {
+          "default": 38100,
+          "description": "\n        Port for the aiomonitor terminal UI.\n        Allows connecting to a debugging console for the manager.\n        Should be a port that's not used by other services.\n        ",
+          "examples": [
+            38100,
+            38200
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Aiomonitor-Termui-Port",
+          "type": "integer"
+        },
+        "aiomonitor-webui-port": {
+          "default": 39100,
+          "description": "\n        Port for the aiomonitor web UI.\n        Provides a web-based monitoring interface for the manager.\n        Should be a port that's not used by other services.\n        ",
+          "examples": [
+            39100,
+            39200
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Aiomonitor-Webui-Port",
+          "type": "integer"
+        },
+        "use-experimental-redis-event-dispatcher": {
+          "default": false,
+          "description": "\n        Whether to use the experimental Redis-based event dispatcher.\n        May provide better performance for event handling in large clusters.\n        Not recommended for production use unless specifically needed.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Use-Experimental-Redis-Event-Dispatcher",
+          "type": "boolean"
+        },
+        "status-update-interval": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Interval in seconds between status updates.\n        Controls how frequently the manager updates its status.\n        Smaller values provide more real-time information but increase overhead.\n        ",
+          "examples": [
+            60.0,
+            120.0
+          ],
+          "title": "Status-Update-Interval"
+        },
+        "status-lifetime": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        How long in seconds status information is considered valid.\n        Status records older than this will be ignored or refreshed.\n        Should be greater than the status_update_interval.\n        ",
+          "examples": [
+            60,
+            120
+          ],
+          "title": "Status-Lifetime"
+        },
+        "public-metrics-port": {
+          "anyOf": [
+            {
+              "maximum": 65535,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Port for exposing public metrics (e.g., Prometheus endpoint).\n        If specified, metrics will be available at this port.\n        Leave as None to disable public metrics exposure.\n        ",
+          "examples": [
+            8080,
+            9090
+          ],
+          "title": "Public-Metrics-Port"
+        },
+        "use-sokovan": {
+          "default": true,
+          "description": "\n        Whether to use the Sokovan orchestrator for session scheduling.\n        When enabled, uses the new Sokovan orchestrator for improved scheduling performance.\n        When disabled, falls back to the legacy scheduling system.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Use-Sokovan",
+          "type": "boolean"
+        }
+      },
+      "title": "ManagerConfig",
+      "type": "object"
+    },
+    "MetricConfig": {
+      "properties": {
+        "addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "127.0.0.1",
+            "port": 9090
+          },
+          "description": "\n        Address for the metric collection service.\n        "
+        },
+        "timewindow": {
+          "default": "1m",
+          "description": "\n        Time window for metric collection.\n        Controls how often metrics are collected and reported.\n        Format is a duration string like \"1h\" for 1 hour.\n        ",
+          "examples": [
+            "1m",
+            "1h"
+          ],
+          "title": "Timewindow",
+          "type": "string"
+        }
+      },
+      "title": "MetricConfig",
+      "type": "object"
+    },
+    "MsgpackOptions": {
+      "properties": {
+        "pack-opts": {
+          "additionalProperties": true,
+          "title": "Pack-Opts",
+          "type": "object"
+        },
+        "unpack-opts": {
+          "additionalProperties": true,
+          "title": "Unpack-Opts",
+          "type": "object"
+        }
+      },
+      "required": [
+        "pack-opts",
+        "unpack-opts"
+      ],
+      "title": "MsgpackOptions",
+      "type": "object"
+    },
+    "NetworkConfig": {
+      "properties": {
+        "inter_container": {
+          "$ref": "#/$defs/InterContainerNetworkConfig",
+          "description": "\n        Settings for networks between containers.\n        Controls how containers communicate with each other.\n        "
+        },
+        "subnet": {
+          "$ref": "#/$defs/SubnetNetworkConfig",
+          "description": "\n        Subnet configurations for the Backend.AI network.\n        Defines IP ranges for agents and containers.\n        "
+        },
+        "rpc": {
+          "$ref": "#/$defs/RpcConfig",
+          "description": "\n        "
+        }
+      },
+      "title": "NetworkConfig",
+      "type": "object"
+    },
+    "OTELConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "\n        Whether to enable OpenTelemetry for tracing or logging.\n        When enabled, traces or log will be collected and sent to the configured OTLP endpoint.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "log-level": {
+          "default": "INFO",
+          "description": "\n        Log level for OpenTelemetry.\n        Controls the verbosity of logs generated by OpenTelemetry.\n        Common levels include 'debug', 'info', 'warn', 'error'.\n        ",
+          "examples": [
+            "INFO",
+            "DEBUG",
+            "WARN",
+            "ERROR",
+            "TRACE"
+          ],
+          "title": "Log-Level",
+          "type": "string"
+        },
+        "endpoint": {
+          "default": "http://localhost:4317",
+          "description": "\n        OTLP endpoint for sending traces.\n        Should include the host and port of the OTLP receiver.\n        ",
+          "examples": [
+            "http://localhost:4317",
+            "http://otel-collector:4317"
+          ],
+          "title": "Endpoint",
+          "type": "string"
+        }
+      },
+      "title": "OTELConfig",
+      "type": "object"
+    },
+    "PasswordHashAlgorithm": {
+      "description": "Supported password hash algorithms.",
+      "enum": [
+        "bcrypt",
+        "sha256",
+        "sha3_256",
+        "pbkdf2_sha256",
+        "pbkdf2_sha3_256"
+      ],
+      "title": "PasswordHashAlgorithm",
+      "type": "string"
+    },
+    "PluginsConfig": {
+      "properties": {
+        "accelerator": {
+          "additionalProperties": true,
+          "description": "\n        Accelerator plugin configurations.\n        Settings for GPU, TPU, and other acceleration devices.\n        Specific configuration depends on installed plugins.\n        ",
+          "examples": [
+            {
+              "cuda": {}
+            }
+          ],
+          "title": "Accelerator",
+          "type": "object"
+        },
+        "scheduler": {
+          "additionalProperties": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "description": "\n        Scheduler plugin configurations.\n        Controls how compute sessions are scheduled across agents.\n        Examples include FIFO, LIFO, DRF schedulers.\n        ",
+          "examples": [
+            {
+              "fifo": {
+                "num_retries_to_skip": 3
+              }
+            }
+          ],
+          "title": "Scheduler",
+          "type": "object"
+        },
+        "agent_selector": {
+          "additionalProperties": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "description": "\n        Agent selector plugin configurations.\n        Controls how agents are selected for compute sessions.\n        Can implement various selection strategies based on load, resource availability, etc.\n        ",
+          "examples": [
+            {}
+          ],
+          "title": "Agent Selector",
+          "type": "object"
+        },
+        "network": {
+          "additionalProperties": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "description": "\n        Network plugin configurations.\n        ",
+          "examples": [
+            {
+              "overlay": {
+                "mtu": 1500
+              }
+            }
+          ],
+          "title": "Network",
+          "type": "object"
+        }
+      },
+      "title": "PluginsConfig",
+      "type": "object"
+    },
+    "PyroscopeConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "\n        Whether to enable Pyroscope profiling.\n        When enabled, performance profiling data will be sent to a Pyroscope server.\n        Useful for debugging performance issues, but adds some overhead.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "app-name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Application name to use in Pyroscope.\n        This name will identify this manager instance in Pyroscope UI.\n        Required if Pyroscope is enabled.\n        ",
+          "examples": [
+            "backendai-half-manager"
+          ],
+          "title": "App-Name"
+        },
+        "server-addr": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Address of the Pyroscope server.\n        Must include the protocol (http or https) and port if non-standard.\n        Required if Pyroscope is enabled.\n        ",
+          "examples": [
+            "http://localhost:4040"
+          ],
+          "title": "Server-Addr"
+        },
+        "sample-rate": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Sampling rate for Pyroscope profiling.\n        Higher values collect more data but increase overhead.\n        Balance based on your performance monitoring needs.\n        ",
+          "examples": [
+            10,
+            100,
+            1000
+          ],
+          "title": "Sample-Rate"
+        }
+      },
+      "title": "PyroscopeConfig",
+      "type": "object"
+    },
+    "RedisConfig": {
+      "properties": {
+        "addr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Network address and port of the Redis server.\n        Redis is used for distributed caching and messaging between managers.\n        Set to None when using Sentinel for high availability.\n        ",
+          "examples": [
+            null,
+            {
+              "host": "127.0.0.1",
+              "port": 6379
+            }
+          ]
+        },
+        "sentinel": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of Redis Sentinel addresses for high availability.\n        If provided, the manager will use Redis Sentinel for automatic failover.\n        When using Sentinel, the addr field is ignored and service_name is required.\n        ",
+          "examples": [
+            null,
+            [
+              {
+                "host": "redis-sentinel",
+                "port": 26379
+              },
+              {
+                "host": "redis-sentinel",
+                "port": 26380
+              }
+            ]
+          ],
+          "title": "Sentinel"
+        },
+        "service_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Service name for Redis Sentinel.\n        Required when using Redis Sentinel for high availability.\n        Identifies which service to monitor for failover.\n        ",
+          "examples": [
+            null,
+            "mymaster",
+            "backend-ai"
+          ],
+          "title": "Service Name"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Password for authenticating with Redis.\n        Set to None if Redis doesn't require authentication.\n        Should be kept secret in production environments.\n        ",
+          "examples": [
+            null,
+            "REDIS_PASSWORD"
+          ],
+          "title": "Password"
+        },
+        "request_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Timeout in milliseconds for Redis requests.\n        Controls how long operations wait before timing out.\n        If None, uses the default timeout configured in the Redis client.\n        ",
+          "examples": [
+            null,
+            1000
+          ],
+          "title": "Request Timeout"
+        },
+        "redis_helper_config": {
+          "$ref": "#/$defs/RedisHelperConfig",
+          "description": "\n        Configuration for the Redis helper library.\n        Controls timeouts and reconnection behavior.\n        Adjust based on network conditions and reliability requirements.\n        "
+        },
+        "use_tls": {
+          "default": false,
+          "description": "\n        Whether to use TLS for Redis connections.",
+          "title": "Use Tls",
+          "type": "boolean"
+        },
+        "tls_skip_verify": {
+          "default": false,
+          "description": "\n        Whether to skip TLS certificate verification.\n        Set to True for self-signed certificates or development environments.\n        ",
+          "title": "Tls Skip Verify",
+          "type": "boolean"
+        },
+        "override_configs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/SingleRedisConfig"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Optional override configurations for specific Redis contexts.\n        Allows different Redis settings for different services within Backend.AI.\n        Each key represents a context name, and the value is a complete Redis configuration.\n        ",
+          "examples": [
+            null,
+            {
+              "live": {
+                "addr": {
+                  "host": "127.0.0.1",
+                  "port": 6379
+                },
+                "password": "different-password",
+                "redis_helper_config": {
+                  "socket_timeout": 10.0
+                }
+              }
+            }
+          ],
+          "title": "Override Configs"
+        }
+      },
+      "title": "RedisConfig",
+      "type": "object"
+    },
+    "RedisHelperConfig": {
+      "properties": {
+        "socket_timeout": {
+          "default": 5.0,
+          "description": "\n        Timeout in seconds for Redis socket operations.\n        Controls how long operations wait before timing out.\n        Increase for slow or congested networks.\n        ",
+          "examples": [
+            5.0,
+            10.0
+          ],
+          "title": "Socket Timeout",
+          "type": "number"
+        },
+        "socket_connect_timeout": {
+          "default": 2.0,
+          "description": "\n        Timeout in seconds for establishing Redis connections.\n        Controls how long connection attempts wait before failing.\n        Shorter values fail faster but may be too aggressive for some networks.\n        ",
+          "examples": [
+            2.0,
+            5.0
+          ],
+          "title": "Socket Connect Timeout",
+          "type": "number"
+        },
+        "reconnect_poll_timeout": {
+          "default": 0.3,
+          "description": "\n        Time in seconds to wait between reconnection attempts.\n        Controls the polling frequency when trying to reconnect to Redis.\n        Lower values reconnect faster but may increase network load.\n        ",
+          "examples": [
+            0.3,
+            1.0
+          ],
+          "title": "Reconnect Poll Timeout",
+          "type": "number"
+        }
+      },
+      "title": "RedisHelperConfig",
+      "type": "object"
+    },
+    "RelayLogHandlerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "class": {
+          "description": "The class name of the log handler.",
+          "title": "Class",
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "The log level to filter messages from this handler."
+        },
+        "endpoint": {
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "msgpack-options": {
+          "$ref": "#/$defs/MsgpackOptions"
+        }
+      },
+      "required": [
+        "class",
+        "endpoint",
+        "msgpack-options"
+      ],
+      "title": "RelayLogHandlerConfig",
+      "type": "object"
+    },
+    "ReporterConfig": {
+      "properties": {
+        "smtp": {
+          "default": [],
+          "description": "\n        SMTP reporter configuration.\n        Controls how email notifications are sent.\n        Includes settings for SMTP server, authentication, and email templates.\n        ",
+          "items": {
+            "$ref": "#/$defs/SMTPReporterConfig"
+          },
+          "title": "Smtp",
+          "type": "array"
+        },
+        "action-monitors": {
+          "default": [],
+          "description": "\n        Action monitors configuration.\n        Each reporter can be configured to subscribe to specific actions.\n        ",
+          "items": {
+            "$ref": "#/$defs/ActionMonitorsConfig"
+          },
+          "title": "Action-Monitors",
+          "type": "array"
+        }
+      },
+      "title": "ReporterConfig",
+      "type": "object"
+    },
+    "ReservoirConfig": {
+      "properties": {
+        "enable-approve-process": {
+          "default": false,
+          "description": "\n        Whether to enable the approval process for artifact uploads.\n        When enabled, artifacts require approval before being available.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enable-Approve-Process",
+          "type": "boolean"
+        },
+        "use-delegation": {
+          "default": false,
+          "description": "\n        Whether this reservoir is a leaf in a delegation hierarchy.\n        If true, it cannot delegate to other reservoirs.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Use-Delegation",
+          "type": "boolean"
+        },
+        "storage-name": {
+          "description": "\n        Name of the reservoir default storage.\n\n        You can specify the storage to be used for each step using storage_step_selection.\n        For steps not explicitly specified in storage_step_selection, the storage is designated by storage_name.\n        If you specify storage for all steps in storage_step_selection, there is no need to specify storage_name.\n        ",
+          "examples": [
+            "minio-storage",
+            "gitlfs-storage",
+            "vfs-storage"
+          ],
+          "title": "Storage-Name",
+          "type": "string"
+        },
+        "config": {
+          "description": "\n        Configuration for the storage.\n        ",
+          "discriminator": {
+            "mapping": {
+              "object_storage": "#/$defs/ReservoirObjectStorageConfig",
+              "vfs_storage": "#/$defs/ReservoirVFSStorageConfig"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ReservoirObjectStorageConfig"
+            },
+            {
+              "$ref": "#/$defs/ReservoirVFSStorageConfig"
+            }
+          ],
+          "title": "Config"
+        },
+        "storage_step_selection": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "\n        Storage step selection configuration for artifact model imports.\n        Maps different import steps (download, archive) to specific storage backends.\n        Required for artifact model import operations.\n        ",
+          "propertyNames": {
+            "$ref": "#/$defs/ArtifactStorageImportStep"
+          },
+          "title": "Storage Step Selection",
+          "type": "object"
+        }
+      },
+      "required": [
+        "storage-name"
+      ],
+      "title": "ReservoirConfig",
+      "type": "object"
+    },
+    "ReservoirObjectStorageConfig": {
+      "properties": {
+        "type": {
+          "const": "object_storage",
+          "default": "object_storage",
+          "description": "\n        Type of the storage configuration.\n        This is used to identify the specific storage type.\n        ",
+          "title": "Type",
+          "type": "string"
+        },
+        "bucket-name": {
+          "default": "OBJECT_STORAGE_BUCKET_NAME",
+          "description": "\n        Name of the bucket to use for the reservoir.\n        ",
+          "examples": [
+            "minio-bucket"
+          ],
+          "title": "Bucket-Name",
+          "type": "string"
+        }
+      },
+      "title": "ReservoirObjectStorageConfig",
+      "type": "object"
+    },
+    "ReservoirVFSStorageConfig": {
+      "properties": {
+        "type": {
+          "const": "vfs_storage",
+          "default": "vfs_storage",
+          "description": "\n        Type of the storage configuration.\n        This is used to identify the specific storage type.\n        ",
+          "title": "Type",
+          "type": "string"
+        },
+        "subpath": {
+          "default": "",
+          "description": "\n        Subpath within the VFS storage for the reservoir.\n        This is appended to the VFS storage's base_path.\n        ",
+          "examples": [
+            "artifacts",
+            "models",
+            ""
+          ],
+          "title": "Subpath",
+          "type": "string"
+        }
+      },
+      "title": "ReservoirVFSStorageConfig",
+      "type": "object"
+    },
+    "ResourceSlotsConfig": {
+      "additionalProperties": true,
+      "properties": {},
+      "title": "ResourceSlotsConfig",
+      "type": "object"
+    },
+    "ResourcesConfig": {
+      "properties": {
+        "group-resource-visibility": {
+          "default": false,
+          "description": "\n        Whether to return group resource status in check-presets.\n        If true, group resources are visible to all users in the group.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Group-Resource-Visibility",
+          "type": "boolean"
+        }
+      },
+      "title": "ResourcesConfig",
+      "type": "object"
+    },
+    "RpcConfig": {
+      "properties": {
+        "keepalive_timeout": {
+          "default": 60.0,
+          "description": "\n        ",
+          "examples": [
+            60.0,
+            120.0
+          ],
+          "title": "Keepalive Timeout",
+          "type": "number"
+        }
+      },
+      "title": "RpcConfig",
+      "type": "object"
+    },
+    "SMTPReporterConfig": {
+      "properties": {
+        "name": {
+          "description": "\n        Name of the SMTP reporter.\n        Used to identify this reporter in the system.\n        ",
+          "examples": [
+            "smtp"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "host": {
+          "description": "\n        Host address of the service.\n        Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to all interfaces.\n        ",
+          "examples": [
+            "smtp.gmail.com"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "description": "\n        Port number of the service.\n        Must be between 1 and 65535.\n        Ports below 1024 require root/admin privileges.\n        ",
+          "examples": [
+            465,
+            587
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "username": {
+          "description": "\n        Username for authenticating with the SMTP server.\n        This is required for sending emails through the SMTP service.\n        ",
+          "examples": [
+            "user@example.com"
+          ],
+          "title": "Username",
+          "type": "string"
+        },
+        "password": {
+          "description": "\n        Password for authenticating with the SMTP server.\n        This is required for sending emails through the SMTP service.\n        ",
+          "examples": [
+            "password"
+          ],
+          "title": "Password",
+          "type": "string"
+        },
+        "sender": {
+          "description": "\n        Email address of the sender.\n        This is the address that will appear as the sender in emails.\n        ",
+          "examples": [
+            "sender@example.com"
+          ],
+          "title": "Sender",
+          "type": "string"
+        },
+        "recipients": {
+          "description": "\n        List of email addresses to send notifications to.\n        Can include multiple recipients separated by commas.\n        ",
+          "examples": [
+            [
+              "recipient1@example.com",
+              "recipient2@example.com"
+            ]
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Recipients",
+          "type": "array"
+        },
+        "use-tls": {
+          "default": true,
+          "description": "\n        Whether to use TLS for secure communication with the SMTP server.\n        Recommended for production environments to protect sensitive information.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Use-Tls",
+          "type": "boolean"
+        },
+        "max-workers": {
+          "default": 5,
+          "description": "\n        Maximum number of worker threads for sending emails.\n        Controls how many emails can be sent concurrently.\n        Higher values may improve performance but increase resource usage.\n        ",
+          "examples": [
+            5,
+            10
+          ],
+          "minimum": 1,
+          "title": "Max-Workers",
+          "type": "integer"
+        },
+        "template": {
+          "default": "\nAction type: {{ action_type }}\nEntity ID: {{ entity_id }}\nStatus: {{ status }}\nDescription: {{ description }}\nStarted at: {{ created_at }}\nFinished at: {{ ended_at }}\nDuration: {{ duration }} seconds\n\nThis email is sent from Backend.AI SMTP Reporter.\n",
+          "description": "\n        Template for the email body.\n        Can include placeholders for dynamic content.\n        Placeholders will be replaced with actual values when sending emails.\n        ",
+          "examples": [
+            "\nAction type: {{ action_type }}\nEntity ID: {{ entity_id }}\nStatus: {{ status }}\nDescription: {{ description }}\nStarted at: {{ created_at }}\nFinished at: {{ ended_at }}\nDuration: {{ duration }} seconds\n\nThis email is sent from Backend.AI SMTP Reporter.\n"
+          ],
+          "title": "Template",
+          "type": "string"
+        },
+        "trigger-policy": {
+          "default": "ALL",
+          "description": "\n        Policy for triggering email notifications.\n        - ALL: Send emails for all events.\n        - ON_ERROR: Send emails only for error events.\n        Choose based on your notification needs.\n        ",
+          "enum": [
+            "ALL",
+            "ON_ERROR"
+          ],
+          "examples": [
+            "ALL",
+            "ON_ERROR"
+          ],
+          "title": "Trigger-Policy",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "host",
+        "port",
+        "username",
+        "password",
+        "sender",
+        "recipients"
+      ],
+      "title": "SMTPReporterConfig",
+      "type": "object"
+    },
+    "ServiceDiscoveryConfig": {
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ServiceDiscoveryType",
+          "default": "redis",
+          "description": "\n        Type of service discovery to use.\n        ",
+          "examples": [
+            "etcd",
+            "redis"
+          ]
+        }
+      },
+      "title": "ServiceDiscoveryConfig",
+      "type": "object"
+    },
+    "ServiceDiscoveryType": {
+      "enum": [
+        "etcd",
+        "redis"
+      ],
+      "title": "ServiceDiscoveryType",
+      "type": "string"
+    },
+    "SessionConfig": {
+      "properties": {
+        "hang_tolerance": {
+          "$ref": "#/$defs/HangToleranceConfig",
+          "description": "\n        Configuration for detecting and handling hung sessions.\n        Controls how the system detects and recovers from session failures.\n        "
+        }
+      },
+      "title": "SessionConfig",
+      "type": "object"
+    },
+    "SingleRedisConfig": {
+      "properties": {
+        "addr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Network address and port of the Redis server.\n        Redis is used for distributed caching and messaging between managers.\n        Set to None when using Sentinel for high availability.\n        ",
+          "examples": [
+            null,
+            {
+              "host": "127.0.0.1",
+              "port": 6379
+            }
+          ]
+        },
+        "sentinel": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of Redis Sentinel addresses for high availability.\n        If provided, the manager will use Redis Sentinel for automatic failover.\n        When using Sentinel, the addr field is ignored and service_name is required.\n        ",
+          "examples": [
+            null,
+            [
+              {
+                "host": "redis-sentinel",
+                "port": 26379
+              },
+              {
+                "host": "redis-sentinel",
+                "port": 26380
+              }
+            ]
+          ],
+          "title": "Sentinel"
+        },
+        "service_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Service name for Redis Sentinel.\n        Required when using Redis Sentinel for high availability.\n        Identifies which service to monitor for failover.\n        ",
+          "examples": [
+            null,
+            "mymaster",
+            "backend-ai"
+          ],
+          "title": "Service Name"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Password for authenticating with Redis.\n        Set to None if Redis doesn't require authentication.\n        Should be kept secret in production environments.\n        ",
+          "examples": [
+            null,
+            "REDIS_PASSWORD"
+          ],
+          "title": "Password"
+        },
+        "request_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Timeout in milliseconds for Redis requests.\n        Controls how long operations wait before timing out.\n        If None, uses the default timeout configured in the Redis client.\n        ",
+          "examples": [
+            null,
+            1000
+          ],
+          "title": "Request Timeout"
+        },
+        "redis_helper_config": {
+          "$ref": "#/$defs/RedisHelperConfig",
+          "description": "\n        Configuration for the Redis helper library.\n        Controls timeouts and reconnection behavior.\n        Adjust based on network conditions and reliability requirements.\n        "
+        },
+        "use_tls": {
+          "default": false,
+          "description": "\n        Whether to use TLS for Redis connections.",
+          "title": "Use Tls",
+          "type": "boolean"
+        },
+        "tls_skip_verify": {
+          "default": false,
+          "description": "\n        Whether to skip TLS certificate verification.\n        Set to True for self-signed certificates or development environments.\n        ",
+          "title": "Tls Skip Verify",
+          "type": "boolean"
+        }
+      },
+      "title": "SingleRedisConfig",
+      "type": "object"
+    },
+    "SubnetNetworkConfig": {
+      "properties": {
+        "agent": {
+          "default": "0.0.0.0/0",
+          "description": "\n        IP subnet for agent communications.\n        Specifies which subnet is used for agent-to-agent and agent-to-manager traffic.\n        Use 0.0.0.0/0 to allow all IPv4 addresses.\n        ",
+          "examples": [
+            "0.0.0.0/0",
+            "192.168.0.0/24"
+          ],
+          "format": "ipvanynetwork",
+          "title": "Agent",
+          "type": "string"
+        },
+        "container": {
+          "default": "0.0.0.0/0",
+          "description": "\n        IP subnet for containers.\n        Specifies which subnet is used for container networks.\n        Use 0.0.0.0/0 to allow all IPv4 addresses.\n        ",
+          "examples": [
+            "0.0.0.0/0",
+            "172.17.0.0/16"
+          ],
+          "format": "ipvanynetwork",
+          "title": "Container",
+          "type": "string"
+        }
+      },
+      "title": "SubnetNetworkConfig",
+      "type": "object"
+    },
+    "SystemConfig": {
+      "properties": {
+        "timezone": {
+          "description": "\n        Timezone setting for the manager.\n        Uses pytz-compatible timezone names.\n        ",
+          "examples": [
+            "UTC"
+          ],
+          "json_schema": {
+            "type": "str"
+          },
+          "python_schema": {
+            "type": "str"
+          },
+          "title": "Timezone",
+          "type": "json-or-python"
+        }
+      },
+      "title": "SystemConfig",
+      "type": "object"
+    },
+    "VolumeProxyConfig": {
+      "properties": {
+        "client_api": {
+          "description": "\n        Client-facing API endpoint URL of the volume proxy.\n        Used by clients to access virtual folder contents.\n        Should include protocol, host and port.\n        ",
+          "examples": [
+            "http://localhost:6021",
+            "https://proxy1.example.com:6021"
+          ],
+          "title": "Client Api",
+          "type": "string"
+        },
+        "manager_api": {
+          "description": "\n        Manager-facing API endpoint URL of the volume proxy.\n        Used by manager to communicate with the volume proxy.\n        Should include protocol, host and port.\n        ",
+          "examples": [
+            "http://localhost:6022",
+            "https://proxy1.example.com:6022"
+          ],
+          "title": "Manager Api",
+          "type": "string"
+        },
+        "secret": {
+          "description": "\n        Secret key for authenticating with the volume proxy manager API.\n        Must match the secret configured on the volume proxy.\n        Should be kept secure and not exposed to clients.\n        ",
+          "examples": [
+            "some-secret-key"
+          ],
+          "title": "Secret",
+          "type": "string"
+        },
+        "ssl_verify": {
+          "default": true,
+          "description": "\n        Whether to verify SSL certificates when connecting to the volume proxy.\n        Should be enabled in production for security.\n        Can be disabled for testing with self-signed certificates.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Ssl Verify",
+          "type": "boolean"
+        },
+        "sftp_scaling_groups": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of SFTP scaling groups that the volume is mapped to.\n        Controls which scaling groups can create SFTP sessions for this volume.\n        ",
+          "examples": [
+            "group-1,group-2"
+          ],
+          "title": "Sftp Scaling Groups"
+        }
+      },
+      "required": [
+        "client_api",
+        "manager_api",
+        "secret"
+      ],
+      "title": "VolumeProxyConfig",
+      "type": "object"
+    },
+    "VolumeTypeConfig": {
+      "properties": {
+        "user": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        User VFolder type configuration.\n        When present, enables user-owned virtual folders.\n        Standard folder type for individual users.\n        ",
+          "title": "User"
+        },
+        "group": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Group VFolder type configuration.\n        When present, enables group-owned virtual folders.\n        Used for sharing files within a group of users.\n        ",
+          "title": "Group"
+        }
+      },
+      "title": "VolumeTypeConfig",
+      "type": "object"
+    },
+    "VolumesConfig": {
+      "properties": {
+        "_types": {
+          "$ref": "#/$defs/VolumeTypeConfig",
+          "description": "\n        Defines which types of virtual folders are enabled.\n        Contains configuration for user and group folders.\n        ",
+          "examples": [
+            {
+              "group": {},
+              "user": {}
+            }
+          ]
+        },
+        "default_host": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Default volume host for new virtual folders.\n        Format is \"proxy_name:volume_name\".\n        Used when user doesn't explicitly specify a host.\n        ",
+          "examples": [
+            "localhost:6021",
+            "local:default",
+            "nas:main-volume"
+          ],
+          "title": "Default Host"
+        },
+        "exposed_volume_info": {
+          "description": "\n        Controls what volume information is exposed to users.\n        Options include \"percentage\" for disk usage percentage.\n        ",
+          "examples": [
+            "percentage",
+            "percentage,bytes"
+          ],
+          "title": "Exposed Volume Info",
+          "type": "string"
+        },
+        "proxies": {
+          "additionalProperties": {
+            "$ref": "#/$defs/VolumeProxyConfig"
+          },
+          "description": "\n        Mapping of volume proxy configurations.\n        Each key is a proxy name used in volume host references.\n        ",
+          "examples": [
+            {
+              "local": {
+                "client_api": "http://localhost:6021",
+                "manager_api": "http://localhost:6022",
+                "secret": "some-secret",
+                "ssl_verify": true
+              }
+            }
+          ],
+          "title": "Proxies",
+          "type": "object"
+        }
+      },
+      "title": "VolumesConfig",
+      "type": "object"
+    },
+    "WatcherConfig": {
+      "properties": {
+        "token": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Authentication token for the watcher service.\n        Used to secure communication between manager and watcher.\n        Should be a secure random string in production.\n        ",
+          "examples": [
+            null,
+            "random-secure-token"
+          ],
+          "title": "Token"
+        },
+        "file_io_timeout": {
+          "default": 10,
+          "description": "\n        Timeout in seconds for file I/O operations in watcher.\n        Controls how long the watcher waits for file operations to complete.\n        Increase for handling large files or slow storage systems.\n        ",
+          "examples": [
+            60.0,
+            120.0
+          ],
+          "title": "File Io Timeout",
+          "type": "number"
+        }
+      },
+      "title": "WatcherConfig",
+      "type": "object"
+    },
+    "ai__backend__common__typed_validators__HostPortPair": {
+      "properties": {
+        "host": {
+          "description": "\n        Host address of the service.\n        Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to all interfaces.\n        ",
+          "examples": [
+            "127.0.0.1"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "description": "\n        Port number of the service.\n        Must be between 1 and 65535.\n        Ports below 1024 require root/admin privileges.\n        ",
+          "examples": [
+            8080
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "title": "HostPortPair",
+      "type": "object"
+    },
+    "ai__backend__logging__config__HostPortPair": {
+      "additionalProperties": true,
+      "properties": {
+        "host": {
+          "examples": [
+            "127.0.0.1"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "examples": [
+            8201
+          ],
+          "exclusiveMaximum": 65536,
+          "exclusiveMinimum": 0,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "title": "HostPortPair",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "db": {
+      "$ref": "#/$defs/DatabaseConfig",
+      "description": "\n        Database configuration settings.\n        Defines how the manager connects to its PostgreSQL database.\n        Contains connection details, credentials, and pool settings.\n        "
+    },
+    "etcd": {
+      "$ref": "#/$defs/EtcdConfig",
+      "description": "\n        Etcd configuration settings.\n        Used for distributed coordination between manager instances.\n        Contains connection details and authentication information.\n        "
+    },
+    "manager": {
+      "$ref": "#/$defs/ManagerConfig",
+      "description": "\n        Core manager service configuration.\n        Controls how the manager operates, communicates, and scales.\n        Includes network settings, process management, and service parameters.\n        "
+    },
+    "docker_registry": {
+      "$ref": "#/$defs/DockerRegistryConfig",
+      "default": {
+        "ssl-verify": true
+      },
+      "description": "\n        Deprecated: Docker registry configuration.\n        Contains settings for connecting to Docker registries.\n        "
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingConfig",
+      "description": "\n        Logging system configuration.\n        Controls how logs are formatted, filtered, and stored.\n        Detailed configuration is handled in ai.backend.logging.\n        "
+    },
+    "pyroscope": {
+      "$ref": "#/$defs/PyroscopeConfig",
+      "description": "\n        Pyroscope profiling configuration.\n        Controls integration with the Pyroscope performance profiling tool.\n        Used for monitoring and analyzing application performance.\n        "
+    },
+    "debug": {
+      "$ref": "#/$defs/DebugConfig",
+      "description": "\n        Debugging options configuration.\n        Controls various debugging features and tools.\n        Should typically be disabled in production environments.\n        "
+    },
+    "reporter": {
+      "$ref": "#/$defs/ReporterConfig",
+      "description": "\n        Reporter configuration.\n        Controls how notifications and logs are reported.\n        Includes settings for Audit Logs, and Action Monitors, and SMTP reporters.\n        Each reporter can be configured with its own settings.\n        "
+    },
+    "system": {
+      "$ref": "#/$defs/SystemConfig",
+      "description": "\n        System-wide settings.\n        Controls general behavior of the Backend.AI system.\n        "
+    },
+    "api": {
+      "$ref": "#/$defs/APIConfig",
+      "description": "\n        API server configuration.\n        Controls how the API behaves, including security and limits.\n        "
+    },
+    "redis": {
+      "$ref": "#/$defs/RedisConfig",
+      "description": "\n        Redis database configuration.\n        Used for distributed caching and messaging between managers.\n        "
+    },
+    "idle": {
+      "$ref": "#/$defs/IdleCheckerConfig",
+      "description": "\n        Idle session checker configuration.\n        "
+    },
+    "docker": {
+      "$ref": "#/$defs/DockerConfig",
+      "description": "\n        Docker container settings.\n        Controls how Docker images are managed and used.\n        "
+    },
+    "plugins": {
+      "$ref": "#/$defs/PluginsConfig",
+      "description": "\n        Plugin system configuration.\n        Controls behavior of various Backend.AI plugins.\n        "
+    },
+    "network": {
+      "$ref": "#/$defs/NetworkConfig",
+      "description": "\n        Network configuration settings.\n        Controls networking between containers and agents.\n        "
+    },
+    "watcher": {
+      "$ref": "#/$defs/WatcherConfig",
+      "description": "\n        Watcher service configuration.\n        Controls the component that monitors compute sessions.\n        "
+    },
+    "auth": {
+      "$ref": "#/$defs/AuthConfig",
+      "description": "\n        Authentication settings.\n        Controls password policies and other security measures.\n        "
+    },
+    "session": {
+      "$ref": "#/$defs/SessionConfig",
+      "description": "\n        Compute session configuration.\n        Controls behavior and limits of compute sessions.\n        "
+    },
+    "metric": {
+      "$ref": "#/$defs/MetricConfig",
+      "description": "\n        Metric collection settings.\n        Controls how metrics are collected and reported.\n        "
+    },
+    "volumes": {
+      "$ref": "#/$defs/VolumesConfig",
+      "description": "\n        Volume management settings.\n        Controls how volumes are managed and accessed.\n        "
+    },
+    "resource-slots": {
+      "$ref": "#/$defs/ResourceSlotsConfig",
+      "description": "\n        Resource slots configuration.\n        Controls how resource slots are allocated and managed.\n        "
+    },
+    "otel": {
+      "$ref": "#/$defs/OTELConfig",
+      "description": "\n        OpenTelemetry configuration.\n        Controls how tracing and logging are handled with OpenTelemetry.\n        "
+    },
+    "service-discovery": {
+      "$ref": "#/$defs/ServiceDiscoveryConfig",
+      "description": "\n        Service discovery configuration.\n        Controls how services are discovered and connected within the Backend.AI system.\n        "
+    },
+    "artifact_registry": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ArtifactRegistryConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "\n        Default artifact registry config.\n        "
+    },
+    "reservoir": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ReservoirConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "\n        Reservoir configuration.\n        "
+    }
+  },
+  "title": "ManagerUnifiedConfig",
+  "type": "object"
+}

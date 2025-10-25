@@ -1,0 +1,2289 @@
+{
+  "$defs": {
+    "APIConfig": {
+      "properties": {
+        "domain": {
+          "default": "default",
+          "description": "\n        API domain name.\n        ",
+          "examples": [
+            "api.example.com"
+          ],
+          "title": "Domain",
+          "type": "string"
+        },
+        "endpoint": {
+          "description": "\n        API endpoint URL.\n        ",
+          "examples": [
+            "http://127.0.0.1:8080,http://api.example.com:8080"
+          ],
+          "minLength": 1,
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "text": {
+          "default": "Backend.AI API",
+          "description": "\n        API text description.\n        ",
+          "examples": [
+            "Backend.AI API"
+          ],
+          "title": "Text",
+          "type": "string"
+        },
+        "ssl_verify": {
+          "default": true,
+          "description": "\n        Whether to verify SSL certificates for API calls.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Ssl Verify",
+          "type": "boolean"
+        },
+        "auth_token_name": {
+          "default": "sToken",
+          "description": "\n        Authentication token name.\n        ",
+          "examples": [
+            "sToken",
+            "authToken"
+          ],
+          "title": "Auth Token Name",
+          "type": "string"
+        },
+        "connection_limit": {
+          "default": 100,
+          "description": "\n        Maximum number of simultaneous API connections.\n        This limits the number of concurrent API requests that can be processed.\n        ",
+          "examples": [
+            100,
+            200
+          ],
+          "minimum": 1,
+          "title": "Connection Limit",
+          "type": "integer"
+        }
+      },
+      "title": "APIConfig",
+      "type": "object"
+    },
+    "ApolloRouterConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "\n        Whether to enable Apollo Router.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "endpoint": {
+          "default": "http://127.0.0.1:4000",
+          "description": "\n        Apollo Router endpoint.\n        ",
+          "examples": [
+            "http://127.0.0.1:4000"
+          ],
+          "title": "Endpoint",
+          "type": "string"
+        }
+      },
+      "title": "ApolloRouterConfig",
+      "type": "object"
+    },
+    "CSPConfig": {
+      "properties": {
+        "default_src": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Content Security Policy default-src directive.\n        ",
+          "examples": [
+            null,
+            [
+              "'self'",
+              "https:"
+            ]
+          ],
+          "title": "Default Src"
+        },
+        "connect_src": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Content Security Policy connect-src directive.\n        ",
+          "examples": [
+            null,
+            [
+              "'self'",
+              "wss:"
+            ]
+          ],
+          "title": "Connect Src"
+        },
+        "img_src": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Content Security Policy img-src directive.\n        ",
+          "examples": [
+            null,
+            [
+              "'self'",
+              "data:"
+            ]
+          ],
+          "title": "Img Src"
+        },
+        "media_src": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Content Security Policy media-src directive.\n        ",
+          "examples": [
+            null,
+            [
+              "'self'"
+            ]
+          ],
+          "title": "Media Src"
+        },
+        "font_src": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Content Security Policy font-src directive.\n        ",
+          "examples": [
+            null,
+            [
+              "'self'",
+              "https:"
+            ]
+          ],
+          "title": "Font Src"
+        },
+        "script_src": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Content Security Policy script-src directive.\n        ",
+          "examples": [
+            null,
+            [
+              "'self'",
+              "'unsafe-inline'"
+            ]
+          ],
+          "title": "Script Src"
+        },
+        "style_src": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Content Security Policy style-src directive.\n        ",
+          "examples": [
+            null,
+            [
+              "'self'",
+              "'unsafe-inline'"
+            ]
+          ],
+          "title": "Style Src"
+        },
+        "frame_src": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Content Security Policy frame-src directive.\n        ",
+          "examples": [
+            null,
+            [
+              "'self'"
+            ]
+          ],
+          "title": "Frame Src"
+        },
+        "object_src": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Content Security Policy object-src directive.\n        ",
+          "examples": [
+            null,
+            [
+              "'none'"
+            ]
+          ],
+          "title": "Object Src"
+        },
+        "frame_ancestors": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Content Security Policy frame-ancestors directive.\n        ",
+          "examples": [
+            null,
+            [
+              "'self'"
+            ]
+          ],
+          "title": "Frame Ancestors"
+        },
+        "form_action": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Content Security Policy form-action directive.\n        ",
+          "examples": [
+            null,
+            [
+              "'self'"
+            ]
+          ],
+          "title": "Form Action"
+        }
+      },
+      "title": "CSPConfig",
+      "type": "object"
+    },
+    "ConsoleConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "colored": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Opt to print colorized log.",
+          "examples": [
+            true
+          ],
+          "title": "Colored"
+        },
+        "format": {
+          "$ref": "#/$defs/LogFormat",
+          "default": "verbose",
+          "description": "Determine verbosity of log."
+        }
+      },
+      "title": "ConsoleConfig",
+      "type": "object"
+    },
+    "DebugConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "\n        Whether to enable debug mode.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "title": "DebugConfig",
+      "type": "object"
+    },
+    "EnvironmentsConfig": {
+      "properties": {
+        "allowlist": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of allowed environments.\n        ",
+          "examples": [
+            null,
+            [
+              "python",
+              "r",
+              "julia"
+            ]
+          ],
+          "title": "Allowlist"
+        },
+        "show_non_installed_images": {
+          "default": false,
+          "description": "\n        Whether to show non-installed images.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Show Non Installed Images",
+          "type": "boolean"
+        }
+      },
+      "title": "EnvironmentsConfig",
+      "type": "object"
+    },
+    "EventLoopType": {
+      "enum": [
+        "asyncio",
+        "uvloop"
+      ],
+      "title": "EventLoopType",
+      "type": "string"
+    },
+    "FileConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "path": {
+          "description": "Path to store log.",
+          "examples": [
+            "/var/log/backend.ai"
+          ],
+          "title": "Path",
+          "type": "string"
+        },
+        "filename": {
+          "description": "Log file name.",
+          "examples": [
+            "wsproxy.log"
+          ],
+          "title": "Filename",
+          "type": "string"
+        },
+        "backup-count": {
+          "default": 5,
+          "description": "Number of outdated log files to retain.",
+          "title": "Backup-Count",
+          "type": "integer"
+        },
+        "rotation-size": {
+          "anyOf": [
+            {
+              "pattern": "^\\s*(\\d*\\.?\\d+)\\s*(\\w+)?",
+              "type": "string"
+            },
+            {
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "description": "Maximum size for a single log file.",
+          "title": "Rotation-Size"
+        },
+        "format": {
+          "$ref": "#/$defs/LogFormat",
+          "default": "verbose",
+          "description": "Determine verbosity of log."
+        }
+      },
+      "required": [
+        "path",
+        "filename"
+      ],
+      "title": "FileConfig",
+      "type": "object"
+    },
+    "ForceEndpointProtocol": {
+      "enum": [
+        "https",
+        "http"
+      ],
+      "title": "ForceEndpointProtocol",
+      "type": "string"
+    },
+    "GraylogConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "host": {
+          "description": "Graylog hostname.",
+          "examples": [
+            "127.0.0.1"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "description": "Graylog server port number.",
+          "examples": [
+            8000
+          ],
+          "title": "Port",
+          "type": "integer"
+        },
+        "level": {
+          "$ref": "#/$defs/ai__backend__logging__types__LogLevel",
+          "default": "INFO",
+          "description": "Log level."
+        },
+        "localname": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The custom source identifier. If not specified, fqdn will be used instead.",
+          "title": "Localname"
+        },
+        "fqdn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The fuly qualified domain name of the source.",
+          "title": "Fqdn"
+        },
+        "ssl-verify": {
+          "default": true,
+          "description": "Verify validity of TLS certificate when communicating with logstash.",
+          "title": "Ssl-Verify",
+          "type": "boolean"
+        },
+        "ca-certs": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to Root CA certificate file.",
+          "examples": [
+            "/etc/ssl/ca.pem"
+          ],
+          "title": "Ca-Certs"
+        },
+        "keyfile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to TLS private key file.",
+          "examples": [
+            "/etc/backend.ai/graylog/privkey.pem"
+          ],
+          "title": "Keyfile"
+        },
+        "certfile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to TLS certificate file.",
+          "examples": [
+            "/etc/backend.ai/graylog/cert.pem"
+          ],
+          "title": "Certfile"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "title": "GraylogConfig",
+      "type": "object"
+    },
+    "LicenseConfig": {
+      "properties": {
+        "edition": {
+          "default": "Open Source",
+          "description": "\n        License edition.\n        ",
+          "examples": [
+            "Open Source",
+            "Enterprise"
+          ],
+          "title": "Edition",
+          "type": "string"
+        },
+        "valid_since": {
+          "default": "",
+          "description": "\n        License valid since date.\n        ",
+          "examples": [
+            "",
+            "2023-01-01"
+          ],
+          "title": "Valid Since",
+          "type": "string"
+        },
+        "valid_until": {
+          "default": "",
+          "description": "\n        License valid until date.\n        ",
+          "examples": [
+            "",
+            "2024-01-01"
+          ],
+          "title": "Valid Until",
+          "type": "string"
+        }
+      },
+      "title": "LicenseConfig",
+      "type": "object"
+    },
+    "LogDriver": {
+      "enum": [
+        "console",
+        "logstash",
+        "file",
+        "graylog"
+      ],
+      "title": "LogDriver",
+      "type": "string"
+    },
+    "LogFormat": {
+      "enum": [
+        "simple",
+        "verbose"
+      ],
+      "title": "LogFormat",
+      "type": "string"
+    },
+    "LogHandlerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "class": {
+          "description": "The class name of the log handler.",
+          "title": "Class",
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/$defs/ai__backend__logging__types__LogLevel",
+          "default": "INFO",
+          "description": "The log level to filter messages from this handler."
+        }
+      },
+      "required": [
+        "class"
+      ],
+      "title": "LogHandlerConfig",
+      "type": "object"
+    },
+    "LoggerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "handlers": {
+          "description": "The name of handlers receiving messages from this logger.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Handlers",
+          "type": "array"
+        },
+        "level": {
+          "$ref": "#/$defs/ai__backend__logging__types__LogLevel",
+          "default": "INFO",
+          "description": "The log level to filter messages from this logger."
+        },
+        "propagate": {
+          "default": true,
+          "description": "Whether to propagate messages to pre-existing loggers.",
+          "title": "Propagate",
+          "type": "boolean"
+        }
+      },
+      "title": "LoggerConfig",
+      "type": "object"
+    },
+    "LoggingConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "version": {
+          "default": 1,
+          "description": "The version used by logging.dictConfig().",
+          "title": "Version",
+          "type": "integer"
+        },
+        "level": {
+          "$ref": "#/$defs/ai__backend__logging__types__LogLevel",
+          "default": "INFO",
+          "description": "The main log level to filter messages from all loggers."
+        },
+        "disable-existing-loggers": {
+          "default": false,
+          "description": "Disable the existing loggers when applying the config.",
+          "title": "Disable-Existing-Loggers",
+          "type": "boolean"
+        },
+        "handlers": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/LogHandlerConfig"
+              },
+              {
+                "$ref": "#/$defs/RelayLogHandlerConfig"
+              }
+            ]
+          },
+          "description": "The mapping of log handler configurations.",
+          "title": "Handlers",
+          "type": "object"
+        },
+        "loggers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LoggerConfig"
+          },
+          "description": "The mapping of per-namespace logger configurations.",
+          "title": "Loggers",
+          "type": "object"
+        },
+        "drivers": {
+          "default": [
+            "console"
+          ],
+          "description": "The list of log drivers to activate.",
+          "items": {
+            "$ref": "#/$defs/LogDriver"
+          },
+          "title": "Drivers",
+          "type": "array"
+        },
+        "console": {
+          "$ref": "#/$defs/ConsoleConfig",
+          "default": {
+            "colored": null,
+            "format": "verbose"
+          }
+        },
+        "file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FileConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "logstash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LogstashConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "graylog": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GraylogConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "pkg_ns": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ai__backend__logging__types__LogLevel"
+          },
+          "default": {
+            "": "WARNING",
+            "ai.backend": "INFO",
+            "tests": "DEBUG"
+          },
+          "description": "Override default log level for specific scope of package",
+          "title": "Pkg Ns",
+          "type": "object"
+        }
+      },
+      "title": "LoggingConfig",
+      "type": "object"
+    },
+    "LogstashConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "endpoint": {
+          "$ref": "#/$defs/ai__backend__logging__config__HostPortPair",
+          "description": "Connection information of logstash node.",
+          "examples": [
+            {
+              "host": "127.0.0.1",
+              "port": 8001
+            }
+          ]
+        },
+        "protocol": {
+          "$ref": "#/$defs/LogstashProtocol",
+          "default": "tcp",
+          "description": "Protocol to communicate with logstash server."
+        },
+        "ssl-enabled": {
+          "default": true,
+          "description": "Use TLS to communicate with logstash server.",
+          "title": "Ssl-Enabled",
+          "type": "boolean"
+        },
+        "ssl-verify": {
+          "default": true,
+          "description": "Verify validity of TLS certificate when communicating with logstash.",
+          "title": "Ssl-Verify",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "endpoint"
+      ],
+      "title": "LogstashConfig",
+      "type": "object"
+    },
+    "LogstashProtocol": {
+      "enum": [
+        "zmq.push",
+        "zmq.pub",
+        "tcp",
+        "udp"
+      ],
+      "title": "LogstashProtocol",
+      "type": "string"
+    },
+    "MsgpackOptions": {
+      "properties": {
+        "pack-opts": {
+          "additionalProperties": true,
+          "title": "Pack-Opts",
+          "type": "object"
+        },
+        "unpack-opts": {
+          "additionalProperties": true,
+          "title": "Unpack-Opts",
+          "type": "object"
+        }
+      },
+      "required": [
+        "pack-opts",
+        "unpack-opts"
+      ],
+      "title": "MsgpackOptions",
+      "type": "object"
+    },
+    "OTELConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "\n        Whether to enable OpenTelemetry.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "log_level": {
+          "$ref": "#/$defs/ai__backend__web__config__unified__LogLevel",
+          "default": "INFO",
+          "description": "\n        OpenTelemetry log level.\n        ",
+          "examples": [
+            "INFO",
+            "DEBUG"
+          ]
+        },
+        "endpoint": {
+          "default": "http://127.0.0.1:4317",
+          "description": "\n        OpenTelemetry endpoint.\n        ",
+          "examples": [
+            "http://127.0.0.1:4317"
+          ],
+          "title": "Endpoint",
+          "type": "string"
+        }
+      },
+      "title": "OTELConfig",
+      "type": "object"
+    },
+    "PipelineConfig": {
+      "properties": {
+        "endpoint": {
+          "description": "\n        Pipeline service endpoint URL.\n        ",
+          "examples": [
+            "http://127.0.0.1:9500"
+          ],
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "frontend_endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Frontend endpoint URL for pipeline service.\n        ",
+          "examples": [
+            null,
+            "http://127.0.0.1:9501"
+          ],
+          "title": "Frontend Endpoint"
+        }
+      },
+      "title": "PipelineConfig",
+      "type": "object"
+    },
+    "PluginConfig": {
+      "properties": {
+        "page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of page plugins.\n        ",
+          "examples": [
+            null,
+            [
+              "dashboard",
+              "settings"
+            ]
+          ],
+          "title": "Page"
+        }
+      },
+      "title": "PluginConfig",
+      "type": "object"
+    },
+    "RedisConfig": {
+      "properties": {
+        "addr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Network address and port of the Redis server.\n        Redis is used for distributed caching and messaging between managers.\n        Set to None when using Sentinel for high availability.\n        ",
+          "examples": [
+            null,
+            {
+              "host": "127.0.0.1",
+              "port": 6379
+            }
+          ]
+        },
+        "sentinel": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of Redis Sentinel addresses for high availability.\n        If provided, the manager will use Redis Sentinel for automatic failover.\n        When using Sentinel, the addr field is ignored and service_name is required.\n        ",
+          "examples": [
+            null,
+            [
+              {
+                "host": "redis-sentinel",
+                "port": 26379
+              },
+              {
+                "host": "redis-sentinel",
+                "port": 26380
+              }
+            ]
+          ],
+          "title": "Sentinel"
+        },
+        "service_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Service name for Redis Sentinel.\n        Required when using Redis Sentinel for high availability.\n        Identifies which service to monitor for failover.\n        ",
+          "examples": [
+            null,
+            "mymaster",
+            "backend-ai"
+          ],
+          "title": "Service Name"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Password for authenticating with Redis.\n        Set to None if Redis doesn't require authentication.\n        Should be kept secret in production environments.\n        ",
+          "examples": [
+            null,
+            "REDIS_PASSWORD"
+          ],
+          "title": "Password"
+        },
+        "request_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Timeout in milliseconds for Redis requests.\n        Controls how long operations wait before timing out.\n        If None, uses the default timeout configured in the Redis client.\n        ",
+          "examples": [
+            null,
+            1000
+          ],
+          "title": "Request Timeout"
+        },
+        "redis_helper_config": {
+          "$ref": "#/$defs/RedisHelperConfig",
+          "description": "\n        Configuration for the Redis helper library.\n        Controls timeouts and reconnection behavior.\n        Adjust based on network conditions and reliability requirements.\n        "
+        },
+        "use_tls": {
+          "default": false,
+          "description": "\n        Whether to use TLS for Redis connections.",
+          "title": "Use Tls",
+          "type": "boolean"
+        },
+        "tls_skip_verify": {
+          "default": false,
+          "description": "\n        Whether to skip TLS certificate verification.\n        Set to True for self-signed certificates or development environments.\n        ",
+          "title": "Tls Skip Verify",
+          "type": "boolean"
+        },
+        "override_configs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/SingleRedisConfig"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Optional override configurations for specific Redis contexts.\n        Allows different Redis settings for different services within Backend.AI.\n        Each key represents a context name, and the value is a complete Redis configuration.\n        ",
+          "examples": [
+            null,
+            {
+              "live": {
+                "addr": {
+                  "host": "127.0.0.1",
+                  "port": 6379
+                },
+                "password": "different-password",
+                "redis_helper_config": {
+                  "socket_timeout": 10.0
+                }
+              }
+            }
+          ],
+          "title": "Override Configs"
+        }
+      },
+      "title": "RedisConfig",
+      "type": "object"
+    },
+    "RedisHelperConfig": {
+      "properties": {
+        "socket_timeout": {
+          "default": 5.0,
+          "description": "\n        Timeout in seconds for Redis socket operations.\n        Controls how long operations wait before timing out.\n        Increase for slow or congested networks.\n        ",
+          "examples": [
+            5.0,
+            10.0
+          ],
+          "title": "Socket Timeout",
+          "type": "number"
+        },
+        "socket_connect_timeout": {
+          "default": 2.0,
+          "description": "\n        Timeout in seconds for establishing Redis connections.\n        Controls how long connection attempts wait before failing.\n        Shorter values fail faster but may be too aggressive for some networks.\n        ",
+          "examples": [
+            2.0,
+            5.0
+          ],
+          "title": "Socket Connect Timeout",
+          "type": "number"
+        },
+        "reconnect_poll_timeout": {
+          "default": 0.3,
+          "description": "\n        Time in seconds to wait between reconnection attempts.\n        Controls the polling frequency when trying to reconnect to Redis.\n        Lower values reconnect faster but may increase network load.\n        ",
+          "examples": [
+            0.3,
+            1.0
+          ],
+          "title": "Reconnect Poll Timeout",
+          "type": "number"
+        }
+      },
+      "title": "RedisHelperConfig",
+      "type": "object"
+    },
+    "RelayLogHandlerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "class": {
+          "description": "The class name of the log handler.",
+          "title": "Class",
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/$defs/ai__backend__logging__types__LogLevel",
+          "default": "INFO",
+          "description": "The log level to filter messages from this handler."
+        },
+        "endpoint": {
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "msgpack-options": {
+          "$ref": "#/$defs/MsgpackOptions"
+        }
+      },
+      "required": [
+        "class",
+        "endpoint",
+        "msgpack-options"
+      ],
+      "title": "RelayLogHandlerConfig",
+      "type": "object"
+    },
+    "ResourcesConfig": {
+      "properties": {
+        "open_port_to_public": {
+          "default": false,
+          "description": "\n        Whether to open ports to public.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Open Port To Public",
+          "type": "boolean"
+        },
+        "allow_non_auth_tcp": {
+          "default": false,
+          "description": "\n        Whether to allow non-authenticated TCP connections.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Allow Non Auth Tcp",
+          "type": "boolean"
+        },
+        "allow_preferred_port": {
+          "default": false,
+          "description": "\n        Whether to allow preferred port selection.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Allow Preferred Port",
+          "type": "boolean"
+        },
+        "max_cpu_cores_per_container": {
+          "default": 64,
+          "description": "\n        Maximum CPU cores per container.\n        ",
+          "examples": [
+            64,
+            128
+          ],
+          "title": "Max Cpu Cores Per Container",
+          "type": "integer"
+        },
+        "max_memory_per_container": {
+          "default": 64,
+          "description": "\n        Maximum memory per container in GB.\n        ",
+          "examples": [
+            64,
+            128
+          ],
+          "title": "Max Memory Per Container",
+          "type": "integer"
+        },
+        "max_cuda_devices_per_container": {
+          "default": 16,
+          "description": "\n        Maximum CUDA devices per container.\n        ",
+          "examples": [
+            16,
+            32
+          ],
+          "title": "Max Cuda Devices Per Container",
+          "type": "integer"
+        },
+        "max_cuda_shares_per_container": {
+          "default": 16,
+          "description": "\n        Maximum CUDA shares per container.\n        ",
+          "examples": [
+            16,
+            32
+          ],
+          "title": "Max Cuda Shares Per Container",
+          "type": "integer"
+        },
+        "max_rocm_devices_per_container": {
+          "default": 10,
+          "description": "\n        Maximum ROCm devices per container.\n        ",
+          "examples": [
+            10,
+            20
+          ],
+          "title": "Max Rocm Devices Per Container",
+          "type": "integer"
+        },
+        "max_tpu_devices_per_container": {
+          "default": 8,
+          "description": "\n        Maximum TPU devices per container.\n        ",
+          "examples": [
+            8,
+            16
+          ],
+          "title": "Max Tpu Devices Per Container",
+          "type": "integer"
+        },
+        "max_ipu_devices_per_container": {
+          "default": 8,
+          "description": "\n        Maximum IPU devices per container.\n        ",
+          "examples": [
+            8,
+            16
+          ],
+          "title": "Max Ipu Devices Per Container",
+          "type": "integer"
+        },
+        "max_atom_devices_per_container": {
+          "default": 8,
+          "description": "\n        Maximum Atom devices per container.\n        ",
+          "examples": [
+            8,
+            16
+          ],
+          "title": "Max Atom Devices Per Container",
+          "type": "integer"
+        },
+        "max_gaudi2_devices_per_container": {
+          "default": 8,
+          "description": "\n        Maximum Gaudi2 devices per container.\n        ",
+          "examples": [
+            8,
+            16
+          ],
+          "title": "Max Gaudi2 Devices Per Container",
+          "type": "integer"
+        },
+        "max_atom_plus_devices_per_container": {
+          "default": 8,
+          "description": "\n        Maximum Atom Plus devices per container.\n        ",
+          "examples": [
+            8,
+            16
+          ],
+          "title": "Max Atom Plus Devices Per Container",
+          "type": "integer"
+        },
+        "max_warboy_devices_per_container": {
+          "default": 8,
+          "description": "\n        Maximum Warboy devices per container.\n        ",
+          "examples": [
+            8,
+            16
+          ],
+          "title": "Max Warboy Devices Per Container",
+          "type": "integer"
+        },
+        "max_shm_per_container": {
+          "default": 2.0,
+          "description": "\n        Maximum shared memory per container in GB.\n        ",
+          "examples": [
+            2.0,
+            4.0
+          ],
+          "title": "Max Shm Per Container",
+          "type": "number"
+        },
+        "max_file_upload_size": {
+          "default": 4294967296,
+          "description": "\n        Maximum file upload size in bytes.\n        ",
+          "examples": [
+            4294967296,
+            8589934592
+          ],
+          "title": "Max File Upload Size",
+          "type": "integer"
+        }
+      },
+      "title": "ResourcesConfig",
+      "type": "object"
+    },
+    "SecurityConfig": {
+      "properties": {
+        "request_policies": {
+          "description": "\n        List of request security policies.\n        ",
+          "examples": [
+            []
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Request Policies",
+          "type": "array"
+        },
+        "response_policies": {
+          "description": "\n        List of response security policies.\n        ",
+          "examples": [
+            []
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Response Policies",
+          "type": "array"
+        },
+        "csp": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CSPConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Content Security Policy configuration.\n        ",
+          "examples": [
+            null
+          ]
+        }
+      },
+      "title": "SecurityConfig",
+      "type": "object"
+    },
+    "ServiceConfig": {
+      "properties": {
+        "ip": {
+          "default": "0.0.0.0",
+          "description": "\n        IP address to bind the webserver service.\n        Use '0.0.0.0' to bind to all interfaces.\n        ",
+          "examples": [
+            "0.0.0.0",
+            "127.0.0.1"
+          ],
+          "title": "Ip",
+          "type": "string"
+        },
+        "port": {
+          "default": 8080,
+          "description": "\n        Port number to bind the webserver service.\n        Must be between 1 and 65535.\n        ",
+          "examples": [
+            8080,
+            8081
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "wsproxy": {
+          "$ref": "#/$defs/WebSocketProxyConfig",
+          "description": "\n        WebSocket proxy configuration.\n        "
+        },
+        "ssl_enabled": {
+          "default": false,
+          "description": "\n        Whether to enable SSL/TLS for the webserver.\n        When enabled, requires ssl_cert and ssl_privkey to be set.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Ssl Enabled",
+          "type": "boolean"
+        },
+        "ssl_cert": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Path to SSL certificate file.\n        Required when ssl_enabled is True.\n        ",
+          "examples": [
+            "/path/to/cert.pem"
+          ],
+          "title": "Ssl Cert"
+        },
+        "ssl_privkey": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Path to SSL private key file.\n        Required when ssl_enabled is True.\n        ",
+          "examples": [
+            "/path/to/privkey.pem"
+          ],
+          "title": "Ssl Privkey"
+        },
+        "static_path": {
+          "description": "\n        Path to static files directory.\n        Contains web UI assets and other static resources.\n        ",
+          "examples": [
+            "/path/to/static"
+          ],
+          "format": "path",
+          "title": "Static Path",
+          "type": "string"
+        },
+        "force_endpoint_protocol": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ForceEndpointProtocol"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Force a specific protocol for API endpoints.\n        Useful when running behind a reverse proxy.\n        ",
+          "examples": [
+            null,
+            "https",
+            "http"
+          ]
+        },
+        "mode": {
+          "$ref": "#/$defs/ServiceMode",
+          "default": "webui",
+          "description": "\n        Service mode.\n        'webui' serves the full web UI, 'static' serves only static files.\n        ",
+          "examples": [
+            "webui",
+            "static"
+          ]
+        },
+        "enable_signup": {
+          "default": false,
+          "description": "\n        Whether to enable user signup functionality.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enable Signup",
+          "type": "boolean"
+        },
+        "allow_anonymous_change_password": {
+          "default": false,
+          "description": "\n        Whether to allow anonymous users to change passwords.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Allow Anonymous Change Password",
+          "type": "boolean"
+        },
+        "allow_project_resource_monitor": {
+          "default": false,
+          "description": "\n        Whether to allow project resource monitoring.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Allow Project Resource Monitor",
+          "type": "boolean"
+        },
+        "allow_change_signin_mode": {
+          "default": false,
+          "description": "\n        Whether to allow users to change signin mode.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Allow Change Signin Mode",
+          "type": "boolean"
+        },
+        "allow_manual_image_name_for_session": {
+          "default": false,
+          "description": "\n        Whether to allow manual image name specification for sessions.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Allow Manual Image Name For Session",
+          "type": "boolean"
+        },
+        "allow_signup_without_confirmation": {
+          "default": false,
+          "description": "\n        Whether to allow signup without email confirmation.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Allow Signup Without Confirmation",
+          "type": "boolean"
+        },
+        "always_enqueue_compute_session": {
+          "default": false,
+          "description": "\n        Whether to always enqueue compute sessions.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Always Enqueue Compute Session",
+          "type": "boolean"
+        },
+        "webui_debug": {
+          "default": false,
+          "description": "\n        Whether to enable debug mode for the web UI.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Webui Debug",
+          "type": "boolean"
+        },
+        "mask_user_info": {
+          "default": false,
+          "description": "\n        Whether to mask user information in the UI.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Mask User Info",
+          "type": "boolean"
+        },
+        "single_sign_on_vendors": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of single sign-on vendors to enable.\n        ",
+          "examples": [
+            null,
+            [
+              "google",
+              "github"
+            ]
+          ],
+          "title": "Single Sign On Vendors"
+        },
+        "sso_realm_name": {
+          "default": "",
+          "description": "\n        SSO realm name for single sign-on.\n        ",
+          "examples": [
+            "",
+            "example-realm"
+          ],
+          "title": "Sso Realm Name",
+          "type": "string"
+        },
+        "enable_container_commit": {
+          "default": false,
+          "description": "\n        Whether to enable container commit functionality.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enable Container Commit",
+          "type": "boolean"
+        },
+        "hide_agents": {
+          "default": true,
+          "description": "\n        Whether to hide agent information in the UI.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Hide Agents",
+          "type": "boolean"
+        },
+        "app_download_url": {
+          "default": "",
+          "description": "\n        URL for app download.\n        ",
+          "examples": [
+            "",
+            "https://example.com/download"
+          ],
+          "title": "App Download Url",
+          "type": "string"
+        },
+        "allow_app_download_panel": {
+          "default": true,
+          "description": "\n        Whether to allow app download panel in the UI.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Allow App Download Panel",
+          "type": "boolean"
+        },
+        "enable_2FA": {
+          "default": false,
+          "description": "\n        Whether to enable two-factor authentication.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enable 2Fa",
+          "type": "boolean"
+        },
+        "force_2FA": {
+          "default": false,
+          "description": "\n        Whether to force two-factor authentication for all users.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Force 2Fa",
+          "type": "boolean"
+        },
+        "system_SSH_image": {
+          "default": "",
+          "description": "\n        System SSH image name.\n        ",
+          "examples": [
+            "",
+            "ubuntu:22.04"
+          ],
+          "title": "System Ssh Image",
+          "type": "string"
+        },
+        "directory_based_usage": {
+          "default": false,
+          "description": "\n        Whether to use directory-based usage tracking.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Directory Based Usage",
+          "type": "boolean"
+        },
+        "allow_custom_resource_allocation": {
+          "default": true,
+          "description": "\n        Whether to allow custom resource allocation.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Allow Custom Resource Allocation",
+          "type": "boolean"
+        },
+        "edu_appname_prefix": {
+          "default": "",
+          "description": "\n        Education app name prefix.\n        ",
+          "examples": [
+            "",
+            "edu-"
+          ],
+          "title": "Edu Appname Prefix",
+          "type": "string"
+        },
+        "enable_extend_login_session": {
+          "default": false,
+          "description": "\n        Whether to enable extended login sessions.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enable Extend Login Session",
+          "type": "boolean"
+        },
+        "is_directory_size_visible": {
+          "default": true,
+          "description": "\n        Whether directory size is visible in the UI.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Is Directory Size Visible",
+          "type": "boolean"
+        },
+        "enable_interactive_login_account_switch": {
+          "default": true,
+          "description": "\n        Whether to enable interactive login account switching.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enable Interactive Login Account Switch",
+          "type": "boolean"
+        },
+        "default_file_browser_image": {
+          "default": "",
+          "description": "\n        Default file browser image name.\n        ",
+          "examples": [
+            "",
+            "filebrowser:latest"
+          ],
+          "title": "Default File Browser Image",
+          "type": "string"
+        },
+        "enable_reservoir": {
+          "default": false,
+          "description": "\n        Whether to enable reservoir feature.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enable Reservoir",
+          "type": "boolean"
+        }
+      },
+      "title": "ServiceConfig",
+      "type": "object"
+    },
+    "ServiceMode": {
+      "enum": [
+        "webui",
+        "static"
+      ],
+      "title": "ServiceMode",
+      "type": "string"
+    },
+    "SessionConfig": {
+      "properties": {
+        "redis": {
+          "$ref": "#/$defs/RedisConfig",
+          "description": "\n        Redis configuration for sessions.\n        "
+        },
+        "max_age": {
+          "default": 604800,
+          "description": "\n        Session maximum age in seconds.\n        ",
+          "examples": [
+            604800,
+            1209600
+          ],
+          "title": "Max Age",
+          "type": "integer"
+        },
+        "login_session_extension_sec": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Login session extension in seconds.\n        ",
+          "examples": [
+            null,
+            3600
+          ],
+          "title": "Login Session Extension Sec"
+        },
+        "flush_on_startup": {
+          "default": false,
+          "description": "\n        Whether to flush sessions on startup.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Flush On Startup",
+          "type": "boolean"
+        },
+        "login_block_time": {
+          "default": 1200,
+          "description": "\n        Login block time in seconds.\n        ",
+          "examples": [
+            1200,
+            3600
+          ],
+          "title": "Login Block Time",
+          "type": "integer"
+        },
+        "login_allowed_fail_count": {
+          "default": 10,
+          "description": "\n        Allowed login failure count.\n        ",
+          "examples": [
+            10,
+            5
+          ],
+          "title": "Login Allowed Fail Count",
+          "type": "integer"
+        },
+        "auto_logout": {
+          "default": false,
+          "description": "\n        Whether to enable auto logout.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Auto Logout",
+          "type": "boolean"
+        },
+        "max_count_for_preopen_ports": {
+          "default": 10,
+          "description": "\n        Maximum count for preopen ports.\n        ",
+          "examples": [
+            10,
+            20
+          ],
+          "title": "Max Count For Preopen Ports",
+          "type": "integer"
+        }
+      },
+      "title": "SessionConfig",
+      "type": "object"
+    },
+    "SingleRedisConfig": {
+      "properties": {
+        "addr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Network address and port of the Redis server.\n        Redis is used for distributed caching and messaging between managers.\n        Set to None when using Sentinel for high availability.\n        ",
+          "examples": [
+            null,
+            {
+              "host": "127.0.0.1",
+              "port": 6379
+            }
+          ]
+        },
+        "sentinel": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of Redis Sentinel addresses for high availability.\n        If provided, the manager will use Redis Sentinel for automatic failover.\n        When using Sentinel, the addr field is ignored and service_name is required.\n        ",
+          "examples": [
+            null,
+            [
+              {
+                "host": "redis-sentinel",
+                "port": 26379
+              },
+              {
+                "host": "redis-sentinel",
+                "port": 26380
+              }
+            ]
+          ],
+          "title": "Sentinel"
+        },
+        "service_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Service name for Redis Sentinel.\n        Required when using Redis Sentinel for high availability.\n        Identifies which service to monitor for failover.\n        ",
+          "examples": [
+            null,
+            "mymaster",
+            "backend-ai"
+          ],
+          "title": "Service Name"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Password for authenticating with Redis.\n        Set to None if Redis doesn't require authentication.\n        Should be kept secret in production environments.\n        ",
+          "examples": [
+            null,
+            "REDIS_PASSWORD"
+          ],
+          "title": "Password"
+        },
+        "request_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Timeout in milliseconds for Redis requests.\n        Controls how long operations wait before timing out.\n        If None, uses the default timeout configured in the Redis client.\n        ",
+          "examples": [
+            null,
+            1000
+          ],
+          "title": "Request Timeout"
+        },
+        "redis_helper_config": {
+          "$ref": "#/$defs/RedisHelperConfig",
+          "description": "\n        Configuration for the Redis helper library.\n        Controls timeouts and reconnection behavior.\n        Adjust based on network conditions and reliability requirements.\n        "
+        },
+        "use_tls": {
+          "default": false,
+          "description": "\n        Whether to use TLS for Redis connections.",
+          "title": "Use Tls",
+          "type": "boolean"
+        },
+        "tls_skip_verify": {
+          "default": false,
+          "description": "\n        Whether to skip TLS certificate verification.\n        Set to True for self-signed certificates or development environments.\n        ",
+          "title": "Tls Skip Verify",
+          "type": "boolean"
+        }
+      },
+      "title": "SingleRedisConfig",
+      "type": "object"
+    },
+    "UIConfig": {
+      "properties": {
+        "default_environment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Default environment for new sessions.\n        ",
+          "examples": [
+            null,
+            "python:3.9-ubuntu20.04"
+          ],
+          "title": "Default Environment"
+        },
+        "default_import_environment": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Default environment for import operations.\n        ",
+          "examples": [
+            null,
+            "python:3.9-ubuntu20.04"
+          ],
+          "title": "Default Import Environment"
+        },
+        "menu_blocklist": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of blocked menu items.\n        ",
+          "examples": [
+            null,
+            [
+              "admin",
+              "billing"
+            ]
+          ],
+          "title": "Menu Blocklist"
+        },
+        "menu_inactivelist": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of inactive menu items.\n        ",
+          "examples": [
+            null,
+            [
+              "maintenance",
+              "experimental"
+            ]
+          ],
+          "title": "Menu Inactivelist"
+        },
+        "enable_model_folders": {
+          "default": true,
+          "description": "\n        Whether to enable model folders functionality.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enable Model Folders",
+          "type": "boolean"
+        }
+      },
+      "title": "UIConfig",
+      "type": "object"
+    },
+    "WebServerConfig": {
+      "properties": {
+        "event_loop": {
+          "$ref": "#/$defs/EventLoopType",
+          "default": "uvloop",
+          "description": "\n        Event loop type.\n        ",
+          "examples": [
+            "asyncio",
+            "uvloop"
+          ]
+        },
+        "ipc_base_path": {
+          "default": "/tmp/backend.ai/ipc",
+          "description": "\n        IPC base path.\n        ",
+          "examples": [
+            "/tmp/backend.ai/ipc"
+          ],
+          "title": "Ipc Base Path",
+          "type": "string"
+        },
+        "pid_file": {
+          "default": "/dev/null",
+          "description": "\n        Process ID file path.\n        ",
+          "examples": [
+            "/var/run/webserver.pid"
+          ],
+          "format": "path",
+          "title": "Pid File",
+          "type": "string"
+        }
+      },
+      "title": "WebServerConfig",
+      "type": "object"
+    },
+    "WebSocketProxyConfig": {
+      "properties": {
+        "url": {
+          "default": "",
+          "description": "\n        WebSocket proxy URL.\n        Used to proxy WebSocket connections through a separate service.\n        Leave empty to disable WebSocket proxy.\n        ",
+          "examples": [
+            "",
+            "ws://localhost:8080"
+          ],
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "title": "WebSocketProxyConfig",
+      "type": "object"
+    },
+    "ai__backend__common__typed_validators__HostPortPair": {
+      "properties": {
+        "host": {
+          "description": "\n        Host address of the service.\n        Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to all interfaces.\n        ",
+          "examples": [
+            "127.0.0.1"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "description": "\n        Port number of the service.\n        Must be between 1 and 65535.\n        Ports below 1024 require root/admin privileges.\n        ",
+          "examples": [
+            8080
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "title": "HostPortPair",
+      "type": "object"
+    },
+    "ai__backend__logging__config__HostPortPair": {
+      "additionalProperties": true,
+      "properties": {
+        "host": {
+          "examples": [
+            "127.0.0.1"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "examples": [
+            8201
+          ],
+          "exclusiveMaximum": 65536,
+          "exclusiveMinimum": 0,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "title": "HostPortPair",
+      "type": "object"
+    },
+    "ai__backend__logging__types__LogLevel": {
+      "enum": [
+        "CRITICAL",
+        "ERROR",
+        "WARNING",
+        "INFO",
+        "DEBUG",
+        "TRACE",
+        "NOTSET"
+      ],
+      "title": "LogLevel",
+      "type": "string"
+    },
+    "ai__backend__web__config__unified__LogLevel": {
+      "enum": [
+        "CRITICAL",
+        "ERROR",
+        "WARNING",
+        "INFO",
+        "DEBUG"
+      ],
+      "title": "LogLevel",
+      "type": "string"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "service": {
+      "$ref": "#/$defs/ServiceConfig",
+      "description": "\n        Service configuration.\n        "
+    },
+    "security": {
+      "$ref": "#/$defs/SecurityConfig",
+      "description": "\n        Security configuration.\n        "
+    },
+    "resources": {
+      "$ref": "#/$defs/ResourcesConfig",
+      "description": "\n        Resources configuration.\n        "
+    },
+    "environments": {
+      "$ref": "#/$defs/EnvironmentsConfig",
+      "description": "\n        Environments configuration.\n        "
+    },
+    "plugin": {
+      "$ref": "#/$defs/PluginConfig",
+      "description": "\n        Plugin configuration.\n        "
+    },
+    "pipeline": {
+      "$ref": "#/$defs/PipelineConfig",
+      "description": "\n        Pipeline configuration.\n        "
+    },
+    "ui": {
+      "$ref": "#/$defs/UIConfig",
+      "description": "\n        UI configuration.\n        "
+    },
+    "api": {
+      "$ref": "#/$defs/APIConfig",
+      "description": "\n        API configuration.\n        "
+    },
+    "session": {
+      "$ref": "#/$defs/SessionConfig",
+      "description": "\n        Session configuration.\n        "
+    },
+    "license": {
+      "$ref": "#/$defs/LicenseConfig",
+      "description": "\n        License configuration.\n        "
+    },
+    "webserver": {
+      "$ref": "#/$defs/WebServerConfig",
+      "description": "\n        Web server configuration.\n        "
+    },
+    "otel": {
+      "$ref": "#/$defs/OTELConfig",
+      "description": "\n        OpenTelemetry configuration.\n        "
+    },
+    "apollo_router": {
+      "$ref": "#/$defs/ApolloRouterConfig",
+      "description": "\n        Apollo Router configuration.\n        "
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingConfig",
+      "description": "\n        Logging configuration.\n        "
+    },
+    "debug": {
+      "$ref": "#/$defs/DebugConfig",
+      "description": "\n        Debug configuration.\n        "
+    }
+  },
+  "title": "WebServerUnifiedConfig",
+  "type": "object"
+}

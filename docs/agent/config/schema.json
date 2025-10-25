@@ -1,0 +1,2348 @@
+{
+  "$defs": {
+    "APIConfig": {
+      "properties": {
+        "pull-timeout": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 7200.0,
+          "description": "Image pull timeout in seconds",
+          "examples": [
+            7200.0,
+            3600.0
+          ],
+          "title": "Pull-Timeout"
+        },
+        "commit-timeout": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Image commit timeout in seconds",
+          "examples": [
+            7200.0,
+            3600.0
+          ],
+          "title": "Commit-Timeout"
+        },
+        "push-timeout": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Image push timeout in seconds",
+          "examples": [
+            7200.0,
+            3600.0
+          ],
+          "title": "Push-Timeout"
+        }
+      },
+      "title": "APIConfig",
+      "type": "object"
+    },
+    "AffinityPolicy": {
+      "enum": [
+        0,
+        1
+      ],
+      "title": "AffinityPolicy",
+      "type": "integer"
+    },
+    "AgentBackend": {
+      "enum": [
+        "docker",
+        "kubernetes",
+        "dummy"
+      ],
+      "title": "AgentBackend",
+      "type": "string"
+    },
+    "AgentConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "backend": {
+          "$ref": "#/$defs/AgentBackend",
+          "description": "\nBackend type for the agent.\nThis determines how the agent interacts with the underlying infrastructure.\nAvailable options are:\n- `docker`: Uses Docker as the backend.\n- `kubernetes`: Uses Kubernetes as the backend.\n- `dummy`: A dummy backend for testing purposes.\n",
+          "examples": [
+            "docker",
+            "kubernetes",
+            "dummy"
+          ]
+        },
+        "rpc-listen-addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "0.0.0.0",
+            "port": 6001
+          },
+          "description": "RPC listen address and port",
+          "examples": [
+            {
+              "host": "",
+              "port": 6001
+            }
+          ]
+        },
+        "service-addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "0.0.0.0",
+            "port": 6003
+          },
+          "description": "Service address and port"
+        },
+        "announce-addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "host.docker.internal",
+            "port": 6003
+          },
+          "description": "Announce address and port"
+        },
+        "ssl-enabled": {
+          "default": false,
+          "description": "Whether to enable SSL",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Ssl-Enabled",
+          "type": "boolean"
+        },
+        "ssl-cert": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to SSL certificate file",
+          "examples": [
+            "/path/to/cert.pem"
+          ],
+          "title": "Ssl-Cert"
+        },
+        "ssl-key": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to SSL private key file",
+          "examples": [
+            "/path/to/key.pem"
+          ],
+          "title": "Ssl-Key"
+        },
+        "advertised-rpc-addr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Advertised RPC address and port",
+          "examples": [
+            {
+              "host": "192.168.1.100",
+              "port": 6001
+            }
+          ]
+        },
+        "rpc-auth-manager-public-key": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to RPC auth manager public key",
+          "examples": [
+            "/path/to/public.key"
+          ],
+          "title": "Rpc-Auth-Manager-Public-Key"
+        },
+        "rpc-auth-agent-keypair": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to RPC auth agent keypair",
+          "examples": [
+            "/path/to/keypair.key"
+          ],
+          "title": "Rpc-Auth-Agent-Keypair"
+        },
+        "agent-sock-port": {
+          "default": 6007,
+          "description": "Agent socket port",
+          "examples": [
+            6007
+          ],
+          "maximum": 65535,
+          "minimum": 1024,
+          "title": "Agent-Sock-Port",
+          "type": "integer"
+        },
+        "id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Agent ID",
+          "examples": [
+            "agent-001"
+          ],
+          "title": "Id"
+        },
+        "ipc-base-path": {
+          "default": "/tmp/backend.ai/ipc",
+          "description": "Base path for IPC",
+          "examples": [
+            "/tmp/backend.ai/ipc"
+          ],
+          "title": "Ipc-Base-Path",
+          "type": "string"
+        },
+        "var-base-path": {
+          "default": "var/lib/backend.ai",
+          "description": "Base path for variable data",
+          "examples": [
+            "./var/lib/backend.ai"
+          ],
+          "title": "Var-Base-Path",
+          "type": "string"
+        },
+        "mount-path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Mount path for containers",
+          "examples": [
+            "/mnt/backend.ai"
+          ],
+          "title": "Mount-Path"
+        },
+        "cohabiting-storage-proxy": {
+          "default": true,
+          "description": "Whether to enable cohabiting storage proxy",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Cohabiting-Storage-Proxy",
+          "type": "boolean"
+        },
+        "public-host": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Public host address",
+          "examples": [
+            "backend.ai"
+          ],
+          "title": "Public-Host"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Region name",
+          "examples": [
+            "us-east-1"
+          ],
+          "title": "Region"
+        },
+        "instance-type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Instance type",
+          "examples": [
+            "m5.large"
+          ],
+          "title": "Instance-Type"
+        },
+        "scaling-group": {
+          "default": "default",
+          "description": "Scaling group name",
+          "examples": [
+            "default",
+            "gpu-group"
+          ],
+          "title": "Scaling-Group",
+          "type": "string"
+        },
+        "scaling-group-type": {
+          "$ref": "#/$defs/ResourceGroupType",
+          "default": "compute",
+          "description": "Scaling group type",
+          "examples": [
+            "compute",
+            "storage"
+          ]
+        },
+        "pid-file": {
+          "default": "/dev/null",
+          "description": "Path to PID file",
+          "examples": [
+            "/var/run/agent.pid"
+          ],
+          "format": "path",
+          "title": "Pid-File",
+          "type": "string"
+        },
+        "event-loop": {
+          "$ref": "#/$defs/EventLoopType",
+          "default": "asyncio",
+          "description": "Event loop type",
+          "examples": [
+            "asyncio",
+            "uvloop"
+          ]
+        },
+        "skip-manager-detection": {
+          "default": false,
+          "description": "Whether to skip manager detection",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Skip-Manager-Detection",
+          "type": "boolean"
+        },
+        "aiomonitor-termui-port": {
+          "default": 38200,
+          "description": "Port for aiomonitor terminal UI",
+          "examples": [
+            38200
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Aiomonitor-Termui-Port",
+          "type": "integer"
+        },
+        "aiomonitor-webui-port": {
+          "default": 39200,
+          "description": "Port for aiomonitor web UI",
+          "examples": [
+            39200
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Aiomonitor-Webui-Port",
+          "type": "integer"
+        },
+        "metadata-server-bind-host": {
+          "default": "0.0.0.0",
+          "description": "Metadata server bind host",
+          "examples": [
+            "0.0.0.0"
+          ],
+          "title": "Metadata-Server-Bind-Host",
+          "type": "string"
+        },
+        "metadata-server-port": {
+          "default": 40128,
+          "description": "Metadata server port",
+          "examples": [
+            40128
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Metadata-Server-Port",
+          "type": "integer"
+        },
+        "allow-compute-plugins": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Allowed compute plugins",
+          "examples": [
+            [
+              "ai.backend.activator.agent",
+              "ai.backend.accelerator.cuda_open"
+            ]
+          ],
+          "title": "Allow-Compute-Plugins"
+        },
+        "block-compute-plugins": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Blocked compute plugins",
+          "examples": [
+            [
+              "ai.backend.accelerator.mock"
+            ]
+          ],
+          "title": "Block-Compute-Plugins"
+        },
+        "allow-network-plugins": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Allowed network plugins",
+          "examples": [
+            [
+              "ai.backend.manager.network.overlay"
+            ]
+          ],
+          "title": "Allow-Network-Plugins"
+        },
+        "block-network-plugins": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "uniqueItems": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Blocked network plugins",
+          "examples": [
+            [
+              "ai.backend.manager.network.overlay"
+            ]
+          ],
+          "title": "Block-Network-Plugins"
+        },
+        "image-commit-path": {
+          "default": "tmp/backend.ai/commit",
+          "description": "Path for image commit",
+          "examples": [
+            "./tmp/backend.ai/commit"
+          ],
+          "title": "Image-Commit-Path",
+          "type": "string"
+        },
+        "abuse-report-path": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path for abuse reports",
+          "examples": [
+            "/var/log/backend.ai/abuse"
+          ],
+          "title": "Abuse-Report-Path"
+        },
+        "force-terminate-abusing-containers": {
+          "default": false,
+          "description": "Whether to force terminate abusing containers",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Force-Terminate-Abusing-Containers",
+          "type": "boolean"
+        },
+        "kernel-creation-concurrency": {
+          "default": 4,
+          "description": "Kernel creation concurrency",
+          "examples": [
+            4,
+            8
+          ],
+          "maximum": 32,
+          "minimum": 1,
+          "title": "Kernel-Creation-Concurrency",
+          "type": "integer"
+        },
+        "use-experimental-redis-event-dispatcher": {
+          "default": false,
+          "description": "Whether to use experimental Redis event dispatcher",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Use-Experimental-Redis-Event-Dispatcher",
+          "type": "boolean"
+        },
+        "sync-container-lifecycles": {
+          "$ref": "#/$defs/SyncContainerLifecyclesConfig",
+          "description": "Container lifecycle synchronization config"
+        },
+        "docker-mode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Docker mode detected based on kernel version (linuxkit/native)",
+          "examples": [
+            "linuxkit",
+            "native"
+          ],
+          "title": "Docker-Mode"
+        },
+        "mount-path-uid-gid": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Owner uid:gid of the mount directory",
+          "examples": [
+            "root:root",
+            "bai:bai"
+          ],
+          "title": "Mount-Path-Uid-Gid"
+        }
+      },
+      "required": [
+        "backend"
+      ],
+      "title": "AgentConfig",
+      "type": "object"
+    },
+    "ConsoleConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "colored": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Opt to print colorized log.",
+          "examples": [
+            true
+          ],
+          "title": "Colored"
+        },
+        "format": {
+          "$ref": "#/$defs/LogFormat",
+          "default": "verbose",
+          "description": "Determine verbosity of log."
+        }
+      },
+      "title": "ConsoleConfig",
+      "type": "object"
+    },
+    "ContainerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "kernel-uid": {
+          "default": -1,
+          "description": "Kernel user ID",
+          "examples": [
+            1000,
+            -1
+          ],
+          "title": "Kernel-Uid",
+          "type": "string"
+        },
+        "kernel-gid": {
+          "default": -1,
+          "description": "Kernel group ID",
+          "examples": [
+            1000,
+            -1
+          ],
+          "title": "Kernel-Gid",
+          "type": "string"
+        },
+        "bind-host": {
+          "default": "",
+          "description": "Bind host for containers",
+          "examples": [
+            "0.0.0.0",
+            ""
+          ],
+          "title": "Bind-Host",
+          "type": "string"
+        },
+        "advertised-host": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Advertised host for containers",
+          "examples": [
+            "192.168.1.100"
+          ],
+          "title": "Advertised-Host"
+        },
+        "port-range": {
+          "default": [
+            30000,
+            31000
+          ],
+          "description": "Port range for containers",
+          "examples": [
+            [
+              30000,
+              31000
+            ]
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "integer"
+            }
+          ],
+          "title": "Port-Range",
+          "type": "array"
+        },
+        "stats-type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StatModes"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": "docker",
+          "description": "Statistics type",
+          "examples": [
+            "cgroup",
+            "docker"
+          ]
+        },
+        "sandbox-type": {
+          "$ref": "#/$defs/ContainerSandboxType",
+          "default": "docker",
+          "description": "Sandbox type",
+          "examples": [
+            "docker",
+            "jail"
+          ]
+        },
+        "jail-args": {
+          "description": "Jail arguments",
+          "examples": [
+            [
+              "--mount",
+              "/tmp"
+            ]
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Jail-Args",
+          "type": "array"
+        },
+        "scratch-type": {
+          "$ref": "#/$defs/ScratchType",
+          "description": "Scratch type",
+          "examples": [
+            "hostdir",
+            "hostfile",
+            "memory",
+            "k8s-nfs"
+          ]
+        },
+        "scratch-root": {
+          "default": "scratches",
+          "description": "Scratch root directory",
+          "examples": [
+            "./scratches"
+          ],
+          "title": "Scratch-Root",
+          "type": "string"
+        },
+        "scratch-size": {
+          "default": 0,
+          "description": "Scratch size",
+          "examples": [
+            "1G",
+            "500M"
+          ],
+          "title": "Scratch-Size"
+        },
+        "scratch-nfs-address": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Scratch NFS address",
+          "examples": [
+            "192.168.1.100:/export"
+          ],
+          "title": "Scratch-Nfs-Address"
+        },
+        "scratch-nfs-options": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Scratch NFS options",
+          "examples": [
+            "rw,sync"
+          ],
+          "title": "Scratch-Nfs-Options"
+        },
+        "alternative-bridge": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Alternative bridge network",
+          "examples": [
+            "br-backend"
+          ],
+          "title": "Alternative-Bridge"
+        },
+        "krunner-volumes": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\nKRunner volumes configuration, mapping container names to host paths.\nThis is used to specify volumes that should be mounted into containers\nwhen using the KRunner backend.\nThis fields is filled by the agent at runtime based on the\n`krunner_volumes` configuration in the agent's environment.\nIt is not intended to be set in the configuration file.\n",
+          "examples": [],
+          "title": "Krunner-Volumes"
+        },
+        "swarm-enabled": {
+          "default": false,
+          "description": "\nWhether to enable Docker Swarm mode.\nThis allows the agent to manage containers in a Docker Swarm cluster.\nWhen enabled, the agent will use Docker Swarm APIs to manage containers,\nnetworks, and services.\nThis field is only used when backend is set to 'docker'.\n",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Swarm-Enabled",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "scratch-type"
+      ],
+      "title": "ContainerConfig",
+      "type": "object"
+    },
+    "ContainerLogsConfig": {
+      "properties": {
+        "max-length": {
+          "default": 10485760,
+          "description": "Maximum length of container logs",
+          "examples": [
+            "10M",
+            "50M"
+          ],
+          "title": "Max-Length"
+        },
+        "chunk-size": {
+          "default": 65536,
+          "description": "Chunk size for container logs",
+          "examples": [
+            "64K",
+            "128K"
+          ],
+          "title": "Chunk-Size"
+        }
+      },
+      "title": "ContainerLogsConfig",
+      "type": "object"
+    },
+    "ContainerSandboxType": {
+      "enum": [
+        "docker",
+        "jail"
+      ],
+      "title": "ContainerSandboxType",
+      "type": "string"
+    },
+    "CoreDumpConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "Whether to enable core dump collection",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "path": {
+          "default": "coredumps",
+          "description": "Directory path for storing core dumps",
+          "examples": [
+            "./coredumps"
+          ],
+          "title": "Path",
+          "type": "string"
+        },
+        "backup-count": {
+          "default": 10,
+          "description": "Number of core dump backups to retain",
+          "examples": [
+            10,
+            20
+          ],
+          "minimum": 1,
+          "title": "Backup-Count",
+          "type": "integer"
+        },
+        "size-limit": {
+          "default": 67108864,
+          "description": "Maximum size limit for core dumps",
+          "examples": [
+            "64M",
+            "128M"
+          ],
+          "title": "Size-Limit"
+        }
+      },
+      "title": "CoreDumpConfig",
+      "type": "object"
+    },
+    "DebugConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "Master switch for debug mode",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "asyncio": {
+          "default": false,
+          "description": "Whether to enable asyncio debug mode",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Asyncio",
+          "type": "boolean"
+        },
+        "kernel-runner": {
+          "default": false,
+          "description": "Whether to enable kernel runner debug mode",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Kernel-Runner",
+          "type": "boolean"
+        },
+        "enhanced-aiomonitor-task-info": {
+          "default": false,
+          "description": "Enable enhanced task information in aiomonitor",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enhanced-Aiomonitor-Task-Info",
+          "type": "boolean"
+        },
+        "skip-container-deletion": {
+          "default": false,
+          "description": "Whether to skip container deletion for debugging",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Skip-Container-Deletion",
+          "type": "boolean"
+        },
+        "log-stats": {
+          "default": false,
+          "description": "Whether to log statistics",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Log-Stats",
+          "type": "boolean"
+        },
+        "log-kernel-config": {
+          "default": false,
+          "description": "Whether to log kernel configuration",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Log-Kernel-Config",
+          "type": "boolean"
+        },
+        "log-alloc-map": {
+          "default": false,
+          "description": "Whether to log allocation map",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Log-Alloc-Map",
+          "type": "boolean"
+        },
+        "log-events": {
+          "default": false,
+          "description": "Whether to log all internal events",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Log-Events",
+          "type": "boolean"
+        },
+        "log-heartbeats": {
+          "default": false,
+          "description": "Whether to log heartbeats",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Log-Heartbeats",
+          "type": "boolean"
+        },
+        "heartbeat-interval": {
+          "default": 20.0,
+          "description": "Heartbeat interval in seconds",
+          "examples": [
+            20.0,
+            30.0
+          ],
+          "title": "Heartbeat-Interval",
+          "type": "number"
+        },
+        "log-docker-events": {
+          "default": false,
+          "description": "Whether to log Docker events",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Log-Docker-Events",
+          "type": "boolean"
+        },
+        "coredump": {
+          "$ref": "#/$defs/CoreDumpConfig",
+          "description": "Core dump configuration"
+        }
+      },
+      "title": "DebugConfig",
+      "type": "object"
+    },
+    "EtcdConfig": {
+      "properties": {
+        "namespace": {
+          "description": "Etcd namespace",
+          "examples": [
+            "local",
+            "backend"
+          ],
+          "title": "Namespace",
+          "type": "string"
+        },
+        "addr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+            },
+            {
+              "items": {
+                "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+              },
+              "type": "array"
+            }
+          ],
+          "description": "Etcd address and port",
+          "examples": [
+            {
+              "host": "127.0.0.1",
+              "port": 2379
+            },
+            [
+              {
+                "host": "127.0.0.4",
+                "port": 2379
+              },
+              {
+                "host": "127.0.0.5",
+                "port": 2379
+              }
+            ]
+          ],
+          "title": "Addr"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Etcd username",
+          "examples": [
+            "backend"
+          ],
+          "title": "User"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Etcd password",
+          "examples": [
+            "PASSWORD"
+          ],
+          "title": "Password"
+        }
+      },
+      "required": [
+        "namespace",
+        "addr"
+      ],
+      "title": "EtcdConfig",
+      "type": "object"
+    },
+    "EventLoopType": {
+      "enum": [
+        "asyncio",
+        "uvloop"
+      ],
+      "title": "EventLoopType",
+      "type": "string"
+    },
+    "FileConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "path": {
+          "description": "Path to store log.",
+          "examples": [
+            "/var/log/backend.ai"
+          ],
+          "title": "Path",
+          "type": "string"
+        },
+        "filename": {
+          "description": "Log file name.",
+          "examples": [
+            "wsproxy.log"
+          ],
+          "title": "Filename",
+          "type": "string"
+        },
+        "backup-count": {
+          "default": 5,
+          "description": "Number of outdated log files to retain.",
+          "title": "Backup-Count",
+          "type": "integer"
+        },
+        "rotation-size": {
+          "anyOf": [
+            {
+              "pattern": "^\\s*(\\d*\\.?\\d+)\\s*(\\w+)?",
+              "type": "string"
+            },
+            {
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "description": "Maximum size for a single log file.",
+          "title": "Rotation-Size"
+        },
+        "format": {
+          "$ref": "#/$defs/LogFormat",
+          "default": "verbose",
+          "description": "Determine verbosity of log."
+        }
+      },
+      "required": [
+        "path",
+        "filename"
+      ],
+      "title": "FileConfig",
+      "type": "object"
+    },
+    "GraylogConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "host": {
+          "description": "Graylog hostname.",
+          "examples": [
+            "127.0.0.1"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "description": "Graylog server port number.",
+          "examples": [
+            8000
+          ],
+          "title": "Port",
+          "type": "integer"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "Log level."
+        },
+        "localname": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The custom source identifier. If not specified, fqdn will be used instead.",
+          "title": "Localname"
+        },
+        "fqdn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The fuly qualified domain name of the source.",
+          "title": "Fqdn"
+        },
+        "ssl-verify": {
+          "default": true,
+          "description": "Verify validity of TLS certificate when communicating with logstash.",
+          "title": "Ssl-Verify",
+          "type": "boolean"
+        },
+        "ca-certs": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to Root CA certificate file.",
+          "examples": [
+            "/etc/ssl/ca.pem"
+          ],
+          "title": "Ca-Certs"
+        },
+        "keyfile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to TLS private key file.",
+          "examples": [
+            "/etc/backend.ai/graylog/privkey.pem"
+          ],
+          "title": "Keyfile"
+        },
+        "certfile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to TLS certificate file.",
+          "examples": [
+            "/etc/backend.ai/graylog/cert.pem"
+          ],
+          "title": "Certfile"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "title": "GraylogConfig",
+      "type": "object"
+    },
+    "KernelLifecyclesConfig": {
+      "properties": {
+        "init-polling-attempt": {
+          "default": 10,
+          "description": "Number of init polling attempts",
+          "examples": [
+            10,
+            20
+          ],
+          "title": "Init-Polling-Attempt",
+          "type": "integer"
+        },
+        "init-polling-timeout-sec": {
+          "default": 60.0,
+          "description": "Init polling timeout in seconds",
+          "examples": [
+            60.0,
+            120.0
+          ],
+          "title": "Init-Polling-Timeout-Sec",
+          "type": "number"
+        },
+        "init-timeout-sec": {
+          "default": 60.0,
+          "description": "Init timeout in seconds",
+          "examples": [
+            60.0,
+            120.0
+          ],
+          "title": "Init-Timeout-Sec",
+          "type": "number"
+        }
+      },
+      "title": "KernelLifecyclesConfig",
+      "type": "object"
+    },
+    "LogDriver": {
+      "enum": [
+        "console",
+        "logstash",
+        "file",
+        "graylog"
+      ],
+      "title": "LogDriver",
+      "type": "string"
+    },
+    "LogFormat": {
+      "enum": [
+        "simple",
+        "verbose"
+      ],
+      "title": "LogFormat",
+      "type": "string"
+    },
+    "LogHandlerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "class": {
+          "description": "The class name of the log handler.",
+          "title": "Class",
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "The log level to filter messages from this handler."
+        }
+      },
+      "required": [
+        "class"
+      ],
+      "title": "LogHandlerConfig",
+      "type": "object"
+    },
+    "LogLevel": {
+      "enum": [
+        "CRITICAL",
+        "ERROR",
+        "WARNING",
+        "INFO",
+        "DEBUG",
+        "TRACE",
+        "NOTSET"
+      ],
+      "title": "LogLevel",
+      "type": "string"
+    },
+    "LoggerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "handlers": {
+          "description": "The name of handlers receiving messages from this logger.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Handlers",
+          "type": "array"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "The log level to filter messages from this logger."
+        },
+        "propagate": {
+          "default": true,
+          "description": "Whether to propagate messages to pre-existing loggers.",
+          "title": "Propagate",
+          "type": "boolean"
+        }
+      },
+      "title": "LoggerConfig",
+      "type": "object"
+    },
+    "LoggingConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "version": {
+          "default": 1,
+          "description": "The version used by logging.dictConfig().",
+          "title": "Version",
+          "type": "integer"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "The main log level to filter messages from all loggers."
+        },
+        "disable-existing-loggers": {
+          "default": false,
+          "description": "Disable the existing loggers when applying the config.",
+          "title": "Disable-Existing-Loggers",
+          "type": "boolean"
+        },
+        "handlers": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/LogHandlerConfig"
+              },
+              {
+                "$ref": "#/$defs/RelayLogHandlerConfig"
+              }
+            ]
+          },
+          "description": "The mapping of log handler configurations.",
+          "title": "Handlers",
+          "type": "object"
+        },
+        "loggers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LoggerConfig"
+          },
+          "description": "The mapping of per-namespace logger configurations.",
+          "title": "Loggers",
+          "type": "object"
+        },
+        "drivers": {
+          "default": [
+            "console"
+          ],
+          "description": "The list of log drivers to activate.",
+          "items": {
+            "$ref": "#/$defs/LogDriver"
+          },
+          "title": "Drivers",
+          "type": "array"
+        },
+        "console": {
+          "$ref": "#/$defs/ConsoleConfig",
+          "default": {
+            "colored": null,
+            "format": "verbose"
+          }
+        },
+        "file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FileConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "logstash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LogstashConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "graylog": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GraylogConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "pkg_ns": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LogLevel"
+          },
+          "default": {
+            "": "WARNING",
+            "ai.backend": "INFO",
+            "tests": "DEBUG"
+          },
+          "description": "Override default log level for specific scope of package",
+          "title": "Pkg Ns",
+          "type": "object"
+        }
+      },
+      "title": "LoggingConfig",
+      "type": "object"
+    },
+    "LogstashConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "endpoint": {
+          "$ref": "#/$defs/ai__backend__logging__config__HostPortPair",
+          "description": "Connection information of logstash node.",
+          "examples": [
+            {
+              "host": "127.0.0.1",
+              "port": 8001
+            }
+          ]
+        },
+        "protocol": {
+          "$ref": "#/$defs/LogstashProtocol",
+          "default": "tcp",
+          "description": "Protocol to communicate with logstash server."
+        },
+        "ssl-enabled": {
+          "default": true,
+          "description": "Use TLS to communicate with logstash server.",
+          "title": "Ssl-Enabled",
+          "type": "boolean"
+        },
+        "ssl-verify": {
+          "default": true,
+          "description": "Verify validity of TLS certificate when communicating with logstash.",
+          "title": "Ssl-Verify",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "endpoint"
+      ],
+      "title": "LogstashConfig",
+      "type": "object"
+    },
+    "LogstashProtocol": {
+      "enum": [
+        "zmq.push",
+        "zmq.pub",
+        "tcp",
+        "udp"
+      ],
+      "title": "LogstashProtocol",
+      "type": "string"
+    },
+    "MsgpackOptions": {
+      "properties": {
+        "pack-opts": {
+          "additionalProperties": true,
+          "title": "Pack-Opts",
+          "type": "object"
+        },
+        "unpack-opts": {
+          "additionalProperties": true,
+          "title": "Unpack-Opts",
+          "type": "object"
+        }
+      },
+      "required": [
+        "pack-opts",
+        "unpack-opts"
+      ],
+      "title": "MsgpackOptions",
+      "type": "object"
+    },
+    "OTELConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "Whether to enable OpenTelemetry",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "log-level": {
+          "default": "INFO",
+          "description": "Log level for OpenTelemetry",
+          "examples": [
+            "DEBUG",
+            "INFO",
+            "WARN",
+            "ERROR"
+          ],
+          "title": "Log-Level",
+          "type": "string"
+        },
+        "endpoint": {
+          "default": "http://127.0.0.1:4317",
+          "description": "OTLP endpoint for sending traces",
+          "examples": [
+            "http://127.0.0.1:4317"
+          ],
+          "title": "Endpoint",
+          "type": "string"
+        }
+      },
+      "title": "OTELConfig",
+      "type": "object"
+    },
+    "PyroscopeConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "Whether to enable Pyroscope profiling",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "app-name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Application name to use in Pyroscope",
+          "examples": [
+            "backendai-agent"
+          ],
+          "title": "App-Name"
+        },
+        "server-addr": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Address of the Pyroscope server",
+          "examples": [
+            "http://localhost:4040"
+          ],
+          "title": "Server-Addr"
+        },
+        "sample-rate": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sampling rate for Pyroscope profiling",
+          "examples": [
+            10,
+            100
+          ],
+          "title": "Sample-Rate"
+        }
+      },
+      "title": "PyroscopeConfig",
+      "type": "object"
+    },
+    "RedisConfig": {
+      "properties": {
+        "addr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Network address and port of the Redis server.\n        Redis is used for distributed caching and messaging between managers.\n        Set to None when using Sentinel for high availability.\n        ",
+          "examples": [
+            null,
+            {
+              "host": "127.0.0.1",
+              "port": 6379
+            }
+          ]
+        },
+        "sentinel": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of Redis Sentinel addresses for high availability.\n        If provided, the manager will use Redis Sentinel for automatic failover.\n        When using Sentinel, the addr field is ignored and service_name is required.\n        ",
+          "examples": [
+            null,
+            [
+              {
+                "host": "redis-sentinel",
+                "port": 26379
+              },
+              {
+                "host": "redis-sentinel",
+                "port": 26380
+              }
+            ]
+          ],
+          "title": "Sentinel"
+        },
+        "service_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Service name for Redis Sentinel.\n        Required when using Redis Sentinel for high availability.\n        Identifies which service to monitor for failover.\n        ",
+          "examples": [
+            null,
+            "mymaster",
+            "backend-ai"
+          ],
+          "title": "Service Name"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Password for authenticating with Redis.\n        Set to None if Redis doesn't require authentication.\n        Should be kept secret in production environments.\n        ",
+          "examples": [
+            null,
+            "REDIS_PASSWORD"
+          ],
+          "title": "Password"
+        },
+        "request_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Timeout in milliseconds for Redis requests.\n        Controls how long operations wait before timing out.\n        If None, uses the default timeout configured in the Redis client.\n        ",
+          "examples": [
+            null,
+            1000
+          ],
+          "title": "Request Timeout"
+        },
+        "redis_helper_config": {
+          "$ref": "#/$defs/RedisHelperConfig",
+          "description": "\n        Configuration for the Redis helper library.\n        Controls timeouts and reconnection behavior.\n        Adjust based on network conditions and reliability requirements.\n        "
+        },
+        "use_tls": {
+          "default": false,
+          "description": "\n        Whether to use TLS for Redis connections.",
+          "title": "Use Tls",
+          "type": "boolean"
+        },
+        "tls_skip_verify": {
+          "default": false,
+          "description": "\n        Whether to skip TLS certificate verification.\n        Set to True for self-signed certificates or development environments.\n        ",
+          "title": "Tls Skip Verify",
+          "type": "boolean"
+        },
+        "override_configs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "$ref": "#/$defs/SingleRedisConfig"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Optional override configurations for specific Redis contexts.\n        Allows different Redis settings for different services within Backend.AI.\n        Each key represents a context name, and the value is a complete Redis configuration.\n        ",
+          "examples": [
+            null,
+            {
+              "live": {
+                "addr": {
+                  "host": "127.0.0.1",
+                  "port": 6379
+                },
+                "password": "different-password",
+                "redis_helper_config": {
+                  "socket_timeout": 10.0
+                }
+              }
+            }
+          ],
+          "title": "Override Configs"
+        }
+      },
+      "title": "RedisConfig",
+      "type": "object"
+    },
+    "RedisHelperConfig": {
+      "properties": {
+        "socket_timeout": {
+          "default": 5.0,
+          "description": "\n        Timeout in seconds for Redis socket operations.\n        Controls how long operations wait before timing out.\n        Increase for slow or congested networks.\n        ",
+          "examples": [
+            5.0,
+            10.0
+          ],
+          "title": "Socket Timeout",
+          "type": "number"
+        },
+        "socket_connect_timeout": {
+          "default": 2.0,
+          "description": "\n        Timeout in seconds for establishing Redis connections.\n        Controls how long connection attempts wait before failing.\n        Shorter values fail faster but may be too aggressive for some networks.\n        ",
+          "examples": [
+            2.0,
+            5.0
+          ],
+          "title": "Socket Connect Timeout",
+          "type": "number"
+        },
+        "reconnect_poll_timeout": {
+          "default": 0.3,
+          "description": "\n        Time in seconds to wait between reconnection attempts.\n        Controls the polling frequency when trying to reconnect to Redis.\n        Lower values reconnect faster but may increase network load.\n        ",
+          "examples": [
+            0.3,
+            1.0
+          ],
+          "title": "Reconnect Poll Timeout",
+          "type": "number"
+        }
+      },
+      "title": "RedisHelperConfig",
+      "type": "object"
+    },
+    "RelayLogHandlerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "class": {
+          "description": "The class name of the log handler.",
+          "title": "Class",
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "The log level to filter messages from this handler."
+        },
+        "endpoint": {
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "msgpack-options": {
+          "$ref": "#/$defs/MsgpackOptions"
+        }
+      },
+      "required": [
+        "class",
+        "endpoint",
+        "msgpack-options"
+      ],
+      "title": "RelayLogHandlerConfig",
+      "type": "object"
+    },
+    "ResourceConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "reserved-cpu": {
+          "default": 1,
+          "description": "The number of CPU cores reserved for the operating system and the agent service.",
+          "examples": [
+            1,
+            2
+          ],
+          "title": "Reserved-Cpu",
+          "type": "integer"
+        },
+        "reserved-mem": {
+          "default": 1073741824,
+          "description": "The memory space reserved for the operating system and the agent service. It is subtracted from the reported main memory size and not available for user workload allocation. Depending on the memory-align-size option and system configuration, this may not be the exact value but have slightly less or more values within the memory-align-size.",
+          "examples": [
+            "1G",
+            "2G"
+          ],
+          "title": "Reserved-Mem"
+        },
+        "reserved-disk": {
+          "default": 8589934592,
+          "description": "The disk space reserved for the operating system and the agent service. Currently this value is unused. In future releases, it may be used to preserve the minimum disk space from the scratch disk allocation via loopback files.",
+          "examples": [
+            "8G",
+            "16G"
+          ],
+          "title": "Reserved-Disk"
+        },
+        "memory-align-size": {
+          "default": 16777216,
+          "description": "The alignment of the reported main memory size to absorb tiny deviations from per-node firwmare/hardware settings. Recommended to be multiple of the page/hugepage size (e.g., 2 MiB).",
+          "examples": [
+            "2M",
+            "32M"
+          ],
+          "title": "Memory-Align-Size"
+        },
+        "allocation-order": {
+          "default": [
+            "cuda",
+            "rocm",
+            "tpu",
+            "cpu",
+            "mem"
+          ],
+          "description": "Resource allocation order",
+          "examples": [
+            [
+              "cuda",
+              "rocm",
+              "tpu",
+              "cpu",
+              "mem"
+            ]
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Allocation-Order",
+          "type": "array"
+        },
+        "affinity-policy": {
+          "$ref": "#/$defs/AffinityPolicy",
+          "default": 1,
+          "description": "Affinity policy",
+          "examples": [
+            "PREFER_SINGLE_NODE",
+            "INTERLEAVED"
+          ]
+        }
+      },
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "ResourceGroupType": {
+      "enum": [
+        "compute",
+        "storage"
+      ],
+      "title": "ResourceGroupType",
+      "type": "string"
+    },
+    "ScratchType": {
+      "enum": [
+        "hostdir",
+        "hostfile",
+        "memory",
+        "k8s-nfs"
+      ],
+      "title": "ScratchType",
+      "type": "string"
+    },
+    "ServiceDiscoveryConfig": {
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ServiceDiscoveryType",
+          "default": "redis",
+          "description": "Type of service discovery to use",
+          "examples": [
+            "etcd",
+            "redis"
+          ]
+        }
+      },
+      "title": "ServiceDiscoveryConfig",
+      "type": "object"
+    },
+    "ServiceDiscoveryType": {
+      "enum": [
+        "etcd",
+        "redis"
+      ],
+      "title": "ServiceDiscoveryType",
+      "type": "string"
+    },
+    "SingleRedisConfig": {
+      "properties": {
+        "addr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Network address and port of the Redis server.\n        Redis is used for distributed caching and messaging between managers.\n        Set to None when using Sentinel for high availability.\n        ",
+          "examples": [
+            null,
+            {
+              "host": "127.0.0.1",
+              "port": 6379
+            }
+          ]
+        },
+        "sentinel": {
+          "anyOf": [
+            {
+              "items": {
+                "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        List of Redis Sentinel addresses for high availability.\n        If provided, the manager will use Redis Sentinel for automatic failover.\n        When using Sentinel, the addr field is ignored and service_name is required.\n        ",
+          "examples": [
+            null,
+            [
+              {
+                "host": "redis-sentinel",
+                "port": 26379
+              },
+              {
+                "host": "redis-sentinel",
+                "port": 26380
+              }
+            ]
+          ],
+          "title": "Sentinel"
+        },
+        "service_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Service name for Redis Sentinel.\n        Required when using Redis Sentinel for high availability.\n        Identifies which service to monitor for failover.\n        ",
+          "examples": [
+            null,
+            "mymaster",
+            "backend-ai"
+          ],
+          "title": "Service Name"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Password for authenticating with Redis.\n        Set to None if Redis doesn't require authentication.\n        Should be kept secret in production environments.\n        ",
+          "examples": [
+            null,
+            "REDIS_PASSWORD"
+          ],
+          "title": "Password"
+        },
+        "request_timeout": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Timeout in milliseconds for Redis requests.\n        Controls how long operations wait before timing out.\n        If None, uses the default timeout configured in the Redis client.\n        ",
+          "examples": [
+            null,
+            1000
+          ],
+          "title": "Request Timeout"
+        },
+        "redis_helper_config": {
+          "$ref": "#/$defs/RedisHelperConfig",
+          "description": "\n        Configuration for the Redis helper library.\n        Controls timeouts and reconnection behavior.\n        Adjust based on network conditions and reliability requirements.\n        "
+        },
+        "use_tls": {
+          "default": false,
+          "description": "\n        Whether to use TLS for Redis connections.",
+          "title": "Use Tls",
+          "type": "boolean"
+        },
+        "tls_skip_verify": {
+          "default": false,
+          "description": "\n        Whether to skip TLS certificate verification.\n        Set to True for self-signed certificates or development environments.\n        ",
+          "title": "Tls Skip Verify",
+          "type": "boolean"
+        }
+      },
+      "title": "SingleRedisConfig",
+      "type": "object"
+    },
+    "StatModes": {
+      "enum": [
+        "cgroup",
+        "docker"
+      ],
+      "title": "StatModes",
+      "type": "string"
+    },
+    "SyncContainerLifecyclesConfig": {
+      "properties": {
+        "enabled": {
+          "default": true,
+          "description": "Whether to enable container lifecycle synchronization",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "interval": {
+          "default": 10.0,
+          "description": "Synchronization interval in seconds",
+          "examples": [
+            10.0,
+            30.0
+          ],
+          "minimum": 0,
+          "title": "Interval",
+          "type": "number"
+        }
+      },
+      "title": "SyncContainerLifecyclesConfig",
+      "type": "object"
+    },
+    "ai__backend__common__typed_validators__HostPortPair": {
+      "properties": {
+        "host": {
+          "description": "\n        Host address of the service.\n        Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to all interfaces.\n        ",
+          "examples": [
+            "127.0.0.1"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "description": "\n        Port number of the service.\n        Must be between 1 and 65535.\n        Ports below 1024 require root/admin privileges.\n        ",
+          "examples": [
+            8080
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "title": "HostPortPair",
+      "type": "object"
+    },
+    "ai__backend__logging__config__HostPortPair": {
+      "additionalProperties": true,
+      "properties": {
+        "host": {
+          "examples": [
+            "127.0.0.1"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "examples": [
+            8201
+          ],
+          "exclusiveMaximum": 65536,
+          "exclusiveMinimum": 0,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "title": "HostPortPair",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "agent": {
+      "$ref": "#/$defs/AgentConfig",
+      "description": "Agent configuration"
+    },
+    "container": {
+      "$ref": "#/$defs/ContainerConfig",
+      "description": "Container configuration"
+    },
+    "pyroscope": {
+      "$ref": "#/$defs/PyroscopeConfig",
+      "description": "Pyroscope configuration"
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingConfig",
+      "description": "Logging configuration"
+    },
+    "resource": {
+      "$ref": "#/$defs/ResourceConfig",
+      "description": "Resource configuration"
+    },
+    "otel": {
+      "$ref": "#/$defs/OTELConfig",
+      "description": "OpenTelemetry configuration"
+    },
+    "service-discovery": {
+      "$ref": "#/$defs/ServiceDiscoveryConfig",
+      "description": "Service discovery configuration"
+    },
+    "debug": {
+      "$ref": "#/$defs/DebugConfig",
+      "description": "Debug configuration"
+    },
+    "etcd": {
+      "$ref": "#/$defs/EtcdConfig",
+      "description": "Etcd configuration"
+    },
+    "container-logs": {
+      "$ref": "#/$defs/ContainerLogsConfig",
+      "description": "Container logs configuration"
+    },
+    "api": {
+      "$ref": "#/$defs/APIConfig",
+      "description": "API configuration"
+    },
+    "kernel-lifecycles": {
+      "$ref": "#/$defs/KernelLifecyclesConfig",
+      "description": "Kernel lifecycles configuration"
+    },
+    "plugins": {
+      "description": "\nPlugins configuration.\nThis field is injected at runtime based on etcd configuration.\nIt is not intended to be set in the configuration file.\n",
+      "title": "Plugins"
+    },
+    "redis": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RedisConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "\nRedis configuration.\nThis field is injected at runtime based on etcd configuration.\nIt is not intended to be set in the other way.\n"
+    }
+  },
+  "required": [
+    "agent",
+    "container",
+    "resource",
+    "etcd"
+  ],
+  "title": "AgentUnifiedConfig",
+  "type": "object"
+}

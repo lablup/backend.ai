@@ -66,7 +66,7 @@ jobs:
       run: |
         ./backend.ai mgr config generate-json-schema docs/manager/config/schema.json
         ./backend.ai ag config generate-json-schema docs/agent/config/schema.json
-        ./backend.ai storage config generate-json-schema docs/storage/config/schema.json
+        ./backend.ai storage config generate-json-schema docs/storage-proxy/config/schema.json
         ./backend.ai web config generate-json-schema docs/web/config/schema.json
     - name: Make commit message for changing change log file
       run: |
