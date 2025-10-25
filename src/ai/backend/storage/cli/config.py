@@ -4,6 +4,7 @@ Configuration management CLI commands for Backend.AI Storage Proxy.
 This module provides CLI commands for generating and managing configuration files.
 """
 
+import json
 import logging
 import pathlib
 
@@ -79,6 +80,38 @@ Generated automatically from the StorageProxyUnifiedConfig schema.
         log.info(f"Sample configuration file generated successfully: {output}")
     except Exception as e:
         raise click.ClickException(f"Failed to generate sample configuration: {e}")
+
+
+@cli.command()
+@click.argument(
+    "path",
+    metavar="PATH",
+    type=click.Path(
+        file_okay=True,
+        dir_okay=False,
+        writable=True,
+        path_type=pathlib.Path,
+    ),
+)
+@click.pass_obj
+def generate_json_schema(
+    cli_ctx: CLIContext,
+    path: pathlib.Path,
+) -> None:
+    """
+    Generate a JSON schema file for the Manager configuration.
+    """
+
+    try:
+        raw_schema = StorageProxyUnifiedConfig.schema_to_dict()
+        with open(path, "w") as fw:
+            json.dump(raw_schema, fw, indent=2)
+    except Exception as e:
+        raise click.ClickException(f"Failed to generate JSON schema: {e}")
+
+
+if __name__ == "__main__":
+    cli()
 
 
 if __name__ == "__main__":

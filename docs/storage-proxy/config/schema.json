@@ -1,0 +1,2169 @@
+{
+  "$defs": {
+    "APIConfig": {
+      "properties": {
+        "client": {
+          "$ref": "#/$defs/ClientAPIConfig",
+          "description": "\n        Configuration for the client-facing API.\n        Handles file operations requested by users.\n        "
+        },
+        "manager": {
+          "$ref": "#/$defs/ManagerAPIConfig",
+          "description": "\n        Configuration for the manager-facing API.\n        Handles control operations from manager services.\n        "
+        }
+      },
+      "required": [
+        "client",
+        "manager"
+      ],
+      "title": "APIConfig",
+      "type": "object"
+    },
+    "ArtifactRegistryConfig": {
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ArtifactRegistryType",
+          "description": "\n        Type of the artifact registry.\n        Determines how to interact with the registry service.\n        ",
+          "examples": [
+            "huggingface",
+            "reservoir"
+          ]
+        },
+        "huggingface": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HuggingfaceConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        HuggingFace registry configuration.\n        "
+        },
+        "reservoir": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReservoirConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Reservoir registry configuration.\n        "
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ArtifactRegistryConfig",
+      "type": "object"
+    },
+    "ArtifactRegistryStorageConfig": {
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ArtifactStorageType",
+          "description": "\n        Type of the artifact storage.\n        Determines how to interact with the storage service.\n        ",
+          "examples": [
+            "object_storage",
+            "vfs_storage",
+            "git_lfs"
+          ]
+        },
+        "object-storage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ObjectStorageConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Object storage configuration.\n        "
+        },
+        "vfs-storage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VFSStorageConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        VFS storage configuration.\n        "
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ArtifactRegistryStorageConfig",
+      "type": "object"
+    },
+    "ArtifactRegistryType": {
+      "enum": [
+        "huggingface",
+        "reservoir"
+      ],
+      "title": "ArtifactRegistryType",
+      "type": "string"
+    },
+    "ArtifactStorageType": {
+      "enum": [
+        "object_storage",
+        "vfs_storage",
+        "git_lfs"
+      ],
+      "title": "ArtifactStorageType",
+      "type": "string"
+    },
+    "ClientAPIConfig": {
+      "properties": {
+        "service-addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "127.0.0.1",
+            "port": 6021
+          },
+          "description": "\n        Network address and port where the client API service will listen.\n        This is the address accessible by clients for file operations.\n        "
+        },
+        "ssl-enabled": {
+          "description": "\n        Whether to enable SSL/TLS for client API connections.\n        Required for secure communication with clients.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Ssl-Enabled",
+          "type": "boolean"
+        },
+        "ssl-cert": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Path to the SSL certificate file for client API.\n        Required if ssl_enabled is True.\n        ",
+          "examples": [
+            "/etc/ssl/certs/storage-proxy.crt"
+          ],
+          "title": "Ssl-Cert"
+        },
+        "ssl-privkey": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Path to the SSL private key file for client API.\n        Required if ssl_enabled is True.\n        ",
+          "examples": [
+            "/etc/ssl/private/storage-proxy.key"
+          ],
+          "title": "Ssl-Privkey"
+        }
+      },
+      "required": [
+        "ssl-enabled"
+      ],
+      "title": "ClientAPIConfig",
+      "type": "object"
+    },
+    "ConsoleConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "colored": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Opt to print colorized log.",
+          "examples": [
+            true
+          ],
+          "title": "Colored"
+        },
+        "format": {
+          "$ref": "#/$defs/LogFormat",
+          "default": "verbose",
+          "description": "Determine verbosity of log."
+        }
+      },
+      "title": "ConsoleConfig",
+      "type": "object"
+    },
+    "DebugConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "\n        Master switch for debug mode.\n        When enabled, activates various debugging features.\n        Should be disabled in production for security and performance.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "asyncio": {
+          "default": false,
+          "description": "\n        Whether to enable asyncio debug mode.\n        Helps detect problems like coroutines never awaited.\n        Adds significant overhead, use only during development.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Asyncio",
+          "type": "boolean"
+        },
+        "enhanced-aiomonitor-task-info": {
+          "default": false,
+          "description": "\n        Enable enhanced task information in aiomonitor.\n        Provides more detailed information about running asyncio tasks.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enhanced-Aiomonitor-Task-Info",
+          "type": "boolean"
+        },
+        "log-events": {
+          "default": false,
+          "description": "\n        Whether to log all internal events.\n        Very verbose, but useful for debugging event-related issues.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Log-Events",
+          "type": "boolean"
+        }
+      },
+      "title": "DebugConfig",
+      "type": "object"
+    },
+    "EtcdConfig": {
+      "properties": {
+        "namespace": {
+          "default": "ETCD_NAMESPACE",
+          "description": "\n        Namespace prefix for etcd keys used by Backend.AI.\n        Allows multiple Backend.AI clusters to share the same etcd cluster.\n        All Backend.AI related keys will be stored under this namespace.\n        ",
+          "examples": [
+            "local",
+            "backend"
+          ],
+          "title": "Namespace",
+          "type": "string"
+        },
+        "addr": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+            },
+            {
+              "items": {
+                "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair"
+              },
+              "type": "array"
+            }
+          ],
+          "default": {
+            "host": "127.0.0.1",
+            "port": 2379
+          },
+          "description": "\n        Network address of the etcd server.\n        Default is the standard etcd port on localhost.\n        In production, should point to one or more etcd instance endpoint(s).\n        ",
+          "examples": [
+            {
+              "host": "127.0.0.1",
+              "port": 2379
+            },
+            [
+              {
+                "host": "127.0.0.4",
+                "port": 2379
+              },
+              {
+                "host": "127.0.0.5",
+                "port": 2379
+              }
+            ]
+          ],
+          "title": "Addr"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Username for authenticating with etcd.\n        Optional if etcd doesn't require authentication.\n        Should be set along with password for secure deployments.\n        ",
+          "examples": [
+            "backend",
+            "manager"
+          ],
+          "title": "User"
+        },
+        "password": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Password for authenticating with etcd.\n        Optional if etcd doesn't require authentication.\n        Can be a direct password or environment variable reference.\n        ",
+          "examples": [
+            "develove",
+            "ETCD_PASSWORD"
+          ],
+          "title": "Password"
+        }
+      },
+      "title": "EtcdConfig",
+      "type": "object"
+    },
+    "EventLoopType": {
+      "enum": [
+        "asyncio",
+        "uvloop"
+      ],
+      "title": "EventLoopType",
+      "type": "string"
+    },
+    "FileConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "path": {
+          "description": "Path to store log.",
+          "examples": [
+            "/var/log/backend.ai"
+          ],
+          "title": "Path",
+          "type": "string"
+        },
+        "filename": {
+          "description": "Log file name.",
+          "examples": [
+            "wsproxy.log"
+          ],
+          "title": "Filename",
+          "type": "string"
+        },
+        "backup-count": {
+          "default": 5,
+          "description": "Number of outdated log files to retain.",
+          "title": "Backup-Count",
+          "type": "integer"
+        },
+        "rotation-size": {
+          "anyOf": [
+            {
+              "pattern": "^\\s*(\\d*\\.?\\d+)\\s*(\\w+)?",
+              "type": "string"
+            },
+            {
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "description": "Maximum size for a single log file.",
+          "title": "Rotation-Size"
+        },
+        "format": {
+          "$ref": "#/$defs/LogFormat",
+          "default": "verbose",
+          "description": "Determine verbosity of log."
+        }
+      },
+      "required": [
+        "path",
+        "filename"
+      ],
+      "title": "FileConfig",
+      "type": "object"
+    },
+    "GraylogConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "host": {
+          "description": "Graylog hostname.",
+          "examples": [
+            "127.0.0.1"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "description": "Graylog server port number.",
+          "examples": [
+            8000
+          ],
+          "title": "Port",
+          "type": "integer"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "Log level."
+        },
+        "localname": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The custom source identifier. If not specified, fqdn will be used instead.",
+          "title": "Localname"
+        },
+        "fqdn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The fuly qualified domain name of the source.",
+          "title": "Fqdn"
+        },
+        "ssl-verify": {
+          "default": true,
+          "description": "Verify validity of TLS certificate when communicating with logstash.",
+          "title": "Ssl-Verify",
+          "type": "boolean"
+        },
+        "ca-certs": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to Root CA certificate file.",
+          "examples": [
+            "/etc/ssl/ca.pem"
+          ],
+          "title": "Ca-Certs"
+        },
+        "keyfile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to TLS private key file.",
+          "examples": [
+            "/etc/backend.ai/graylog/privkey.pem"
+          ],
+          "title": "Keyfile"
+        },
+        "certfile": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Path to TLS certificate file.",
+          "examples": [
+            "/etc/backend.ai/graylog/cert.pem"
+          ],
+          "title": "Certfile"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "title": "GraylogConfig",
+      "type": "object"
+    },
+    "HuggingfaceConfig": {
+      "properties": {
+        "endpoint": {
+          "default": "https://huggingface.co",
+          "description": "\n        Custom endpoint for HuggingFace API.\n        If not provided, defaults to the official HuggingFace API endpoint.\n        Useful for connecting to self-hosted HuggingFace instances.\n        ",
+          "examples": [
+            "https://huggingface.co"
+          ],
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "token": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        HuggingFace API token for authentication.\n        You cannot access the gated repositories without this token.\n        ",
+          "title": "Token"
+        },
+        "download-chunk-size": {
+          "default": 8192,
+          "description": "\n        Chunk size (in bytes) for downloading files from the HuggingFace API.\n        ",
+          "examples": [
+            8192
+          ],
+          "title": "Download-Chunk-Size",
+          "type": "integer"
+        }
+      },
+      "title": "HuggingfaceConfig",
+      "type": "object"
+    },
+    "LegacyArtifactRegistryConfig": {
+      "properties": {
+        "name": {
+          "description": "\n        Name of the artifact registry configuration.\n        Used to identify this registry in the system.\n        ",
+          "examples": [
+            "huggingface",
+            "reservoir"
+          ],
+          "title": "Name",
+          "type": "string"
+        },
+        "config": {
+          "description": "\n        Configuration for the artifact registry.\n        ",
+          "discriminator": {
+            "mapping": {
+              "huggingface": "#/$defs/LegacyHuggingfaceConfig",
+              "reservoir": "#/$defs/LegacyReservoirConfig"
+            },
+            "propertyName": "type"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/LegacyHuggingfaceConfig"
+            },
+            {
+              "$ref": "#/$defs/LegacyReservoirConfig"
+            }
+          ],
+          "title": "Config"
+        }
+      },
+      "required": [
+        "name",
+        "config"
+      ],
+      "title": "LegacyArtifactRegistryConfig",
+      "type": "object"
+    },
+    "LegacyHuggingfaceConfig": {
+      "properties": {
+        "endpoint": {
+          "default": "https://huggingface.co",
+          "description": "\n        Custom endpoint for HuggingFace API.\n        If not provided, defaults to the official HuggingFace API endpoint.\n        Useful for connecting to self-hosted HuggingFace instances.\n        ",
+          "examples": [
+            "https://huggingface.co"
+          ],
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "token": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        HuggingFace API token for authentication.\n        You cannot access the gated repositories without this token.\n        ",
+          "title": "Token"
+        },
+        "download-chunk-size": {
+          "default": 8192,
+          "description": "\n        Chunk size (in bytes) for downloading files from the HuggingFace API.\n        ",
+          "examples": [
+            8192
+          ],
+          "title": "Download-Chunk-Size",
+          "type": "integer"
+        },
+        "type": {
+          "const": "huggingface",
+          "description": "\n        Type of the registry configuration.\n        This is used to identify the specific registry type.\n        ",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "LegacyHuggingfaceConfig",
+      "type": "object"
+    },
+    "LegacyObjectStorageConfig": {
+      "properties": {
+        "endpoint": {
+          "description": "\n        Endpoint URL for the object storage service.\n        Should include the protocol (http or https) and port if non-standard.\n        ",
+          "examples": [
+            "http://localhost:9000",
+            "https://storage.example.com"
+          ],
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "access-key": {
+          "description": "\n        Access key for authenticating with the object storage service.\n        Required for services that use access keys for authentication.\n        ",
+          "examples": [
+            "my-access-key"
+          ],
+          "title": "Access-Key",
+          "type": "string"
+        },
+        "secret-key": {
+          "description": "\n        Secret key for authenticating with the object storage service.\n        Required for services that use secret keys for authentication.\n        ",
+          "examples": [
+            "my-secret-key"
+          ],
+          "title": "Secret-Key",
+          "type": "string"
+        },
+        "buckets": {
+          "description": "\n        List of bucket names managed by this storage configuration.\n        ",
+          "examples": [
+            "my-bucket"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Buckets",
+          "type": "array"
+        },
+        "region": {
+          "description": "\n        Region where the object storage service is located.\n        Required for services that require region specification.\n        ",
+          "examples": [
+            "us-west-1",
+            "eu-central-1"
+          ],
+          "title": "Region",
+          "type": "string"
+        },
+        "presigned-upload": {
+          "$ref": "#/$defs/PresignedUploadConfig",
+          "description": "\n        Configuration for presigned upload URLs.\n        Controls parameters like expiration time and size limits.\n        "
+        },
+        "presigned-download": {
+          "$ref": "#/$defs/PresignedDownloadConfig",
+          "description": "\n        Configuration for presigned download URLs.\n        Controls parameters like expiration time.\n        "
+        },
+        "upload-chunk-size": {
+          "default": 5242880,
+          "description": "\n        Chunk size (in bytes) for uploading files to the object storage.\n        Should be greater than or equal to 5 MiB due to S3 requirements.\n        ",
+          "examples": [
+            5242880
+          ],
+          "minimum": 5242880,
+          "title": "Upload-Chunk-Size",
+          "type": "integer"
+        },
+        "download-chunk-size": {
+          "default": 8192,
+          "description": "\n        Chunk size (in bytes) for downloading files from the object storage.\n        ",
+          "examples": [
+            8192
+          ],
+          "title": "Download-Chunk-Size",
+          "type": "integer"
+        },
+        "reservoir-download-chunk-size": {
+          "default": 8192,
+          "description": "\n        Chunk size (in bytes) for downloading files from the remote reservoir storage.\n        ",
+          "examples": [
+            8192
+          ],
+          "title": "Reservoir-Download-Chunk-Size",
+          "type": "integer"
+        },
+        "name": {
+          "description": "\n        Name of the object storage configuration.\n        Used to identify this storage in the system.\n        ",
+          "examples": [
+            "s3-storage",
+            "minio-storage"
+          ],
+          "title": "Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "endpoint",
+        "access-key",
+        "secret-key",
+        "region",
+        "name"
+      ],
+      "title": "LegacyObjectStorageConfig",
+      "type": "object"
+    },
+    "LegacyReservoirConfig": {
+      "properties": {
+        "endpoint": {
+          "default": "https://huggingface.co",
+          "description": "\n        Custom endpoint for the reservoir registry API.\n        ",
+          "examples": [
+            "https://huggingface.co"
+          ],
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "object-storage-access-key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Access key for authenticating with the reservoir registry's object storage API.\n        ",
+          "title": "Object-Storage-Access-Key"
+        },
+        "object-storage-secret-key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Secret key for authenticating with the reservoir registry's object storage API.\n        ",
+          "title": "Object-Storage-Secret-Key"
+        },
+        "object-storage-region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Region for the reservoir registry's object storage.\n        ",
+          "title": "Object-Storage-Region"
+        },
+        "manager-endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Custom endpoint for the reservoir manager API.\n        Required if the remote reservoir registry use vfs storage.\n        ",
+          "examples": [
+            "https://manager.reservoir.ai"
+          ],
+          "title": "Manager-Endpoint"
+        },
+        "manager-access-key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Access key for authenticating with the reservoir manager API.\n        Required if the remote reservoir registry use vfs storage.\n        ",
+          "title": "Manager-Access-Key"
+        },
+        "manager-secret-key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Secret key for authenticating with the reservoir manager API.\n        Required if the remote reservoir registry use vfs storage.\n        ",
+          "title": "Manager-Secret-Key"
+        },
+        "manager-api-version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        API version for the reservoir manager API.\n        Required if the remote reservoir registry use vfs storage.\n        ",
+          "examples": [
+            "v1"
+          ],
+          "title": "Manager-Api-Version"
+        },
+        "storage-name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Name of the object storage configuration to use with the reservoir registry.\n        Required if the remote reservoir registry use vfs storage.\n        ",
+          "examples": [
+            "s3-storage",
+            "vfs-storage"
+          ],
+          "title": "Storage-Name"
+        },
+        "type": {
+          "const": "reservoir",
+          "description": "\n        Type of the registry configuration.\n        This is used to identify the specific registry type.\n        ",
+          "title": "Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "LegacyReservoirConfig",
+      "type": "object"
+    },
+    "LogDriver": {
+      "enum": [
+        "console",
+        "logstash",
+        "file",
+        "graylog"
+      ],
+      "title": "LogDriver",
+      "type": "string"
+    },
+    "LogFormat": {
+      "enum": [
+        "simple",
+        "verbose"
+      ],
+      "title": "LogFormat",
+      "type": "string"
+    },
+    "LogHandlerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "class": {
+          "description": "The class name of the log handler.",
+          "title": "Class",
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "The log level to filter messages from this handler."
+        }
+      },
+      "required": [
+        "class"
+      ],
+      "title": "LogHandlerConfig",
+      "type": "object"
+    },
+    "LogLevel": {
+      "enum": [
+        "CRITICAL",
+        "ERROR",
+        "WARNING",
+        "INFO",
+        "DEBUG",
+        "TRACE",
+        "NOTSET"
+      ],
+      "title": "LogLevel",
+      "type": "string"
+    },
+    "LoggerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "handlers": {
+          "description": "The name of handlers receiving messages from this logger.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Handlers",
+          "type": "array"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "The log level to filter messages from this logger."
+        },
+        "propagate": {
+          "default": true,
+          "description": "Whether to propagate messages to pre-existing loggers.",
+          "title": "Propagate",
+          "type": "boolean"
+        }
+      },
+      "title": "LoggerConfig",
+      "type": "object"
+    },
+    "LoggingConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "version": {
+          "default": 1,
+          "description": "The version used by logging.dictConfig().",
+          "title": "Version",
+          "type": "integer"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "The main log level to filter messages from all loggers."
+        },
+        "disable-existing-loggers": {
+          "default": false,
+          "description": "Disable the existing loggers when applying the config.",
+          "title": "Disable-Existing-Loggers",
+          "type": "boolean"
+        },
+        "handlers": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/LogHandlerConfig"
+              },
+              {
+                "$ref": "#/$defs/RelayLogHandlerConfig"
+              }
+            ]
+          },
+          "description": "The mapping of log handler configurations.",
+          "title": "Handlers",
+          "type": "object"
+        },
+        "loggers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LoggerConfig"
+          },
+          "description": "The mapping of per-namespace logger configurations.",
+          "title": "Loggers",
+          "type": "object"
+        },
+        "drivers": {
+          "default": [
+            "console"
+          ],
+          "description": "The list of log drivers to activate.",
+          "items": {
+            "$ref": "#/$defs/LogDriver"
+          },
+          "title": "Drivers",
+          "type": "array"
+        },
+        "console": {
+          "$ref": "#/$defs/ConsoleConfig",
+          "default": {
+            "colored": null,
+            "format": "verbose"
+          }
+        },
+        "file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FileConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "logstash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LogstashConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "graylog": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GraylogConfig"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "pkg_ns": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LogLevel"
+          },
+          "default": {
+            "": "WARNING",
+            "ai.backend": "INFO",
+            "tests": "DEBUG"
+          },
+          "description": "Override default log level for specific scope of package",
+          "title": "Pkg Ns",
+          "type": "object"
+        }
+      },
+      "title": "LoggingConfig",
+      "type": "object"
+    },
+    "LogstashConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "endpoint": {
+          "$ref": "#/$defs/ai__backend__logging__config__HostPortPair",
+          "description": "Connection information of logstash node.",
+          "examples": [
+            {
+              "host": "127.0.0.1",
+              "port": 8001
+            }
+          ]
+        },
+        "protocol": {
+          "$ref": "#/$defs/LogstashProtocol",
+          "default": "tcp",
+          "description": "Protocol to communicate with logstash server."
+        },
+        "ssl-enabled": {
+          "default": true,
+          "description": "Use TLS to communicate with logstash server.",
+          "title": "Ssl-Enabled",
+          "type": "boolean"
+        },
+        "ssl-verify": {
+          "default": true,
+          "description": "Verify validity of TLS certificate when communicating with logstash.",
+          "title": "Ssl-Verify",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "endpoint"
+      ],
+      "title": "LogstashConfig",
+      "type": "object"
+    },
+    "LogstashProtocol": {
+      "enum": [
+        "zmq.push",
+        "zmq.pub",
+        "tcp",
+        "udp"
+      ],
+      "title": "LogstashProtocol",
+      "type": "string"
+    },
+    "ManagerAPIConfig": {
+      "properties": {
+        "service-addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "127.0.0.1",
+            "port": 6022
+          },
+          "description": "\n        Network address and port where the manager API service will listen.\n        This is the address accessible by managers for control operations.\n        "
+        },
+        "announce-addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "127.0.0.1",
+            "port": 6022
+          },
+          "description": "\n        Address and port to announce to managers for service discovery.\n        Should be accessible by other manager components.\n        "
+        },
+        "announce-internal-addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "host.docker.internal",
+            "port": 6023
+          },
+          "description": "\n        Address and port to announce for internal manager API requests.\n        Used for service discovery within container environments.\n        "
+        },
+        "internal-addr": {
+          "$ref": "#/$defs/ai__backend__common__typed_validators__HostPortPair",
+          "default": {
+            "host": "127.0.0.1",
+            "port": 16023
+          },
+          "description": "\n        Internal address where manager API listens for internal requests.\n        Used for internal communication between services.\n        "
+        },
+        "ssl-enabled": {
+          "description": "\n        Whether to enable SSL/TLS for manager API connections.\n        Required for secure communication with managers.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Ssl-Enabled",
+          "type": "boolean"
+        },
+        "ssl-cert": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Path to the SSL certificate file for manager API.\n        Required if ssl_enabled is True.\n        ",
+          "examples": [
+            "/etc/ssl/certs/storage-proxy.crt"
+          ],
+          "title": "Ssl-Cert"
+        },
+        "ssl-privkey": {
+          "anyOf": [
+            {
+              "format": "file-path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Path to the SSL private key file for manager API.\n        Required if ssl_enabled is True.\n        ",
+          "examples": [
+            "/etc/ssl/private/storage-proxy.key"
+          ],
+          "title": "Ssl-Privkey"
+        },
+        "secret": {
+          "description": "\n        Secret key for authenticating managers with the storage-proxy.\n        Must be shared between manager and storage-proxy instances.\n        ",
+          "examples": [
+            "manager-secret-key"
+          ],
+          "title": "Secret",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ssl-enabled",
+        "secret"
+      ],
+      "title": "ManagerAPIConfig",
+      "type": "object"
+    },
+    "MsgpackOptions": {
+      "properties": {
+        "pack-opts": {
+          "additionalProperties": true,
+          "title": "Pack-Opts",
+          "type": "object"
+        },
+        "unpack-opts": {
+          "additionalProperties": true,
+          "title": "Unpack-Opts",
+          "type": "object"
+        }
+      },
+      "required": [
+        "pack-opts",
+        "unpack-opts"
+      ],
+      "title": "MsgpackOptions",
+      "type": "object"
+    },
+    "OTELConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "\n        Whether to enable OpenTelemetry for tracing or logging.\n        When enabled, traces or logs will be collected and sent to the configured OTLP endpoint.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "log-level": {
+          "default": "INFO",
+          "description": "\n        Log level for OpenTelemetry.\n        Controls the verbosity of logs generated by OpenTelemetry.\n        ",
+          "examples": [
+            "DEBUG",
+            "INFO",
+            "WARN",
+            "ERROR"
+          ],
+          "title": "Log-Level",
+          "type": "string"
+        },
+        "endpoint": {
+          "default": "http://127.0.0.1:4317",
+          "description": "\n        OTLP endpoint for sending traces.\n        Should include the protocol, host and port of the OTLP receiver.\n        ",
+          "examples": [
+            "http://localhost:4317",
+            "http://otel-collector:4317"
+          ],
+          "title": "Endpoint",
+          "type": "string"
+        }
+      },
+      "title": "OTELConfig",
+      "type": "object"
+    },
+    "ObjectStorageConfig": {
+      "properties": {
+        "endpoint": {
+          "description": "\n        Endpoint URL for the object storage service.\n        Should include the protocol (http or https) and port if non-standard.\n        ",
+          "examples": [
+            "http://localhost:9000",
+            "https://storage.example.com"
+          ],
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "access-key": {
+          "description": "\n        Access key for authenticating with the object storage service.\n        Required for services that use access keys for authentication.\n        ",
+          "examples": [
+            "my-access-key"
+          ],
+          "title": "Access-Key",
+          "type": "string"
+        },
+        "secret-key": {
+          "description": "\n        Secret key for authenticating with the object storage service.\n        Required for services that use secret keys for authentication.\n        ",
+          "examples": [
+            "my-secret-key"
+          ],
+          "title": "Secret-Key",
+          "type": "string"
+        },
+        "buckets": {
+          "description": "\n        List of bucket names managed by this storage configuration.\n        ",
+          "examples": [
+            "my-bucket"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "title": "Buckets",
+          "type": "array"
+        },
+        "region": {
+          "description": "\n        Region where the object storage service is located.\n        Required for services that require region specification.\n        ",
+          "examples": [
+            "us-west-1",
+            "eu-central-1"
+          ],
+          "title": "Region",
+          "type": "string"
+        },
+        "presigned-upload": {
+          "$ref": "#/$defs/PresignedUploadConfig",
+          "description": "\n        Configuration for presigned upload URLs.\n        Controls parameters like expiration time and size limits.\n        "
+        },
+        "presigned-download": {
+          "$ref": "#/$defs/PresignedDownloadConfig",
+          "description": "\n        Configuration for presigned download URLs.\n        Controls parameters like expiration time.\n        "
+        },
+        "upload-chunk-size": {
+          "default": 5242880,
+          "description": "\n        Chunk size (in bytes) for uploading files to the object storage.\n        Should be greater than or equal to 5 MiB due to S3 requirements.\n        ",
+          "examples": [
+            5242880
+          ],
+          "minimum": 5242880,
+          "title": "Upload-Chunk-Size",
+          "type": "integer"
+        },
+        "download-chunk-size": {
+          "default": 8192,
+          "description": "\n        Chunk size (in bytes) for downloading files from the object storage.\n        ",
+          "examples": [
+            8192
+          ],
+          "title": "Download-Chunk-Size",
+          "type": "integer"
+        },
+        "reservoir-download-chunk-size": {
+          "default": 8192,
+          "description": "\n        Chunk size (in bytes) for downloading files from the remote reservoir storage.\n        ",
+          "examples": [
+            8192
+          ],
+          "title": "Reservoir-Download-Chunk-Size",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "endpoint",
+        "access-key",
+        "secret-key",
+        "region"
+      ],
+      "title": "ObjectStorageConfig",
+      "type": "object"
+    },
+    "PresignedDownloadConfig": {
+      "properties": {
+        "expiration": {
+          "default": 300,
+          "description": "\n        Expiration time (in seconds) for presigned URLs.\n        ",
+          "examples": [
+            3600,
+            7200
+          ],
+          "title": "Expiration",
+          "type": "integer"
+        }
+      },
+      "title": "PresignedDownloadConfig",
+      "type": "object"
+    },
+    "PresignedUploadConfig": {
+      "properties": {
+        "min-size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Minimum file size for multipart uploads.\n        If None, no minimum size limit is enforced.\n        ",
+          "examples": [
+            5242880,
+            10485760
+          ],
+          "title": "Min-Size"
+        },
+        "max-size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Maximum file size for uploads.\n        If None, no maximum size limit is enforced.\n        ",
+          "examples": [
+            5368709120,
+            10737418240
+          ],
+          "title": "Max-Size"
+        },
+        "expiration": {
+          "default": 300,
+          "description": "\n        Expiration time (in seconds) for presigned URLs.\n        ",
+          "examples": [
+            3600,
+            7200
+          ],
+          "title": "Expiration",
+          "type": "integer"
+        }
+      },
+      "title": "PresignedUploadConfig",
+      "type": "object"
+    },
+    "PyroscopeConfig": {
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "\n        Whether to enable Pyroscope profiling.\n        When enabled, performance profiling data will be sent to a Pyroscope server.\n        Useful for debugging performance issues, but adds some overhead.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "app-name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Application name to use in Pyroscope.\n        This name will identify this storage-proxy instance in Pyroscope UI.\n        Required if Pyroscope is enabled.\n        ",
+          "examples": [
+            "backendai-storage-proxy"
+          ],
+          "title": "App-Name"
+        },
+        "server-addr": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Address of the Pyroscope server.\n        Must include the protocol (http or https) and port if non-standard.\n        Required if Pyroscope is enabled.\n        ",
+          "examples": [
+            "http://localhost:4040"
+          ],
+          "title": "Server-Addr"
+        },
+        "sample-rate": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Sampling rate for Pyroscope profiling.\n        Higher values collect more data but increase overhead.\n        Balance based on your performance monitoring needs.\n        ",
+          "examples": [
+            10,
+            100,
+            1000
+          ],
+          "title": "Sample-Rate"
+        }
+      },
+      "title": "PyroscopeConfig",
+      "type": "object"
+    },
+    "RelayLogHandlerConfig": {
+      "additionalProperties": true,
+      "properties": {
+        "class": {
+          "description": "The class name of the log handler.",
+          "title": "Class",
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/$defs/LogLevel",
+          "default": "INFO",
+          "description": "The log level to filter messages from this handler."
+        },
+        "endpoint": {
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "msgpack-options": {
+          "$ref": "#/$defs/MsgpackOptions"
+        }
+      },
+      "required": [
+        "class",
+        "endpoint",
+        "msgpack-options"
+      ],
+      "title": "RelayLogHandlerConfig",
+      "type": "object"
+    },
+    "ReservoirConfig": {
+      "properties": {
+        "endpoint": {
+          "default": "https://huggingface.co",
+          "description": "\n        Custom endpoint for the reservoir registry API.\n        ",
+          "examples": [
+            "https://huggingface.co"
+          ],
+          "title": "Endpoint",
+          "type": "string"
+        },
+        "object-storage-access-key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Access key for authenticating with the reservoir registry's object storage API.\n        ",
+          "title": "Object-Storage-Access-Key"
+        },
+        "object-storage-secret-key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Secret key for authenticating with the reservoir registry's object storage API.\n        ",
+          "title": "Object-Storage-Secret-Key"
+        },
+        "object-storage-region": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Region for the reservoir registry's object storage.\n        ",
+          "title": "Object-Storage-Region"
+        },
+        "manager-endpoint": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Custom endpoint for the reservoir manager API.\n        Required if the remote reservoir registry use vfs storage.\n        ",
+          "examples": [
+            "https://manager.reservoir.ai"
+          ],
+          "title": "Manager-Endpoint"
+        },
+        "manager-access-key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Access key for authenticating with the reservoir manager API.\n        Required if the remote reservoir registry use vfs storage.\n        ",
+          "title": "Manager-Access-Key"
+        },
+        "manager-secret-key": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Secret key for authenticating with the reservoir manager API.\n        Required if the remote reservoir registry use vfs storage.\n        ",
+          "title": "Manager-Secret-Key"
+        },
+        "manager-api-version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        API version for the reservoir manager API.\n        Required if the remote reservoir registry use vfs storage.\n        ",
+          "examples": [
+            "v1"
+          ],
+          "title": "Manager-Api-Version"
+        },
+        "storage-name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Name of the object storage configuration to use with the reservoir registry.\n        Required if the remote reservoir registry use vfs storage.\n        ",
+          "examples": [
+            "s3-storage",
+            "vfs-storage"
+          ],
+          "title": "Storage-Name"
+        }
+      },
+      "title": "ReservoirConfig",
+      "type": "object"
+    },
+    "ServiceDiscoveryConfig": {
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/ServiceDiscoveryType",
+          "default": "redis",
+          "description": "\n        Type of service discovery to use.\n        ",
+          "examples": [
+            "etcd",
+            "redis"
+          ]
+        }
+      },
+      "title": "ServiceDiscoveryConfig",
+      "type": "object"
+    },
+    "ServiceDiscoveryType": {
+      "enum": [
+        "etcd",
+        "redis"
+      ],
+      "title": "ServiceDiscoveryType",
+      "type": "string"
+    },
+    "StorageProxyConfig": {
+      "properties": {
+        "ipc-base-path": {
+          "default": "/tmp/backend.ai/ipc",
+          "description": "\n        Base directory path for inter-process communication files.\n        Used for Unix domain sockets and other IPC mechanisms.\n        ",
+          "examples": [
+            "/tmp/backend.ai/ipc"
+          ],
+          "title": "Ipc-Base-Path",
+          "type": "string"
+        },
+        "node-id": {
+          "description": "\n        Unique identifier for this storage-proxy node.\n        Used for service discovery and coordination.\n        ",
+          "examples": [
+            "storage-proxy-1"
+          ],
+          "title": "Node-Id",
+          "type": "string"
+        },
+        "num-proc": {
+          "default": 10,
+          "description": "\n        Number of worker processes to spawn.\n        Defaults to the number of CPU cores available.\n        ",
+          "examples": [
+            1,
+            4
+          ],
+          "maximum": 10,
+          "minimum": 1,
+          "title": "Num-Proc",
+          "type": "integer"
+        },
+        "pid-file": {
+          "default": "/dev/null",
+          "description": "\n        Path to the file where the process ID will be written.\n        Set to /dev/null to disable this feature.\n        ",
+          "examples": [
+            "/var/run/storage-proxy.pid"
+          ],
+          "format": "path",
+          "title": "Pid-File",
+          "type": "string"
+        },
+        "event-loop": {
+          "$ref": "#/$defs/EventLoopType",
+          "default": "asyncio",
+          "description": "\n        Event loop implementation to use.\n        'asyncio' is the standard library implementation.\n        'uvloop' is a faster alternative but may have compatibility issues.\n        ",
+          "examples": [
+            "asyncio",
+            "uvloop"
+          ]
+        },
+        "scandir-limit": {
+          "default": 1000,
+          "description": "\n        Maximum number of entries to scan in directory operations.\n        Prevents excessive memory usage when scanning large directories.\n        ",
+          "examples": [
+            1000,
+            5000
+          ],
+          "minimum": 0,
+          "title": "Scandir-Limit",
+          "type": "integer"
+        },
+        "max-upload-size": {
+          "default": "100g",
+          "description": "\n        Maximum size allowed for file uploads.\n        Prevents storage exhaustion from large uploads.\n        ",
+          "examples": [
+            "100g",
+            "500g"
+          ],
+          "title": "Max-Upload-Size",
+          "type": "string"
+        },
+        "secret": {
+          "description": "\n        Secret key for generating JWT tokens.\n        Used for authenticating client requests.\n        ",
+          "examples": [
+            "jwt-secret-key"
+          ],
+          "title": "Secret",
+          "type": "string"
+        },
+        "session-expire": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "string"
+            }
+          ],
+          "description": "\n        Session expiration time.\n        Controls how long JWT tokens remain valid.\n        ",
+          "examples": [
+            "1h",
+            "24h"
+          ],
+          "title": "Session-Expire"
+        },
+        "user": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 502,
+          "description": "\n        User ID to run the storage-proxy process as.\n        Defaults to the UID of the current file's owner.\n        ",
+          "examples": [
+            502
+          ],
+          "title": "User"
+        },
+        "group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": 20,
+          "description": "\n        Group ID to run the storage-proxy process as.\n        Defaults to the GID of the current file's owner.\n        ",
+          "examples": [
+            20
+          ],
+          "title": "Group"
+        },
+        "aiomonitor-termui-port": {
+          "default": 38300,
+          "description": "\n        Port for the aiomonitor terminal UI.\n        Allows connecting to a debugging console.\n        ",
+          "examples": [
+            38300
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Aiomonitor-Termui-Port",
+          "type": "integer"
+        },
+        "aiomonitor-webui-port": {
+          "default": 39300,
+          "description": "\n        Port for the aiomonitor web UI.\n        Provides a web-based monitoring interface.\n        ",
+          "examples": [
+            39300
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Aiomonitor-Webui-Port",
+          "type": "integer"
+        },
+        "watcher-insock-path-prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Path prefix for watcher input sockets.\n        Used for communication with watcher processes.\n        ",
+          "examples": [
+            "/tmp/backend.ai/watcher"
+          ],
+          "title": "Watcher-Insock-Path-Prefix"
+        },
+        "watcher-outsock-path-prefix": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Path prefix for watcher output sockets.\n        Used for communication with watcher processes.\n        ",
+          "examples": [
+            "/tmp/backend.ai/watcher"
+          ],
+          "title": "Watcher-Outsock-Path-Prefix"
+        },
+        "use-watcher": {
+          "default": false,
+          "description": "\n        Whether to use watcher processes.\n        Enables additional monitoring capabilities.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Use-Watcher",
+          "type": "boolean"
+        },
+        "use-experimental-redis-event-dispatcher": {
+          "default": false,
+          "description": "\n        Whether to use experimental Redis-based event dispatcher.\n        May provide better performance for event handling.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Use-Experimental-Redis-Event-Dispatcher",
+          "type": "boolean"
+        },
+        "allow-auto-quota-scope-creation": {
+          "default": true,
+          "description": "\n        Whether to allow automatic creation of quota scopes.\n        If true, quota scopes will be created when creating VFolders in non-existent quota scopes.\n        If false, VFolder creation will fail if the quota scope does not exist.\n        ",
+          "examples": [
+            true,
+            false
+          ],
+          "title": "Allow-Auto-Quota-Scope-Creation",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "node-id",
+        "secret",
+        "session-expire"
+      ],
+      "title": "StorageProxyConfig",
+      "type": "object"
+    },
+    "VFSStorageConfig": {
+      "properties": {
+        "base-path": {
+          "description": "\n        Base filesystem path for VFS storage.\n        This directory will serve as the root for all VFS operations.\n        ",
+          "examples": [
+            "/data/ai-models",
+            "/shared/datasets"
+          ],
+          "format": "path",
+          "title": "Base-Path",
+          "type": "string"
+        },
+        "subpath": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Optional subdirectory path appended to base_path.\n        Used to further organize storage within the base directory.\n        ",
+          "examples": [
+            "models",
+            "datasets",
+            "user-data"
+          ],
+          "title": "Subpath"
+        },
+        "upload-chunk-size": {
+          "default": 65536,
+          "description": "\n        Chunk size (in bytes) for streaming file upload operations.\n        Controls how data is buffered during file uploads.\n        ",
+          "examples": [
+            8192,
+            65536,
+            1048576
+          ],
+          "minimum": 1024,
+          "title": "Upload-Chunk-Size",
+          "type": "integer"
+        },
+        "download-chunk-size": {
+          "default": 65536,
+          "description": "\n        Chunk size (in bytes) for streaming file download operations.\n        Controls how data is buffered during file downloads.\n        ",
+          "examples": [
+            8192,
+            65536,
+            1048576
+          ],
+          "minimum": 1024,
+          "title": "Download-Chunk-Size",
+          "type": "integer"
+        },
+        "max-file-size": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Maximum file size (in bytes) allowed for uploads.\n        If None, no size limit is enforced.\n        ",
+          "examples": [
+            1073741824,
+            10737418240
+          ],
+          "title": "Max-File-Size"
+        }
+      },
+      "required": [
+        "base-path"
+      ],
+      "title": "VFSStorageConfig",
+      "type": "object"
+    },
+    "VolumeInfoConfig": {
+      "properties": {
+        "backend": {
+          "description": "\n        Storage backend type to use for this volume.\n        Determines how files are stored and accessed.\n        ",
+          "examples": [
+            "vfs",
+            "purestorage",
+            "cephfs"
+          ],
+          "title": "Backend",
+          "type": "string"
+        },
+        "path": {
+          "description": "\n        Root path for this volume.\n        Must be a directory that exists and is accessible.\n        ",
+          "examples": [
+            "/var/lib/backend.ai/volumes"
+          ],
+          "format": "path",
+          "title": "Path",
+          "type": "string"
+        },
+        "fsprefix": {
+          "anyOf": [
+            {
+              "format": "path",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": ".",
+          "description": "\n        Filesystem prefix path for this volume.\n        Used as a subdirectory within the volume path.\n        ",
+          "examples": [
+            ".",
+            "data"
+          ],
+          "title": "Fsprefix"
+        },
+        "options": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "\n        Backend-specific options for this volume.\n        Configuration parameters specific to the chosen backend.\n        ",
+          "examples": [
+            {}
+          ],
+          "title": "Options"
+        }
+      },
+      "required": [
+        "backend",
+        "path"
+      ],
+      "title": "VolumeInfoConfig",
+      "type": "object"
+    },
+    "ai__backend__common__typed_validators__HostPortPair": {
+      "properties": {
+        "host": {
+          "description": "\n        Host address of the service.\n        Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to all interfaces.\n        ",
+          "examples": [
+            "127.0.0.1"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "description": "\n        Port number of the service.\n        Must be between 1 and 65535.\n        Ports below 1024 require root/admin privileges.\n        ",
+          "examples": [
+            8080
+          ],
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "title": "HostPortPair",
+      "type": "object"
+    },
+    "ai__backend__logging__config__HostPortPair": {
+      "additionalProperties": true,
+      "properties": {
+        "host": {
+          "examples": [
+            "127.0.0.1"
+          ],
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "examples": [
+            8201
+          ],
+          "exclusiveMaximum": 65536,
+          "exclusiveMinimum": 0,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "port"
+      ],
+      "title": "HostPortPair",
+      "type": "object"
+    }
+  },
+  "additionalProperties": true,
+  "properties": {
+    "storage-proxy": {
+      "$ref": "#/$defs/StorageProxyConfig",
+      "description": "\n        Core storage-proxy service configuration.\n        Controls how the storage-proxy operates and communicates.\n        "
+    },
+    "pyroscope": {
+      "$ref": "#/$defs/PyroscopeConfig",
+      "description": "\n        Pyroscope profiling configuration.\n        Controls integration with the Pyroscope performance profiling tool.\n        "
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingConfig",
+      "description": "\n        Logging system configuration.\n        Controls how logs are formatted, filtered, and stored.\n        "
+    },
+    "api": {
+      "$ref": "#/$defs/APIConfig",
+      "description": "\n        API configuration for client and manager interfaces.\n        Controls how the storage-proxy serves requests.\n        "
+    },
+    "volume": {
+      "additionalProperties": {
+        "$ref": "#/$defs/VolumeInfoConfig"
+      },
+      "description": "\n        Volume configuration.\n        Defines available storage backends and their settings.\n        ",
+      "title": "Volume",
+      "type": "object"
+    },
+    "debug": {
+      "$ref": "#/$defs/DebugConfig",
+      "description": "\n        Debugging options configuration.\n        Controls various debugging features and tools.\n        "
+    },
+    "service-discovery": {
+      "$ref": "#/$defs/ServiceDiscoveryConfig",
+      "description": "\n        Service discovery configuration.\n        Controls how services are discovered and connected.\n        "
+    },
+    "otel": {
+      "$ref": "#/$defs/OTELConfig",
+      "description": "\n        OpenTelemetry configuration.\n        Controls how tracing and logging are handled.\n        "
+    },
+    "etcd": {
+      "$ref": "#/$defs/EtcdConfig",
+      "description": "\n        Etcd configuration settings.\n        Used for distributed coordination.\n        "
+    },
+    "storages": {
+      "description": "\n        Deprecated, use `artifact_storages` instead.\n\n        List of object storage configurations.\n        Each configuration defines how to connect to and use an object storage service.\n        ",
+      "items": {
+        "$ref": "#/$defs/LegacyObjectStorageConfig"
+      },
+      "title": "Storages",
+      "type": "array"
+    },
+    "registries": {
+      "description": "\n        Deprecated, use `artifact_registries` instead.\n\n        List of artifact registry configurations.\n        Each configuration defines how to connect to and use an artifact registry service.\n        ",
+      "items": {
+        "$ref": "#/$defs/LegacyArtifactRegistryConfig"
+      },
+      "title": "Registries",
+      "type": "array"
+    },
+    "artifact-storages": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ArtifactRegistryStorageConfig"
+      },
+      "description": "\n        Dictionary of artifact storage configurations keyed by name.\n        Each configuration defines how to connect to and use an artifact storage service.\n        ",
+      "title": "Artifact-Storages",
+      "type": "object"
+    },
+    "artifact-registries": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ArtifactRegistryConfig"
+      },
+      "description": "\n        Dictionary of artifact registry configurations keyed by name.\n        Each configuration defines how to connect to and use an artifact registry service.\n        ",
+      "title": "Artifact-Registries",
+      "type": "object"
+    }
+  },
+  "required": [
+    "storage-proxy",
+    "api",
+    "volume"
+  ],
+  "title": "StorageProxyUnifiedConfig",
+  "type": "object"
+}

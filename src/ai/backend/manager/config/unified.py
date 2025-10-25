@@ -189,7 +189,7 @@ from pydantic import (
     field_validator,
 )
 
-from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.config import BaseConfigSchema, RootConfigSchema
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
@@ -1881,7 +1881,7 @@ class ArtifactRegistryConfig(BaseConfigSchema):
     )
 
 
-class ManagerUnifiedConfig(BaseConfigSchema):
+class ManagerUnifiedConfig(RootConfigSchema):
     # From legacy local config
     db: DatabaseConfig = Field(
         default_factory=DatabaseConfig,

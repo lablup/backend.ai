@@ -13,7 +13,7 @@ from pydantic import (
     model_validator,
 )
 
-from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.config import BaseConfigSchema, RootConfigSchema
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.data.storage.types import ArtifactStorageType
@@ -1010,7 +1010,7 @@ class ArtifactRegistryConfig(BaseConfigSchema):
         return self
 
 
-class StorageProxyUnifiedConfig(BaseConfigSchema):
+class StorageProxyUnifiedConfig(RootConfigSchema):
     storage_proxy: StorageProxyConfig = Field(
         description="""
         Core storage-proxy service configuration.
