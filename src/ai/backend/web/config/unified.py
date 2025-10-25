@@ -14,7 +14,7 @@ from pydantic import (
     field_validator,
 )
 
-from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.config import BaseConfigSchema, RootConfigSchema
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
@@ -1119,7 +1119,7 @@ class DebugConfig(BaseConfigSchema):
     )
 
 
-class WebServerUnifiedConfig(BaseConfigSchema):
+class WebServerUnifiedConfig(RootConfigSchema):
     service: ServiceConfig = Field(
         default_factory=ServiceConfig,
         description="""

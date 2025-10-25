@@ -1,0 +1,87 @@
+name: update-config-schema
+
+on:
+  pull_request:
+    paths:
+      - 'src/ai/backend/agent/config/**'
+      - 'src/ai/backend/manager/config/**'
+      - 'src/ai/backend/storage/config/**'
+      - 'src/ai/backend/web/config/**'
+      - 'VERSION'
+
+jobs:
+  config-schema-updated:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - name: Calculate the fetch depth
+      run: |
+        if [ "$GITHUB_EVENT_NAME" == "pull_request" ]; then
+          echo "GIT_FETCH_DEPTH=$(( ${{ github.event.pull_request.commits }} + 1 ))" >> "${GITHUB_ENV}"
+        else
+          echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
+        fi
+    - name: Checkout the revision with minimal required history
+      uses: actions/checkout@v5
+      with:
+        fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
+        ref: ${{ github.head_ref }}
+        token: ${{ secrets.OCTODOG }}
+        lfs: false
+    - name: Extract Python version from pants.toml
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Set up remote cache backend (if applicable)
+      run: |
+        echo "PANTS_REMOTE_STORE_ADDRESS=${REMOTE_CACHE_BACKEND_ENDPOINT}" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_READ=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_CACHE_WRITE=true" >> $GITHUB_ENV
+        echo "PANTS_REMOTE_INSTANCE_NAME=main" >> $GITHUB_ENV
+      env:
+        REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
+      if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
+    - name: Bootstrap Pants
+      uses: ./actions/init-pants
+      # See: github.com/pantsbuild/actions/tree/main/init-pants/
+      # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
+      with:
+        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        cache-lmdb-store: 'true'
+    - name: Pants export
+      run: pants export --resolve=python-default
+    - name: Install Rover CLI for generating supergraph
+      run: |
+        curl -sSL https://rover.apollo.dev/nix/latest | sh
+        echo "$HOME/.rover/bin" >> $GITHUB_PATH
+    - name: Create config schema dump
+      env: 
+        APOLLO_ELV2_LICENSE: accept
+      run: |
+        ./backend.ai mgr config generate-json-schema docs/manager/config/schema.json
+        ./backend.ai ag config generate-json-schema docs/agent/config/schema.json
+        ./backend.ai storage config generate-json-schema docs/storage/config/schema.json
+        ./backend.ai web config generate-json-schema docs/web/config/schema.json
+    - name: Make commit message for changing change log file
+      run: |
+        git add docs/manager/config/schema.json
+        git add docs/agent/config/schema.json
+        git add docs/storage/config/schema.json
+        git add docs/web/config/schema.json
+        author_name=$(git show -q --pretty='format:%an')
+        author_email=$(git show -q --pretty='format:%ae')
+        git config user.email "$author_email"
+        git config user.name "$author_name"
+        if [ -n "$(git diff --staged)" ]; then
+          git commit \
+            -m "chore: update config schema dump" \
+            --author="$author_name <$author_email>" \
+            --trailer "Co-authored-by: octodog <mu001@lablup.com>"
+          git push
+        fi
