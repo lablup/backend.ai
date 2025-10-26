@@ -1,9 +1,16 @@
-from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
-from ai.backend.common.events.dispatcher import EventProducer
+from __future__ import annotations
 
-from ..volumes.pool import VolumePool
+from typing import TYPE_CHECKING
+
+from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
+
 from .tasks.clone import VFolderCloneTaskHandler
 from .tasks.delete import VFolderDeleteTaskHandler
+
+if TYPE_CHECKING:
+    from ai.backend.common.events.dispatcher import EventProducer
+
+    from ..volumes.pool import VolumePool
 
 
 class BgtaskHandlerRegistryCreator:
