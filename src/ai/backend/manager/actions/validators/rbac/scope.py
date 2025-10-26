@@ -6,6 +6,7 @@ from ai.backend.manager.actions.action.scope import BaseScopeAction
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.role import ScopePermissionCheckInput
 from ai.backend.manager.data.permission.types import EntityType, ScopeType
+from ai.backend.manager.errors.rbac import RBACForbidden
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -30,7 +31,7 @@ class ScopeActionRBACValidator(ScopeActionValidator):
         if user is None:
             raise UserNotFound("User not found in context")
 
-        await self._repository.check_permission_in_scope(
+        is_valid = await self._repository.check_permission_in_scope(
             ScopePermissionCheckInput(
                 user_id=user.user_id,
                 operation=action.permission_operation_type(),
@@ -41,3 +42,8 @@ class ScopeActionRBACValidator(ScopeActionValidator):
                 ),
             )
         )
+        if not is_valid:
+            raise RBACForbidden(
+                "User does not have permission to perform this action in the specified scope "
+                f"({scope_type.value}:{scope_id})"
+            )

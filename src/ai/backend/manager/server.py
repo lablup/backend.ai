@@ -660,6 +660,10 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .actions.monitors.audit_log import AuditLogMonitor
     from .actions.monitors.prometheus import PrometheusMonitor
     from .actions.monitors.reporter import ReporterMonitor
+    from .actions.validator.args import ValidatorArgs
+    from .actions.validators.rbac.batch import BatchActionRBACValidator
+    from .actions.validators.rbac.scope import ScopeActionRBACValidator
+    from .actions.validators.rbac.single_entity import SingleEntityActionRBACValidator
     from .reporters.hub import ReporterHub, ReporterHubArgs
     from .services.processors import ProcessorArgs, Processors, ServiceArgs
 
@@ -673,6 +677,15 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     reporter_monitor = ReporterMonitor(reporter_hub)
     prometheus_monitor = PrometheusMonitor()
     audit_log_monitor = AuditLogMonitor(root_ctx.db)
+    batch_action_rbac_validator = BatchActionRBACValidator(
+        root_ctx.repositories.permission_controller
+    )
+    single_entity_rbac_validator = SingleEntityActionRBACValidator(
+        root_ctx.repositories.permission_controller
+    )
+    scope_action_rbac_validator = ScopeActionRBACValidator(
+        root_ctx.repositories.permission_controller
+    )
     root_ctx.processors = Processors.create(
         ProcessorArgs(
             service_args=ServiceArgs(
@@ -695,9 +708,14 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 deployment_controller=root_ctx.deployment_controller,
                 event_producer=root_ctx.event_producer,
                 agent_cache=root_ctx.agent_cache,
-            )
+            ),
+            action_monitors=[reporter_monitor, prometheus_monitor, audit_log_monitor],
+            action_validator_args=ValidatorArgs(
+                batch=[batch_action_rbac_validator],
+                single_entity=[single_entity_rbac_validator],
+                scope=[scope_action_rbac_validator],
+            ),
         ),
-        [reporter_monitor, prometheus_monitor, audit_log_monitor],
     )
     yield
 
