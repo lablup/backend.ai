@@ -9,7 +9,7 @@ from sqlalchemy.dialects import postgresql as pgsql
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.app_config.types import AppConfigData, AppConfigScopeType
 
-from .base import Base
+from .base import Base, IDColumn
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -23,7 +23,7 @@ __all__: Sequence[str] = (
 class AppConfigRow(Base):
     __tablename__ = "app_configs"
 
-    id = sa.Column("id", sa.Integer, primary_key=True, autoincrement=True)
+    id = IDColumn()
     scope_type = sa.Column(
         "scope_type",
         sa.Enum(AppConfigScopeType, name="app_config_scope_type"),

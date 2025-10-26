@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, override
+from uuid import UUID
 
 from ai.backend.manager.types import Creator, OptionalState, PartialModifier
 
@@ -24,7 +25,7 @@ class MergedAppConfig:
 
 @dataclass
 class AppConfigData:
-    id: int
+    id: UUID
     scope_type: AppConfigScopeType
     scope_id: str
     extra_config: dict[str, Any]

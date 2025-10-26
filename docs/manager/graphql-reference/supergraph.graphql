@@ -290,6 +290,13 @@ input AllowedGroups
   remove: [String] = []
 }
 
+"""Added in 25.16.0. App configuration data"""
+type AppConfig
+  @join__type(graph: STRAWBERRY)
+{
+  extraConfig: JSON!
+}
+
 """
 Added in 25.14.0.
 
@@ -1036,7 +1043,7 @@ input ClearImageCustomResourceLimitKey
   @join__type(graph: GRAPHENE)
 {
   image_canonical: String!
-  architecture: String! = "x86_64"
+  architecture: String! = "aarch64"
 }
 
 """Added in 25.6.0."""
@@ -2044,6 +2051,24 @@ type DeleteDomain
   msg: String
 }
 
+"""Added in 25.16.0. Input for deleting domain-level app configuration"""
+input DeleteDomainConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  domainName: String!
+}
+
+"""
+Added in 25.16.0.
+Payload returned after deleting domain-level app configuration.
+Indicates whether the deletion was successful.
+"""
+type DeleteDomainConfigPayload
+  @join__type(graph: STRAWBERRY)
+{
+  deleted: Boolean!
+}
+
 """Added in 25.1.0."""
 type DeleteEndpointAutoScalingRuleNode
   @join__type(graph: GRAPHENE)
@@ -2169,6 +2194,24 @@ type DeleteUser
 {
   ok: Boolean
   msg: String
+}
+
+"""Added in 25.16.0. Input for deleting user-level app configuration"""
+input DeleteUserConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  userId: ID!
+}
+
+"""
+Added in 25.16.0.
+Payload returned after deleting user-level app configuration.
+Indicates whether the deletion was successful.
+"""
+type DeleteUserConfigPayload
+  @join__type(graph: STRAWBERRY)
+{
+  deleted: Boolean!
 }
 
 type DeleteUserResourcePolicy
@@ -4263,7 +4306,7 @@ type Mutation
   ): RescanImages @join__field(graph: GRAPHENE)
   preload_image(references: [String]!, target_agents: [String]!): PreloadImage @join__field(graph: GRAPHENE)
   unload_image(references: [String]!, target_agents: [String]!): UnloadImage @join__field(graph: GRAPHENE)
-  modify_image(architecture: String = "x86_64", props: ModifyImageInput!, target: String!): ModifyImage @join__field(graph: GRAPHENE)
+  modify_image(architecture: String = "aarch64", props: ModifyImageInput!, target: String!): ModifyImage @join__field(graph: GRAPHENE)
 
   """Added in 25.6.0"""
   clear_image_custom_resource_limit(key: ClearImageCustomResourceLimitKey!): ClearImageCustomResourceLimitPayload @join__field(graph: GRAPHENE)
@@ -4272,7 +4315,7 @@ type Mutation
   forget_image_by_id(image_id: String!): ForgetImageById @join__field(graph: GRAPHENE)
 
   """Deprecated since 25.4.0. Use `forget_image_by_id` instead."""
-  forget_image(architecture: String = "x86_64", reference: String!): ForgetImage @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
+  forget_image(architecture: String = "aarch64", reference: String!): ForgetImage @join__field(graph: GRAPHENE) @deprecated(reason: "Deprecated since 25.4.0. Use `forget_image_by_id` instead.")
 
   """Added in 25.4.0"""
   purge_image_by_id(
@@ -4284,7 +4327,7 @@ type Mutation
 
   """Added in 24.03.1"""
   untag_image_from_registry(image_id: String!): UntagImageFromRegistry @join__field(graph: GRAPHENE)
-  alias_image(alias: String!, architecture: String = "x86_64", target: String!): AliasImage @join__field(graph: GRAPHENE)
+  alias_image(alias: String!, architecture: String = "aarch64", target: String!): AliasImage @join__field(graph: GRAPHENE)
   dealias_image(alias: String!): DealiasImage @join__field(graph: GRAPHENE)
   clear_images(registry: String): ClearImages @join__field(graph: GRAPHENE)
 
@@ -4522,6 +4565,46 @@ type Mutation
   Once AVAILABLE, artifacts can be used by users in their sessions.
   """
   importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 25.16.0.
+  Create or update domain-level app configuration.
+  The provided extra_config object will completely replace the existing configuration;
+  existing keys not present in the new extra_config will be removed.
+  All users in this domain will be affected by these settings when their configurations are merged,
+  unless they have user-level configurations that override specific keys.
+  Requires admin privileges.
+  """
+  upsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 25.16.0.
+  Create or update user-level app configuration.
+  The provided extra_config object will completely replace the existing configuration;
+  existing keys not present in the new extra_config will be removed.
+  These settings will override domain-level settings when configurations are merged for this user.
+  Users can only modify their own configuration, but admins can modify any user's configuration.
+  """
+  upsertUserAppConfig(input: UpsertUserConfigInput!): UpsertUserConfigPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 25.16.0.
+  Delete domain-level app configuration.
+  All users in this domain may be affected by this deletion.
+  After deletion, users will only receive their user-level configurations
+  when configurations are merged, with no domain-level defaults.
+  Requires admin privileges.
+  """
+  deleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 25.16.0.
+  Delete user-level app configuration.
+  After deletion, the user will still receive domain-level configuration values
+  when configurations are merged, as domain settings remain unaffected.
+  Users can only delete their own configuration, but admins can delete any user's configuration.
+  """
+  deleteUserAppConfig(input: DeleteUserConfigInput!): DeleteUserConfigPayload! @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.15.0.
@@ -5101,7 +5184,7 @@ type Query
     """Added in 24.03.1"""
     id: String
     reference: String
-    architecture: String = "x86_64"
+    architecture: String = "aarch64"
   ): Image @join__field(graph: GRAPHENE)
   images(
     """
@@ -5404,6 +5487,38 @@ type Query
   Supports cursor-based pagination for efficient browsing.
   """
   artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection! @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 25.16.0.
+  Retrieve domain-level app configuration.
+  Returns only the configuration set specifically for the domain, without merging.
+  This query is useful for checking what values are configured at the domain level
+  when you want to modify domain or user configurations separately.
+  For actual configuration values to be applied, use mergedAppConfig instead.
+  Requires admin privileges.
+  """
+  domainAppConfig(domainName: String!): AppConfig @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 25.16.0.
+  Retrieve user-level app configuration.
+  Returns only the configuration set specifically for the user, without merging with domain config.
+  This query is useful for checking what values are configured at the user level
+  when you want to modify domain or user configurations separately.
+  For actual configuration values to be applied, use mergedAppConfig instead.
+  Users can only access their own configuration, but admins can access any user's configuration.
+  """
+  userAppConfig(userId: ID!): AppConfig @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 25.16.0.
+  Retrieve merged app configuration for the current user.
+  The result combines domain-level and user-level configurations,
+  where user settings override domain settings for the same keys.
+  This query should be used when working with user app configurations
+  to get the actual configuration values that will be applied.
+  """
+  mergedAppConfig: AppConfig! @join__field(graph: STRAWBERRY)
 
   """Added in 25.16.0"""
   deployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection! @join__field(graph: STRAWBERRY)
@@ -6433,6 +6548,56 @@ type UpdateVFSStoragePayload
   @join__type(graph: STRAWBERRY)
 {
   vfsStorage: VFSStorage!
+}
+
+"""
+Added in 25.16.0.
+Input for creating or updating domain-level app configuration.
+The provided extra_config object will completely replace the existing configuration;
+existing keys not present in the new extra_config will be removed.
+All users in this domain will be affected by these settings when their configurations are merged.
+"""
+input UpsertDomainConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  domainName: String!
+  extraConfig: JSON!
+}
+
+"""
+Added in 25.16.0.
+Payload returned after upserting domain-level app configuration.
+Contains the resulting configuration that was stored.
+"""
+type UpsertDomainConfigPayload
+  @join__type(graph: STRAWBERRY)
+{
+  appConfig: AppConfig!
+}
+
+"""
+Added in 25.16.0.
+Input for creating or updating user-level app configuration.
+The provided extra_config object will completely replace the existing configuration;
+existing keys not present in the new extra_config will be removed.
+These settings will override domain-level settings when configurations are merged for this user.
+"""
+input UpsertUserConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  userId: ID!
+  extraConfig: JSON!
+}
+
+"""
+Added in 25.16.0.
+Payload returned after upserting user-level app configuration.
+Contains the resulting configuration that was stored.
+"""
+type UpsertUserConfigPayload
+  @join__type(graph: STRAWBERRY)
+{
+  appConfig: AppConfig!
 }
 
 type User implements Item
