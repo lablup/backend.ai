@@ -26,7 +26,7 @@ from pydantic import (
 )
 
 from ai.backend.agent.utils import get_arch_name
-from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.config import BaseConfigSchema, RootConfigSchema
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.configs.validation_context import BaseConfigValidationContext
 from ai.backend.common.data.config.types import EtcdConfigData
@@ -994,7 +994,7 @@ class DockerExtraConfig(BaseConfigSchema):
     )
 
 
-class AgentUnifiedConfig(BaseConfigSchema):
+class AgentUnifiedConfig(RootConfigSchema):
     # Local config
     agent: AgentConfig = Field(
         description="Agent configuration",

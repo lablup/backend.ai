@@ -4,8 +4,10 @@ Configuration management CLI commands for Backend.AI Manager.
 This module provides CLI commands for generating and managing configuration files.
 """
 
+import json
 import logging
 import pathlib
+import textwrap
 
 import click
 
@@ -62,15 +64,15 @@ def generate_sample(
         )
         return
 
-    header_comment = """
-Backend.AI Manager Configuration Sample
+    header_comment = textwrap.dedent("""
+        Backend.AI Manager Configuration Sample
 
-This is a sample configuration file for the Backend.AI Manager.
-All configuration options are documented with their descriptions,
-default values, and examples.
+        This is a sample configuration file for the Backend.AI Manager.
+        All configuration options are documented with their descriptions,
+        default values, and examples.
 
-Generated automatically from the ManagerUnifiedConfig schema.
-"""
+        Generated automatically from the ManagerUnifiedConfig schema.
+        """)
 
     try:
         generate_sample_config_file(
@@ -79,6 +81,34 @@ Generated automatically from the ManagerUnifiedConfig schema.
         log.info(f"Sample configuration file generated successfully: {output}")
     except Exception as e:
         raise click.ClickException(f"Failed to generate sample configuration: {e}")
+
+
+@cli.command()
+@click.argument(
+    "path",
+    metavar="PATH",
+    type=click.Path(
+        file_okay=True,
+        dir_okay=False,
+        writable=True,
+        path_type=pathlib.Path,
+    ),
+)
+@click.pass_obj
+def generate_json_schema(
+    cli_ctx: CLIContext,
+    path: pathlib.Path,
+) -> None:
+    """
+    Generate a JSON schema file for the Manager configuration.
+    """
+
+    try:
+        raw_schema = ManagerUnifiedConfig.schema_to_dict()
+        with open(path, "w") as fw:
+            json.dump(raw_schema, fw, indent=2)
+    except Exception as e:
+        raise click.ClickException(f"Failed to generate JSON schema: {e}")
 
 
 if __name__ == "__main__":

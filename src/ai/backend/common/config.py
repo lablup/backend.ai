@@ -63,6 +63,12 @@ class BaseConfigModel(BaseModel):
     )
 
 
+class RootConfigSchema(BaseConfigSchema):
+    @classmethod
+    def schema_to_dict(cls) -> dict[str, Any]:
+        return cls.model_json_schema()
+
+
 etcd_config_iv = t.Dict({
     t.Key("etcd"): t.Dict({
         t.Key("namespace"): t.String,
