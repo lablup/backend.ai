@@ -61,7 +61,6 @@ class CustomGraphQLView(GraphQLView):
         set_handler_attr(self, "auth_required", True)
         set_handler_attr(self, "auth_scope", "user")
 
-    @auth_required
     async def __call__(self, request: web.Request) -> web.StreamResponse:
         if request.get("is_authorized", False):
             return await super().__call__(request)

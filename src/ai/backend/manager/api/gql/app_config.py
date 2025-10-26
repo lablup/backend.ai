@@ -61,14 +61,15 @@ class UpsertDomainConfigInput:
         The provided extra_config object will completely replace the existing configuration;
         existing keys not present in the new extra_config will be removed.
         These settings will override domain-level settings when configurations are merged for this user.
+        If user_id is not provided, the current user's configuration will be updated.
         """
     )
 )
 class UpsertUserConfigInput:
     """Input type for upserting user-level app configuration."""
 
-    user_id: ID
     extra_config: strawberry.scalars.JSON
+    user_id: Optional[ID] = None
 
     def to_modifier(self) -> AppConfigModifier:
         return AppConfigModifier(extra_config=OptionalState.update(self.extra_config))
@@ -81,11 +82,19 @@ class DeleteDomainConfigInput:
     domain_name: str
 
 
-@strawberry.input(description="Added in 25.16.0. Input for deleting user-level app configuration")
+@strawberry.input(
+    description=dedent_strip(
+        """\
+        Added in 25.16.0.
+        Input for deleting user-level app configuration.
+        If user_id is not provided, the current user's configuration will be deleted.
+        """
+    )
+)
 class DeleteUserConfigInput:
     """Input type for deleting user-level app configuration."""
 
-    user_id: ID
+    user_id: Optional[ID] = None
 
 
 @strawberry.type(
@@ -190,24 +199,29 @@ async def domain_app_config(
         This query is useful for checking what values are configured at the user level
         when you want to modify domain or user configurations separately.
         For actual configuration values to be applied, use mergedAppConfig instead.
+        If user_id is not provided, returns the current user's configuration.
         Users can only access their own configuration, but admins can access any user's configuration.
         """
     )
 )
 async def user_app_config(
-    user_id: ID,
     info: Info[StrawberryGQLContext],
+    user_id: Optional[ID] = None,
 ) -> Optional[AppConfig]:
     """Get user-level app configuration."""
     processors = info.context.processors
     me = current_user()
     if me is None:
         raise InsufficientPrivilege("Authentication required")
-    if str(me.user_id) != str(user_id) and not (me.is_admin or me.is_superadmin):
+
+    # Use current user's ID if user_id is not provided
+    target_user_id = str(user_id) if user_id is not None else str(me.user_id)
+
+    if str(me.user_id) != target_user_id and not (me.is_admin or me.is_superadmin):
         raise InsufficientPrivilege("Cannot access another user's app configuration")
 
     action_result = await processors.app_config.get_user_config.wait_for_complete(
-        GetUserConfigAction(user_id=str(user_id))
+        GetUserConfigAction(user_id=target_user_id)
     )
 
     if not action_result.result:
@@ -289,6 +303,7 @@ async def upsert_domain_app_config(
         The provided extra_config object will completely replace the existing configuration;
         existing keys not present in the new extra_config will be removed.
         These settings will override domain-level settings when configurations are merged for this user.
+        If user_id is not provided, the current user's configuration will be updated.
         Users can only modify their own configuration, but admins can modify any user's configuration.
         """
     ),
@@ -302,12 +317,16 @@ async def upsert_user_app_config(
     me = current_user()
     if me is None:
         raise InsufficientPrivilege("Authentication required")
-    if str(me.user_id) != str(input.user_id) and not (me.is_admin or me.is_superadmin):
+
+    # Use current user's ID if user_id is not provided
+    target_user_id = str(input.user_id) if input.user_id is not None else str(me.user_id)
+
+    if str(me.user_id) != target_user_id and not (me.is_admin or me.is_superadmin):
         raise InsufficientPrivilege("Cannot modify another user's app configuration")
 
     action_result = await processors.app_config.upsert_user_config.wait_for_complete(
         UpsertUserConfigAction(
-            user_id=str(input.user_id),
+            user_id=target_user_id,
             modifier=input.to_modifier(),
         )
     )
@@ -355,6 +374,7 @@ async def delete_domain_app_config(
         Delete user-level app configuration.
         After deletion, the user will still receive domain-level configuration values
         when configurations are merged, as domain settings remain unaffected.
+        If user_id is not provided, the current user's configuration will be deleted.
         Users can only delete their own configuration, but admins can delete any user's configuration.
         """
     ),
@@ -368,11 +388,15 @@ async def delete_user_app_config(
     me = current_user()
     if me is None:
         raise InsufficientPrivilege("Authentication required")
-    if str(me.user_id) != str(input.user_id) and not (me.is_admin or me.is_superadmin):
+
+    # Use current user's ID if user_id is not provided
+    target_user_id = str(input.user_id) if input.user_id is not None else str(me.user_id)
+
+    if str(me.user_id) != target_user_id and not (me.is_admin or me.is_superadmin):
         raise InsufficientPrivilege("Cannot delete another user's app configuration")
 
     action_result = await processors.app_config.delete_user_config.wait_for_complete(
-        DeleteUserConfigAction(user_id=str(input.user_id))
+        DeleteUserConfigAction(user_id=target_user_id)
     )
 
     return DeleteUserConfigPayload(deleted=action_result.deleted)

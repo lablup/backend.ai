@@ -849,9 +849,13 @@ type DeleteReservoirRegistryPayload {
   id: ID!
 }
 
-"""Added in 25.16.0. Input for deleting user-level app configuration"""
+"""
+Added in 25.16.0.
+Input for deleting user-level app configuration.
+If user_id is not provided, the current user's configuration will be deleted.
+"""
 input DeleteUserConfigInput {
-  userId: ID!
+  userId: ID = null
 }
 
 """
@@ -1381,6 +1385,7 @@ type Mutation {
   The provided extra_config object will completely replace the existing configuration;
   existing keys not present in the new extra_config will be removed.
   These settings will override domain-level settings when configurations are merged for this user.
+  If user_id is not provided, the current user's configuration will be updated.
   Users can only modify their own configuration, but admins can modify any user's configuration.
   """
   upsertUserAppConfig(input: UpsertUserConfigInput!): UpsertUserConfigPayload!
@@ -1400,6 +1405,7 @@ type Mutation {
   Delete user-level app configuration.
   After deletion, the user will still receive domain-level configuration values
   when configurations are merged, as domain settings remain unaffected.
+  If user_id is not provided, the current user's configuration will be deleted.
   Users can only delete their own configuration, but admins can delete any user's configuration.
   """
   deleteUserAppConfig(input: DeleteUserConfigInput!): DeleteUserConfigPayload!
@@ -1726,9 +1732,10 @@ type Query {
   This query is useful for checking what values are configured at the user level
   when you want to modify domain or user configurations separately.
   For actual configuration values to be applied, use mergedAppConfig instead.
+  If user_id is not provided, returns the current user's configuration.
   Users can only access their own configuration, but admins can access any user's configuration.
   """
-  userAppConfig(userId: ID!): AppConfig
+  userAppConfig(userId: ID = null): AppConfig
 
   """
   Added in 25.16.0.
@@ -2338,10 +2345,11 @@ Input for creating or updating user-level app configuration.
 The provided extra_config object will completely replace the existing configuration;
 existing keys not present in the new extra_config will be removed.
 These settings will override domain-level settings when configurations are merged for this user.
+If user_id is not provided, the current user's configuration will be updated.
 """
 input UpsertUserConfigInput {
-  userId: ID!
   extraConfig: JSON!
+  userId: ID = null
 }
 
 """
