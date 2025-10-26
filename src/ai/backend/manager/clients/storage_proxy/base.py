@@ -11,6 +11,7 @@ from ai.backend.common.exception import ErrorCode, ErrorDomain, InvalidErrorCode
 from ai.backend.common.json import load_json
 from ai.backend.manager.errors.storage import (
     QuotaScopeNotFoundError,
+    StorageProxyConnectionError,
     UnexpectedStorageProxyResponseError,
     VFolderBadRequest,
     VFolderGone,
@@ -110,17 +111,22 @@ class StorageProxyHTTPClient:
         headers = {
             AUTH_TOKEN_HDR: self._secret,
         }
-        async with self._client_session.request(
-            method,
-            self._endpoint / url,
-            headers=headers,
-            json=body,
-            params=params,
-        ) as client_resp:
-            if client_resp.status // 100 == 2:
-                yield client_resp
-                return
-            await self._handle_exceptional_response(client_resp)
+        try:
+            async with self._client_session.request(
+                method,
+                self._endpoint / url,
+                headers=headers,
+                json=body,
+                params=params,
+            ) as client_resp:
+                if client_resp.status // 100 == 2:
+                    yield client_resp
+                    return
+                await self._handle_exceptional_response(client_resp)
+        except aiohttp.ClientConnectionError as e:
+            raise StorageProxyConnectionError(
+                extra_msg="Failed to connect to storage proxy",
+            ) from e
 
     async def request(
         self,

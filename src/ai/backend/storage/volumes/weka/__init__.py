@@ -70,9 +70,19 @@ class WekaQuotaModel(BaseQuotaModel):
 
         inode_id = await self._get_inode_id(qspath)
         quota = await self.api_client.get_quota(self.fs_uid, inode_id)
+        used_bytes = quota.used_bytes if quota.used_bytes is not None else -1
+        limit_bytes = quota.hard_limit if quota.hard_limit is not None else -1
+        if used_bytes < 0 or limit_bytes < 0:
+            log.warning(
+                "Data from Weka API negative values in used_bytes({}) or limit_bytes({}) for quota scope {}: response from Weka API = {}",
+                used_bytes,
+                limit_bytes,
+                quota_scope_id,
+                quota.to_json(),
+            )
         return QuotaUsage(
-            used_bytes=quota.used_bytes if quota.used_bytes is not None else -1,
-            limit_bytes=quota.hard_limit if quota.hard_limit is not None else -1,
+            used_bytes=used_bytes,
+            limit_bytes=limit_bytes,
         )
 
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:

@@ -220,14 +220,6 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         """,
         examples=["huggingface", "my-huggingface"],
     )
-    storage_name: str = Field(
-        description="""
-        Target storage name where all models will be imported.
-        Must be a configured and accessible storage backend.
-        Used as fallback when storage_step_mappings is not provided.
-        """,
-        examples=["default-minio", "s3-storage", "local-storage"],
-    )
     storage_step_mappings: dict[ArtifactStorageImportStep, str] = Field(
         description="""
         Optional mapping of import steps to specific storage backends.
@@ -259,14 +251,6 @@ class ReservoirImportModelsReq(BaseRequestModel):
         This should match the configured registry name in the system.
         """,
         examples=["reservoir", "my-reservoir"],
-    )
-    storage_name: str = Field(
-        description="""
-        Target storage name where all models will be imported.
-        Must be a configured and accessible storage backend.
-        Used as fallback when storage_step_mappings is not provided.
-        """,
-        examples=["default-minio", "s3-storage", "local-storage"],
     )
     storage_step_mappings: dict[ArtifactStorageImportStep, str] = Field(
         description="""

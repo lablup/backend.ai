@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, FrozenSet, Optional, cast
@@ -9,6 +10,7 @@ import aiofiles.os
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 
 from ...exception import QuotaDirectoryNotEmptyError
 from ...types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
@@ -18,6 +20,8 @@ from ..vfs import BaseQuotaModel, BaseVolume
 from .config import config_iv
 from .exceptions import DellNoMetricError
 from .onefs_client import OneFSClient, QuotaThresholds, QuotaTypes
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class DellEMCOneFSQuotaModel(BaseQuotaModel):
@@ -74,9 +78,19 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         quota_id = await self._get_quota_id(qspath)
         if quota_id is not None:
             data = await self.api_client.get_quota(quota_id)
+            used_bytes = data["usage"]["fslogical"]
+            limit_bytes = data["thresholds"]["hard"]
+            if used_bytes < 0 or limit_bytes < 0:
+                log.warning(
+                    "Data from OneFS API negative values in used_bytes({}) or limit_bytes({}) for quota scope {}: response from OneFS API = {}",
+                    used_bytes,
+                    limit_bytes,
+                    quota_scope_id,
+                    data,
+                )
             return QuotaUsage(
-                used_bytes=data["usage"]["fslogical"],
-                limit_bytes=data["thresholds"]["hard"],
+                used_bytes=used_bytes,
+                limit_bytes=limit_bytes,
             )
         else:
             return None

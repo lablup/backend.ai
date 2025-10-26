@@ -89,7 +89,7 @@ from .base import (
     batch_result_in_scalar_stream,
     metadata,
 )
-from .group import GroupRow
+from .group import AssocGroupUserRow, GroupRow
 from .minilang.ordering import OrderSpecItem, QueryOrderParser
 from .minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from .rbac import (
@@ -2392,9 +2392,19 @@ class VFolderPermissionContextBuilder(
     ) -> VFolderPermissionContext:
         result = VFolderPermissionContext()
 
+        j = sa.join(
+            GroupRow,
+            AssocGroupUserRow,
+            GroupRow.id == AssocGroupUserRow.group_id,
+        )
         _project_stmt = (
             sa.select(GroupRow)
-            .where(GroupRow.domain_name == domain_name)
+            .select_from(j)
+            .where(
+                sa.and_(
+                    GroupRow.domain_name == domain_name, AssocGroupUserRow.user_id == ctx.user_id
+                )
+            )
             .options(load_only(GroupRow.id))
         )
         for row in await self.db_session.scalars(_project_stmt):

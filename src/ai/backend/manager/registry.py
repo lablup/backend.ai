@@ -66,8 +66,6 @@ from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageR
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import (
-    AgentStartedEvent,
-    AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
 from ai.backend.common.events.event_types.image.anycast import (
@@ -3105,45 +3103,6 @@ class AgentRegistry:
         # noop for performance reasons
         pass
 
-    async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
-        await self.valkey_live.remove_agent_last_seen(agent_id)
-
-        async def _update() -> None:
-            async with self.db.begin() as conn:
-                fetch_query = (
-                    sa.select([
-                        agents.c.status,
-                        agents.c.addr,
-                    ])
-                    .select_from(agents)
-                    .where(agents.c.id == agent_id)
-                    .with_for_update()
-                )
-                result = await conn.execute(fetch_query)
-                row = result.first()
-                prev_status = row["status"]
-                if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
-                    return
-
-                if status == AgentStatus.LOST:
-                    log.warning("agent {0} heartbeat timeout detected.", agent_id)
-                elif status == AgentStatus.TERMINATED:
-                    log.info("agent {0} has terminated.", agent_id)
-                now = datetime.now(tzutc())
-                update_query = (
-                    sa.update(agents)
-                    .values({
-                        "status": status,
-                        "status_changed": now,
-                        "lost_at": now,
-                    })
-                    .where(agents.c.id == agent_id)
-                )
-                await conn.execute(update_query)
-
-        await self.valkey_image.remove_agent_from_all_images(agent_id)
-        await execute_with_retry(_update)
-
     async def sync_kernel_stats(
         self,
         kernel_ids: Sequence[KernelId],
@@ -4071,38 +4030,6 @@ async def handle_batch_result(
     )
 
     await invoke_session_callback(context, source, event)
-
-
-async def handle_agent_lifecycle(
-    context: AgentRegistry,
-    source: AgentId,
-    event: AgentStartedEvent | AgentTerminatedEvent,
-) -> None:
-    if isinstance(event, AgentStartedEvent):
-        log.info("instance_lifecycle: ag:{0} joined (via event, {1})", source, event.reason)
-        await context.update_instance(
-            source,
-            {
-                "status": AgentStatus.ALIVE,
-            },
-        )
-    if isinstance(event, AgentTerminatedEvent):
-        if event.reason == "agent-lost":
-            await context.mark_agent_terminated(source, AgentStatus.LOST)
-            context.agent_cache.discard(source)
-        elif event.reason == "agent-restart":
-            log.info("agent@{0} restarting for maintenance.", source)
-            await context.update_instance(
-                source,
-                {
-                    "status": AgentStatus.RESTARTING,
-                },
-            )
-        else:
-            # On normal instance termination, kernel_terminated events were already
-            # triggered by the agent.
-            await context.mark_agent_terminated(source, AgentStatus.TERMINATED)
-            context.agent_cache.discard(source)
 
 
 async def handle_route_creation(

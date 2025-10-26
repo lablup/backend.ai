@@ -903,7 +903,6 @@ class ImageRow(Base):
             supported_accelerators=self.accelerators.split(",") if self.accelerators else ["*"],
             # legacy
             hash=self.trimmed_digest or None,
-            raw_labels=self.labels,
         )
 
     async def untag_image_from_registry(

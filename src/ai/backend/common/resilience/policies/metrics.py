@@ -93,17 +93,17 @@ class MetricPolicy(Policy):
                 domain=self._domain,
                 layer=self._layer,
                 operation=operation,
-                success=True,
                 duration=time.perf_counter() - start,
+                exception=None,
             )
             return result
-        except Exception:
+        except BaseException as e:
             # Record failure
             self._observer.observe_layer_operation(
                 domain=self._domain,
                 layer=self._layer,
                 operation=operation,
-                success=False,
                 duration=time.perf_counter() - start,
+                exception=e,
             )
             raise

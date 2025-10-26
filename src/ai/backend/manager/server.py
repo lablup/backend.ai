@@ -1096,7 +1096,9 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     task_specs = root_ctx.sokovan_orchestrator.create_task_specs()
 
     # Rescan reservoir registry periodically
-    if root_ctx.config_provider.config.reservoir.use_delegation:
+    reservoir_config = root_ctx.config_provider.config.reservoir
+
+    if reservoir_config and reservoir_config.use_delegation:
         task_specs.append(
             EventTaskSpec(
                 name="reservoir_registry_scan",

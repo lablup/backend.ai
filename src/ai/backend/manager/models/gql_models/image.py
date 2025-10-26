@@ -196,9 +196,6 @@ class Image(graphene.ObjectType):
     # legacy field
     hash = graphene.String()
 
-    # internal attributes
-    raw_labels: dict[str, Any]
-
     @classmethod
     def from_image_with_agent_install_status(cls, data: ImageWithAgentInstallStatus) -> Self:
         result = cls(
@@ -233,8 +230,6 @@ class Image(graphene.ObjectType):
             # legacy
             hash=data.image.digest,
         )
-        # internal
-        result.raw_labels = data.image.raw_labels
         return result
 
     @classmethod
@@ -374,6 +369,13 @@ class Image(graphene.ObjectType):
                         else:
                             return False
         return is_valid
+
+    @property
+    def is_customized_image(self) -> bool:
+        for label in self.labels:
+            if label.key == LabelName.CUSTOMIZED_OWNER.value:
+                return True
+        return False
 
 
 class ImagePermissionValueField(graphene.Scalar):
