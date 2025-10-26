@@ -5,6 +5,15 @@ from strawberry.schema.config import StrawberryConfig
 from .agent_stats import (
     agent_stats,
 )
+from .app_config import (
+    delete_domain_app_config,
+    delete_user_app_config,
+    domain_app_config,
+    merged_app_config,
+    upsert_domain_app_config,
+    upsert_user_app_config,
+    user_app_config,
+)
 from .artifact import (
     approve_artifact_revision,
     artifact,
@@ -96,6 +105,9 @@ class Query:
     artifacts = artifacts
     artifact_revision = artifact_revision
     artifact_revisions = artifact_revisions
+    domain_app_config = domain_app_config
+    user_app_config = user_app_config
+    merged_app_config = merged_app_config
     deployments = deployments
     deployment = deployment
     revisions = revisions
@@ -121,6 +133,10 @@ class Mutation:
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
+    upsert_domain_app_config = upsert_domain_app_config
+    upsert_user_app_config = upsert_user_app_config
+    delete_domain_app_config = delete_domain_app_config
+    delete_user_app_config = delete_user_app_config
     delegate_scan_artifacts = delegate_scan_artifacts
     delegate_import_artifacts = delegate_import_artifacts
     update_artifact = update_artifact

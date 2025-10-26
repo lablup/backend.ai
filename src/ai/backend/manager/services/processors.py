@@ -21,6 +21,8 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.agent.service import AgentService
+from ai.backend.manager.services.app_config.processors import AppConfigProcessors
+from ai.backend.manager.services.app_config.service import AppConfigService
 from ai.backend.manager.services.artifact.processors import ArtifactProcessors
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
@@ -114,6 +116,7 @@ class ServiceArgs:
 @dataclass
 class Services:
     agent: AgentService
+    app_config: AppConfigService
     domain: DomainService
     group: GroupService
     user: UserService
@@ -151,6 +154,9 @@ class Services:
             args.hook_plugin_ctx,
             args.event_producer,
             args.agent_cache,
+        )
+        app_config_service = AppConfigService(
+            app_config_repository=repositories.app_config.repository,
         )
         domain_service = DomainService(
             repositories.domain.repository, repositories.domain.admin_repository
@@ -288,6 +294,7 @@ class Services:
 
         return cls(
             agent=agent_service,
+            app_config=app_config_service,
             domain=domain_service,
             group=group_service,
             user=user_service,
@@ -323,6 +330,7 @@ class ProcessorArgs:
 @dataclass
 class Processors(AbstractProcessorPackage):
     agent: AgentProcessors
+    app_config: AppConfigProcessors
     domain: DomainProcessors
     group: GroupProcessors
     user: UserProcessors
@@ -352,6 +360,7 @@ class Processors(AbstractProcessorPackage):
     def create(cls, args: ProcessorArgs, action_monitors: list[ActionMonitor]) -> Self:
         services = Services.create(args.service_args)
         agent_processors = AgentProcessors(services.agent, action_monitors)
+        app_config_processors = AppConfigProcessors(services.app_config, action_monitors)
         domain_processors = DomainProcessors(services.domain, action_monitors)
         group_processors = GroupProcessors(services.group, action_monitors)
         user_processors = UserProcessors(services.user, action_monitors)
@@ -408,6 +417,7 @@ class Processors(AbstractProcessorPackage):
 
         return cls(
             agent=agent_processors,
+            app_config=app_config_processors,
             domain=domain_processors,
             group=group_processors,
             user=user_processors,
@@ -438,6 +448,7 @@ class Processors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             *self.agent.supported_actions(),
+            *self.app_config.supported_actions(),
             *self.domain.supported_actions(),
             *self.group.supported_actions(),
             *self.user.supported_actions(),
