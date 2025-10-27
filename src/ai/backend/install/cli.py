@@ -40,7 +40,15 @@ from ai.backend.plugin.entrypoint import find_build_root
 from . import __version__
 from .common import detect_os
 from .context import DevContext, PackageContext, current_log
-from .types import CliArgs, DistInfo, InstallInfo, InstallModes, InstallVariable, PrerequisiteError
+from .types import (
+    CliArgs,
+    DistInfo,
+    InstallInfo,
+    InstallModes,
+    InstallVariable,
+    OSInfo,
+    PrerequisiteError,
+)
 
 top_tasks: WeakSet[asyncio.Task] = WeakSet()
 
@@ -79,7 +87,7 @@ class DevSetup(Static):
             # post-setup
             await ctx.populate_images()
             await ctx.dump_install_info()
-            install_report = InstallReport(ctx.install_info, id="install-report")
+            install_report = InstallReport(ctx.install_info, ctx.os_info, id="install-report")
             self.query_one("TabPane#tab-dev-report Label").remove()
             self.query_one("TabPane#tab-dev-report").mount(install_report)
             self.query_one("TabbedContent", TabbedContent).active = "tab-dev-report"
@@ -151,7 +159,7 @@ class PackageSetup(Static):
             # post-setup
             await ctx.populate_images()
             await ctx.dump_install_info()
-            install_report = InstallReport(ctx.install_info, id="install-report")
+            install_report = InstallReport(ctx.install_info, ctx.os_info, id="install-report")
             self.query_one("TabPane#tab-pkg-report Label").remove()
             self.query_one("TabPane#tab-pkg-report").mount(install_report)
             self.query_one("TabbedContent", TabbedContent).active = "tab-pkg-report"
@@ -226,9 +234,10 @@ class Configure(Static):
 
 
 class InstallReport(Static):
-    def __init__(self, install_info: InstallInfo, **kwargs) -> None:
+    def __init__(self, install_info: InstallInfo, os_info: OSInfo, **kwargs) -> None:
         super().__init__(**kwargs)
         self.install_info = install_info
+        self.os_info = os_info
 
     def compose(self) -> ComposeResult:
         service = self.install_info.service_config
@@ -242,7 +251,7 @@ class InstallReport(Static):
         - Username: `admin@lablup.com`
         - Password: `wJalrXUt`
 
-        To see this guide again, run './backendai-install-<platform> install --show-guide'.
+        To see this guide again, run './backendai-install-{self.os_info.platform} install --show-guide'.
         """
             )
         )
@@ -529,6 +538,17 @@ class InstallerApp(App):
             )
         self._args = args
 
+    async def show_guide(self):
+        try:
+            install_info = InstallInfo(**json.loads((Path.cwd() / "INSTALL-INFO").read_bytes()))
+            os_info = await detect_os()
+            self.mount(InstallReport(install_info, os_info))
+        except IOError as e:
+            log = SetupLog()
+            log.write("Failed to read INSTALL-INFO!")
+            log.write(e)
+            self.mount(log)
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
         logo_text = textwrap.dedent(
@@ -542,14 +562,7 @@ class InstallerApp(App):
         )
         yield Static(logo_text, id="logo")
         if self._args.show_guide:
-            try:
-                install_info = InstallInfo(**json.loads((Path.cwd() / "INSTALL-INFO").read_bytes()))
-                yield InstallReport(install_info)
-            except IOError as e:
-                log = SetupLog()
-                log.write("Failed to read INSTALL-INFO!")
-                log.write(e)
-                yield log
+            asyncio.create_task(self.show_guide())
         else:
             with ContentSwitcher(id="top", initial="mode-menu"):
                 yield ModeMenu(self._args, id="mode-menu")
