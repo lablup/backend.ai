@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import functools
-from collections.abc import Awaitable, Callable, Iterable
+from collections.abc import Callable, Coroutine, Iterable
 from contextvars import ContextVar
-from typing import Optional, ParamSpec, TypeVar
+from typing import Any, Optional, ParamSpec, TypeVar
 
 from .policy import Policy
 
@@ -56,7 +56,9 @@ class Resilience:
         """
         self._policies = policies
 
-    def apply(self) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
+    def apply(
+        self,
+    ) -> Callable[[Callable[P, Coroutine[Any, Any, R]]], Callable[P, Coroutine[Any, Any, R]]]:
         """
         Create a decorator that applies all policies to an async function.
 
@@ -67,22 +69,24 @@ class Resilience:
             A decorator function that wraps the target function with all policies
         """
 
-        def decorator(func: Callable[P, Awaitable[R]]) -> Callable[P, Awaitable[R]]:
+        def decorator(
+            func: Callable[P, Coroutine[Any, Any, R]],
+        ) -> Callable[P, Coroutine[Any, Any, R]]:
             @functools.wraps(func)
             async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
                 # Set the current operation name in context
                 token = _current_operation.set(func.__name__)
                 try:
                     # Build middleware chain from policies
-                    next_call: Callable[P, Awaitable[R]] = func
+                    next_call: Callable[P, Coroutine[Any, Any, R]] = func
 
                     # Wrap function with policies in reverse order
                     # so that first policy in list becomes outermost wrapper
                     for policy in reversed(list(self._policies)):
 
                         def make_wrapper(
-                            p: Policy, next_fn: Callable[P, Awaitable[R]]
-                        ) -> Callable[P, Awaitable[R]]:
+                            p: Policy, next_fn: Callable[P, Coroutine[Any, Any, R]]
+                        ) -> Callable[P, Coroutine[Any, Any, R]]:
                             async def policy_call(
                                 *inner_args: P.args, **inner_kwargs: P.kwargs
                             ) -> R:

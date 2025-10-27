@@ -514,7 +514,7 @@ class Mutation(graphene.ObjectType):
 class Query(graphene.ObjectType):
     """
     All available GraphQL queries.
-    Type name changed from 'Queries' to 'Query' in 25.13.0
+    Type name changed from 'Queries' to 'Query' in 25.14.0
     """
 
     node = AsyncNode.Field()

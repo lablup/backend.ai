@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import enum
 import logging
 import math
@@ -323,18 +322,18 @@ class IdleCheckerHost:
                     assert policy is not None
                     policy_cache[kernel["access_key"]] = policy
 
-                check_task = [
+                check_tasks = [
                     checker.check_idleness(kernel, conn, policy, grace_period_end=grace_period_end)
                     for checker in self._checkers
                 ]
-                check_results = await asyncio.gather(*check_task, return_exceptions=True)
+                check_results = await aiotools.gather_safe(check_tasks)
                 terminated = False
-                errors = []
+                errors: list[BaseException] = []
                 for checker, result in zip(self._checkers, check_results):
-                    if isinstance(result, aiotools.TaskGroupError):
-                        errors.extend(result.__errors__)
+                    if isinstance(result, BaseExceptionGroup):
+                        errors.extend(result.exceptions)
                         continue
-                    elif isinstance(result, Exception):
+                    elif isinstance(result, BaseException):
                         # mark to be destroyed afterwards
                         errors.append(result)
                         continue

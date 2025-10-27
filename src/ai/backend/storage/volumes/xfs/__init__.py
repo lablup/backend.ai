@@ -204,7 +204,6 @@ class XFSProjectQuotaModel(BaseQuotaModel):
             # -N: without header
             ["sudo", "xfs_quota", "-x", "-c", "report -p -b -N", self.mount_path],
         )
-        print(full_report)
         for line in full_report.splitlines():
             if quota_scope_id.pathname in line:
                 report = line
@@ -217,6 +216,14 @@ class XFSProjectQuotaModel(BaseQuotaModel):
         # By default, report command displays the sizes in the 1 KiB unit.
         used_bytes = int(used_kbs) * 1024
         hard_limit_bytes = int(hard_limit_kbs) * 1024
+        if used_bytes < 0 or hard_limit_bytes < 0:
+            log.warning(
+                "Negative values in used_bytes({}) or limit_bytes({}) for quota scope {} in XFS: report line = {}",
+                used_bytes,
+                hard_limit_bytes,
+                quota_scope_id,
+                report,
+            )
         return QuotaUsage(used_bytes, hard_limit_bytes)
 
     async def update_quota_scope(

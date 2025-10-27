@@ -179,8 +179,9 @@ class Service(BaseFunction):
                     vfolder_id = vfolder_name_to_id[mount]
                 extra_mount_body[str(vfolder_id)] = {
                     "mount_destination": extra_mount_map.get(mount),
-                    "type": extra_mount_options.get(mount, {}).get("type"),
                 }
+                if mount_type := extra_mount_options.get(mount, {}).get("type"):
+                    extra_mount_body[str(vfolder_id)]["type"] = mount_type
         model_config = {
             "model": model_id_or_name,
             "model_mount_destination": model_mount_destination,

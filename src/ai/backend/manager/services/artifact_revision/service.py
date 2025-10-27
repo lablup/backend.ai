@@ -36,6 +36,7 @@ from ai.backend.manager.errors.artifact import (
 from ai.backend.manager.errors.artifact_registry import (
     InvalidArtifactRegistryTypeError,
 )
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.storage import UnsupportedStorageTypeError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
@@ -244,13 +245,16 @@ class ArtifactRevisionService:
             artifact = await self._artifact_repository.get_artifact_by_id(revision_data.artifact_id)
 
             reservoir_config = self._config_provider.config.reservoir
+            if reservoir_config is None:
+                raise ServerMisconfiguredError("Reservoir configuration is missing")
+
             storage_type = reservoir_config.config.storage_type
-            reservoir_storage_name = reservoir_config.storage_name
+            reservoir_archive_storage = reservoir_config.archive_storage
 
             # Get bucket name or subpath depending on storage type
             namespace = self._resolve_storage_namespace(reservoir_config)
-            storage_host, namespace_id, storage_name = await self._get_storage_info(
-                reservoir_storage_name, namespace
+            storage_host, namespace_id, _ = await self._get_storage_info(
+                reservoir_archive_storage, namespace
             )
 
             storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_host)
@@ -267,8 +271,7 @@ class ArtifactRevisionService:
                                 ModelTarget(model_id=artifact.name, revision=revision_data.version)
                             ],
                             registry_name=huggingface_registry_data.name,
-                            storage_name=storage_name,
-                            storage_step_mappings=reservoir_config.storage_step_selection,
+                            storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
                         )
                     )
                     task_id = huggingface_result.task_id
@@ -285,8 +288,7 @@ class ArtifactRevisionService:
                                 ModelTarget(model_id=artifact.name, revision=revision_data.version)
                             ],
                             registry_name=registry_data.name,
-                            storage_name=storage_name,
-                            storage_step_mappings=reservoir_config.storage_step_selection,
+                            storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
                         )
                     )
                     task_id = result.task_id
@@ -327,7 +329,10 @@ class ArtifactRevisionService:
         )
 
         reservoir_config = self._config_provider.config.reservoir
-        reservoir_storage_name = reservoir_config.storage_name
+        if reservoir_config is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
+
+        reservoir_archive_storage = reservoir_config.archive_storage
         # TODO: Abstract this.
         namespace = self._resolve_storage_namespace(reservoir_config)
 
@@ -339,7 +344,9 @@ class ArtifactRevisionService:
         storage_name = None
 
         try:
-            storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
+            storage_data = await self._object_storage_repository.get_by_name(
+                reservoir_archive_storage
+            )
             storage_namespace = (
                 await self._storage_namespace_repository.get_by_storage_and_namespace(
                     storage_data.id, namespace
@@ -350,7 +357,7 @@ class ArtifactRevisionService:
             storage_name = storage_data.name
         except Exception:
             vfs_storage_data = await self._vfs_storage_repository.get_by_name(
-                reservoir_storage_name
+                reservoir_archive_storage
             )
             storage_namespace = (
                 await self._storage_namespace_repository.get_by_storage_and_namespace(
@@ -394,7 +401,11 @@ class ArtifactRevisionService:
         self, action: DelegateImportArtifactRevisionBatchAction
     ) -> DelegateImportArtifactRevisionBatchActionResult:
         # If this is a leaf node, perform local import instead of delegation
-        if not self._config_provider.config.reservoir.use_delegation:
+        reservoir_cfg = self._config_provider.config.reservoir
+        if reservoir_cfg is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
+
+        if not reservoir_cfg.use_delegation:
             registry_id = None
             if action.delegatee_target:
                 registry_id = action.delegatee_target.target_registry_id
@@ -473,8 +484,12 @@ class ArtifactRevisionService:
         self, artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
     ) -> ArtifactRegistryData:
         if registry_id_or_none is None:
+            artifact_registry_cfg = self._config_provider.config.artifact_registry
+            if artifact_registry_cfg is None:
+                raise ServerMisconfiguredError("Artifact registry configuration is missing.")
+
             # TODO: Handle `artifact_type` for other types
-            registry_name = self._config_provider.config.artifact_registry.model_registry
+            registry_name = artifact_registry_cfg.model_registry
             registry_meta = (
                 await self._artifact_registry_repository.get_artifact_registry_data_by_name(
                     registry_name

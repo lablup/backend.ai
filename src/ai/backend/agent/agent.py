@@ -1066,10 +1066,7 @@ class AbstractAgent(
             await self.save_last_registry(force=True)
 
         # Stop timers.
-        cancel_results = await cancel_tasks(self.timer_tasks)
-        for result in cancel_results:
-            if isinstance(result, Exception):
-                log.error("timer cancellation error: {}", result)
+        await aiotools.cancel_and_wait(self.timer_tasks)
         await self._agent_runner.close()
         self._clean_kernel_registry_task.cancel()
 

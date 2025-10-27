@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import shutil
 from pathlib import Path
@@ -7,6 +8,7 @@ from typing import Any, Dict, FrozenSet, List
 import aiofiles.os
 
 from ai.backend.common.types import BinarySize, QuotaScopeID
+from ai.backend.logging import BraceStyleAdapter
 
 from ...exception import QuotaScopeNotFoundError
 from ...subproc import run
@@ -19,6 +21,8 @@ from ..abc import (
     AbstractQuotaModel,
 )
 from ..vfs import BaseFSOpModel, BaseQuotaModel, BaseVolume
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class CephDirQuotaModel(BaseQuotaModel):
@@ -49,6 +53,18 @@ class CephDirQuotaModel(BaseQuotaModel):
                         limit_bytes = 0
                     case _:
                         limit_bytes = -1  # unset
+                log.warning(
+                    "Failed to read ceph.quota.max_bytes for quota scope {}: {}",
+                    quota_scope_id,
+                    e,
+                )
+            if used_bytes < 0 or limit_bytes < 0:
+                log.warning(
+                    "Used bytes < 0 ({}) or limit bytes < 0 ({}) for quota scope {} in CephFS",
+                    used_bytes,
+                    limit_bytes,
+                    quota_scope_id,
+                )
             return used_bytes, limit_bytes
 
         # without type: ignore mypy will raise error when trying to run on macOS

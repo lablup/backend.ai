@@ -1,14 +1,28 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Optional
+from typing import Optional, Self
 from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
 from strawberry.relay import Node, NodeID
 
+from ai.backend.common.types import AutoScalingMetricSource as CommonAutoScalingMetricSource
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.data.deployment.scale import ModelDeploymentAutoScalingRuleCreator
+from ai.backend.manager.data.deployment.scale_modifier import ModelDeploymentAutoScalingRuleModifier
+from ai.backend.manager.data.deployment.types import ModelDeploymentAutoScalingRuleData
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.create_auto_scaling_rule import (
+    CreateAutoScalingRuleAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_auto_scaling_rule import (
+    DeleteAutoScalingRuleAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
+    UpdateAutoScalingRuleAction,
+)
+from ai.backend.manager.types import OptionalState
 
 
 @strawberry.enum(description="Added in 25.1.0")
@@ -19,36 +33,52 @@ class AutoScalingMetricSource(StrEnum):
 
 @strawberry.type
 class AutoScalingRule(Node):
-    id: NodeID
+    id: NodeID[str]
 
     metric_source: AutoScalingMetricSource = strawberry.field(
-        description="Added in 25.13.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"
+        description="Added in 25.16.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"
     )
     metric_name: str = strawberry.field()
 
     min_threshold: Optional[Decimal] = strawberry.field(
-        description="Added in 25.13.0: The minimum threshold for scaling (e.g. 0.5)"
+        description="Added in 25.16.0: The minimum threshold for scaling (e.g. 0.5)"
     )
     max_threshold: Optional[Decimal] = strawberry.field(
-        description="Added in 25.13.0: The maximum threshold for scaling (e.g. 21.0)"
+        description="Added in 25.16.0: The maximum threshold for scaling (e.g. 21.0)"
     )
 
     step_size: int = strawberry.field(
-        description="Added in 25.13.0: The step size for scaling (e.g. 1)."
+        description="Added in 25.16.0: The step size for scaling (e.g. 1)."
     )
     time_window: int = strawberry.field(
-        description="Added in 25.13.0: The time window (seconds) for scaling (e.g. 60)."
+        description="Added in 25.16.0: The time window (seconds) for scaling (e.g. 60)."
     )
 
     min_replicas: Optional[int] = strawberry.field(
-        description="Added in 25.13.0: The minimum number of replicas (e.g. 1)."
+        description="Added in 25.16.0: The minimum number of replicas (e.g. 1)."
     )
     max_replicas: Optional[int] = strawberry.field(
-        description="Added in 25.13.0: The maximum number of replicas (e.g. 10)."
+        description="Added in 25.16.0: The maximum number of replicas (e.g. 10)."
     )
 
     created_at: datetime
     last_triggered_at: datetime
+
+    @classmethod
+    def from_dataclass(cls, data: ModelDeploymentAutoScalingRuleData) -> Self:
+        return cls(
+            id=ID(str(data.id)),
+            metric_source=AutoScalingMetricSource(data.metric_source.name),
+            metric_name=data.metric_name,
+            min_threshold=data.min_threshold,
+            max_threshold=data.max_threshold,
+            step_size=data.step_size,
+            time_window=data.time_window,
+            min_replicas=data.min_replicas,
+            max_replicas=data.max_replicas,
+            created_at=data.created_at,
+            last_triggered_at=data.last_triggered_at,
+        )
 
 
 # Input Types
@@ -64,6 +94,19 @@ class CreateAutoScalingRuleInput:
     min_replicas: Optional[int]
     max_replicas: Optional[int]
 
+    def to_creator(self) -> ModelDeploymentAutoScalingRuleCreator:
+        return ModelDeploymentAutoScalingRuleCreator(
+            model_deployment_id=UUID(self.model_deployment_id),
+            metric_source=CommonAutoScalingMetricSource(self.metric_source.lower()),
+            metric_name=self.metric_name,
+            min_threshold=self.min_threshold,
+            max_threshold=self.max_threshold,
+            step_size=self.step_size,
+            time_window=self.time_window,
+            min_replicas=self.min_replicas,
+            max_replicas=self.max_replicas,
+        )
+
 
 @strawberry.input
 class UpdateAutoScalingRuleInput:
@@ -76,6 +119,26 @@ class UpdateAutoScalingRuleInput:
     time_window: Optional[int]
     min_replicas: Optional[int]
     max_replicas: Optional[int]
+
+    def to_action(self) -> UpdateAutoScalingRuleAction:
+        optional_state_metric_source = OptionalState[CommonAutoScalingMetricSource].nop()
+        if isinstance(self.metric_source, AutoScalingMetricSource):
+            optional_state_metric_source = OptionalState[CommonAutoScalingMetricSource].update(
+                CommonAutoScalingMetricSource(self.metric_source)
+            )
+        return UpdateAutoScalingRuleAction(
+            auto_scaling_rule_id=UUID(self.id),
+            modifier=ModelDeploymentAutoScalingRuleModifier(
+                metric_source=optional_state_metric_source,
+                metric_name=OptionalState[str].from_graphql(self.metric_name),
+                min_threshold=OptionalState[Decimal].from_graphql(self.min_threshold),
+                max_threshold=OptionalState[Decimal].from_graphql(self.max_threshold),
+                step_size=OptionalState[int].from_graphql(self.step_size),
+                time_window=OptionalState[int].from_graphql(self.time_window),
+                min_replicas=OptionalState[int].from_graphql(self.min_replicas),
+                max_replicas=OptionalState[int].from_graphql(self.max_replicas),
+            ),
+        )
 
 
 @strawberry.input
@@ -99,89 +162,41 @@ class DeleteAutoScalingRulePayload:
     id: ID
 
 
-mock_scaling_rule_0 = AutoScalingRule(
-    id=UUID("77117a41-87f3-43b7-ba24-40dd5e978720"),
-    metric_source=AutoScalingMetricSource.KERNEL,
-    metric_name="memory_usage",
-    min_threshold=None,
-    max_threshold=Decimal("90"),
-    step_size=1,
-    time_window=120,
-    min_replicas=1,
-    max_replicas=3,
-    created_at=datetime.now() - timedelta(days=15),
-    last_triggered_at=datetime.now() - timedelta(hours=6),
-)
-
-mock_scaling_rule_1 = AutoScalingRule(
-    id=UUID("7ff8c1f5-cf8c-4ea2-911c-24ca0f4c2efb"),
-    metric_source=AutoScalingMetricSource.KERNEL,
-    metric_name="cpu_usage",
-    min_threshold=None,
-    max_threshold=Decimal("80"),
-    step_size=1,
-    time_window=300,
-    min_replicas=1,
-    max_replicas=5,
-    created_at=datetime.now() - timedelta(days=10),
-    last_triggered_at=datetime.now() - timedelta(hours=2),
-)
-
-mock_scaling_rule_2 = AutoScalingRule(
-    id=UUID("483e2158-e089-482b-8cef-260805649cf1"),
-    metric_source=AutoScalingMetricSource.INFERENCE_FRAMEWORK,
-    metric_name="requests_per_second",
-    min_threshold=None,
-    max_threshold=Decimal("1000"),
-    step_size=2,
-    time_window=600,
-    min_replicas=2,
-    max_replicas=10,
-    created_at=datetime.now() - timedelta(days=5),
-    last_triggered_at=datetime.now() - timedelta(hours=12),
-)
-
-
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.16.0")
 async def create_auto_scaling_rule(
     input: CreateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> CreateAutoScalingRulePayload:
-    return CreateAutoScalingRulePayload(auto_scaling_rule=mock_scaling_rule_0)
-
-
-@strawberry.mutation(description="Added in 25.13.0")
-async def update_auto_scaling_rule(
-    input: UpdateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
-) -> UpdateAutoScalingRulePayload:
-    return UpdateAutoScalingRulePayload(
-        auto_scaling_rule=AutoScalingRule(
-            id=input.id,
-            metric_source=input.metric_source
-            if input.metric_source
-            else mock_scaling_rule_1.metric_source,
-            metric_name=input.metric_name if input.metric_name else mock_scaling_rule_1.metric_name,
-            min_threshold=input.min_threshold
-            if input.min_threshold
-            else mock_scaling_rule_1.min_threshold,
-            max_threshold=input.max_threshold
-            if input.max_threshold
-            else mock_scaling_rule_1.max_threshold,
-            step_size=input.step_size if input.step_size else mock_scaling_rule_1.step_size,
-            time_window=input.time_window if input.time_window else mock_scaling_rule_1.time_window,
-            min_replicas=input.min_replicas
-            if input.min_replicas
-            else mock_scaling_rule_1.min_replicas,
-            max_replicas=input.max_replicas
-            if input.max_replicas
-            else mock_scaling_rule_1.max_replicas,
-            created_at=datetime.now(),
-            last_triggered_at=datetime.now(),
-        )
+    deployment_processor = info.context.processors.deployment
+    assert deployment_processor is not None
+    result = await deployment_processor.create_auto_scaling_rule.wait_for_complete(
+        action=CreateAutoScalingRuleAction(input.to_creator())
+    )
+    return CreateAutoScalingRulePayload(
+        auto_scaling_rule=AutoScalingRule.from_dataclass(result.data)
     )
 
 
-@strawberry.mutation(description="Added in 25.13.0")
+@strawberry.mutation(description="Added in 25.16.0")
+async def update_auto_scaling_rule(
+    input: UpdateAutoScalingRuleInput, info: Info[StrawberryGQLContext]
+) -> UpdateAutoScalingRulePayload:
+    deployment_processor = info.context.processors.deployment
+    assert deployment_processor is not None
+    action_result = await deployment_processor.update_auto_scaling_rule.wait_for_complete(
+        input.to_action()
+    )
+    return UpdateAutoScalingRulePayload(
+        auto_scaling_rule=AutoScalingRule.from_dataclass(action_result.data)
+    )
+
+
+@strawberry.mutation(description="Added in 25.16.0")
 async def delete_auto_scaling_rule(
     input: DeleteAutoScalingRuleInput, info: Info[StrawberryGQLContext]
 ) -> DeleteAutoScalingRulePayload:
-    return DeleteAutoScalingRulePayload(id=input.id)
+    deployment_processor = info.context.processors.deployment
+    assert deployment_processor is not None
+    _ = await deployment_processor.delete_auto_scaling_rule.wait_for_complete(
+        DeleteAutoScalingRuleAction(auto_scaling_rule_id=UUID(input.id))
+    )
+    return DeleteAutoScalingRulePayload(id=ID(input.id))

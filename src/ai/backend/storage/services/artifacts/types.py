@@ -75,8 +75,16 @@ class ImportPipeline:
                 completed_steps.append(step)
 
             # On success, cleanup all non-archive steps
+            archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
+
             for step in completed_steps:
                 if step.step_type != ArtifactStorageImportStep.ARCHIVE:
+                    step_storage = context.storage_step_mappings.get(step.step_type)
+
+                    # Skip cleanup if this step uses the same storage as archive step
+                    if step_storage == archive_storage:
+                        continue
+
                     try:
                         await step.cleanup_stage(context)
                     except Exception:
