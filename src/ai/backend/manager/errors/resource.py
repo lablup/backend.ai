@@ -354,3 +354,16 @@ class InvalidPresetQuery(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
+
+
+class NoAvailableScalingGroup(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/no-available-scaling-group"
+    error_title = "No scaling groups available for this session."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )

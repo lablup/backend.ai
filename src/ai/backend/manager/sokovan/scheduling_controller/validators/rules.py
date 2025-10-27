@@ -7,9 +7,7 @@ from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import SlotName, SlotTypes
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.kernel import QuotaExceeded
-from ai.backend.manager.models import PRIVATE_SESSION_TYPES
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    AllowedScalingGroup,
     SessionCreationContext,
     SessionCreationSpec,
 )
@@ -29,75 +27,12 @@ class ContainerLimitRule(SessionValidatorRule):
         self,
         spec: SessionCreationSpec,
         context: SessionCreationContext,
-        allowed_groups: list[AllowedScalingGroup],
     ) -> None:
         max_containers = spec.resource_policy.get("max_containers_per_session", 1)
         if spec.cluster_size > int(max_containers):
             raise QuotaExceeded(
                 f"You cannot create session with more than {max_containers} containers."
             )
-
-
-class ScalingGroupAccessRule(SessionValidatorRule):
-    """Validates that the scaling group is accessible."""
-
-    @override
-    def name(self) -> str:
-        return "scaling_group_access"
-
-    @override
-    def validate(
-        self,
-        spec: SessionCreationSpec,
-        context: SessionCreationContext,
-        allowed_groups: list[AllowedScalingGroup],
-    ) -> None:
-        if not spec.scaling_group:
-            # Should have been resolved already
-            return
-
-        public_sgroup_only = spec.session_type not in PRIVATE_SESSION_TYPES
-
-        # Find the scaling group in allowed list
-        for sg in allowed_groups:
-            if sg.name == spec.scaling_group:
-                if public_sgroup_only and sg.is_private:
-                    raise InvalidAPIParameters(
-                        f"Scaling group {spec.scaling_group} is not allowed for {spec.session_type} sessions"
-                    )
-                return
-
-        raise InvalidAPIParameters(f"Scaling group {spec.scaling_group} is not accessible")
-
-
-class SessionTypeRule(SessionValidatorRule):
-    """Validates session type compatibility with scaling group."""
-
-    @override
-    def name(self) -> str:
-        return "session_type"
-
-    @override
-    def validate(
-        self,
-        spec: SessionCreationSpec,
-        context: SessionCreationContext,
-        allowed_groups: list[AllowedScalingGroup],
-    ) -> None:
-        if spec.scaling_group is None:
-            # Should have been resolved already
-            return
-
-        for sg in allowed_groups:
-            if sg.name == spec.scaling_group:
-                allowed_session_types = sg.scheduler_opts.allowed_session_types
-                if spec.session_type not in allowed_session_types:
-                    raise InvalidAPIParameters(
-                        f"Session type {spec.session_type} is not allowed in scaling group {sg.name}"
-                    )
-                return
-
-        raise InvalidAPIParameters(f"Scaling group {spec.scaling_group} is not accessible")
 
 
 class ServicePortRule(SessionValidatorRule):
@@ -112,7 +47,6 @@ class ServicePortRule(SessionValidatorRule):
         self,
         spec: SessionCreationSpec,
         context: SessionCreationContext,
-        allowed_groups: list[AllowedScalingGroup],
     ) -> None:
         # Check preopen_ports from creation_config (applies to all kernels)
         creation_preopen_ports = spec.creation_spec.get("preopen_ports")
@@ -186,7 +120,6 @@ class ResourceLimitRule(SessionValidatorRule):
         self,
         spec: SessionCreationSpec,
         context: SessionCreationContext,
-        allowed_groups: list[AllowedScalingGroup],
     ) -> None:
         # Note: This validation should ideally be done after resource calculation
         # For now, we'll validate what we can from the spec
