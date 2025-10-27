@@ -56,7 +56,7 @@ class TestMountNameValidationRule:
         )
 
         # Should not raise
-        mount_rule.validate(spec, basic_context, [])
+        mount_rule.validate(spec, basic_context)
 
     def test_duplicate_alias_names(self, mount_rule, basic_context):
         """Test validation with duplicate alias names."""
@@ -81,7 +81,7 @@ class TestMountNameValidationRule:
         )
 
         with pytest.raises(InvalidAPIParameters) as exc_info:
-            mount_rule.validate(spec, basic_context, [])
+            mount_rule.validate(spec, basic_context)
         assert "duplicate alias folder name" in str(exc_info.value).lower()
 
     def test_empty_alias_name(self, mount_rule, basic_context):
@@ -106,7 +106,7 @@ class TestMountNameValidationRule:
         )
 
         with pytest.raises(InvalidAPIParameters) as exc_info:
-            mount_rule.validate(spec, basic_context, [])
+            mount_rule.validate(spec, basic_context)
         assert "alias name cannot be empty" in str(exc_info.value).lower()
 
     def test_reserved_folder_names(self, mount_rule, basic_context):
@@ -158,7 +158,7 @@ class TestMountNameValidationRule:
             )
 
             with pytest.raises(InvalidAPIParameters) as exc_info:
-                mount_rule.validate(spec, basic_context, [])
+                mount_rule.validate(spec, basic_context)
             assert "reserved for internal path" in str(exc_info.value)
 
     def test_alias_same_as_original_folder(self, mount_rule, basic_context):
@@ -183,7 +183,7 @@ class TestMountNameValidationRule:
         )
 
         with pytest.raises(InvalidAPIParameters) as exc_info:
-            mount_rule.validate(spec, basic_context, [])
+            mount_rule.validate(spec, basic_context)
         assert "cannot be set to an existing folder name" in str(exc_info.value)
 
     def test_work_directory_prefix_handling(self, mount_rule, basic_context):
@@ -208,7 +208,7 @@ class TestMountNameValidationRule:
         )
 
         # Should validate without the prefix - the prefix is stripped
-        mount_rule.validate(spec, basic_context, [])
+        mount_rule.validate(spec, basic_context)
 
     def test_combined_mount_maps(self, mount_rule, basic_context):
         """Test validation with both mount_map and mount_id_map."""
@@ -236,7 +236,7 @@ class TestMountNameValidationRule:
         )
 
         # Should validate both maps combined
-        mount_rule.validate(spec, basic_context, [])
+        mount_rule.validate(spec, basic_context)
 
     def test_duplicate_across_maps(self, mount_rule, basic_context):
         """Test duplicate aliases across mount_map and mount_id_map."""
@@ -262,7 +262,7 @@ class TestMountNameValidationRule:
         )
 
         with pytest.raises(InvalidAPIParameters) as exc_info:
-            mount_rule.validate(spec, basic_context, [])
+            mount_rule.validate(spec, basic_context)
         assert "duplicate alias folder name" in str(exc_info.value).lower()
 
     def test_none_alias_values(self, mount_rule, basic_context):
@@ -287,7 +287,7 @@ class TestMountNameValidationRule:
         )
 
         # Should not raise - None values are skipped
-        mount_rule.validate(spec, basic_context, [])
+        mount_rule.validate(spec, basic_context)
 
     def test_special_characters_in_names(self, mount_rule, basic_context):
         """Test validation with special characters in folder names."""
@@ -319,7 +319,7 @@ class TestMountNameValidationRule:
             )
 
             with pytest.raises(InvalidAPIParameters):
-                mount_rule.validate(spec, basic_context, [])
+                mount_rule.validate(spec, basic_context)
 
     def test_large_mount_map(self, mount_rule, basic_context):
         """Test validation with a large number of mounts."""
@@ -341,7 +341,7 @@ class TestMountNameValidationRule:
         )
 
         # Should handle large number of mounts
-        mount_rule.validate(spec, basic_context, [])
+        mount_rule.validate(spec, basic_context)
 
     def test_unicode_names(self, mount_rule, basic_context):
         """Test validation with unicode characters in names."""
@@ -368,7 +368,7 @@ class TestMountNameValidationRule:
         # Unicode names should be handled properly
         # This may pass or fail depending on verify_vfolder_name implementation
         try:
-            mount_rule.validate(spec, basic_context, [])
+            mount_rule.validate(spec, basic_context)
         except InvalidAPIParameters:
             # If unicode is not allowed, that's also valid behavior
             pass

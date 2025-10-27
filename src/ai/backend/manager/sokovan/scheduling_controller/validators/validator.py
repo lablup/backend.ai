@@ -41,4 +41,4 @@ class SessionValidator:
         """
         for rule in self._rules:
             log.debug(f"Applying validation rule: {rule.name()}")
-            rule.validate(spec, context, context.allowed_scaling_groups)
+            rule.validate(spec, context)

@@ -43,9 +43,10 @@ from .validators import (
     ClusterValidationRule,
     ContainerLimitRule,
     MountNameValidationRule,
-    ScalingGroupAccessRule,
+    PublicPrivateFilterRule,
+    ScalingGroupFilter,
     ServicePortRule,
-    SessionTypeRule,
+    SessionTypeFilterRule,
     SessionValidator,
 )
 
@@ -76,6 +77,7 @@ class SchedulingController:
 
     # Services
     _scaling_group_resolver: ScalingGroupResolver
+    _scaling_group_filter: ScalingGroupFilter
     _validator: SessionValidator
     _preparer: SessionPreparer
     _resource_calculator: ResourceCalculator
@@ -98,11 +100,16 @@ class SchedulingController:
         # Initialize services
         self._scaling_group_resolver = ScalingGroupResolver()
 
+        # Initialize scaling group filter with rules
+        filter_rules = [
+            PublicPrivateFilterRule(),
+            SessionTypeFilterRule(),
+        ]
+        self._scaling_group_filter = ScalingGroupFilter(filter_rules)
+
         # Initialize validator with rules
         validator_rules = [
             ContainerLimitRule(),
-            ScalingGroupAccessRule(),
-            SessionTypeRule(),
             ServicePortRule(),
             ClusterValidationRule(),
             MountNameValidationRule(),
@@ -196,10 +203,22 @@ class SchedulingController:
                 allowed_vfolder_types,
             )
 
-        # Phase 3: Validate
+        # Phase 3: Filter and validate
         with self._metric_observer.measure_phase(
             "scheduling_controller", validated_scaling_group.name, "validation"
         ):
+            # Filter scaling groups based on session requirements
+            # This will raise NoAvailableScalingGroup if filtering fails
+            filter_result = self._scaling_group_filter.filter(
+                session_spec,
+                creation_context.allowed_scaling_groups,
+            )
+
+            # Update context with filtered scaling groups for remaining validation
+            creation_context.allowed_scaling_groups = filter_result.allowed_groups
+            session_spec.scaling_group = filter_result.selected_scaling_group
+
+            # Run remaining validation rules
             self._validator.validate(
                 session_spec,
                 creation_context,
