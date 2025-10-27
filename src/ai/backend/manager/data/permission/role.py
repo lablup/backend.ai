@@ -12,7 +12,10 @@ from .object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
     ObjectPermissionData,
 )
-from .permission_group import PermissionGroupCreatorBeforeRoleCreation, PermissionGroupData
+from .permission_group import (
+    PermissionGroupCreatorBeforeRoleCreation,
+    PermissionGroupExtendedData,
+)
 from .status import RoleStatus
 from .types import EntityType, OperationType, RoleSource
 
@@ -73,7 +76,7 @@ class RoleDataWithPermissions:
     source: RoleSource
     status: RoleStatus
 
-    permission_groups: list[PermissionGroupData]
+    permission_groups: list[PermissionGroupExtendedData]
     object_permissions: list[ObjectPermissionData]
 
     created_at: datetime

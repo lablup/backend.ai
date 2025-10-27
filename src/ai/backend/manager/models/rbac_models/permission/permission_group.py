@@ -10,6 +10,7 @@ from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission_group import (
     PermissionGroupCreator,
     PermissionGroupData,
+    PermissionGroupExtendedData,
 )
 from ai.backend.manager.data.permission.types import (
     ScopeType,
@@ -70,6 +71,13 @@ class PermissionGroupRow(Base):
 
     def to_data(self) -> PermissionGroupData:
         return PermissionGroupData(
+            id=self.id,
+            role_id=self.role_id,
+            scope_id=ScopeId(scope_type=self.scope_type, scope_id=self.scope_id),
+        )
+
+    def to_extended_data(self) -> PermissionGroupExtendedData:
+        return PermissionGroupExtendedData(
             id=self.id,
             role_id=self.role_id,
             scope_id=ScopeId(scope_type=self.scope_type, scope_id=self.scope_id),
