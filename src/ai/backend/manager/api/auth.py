@@ -531,7 +531,6 @@ async def _authenticate_via_jwt(
 
     try:
         # 1. Decode token without verification to extract access_key
-        log.info("jwt token: {}", jwt_token)
         unverified_payload = pyjwt.decode(
             jwt_token,
             options={"verify_signature": False},
@@ -727,8 +726,6 @@ async def auth_middleware(request: web.Request, handler) -> web.StreamResponse:
     # Detect authentication method and route to appropriate flow
     jwt_token = request.headers.get("X-BackendAI-Token")
     auth_header = request.headers.get("Authorization")
-    log.info("AUTH.MIDDLEWARE(path:{}, headers:{})", request.path, dict(request.headers))
-
     if jwt_token:
         # JWT authentication flow (GraphQL Federation)
         await _authenticate_via_jwt(request, root_ctx, jwt_token)
