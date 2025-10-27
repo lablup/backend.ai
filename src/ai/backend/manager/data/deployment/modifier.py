@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, override
 from uuid import UUID
 
+from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
 
@@ -88,4 +89,33 @@ class DeploymentModifier(PartialModifier):
             to_update.update(self.network.fields_to_update())
         if self.model_revision:
             to_update.update(self.model_revision.fields_to_update())
+        return to_update
+
+
+@dataclass
+class NewDeploymentModifier(PartialModifier):
+    name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
+    tags: OptionalState[list[str]] = field(default_factory=OptionalState[list[str]].nop)
+    desired_replica_count: OptionalState[int] = field(default_factory=OptionalState[int].nop)
+    open_to_public: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    preferred_domain_name: TriState[str] = field(default_factory=TriState[str].nop)
+    default_deployment_strategy: OptionalState[DeploymentStrategy] = field(
+        default_factory=OptionalState[DeploymentStrategy].nop
+    )
+    active_revision_id: OptionalState[UUID] = field(
+        default_factory=OptionalState[UUID].nop
+    )  # TODO: Check if TriState is more appropriate
+
+    @override
+    def fields_to_update(self) -> dict[str, Any]:
+        to_update: dict[str, Any] = {}
+        self.name.update_dict(to_update, "name")
+        tag = self.tags.optional_value()
+        if tag is not None:
+            to_update["tags"] = ",".join(tag)
+        self.desired_replica_count.update_dict(to_update, "desired_replica_count")
+        self.open_to_public.update_dict(to_update, "open_to_public")
+        self.preferred_domain_name.update_dict(to_update, "preferred_domain_name")
+        self.default_deployment_strategy.update_dict(to_update, "default_deployment_strategy")
+        self.active_revision_id.update_dict(to_update, "current_revision_id")
         return to_update

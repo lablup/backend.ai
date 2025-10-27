@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import Iterator, Optional
+from typing import TYPE_CHECKING, Iterator, Optional
 
 from aiohttp import web
 
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 
-from .api.types import CORSOptions, WebMiddleware
-from .volumes.abc import AbstractVolume
+if TYPE_CHECKING:
+    from .api.types import CORSOptions, WebMiddleware
+    from .volumes.abc import AbstractVolume
 
 
 class AbstractStoragePlugin(AbstractPlugin, metaclass=ABCMeta):

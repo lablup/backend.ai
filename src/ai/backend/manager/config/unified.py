@@ -185,7 +185,6 @@ from pydantic import (
     Field,
     FilePath,
     IPvAnyNetwork,
-    ValidationInfo,
     field_serializer,
     field_validator,
 )
@@ -341,8 +340,8 @@ class DatabaseConfig(BaseConfigSchema):
 
 
 class EventLoopType(enum.StrEnum):
-    asyncio = "asyncio"
-    uvloop = "uvloop"
+    ASYNCIO = "asyncio"
+    UVLOOP = "uvloop"
 
 
 class DistributedLockType(enum.StrEnum):
@@ -623,7 +622,7 @@ class ManagerConfig(BaseConfigSchema):
         serialization_alias="ssl-privkey",
     )
     event_loop: EventLoopType = Field(
-        default=EventLoopType.asyncio,
+        default=EventLoopType.ASYNCIO,
         description="""
         Event loop implementation to use.
         'asyncio' is the Python standard library implementation.
@@ -1816,10 +1815,12 @@ class ReservoirConfig(BaseConfigSchema):
         serialization_alias="use-delegation",
     )
     storage_name: str = Field(
-        default="RESERVOIR_STORAGE_NAME",
         description="""
-        Name of the reservoir storage configuration.
-        Used to identify this storage in the system.
+        Name of the reservoir default storage.
+
+        You can specify the storage to be used for each step using storage_step_selection.
+        For steps not explicitly specified in storage_step_selection, the storage is designated by storage_name.
+        If you specify storage for all steps in storage_step_selection, there is no need to specify storage_name.
         """,
         examples=["minio-storage", "gitlfs-storage", "vfs-storage"],
         validation_alias=AliasChoices("storage-name", "storage_name"),
@@ -1843,43 +1844,33 @@ class ReservoirConfig(BaseConfigSchema):
         serialization_alias="storage-step-selection",
     )
 
-    @field_validator("storage_step_selection", mode="before")
-    @classmethod
-    def _validate_required_steps(
-        cls, v: dict[str, str], info: ValidationInfo
-    ) -> dict[ArtifactStorageImportStep, str]:
+    def resolve_storage_step_selection(self) -> dict[ArtifactStorageImportStep, str]:
+        """
+        Resolves the actual `storage_step_selection` to be passed to the storage proxy based on `storage_step_selection` and `storage_name`
+        """
+
         _REQUIRED_STEPS = {ArtifactStorageImportStep.DOWNLOAD, ArtifactStorageImportStep.ARCHIVE}
 
-        # Get storage_name from the current model data being validated
-        default_storage_name = info.data.get("storage_name", "RESERVOIR_STORAGE_NAME")
+        resolved_selection: dict[ArtifactStorageImportStep, str] = (
+            self.storage_step_selection.copy()
+        )
+        for required_step in _REQUIRED_STEPS:
+            if required_step not in resolved_selection:
+                resolved_selection[required_step] = self.storage_name
 
-        if not v:  # If storage_step_selection is empty or None
-            return {step: default_storage_name for step in _REQUIRED_STEPS}
+        return resolved_selection
 
-        # Convert string keys to ArtifactStorageImportStep enum keys if needed
-        converted_dict = {}
-        for key, value in v.items():
-            try:
-                enum_key = ArtifactStorageImportStep(key)
-                converted_dict[enum_key] = value
-            except ValueError:
-                # Skip invalid step names
-                log.warning(f"Invalid artifact storage step key: {key}, skipping...")
-                continue
-
-        # Check for required steps
-        missing_steps = _REQUIRED_STEPS - set(converted_dict.keys())
-
-        # Add missing steps with default storage name
-        for step in missing_steps:
-            converted_dict[step] = default_storage_name
-
-        return converted_dict
+    @property
+    def archive_storage(self) -> str:
+        """
+        Resolve the storage backend for the `ARCHIVE` step.
+        If not explicitly specified, falls back to `storage_name`.
+        """
+        return self.storage_step_selection.get(ArtifactStorageImportStep.ARCHIVE, self.storage_name)
 
 
-class ModelRegistryConfig(BaseConfigSchema):
+class ArtifactRegistryConfig(BaseConfigSchema):
     model_registry: str = Field(
-        default="MODEL_REGISTRY_NAME",
         description="""
         Name of the Model registry configuration.
         Used to identify this registry in the system.
@@ -2064,16 +2055,16 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         Controls how services are discovered and connected within the Backend.AI system.
         """,
     )
-    artifact_registry: ModelRegistryConfig = Field(
-        default_factory=ModelRegistryConfig,
+    artifact_registry: Optional[ArtifactRegistryConfig] = Field(
+        default=None,
         description="""
         Default artifact registry config.
         """,
         validation_alias=AliasChoices("artifact_registry", "artifact-registry"),
         serialization_alias="artifact-registry",
     )
-    reservoir: ReservoirConfig = Field(
-        default_factory=ReservoirConfig,
+    reservoir: Optional[ReservoirConfig] = Field(
+        default=None,
         description="""
         Reservoir configuration.
         """,

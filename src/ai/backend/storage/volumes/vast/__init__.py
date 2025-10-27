@@ -173,6 +173,14 @@ class VASTQuotaModel(BaseQuotaModel):
             return None
         if (quota := await self.api_client.get_quota(vast_quota_id)) is None:
             return None
+        if quota.used_capacity < 0 or quota.hard_limit < 0:
+            log.warning(
+                "Data from VAST API negative values in used_bytes({}) or limit_bytes({}) for quota scope {}: response from VAST API = {}",
+                quota.used_capacity,
+                quota.hard_limit,
+                quota_scope_id,
+                quota,
+            )
         return QuotaUsage(
             used_bytes=quota.used_capacity,
             limit_bytes=quota.hard_limit,

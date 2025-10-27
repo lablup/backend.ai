@@ -13,6 +13,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
 from ai.backend.manager.repositories.reservoir_registry.repository import (
@@ -84,7 +85,10 @@ class ArtifactEventHandler:
             return
 
         try:
-            if self._config_provider.config.reservoir.enable_approve_process:
+            reservoir_config = self._config_provider.config.reservoir
+            if reservoir_config is None:
+                raise ServerMisconfiguredError("Reservoir configuration is missing.")
+            if reservoir_config.enable_approve_process:
                 await self._artifact_repository.update_artifact_revision_status(
                     revision.id, ArtifactStatus.NEEDS_APPROVAL
                 )

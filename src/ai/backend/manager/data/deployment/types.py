@@ -2,13 +2,29 @@ import enum
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
+from decimal import Decimal
 from functools import lru_cache
+from pathlib import PurePosixPath
 from typing import Any, Optional
 from uuid import UUID
 
 import yarl
 
-from ai.backend.common.types import ClusterMode, RuntimeVariant, SessionId, VFolderMount
+from ai.backend.common.data.model_deployment.types import (
+    ActivenessStatus,
+    DeploymentStrategy,
+    LivenessStatus,
+    ModelDeploymentStatus,
+    ReadinessStatus,
+)
+from ai.backend.common.types import (
+    AutoScalingMetricSource,
+    ClusterMode,
+    ResourceSlot,
+    RuntimeVariant,
+    SessionId,
+    VFolderMount,
+)
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.image.types import ImageIdentifier
 
@@ -96,6 +112,12 @@ class MountSpec:
 
 
 @dataclass
+class MountInfo:
+    vfolder_id: UUID
+    kernel_path: PurePosixPath
+
+
+@dataclass
 class MountMetadata:
     model_vfolder_id: UUID
     model_definition_path: Optional[str] = None
@@ -142,6 +164,7 @@ class ExecutionSpec:
     environ: Optional[dict[str, str]] = None
     runtime_variant: RuntimeVariant = RuntimeVariant.CUSTOM
     callback_url: Optional[yarl.URL] = None
+    inference_runtime_config: Optional[Mapping[str, Any]] = None
 
 
 @dataclass
@@ -155,7 +178,9 @@ class ModelRevisionSpec:
 @dataclass
 class DeploymentNetworkSpec:
     open_to_public: bool
+    access_token_ids: Optional[list[UUID]] = None
     url: Optional[str] = None
+    preferred_domain_name: Optional[str] = None
 
 
 @dataclass
@@ -218,3 +243,138 @@ class DeploymentInfoWithAutoScalingRules:
 
     deployment_info: DeploymentInfo
     rules: list[AutoScalingRule] = field(default_factory=list)
+
+
+@dataclass
+class ModelDeploymentAutoScalingRuleData:
+    id: UUID
+    model_deployment_id: UUID
+    metric_source: AutoScalingMetricSource
+    metric_name: str
+    min_threshold: Optional[Decimal]
+    max_threshold: Optional[Decimal]
+    step_size: int
+    time_window: int
+    min_replicas: Optional[int]
+    max_replicas: Optional[int]
+    created_at: datetime
+    last_triggered_at: datetime
+
+
+@dataclass
+class ModelDeploymentAccessTokenData:
+    id: UUID
+    token: str
+    valid_until: datetime
+    created_at: datetime
+
+
+@dataclass
+class ModelReplicaData:
+    id: UUID
+    revision_id: UUID
+    session_id: UUID
+    readiness_status: ReadinessStatus
+    liveness_status: LivenessStatus
+    activeness_status: ActivenessStatus
+    weight: int
+    detail: dict[str, Any]
+    created_at: datetime
+    live_stat: dict[str, Any]
+
+
+@dataclass
+class ClusterConfigData:
+    mode: ClusterMode
+    size: int
+
+
+@dataclass
+class ResourceConfigData:
+    resource_group_name: str
+    resource_slot: ResourceSlot
+    resource_opts: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ModelRuntimeConfigData:
+    runtime_variant: RuntimeVariant
+    inference_runtime_config: Optional[Mapping[str, Any]] = None
+    environ: Optional[dict[str, Any]] = None
+
+
+@dataclass
+class ModelMountConfigData:
+    vfolder_id: UUID
+    mount_destination: str
+    definition_path: str
+
+
+@dataclass
+class ExtraVFolderMountData:
+    vfolder_id: UUID
+    mount_destination: str
+
+
+@dataclass
+class ModelRevisionData:
+    id: UUID
+    name: str
+    cluster_config: ClusterConfigData
+    resource_config: ResourceConfigData
+    model_runtime_config: ModelRuntimeConfigData
+    model_mount_config: ModelMountConfigData
+    created_at: datetime
+    image_id: UUID
+    extra_vfolder_mounts: list[ExtraVFolderMountData] = field(default_factory=list)
+
+
+@dataclass
+class ModelDeploymentMetadataInfo:
+    name: str
+    status: ModelDeploymentStatus
+    tags: list[str]
+    project_id: UUID
+    domain_name: str
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass
+class ReplicaStateData:
+    desired_replica_count: int
+    replica_ids: list[UUID]
+
+
+@dataclass
+class ModelDeploymentData:
+    id: UUID
+    metadata: ModelDeploymentMetadataInfo
+    network_access: DeploymentNetworkSpec
+    revision: Optional[ModelRevisionData]
+    revision_history_ids: list[UUID]
+    scaling_rule_ids: list[UUID]
+    replica_state: ReplicaStateData
+    default_deployment_strategy: DeploymentStrategy
+    created_user_id: UUID
+    access_token_ids: Optional[UUID] = None
+
+
+class DeploymentOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"
+    UPDATED_AT = "UPDATED_AT"
+    NAME = "NAME"
+
+
+class ModelRevisionOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"
+    NAME = "NAME"
+
+
+class ReplicaOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"
+    ID = "ID"
+
+
+class AccessTokenOrderField(enum.StrEnum):
+    CREATED_AT = "CREATED_AT"

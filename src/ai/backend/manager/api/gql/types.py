@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from ai.backend.manager.api.gql.data_loader.registry import DataLoaderRegistry
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.services.processors import Processors
 
@@ -18,3 +19,4 @@ class StrawberryGQLContext:
     config_provider: ManagerConfigProvider
     event_hub: EventHub
     event_fetcher: EventFetcher
+    dataloader_registry: DataLoaderRegistry

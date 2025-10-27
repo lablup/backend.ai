@@ -8,17 +8,17 @@ type AccessToken implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 25.13.0: The access token."""
+  """Added in 25.16.0: The access token."""
   token: String!
 
-  """Added in 25.13.0: The creation timestamp of the access token."""
+  """Added in 25.16.0: The creation timestamp of the access token."""
   createdAt: DateTime!
 
-  """Added in 25.13.0: The expiration timestamp of the access token."""
+  """Added in 25.16.0: The expiration timestamp of the access token."""
   validUntil: DateTime!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type AccessTokenConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -37,21 +37,31 @@ type AccessTokenEdge {
   node: AccessToken!
 }
 
+"""Added in 25.16.0"""
+input AccessTokenOrderBy {
+  field: AccessTokenOrderField!
+  direction: OrderDirection! = DESC
+}
+
+enum AccessTokenOrderField {
+  CREATED_AT
+}
+
 """
-Added in 25.13.0. This enum represents the activeness status of a replica, indicating whether the deployment is currently active and able to serve requests.
+Added in 25.16.0. This enum represents the activeness status of a replica, indicating whether the deployment is currently active and able to serve requests.
 """
 enum ActivenessStatus {
   ACTIVE
   INACTIVE
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ActivenessStatusFilter {
   in: [ActivenessStatus!] = null
   equals: ActivenessStatus = null
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input AddModelRevisionInput {
   name: String = null
   deploymentId: ID!
@@ -63,7 +73,7 @@ input AddModelRevisionInput {
   extraMounts: [ExtraVFolderMountInput!]
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type AddModelRevisionPayload {
   revision: ModelRevision!
 }
@@ -79,6 +89,11 @@ type AgentResource {
 type AgentStats {
   """Added in 25.15.0"""
   totalResource: AgentResource!
+}
+
+"""Added in 25.16.0. App configuration data"""
+type AppConfig {
+  extraConfig: JSON!
 }
 
 """
@@ -441,26 +456,26 @@ type AutoScalingRule implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
 
-  """Added in 25.13.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"""
+  """Added in 25.16.0 (e.g. KERNEL, INFERENCE_FRAMEWORK)"""
   metricSource: AutoScalingMetricSource!
   metricName: String!
 
-  """Added in 25.13.0: The minimum threshold for scaling (e.g. 0.5)"""
+  """Added in 25.16.0: The minimum threshold for scaling (e.g. 0.5)"""
   minThreshold: Decimal
 
-  """Added in 25.13.0: The maximum threshold for scaling (e.g. 21.0)"""
+  """Added in 25.16.0: The maximum threshold for scaling (e.g. 21.0)"""
   maxThreshold: Decimal
 
-  """Added in 25.13.0: The step size for scaling (e.g. 1)."""
+  """Added in 25.16.0: The step size for scaling (e.g. 1)."""
   stepSize: Int!
 
-  """Added in 25.13.0: The time window (seconds) for scaling (e.g. 60)."""
+  """Added in 25.16.0: The time window (seconds) for scaling (e.g. 60)."""
   timeWindow: Int!
 
-  """Added in 25.13.0: The minimum number of replicas (e.g. 1)."""
+  """Added in 25.16.0: The minimum number of replicas (e.g. 1)."""
   minReplicas: Int
 
-  """Added in 25.13.0: The maximum number of replicas (e.g. 10)."""
+  """Added in 25.16.0: The maximum number of replicas (e.g. 10)."""
   maxReplicas: Int
   createdAt: DateTime!
   lastTriggeredAt: DateTime!
@@ -532,19 +547,19 @@ type CleanupArtifactRevisionsPayload {
   artifactRevisions: ArtifactRevisionConnection!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ClusterConfig {
   mode: ClusterMode!
   size: Int!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ClusterConfigInput {
   mode: ClusterMode!
   size: Int!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 enum ClusterMode {
   SINGLE_NODE
   MULTI_NODE
@@ -556,11 +571,11 @@ extend type ComputeSessionNode @key(fields: "id") {
 
 input CreateAccessTokenInput {
   """
-  Added in 25.13.0: The ID of the model deployment for which the access token is created.
+  Added in 25.16.0: The ID of the model deployment for which the access token is created.
   """
   modelDeploymentId: ID!
 
-  """Added in 25.13.0: The expiration timestamp of the access token."""
+  """Added in 25.16.0: The expiration timestamp of the access token."""
   validUntil: DateTime!
 }
 
@@ -596,7 +611,7 @@ type CreateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input CreateModelDeploymentInput {
   metadata: ModelDeploymentMetadataInput!
   networkAccess: ModelDeploymentNetworkAccessInput!
@@ -605,12 +620,12 @@ input CreateModelDeploymentInput {
   initialRevision: CreateModelRevisionInput!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type CreateModelDeploymentPayload {
   deployment: ModelDeployment!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input CreateModelRevisionInput {
   name: String = null
   clusterConfig: ClusterConfigInput!
@@ -621,7 +636,7 @@ input CreateModelRevisionInput {
   extraMounts: [ExtraVFolderMountInput!]
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type CreateModelRevisionPayload {
   revision: ModelRevision!
 }
@@ -780,6 +795,20 @@ type DeleteAutoScalingRulePayload {
   id: ID!
 }
 
+"""Added in 25.16.0. Input for deleting domain-level app configuration"""
+input DeleteDomainConfigInput {
+  domainName: String!
+}
+
+"""
+Added in 25.16.0.
+Payload returned after deleting domain-level app configuration.
+Indicates whether the deletion was successful.
+"""
+type DeleteDomainConfigPayload {
+  deleted: Boolean!
+}
+
 """Added in 25.14.0"""
 input DeleteHuggingFaceRegistryInput {
   id: ID!
@@ -790,12 +819,12 @@ type DeleteHuggingFaceRegistryPayload {
   id: ID!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input DeleteModelDeploymentInput {
   id: ID!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type DeleteModelDeploymentPayload {
   id: ID!
 }
@@ -820,6 +849,24 @@ type DeleteReservoirRegistryPayload {
   id: ID!
 }
 
+"""
+Added in 25.16.0.
+Input for deleting user-level app configuration.
+If user_id is not provided, the current user's configuration will be deleted.
+"""
+input DeleteUserConfigInput {
+  userId: ID = null
+}
+
+"""
+Added in 25.16.0.
+Payload returned after deleting user-level app configuration.
+Indicates whether the deletion was successful.
+"""
+type DeleteUserConfigPayload {
+  deleted: Boolean!
+}
+
 """Added in 25.16.0. Input for deleting VFS storage"""
 input DeleteVFSStorageInput {
   id: ID!
@@ -830,7 +877,7 @@ type DeleteVFSStoragePayload {
   id: ID!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input DeploymentFilter {
   name: StringFilter = null
   status: DeploymentStatusFilter = null
@@ -843,13 +890,12 @@ input DeploymentFilter {
   NOT: [DeploymentFilter!] = null
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input DeploymentOrderBy {
   field: DeploymentOrderField!
   direction: OrderDirection! = DESC
 }
 
-"""Added in 25.13.0"""
 enum DeploymentOrderField {
   CREATED_AT
   UPDATED_AT
@@ -857,7 +903,7 @@ enum DeploymentOrderField {
 }
 
 """
-Added in 25.13.0. This enum represents the deployment status of a model deployment, indicating its current state.
+Added in 25.16.0. This enum represents the deployment status of a model deployment, indicating its current state.
 """
 enum DeploymentStatus {
   PENDING
@@ -868,29 +914,29 @@ enum DeploymentStatus {
   STOPPED
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type DeploymentStatusChangedPayload {
   deployment: ModelDeployment!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input DeploymentStatusFilter {
   in: [DeploymentStatus!] = null
   equals: DeploymentStatus = null
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type DeploymentStrategy {
   type: DeploymentStrategyType!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input DeploymentStrategyInput {
   type: DeploymentStrategyType!
 }
 
 """
-Added in 25.13.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.
+Added in 25.16.0. This enum represents the deployment strategy type of a model deployment, indicating the strategy used for deployment.
 """
 enum DeploymentStrategyType {
   ROLLING
@@ -908,7 +954,7 @@ type ExtraVFolderMount implements Node {
   vfolder: VirtualFolderNode!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ExtraVFolderMountConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -927,7 +973,7 @@ type ExtraVFolderMountEdge {
   node: ExtraVFolderMount!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ExtraVFolderMountInput {
   vfolderId: ID!
   mountDestination: String
@@ -989,7 +1035,7 @@ type HuggingFaceRegistryEdge {
   node: HuggingFaceRegistry!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ImageInput {
   name: String!
   architecture: String!
@@ -1038,11 +1084,11 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 """
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
-"""Added in 25.13.0"""
+"""Added in 25.15.0"""
 scalar JSONString
 
 """
-Added in 25.13.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
+Added in 25.16.0. This enum represents the liveness status of a replica, indicating whether the deployment is currently running and able to serve requests.
 """
 enum LivenessStatus {
   NOT_CHECKED
@@ -1051,27 +1097,27 @@ enum LivenessStatus {
   DEGRADED
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input LivenessStatusFilter {
   in: [LivenessStatus!] = null
   equals: LivenessStatus = null
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ModelDeployment implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
   metadata: ModelDeploymentMetadata!
   networkAccess: ModelDeploymentNetworkAccess!
   revision: ModelRevision
-  scalingRule: ScalingRule!
-  replicaState: ReplicaState!
   defaultDeploymentStrategy: DeploymentStrategy!
   createdUser: UserNode!
+  scalingRule: ScalingRule!
+  replicaState: ReplicaState!
   revisionHistory(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ModelDeploymentConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -1090,18 +1136,18 @@ type ModelDeploymentEdge {
   node: ModelDeployment!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ModelDeploymentMetadata {
   name: String!
   status: DeploymentStatus!
   tags: [String!]!
-  project: GroupNode!
-  domain: DomainNode!
   createdAt: DateTime!
   updatedAt: DateTime!
+  project: GroupNode!
+  domain: DomainNode!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ModelDeploymentMetadataInput {
   projectId: ID!
   domainName: String!
@@ -1109,39 +1155,38 @@ input ModelDeploymentMetadataInput {
   tags: [String!] = null
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ModelDeploymentNetworkAccess {
   endpointUrl: String
   preferredDomainName: String
   openToPublic: Boolean!
-  accessTokens: AccessTokenConnection!
+  accessTokens(orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ModelDeploymentNetworkAccessInput {
   preferredDomainName: String = null
   openToPublic: Boolean! = false
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ModelMountConfig {
-  vfolder: VirtualFolderNode!
   mountDestination: String!
   definitionPath: String!
+  vfolder: VirtualFolderNode!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ModelMountConfigInput {
   vfolderId: ID!
   mountDestination: String!
   definitionPath: String!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ModelReplica implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
-  revision: ModelRevision!
 
   """
   This represents whether the replica has been checked and its health state.
@@ -1174,9 +1219,10 @@ type ModelReplica implements Node {
   The session ID associated with the replica. This can be null right after replica creation.
   """
   session: ComputeSessionNode!
+  revision: ModelRevision!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ModelReplicaConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -1195,7 +1241,7 @@ type ModelReplicaEdge {
   node: ModelReplica!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ModelRevision implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -1205,11 +1251,11 @@ type ModelRevision implements Node {
   modelRuntimeConfig: ModelRuntimeConfig!
   modelMountConfig: ModelMountConfig!
   extraMounts: ExtraVFolderMountConnection!
-  image: ImageNode!
   createdAt: DateTime!
+  image: ImageNode!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ModelRevisionConnection {
   """Pagination data for this connection"""
   pageInfo: PageInfo!
@@ -1228,7 +1274,7 @@ type ModelRevisionEdge {
   node: ModelRevision!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ModelRevisionFilter {
   name: StringFilter = null
   deploymentId: ID = null
@@ -1238,20 +1284,18 @@ input ModelRevisionFilter {
   NOT: [ModelRevisionFilter!] = null
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ModelRevisionOrderBy {
   field: ModelRevisionOrderField!
   direction: OrderDirection! = DESC
 }
 
-"""Added in 25.13.0"""
 enum ModelRevisionOrderField {
   CREATED_AT
   NAME
-  ID
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ModelRuntimeConfig {
   runtimeVariant: String!
   inferenceRuntimeConfig: JSON
@@ -1262,7 +1306,7 @@ type ModelRuntimeConfig {
   environ: JSONString
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ModelRuntimeConfigInput {
   runtimeVariant: String!
   inferenceRuntimeConfig: JSON = null
@@ -1323,6 +1367,48 @@ type Mutation {
   Once AVAILABLE, artifacts can be used by users in their sessions.
   """
   importArtifacts(input: ImportArtifactsInput!): ImportArtifactsPayload!
+
+  """
+  Added in 25.16.0.
+  Create or update domain-level app configuration.
+  The provided extra_config object will completely replace the existing configuration;
+  existing keys not present in the new extra_config will be removed.
+  All users in this domain will be affected by these settings when their configurations are merged,
+  unless they have user-level configurations that override specific keys.
+  Requires admin privileges.
+  """
+  upsertDomainAppConfig(input: UpsertDomainConfigInput!): UpsertDomainConfigPayload!
+
+  """
+  Added in 25.16.0.
+  Create or update user-level app configuration.
+  The provided extra_config object will completely replace the existing configuration;
+  existing keys not present in the new extra_config will be removed.
+  These settings will override domain-level settings when configurations are merged for this user.
+  If user_id is not provided, the current user's configuration will be updated.
+  Users can only modify their own configuration, but admins can modify any user's configuration.
+  """
+  upsertUserAppConfig(input: UpsertUserConfigInput!): UpsertUserConfigPayload!
+
+  """
+  Added in 25.16.0.
+  Delete domain-level app configuration.
+  All users in this domain may be affected by this deletion.
+  After deletion, users will only receive their user-level configurations
+  when configurations are merged, with no domain-level defaults.
+  Requires admin privileges.
+  """
+  deleteDomainAppConfig(input: DeleteDomainConfigInput!): DeleteDomainConfigPayload!
+
+  """
+  Added in 25.16.0.
+  Delete user-level app configuration.
+  After deletion, the user will still receive domain-level configuration values
+  when configurations are merged, as domain settings remain unaffected.
+  If user_id is not provided, the current user's configuration will be deleted.
+  Users can only delete their own configuration, but admins can delete any user's configuration.
+  """
+  deleteUserAppConfig(input: DeleteUserConfigInput!): DeleteUserConfigPayload!
 
   """
   Added in 25.15.0.
@@ -1408,24 +1494,26 @@ type Mutation {
   """
   cancelImportArtifact(input: CancelArtifactInput!): CancelImportArtifactPayload!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   createModelDeployment(input: CreateModelDeploymentInput!): CreateModelDeploymentPayload!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   updateModelDeployment(input: UpdateModelDeploymentInput!): UpdateModelDeploymentPayload!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   deleteModelDeployment(input: DeleteModelDeploymentInput!): DeleteModelDeploymentPayload!
 
   """
-  Added in 25.13.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers
+  Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers
   """
   syncReplicas(input: SyncReplicaInput!): SyncReplicaPayload!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   addModelRevision(input: AddModelRevisionInput!): AddModelRevisionPayload!
 
-  """Added in 25.13.0"""
+  """
+  Added in 25.16.0. Create model revision which is not attached to any deployment.
+  """
   createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload!
 
   """Added in 25.14.0"""
@@ -1434,13 +1522,13 @@ type Mutation {
   """Added in 25.14.0"""
   updateObjectStorage(input: UpdateObjectStorageInput!): UpdateObjectStoragePayload!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   createAutoScalingRule(input: CreateAutoScalingRuleInput!): CreateAutoScalingRulePayload!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   updateAutoScalingRule(input: UpdateAutoScalingRuleInput!): UpdateAutoScalingRulePayload!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   deleteAutoScalingRule(input: DeleteAutoScalingRuleInput!): DeleteAutoScalingRulePayload!
 
   """Added in 25.14.0"""
@@ -1513,7 +1601,7 @@ type Mutation {
   """
   rejectArtifactRevision(input: RejectArtifactInput!): RejectArtifactPayload!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   createAccessToken(input: CreateAccessTokenInput!): CreateAccessTokenPayload!
 }
 
@@ -1626,22 +1714,55 @@ type Query {
   """
   artifactRevisions(filter: ArtifactRevisionFilter = null, orderBy: [ArtifactRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ArtifactRevisionConnection!
 
-  """Added in 25.13.0"""
+  """
+  Added in 25.16.0.
+  Retrieve domain-level app configuration.
+  Returns only the configuration set specifically for the domain, without merging.
+  This query is useful for checking what values are configured at the domain level
+  when you want to modify domain or user configurations separately.
+  For actual configuration values to be applied, use mergedAppConfig instead.
+  Requires admin privileges.
+  """
+  domainAppConfig(domainName: String!): AppConfig
+
+  """
+  Added in 25.16.0.
+  Retrieve user-level app configuration.
+  Returns only the configuration set specifically for the user, without merging with domain config.
+  This query is useful for checking what values are configured at the user level
+  when you want to modify domain or user configurations separately.
+  For actual configuration values to be applied, use mergedAppConfig instead.
+  If user_id is not provided, returns the current user's configuration.
+  Users can only access their own configuration, but admins can access any user's configuration.
+  """
+  userAppConfig(userId: ID = null): AppConfig
+
+  """
+  Added in 25.16.0.
+  Retrieve merged app configuration for the current user.
+  The result combines domain-level and user-level configurations,
+  where user settings override domain settings for the same keys.
+  This query should be used when working with user app configurations
+  to get the actual configuration values that will be applied.
+  """
+  mergedAppConfig: AppConfig!
+
+  """Added in 25.16.0"""
   deployments(filter: DeploymentFilter = null, orderBy: [DeploymentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelDeploymentConnection!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   deployment(id: ID!): ModelDeployment
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   revisions(filter: ModelRevisionFilter = null, orderBy: [ModelRevisionOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelRevisionConnection!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   revision(id: ID!): ModelRevision!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   replica(id: ID!): ModelReplica
 
   """Added in 25.14.0"""
@@ -1675,16 +1796,16 @@ type Query {
   agentStats: AgentStats!
 
   """
-  Added in 25.13.0 Get configuration JSON Schemas for all inference runtimes
+  Added in 25.16.0 Get configuration JSON Schemas for all inference runtimes
   """
   inferenceRuntimeConfigs: JSON!
 
-  """Added in 25.13.0. Get JSON Schema for inference runtime configuration"""
+  """Added in 25.16.0. Get JSON Schema for inference runtime configuration"""
   inferenceRuntimeConfig(name: String!): JSON!
 }
 
 """
-Added in 25.13.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.
+Added in 25.16.0. This enum represents the readiness status of a replica, indicating whether the deployment has been checked and its health state.
 """
 enum ReadinessStatus {
   NOT_CHECKED
@@ -1692,7 +1813,7 @@ enum ReadinessStatus {
   UNHEALTHY
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ReadinessStatusFilter {
   in: [ReadinessStatus!] = null
   equals: ReadinessStatus = null
@@ -1739,7 +1860,7 @@ type RejectArtifactPayload {
   artifactRevision: ArtifactRevision!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ReplicaFilter {
   readinessStatus: ReadinessStatusFilter = null
   livenessStatus: LivenessStatusFilter = null
@@ -1750,24 +1871,24 @@ input ReplicaFilter {
   NOT: [ReplicaFilter!] = null
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ReplicaOrderBy {
   field: ReplicaOrderField!
   direction: OrderDirection! = DESC
 }
 
-"""Added in 25.13.0"""
 enum ReplicaOrderField {
   CREATED_AT
+  ID
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ReplicaState {
   desiredReplicaCount: Int!
   replicas(filter: ReplicaFilter = null, orderBy: [ReplicaOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelReplicaConnection!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ReplicaStatusChangedPayload {
   replica: ModelReplica!
 }
@@ -1803,10 +1924,8 @@ type ReservoirRegistryEdge {
   node: ReservoirRegistry!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ResourceConfig {
-  resourceGroup: ScalingGroupNode!
-
   """
   Resource Slots are a JSON string that describes the resources allocated for the deployment. Example: "resourceSlots": "{\"cpu\": \"1\", \"mem\": \"1073741824\", \"cuda.device\": \"0\"}"
   """
@@ -1816,9 +1935,10 @@ type ResourceConfig {
   Resource Options are a JSON string that describes additional options for the resources. This is especially used for shared memory configurations. Example: "resourceOpts": "{\"shmem\": \"64m\"}"
   """
   resourceOpts: JSONString
+  resourceGroup: ScalingGroupNode!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ResourceConfigInput {
   resourceGroup: ResourceGroupInput!
 
@@ -1833,7 +1953,7 @@ input ResourceConfigInput {
   resourceOpts: JSONString = null
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input ResourceGroupInput {
   name: String!
 }
@@ -1864,7 +1984,7 @@ extend type ScalingGroupNode @key(fields: "id") {
   id: ID! @external
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type ScalingRule {
   autoScalingRules: [AutoScalingRule!]!
 }
@@ -2035,10 +2155,10 @@ type Subscription {
   """
   artifactImportProgressUpdated(artifactRevisionId: ID!): ArtifactImportProgressUpdatedPayload!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   deploymentStatusChanged(deploymentId: ID!): DeploymentStatusChangedPayload!
 
-  """Added in 25.13.0"""
+  """Added in 25.16.0"""
   replicaStatusChanged(revisionId: ID!): ReplicaStatusChangedPayload!
 
   """
@@ -2052,12 +2172,12 @@ type Subscription {
   backgroundTaskEvents(taskId: ID!): BackgroundTaskEventPayload!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input SyncReplicaInput {
   modelDeploymentId: ID!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type SyncReplicaPayload {
   success: Boolean!
 }
@@ -2137,7 +2257,7 @@ type UpdateHuggingFaceRegistryPayload {
   huggingfaceRegistry: HuggingFaceRegistry!
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 input UpdateModelDeploymentInput {
   id: ID!
   openToPublic: Boolean = null
@@ -2149,7 +2269,7 @@ input UpdateModelDeploymentInput {
   preferredDomainName: String = null
 }
 
-"""Added in 25.13.0"""
+"""Added in 25.16.0"""
 type UpdateModelDeploymentPayload {
   deployment: ModelDeployment!
 }
@@ -2196,6 +2316,49 @@ input UpdateVFSStorageInput {
 """Added in 25.16.0. Payload for updating VFS storage"""
 type UpdateVFSStoragePayload {
   vfsStorage: VFSStorage!
+}
+
+"""
+Added in 25.16.0.
+Input for creating or updating domain-level app configuration.
+The provided extra_config object will completely replace the existing configuration;
+existing keys not present in the new extra_config will be removed.
+All users in this domain will be affected by these settings when their configurations are merged.
+"""
+input UpsertDomainConfigInput {
+  domainName: String!
+  extraConfig: JSON!
+}
+
+"""
+Added in 25.16.0.
+Payload returned after upserting domain-level app configuration.
+Contains the resulting configuration that was stored.
+"""
+type UpsertDomainConfigPayload {
+  appConfig: AppConfig!
+}
+
+"""
+Added in 25.16.0.
+Input for creating or updating user-level app configuration.
+The provided extra_config object will completely replace the existing configuration;
+existing keys not present in the new extra_config will be removed.
+These settings will override domain-level settings when configurations are merged for this user.
+If user_id is not provided, the current user's configuration will be updated.
+"""
+input UpsertUserConfigInput {
+  extraConfig: JSON!
+  userId: ID = null
+}
+
+"""
+Added in 25.16.0.
+Payload returned after upserting user-level app configuration.
+Contains the resulting configuration that was stored.
+"""
+type UpsertUserConfigPayload {
+  appConfig: AppConfig!
 }
 
 extend type UserNode @key(fields: "id") {

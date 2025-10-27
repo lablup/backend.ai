@@ -22,10 +22,9 @@ from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
-from ai.backend.common.exception import ScalingGroupNotFoundError
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.errors.resource import ScalingGroupDeletionFailure
+from ai.backend.manager.errors.resource import ScalingGroupDeletionFailure, ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import execute_with_txn_retry
@@ -133,7 +132,7 @@ class ScalingGroupNode(graphene.ObjectType):
             )
             result = await db_session.scalar(query_stmt)
             if result is None:
-                raise ScalingGroupNotFoundError()
+                raise ScalingGroupNotFound(f"Scaling group not found: {scaling_group_name}")
             return ScalingGroupNode.from_row(graph_ctx, result)
 
     @classmethod
