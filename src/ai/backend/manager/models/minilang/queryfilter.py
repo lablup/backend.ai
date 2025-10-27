@@ -61,11 +61,7 @@ WhereClauseType: TypeAlias = (
 
 
 class QueryFilterTransformer(Transformer):
-    def __init__(
-        self,
-        sa_table: sa.Table,
-        fieldspec: Optional[FieldSpecType] = None,
-    ) -> None:
+    def __init__(self, sa_table: sa.Table, fieldspec: Optional[FieldSpecType] = None) -> None:
         super().__init__()
         self._sa_table = sa_table
         self._fieldspec = fieldspec
@@ -116,7 +112,6 @@ class QueryFilterTransformer(Transformer):
         children: list[Token] = args[0]
         col_name = children[0].value
         op = children[1].value
-
         val = self._transform_val(col_name, op, children[2])
 
         def build_expr(op: str, col, val):
@@ -205,8 +200,6 @@ class QueryFilterTransformer(Transformer):
         op = children[1].value
         expr1 = children[0]
         expr2 = children[2]
-
-        # Handle None operands (excluded fields) to preserve logical identity
         if op == "&":
             return sa.and_(expr1, expr2)
         elif op == "|":
@@ -228,22 +221,8 @@ class QueryFilterParser:
         table,
         filter_expr: str,
     ) -> WhereClauseType:
-        """
-        Parse filter expression and build WHERE clause.
-
-        Args:
-            table: SQLAlchemy table to parse against
-            filter_expr: Filter expression string
-            exclude_fields: Optional set of field names to exclude from parsing.
-                          Fields in this set will be ignored during parsing.
-
-        Returns:
-            WHERE clause for SQLAlchemy query
-        """
         try:
             ast = self._parser.parse(filter_expr)
-            # Pass exclude_fields to transformer so it can skip generating SQL for them
-            # but keep them in fieldspec for validation
             where_clause = QueryFilterTransformer(table, self._fieldspec).transform(ast)
         except LarkError as e:
             raise ValueError(f"Query filter parsing error: {e}")
@@ -257,14 +236,6 @@ class QueryFilterParser:
         """
         Parse the given filter expression and build the where clause based on the first target table from
         the given SQLAlchemy query object.
-
-        Args:
-            sa_query: SQLAlchemy query object
-            filter_expr: Filter expression string
-            exclude_fields: Optional set of field names to exclude from parsing
-
-        Returns:
-            Updated SQLAlchemy query with WHERE clause
         """
         if isinstance(sa_query, sa.sql.Select):
             table = sa_query.froms[0]
