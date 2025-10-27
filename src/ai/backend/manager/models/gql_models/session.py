@@ -33,6 +33,7 @@ from ai.backend.common.types import (
     SessionResult,
     VFolderMount,
 )
+from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import ReportInfo
@@ -453,8 +454,10 @@ class ComputeSessionNode(graphene.ObjectType):
         self, info: graphene.ResolveInfo, **kwargs
     ) -> Optional["ComputeSessionNode"]:
         # TODO: Confirm if scope and permsission are correct
+        # Parse the global ID from Federation (converts base64 encoded string to tuple)
+        resolved_id = resolve_global_id(self.id)
         return await ComputeSessionNode.get_accessible_node(
-            info, self.id, SystemScope(), ComputeSessionPermission.READ_ATTRIBUTE
+            info, resolved_id, SystemScope(), ComputeSessionPermission.READ_ATTRIBUTE
         )
 
     async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> dict[str, Any] | None:

@@ -43,7 +43,7 @@ class AppConfigService:
 
     async def get_domain_config(self, action: GetDomainConfigAction) -> GetDomainConfigActionResult:
         """Get domain-level app configuration."""
-        log.info("Getting domain config for: {}", action.domain_name)
+        log.debug("Getting domain config for: {}", action.domain_name)
         config_data = await self._app_config_repository.get_config(
             AppConfigScopeType.DOMAIN,
             action.domain_name,
@@ -54,7 +54,7 @@ class AppConfigService:
         self, action: UpsertDomainConfigAction
     ) -> UpsertDomainConfigActionResult:
         """Create or update domain-level app configuration."""
-        log.info("Upserting domain config for: {}", action.domain_name)
+        log.debug("Upserting domain config for: {}", action.domain_name)
         config_data = await self._app_config_repository.upsert_config(
             AppConfigScopeType.DOMAIN,
             action.domain_name,
@@ -66,7 +66,7 @@ class AppConfigService:
         self, action: DeleteDomainConfigAction
     ) -> DeleteDomainConfigActionResult:
         """Delete domain-level app configuration."""
-        log.info("Deleting domain config for: {}", action.domain_name)
+        log.debug("Deleting domain config for: {}", action.domain_name)
         deleted = await self._app_config_repository.delete_config(
             AppConfigScopeType.DOMAIN,
             action.domain_name,
@@ -80,7 +80,7 @@ class AppConfigService:
 
     async def get_user_config(self, action: GetUserConfigAction) -> GetUserConfigActionResult:
         """Get user-level app configuration."""
-        log.info("Getting user config for: {}", action.user_id)
+        log.debug("Getting user config for: {}", action.user_id)
         config_data = await self._app_config_repository.get_config(
             AppConfigScopeType.USER,
             action.user_id,
@@ -91,7 +91,7 @@ class AppConfigService:
         self, action: UpsertUserConfigAction
     ) -> UpsertUserConfigActionResult:
         """Create or update user-level app configuration."""
-        log.info("Upserting user config for: {}", action.user_id)
+        log.debug("Upserting user config for: {}", action.user_id)
         config_data = await self._app_config_repository.upsert_config(
             AppConfigScopeType.USER,
             action.user_id,
@@ -103,7 +103,7 @@ class AppConfigService:
         self, action: DeleteUserConfigAction
     ) -> DeleteUserConfigActionResult:
         """Delete user-level app configuration."""
-        log.info("Deleting user config for: {}", action.user_id)
+        log.debug("Deleting user config for: {}", action.user_id)
         deleted = await self._app_config_repository.delete_config(
             AppConfigScopeType.USER,
             action.user_id,
@@ -122,7 +122,7 @@ class AppConfigService:
         Get merged app configuration for a user.
         Domain config is merged with user config (user overrides domain).
         """
-        log.info("Getting merged app config for user: {}", action.user_id)
+        log.debug("Getting merged app config for user: {}", action.user_id)
         merged_config = await self._app_config_repository.get_merged_config(action.user_id)
         return GetMergedAppConfigActionResult(
             user_id=action.user_id,

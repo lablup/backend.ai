@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.common.jwt.validator import JWTValidator
     from ai.backend.common.leader import ValkeyLeaderElection
     from ai.backend.common.message_queue.queue import AbstractMessageQueue
     from ai.backend.common.metrics.metric import CommonMetricRegistry
@@ -75,6 +76,7 @@ class RootContext(BaseContext):
     valkey_bgtask: ValkeyBgtaskClient
     config_provider: ManagerConfigProvider
     cors_options: CORSOptions
+    jwt_validator: JWTValidator
 
     webapp_plugin_ctx: WebappPluginContext
     idle_checker_host: IdleCheckerHost

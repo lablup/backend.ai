@@ -1,38 +1,34 @@
 import { defineConfig, WSTransportOptions, type GatewayPlugin } from '@graphql-hive/gateway';
 
-// Custom plugin to convert WebSocket connectionParams to HTTP headers
-// This allows authentication parameters sent via WebSocket connection_init
-// to be forwarded as HTTP headers when the gateway makes federation requests to subgraphs
+// Custom plugin to forward headers from context to subgraph requests
+// This ensures headers (including JWT tokens) are included in each GraphQL operation
+// execution after the WebSocket connection is established.
+// Note: For WebSocket handshake authentication, the 'headers' option in transportEntries is used.
 const useConnectionParamsToHeadersPlugin = (): GatewayPlugin => {
   return {
     onSubgraphExecute({ executionRequest, executor, setExecutor }) {
-      // Access WebSocket connectionParams from context
-      const connectionParams = executionRequest.context?.connectionParams;
+      // Always wrap executor to forward headers from context
+      const originalExecutor = executor;
+      const wrappedExecutor = async (execRequest: any) => {
+        // Extract headers from execution request context
+        let reqHeaders = execRequest.context.headers || {};
+        let new_headers = {};
+        if (reqHeaders["x-backendai-token"]) {
+          new_headers = {
+            "x-backendai-token": reqHeaders["x-backendai-token"]
+          };
+        }
 
-      if (connectionParams && typeof connectionParams === 'object') {
-        // Wrap executor to inject connectionParams as HTTP headers
-        const originalExecutor = executor;
-        const wrappedExecutor = async (execRequest: any) => {
-          // Extract Authorization header from context if it exists
-          let reqHeaders = execRequest.context.headers || {};
-          delete reqHeaders['content-length'];
-          // Merge connectionParams with Authorization (if present)
-          const mergedHeaders = {
-            ...reqHeaders,
-            ...connectionParams,
-          };
-          const modifiedRequest = {
-            ...execRequest,
-            extensions: {
-              ...execRequest.extensions,
-              headers: mergedHeaders,
-            },
-          };
-          return originalExecutor(modifiedRequest);
+        const modifiedRequest = {
+          ...execRequest,
+          extensions: {
+            headers: new_headers,
+          },
         };
+        return originalExecutor(modifiedRequest);
+      };
 
-        setExecutor(wrappedExecutor);
-      }
+      setExecutor(wrappedExecutor);
     },
   };
 };
@@ -63,14 +59,18 @@ export const gatewayConfig = defineConfig({
       // Location points to the manager's GraphQL path
       // This is configured for halfstack's Docker environment
       // NOTE: This must be changed in production environments
+      // NOTE: STRAWBERRY supports WebSocket subscriptions
       location: 'http://host.docker.internal:8091/admin/gql/strawberry',
     },
     '*.http': {
       options: {
         subscriptions: {
           kind: 'ws',
-        }
+          headers: [
+            ['x-backendai-token', '{context.headers.x-backendai-token}']
+          ]
+        },
       }
-    }
+    },
   },
 });

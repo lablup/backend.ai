@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timedelta, timezone
-from uuid import uuid4
 
 import jwt as pyjwt
 import pytest
@@ -19,11 +18,15 @@ from ai.backend.common.types import AccessKey
 def jwt_config() -> JWTConfig:
     """Create test JWT configuration."""
     return JWTConfig(
-        secret_key="test-secret-key-at-least-32-bytes-long",
         algorithm="HS256",
         token_expiration_seconds=900,
-        issuer="backend.ai-webserver",
     )
+
+
+@pytest.fixture
+def test_secret_key() -> str:
+    """Create test secret key."""
+    return "test-secret-key-at-least-32-bytes-long"
 
 
 @pytest.fixture
@@ -36,12 +39,8 @@ def jwt_signer(jwt_config: JWTConfig) -> JWTSigner:
 def user_context() -> JWTUserContext:
     """Create test user context."""
     return JWTUserContext(
-        user_id=uuid4(),
         access_key=AccessKey("AKIAIOSFODNN7EXAMPLE"),
         role="user",
-        domain_name="default",
-        is_admin=False,
-        is_superadmin=False,
     )
 
 
@@ -49,9 +48,10 @@ def test_generate_token_creates_valid_jwt(
     jwt_signer: JWTSigner,
     jwt_config: JWTConfig,
     user_context: JWTUserContext,
+    test_secret_key: str,
 ) -> None:
     """Test that generate_token creates a valid JWT token."""
-    token = jwt_signer.generate_token(user_context)
+    token = jwt_signer.generate_token(user_context, test_secret_key)
 
     # Verify token is a string
     assert isinstance(token, str)
@@ -64,54 +64,45 @@ def test_generate_token_creates_valid_jwt(
     )
 
     # Verify claims are present
-    assert "sub" in decoded
     assert "exp" in decoded
     assert "iat" in decoded
-    assert "iss" in decoded
     assert "access_key" in decoded
     assert "role" in decoded
-    assert "domain_name" in decoded
-    assert "is_admin" in decoded
-    assert "is_superadmin" in decoded
 
 
 def test_generate_token_includes_user_data(
     jwt_signer: JWTSigner,
     jwt_config: JWTConfig,
     user_context: JWTUserContext,
+    test_secret_key: str,
 ) -> None:
     """Test that generated token includes all user context data."""
-    token = jwt_signer.generate_token(user_context)
+    token = jwt_signer.generate_token(user_context, test_secret_key)
 
     decoded = pyjwt.decode(
         token,
-        jwt_config.secret_key,
+        test_secret_key,
         algorithms=[jwt_config.algorithm],
-        issuer=jwt_config.issuer,
     )
 
-    assert decoded["sub"] == str(user_context.user_id)
     assert decoded["access_key"] == str(user_context.access_key)
     assert decoded["role"] == user_context.role
-    assert decoded["domain_name"] == user_context.domain_name
-    assert decoded["is_admin"] == user_context.is_admin
-    assert decoded["is_superadmin"] == user_context.is_superadmin
-    assert decoded["iss"] == jwt_config.issuer
 
 
 def test_generate_token_sets_expiration(
     jwt_signer: JWTSigner,
     jwt_config: JWTConfig,
     user_context: JWTUserContext,
+    test_secret_key: str,
 ) -> None:
     """Test that generated token has correct expiration time."""
     before_generation = datetime.now(timezone.utc)
-    token = jwt_signer.generate_token(user_context)
+    token = jwt_signer.generate_token(user_context, test_secret_key)
     after_generation = datetime.now(timezone.utc)
 
     decoded = pyjwt.decode(
         token,
-        jwt_config.secret_key,
+        test_secret_key,
         algorithms=[jwt_config.algorithm],
     )
 
@@ -127,15 +118,16 @@ def test_generate_token_sets_issued_at(
     jwt_signer: JWTSigner,
     jwt_config: JWTConfig,
     user_context: JWTUserContext,
+    test_secret_key: str,
 ) -> None:
     """Test that generated token has correct issued-at time."""
     before_generation = datetime.now(timezone.utc)
-    token = jwt_signer.generate_token(user_context)
+    token = jwt_signer.generate_token(user_context, test_secret_key)
     after_generation = datetime.now(timezone.utc)
 
     decoded = pyjwt.decode(
         token,
-        jwt_config.secret_key,
+        test_secret_key,
         algorithms=[jwt_config.algorithm],
     )
 
@@ -152,69 +144,60 @@ def test_generate_token_sets_issued_at(
 def test_generate_token_with_admin_user(
     jwt_signer: JWTSigner,
     jwt_config: JWTConfig,
+    test_secret_key: str,
 ) -> None:
     """Test token generation for admin user."""
     admin_context = JWTUserContext(
-        user_id=uuid4(),
         access_key=AccessKey("AKIAADMIN123456789"),
         role="admin",
-        domain_name="admin-domain",
-        is_admin=True,
-        is_superadmin=False,
     )
 
-    token = jwt_signer.generate_token(admin_context)
+    token = jwt_signer.generate_token(admin_context, test_secret_key)
 
     decoded = pyjwt.decode(
         token,
-        jwt_config.secret_key,
+        test_secret_key,
         algorithms=[jwt_config.algorithm],
     )
 
     assert decoded["role"] == "admin"
-    assert decoded["is_admin"] is True
-    assert decoded["is_superadmin"] is False
 
 
 def test_generate_token_with_superadmin_user(
     jwt_signer: JWTSigner,
     jwt_config: JWTConfig,
+    test_secret_key: str,
 ) -> None:
     """Test token generation for superadmin user."""
     superadmin_context = JWTUserContext(
-        user_id=uuid4(),
         access_key=AccessKey("AKIASUPERADMIN123456"),
         role="superadmin",
-        domain_name="super-domain",
-        is_admin=True,
-        is_superadmin=True,
     )
 
-    token = jwt_signer.generate_token(superadmin_context)
+    token = jwt_signer.generate_token(superadmin_context, test_secret_key)
 
     decoded = pyjwt.decode(
         token,
-        jwt_config.secret_key,
+        test_secret_key,
         algorithms=[jwt_config.algorithm],
     )
 
     assert decoded["role"] == "superadmin"
-    assert decoded["is_admin"] is True
-    assert decoded["is_superadmin"] is True
 
 
 def test_generate_token_signature_verification(
     jwt_signer: JWTSigner,
     jwt_config: JWTConfig,
     user_context: JWTUserContext,
+    test_secret_key: str,
 ) -> None:
     """Test that generated token can be verified with correct secret."""
-    token = jwt_signer.generate_token(user_context)
+    token = jwt_signer.generate_token(user_context, test_secret_key)
 
     # Should not raise exception
     pyjwt.decode(
         token,
-        jwt_config.secret_key,
+        test_secret_key,
         algorithms=[jwt_config.algorithm],
     )
 
@@ -222,9 +205,10 @@ def test_generate_token_signature_verification(
 def test_generate_token_wrong_secret_fails_verification(
     jwt_signer: JWTSigner,
     user_context: JWTUserContext,
+    test_secret_key: str,
 ) -> None:
     """Test that token fails verification with wrong secret."""
-    token = jwt_signer.generate_token(user_context)
+    token = jwt_signer.generate_token(user_context, test_secret_key)
 
     with pytest.raises(pyjwt.InvalidSignatureError):
         pyjwt.decode(
@@ -237,12 +221,13 @@ def test_generate_token_wrong_secret_fails_verification(
 def test_multiple_tokens_are_different(
     jwt_signer: JWTSigner,
     user_context: JWTUserContext,
+    test_secret_key: str,
 ) -> None:
     """Test that generating multiple tokens produces different tokens."""
-    token1 = jwt_signer.generate_token(user_context)
+    token1 = jwt_signer.generate_token(user_context, test_secret_key)
     # Sleep to ensure different timestamps (JWT uses second precision)
     time.sleep(1.1)
-    token2 = jwt_signer.generate_token(user_context)
+    token2 = jwt_signer.generate_token(user_context, test_secret_key)
 
     # Tokens should be different due to different iat/exp timestamps
     assert token1 != token2

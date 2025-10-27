@@ -6,7 +6,6 @@ import jwt
 from jwt.exceptions import (
     DecodeError,
     ExpiredSignatureError,
-    InvalidIssuerError,
     InvalidSignatureError,
 )
 
@@ -28,10 +27,14 @@ class JWTValidator:
     Hive Router via the X-BackendAI-Token header. It verifies the token's
     signature, expiration, and claims.
 
+    Note: JWT tokens are signed using per-user secret keys (from keypair table),
+    not a shared system secret key. This maintains the same security model as HMAC authentication.
+
     Usage:
-        config = JWTConfig(secret_key="your-secret-key")
+        config = JWTConfig()
         validator = JWTValidator(config)
-        claims = validator.validate_token(token_string)
+        # Get user's secret key from keypair table after extracting access_key from token
+        claims = validator.validate_token(token_string, secret_key)
     """
 
     _config: JWTConfig
@@ -41,22 +44,22 @@ class JWTValidator:
         Initialize JWT validator with configuration.
 
         Args:
-            config: JWT configuration containing secret key and validation settings
+            config: JWT configuration containing algorithm and validation settings
         """
         self._config = config
 
-    def validate_token(self, token: str) -> JWTClaims:
+    def validate_token(self, token: str, secret_key: str) -> JWTClaims:
         """
         Validate JWT token and extract claims.
 
         This method performs comprehensive validation:
-        1. Verifies the token signature using the configured secret key
+        1. Verifies the token signature using the user's secret key
         2. Checks token expiration
-        3. Validates the issuer claim
-        4. Ensures all required claims are present and valid
+        3. Ensures all required claims are present and valid
 
         Args:
             token: Encoded JWT token string
+            secret_key: User's secret key from keypair table for signature verification
 
         Returns:
             JWTClaims object containing validated user information
@@ -71,14 +74,12 @@ class JWTValidator:
             # Decode and verify token
             payload = jwt.decode(
                 token,
-                self._config.secret_key,
+                secret_key,
                 algorithms=[self._config.algorithm],
-                issuer=self._config.issuer,
                 options={
                     "verify_signature": True,
                     "verify_exp": True,
                     "verify_iat": True,
-                    "verify_iss": True,
                 },
             )
 
@@ -94,8 +95,6 @@ class JWTValidator:
             raise JWTExpiredError("JWT token has expired") from e
         except InvalidSignatureError as e:
             raise JWTInvalidSignatureError("JWT signature verification failed") from e
-        except InvalidIssuerError as e:
-            raise JWTInvalidClaimsError(f"Invalid issuer: {e}") from e
         except (KeyError, ValueError, TypeError) as e:
             raise JWTInvalidClaimsError(f"JWT claims are invalid: {e}") from e
         except DecodeError as e:
@@ -105,8 +104,7 @@ class JWTValidator:
         """
         Validate claim values meet requirements.
 
-        Ensures that role is one of the expected values and that the issuer
-        matches the configured value.
+        Ensures that role is one of the expected values.
 
         Args:
             claims: Parsed JWT claims to validate
@@ -119,10 +117,4 @@ class JWTValidator:
         if claims.role not in valid_roles:
             raise JWTInvalidClaimsError(
                 f"Invalid role: {claims.role}. Must be one of {valid_roles}"
-            )
-
-        # Validate issuer matches expected value
-        if claims.iss != self._config.issuer:
-            raise JWTInvalidClaimsError(
-                f"Invalid issuer: expected '{self._config.issuer}', got '{claims.iss}'"
             )
