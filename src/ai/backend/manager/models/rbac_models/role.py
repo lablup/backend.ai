@@ -104,7 +104,7 @@ class RoleRow(Base):
             updated_at=self.updated_at,
             deleted_at=self.deleted_at,
             description=self.description,
-            permission_groups=[pg_row.to_data() for pg_row in self.permission_group_rows],
+            permission_groups=[pg_row.to_extended_data() for pg_row in self.permission_group_rows],
             object_permissions=[op_row.to_data() for op_row in self.object_permission_rows],
         )
 
