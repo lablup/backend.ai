@@ -17,6 +17,7 @@ from ai.backend.common.types import SessionId, ValkeyTarget
 
 PENDING_QUEUE_EXPIRY_SEC = 600  # 10 minutes
 ROUTE_HEALTH_TTL_SEC = 120  # 2 minutes
+MAX_HEALTH_STALENESS_SEC = 300  # 5 minutes - threshold for health status staleness
 
 
 # Layer-specific decorator for valkey_schedule client
@@ -110,7 +111,24 @@ class ValkeyScheduleClient:
         """
         return f"route:health:{route_id}"
 
-    @valkey_decorator()
+    def _is_health_status_valid(self, status: str, timestamp_str: str) -> bool:
+        """
+        Check if health status is healthy and timestamp is not stale.
+
+        :param status: The status string ("1" for healthy, "0" for unhealthy)
+        :param timestamp_str: The timestamp string value from Redis
+        :return: True if status is healthy and timestamp is not stale, False otherwise
+        """
+        if status != "1":
+            return False
+        try:
+            timestamp = int(timestamp_str)
+            current_time = int(time())
+            return (current_time - timestamp) <= MAX_HEALTH_STALENESS_SEC
+        except (ValueError, TypeError):
+            return False
+
+    @valkey_schedule_resilience.apply()
     async def mark_schedule_needed(self, schedule_type: str) -> None:
         """
         Mark that scheduling is needed for the given schedule type.
@@ -285,9 +303,13 @@ class ValkeyScheduleClient:
         # Convert bytes to strings and parse
         data = {k.decode(): v.decode() for k, v in result.items()}
 
-        # Parse boolean values and timestamp
-        readiness = data.get("readiness") == "1"
-        liveness = data.get("liveness") == "1"
+        # Parse boolean values using validation helper (checks both status and staleness)
+        readiness = self._is_health_status_valid(
+            data.get("readiness", "0"), data.get("last_readiness", "0")
+        )
+        liveness = self._is_health_status_valid(
+            data.get("liveness", "0"), data.get("last_liveness", "0")
+        )
         last_check = int(data["last_check"]) if "last_check" in data else 0
 
         return HealthStatus(readiness=readiness, liveness=liveness, last_check=last_check)
@@ -313,6 +335,7 @@ class ValkeyScheduleClient:
                 "readiness": "0",
                 "liveness": "0",
                 "last_check": current_time,
+                # last_readiness and last_liveness are not set until first health check
             }
             batch.hset(key, data)
             batch.expire(key, ROUTE_HEALTH_TTL_SEC)
@@ -329,7 +352,10 @@ class ValkeyScheduleClient:
         :param readiness: Whether the route is ready
         """
         key = self._get_route_health_key(route_id)
-        data: Mapping[str | bytes, str | bytes] = {"readiness": "1" if readiness else "0"}
+        data: Mapping[str | bytes, str | bytes] = {
+            "readiness": "1" if readiness else "0",
+            "last_readiness": str(int(time())),
+        }
 
         batch = Batch(is_atomic=False)
         batch.hset(key, data)
@@ -346,7 +372,10 @@ class ValkeyScheduleClient:
         :param liveness: Whether the route is alive
         """
         key = self._get_route_health_key(route_id)
-        data: Mapping[str | bytes, str | bytes] = {"liveness": "1" if liveness else "0"}
+        data: Mapping[str | bytes, str | bytes] = {
+            "liveness": "1" if liveness else "0",
+            "last_liveness": str(int(time())),
+        }
 
         batch = Batch(is_atomic=False)
         batch.hset(key, data)
@@ -398,9 +427,14 @@ class ValkeyScheduleClient:
 
             # Parse existing data
             data = {k.decode(): v.decode() for k, v in result.items()}
+            # Parse boolean values using validation helper (checks both status and staleness)
             health_statuses[route_id] = HealthStatus(
-                readiness=data.get("readiness") == "1",
-                liveness=data.get("liveness") == "1",
+                readiness=self._is_health_status_valid(
+                    data.get("readiness", "0"), data.get("last_readiness", "0")
+                ),
+                liveness=self._is_health_status_valid(
+                    data.get("liveness", "0"), data.get("last_liveness", "0")
+                ),
                 last_check=int(data["last_check"]) if "last_check" in data else 0,
             )
 
@@ -417,10 +451,14 @@ class ValkeyScheduleClient:
         if not route_readiness:
             return
 
+        current_time = str(int(time()))
         batch = Batch(is_atomic=False)
         for route_id, readiness in route_readiness.items():
             key = self._get_route_health_key(route_id)
-            data: Mapping[str | bytes, str | bytes] = {"readiness": "1" if readiness else "0"}
+            data: Mapping[str | bytes, str | bytes] = {
+                "readiness": "1" if readiness else "0",
+                "last_readiness": current_time,
+            }
             batch.hset(key, data)
             batch.expire(key, ROUTE_HEALTH_TTL_SEC)
 
