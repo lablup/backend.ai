@@ -19,21 +19,23 @@ class JWTSigner:
     HMAC authentication. The generated tokens are then forwarded to the manager
     via Hive Router using the X-BackendAI-Token header.
 
+    Note: JWT tokens are signed using per-user secret keys (from keypair table),
+    not a shared system secret key. This maintains the same security model as HMAC authentication.
+
     Usage:
         from ai.backend.common.jwt import JWTSigner, JWTConfig, JWTUserContext
 
-        config = JWTConfig(secret_key="your-secret-key")
+        config = JWTConfig()
         signer = JWTSigner(config)
 
         user_context = JWTUserContext(
             user_id=user_uuid,
             access_key=access_key,
             role="user",
-            domain_name="default",
-            is_admin=False,
-            is_superadmin=False,
         )
-        token = signer.generate_token(user_context)
+        # Get user's secret key from keypair table
+        secret_key = keypair.secret_key
+        token = signer.generate_token(user_context, secret_key)
     """
 
     _config: JWTConfig
@@ -43,19 +45,20 @@ class JWTSigner:
         Initialize JWT signer with configuration.
 
         Args:
-            config: JWT configuration containing secret key and other settings
+            config: JWT configuration containing algorithm and expiration settings
         """
         self._config = config
 
-    def generate_token(self, user_context: JWTUserContext) -> str:
+    def generate_token(self, user_context: JWTUserContext, secret_key: str) -> str:
         """
         Generate a JWT token from authenticated user context.
 
-        This method creates a JWT token containing all necessary user authentication
-        information. The token is signed using HS256 with the configured secret key.
+        This method creates a JWT token containing minimal user authentication
+        information. The token is signed using HS256 with the user's secret key.
 
         Args:
             user_context: User context data containing authentication information
+            secret_key: User's secret key from keypair table for signing the token
 
         Returns:
             Encoded JWT token string
@@ -66,21 +69,16 @@ class JWTSigner:
         now = datetime.now(timezone.utc)
 
         claims = JWTClaims(
-            sub=user_context.user_id,
             exp=now + self._config.token_expiration,
             iat=now,
-            iss=self._config.issuer,
             access_key=user_context.access_key,
             role=user_context.role,
-            domain_name=user_context.domain_name,
-            is_admin=user_context.is_admin,
-            is_superadmin=user_context.is_superadmin,
         )
 
         try:
             return jwt.encode(
                 claims.to_dict(),
-                self._config.secret_key,
+                secret_key,
                 algorithm=self._config.algorithm,
             )
         except Exception as e:

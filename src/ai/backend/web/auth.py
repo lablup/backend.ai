@@ -6,6 +6,9 @@ from aiohttp import web
 from ai.backend.client.config import APIConfig
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
+from ai.backend.common.jwt.signer import JWTSigner
+from ai.backend.common.jwt.types import JWTUserContext
+from ai.backend.common.types import AccessKey
 from ai.backend.common.web.session import get_session
 from ai.backend.web.config.unified import WebServerUnifiedConfig
 
@@ -116,3 +119,73 @@ def fill_forwarding_hdrs_to_api_session(
     if client_ip:
         _headers["X-Forwarded-For"] = client_ip
         api_session.aiohttp_session.headers.update(_headers)
+
+
+async def generate_jwt_token_for_session(
+    request: web.Request,
+) -> str:
+    """
+    Generate JWT token from current web session.
+
+    Reads user information from the web session and generates a JWT token
+    that can be used for authentication with the Backend.AI Manager API.
+
+    Args:
+        request: The web request containing the session information
+
+    Returns:
+        Generated JWT token string
+
+    Raises:
+        web.HTTPUnauthorized: If session is not authenticated or token info is missing
+        web.HTTPBadRequest: If token type is incompatible
+    """
+
+    config = cast(WebServerUnifiedConfig, request.app["config"])
+    session = await get_session(request)
+
+    # Validate session authentication
+    if not session.get("authenticated", False):
+        raise web.HTTPUnauthorized(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/auth-failed",
+                "title": "Unauthorized access",
+            }),
+            content_type="application/problem+json",
+        )
+
+    if "token" not in session:
+        raise web.HTTPUnauthorized(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/auth-failed",
+                "title": "Unauthorized access",
+            }),
+            content_type="application/problem+json",
+        )
+
+    token = session["token"]
+    if token["type"] != "keypair":
+        raise web.HTTPBadRequest(
+            text=json.dumps({
+                "type": "https://api.backend.ai/probs/invalid-auth-params",
+                "title": "Incompatible auth token type.",
+            }),
+            content_type="application/problem+json",
+        )
+
+    # Extract user information from session
+    access_key = AccessKey(token["access_key"])
+    secret_key = token["secret_key"]
+    role = session.get("role", "user")
+
+    # Create JWT user context (minimal information)
+    # user_id, domain_name, is_admin, is_superadmin will be retrieved from user table during authentication
+    user_context = JWTUserContext(
+        access_key=access_key,
+        role=role,
+    )
+
+    # Generate JWT token using user's secret key
+    jwt_config = config.jwt.to_jwt_config()
+    jwt_signer = JWTSigner(jwt_config)
+    return jwt_signer.generate_token(user_context, secret_key)

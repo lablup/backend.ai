@@ -55,7 +55,13 @@ from ai.backend.web.security import SecurityPolicy, security_policy_middleware
 
 from . import __version__, user_agent
 from .auth import fill_forwarding_hdrs_to_api_session, get_client_ip
-from .proxy import decrypt_payload, web_handler, web_plugin_handler, websocket_handler
+from .proxy import (
+    decrypt_payload,
+    web_handler,
+    web_handler_with_jwt,
+    web_plugin_handler,
+    websocket_handler,
+)
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
@@ -820,7 +826,10 @@ async def webapp_ctx(
 
     # Feature flag for using Apollo Router(Graphql Federation)
     if config.apollo_router.enabled:
-        supergraph_handler = partial(web_handler, api_endpoint=str(config.apollo_router.endpoint))
+        # Use JWT authentication for Apollo Router if enabled, otherwise use HMAC
+        supergraph_handler = partial(
+            web_handler_with_jwt, api_endpoint=str(config.apollo_router.endpoint)
+        )
         cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
 

@@ -2046,10 +2046,13 @@ type ScanArtifactsPayload {
 
 """Added in 25.15.0. Scheduling event broadcast payload"""
 type SchedulingBroadcastEventPayload {
-  sessionId: ID!
-  creationId: String!
   statusTransition: SchedulingStatus!
   reason: String!
+
+  """
+  The session ID associated with the replica. This can be null right after replica creation.
+  """
+  session: ComputeSessionNode!
 }
 
 """Status of session scheduling transitions"""

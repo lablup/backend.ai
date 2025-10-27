@@ -47,6 +47,11 @@ Alias keys are also URL-quoted in the same way.
        + resources
          - group_resource_visibility: "true"  # return group resource status in check-presets
                                               # (default: false)
+     + jwt
+       - secret-key: "..."                     # JWT signing secret key (min 32 chars)
+       - algorithm: "HS256"                    # JWT signing algorithm (HS256, HS384, HS512)
+       - token-expiration-seconds: 900         # JWT token TTL in seconds (default: 15min)
+       - issuer: "backend.ai"                  # JWT issuer identifier (shared by manager & webserver)
      + docker
        + image
          - auto_pull: "digest" (default) | "tag" | "none"
@@ -190,6 +195,7 @@ from pydantic import (
 )
 
 from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
@@ -2011,6 +2017,14 @@ class ManagerUnifiedConfig(BaseConfigSchema):
         description="""
         Authentication settings.
         Controls password policies and other security measures.
+        """,
+    )
+    jwt: SharedJWTConfig = Field(
+        default_factory=SharedJWTConfig,
+        description="""
+        JWT authentication configuration.
+        Shared configuration for JWT token signing and verification.
+        Used by both manager and webserver for stateless authentication.
         """,
     )
     session: SessionConfig = Field(

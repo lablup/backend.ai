@@ -75,6 +75,7 @@ from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.exception import BackendAIError, ErrorCode
 from ai.backend.common.json import dump_json_str
+from ai.backend.common.jwt.validator import JWTValidator
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -1699,6 +1700,10 @@ async def server_main(
         await manager_init_stack.enter_async_context(
             config_provider_ctx(root_ctx, args.log_level, args.bootstrap_cfg_path)
         )
+
+        # Initialize JWT validator after config is loaded
+        jwt_config = root_ctx.config_provider.config.jwt.to_jwt_config()
+        root_ctx.jwt_validator = JWTValidator(jwt_config)
 
         # Plugin webapps should be loaded before runner.setup() because root_app is frozen upon on_startup event.
         await manager_init_stack.enter_async_context(webapp_plugin_ctx(root_app))
