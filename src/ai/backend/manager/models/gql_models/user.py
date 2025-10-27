@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -27,6 +28,7 @@ from ai.backend.manager.data.user.types import (
     UserInfoContext,
 )
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.minilang import ExternalTableFilterSpec, ORMFieldItem
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -216,7 +218,21 @@ class UserNode(graphene.ObjectType):
         "totp_activated_at": ("totp_activated_at", dtparse),
         "sudo_session_enabled": ("sudo_session_enabled", None),
         "main_access_key": ("main_access_key", None),
-        "project_name": ("project_name", None),
+    }
+
+    # External table filter specifications
+    # These define filters on related tables that require JOINs
+    _external_table_filters: Mapping[str, ExternalTableFilterSpec] = {
+        "project_name": ExternalTableFilterSpec(
+            field_name="project_name",
+            target_table=cast(sa.Table, GroupRow.__table__),
+            target_column="name",
+            join_builder=lambda base_table: sa.join(
+                base_table,
+                AssocGroupUserRow,
+                base_table.c.uuid == AssocGroupUserRow.user_id,
+            ).join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id),
+        ),
     }
 
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
@@ -239,6 +255,58 @@ class UserNode(graphene.ObjectType):
         "main_access_key": ("main_access_key", None),
     }
 
+    @staticmethod
+    def _split_filter_by_external_fields(
+        filter_expr: str,
+        external_field_names: set[str],
+    ) -> tuple[str | None, str | None]:
+        """
+        Split filter expression into user table filter and external table filter.
+
+        Args:
+            filter_expr: Original filter expression
+            external_field_names: Set of external field names to split out
+
+        Returns:
+            Tuple of (user_table_filter, external_table_filter)
+            Either or both can be None if no matching fields found
+        """
+        _FIELD_EXPR_PATTERN = r'\b{field}\s*(==|!=|>|>=|<|<=|contains|in|is|isnot|like|ilike)\s*(?:"[^"]*"|\[[^\]]*\]|\'[^\']*\'|\S+)'
+
+        # Extract external field expressions
+        external_parts = []
+        for field_name in external_field_names:
+            pattern = _FIELD_EXPR_PATTERN.format(field=re.escape(field_name))
+            match = re.search(pattern, filter_expr)
+            if match:
+                external_parts.append(match.group(0))
+
+        external_filter = " & ".join(external_parts) if external_parts else None
+
+        # Remove external fields from original filter to get user table filter
+        user_filter = filter_expr
+        for field_name in external_field_names:
+            pattern = _FIELD_EXPR_PATTERN.format(field=re.escape(field_name))
+            user_filter = re.sub(pattern, "", user_filter)
+
+        # Clean up leftover operators and empty parentheses in user filter
+        for _ in range(3):
+            user_filter = re.sub(r"\(\s*[&|]\s*", "(", user_filter)
+            user_filter = re.sub(r"\s*[&|]\s*\)", ")", user_filter)
+            user_filter = re.sub(r"\(\s*\)", "", user_filter)
+            user_filter = re.sub(r"\(\s*\)\s*[&|]\s*", "", user_filter)
+            user_filter = re.sub(r"\s*[&|]\s*\(\s*\)", "", user_filter)
+            user_filter = re.sub(r"\s*&\s*&\s*", " & ", user_filter)
+            user_filter = re.sub(r"\s*\|\s*\|\s*", " | ", user_filter)
+            user_filter = re.sub(r"^\s*[&|]\s*|\s*[&|]\s*$", "", user_filter)
+            user_filter = user_filter.strip()
+
+        user_filter_result: str | None = (
+            user_filter if user_filter and user_filter not in ("&", "|", "()", "") else None
+        )
+
+        return (user_filter_result, external_filter)
+
     @classmethod
     async def get_connection(
         cls,
@@ -253,34 +321,28 @@ class UserNode(graphene.ObjectType):
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
 
-        has_project_filter = False
-        if filter_expr is not None:
-            temp_parser = QueryFilterParser(cls._queryfilter_fieldspec)
-            has_project_filter = temp_parser.has_field(filter_expr, "project_name")
+        # Detect which external table filters are present and split the filter expression
+        external_filters_to_apply: dict[str, ExternalTableFilterSpec] = {}
+        user_table_filter = filter_expr
+        external_table_filter: str | None = None
 
-        project_name_filter_clause = None
-        if has_project_filter:
-            project_fieldspec: Mapping[str, FieldSpecItem] = {
-                "project_name": ("name", None),
+        if filter_expr:
+            external_filters_to_apply = {
+                field_name: spec
+                for field_name, spec in cls._external_table_filters.items()
+                if field_name in filter_expr
             }
-            project_filter_parser = QueryFilterParser(project_fieldspec)
-            user_fields = set(cls._queryfilter_fieldspec.keys())
-            user_fields.discard("project_name")
-            try:
-                project_name_filter_clause = project_filter_parser.parse_filter(
-                    GroupRow.__table__, cast(str, filter_expr), exclude_fields=user_fields
+            if external_filters_to_apply:
+                user_table_filter, external_table_filter = cls._split_filter_by_external_fields(
+                    filter_expr, set(external_filters_to_apply.keys())
                 )
-            except ValueError:
-                # If parsing fails, ignore project_name filter
-                pass
 
         _filter_arg = (
             FilterExprArg(
-                filter_expr,
+                user_table_filter,
                 QueryFilterParser(cls._queryfilter_fieldspec),
-                exclude_fields={"project_name"},
             )
-            if filter_expr is not None
+            if user_table_filter is not None
             else None
         )
         _order_expr = (
@@ -308,17 +370,30 @@ class UserNode(graphene.ObjectType):
             last=last,
         )
 
-        if project_name_filter_clause is not None:
-            j = sa.join(
-                UserRow,
-                AssocGroupUserRow,
-                UserRow.uuid == AssocGroupUserRow.user_id,
-            ).join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id)
+        if external_filters_to_apply and external_table_filter:
+            user_table = cast(sa.Table, UserRow.__table__)
 
-            query = query.select_from(j).where(project_name_filter_clause).distinct()
+            join_clause = user_table
+            for spec in external_filters_to_apply.values():
+                join_clause = spec.join_builder(join_clause)
 
-            cnt_query = sa.select(sa.func.count(sa.distinct(UserRow.uuid))).select_from(j)
-            cnt_query = cnt_query.where(project_name_filter_clause)
+            combined_fieldspec: dict[str, FieldSpecItem] = {}
+            for spec in external_filters_to_apply.values():
+                col = spec.target_table.c[spec.target_column]
+                combined_fieldspec[spec.field_name] = (ORMFieldItem(col), spec.transform)
+
+            parser = QueryFilterParser(combined_fieldspec)
+            ext_clause = parser.parse_filter(join_clause, external_table_filter)
+
+            updated_query = query.select_from(join_clause)
+            if updated_query is not None:
+                query = updated_query.distinct().where(ext_clause)
+
+            cnt_query = (
+                sa.select(sa.func.count(sa.distinct(UserRow.uuid)))
+                .select_from(join_clause)
+                .where(ext_clause)
+            )
             for cond in conditions:
                 cnt_query = cnt_query.where(cond)
 
