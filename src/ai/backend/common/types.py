@@ -23,7 +23,9 @@ from typing import (
     TYPE_CHECKING,
     Annotated,
     Any,
+    Dict,
     Generic,
+    List,
     Literal,
     Mapping,
     NewType,
@@ -284,7 +286,7 @@ def check_typed_tuple(
 ) -> Tuple[T1, T2, T3, T4]: ...
 
 
-def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> tuple:
+def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> Tuple:
     for val, typ in itertools.zip_longest(value, types):
         if typ is not None:
             typeguard.check_type(val, typ)
@@ -398,7 +400,7 @@ class SlotTypes(enum.StrEnum):
 class HardwareMetadata(TypedDict):
     status: Literal["healthy", "degraded", "offline", "unavailable"]
     status_info: Optional[str]
-    metadata: dict[str, str]
+    metadata: Dict[str, str]
 
 
 class AutoPullBehavior(enum.StrEnum):
@@ -475,8 +477,8 @@ class ItemResult(TypedDict):
 
 
 class ResultSet(TypedDict):
-    success: list[ItemResult]
-    failed: list[ItemResult]
+    success: List[ItemResult]
+    failed: List[ItemResult]
 
 
 class AbuseReportValue(enum.StrEnum):
@@ -1037,7 +1039,7 @@ class LegacyResourceSlotState(enum.StrEnum):
 
 class JSONSerializableMixin(metaclass=ABCMeta):
     @abstractmethod
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self) -> Dict[str, Any]:
         raise NotImplementedError
 
     @classmethod
@@ -1151,7 +1153,7 @@ class VFolderMount(JSONSerializableMixin):
     mount_perm: MountPermission
     usage_mode: VFolderUsageMode
 
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self) -> Dict[str, Any]:
         return {
             "name": self.name,
             "vfid": str(self.vfid),
@@ -1213,7 +1215,7 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
             return self
         if not isinstance(other, dict):
             raise ValueError(f"Invalid type. expected `dict` type, got {type(other)} type")
-        union_map: dict[str, set] = defaultdict(set)
+        union_map: Dict[str, set] = defaultdict(set)
         for host, perms in [*self.items(), *other.items()]:
             try:
                 perm_list = [VFolderHostPermission(perm) for perm in perms]
@@ -1222,7 +1224,7 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
             union_map[host] |= set(perm_list)
         return VFolderHostPermissionMap(union_map)
 
-    def to_json(self) -> dict[str, Any]:
+    def to_json(self) -> Dict[str, Any]:
         return {host: [perm.value for perm in perms] for host, perms in self.items()}
 
     @classmethod
@@ -1432,7 +1434,7 @@ class KernelCreationConfig(TypedDict):
     local_rank: int  # the kernel's local rank in the cluster
     uid: Optional[int]
     main_gid: Optional[int]
-    supplementary_gids: list[int]
+    supplementary_gids: List[int]
     resource_slots: Mapping[str, str]  # json form of ResourceSlot
     resource_opts: Mapping[str, Any]  # json form of resource options
     environ: Mapping[str, str]
@@ -1442,8 +1444,8 @@ class KernelCreationConfig(TypedDict):
     bootstrap_script: Optional[str]
     startup_command: Optional[str]
     internal_data: Optional[Mapping[str, Any]]
-    preopen_ports: list[int]
-    allocated_host_ports: list[int]
+    preopen_ports: List[int]
+    allocated_host_ports: List[int]
     scaling_group: str
     agent_addr: str
     endpoint_id: Optional[str]
@@ -1451,7 +1453,7 @@ class KernelCreationConfig(TypedDict):
 
 class SessionEnqueueingConfig(TypedDict):
     creation_config: dict
-    kernel_configs: list[KernelEnqueueingConfig]
+    kernel_configs: List[KernelEnqueueingConfig]
 
 
 class KernelEnqueueingConfig(TypedDict):
@@ -1465,7 +1467,7 @@ class KernelEnqueueingConfig(TypedDict):
     startup_command: Optional[str]
     uid: Optional[int]
     main_gid: Optional[int]
-    supplementary_gids: list[int]
+    supplementary_gids: List[int]
 
 
 def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
@@ -1491,7 +1493,7 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
 @dataclass
 class ValkeyTarget:
     addr: Optional[str] = None
-    sentinel: Optional[list[str]] = None
+    sentinel: Optional[List[str]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
     request_timeout: Optional[int] = None
@@ -1514,7 +1516,7 @@ class ValkeyTarget:
 @dataclass
 class RedisTarget:
     addr: Optional[HostPortPair] = None
-    sentinel: Optional[Union[str, list[HostPortPair]]] = None
+    sentinel: Optional[Union[str, List[HostPortPair]]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
     redis_helper_config: Optional[RedisHelperConfig] = None
@@ -1546,7 +1548,7 @@ class RedisTarget:
 
     def to_valkey_target(self) -> ValkeyTarget:
         addr = str(self.addr) if self.addr else None
-        sentinel_addrs: Optional[list[str]] = None
+        sentinel_addrs: Optional[List[str]] = None
         if self.sentinel:
             sentinel_addrs = None
             if isinstance(self.sentinel, list):
@@ -1577,7 +1579,7 @@ class ValkeyProfileTarget:
         self,
         *,
         addr: Optional[str] = None,
-        sentinel: Optional[list[str]] = None,
+        sentinel: Optional[List[str]] = None,
         service_name: Optional[str] = None,
         password: Optional[str] = None,
         request_timeout: Optional[int] = None,
@@ -1608,7 +1610,7 @@ class RedisProfileTarget:
         self,
         *,
         addr: Optional[HostPortPair] = None,
-        sentinel: Optional[Union[str, list[HostPortPair]]] = None,
+        sentinel: Optional[Union[str, List[HostPortPair]]] = None,
         service_name: Optional[str] = None,
         password: Optional[str] = None,
         redis_helper_config: Optional[RedisHelperConfig] = None,
@@ -1646,7 +1648,7 @@ class RedisProfileTarget:
                 return HostPortPair(addr_data_parts[0], int(addr_data_parts[1]))
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Self:
+    def from_dict(cls, data: Dict[str, Any]) -> Self:
         override_targets = None
         if data.get("override_configs"):
             override_targets = {
@@ -1853,7 +1855,7 @@ ResultType = TypeVar("ResultType")
 @dataclass
 class DispatchResult(Generic[ResultType]):
     result: Optional[ResultType] = None
-    errors: list[str] = field(default_factory=list)
+    errors: List[str] = field(default_factory=list)
 
     def is_success(self) -> bool:
         return not self.errors
@@ -1879,14 +1881,14 @@ class DispatchResult(Generic[ResultType]):
 
     @classmethod
     def partial_success(
-        cls, result_type: ResultType, errors: list[str]
+        cls, result_type: ResultType, errors: List[str]
     ) -> DispatchResult[ResultType]:
         return cls(result=result_type, errors=errors)
 
 
 class PurgeImageResult(TypedDict):
     image: str
-    result: Optional[list[Any]]
+    result: Optional[List[Any]]
     error: Optional[str]
 
 
