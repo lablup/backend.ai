@@ -11,7 +11,7 @@ import textwrap
 import uuid
 from abc import ABC, ABCMeta, abstractmethod
 from collections import UserDict, defaultdict, namedtuple
-from collections.abc import AsyncIterator, Iterable, Mapping, Sequence
+from collections.abc import AsyncIterator, Iterable
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from decimal import Decimal
@@ -25,10 +25,13 @@ from typing import (
     Any,
     Generic,
     Literal,
+    Mapping,
     NewType,
     NotRequired,
     Optional,
     Self,
+    Sequence,
+    Tuple,
     Type,
     TypeAlias,
     TypedDict,
@@ -195,15 +198,7 @@ class aobject(object):
 
 
 class Sentinel(enum.Enum):
-    """
-    A special type to represent a special value to indicate closing/shutdown of queues.
-    """
-
     TOKEN = 0
-
-    def __bool__(self) -> bool:
-        # It should be evaluated as False when used as a boolean expr.
-        return False
 
 
 class QueueSentinel(enum.Enum):
@@ -263,33 +258,33 @@ T4 = TypeVar("T4")
 
 @overload
 def check_typed_tuple(
-    value: tuple[Any],
-    types: tuple[Type[T1]],
-) -> tuple[T1]: ...
+    value: Tuple[Any],
+    types: Tuple[Type[T1]],
+) -> Tuple[T1]: ...
 
 
 @overload
 def check_typed_tuple(
-    value: tuple[Any, Any],
-    types: tuple[Type[T1], Type[T2]],
-) -> tuple[T1, T2]: ...
+    value: Tuple[Any, Any],
+    types: Tuple[Type[T1], Type[T2]],
+) -> Tuple[T1, T2]: ...
 
 
 @overload
 def check_typed_tuple(
-    value: tuple[Any, Any, Any],
-    types: tuple[Type[T1], Type[T2], Type[T3]],
-) -> tuple[T1, T2, T3]: ...
+    value: Tuple[Any, Any, Any],
+    types: Tuple[Type[T1], Type[T2], Type[T3]],
+) -> Tuple[T1, T2, T3]: ...
 
 
 @overload
 def check_typed_tuple(
-    value: tuple[Any, Any, Any, Any],
-    types: tuple[Type[T1], Type[T2], Type[T3], Type[T4]],
-) -> tuple[T1, T2, T3, T4]: ...
+    value: Tuple[Any, Any, Any, Any],
+    types: Tuple[Type[T1], Type[T2], Type[T3], Type[T4]],
+) -> Tuple[T1, T2, T3, T4]: ...
 
 
-def check_typed_tuple(value: tuple[Any, ...], types: tuple[Type, ...]) -> tuple:
+def check_typed_tuple(value: Tuple[Any, ...], types: Tuple[Type, ...]) -> tuple:
     for val, typ in itertools.zip_longest(value, types):
         if typ is not None:
             typeguard.check_type(val, typ)
@@ -427,7 +422,7 @@ class SessionTypes(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def private_types(cls) -> tuple[SessionTypes]:
+    def private_types(cls) -> Tuple[SessionTypes]:
         """
         Returns a set of private session types.
         """
@@ -599,7 +594,7 @@ class MountExpression:
 
 
 class HostPortPair(namedtuple("HostPortPair", "host port")):
-    def as_sockaddr(self) -> tuple[str, int]:
+    def as_sockaddr(self) -> Tuple[str, int]:
         return str(self.host), self.port
 
     def __str__(self) -> str:
@@ -1292,7 +1287,7 @@ class ServicePort(TypedDict):
     is_inference: bool
 
 
-ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, tuple[str, int]])
+ClusterSSHPortMapping = NewType("ClusterSSHPortMapping", Mapping[str, Tuple[str, int]])
 
 
 class ClusterInfo(TypedDict):
@@ -1350,7 +1345,7 @@ class KernelContainerId:
             str(self.container_id)[:12] if self.container_id is not None else UNKNOWN_CONTAINER_ID
         )
 
-    def serialize(self) -> tuple[str, Optional[str]]:
+    def serialize(self) -> Tuple[str, Optional[str]]:
         """
         Serializes the KernelContainerId to a string format.
         """
@@ -1360,7 +1355,7 @@ class KernelContainerId:
         )
 
     @classmethod
-    def deserialize(cls, data: tuple[str, Optional[str]]) -> Self:
+    def deserialize(cls, data: Tuple[str, Optional[str]]) -> Self:
         """
         Deserializes a string into a KernelContainerId instance.
         """
@@ -1388,7 +1383,7 @@ class ContainerKernelId:
         """
         return str(self.container_id)[:12]
 
-    def serialize(self) -> tuple[str, str]:
+    def serialize(self) -> Tuple[str, str]:
         """
         Serializes the KernelContainerId to a string format.
         """
@@ -1398,7 +1393,7 @@ class ContainerKernelId:
         )
 
     @classmethod
-    def deserialize(cls, data: tuple[str, str]) -> Self:
+    def deserialize(cls, data: Tuple[str, str]) -> Self:
         """
         Deserializes a string into a KernelContainerId instance.
         """
