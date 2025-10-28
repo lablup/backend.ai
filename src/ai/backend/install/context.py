@@ -48,6 +48,7 @@ from .docker import (
 from .http import wget
 from .python import check_python
 from .types import (
+    Accelerator,
     DistInfo,
     HalfstackConfig,
     HostPortPair,
@@ -103,6 +104,10 @@ class Context(metaclass=ABCMeta):
 
     @abstractmethod
     def hydrate_install_info(self) -> InstallInfo:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
         raise NotImplementedError
 
     def add_post_guide(self, guide: PostGuide) -> None:
@@ -461,6 +466,7 @@ class Context(metaclass=ABCMeta):
     async def configure_agent(self) -> None:
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
+        accelerator = self.install_info.accelerator
         toml_path = self.copy_config("agent.toml")
         self.sed_in_place_multi(
             toml_path,
@@ -485,25 +491,27 @@ class Context(metaclass=ABCMeta):
         Path(self.install_info.service_config.agent_var_base_path).mkdir(
             parents=True, exist_ok=True
         )
-        # enable the CUDA plugin (open-source version)
-        # The agent will show an error log if the CUDA is not available in the system and report
-        # "cuda.devices = 0" as the agent capacity, but it will still run.
+        if accelerator is not None:
+            if accelerator == Accelerator.CUDA:
+                plugin_list = ['"ai.backend.accelerator.cuda_open"']
+            elif accelerator in (
+                Accelerator.CUDA_MOCK,
+                Accelerator.CUDA_MIG_MOCK,
+                Accelerator.ROCM_MOCK,
+            ):
+                plugin_list = ['"ai.backend.accelerator.mock"']
+            else:
+                plugin_list = []
+
+            await self._configure_mock_accelerator(accelerator)
+        else:
+            plugin_list = []
+
         self.sed_in_place(
             toml_path,
-            re.compile("^(# )?allow-compute-plugins = .*", flags=re.M),
-            'allow-compute-plugins = ["ai.backend.accelerator.cuda_open"]',
+            re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.M),
+            f"allow-compute-plugins = [{', '.join(plugin_list)}]",
         )
-        # TODO: let the installer enable the CUDA plugin only when it verifies CUDA availability or
-        #       via an explicit installer option/config.
-        r"""
-        if [ $ENABLE_CUDA -eq 1 ]; then
-          sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
-        elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-          sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
-        else
-          sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
-        fi
-        """
 
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -870,6 +878,7 @@ class DevContext(Context):
             last_updated=datetime.now(tzutc()),
             halfstack_config=halfstack_config,
             service_config=service_config,
+            accelerator=self.install_variable.accelerator,
         )
 
     def copy_config(self, template_name: str) -> Path:
@@ -895,10 +904,23 @@ class DevContext(Context):
         await install_editable_webui(self)
         await self.install_halfstack()
 
-    async def _configure_mock_accelerator(self) -> None:
+    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
         """
         cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
         """
+        mapping = {
+            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
+            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
+            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
+        }
+
+        src = mapping.get(accelerator)
+        if not src:
+            return
+
+        dst = Path("mock-accelerator.toml")
+        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
+        shutil.copy(src, dst)
 
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
@@ -986,6 +1008,7 @@ class PackageContext(Context):
             last_updated=datetime.now(tzutc()),
             halfstack_config=halfstack_config,
             service_config=service_config,
+            accelerator=self.install_variable.accelerator,
         )
 
     def copy_config(self, template_name: str) -> Path:
@@ -1147,6 +1170,24 @@ class PackageContext(Context):
             vpane.remove()
         self.log_header("Installing databases (halfstack)...")
         await self.install_halfstack()
+
+    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
+        """
+        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
+        """
+        mapping = {
+            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
+            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
+            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
+        }
+
+        src = mapping.get(accelerator)
+        if not src:
+            return
+
+        dst = Path("mock-accelerator.toml")
+        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
+        shutil.copy(src, dst)
 
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
