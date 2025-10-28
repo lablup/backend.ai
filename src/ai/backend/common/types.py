@@ -424,7 +424,7 @@ class SessionTypes(CIStrEnum):
 
     @classmethod
     @lru_cache(maxsize=1)
-    def private_types(cls) -> Tuple[SessionTypes]:
+    def private_types(cls) -> tuple[SessionTypes]:
         """
         Returns a set of private session types.
         """
@@ -477,8 +477,8 @@ class ItemResult(TypedDict):
 
 
 class ResultSet(TypedDict):
-    success: List[ItemResult]
-    failed: List[ItemResult]
+    success: list[ItemResult]
+    failed: list[ItemResult]
 
 
 class AbuseReportValue(enum.StrEnum):
@@ -1039,7 +1039,7 @@ class LegacyResourceSlotState(enum.StrEnum):
 
 class JSONSerializableMixin(metaclass=ABCMeta):
     @abstractmethod
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         raise NotImplementedError
 
     @classmethod
@@ -1153,7 +1153,7 @@ class VFolderMount(JSONSerializableMixin):
     mount_perm: MountPermission
     usage_mode: VFolderUsageMode
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "vfid": str(self.vfid),
@@ -1224,7 +1224,7 @@ class VFolderHostPermissionMap(dict, JSONSerializableMixin):
             union_map[host] |= set(perm_list)
         return VFolderHostPermissionMap(union_map)
 
-    def to_json(self) -> Dict[str, Any]:
+    def to_json(self) -> dict[str, Any]:
         return {host: [perm.value for perm in perms] for host, perms in self.items()}
 
     @classmethod
@@ -1347,7 +1347,7 @@ class KernelContainerId:
             str(self.container_id)[:12] if self.container_id is not None else UNKNOWN_CONTAINER_ID
         )
 
-    def serialize(self) -> Tuple[str, Optional[str]]:
+    def serialize(self) -> tuple[str, Optional[str]]:
         """
         Serializes the KernelContainerId to a string format.
         """
@@ -1357,7 +1357,7 @@ class KernelContainerId:
         )
 
     @classmethod
-    def deserialize(cls, data: Tuple[str, Optional[str]]) -> Self:
+    def deserialize(cls, data: tuple[str, Optional[str]]) -> Self:
         """
         Deserializes a string into a KernelContainerId instance.
         """
@@ -1385,7 +1385,7 @@ class ContainerKernelId:
         """
         return str(self.container_id)[:12]
 
-    def serialize(self) -> Tuple[str, str]:
+    def serialize(self) -> tuple[str, str]:
         """
         Serializes the KernelContainerId to a string format.
         """
@@ -1395,7 +1395,7 @@ class ContainerKernelId:
         )
 
     @classmethod
-    def deserialize(cls, data: Tuple[str, str]) -> Self:
+    def deserialize(cls, data: tuple[str, str]) -> Self:
         """
         Deserializes a string into a KernelContainerId instance.
         """
@@ -1434,7 +1434,7 @@ class KernelCreationConfig(TypedDict):
     local_rank: int  # the kernel's local rank in the cluster
     uid: Optional[int]
     main_gid: Optional[int]
-    supplementary_gids: List[int]
+    supplementary_gids: list[int]
     resource_slots: Mapping[str, str]  # json form of ResourceSlot
     resource_opts: Mapping[str, Any]  # json form of resource options
     environ: Mapping[str, str]
@@ -1467,7 +1467,7 @@ class KernelEnqueueingConfig(TypedDict):
     startup_command: Optional[str]
     uid: Optional[int]
     main_gid: Optional[int]
-    supplementary_gids: List[int]
+    supplementary_gids: list[int]
 
 
 def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
@@ -1493,7 +1493,7 @@ def _stringify_number(v: Union[BinarySize, int, float, Decimal]) -> str:
 @dataclass
 class ValkeyTarget:
     addr: Optional[str] = None
-    sentinel: Optional[List[str]] = None
+    sentinel: Optional[list[str]] = None
     service_name: Optional[str] = None
     password: Optional[str] = None
     request_timeout: Optional[int] = None
@@ -1548,7 +1548,7 @@ class RedisTarget:
 
     def to_valkey_target(self) -> ValkeyTarget:
         addr = str(self.addr) if self.addr else None
-        sentinel_addrs: Optional[List[str]] = None
+        sentinel_addrs: Optional[list[str]] = None
         if self.sentinel:
             sentinel_addrs = None
             if isinstance(self.sentinel, list):
@@ -1579,7 +1579,7 @@ class ValkeyProfileTarget:
         self,
         *,
         addr: Optional[str] = None,
-        sentinel: Optional[List[str]] = None,
+        sentinel: Optional[list[str]] = None,
         service_name: Optional[str] = None,
         password: Optional[str] = None,
         request_timeout: Optional[int] = None,
@@ -1648,7 +1648,7 @@ class RedisProfileTarget:
                 return HostPortPair(addr_data_parts[0], int(addr_data_parts[1]))
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> Self:
+    def from_dict(cls, data: dict[str, Any]) -> Self:
         override_targets = None
         if data.get("override_configs"):
             override_targets = {
@@ -1855,7 +1855,7 @@ ResultType = TypeVar("ResultType")
 @dataclass
 class DispatchResult(Generic[ResultType]):
     result: Optional[ResultType] = None
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
     def is_success(self) -> bool:
         return not self.errors
@@ -1881,14 +1881,14 @@ class DispatchResult(Generic[ResultType]):
 
     @classmethod
     def partial_success(
-        cls, result_type: ResultType, errors: List[str]
+        cls, result_type: ResultType, errors: list[str]
     ) -> DispatchResult[ResultType]:
         return cls(result=result_type, errors=errors)
 
 
 class PurgeImageResult(TypedDict):
     image: str
-    result: Optional[List[Any]]
+    result: Optional[list[Any]]
     error: Optional[str]
 
 
