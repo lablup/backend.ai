@@ -12,7 +12,7 @@ from typing import Any, Callable, Final, Optional, Protocol, cast, override
 
 import aiohttp
 
-from ai.backend.common.artifact_storage import StoragePoolProtocol
+from ai.backend.common.artifact_storage import AbstractStoragePool
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import (
@@ -795,7 +795,7 @@ class HuggingFaceDownloadStep(ImportStep):
         file_info: FileObjectData,
         model: ModelTarget,
         storage_name: str,
-        storage_pool: StoragePoolProtocol,
+        storage_pool: AbstractStoragePool,
         download_chunk_size: int,
     ) -> str:
         """Download file from HuggingFace to specified storage"""

@@ -1,7 +1,7 @@
 import logging
 from typing import Optional, Self
 
-from ai.backend.common.artifact_storage import AbstractStorage
+from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
 from ai.backend.logging.utils import BraceStyleAdapter
@@ -14,7 +14,7 @@ from ai.backend.storage.storages.vfs_storage import VFSStorage
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class StoragePool:
+class StoragePool(AbstractStoragePool):
     """
     Storage pool that manages different types of storage backends.
     Supports both Object Storage (S3-compatible) and VFS storage.

@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any
 
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
@@ -30,25 +30,30 @@ class AbstractStorage(ABC):
         raise NotImplementedError
 
 
-class StoragePoolProtocol(Protocol):
-    """Protocol for StoragePool interface"""
+class AbstractStoragePool(ABC):
+    """Abstract base class for storage pool interface"""
 
+    @abstractmethod
     def get_storage(self, name: str) -> AbstractStorage:
         """Get storage by name"""
         ...
 
+    @abstractmethod
     def add_storage(self, name: str, storage: AbstractStorage) -> None:
         """Add a storage to the pool"""
         ...
 
+    @abstractmethod
     def remove_storage(self, name: str) -> None:
         """Remove a storage from the pool"""
         ...
 
+    @abstractmethod
     def list_storages(self) -> list[str]:
         """List all storage names in the pool"""
         ...
 
+    @abstractmethod
     def has_storage(self, name: str) -> bool:
         """Check if storage exists in the pool"""
         ...
@@ -60,6 +65,6 @@ class ImportStepContext:
 
     model: ModelTarget
     registry_name: str
-    storage_pool: StoragePoolProtocol
+    storage_pool: AbstractStoragePool
     storage_step_mappings: dict[ArtifactStorageImportStep, str]
     step_metadata: dict[str, Any]  # For passing data between steps

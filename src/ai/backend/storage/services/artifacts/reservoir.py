@@ -11,7 +11,7 @@ from typing import Any, Optional, cast, override
 
 import aiofiles
 
-from ai.backend.common.artifact_storage import AbstractStorage, StoragePoolProtocol
+from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import FileObjectData, ModelTarget
@@ -581,7 +581,7 @@ class ReservoirDownloadStep(ImportStep):
         return downloaded_files, bytes_copied
 
     def _get_s3_client(
-        self, storage_pool: StoragePoolProtocol, storage_name: str
+        self, storage_pool: AbstractStoragePool, storage_name: str
     ) -> tuple[S3Client, str]:
         """Get S3 client for the specified storage"""
         # Get storage from pool and verify it's ObjectStorage type
@@ -617,7 +617,7 @@ class ReservoirDownloadStep(ImportStep):
         self,
         source_cfg: ReservoirConfig,
         storage_name: str,
-        storage_pool: StoragePoolProtocol,
+        storage_pool: AbstractStoragePool,
         options: BucketCopyOptions,
         progress_reporter: Optional[ProgressReporter],
         key_prefix: Optional[str] = None,
