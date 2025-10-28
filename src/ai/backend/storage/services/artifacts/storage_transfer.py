@@ -143,8 +143,8 @@ class StorageTransferManager:
         dest_path: str,
     ) -> None:
         """Optimized copy between VFS storages using direct file system operations."""
-        source_full_path = source_storage._resolve_path(source_path)
-        dest_full_path = dest_storage._resolve_path(dest_path)
+        source_full_path = source_storage.resolve_path(source_path)
+        dest_full_path = dest_storage.resolve_path(dest_path)
 
         # Check if source is a file or directory
         if source_full_path.is_file():
@@ -199,7 +199,7 @@ class StorageTransferManager:
     async def _list_vfs_files_with_prefix(self, storage: VFSStorage, prefix: str) -> list[str]:
         """List files in VFS storage with given prefix."""
         try:
-            full_path = storage._resolve_path(prefix)
+            full_path = storage.resolve_path(prefix)
             if full_path.is_file():
                 return [prefix]
             elif full_path.is_dir():

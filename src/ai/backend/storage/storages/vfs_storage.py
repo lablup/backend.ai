@@ -152,7 +152,7 @@ class VFSStorage(AbstractStorage):
     def base_path(self) -> Path:
         return self._base_path
 
-    def _resolve_path(self, filepath: str) -> Path:
+    def resolve_path(self, filepath: str) -> Path:
         """
         Resolve relative filepath to absolute path within base_path.
         Prevents path traversal attacks.
@@ -198,7 +198,7 @@ class VFSStorage(AbstractStorage):
             self._validate_upload_constraints(filepath)
 
             # Resolve target path
-            target_path = self._resolve_path(filepath)
+            target_path = self.resolve_path(filepath)
 
             # Create parent directories if needed
             target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -235,7 +235,7 @@ class VFSStorage(AbstractStorage):
             StreamReader: Stream for reading file data or tar archive for directories
         """
         try:
-            target_path = self._resolve_path(filepath)
+            target_path = self.resolve_path(filepath)
 
             if not target_path.exists():
                 raise FileStreamDownloadError(f"Path not found: {filepath}")
@@ -263,7 +263,7 @@ class VFSStorage(AbstractStorage):
             VFSFileMetaResponse with file metadata
         """
         try:
-            target_path = self._resolve_path(filepath)
+            target_path = self.resolve_path(filepath)
 
             if not target_path.exists():
                 raise StorageBucketFileNotFoundError(f"File not found: {filepath}")
@@ -306,7 +306,7 @@ class VFSStorage(AbstractStorage):
         """
 
         try:
-            target_path = self._resolve_path(filepath)
+            target_path = self.resolve_path(filepath)
 
             if not target_path.exists():
                 # Silently ignore non-existent files (similar to S3 behavior)
@@ -335,7 +335,7 @@ class VFSStorage(AbstractStorage):
             List of file/directory information
         """
         try:
-            target_path = self._resolve_path(directory)
+            target_path = self.resolve_path(directory)
 
             if not target_path.exists():
                 raise StorageBucketFileNotFoundError(f"Directory not found: {directory}")
@@ -374,7 +374,7 @@ class VFSStorage(AbstractStorage):
             VFSListFilesResponse containing all files found recursively
         """
         try:
-            target_path = self._resolve_path(directory)
+            target_path = self.resolve_path(directory)
 
             if not target_path.exists():
                 raise StorageBucketFileNotFoundError(f"Directory not found: {directory}")
@@ -440,7 +440,7 @@ class VFSStorage(AbstractStorage):
             directory: Directory path to create (relative to base_path)
         """
         try:
-            target_path = self._resolve_path(directory)
+            target_path = self.resolve_path(directory)
             target_path.mkdir(parents=True, exist_ok=True)
 
         except Exception as e:

@@ -31,6 +31,8 @@ from ai.backend.storage.context_types import ArtifactVerifierContext
 from ai.backend.storage.exception import (
     ArtifactRevisionEmptyError,
     ArtifactStorageEmptyError,
+    ArtifactVerificationFailedError,
+    ArtifactVerifyStorageTypeInvalid,
     ObjectStorageBucketNotFoundError,
     ReservoirStorageConfigInvalidError,
     StorageNotFoundError,
@@ -794,9 +796,15 @@ class ReservoirVerifyStep(ImportStep[DownloadStepResult]):
     """Step to verify downloaded files in reservoir storage"""
 
     _artifact_verifier_ctx: ArtifactVerifierContext
+    _transfer_manager: StorageTransferManager
 
-    def __init__(self, artifact_verifier_ctx: ArtifactVerifierContext) -> None:
+    def __init__(
+        self,
+        artifact_verifier_ctx: ArtifactVerifierContext,
+        transfer_manager: StorageTransferManager,
+    ) -> None:
         self._artifact_verifier_ctx = artifact_verifier_ctx
+        self._transfer_manager = transfer_manager
 
     @property
     def step_type(self) -> ArtifactStorageImportStep:
@@ -806,26 +814,69 @@ class ReservoirVerifyStep(ImportStep[DownloadStepResult]):
     async def execute(
         self, context: ImportStepContext, input_data: DownloadStepResult
     ) -> VerifyStepResult:
-        verify_path = context.storage_step_mappings.get(ArtifactStorageImportStep.VERIFY)
-        for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
-            log.info(f"Starting artifact verification using '{verifier_name}'")
-            # TODO: Copy files first before verify if needed
-            revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
-            model_prefix = f"{context.model.model_id}/{revision}"
-            dst_path = Path(f"{verify_path}") / f"{model_prefix}"
+        source_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.DOWNLOAD)
+        dst_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.VERIFY)
+        if source_storage_name is None:
+            raise StorageStepRequiredStepNotProvided(
+                "No storage mapping provided for DOWNLOAD step"
+            )
+        if dst_storage_name is None:
+            raise StorageStepRequiredStepNotProvided("No storage mapping provided for VERIFY step")
 
-            await verifier.verify(dst_path, context)
+        revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
+        model_prefix = f"{context.model.model_id}/{revision}"
+
+        await self._transfer_manager.transfer_directory(
+            source_storage_name=source_storage_name,
+            dest_storage_name=dst_storage_name,
+            source_prefix=model_prefix,
+            dest_prefix=model_prefix,
+        )
+
+        dst_storage = context.storage_pool.get_storage(dst_storage_name)
+        if not isinstance(dst_storage, VFSStorage):
+            raise ArtifactVerifyStorageTypeInvalid("Verify step requires VFS storage type")
+        dst_storage = cast(VFSStorage, dst_storage)
+
+        for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
+            dst_path = dst_storage.resolve_path(model_prefix)
+            log.info(
+                f"Starting artifact verification using '{verifier_name}', dst_path: {dst_path}"
+            )
+            result = await verifier.verify(dst_path, context)
+            if result.infected_count > 0:
+                raise ArtifactVerificationFailedError(
+                    f"Artifact '{model_prefix}' verification failed using '{verifier_name}': "
+                    f"infected_count={result.infected_count}"
+                )
+
             log.info(f"Artifact verification using '{verifier_name}' completed successfully")
 
         return VerifyStepResult(
             verified_files=input_data.downloaded_files,
-            storage_name=input_data.storage_name,
+            storage_name=dst_storage_name,
             total_bytes=input_data.total_bytes,
         )
 
     @override
     async def cleanup_stage(self, context: ImportStepContext) -> None:
-        pass
+        """Clean up files from verify storage on failure"""
+        verify_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.VERIFY)
+        if not verify_storage:
+            return
+
+        # Delete entire model (cleaning up individual files is complex)
+        revision = context.model.resolve_revision(ArtifactRegistryType.RESERVOIR)
+        model_prefix = f"{context.model.model_id}/{revision}"
+
+        try:
+            storage = context.storage_pool.get_storage(verify_storage)
+            await storage.delete_file(model_prefix)
+            log.info(f"[cleanup] Removed verify files: {verify_storage}:{model_prefix}")
+        except Exception as e:
+            log.warning(
+                f"[cleanup] Failed to cleanup verify: {verify_storage}:{model_prefix}: {str(e)}"
+            )
 
 
 class ReservoirArchiveStep(ImportStep[VerifyStepResult]):
@@ -917,7 +968,7 @@ def create_reservoir_import_pipeline(
         steps.append(ReservoirDownloadStep(registry_configs, download_storage))
 
     if ArtifactStorageImportStep.VERIFY in storage_step_mappings:
-        steps.append(ReservoirVerifyStep(artifact_verifier_ctx))
+        steps.append(ReservoirVerifyStep(artifact_verifier_ctx, transfer_manager))
 
     if ArtifactStorageImportStep.ARCHIVE in storage_step_mappings:
         steps.append(ReservoirArchiveStep(transfer_manager))
