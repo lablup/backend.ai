@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Iterator, Optional
 
@@ -22,9 +23,15 @@ class AbstractStoragePlugin(AbstractPlugin, metaclass=ABCMeta):
         raise NotImplementedError
 
 
+@dataclass
+class VerificationResult:
+    scanned_count: int
+    infected_count: int
+
+
 class AbstractArtifactVerifierPlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
-    async def verify(self, artifact_path: Path, context: ImportStepContext) -> None:
+    async def verify(self, artifact_path: Path, context: ImportStepContext) -> VerificationResult:
         raise NotImplementedError
 
 
