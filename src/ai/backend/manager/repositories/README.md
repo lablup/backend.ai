@@ -220,7 +220,7 @@ async def _fetch_session(
     self,
     db_sess: SASession,
     session_id: SessionId,
-) -> SessionRow | None:
+) -> Optional[SessionRow]:
     """Internal methods can return Row"""
     stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
     return await db_sess.scalar(stmt)
@@ -280,12 +280,12 @@ class MixedRepository:
 async def get_session_by_id(
     self,
     session_id: SessionId,
-) -> SessionInfo | None:
+) -> SessionInfo:
     """Query by session ID"""
     async with self._db.begin_readonly_session() as db_sess:
         session_row = await self._fetch_session(db_sess, session_id)
         if not session_row:
-            return None
+            raise SessionNotFound(session_id)
         return self._to_session_info(session_row)
 
 async def list_by_access_key(
@@ -349,7 +349,7 @@ async def _update_session_status(
         .where(SessionRow.id == session_id)
         .values(
             status=status,
-            status_changed_at=datetime.utcnow(),
+            status_changed_at=datetime.now(timezone.utc),
         )
     )
     await db_sess.execute(stmt)
@@ -413,7 +413,7 @@ class SessionDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    async def get_session(self, session_id: SessionId) -> SessionInfo | None:
+    async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
         async with self._db.begin_readonly_session() as db_sess:
             session_row = await self._fetch_session(db_sess, session_id)
             if not session_row:
@@ -434,7 +434,7 @@ class SessionCacheSource:
         self._redis = redis
         self._db_source = db_source
 
-    async def get_session(self, session_id: SessionId) -> SessionInfo | None:
+    async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
         """Cache-first query, fall back to DB on cache miss"""
         # Check cache
         cached = await self._get_from_cache(session_id)
@@ -452,17 +452,17 @@ class SessionCacheSource:
 class SessionRepository:
     """Repository: orchestrates db_source and cache_source"""
     _db_source: SessionDBSource
-    _cache_source: SessionCacheSource | None
+    _cache_source: Optional[SessionCacheSource]
 
     def __init__(
         self,
         db_source: SessionDBSource,
-        cache_source: SessionCacheSource | None = None,
+        cache_source: Optional[SessionCacheSource] = None,
     ) -> None:
         self._db_source = db_source
         self._cache_source = cache_source
 
-    async def get_session(self, session_id: SessionId) -> SessionInfo | None:
+    async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
         """Use cache if available, otherwise use DB directly"""
         if self._cache_source:
             return await self._cache_source.get_session(session_id)
@@ -528,7 +528,7 @@ from ai.backend.common.types import (
 )
 
 class SessionRepository:
-    async def get_session(self, session_id: SessionId) -> SessionInfo | None:
+    async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
         """Use SessionId type"""
         ...
 
@@ -571,7 +571,7 @@ async def create_session(
 async def get_session(
     self,
     session_id: SessionId,
-) -> SessionInfo | None:
+) -> Optional[SessionInfo]:
     """Structured output type (public method)"""
     ...
 ```
@@ -685,7 +685,7 @@ class SessionRepository:
 async def get_session_by_id(
     self,
     session_id: SessionId,
-) -> SessionInfo | None:
+) -> Optional[SessionInfo]:
     """Query session by ID"""
     ...
 
