@@ -9,6 +9,7 @@ from uuid import UUID
 
 import yarl
 
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
@@ -25,7 +26,6 @@ from ai.backend.manager.errors.deployment import DeploymentHasNoTargetRevision
 from ai.backend.manager.models import NetworkRow
 from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.scaling_group import ScalingGroupOpts
-from ai.backend.manager.models.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.manager.types import UserScope
 
 

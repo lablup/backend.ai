@@ -24,6 +24,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common import validators as tx
+from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
     ClusterMode,
@@ -76,8 +77,6 @@ from ..rbac.permission_defs import ComputeSessionPermission
 from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from ..session import (
     DEFAULT_SESSION_ORDERING,
-    SESSION_PRIORITY_MAX,
-    SESSION_PRIORITY_MIN,
     SessionDependencyRow,
     SessionRow,
     SessionTypes,
