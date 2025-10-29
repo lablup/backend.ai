@@ -74,7 +74,7 @@ class QuotaScopeNotFoundError(ObjectNotFound):
         )
 
 
-class VFolderAlreadyExists(BackendAIError, web.HTTPBadRequest):
+class VFolderAlreadyExists(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/vfolder-already-exists"
     error_title = "The virtual folder already exists with the same name."
 
