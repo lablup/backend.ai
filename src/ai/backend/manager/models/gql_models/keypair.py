@@ -297,8 +297,8 @@ class KeyPair(graphene.ObjectType):
 
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
-            .join(groups, association_groups_users.c.group_id == groups.c.id)
+            .outerjoin(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
+            .outerjoin(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = sa.select([sa.func.count()]).group_by(keypairs.c.access_key).select_from(j)
         if domain_name is not None:
@@ -332,8 +332,8 @@ class KeyPair(graphene.ObjectType):
 
         j = (
             sa.join(keypairs, users, keypairs.c.user == users.c.uuid)
-            .join(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
-            .join(groups, association_groups_users.c.group_id == groups.c.id)
+            .outerjoin(association_groups_users, users.c.uuid == association_groups_users.c.user_id)
+            .outerjoin(groups, association_groups_users.c.group_id == groups.c.id)
         )
         query = (
             sa.select([
