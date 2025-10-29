@@ -14,42 +14,43 @@ Sokovan is the orchestration layer that comprehensively coordinates session sche
 Sokovan consists of a 3-tier architecture:
 
 ```
-┌─────────────────────────────────────────────────┐
-│         SokovanOrchestrator                     │
-│  (Top-level Orchestrator)                       │
-│  - Creates and manages 3 Coordinators           │
-│  - Schedules periodic tasks                     │
-│  - Provides common dependencies (events, locks) │
-└───────────────┬─────────────────────────────────┘
-                │
-    ┌───────────┼───────────┐
-    │           │           │
-    ▼           ▼           ▼
-┌─────────┐ ┌─────────┐ ┌─────────┐
-│Schedule │ │Deploy-  │ │ Route   │
-│Coordi-  │ │ment     │ │Coordi-  │
-│nator    │ │Coordi-  │ │nator    │
-│         │ │nator    │ │         │
-│Session  │ │Deploy-  │ │Route    │
-│lifecycle│ │ment     │ │lifecycle│
-│coordi-  │ │lifecycle│ │coordi-  │
-│nation   │ │coordi-  │ │nation   │
-│         │ │nation   │ │         │
-└────┬────┘ └────┬────┘ └────┬────┘
-     │           │           │
-     ▼           ▼           ▼
-┌─────────┐ ┌─────────┐ ┌─────────┐
-│Scheduler│ │Deploy-  │ │ Route   │
-│    +    │ │ment     │ │Control- │
-│Schedu-  │ │Control- │ │ler      │
-│ling     │ │ler      │ │         │
-│Control- │ │         │ │Actual   │
-│ler      │ │Actual   │ │route    │
-│         │ │deploy-  │ │control  │
-│Actual   │ │ment     │ │logic    │
-│schedul- │ │control  │ │         │
-│ing logic│ │logic    │ │         │
-└─────────┘ └─────────┘ └─────────┘
+┌────────────────────────────────────────────────────────────────────────────────────┐
+│                          SokovanOrchestrator                                       │
+│                        (Top-level Orchestrator)                                    │
+│                                                                                    │
+│                   - Creates and manages 3 Coordinators                             │
+│                   - Schedules periodic tasks                                       │
+│                   - Provides common dependencies (events, locks)                   │
+│                                                                                    │
+└──────────────────────────────────────┬─────────────────────────────────────────────┘
+                                       │
+         ┌─────────────────────────────┼─────────────────────────────┐
+         │                             │                             │
+         ▼                             ▼                             ▼
+┌───────────────────────────┐  ┌──────────────────────────┐  ┌──────────────────────────┐
+│                           │  │                          │  │                          │
+│   ScheduleCoordinator     │  │  DeploymentCoordinator   │  │    RouteCoordinator      │
+│                           │  │                          │  │                          │
+│                           │  │                          │  │                          │
+│     Session lifecycle     │  │   Deployment lifecycle   │  │    Route lifecycle       │
+│       coordination        │  │      coordination        │  │      coordination        │
+│                           │  │                          │  │                          │
+│                           │  │                          │  │                          │
+└─────────────┬─────────────┘  └────────────┬─────────────┘  └────────────┬─────────────┘
+              │                             │                             │
+              │                             │                             │
+              ▼                             ▼                             ▼
+┌───────────────────────────┐  ┌──────────────────────────┐  ┌──────────────────────────┐
+│                           │  │                          │  │                          │
+│  Scheduler                │  │  DeploymentController    │  │   RouteController        │
+│      +                    │  │                          │  │                          │
+│  SchedulingController     │  │                          │  │                          │
+│                           │  │                          │  │                          │
+│                           │  │   Actual deployment      │  │   Actual route           │
+│  Actual scheduling logic  │  │   control logic          │  │   control logic          │
+│                           │  │                          │  │                          │
+│                           │  │                          │  │                          │
+└───────────────────────────┘  └──────────────────────────┘  └──────────────────────────┘
 ```
 
 ### Roles by Layer

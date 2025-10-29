@@ -262,21 +262,26 @@ sequenceDiagram
         loop For each kernel in session
             Sched->>Agent: create_kernel(kernel_config)
 
+            Note over Agent: Kernel creation performs container creation
+            Note over Agent: Image is already prepared in PREPARED stage
+            Note over Agent: Additional image pull may occur if needed
+
             alt RPC success
                 Agent-->>Sched: Creation start confirmation
-                Sched->>Repo: update_kernel_status(PULLING)
-                Repo->>DB: UPDATE kernel SET status=PULLING
+                Sched->>Repo: update_kernel_status(CREATING)
+                Repo->>DB: UPDATE kernel SET status=CREATING
             else RPC failure
-                Sched->>Repo: mark_kernel_failed()
-                Note over Sched: Cancel other kernels in session
+                Note over Sched: Retry up to 3 times
+                Note over Sched: Return to PENDING for rescheduling after 3 failures
             end
         end
 
         alt All kernel creation requests successful
-            Sched->>Repo: update_session_status(PREPARING)
-            Repo->>DB: UPDATE session SET status=PREPARING
+            Note over Sched: Session start complete
+            Sched->>Repo: update_session_status(RUNNING)
+            Repo->>DB: UPDATE session SET status=RUNNING
         else Some failed
-            Sched->>Repo: mark_session_failed()
+            Note over Sched: Return to PENDING for rescheduling after retries
         end
     end
 
@@ -326,7 +331,6 @@ sequenceDiagram
 
             alt RPC success
                 Agent-->>Sched: Termination start confirmation
-                Note over Agent: Send SIGTERM, SIGKILL after timeout
             else RPC failure
                 Note over Sched: Log error, continue
             end
@@ -335,19 +339,21 @@ sequenceDiagram
 
     Sched-->>Coord: Termination request complete
 
-    Note over Agent: Container cleanup
+    Note over Agent: Container cleanup process
     Agent->>Agent: Stop container
     Agent->>Agent: Unmount volumes
     Agent->>Agent: Release network resources
 
-    Agent->>Coord: kernel_terminated event
+    loop For each terminated kernel
+        Agent->>Coord: kernel_terminated event
+        Coord->>Repo: mark_kernel_terminated(kernel_id)
+        Repo->>DB: UPDATE kernel SET status=TERMINATED
+    end
 
-    Coord->>Repo: mark_kernel_terminated(kernel_id)
-    Repo->>DB: UPDATE kernel SET status=TERMINATED
-    DB-->>Repo: Update complete
-
+    Note over Coord: Check all kernels terminated
     Coord->>Repo: check_session_all_kernels_terminated()
     alt All kernels TERMINATED
+        Coord->>Repo: mark_session_terminated()
         Repo->>DB: UPDATE session SET status=TERMINATED
         Repo->>DB: UPDATE agent occupied_slots -= session_resources
     end
