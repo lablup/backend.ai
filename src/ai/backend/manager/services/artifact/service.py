@@ -251,13 +251,7 @@ class ArtifactService:
                                     response_revision.id
                                 )
                                 readme = readme_resp.readme
-                            except Exception as e:
-                                log.warning(
-                                    "Failed to fetch readme for artifact {} revision {}: {}",
-                                    response_revision.artifact_id,
-                                    response_revision.version,
-                                    e,
-                                )
+                            except Exception:
                                 readme = None
 
                             # Determine remote_status based on remote artifact status
@@ -433,13 +427,7 @@ class ArtifactService:
                                     response_revision.id
                                 )
                                 readme = readme_resp.readme
-                            except Exception as e:
-                                log.warning(
-                                    "Failed to fetch readme for artifact {} revision {}: {}",
-                                    response_revision.artifact_id,
-                                    response_revision.version,
-                                    e,
-                                )
+                            except Exception:
                                 readme = None
 
                             # Determine remote_status based on remote artifact status
