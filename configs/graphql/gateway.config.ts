@@ -44,6 +44,7 @@ export const gatewayConfig = defineConfig({
       return headers;
     },
   },
+  maskedErrors: false,
   logging: false,
   supergraph: '/gateway/supergraph.graphql',
   graphqlEndpoint: '/admin/gql',
