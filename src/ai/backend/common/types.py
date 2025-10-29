@@ -319,8 +319,11 @@ class SlotName(UserString):
     __slots__ = ("_parsed", "_device_name", "_major_type", "_minor_type")
 
     def __init__(self, value: str | SlotName) -> None:
-        super().__init__(value)
         self._parsed = False
+        self._device_name = ""
+        self._major_type = ""
+        self._minor_type = ""
+        super().__init__(value)
 
     def _parse(self) -> None:
         # Do lazy-parsing for when required only because SlotName is used
