@@ -234,7 +234,9 @@ class ResourcePresetRepository:
 
         # Apply group resource visibility settings
         if not group_resource_visibility:
-            nan_slots = ResourceSlot({k: Decimal("NaN") for k in db_data.known_slot_types.keys()})
+            nan_slots = ResourceSlot({
+                str(k): Decimal("NaN") for k in db_data.known_slot_types.keys()
+            })
             group_limits = nan_slots
             group_occupied = nan_slots
             group_remaining = nan_slots
