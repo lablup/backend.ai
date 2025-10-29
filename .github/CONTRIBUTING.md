@@ -237,7 +237,7 @@ individual sub-projects.
 Use the PR template to include the following:
 
 ```markdown
-resolves #NNN (BA-MMM)
+resolves #<issue-number> (BA-<jira-number>)
 
 ## Changes
 - Specific description of what was changed
