@@ -15,7 +15,7 @@ from .base import BaseContainerRegistry
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
-class OpenShiftContainerRegistry(BaseContainerRegistry):
+class OpenShiftPlatformContainerRegistry(BaseContainerRegistry):
     @override
     async def fetch_repositories(
         self,
