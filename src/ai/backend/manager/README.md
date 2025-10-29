@@ -1,262 +1,459 @@
-Backend.AI Manager with API Gateway
-===================================
+# Backend.AI Manager
 
-Package Structure
------------------
+## Purpose
 
-* `ai.backend.manager`: Computing resource and workload management with public APIs
+The Manager is the central orchestrator of the Backend.AI cluster. It schedules computing sessions (sessions and kernels), allocates resources, manages the lifecycle of sessions, and provides API gateway functionality through REST and GraphQL interfaces.
 
-Installation
-------------
+## Key Responsibilities
 
-Please visit [the installation guides](https://github.com/lablup/backend.ai/wiki).
+### 1. API Gateway
+- Provide REST API and GraphQL API to clients
+- Request authentication and authorization
+- Rate limiting and quota management
+- API versioning management
 
+### 2. Session Scheduling
+- Allocate computing resources for user compute session requests
+- Select optimal agents based on various scheduling algorithms
+- Manage session lifecycle (creation, execution, termination)
+- Cluster-mode session scheduling and management
 
-### Kernel/system configuration
+### 3. Resource Management
+- Track cluster-wide resource status
+- Collect and aggregate agent resource information
+- Manage resource allocation and release
+- Handle resource presets and quotas
 
-#### Recommended resource limits:
+### 4. User and Organization Management
+- User account and authentication management
+- Group and domain organization management
+- Permission and role-based access control
+- Credential (access key/secret key) management
 
-**`/etc/security/limits.conf`**
+### 5. Virtual Folder Management
+- Provide persistent storage to users
+- Integrate various storage backends
+- Manage file upload/download
+- Manage folder sharing and permissions
+
+### 6. Image Registry Management
+- Manage container image repositories
+- Scan and synchronize image metadata
+- Validate and manage image versions
+- Control allowed images per domain
+
+## Architecture
+
 ```
-root hard nofile 512000
-root soft nofile 512000
-root hard nproc 65536
-root soft nproc 65536
-user hard nofile 512000
-user soft nofile 512000
-user hard nproc 65536
-user soft nproc 65536
-```
-
-**sysctl**
-```
-fs.file-max=2048000
-net.core.somaxconn=1024
-net.ipv4.tcp_max_syn_backlog=1024
-net.ipv4.tcp_slow_start_after_idle=0
-net.ipv4.tcp_fin_timeout=10
-net.ipv4.tcp_window_scaling=1
-net.ipv4.tcp_tw_reuse=1
-net.ipv4.tcp_early_retrans=1
-net.ipv4.ip_local_port_range="10000 65000"
-net.core.rmem_max=16777216
-net.core.wmem_max=16777216
-net.ipv4.tcp_rmem=4096 12582912 16777216
-net.ipv4.tcp_wmem=4096 12582912 16777216
-```
-
-
-### For development
-
-#### Prerequisites
-
-* Python 3.6 or higher with [pyenv](https://github.com/pyenv/pyenv)
-and [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) (optional but recommneded)
-* Docker 18.03 or later with docker-compose (18.09 or later is recommended)
-
-#### Common steps
-
-Clone [the meta repository](https://github.com/lablup/backend.ai) and install a "halfstack"
-configuration.  The halfstack configuration installs and runs several dependency daemons such as etcd in
-the background.
-
-```console
-$ git clone https://github.com/lablup/backend.ai halfstack
-$ cd halfstack
-$ docker-compose -f docker-compose.halfstack.yml up -d
-```
-
-Then prepare the source clone of the agent as follows.
-First install the current working copy.
-
-```console
-$ git clone https://github.com/lablup/backend.ai-manager manager
-$ cd manager
-$ pyenv virtualenv venv-manager
-$ pyenv local venv-manager
-$ pip install -U pip setuptools
-$ pip install -U -r requirements/dev.txt
-```
-
-From now on, let's assume all shell commands are executed inside the virtualenv.
-
-### Halfstack (single-node development & testing)
-
-#### Recommended directory structure
-
-* `backend.ai-dev`
-  - `manager` (git clone from this repo)
-  - `agent` (git clone from [the agent repo](https://github.com/lablup/backend.ai-agent))
-  - `common` (git clone from [the common repo](https://github.com/lablup/backend.ai-common))
-
-Install `backend.ai-common` as an editable package in the manager (and the agent) virtualenvs
-to keep the codebase up-to-date.
-
-```console
-$ cd manager
-$ pip install -U -e ../common -r requirements/dev.txt
+┌───────────────────────────────────────────┐
+│              API Layer                    │
+│  - REST API Handler (Starlette)           │
+│  - GraphQL Handler (GraphQL Core)         │
+│  - Authentication & Authorization         │
+│  - Request Validation                     │
+└──────────────────┬────────────────────────┘
+                   │
+┌──────────────────┴────────────────────────┐
+│            Actions Layer                  │
+│  - Session Lifecycle Actions              │
+│  - Resource Allocation Actions            │
+│  - User Management Actions                │
+│  - VFolder Management Actions             │
+└──────────────────┬────────────────────────┘
+                   │
+┌──────────────────┴────────────────────────┐
+│           Services Layer                  │
+│  - Scheduling Service                     │
+│  - Session Management Service             │
+│  - Resource Quota Service                 │
+│  - Event Processing Service               │
+└──────────────────┬────────────────────────┘
+                   │
+┌──────────────────┴────────────────────────┐
+│         Repositories Layer                │
+│  - Session Repository                     │
+│  - Agent Repository                       │
+│  - User Repository                        │
+│  - VFolder Repository                     │
+└──────────────────┬────────────────────────┘
+                   │
+┌──────────────────┴────────────────────────┐
+│            Models Layer                   │
+│  - SQLAlchemy ORM Models                  │
+│  - Domain Types & DTOs                    │
+└───────────────────────────────────────────┘
 ```
 
-#### Steps
+## Directory Structure
 
-Copy (or symlink) the halfstack configs:
-```console
-$ cp config/halfstack.toml ./manager.toml
-$ cp config/halfstack.alembic.ini ./alembic.ini
+```
+manager/
+├── models/              # Database schema and ORM models
+│   ├── alembic/        # Database migration scripts
+│   ├── user.py         # User and credential models
+│   ├── session.py      # Session and kernel models
+│   ├── agent.py        # Agent models
+│   ├── vfolder.py      # Virtual folder models
+│   ├── scaling_group.py # Scaling group models
+│   └── ...
+├── repositories/        # Data access layer
+│   ├── session.py      # Session data access
+│   ├── agent.py        # Agent data access
+│   ├── user.py         # User data access
+│   └── ...
+├── services/            # Business logic layer
+│   ├── scheduler/      # Session scheduling service
+│   ├── session/        # Session lifecycle management
+│   ├── quota/          # Resource quota management
+│   └── ...
+├── api/                 # API handlers and routes
+│   ├── rest.py         # REST API endpoints
+│   ├── graphql.py      # GraphQL schema and resolvers
+│   ├── auth.py         # Authentication handlers
+│   └── ...
+├── config/              # Configuration management
+│   ├── sample.toml     # Sample configuration
+│   └── ...
+├── cli/                 # CLI commands
+│   ├── schema.py       # Database schema management
+│   ├── fixture.py      # Test data management
+│   └── ...
+├── clients/             # External service clients
+│   ├── agent.py        # Agent RPC client
+│   ├── storage.py      # Storage proxy client
+│   └── ...
+├── scheduler/           # Scheduling algorithms and logic
+│   ├── dispatcher.py   # Scheduling dispatcher
+│   ├── predicates.py   # Scheduling predicates
+│   └── ...
+├── events.py            # Event definitions and processing
+├── server.py            # Main server entry point
+└── defs.py              # Shared constants and types
 ```
 
-Set up Redis:
-```console
-$ backend.ai mgr etcd put config/redis/addr 127.0.0.1:8110
-```
+## Core Concepts
 
-> ℹ️ NOTE: You may replace `backend.ai mgr` with `python -m ai.backend.manager.cli` in case your `PATH` is unmodifiable.
+### Sessions
+Sessions represent user compute requests and are composed of one or more kernels:
+- **Session ID**: Unique identifier for the session
+- **Access Key**: Owner's API access key
+- **Status**: Session state (PENDING, RUNNING, TERMINATED, etc.)
+- **Resource Allocation**: Allocated CPU, memory, GPU resources
+- **Cluster Size**: Number of kernels in multi-container mode
 
-Set up the public Docker registry:
-```console
-$ backend.ai mgr etcd put config/docker/registry/index.docker.io "https://registry-1.docker.io"
-$ backend.ai mgr etcd put config/docker/registry/index.docker.io/username "lablup"
-$ backend.ai mgr image rescan index.docker.io
-```
+Session Lifecycle:
+1. User creates session via API
+2. Manager schedules and allocates resources
+3. Agent creates and starts kernel containers
+4. User executes code and uses services
+5. Session terminates (user request or timeout)
+6. Resources are returned to the pool
 
-Set up the vfolder paths:
-```console
-$ mkdir -p "$HOME/vfroot/local"
-$ backend.ai mgr etcd put volumes/_mount "$HOME/vfroot"
-$ backend.ai mgr etcd put volumes/_default_host local
-```
+### Agents
+Agents are compute node workers that execute kernels:
+- **Agent ID**: Unique identifier for the agent
+- **Status**: Agent state (ALIVE, LOST, TERMINATED)
+- **Available Resources**: CPU, memory, GPU capacity
+- **Occupied Slots**: Currently allocated resources
+- **Scaling Group**: Group to which the agent belongs
 
-Set up the allowed types of vfolder. Allowed values are "user" or "group".
-If none is specified, "user" type is set implicitly:
-```console
-$ backend.ai mgr etcd put volumes/_types/user ""   # enable user vfolder
-$ backend.ai mgr etcd put volumes/_types/group ""  # enable group vfolder
-```
+Agent Monitoring:
+- Manager periodically checks agent health
+- Agent heartbeat and resource status updates
+- Automatic detection of lost agents
+- Kernel rebalancing during failures
 
-Set up the database:
-```console
-$ backend.ai mgr schema oneshot
-$ backend.ai mgr fixture populate sample-configs/example-keypairs.json
-$ backend.ai mgr fixture populate sample-configs/example-resource-presets.json
-```
+### Scaling Groups
+Scaling groups manage agent clusters logically:
+- **Group Name**: Unique identifier for the scaling group
+- **Scheduler Type**: Scheduling algorithm (FIFO, LIFO, DRF, etc.)
+- **Agent Members**: Agents belonging to the group
+- **Allowed vFolder Hosts**: Permitted storage backends
+- **Resource Limits**: Per-group resource limits
 
-Then, run it (for debugging, append a `--debug` flag):
+### Virtual Folders (VFolders)
+VFolders provide persistent storage:
+- **Folder Name**: User-defined folder name
+- **Host**: Storage backend location
+- **Ownership**: User or group ownership
+- **Permissions**: Read/write permissions
+- **Quota**: Storage capacity limit
 
-```console
-$ backend.ai mgr start-server
-```
+## Infrastructure Dependencies
 
-To run tests:
+### Required Infrastructure
 
-```console
-$ python -m flake8 src tests
-$ python -m pytest -m 'not integration' tests
-```
+#### PostgreSQL (Persistent Data)
+- **Purpose**:
+  - Store all Backend.AI metadata
+  - User/Group/Domain information
+  - Session and kernel history
+  - VFolder metadata
+  - Resource allocation records
+- **Halfstack Port**: 8101 (host) → 5432 (container)
+- **Key Tables**:
+  - `users`, `keypairs` - User credentials
+  - `groups`, `domains` - Organization structure
+  - `kernels`, `sessions` - Session information
+  - `agents` - Agent status
+  - `vfolders` - VFolder metadata
+  - `scaling_groups` - Scaling group configuration
 
-Now you are ready to install the agent.
-Head to [the README of Backend.AI Agent](https://github.com/lablup/backend.ai-agent/blob/master/README.md).
+#### Redis (Caching and Real-time Data)
+- **Purpose**:
+  - Cache frequently accessed data
+  - Distributed locking
+  - Agent live status tracking
+  - Session rate limiting
+  - Temporary session data storage
+- **Halfstack Port**: 8111 (host) → 6379 (container)
+- **Key Patterns**:
+  - `keypair.{access_key}` - Access key information cache
+  - `manager.heartbeat` - Manager heartbeat
+  - `ratelimit.{identifier}` - Rate limiting counters
+  - `lock.{resource}` - Distributed lock keys
 
-NOTE: To run tests including integration tests, you first need to install and run the agent on the same host.
+#### etcd (Global Configuration)
+- **Purpose**:
+  - Store cluster-wide configuration
+  - Service discovery
+  - Agent registration
+  - Dynamic configuration updates
+- **Halfstack Port**: 8121 (host) → 2379 (container)
+- **Key Prefixes**:
+  - `config/` - Global configuration
+  - `nodes/manager` - Manager node information
+  - `volumes/` - VFolder host configuration
 
-## Deployment
+### Optional Infrastructure (Observability)
 
-### Configuration
+#### Prometheus (Metrics Collection)
+- **Purpose**:
+  - API request metrics
+  - Session scheduling metrics
+  - Resource usage metrics
+  - Background task metrics
+- **Exposed Endpoint**: `http://localhost:8091/metrics`
+- **Key Metrics**:
+  - `backendai_api_request_count` - Total API requests
+  - `backendai_api_request_duration_sec` - Request processing time
+  - `backendai_scheduler_enqueue_success` - Successful scheduling count
+  - `backendai_agent_registry_count` - Number of agents
 
-Put a TOML-formatted manager configuration (see the sample in `config/sample.toml`)
-in one of the following locations:
+#### Loki (Log Aggregation)
+- **Purpose**:
+  - Session lifecycle events
+  - API request/response logs
+  - Scheduling decision logs
+  - Error and exception logs
+- **Log Labels**:
+  - `component` - Component identifier (manager)
+  - `session_id` - Session identifier
+  - `user_id` - User identifier
+  - `level` - Log level (info, warning, error)
 
- * `manager.toml` (current working directory)
- * `~/.config/backend.ai/manager.toml` (user-config directory)
- * `/etc/backend.ai/manager.toml` (system-config directory)
+#### Grafana (Visualization)
+- **Purpose**:
+  - Real-time metrics dashboards
+  - Resource usage visualization
+  - Session status monitoring
+  - Alert management
 
-Only the first found one is used by the daemon.
+## Configuration
 
-Also many configurations shared by both manager and agent are stored in etcd.
-As you might have noticed above, the manager provides a CLI interface to access and manipulate the etcd
-data.  Check out the help page of our etcd command set:
+See `configs/manager/halfstack.conf` for configuration file examples.
 
-```console
-$ python -m ai.backend.manager.cli etcd --help
-```
+### Key Configuration Items
 
-If you run etcd as a Docker container (e.g., via halfstack), you may use the native client as well.
-In this case, PLEASE BE WARNED that you must prefix the keys with "/sorna/{namespace}" manaully:
+**Database Settings**:
+- PostgreSQL connection string
+- Connection pool size
+- Query timeout settings
 
-```console
-$ docker exec -it ${ETCD_CONTAINER_ID} /bin/ash -c 'ETCDCTL_API=3 etcdctl ...'
-```
+**Redis Settings**:
+- Redis connection information
+- Connection pool configuration
+- Key expiration time
 
-### Running from a command line
+**etcd Settings**:
+- etcd endpoint addresses
+- Configuration key prefixes
+- Watch settings
 
-The minimal command to execute:
+**API Settings**:
+- Listen address and port
+- CORS configuration
+- Rate limiting settings
+- Authentication method
 
-```sh
-python -m ai.backend.gateway.server
-```
+**Scheduling Settings**:
+- Default scheduler type
+- Scheduling interval
+- Resource allocation policy
 
-For more arguments and options, run the command with `--help` option.
+**Session Settings**:
+- Session timeout
+- Maximum session duration
+- Container creation timeout
 
-### Writing a wrapper script
+### Halfstack Configuration
 
-To use with systemd, crontab, and other system-level daemons, you may need to write a shell script
-that executes specific CLI commands provided by Backend.AI modules.
+**Recommended**: Use the `./scripts/install-dev.sh` script for development environment setup.
 
-The following example shows how to set up pyenv and virtualenv for the script-local environment.
-It runs the gateway server if no arguments are given, and execute the given arguments as a shell command
-if any.
-For instance, you may get/set configurations like: `run-manager.sh python -m ai.backend.manager.etcd ...`
-where the name of scripts is `run-manager.sh`.
-
+#### Starting Development Environment
 ```bash
-#! /bin/bash
-if [ -z "$HOME" ]; then
-  export HOME="/home/devops"
-fi
-if [ -z "$PYENV_ROOT" ]; then
-  export PYENV_ROOT="$HOME/.pyenv"
-  export PATH="$PYENV_ROOT/bin:$PATH"
-fi
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
-pyenv activate venv-bai-manager
+# Setup development environment via script (recommended)
+./scripts/install-dev.sh
 
-if [ "$#" -eq 0 ]; then
-  exec python -m ai.backend.gateway.server
-else
-  exec "$@"
-fi
+# Initialize database
+./backend.ai mgr schema oneshot
+
+# Populate sample data
+./backend.ai mgr fixture populate sample-configs/example-keypairs.json
+./backend.ai mgr fixture populate sample-configs/example-resource-presets.json
+
+# Start Manager
+./backend.ai mgr start-server
 ```
 
-### Networking
+#### API Access
+- REST API: http://localhost:8081
+- GraphQL API: http://localhost:8081/graphql
+- Admin GraphQL UI: http://localhost:8081/graphql-ui
 
-The manager and agent should run in the same local network or different
-networks reachable via VPNs, whereas the manager's API service must be exposed to
-the public network or another private network that users have access to.
+## Metrics and Monitoring
 
-The manager requires access to the etcd, the PostgreSQL database, and the Redis server.
+### Prometheus Metrics
 
-| User-to-Manager TCP Ports | Usage |
-|:-------------------------:|-------|
-| manager:{80,443}          | Backend.AI API access |
+#### API Metrics
+Metrics related to API request processing.
 
-| Manager-to-X TCP Ports | Usage |
-|:----------------------:|-------|
-| etcd:2379              | etcd API access |
-| postgres:5432          | Database access |
-| redis:6379             | Redis API access |
+- `backendai_api_request_count`: Total API requests
+  - Labels: method, endpoint, domain, operation, error_detail, status_code
+  - Tracks REST API and GraphQL request counts
 
-The manager must also be able to access TCP ports 6001, 6009, and 30000 to 31000 of the agents in default
-configurations.  You can of course change those port numbers and ranges in the configuration.
+- `backendai_api_request_duration_sec`: API request processing time (seconds)
+  - Labels: method, endpoint, domain, operation, error_detail, status_code
+  - Measures API response time
 
-| Manager-to-Agent TCP Ports | Usage |
-|:--------------------------:|-------|
-| 6001                       | ZeroMQ-based RPC calls from managers to agents |
-| 6009                       | HTTP watcher API |
-| 30000-31000                | Port pool for in-container services |
+#### GraphQL Metrics
+Metrics related to GraphQL query processing.
 
+- `backendai_graphql_query_count`: Total GraphQL queries
+  - Labels: query_name, domain, operation, error_detail, status_code
 
-LICENSES
---------
+- `backendai_graphql_query_duration_sec`: GraphQL query processing time (seconds)
+  - Labels: query_name, domain, operation, error_detail, status_code
 
-[GNU Lesser General Public License](https://github.com/lablup/backend.ai-manager/blob/master/LICENSE)
-[Dependencies](https://github.com/lablup/backend.ai-manager/blob/master/DEPENDENCIES.md)
+#### Event Metrics
+Metrics related to event processing.
+
+- `backendai_event_producer_count`: Event production count
+  - Labels: event_name, status
+  - Tracks successful/failed event production
+
+- `backendai_event_consumer_count`: Event consumption count
+  - Labels: event_name, status
+  - Tracks event processing in consumers
+
+#### Background Task Metrics
+Metrics for background task execution.
+
+- `backendai_background_task_count`: Background task execution count
+  - Labels: task_name, status
+  - Tracks cron jobs and periodic tasks
+
+- `backendai_background_task_duration_sec`: Background task execution time (seconds)
+  - Labels: task_name, status
+
+#### Action Metrics
+Metrics for specific actions and business logic.
+
+- `backendai_action_execution_count`: Action execution count
+  - Labels: action_name, status
+  - Tracks session creation, termination, and other major actions
+
+- `backendai_action_execution_duration_sec`: Action execution time (seconds)
+  - Labels: action_name, status
+
+#### Layer Operation Metrics
+Metrics for operations at each architecture layer.
+
+- `backendai_layer_operation_count`: Operation count per layer
+  - Labels: layer (api/service/repository), operation_name, status
+
+- `backendai_layer_operation_duration_sec`: Operation time per layer (seconds)
+  - Labels: layer, operation_name, status
+
+#### System Metrics
+System-level metrics.
+
+- `backendai_db_connection_pool_size`: Database connection pool size
+  - Current active connections
+
+- `backendai_db_connection_pool_overflow`: Connection pool overflow count
+  - Number of connections exceeding pool limit
+
+- `backendai_redis_connection_count`: Redis connection count
+  - Current active Redis connections
+
+#### Event Propagator Metrics
+Metrics for event propagation to external systems.
+
+- `backendai_event_propagator_webhook_count`: Webhook call count
+  - Labels: event_type, status
+
+- `backendai_event_propagator_webhook_duration_sec`: Webhook call time (seconds)
+  - Labels: event_type, status
+
+### Logs
+- API request/response logs
+- Session scheduling decision logs
+- Resource allocation/release events
+- Authentication and authorization events
+- Background task execution logs
+- Error and exception stack traces
+
+## Communication Protocols
+
+### Agent Communication
+- **Protocol**: ZeroMQ RPC
+- **Port**: 6011 (agent RPC server)
+- **Main Operations**:
+  - `create_kernel`: Create kernel
+  - `destroy_kernel`: Destroy kernel
+  - `restart_kernel`: Restart kernel
+  - `execute_code`: Execute code
+  - `upload_file`: File upload
+  - `download_file`: File download
+  - `get_container_stats`: Get container resource usage
+
+### Storage Proxy Communication
+- **Protocol**: HTTP/gRPC
+- **Port**: 6021 (client API), 6022 (manager API)
+- **Main Operations**:
+  - `create_vfolder`: Create VFolder
+  - `delete_vfolder`: Delete VFolder
+  - `upload_file`: Upload file to VFolder
+  - `download_file`: Download file from VFolder
+  - `list_files`: List VFolder files
+
+### etcd Communication
+- **Protocol**: gRPC (etcd v3 API)
+- **Port**: 2379
+- **Main Operations**:
+  - `get`: Get configuration values
+  - `put`: Set configuration values
+  - `watch`: Watch configuration changes
+  - `lease`: Manage service registration
+
+## Development
+
+See [README.md](./README.md) for development setup instructions.
+
+## Related Documentation
+
+- [Session Scheduling](./scheduler/README.md) - Session scheduling algorithms and policies
+- [Agent Component](../agent/README.md) - Agent component
+- [Storage Proxy Component](../storage/README.md) - Storage proxy component
+- [Overall Architecture](../README.md) - System-wide architecture
