@@ -66,9 +66,14 @@ from ..errors.common import InternalServerError, ObjectNotFound
 from ..errors.kernel import BackendAgentError
 from ..errors.service import ModelServiceDependencyNotCleared
 from ..errors.storage import (
+    ModelServiceDependencyNotCleared as VFolderMountedOnModelService,
+)
+from ..errors.storage import (
     TooManyVFoldersFound,
+    VFolderAlreadyExists,
     VFolderFilterStatusFailed,
     VFolderFilterStatusNotAvailable,
+    VFolderInvalidParameter,
     VFolderNotFound,
     VFolderOperationFailed,
 )
@@ -136,13 +141,6 @@ from ..services.vfolder.actions.invite import (
     RevokeInvitedVFolderAction,
     UpdateInvitationAction,
     UpdateInvitedVFolderMountPermissionAction,
-)
-from ..services.vfolder.exceptions import (
-    ModelServiceDependencyNotCleared as VFolderMountedOnModelService,
-)
-from ..services.vfolder.exceptions import (
-    VFolderAlreadyExists,
-    VFolderInvalidParameter,
 )
 from ..types import OptionalState
 from .auth import admin_required, auth_required, superadmin_required
