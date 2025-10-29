@@ -10,7 +10,7 @@ import numbers
 import textwrap
 import uuid
 from abc import ABC, ABCMeta, abstractmethod
-from collections import UserDict, defaultdict, namedtuple
+from collections import UserDict, UserString, defaultdict, namedtuple
 from collections.abc import AsyncIterator, Iterable
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -313,7 +313,49 @@ AGENTID_MANAGER = AgentId("manager")
 AGENTID_STORAGE = AgentId("storage")
 DeviceName = NewType("DeviceName", str)
 DeviceId = NewType("DeviceId", str)
-SlotName = NewType("SlotName", str)
+
+
+class SlotName(UserString):
+    __slots__ = ("_parsed", "_device_name", "_major_type", "_minor_type")
+
+    def __init__(self, value: str | SlotName) -> None:
+        super().__init__(value)
+        self._parsed = False
+
+    def _parse(self) -> None:
+        # Do lazy-parsing for when required only because SlotName is used
+        # very frequently in certain code paths to represent subtypes,
+        # without actually needing to access parsed attributes.
+        if self._parsed:
+            return
+        name, _, type_ = self.data.partition(".")
+        major_type, _, minor_type = type_.partition(":")
+        self._device_name = name
+        self._major_type = major_type
+        self._minor_type = minor_type
+        self._parsed = True
+
+    @property
+    def device_name(self) -> str:
+        self._parse()
+        return self._device_name
+
+    @property
+    def major_type(self) -> str:
+        self._parse()
+        return self._major_type
+
+    @property
+    def minor_type(self) -> str:
+        self._parse()
+        return self._minor_type
+
+    def is_accelerator(self) -> bool:
+        if self.major_type in ("device", "devices", "share", "shares"):
+            return True
+        return False
+
+
 MetricKey = NewType("MetricKey", str)
 
 AccessKey = NewType("AccessKey", str)
