@@ -479,18 +479,17 @@ class BaseContainerRegistry(metaclass=ABCMeta):
         if (reporter := progress_reporter.get()) is not None:
             reporter.total_progress += 1
 
-        async with concurrency_sema.get():
-            config_digest = image_info["config"]["digest"]
-            size_bytes = (
-                sum(layer["size"] for layer in image_info["layers"]) + image_info["config"]["size"]
-            )
+        config_digest = image_info["config"]["digest"]
+        size_bytes = (
+            sum(layer["size"] for layer in image_info["layers"]) + image_info["config"]["size"]
+        )
 
-            async with sess.get(
-                self.registry_url / f"v2/{image}/blobs/{config_digest}",
-                **rqst_args,
-            ) as resp:
-                resp.raise_for_status()
-                config_data = await read_json(resp)
+        async with sess.get(
+            self.registry_url / f"v2/{image}/blobs/{config_digest}",
+            **rqst_args,
+        ) as resp:
+            resp.raise_for_status()
+            config_data = await read_json(resp)
 
         labels = {}
         if _config_labels := (config_data.get("config") or {}).get("Labels"):
