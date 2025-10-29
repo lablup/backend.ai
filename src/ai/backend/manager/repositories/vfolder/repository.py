@@ -24,7 +24,11 @@ from ai.backend.manager.data.vfolder.types import (
 )
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.resource import GroupNotFound
-from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed, VFolderNotFound
+from ai.backend.manager.errors.storage import (
+    VFolderDeletionNotAllowed,
+    VFolderInvalidParameter,
+    VFolderNotFound,
+)
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.group import GroupRow, ProjectType
 from ai.backend.manager.models.keypair import KeyPairRow
@@ -49,7 +53,6 @@ from ai.backend.manager.models.vfolder import (
     query_accessible_vfolders,
     vfolders,
 )
-from ai.backend.manager.services.vfolder.exceptions import VFolderInvalidParameter
 
 from ..permission_controller.role_manager import RoleManager
 
