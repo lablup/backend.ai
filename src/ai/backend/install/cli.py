@@ -339,25 +339,25 @@ class InstallReport(Static):
                 """
                     )
                 )
-            with TabPane("Local Proxy", id="wsproxy"):
+            with TabPane("App-Proxy Coordinator", id="appproxy-coordinator"):
                 yield Markdown(
                     textwrap.dedent(
                         f"""
-                Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
-                $ ./backendai-wsproxy wsproxy start-server
+                $ ./backend.ai app-proxy coordinator start-server --debug
                 ```
-
-                It works if the console output ends with something like:
+                """
+                    )
+                )
+            with TabPane("App-Proxy Worker", id="appproxy-worker"):
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./backend.ai app-proxy worker start-server --debug
                 ```
-                ...
-                2024-07-03 13:19:44.536 INFO ai.backend.wsproxy.proxy.frontend.http.port [2596460] accepting proxy requests from 0.0.0.0:10200~10300
-                2024-07-03 13:19:44.536 INFO ai.backend.wsproxy.server [2596460] started handling API requests at 0.0.0.0:{service.local_proxy_addr.bind.port}
-                ...
-                ```
-
-                To terminate, send SIGINT or press Ctrl+C in the console.
                 """
                     )
                 )
