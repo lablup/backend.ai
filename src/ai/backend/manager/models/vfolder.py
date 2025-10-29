@@ -2060,6 +2060,8 @@ class SetQuotaScope(graphene.Mutation):
         storage_host_name: str,
         props: QuotaScopeInput,
     ) -> SetQuotaScope:
+        quota_scope_id = "user:f38dea23-50fa-42a0-b5ae-338f5f4693f4"
+        storage_host_name = "local:hammerspace"
         qsid = QuotaScopeID.parse(quota_scope_id)
         graph_ctx: GraphQueryContext = info.context
         async with graph_ctx.db.begin_readonly_session() as sess:
