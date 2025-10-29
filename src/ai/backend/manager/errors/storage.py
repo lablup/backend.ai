@@ -165,19 +165,6 @@ class VFolderPermissionError(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class InsufficientPrivilege(BackendAIError, web.HTTPForbidden):
-    error_type = "https://api.backend.ai/probs/insufficient-privilege"
-    error_title = "Insufficient privilege to access the virtual folder."
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.FORBIDDEN,
-        )
-
-
 class VFolderInvitationNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/vfolder-invitation-not-found"
     error_title = "Virtual folder invitation not found."
@@ -227,19 +214,6 @@ class VFolderDeletionNotAllowed(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.SOFT_DELETE,
             error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
-class ModelServiceDependencyNotCleared(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/model-service-dependency-not-cleared"
-    error_title = "Cannot delete model VFolders bound to alive model services."
-
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.VFOLDER,
-            operation=ErrorOperation.SOFT_DELETE,
-            error_detail=ErrorDetail.CONFLICT,
         )
 
 

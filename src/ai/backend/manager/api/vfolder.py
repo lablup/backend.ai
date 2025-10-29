@@ -66,9 +66,6 @@ from ..errors.common import InternalServerError, ObjectNotFound
 from ..errors.kernel import BackendAgentError
 from ..errors.service import ModelServiceDependencyNotCleared
 from ..errors.storage import (
-    ModelServiceDependencyNotCleared as VFolderMountedOnModelService,
-)
-from ..errors.storage import (
     TooManyVFoldersFound,
     VFolderAlreadyExists,
     VFolderFilterStatusFailed,
@@ -1718,8 +1715,6 @@ async def delete_by_id(request: web.Request, params: DeleteRequestModel) -> web.
         )
     except VFolderInvalidParameter as e:
         raise InvalidAPIParameters(str(e))
-    except VFolderMountedOnModelService:
-        raise ModelServiceDependencyNotCleared()
     return web.Response(status=HTTPStatus.NO_CONTENT)
 
 
