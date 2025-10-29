@@ -106,7 +106,7 @@ class ContainerRegistryRow(Base):
     __tablename__ = "container_registries"
     id = IDColumn()
     url = sa.Column("url", sa.String(length=512), index=True, nullable=False)
-    registry_name = sa.Column("registry_name", sa.String(length=50), index=True, nullable=False)
+    registry_name = sa.Column("registry_name", sa.String(), index=True, nullable=False)
     type = sa.Column(
         "type",
         StrEnumType(ContainerRegistryType),
