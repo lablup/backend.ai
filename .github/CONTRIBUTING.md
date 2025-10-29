@@ -27,7 +27,7 @@ Examples:
 - Sprint releases in March and September are supported for 1 year
 - Example: The `25.6` release (released in March 2025) is supported as LTS until March 2026
 
-Before you make a contribution, ensure that which branch is the target you want to
+Before you make a contribution, ensure which branch is the target you want to
 contribute to.
 Please take a look at [our versioning scheme
 document](https://docs.backend.ai/en/latest/dev/version-management-and-upgrades.html#version-numbering)
