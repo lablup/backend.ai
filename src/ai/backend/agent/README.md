@@ -1,290 +1,448 @@
 # Backend.AI Agent
 
-The Backend.AI Agent is a small daemon that does:
+## Purpose
 
-* Reports the status and available resource slots of a worker to the manager
-* Routes code execution requests to the designated kernel container
-* Manages the lifecycle of kernel containers (create/monitor/destroy them)
+The Agent is a compute node component responsible for container lifecycle management. It runs computing sessions as containers, monitors resource usage, and reports status to the Manager.
 
-## Package Structure
+## Key Responsibilities
 
-* `ai.backend`
-  - `agent`: The agent package
-    - `docker`: A docker-based backend implementation for the kernel lifecycle interface.
-    - `server`: The agent daemon which communicates with the manager and the Docker daemon
-    - `watcher`: A side-by-side daemon which provides a separate HTTP endpoint for accessing the status
-      information of the agent daemon and manipulation of the agent's systemd service
-  - `helpers`: A utility package that is available as `ai.backend.helpers` *inside* Python-based containers
-  - `kernel`: Language-specific runtimes (mostly ipykernel client adaptor) which run *inside* containers
-  - `runner`: Auxiliary components (usually self-contained binaries) mounted *inside* containers
+### 1. Container Lifecycle Management
+- Create and start containers from session specifications
+- Initialize kernels and execute runtime configuration
+- Monitor container health and status
+- Delete containers upon session termination
+- Handle container restarts and error recovery
 
+### 2. Resource Monitoring
+- Track CPU, memory, GPU usage per container
+- Monitor disk I/O and network traffic
+- Collect accelerator metrics (CUDA, ROCm, TPU)
+- Report resource availability to Manager
+- Enforce resource limits via cgroups
 
-## Installation
+### 3. Local Storage Management
+- Manage scratch storage for temporary files
+- Mount virtual folders (vfolders) to containers
+- Handle file permissions and ownership
+- Clean up storage after session termination
 
-Please visit [the installation guides](https://github.com/lablup/backend.ai/wiki).
+### 4. Service Port Management
+- Expose container service ports (Jupyter, SSH, TensorBoard, etc.)
+- Forward traffic from App Proxy to containers
+- Manage port allocation from configured ranges
+- Handle SSL/TLS termination when needed
 
+### 5. Agent Status Reporting
+- Periodically report agent status to Manager
+- Send heartbeat signals indicating availability
+- Update occupied and available resource slots
+- Report errors and exceptional conditions
 
-### Kernel/system configuration
-
-#### Recommended kernel parameters in the bootloader (e.g., Grub):
+## Architecture
 
 ```
-cgroup_enable=memory swapaccount=1
+┌────────────────────────────────────────┐
+│         Agent Server (agent.py)        │
+├────────────────────────────────────────┤
+│    Container Backend (docker/)         │  ← Docker
+├────────────────────────────────────────┤
+│  Resource Monitor (watcher/ stats.py)  │  ← CPU, GPU, Memory
+├────────────────────────────────────────┤
+│   Storage Manager (scratch.py fs.py)   │  ← Local and mounted storage
+├────────────────────────────────────────┤
+│      Plugin System (plugin/)           │  ← Accelerator plugins
+└────────────────────────────────────────┘
 ```
 
-#### Recommended resource limits:
+## Directory Structure
 
-**`/etc/security/limits.conf`**
 ```
-root hard nofile 512000
-root soft nofile 512000
-root hard nproc 65536
-root soft nproc 65536
-user hard nofile 512000
-user soft nofile 512000
-user hard nproc 65536
-user soft nproc 65536
-```
-
-**sysctl**
-```
-fs.file-max=2048000
-fs.inotify.max_user_watches=524288
-net.core.somaxconn=1024
-net.ipv4.tcp_max_syn_backlog=1024
-net.ipv4.tcp_slow_start_after_idle=0
-net.ipv4.tcp_fin_timeout=10
-net.ipv4.tcp_window_scaling=1
-net.ipv4.tcp_tw_reuse=1
-net.ipv4.tcp_early_retrans=1
-net.ipv4.ip_local_port_range=40000 65000
-net.core.rmem_max=16777216
-net.core.wmem_max=16777216
-net.ipv4.tcp_rmem=4096 12582912 16777216
-net.ipv4.tcp_wmem=4096 12582912 16777216
-net.netfilter.nf_conntrack_max=10485760
-net.netfilter.nf_conntrack_tcp_timeout_established=432000
-net.netfilter.nf_conntrack_tcp_timeout_close_wait=10
-net.netfilter.nf_conntrack_tcp_timeout_fin_wait=10
-net.netfilter.nf_conntrack_tcp_timeout_time_wait=10
+agent/
+├── docker/              # Docker container backend
+│   ├── agent.py        # Docker-specific agent implementation
+│   └── resources.py    # Docker resource management
+├── watcher/             # Resource monitoring
+│   ├── cpu.py          # CPU monitoring
+│   ├── mem.py          # Memory monitoring
+│   └── gpu.py          # GPU monitoring
+├── plugin/              # Accelerator plugins
+│   ├── cuda.py         # NVIDIA CUDA support
+│   ├── rocm.py         # AMD ROCm support
+│   └── tpu.py          # Google TPU support
+├── observer/            # Metrics observers
+│   └── stat.py         # Statistics collection
+├── cli/                 # CLI commands
+├── config/              # Configuration
+├── agent.py             # Main agent logic
+├── server.py            # RPC server entry point
+├── kernel.py            # Kernel (container) management
+├── resources.py         # Resource allocation
+├── stats.py             # Statistics aggregation
+├── scratch.py           # Scratch storage management
+└── fs.py                # Filesystem utilities
 ```
 
-The `ip_local_port_range` should not overlap with the container port range pool
-(default: 30000 to 31000).
+## Core Concepts
 
-To apply netfilter settings during the boot time, you may need to add `nf_conntrack` to `/etc/modules`
-so that `sysctl` could set the `net.netfilter.nf_conntrack_*` values.
+### Kernels
+Kernels represent running containers executing computing sessions:
+- **Kernel ID**: Unique identifier for the container
+- **Session ID**: Associated session in Manager
+- **Image**: Container image (e.g., `lablup/python:3.11-ubuntu20.04`)
+- **Resources**: Allocated CPU, memory, GPU slots
+- **Status**: PREPARING, RUNNING, RESTARTING, TERMINATING, TERMINATED
+- **Service Ports**: Exposed ports for services (Jupyter, SSH, etc.)
 
+### Container Backend
+The Agent supports multiple container runtimes:
+- **Docker**: Standard Docker containers
 
-### For development
+The Docker backend implements these interfaces:
+- `create_kernel()`: Create new container
+- `destroy_kernel()`: Remove container
+- `restart_kernel()`: Restart container
+- `get_kernel_status()`: Query container status
+- `execute_code()`: Execute code in container
 
-#### Prerequisites
+### Resource Allocation
+Resources are allocated from the agent's capacity:
+- **CPU Slots**: Measured in cores (e.g., 2.0 cores)
+- **Memory Slots**: Measured in bytes (e.g., 4GB)
+- **GPU Slots**: Number of GPU devices (e.g., 1 GPU)
+- **Accelerator Slots**: Custom accelerator resources
 
-* Python 3.6 or higher with [pyenv](https://github.com/pyenv/pyenv)
-and [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) (optional but recommneded)
-* Docker 18.03 or later with docker-compose (18.09 or later is recommended)
+The Agent tracks:
+- **Total Capacity**: Maximum available resources
+- **Occupied Slots**: Currently allocated resources
+- **Available Slots**: Remaining resources for new sessions
 
-First, you need **a working manager installation**.
-For the detailed instructions on installing the manager, please refer
-[the manager's README](https://github.com/lablup/backend.ai-manager/blob/master/README.md)
-and come back here again.
+### Scratch Storage
+Each kernel receives local scratch storage:
+- **Location**: `/tmp/backend.ai/scratches/{kernel_id}`
+- **Quota**: Configurable size limit per kernel
+- **Cleanup**: Automatically removed after kernel termination
+- **Performance**: Local SSD for fast I/O
 
-#### Preparing working copy
+### Virtual Folder Mounting
+VFolders are mounted to containers at runtime:
+- **Mount Point**: `/home/work/{vfolder_name}`
+- **Permissions**: RO, RW, or RW-DELETE
+- **Backend**: Storage Proxy manages actual storage
+- **Protocol**: NFS, SMB, or direct mount
 
-Install and activate [`git-lfs`](https://git-lfs.github.com/) to work with pre-built binaries in
-`src/ai/backend/runner`.
+## Resource Monitoring
 
-```console
-$ git lfs install
+### CPU Monitoring
+- Track per-container CPU usage via cgroups
+- Measure CPU time in user and system modes
+- Calculate CPU utilization percentages
+- Enforce CPU quotas and limits
+
+### Memory Monitoring
+- Track RSS (Resident Set Size) per container
+- Measure cache and swap usage
+- Detect OOM (Out-of-Memory) conditions
+- Enforce memory limits via cgroups
+
+### GPU Monitoring
+- Query NVIDIA GPUs via NVML (nvidia-ml-py)
+- Query AMD GPUs via ROCm SMI
+- Track GPU utilization and memory usage
+- Measure GPU temperature and power consumption
+
+### Disk I/O Monitoring
+- Track read/write operations per container
+- Measure I/O bandwidth usage
+- Monitor disk space consumption
+- Enforce I/O throttling when configured
+
+## Plugin System
+
+The Agent uses plugins for accelerator support:
+
+### CUDA Plugin
+- Detect NVIDIA GPUs via `nvidia-smi`
+- Allocate GPU devices to containers
+- Set `CUDA_VISIBLE_DEVICES` environment variable
+- Monitor GPU metrics via NVML
+
+### ROCm Plugin
+- Detect AMD GPUs via `rocm-smi`
+- Allocate GPU devices to containers
+- Set `HIP_VISIBLE_DEVICES` environment variable
+- Monitor GPU metrics via ROCm
+
+### TPU Plugin
+- Detect Google TPUs
+- Configure TPU access for TensorFlow
+- Monitor TPU utilization
+
+## Communication Protocols
+
+### Manager → Agent (ZeroMQ RPC)
+- **Port**: 6011 (default)
+- **Protocol**: ZeroMQ request-response
+- **Operations**:
+  - `create_kernel`: Create new container
+  - `destroy_kernel`: Terminate container
+  - `restart_kernel`: Restart container
+  - `execute_code`: Execute code in container
+  - `get_status`: Query agent and kernel status
+
+### Agent → Manager (HTTP Watcher API)
+- **Port**: 6009 (default)
+- **Protocol**: HTTP
+- **Operations**:
+  - Heartbeat signals
+  - Resource usage reporting
+  - Kernel status updates
+  - Error notifications
+
+### Agent → Storage Proxy
+- **Protocol**: HTTP or NFS/SMB
+- **Operations**:
+  - Mount vfolder
+  - Unmount vfolder
+  - Query vfolder metadata
+
+## Container Execution Flow
+
+```
+1. Manager sends create_kernel RPC
+   ↓
+2. Agent validates resource availability
+   ↓
+3. Agent pulls container image (if needed)
+   ↓
+4. Agent creates scratch directory
+   ↓
+5. Agent mounts vfolders via Storage Proxy
+   ↓
+6. Agent creates container with resources
+   ↓
+7. Agent starts container and runs init script
+   ↓
+8. Agent registers service ports
+   ↓
+9. Agent reports kernel status to Manager
+   ↓
+10. Container runs until termination
+   ↓
+11. Agent cleans up resources upon termination
 ```
 
-Next, prepare the source clone of the agent and install from it as follows.
-`pyenv` is just a recommendation; you may use other virtualenv management tools.
+## Service Ports
 
-```console
-$ git clone https://github.com/lablup/backend.ai-agent agent
-$ cd agent
-$ pyenv virtualenv venv-agent
-$ pyenv local venv-agent
-$ pip install -U pip setuptools
-$ pip install -U -r requirements/dev.txt
+Containers can expose service ports:
+- **Jupyter Notebook**: Port 8080 (HTTP)
+- **Jupyter Lab**: Port 8090 (HTTP)
+- **SSH**: Port 2200 (TCP)
+- **TensorBoard**: Port 6006 (HTTP)
+- **Custom Services**: User-defined ports
+
+Service ports are:
+- **Allocated** from configured range (default 30000-31000)
+- **Registered** with App Proxy for external access
+- **Forwarded** from agent host to container
+- **Cleaned up** upon container termination
+
+## Configuration
+
+See `configs/agent/halfstack.toml` for configuration file examples.
+
+### Key Configuration Items
+
+**Agent Basic Settings**:
+- Agent ID and region information
+- Resource slot definitions
+- Container runtime configuration (Docker)
+
+**Storage Settings**:
+- Scratch storage root path
+- Per-session quota
+
+**Service Port Settings**:
+- Container port range
+
+**Resource Monitoring**:
+- Watcher interval settings
+
+## Infrastructure Dependencies
+
+### Required Infrastructure
+
+#### Container Runtime
+- **Purpose**: Container creation and management
+- **Supported Runtimes**: Docker
+
+#### Redis (Event and State Management)
+- **Purpose**:
+  - Send heartbeat events (for Manager registration)
+  - Update agent status
+  - Manage background tasks
+- **Note**: Agent registers with Manager via Redis and receives RPC commands from Manager.
+
+#### Manager Connection
+- **Protocol**: ZeroMQ RPC (6011), HTTP Watcher API (6009)
+- **Purpose**: Receive session commands from Manager, report status
+- **Note**: Agent only receives commands from Manager, not directly from users or other components.
+
+#### etcd (Global Configuration)
+- **Purpose**:
+  - Retrieve global configuration (container registry, storage volumes, etc.)
+  - Auto-discover Manager address
+
+### Optional Infrastructure (Observability)
+
+Optional infrastructure for Agent monitoring.
+
+#### Prometheus (Metrics Collection)
+- **Purpose**:
+  - Monitor agent resource utilization
+  - Collect kernel (container) metrics
+  - Track heartbeat and health status
+- **Exposed Endpoint**: `http://localhost:6009/metrics`
+- **Key Metrics**:
+  - `backendai_agent_heartbeat` - Last heartbeat timestamp
+  - `backendai_agent_cpu_usage` - CPU usage percentage
+  - `backendai_agent_mem_usage` - Memory usage (bytes)
+  - `backendai_agent_gpu_usage` - GPU usage percentage
+  - `backendai_kernel_count` - Number of running kernels
+- **Service Discovery**: Automatically registered via Manager's HTTP SD
+  - Agent auto-registers with Manager at startup
+  - Manager provides agent information to Prometheus SD
+
+#### Loki (Log Aggregation)
+- **Purpose**:
+  - Centralized agent log collection
+  - Aggregate kernel execution logs
+  - Track errors and debugging information
+- **Log Transmission Methods**:
+  - Direct HTTP API usage
+  - Use Promtail or Fluent Bit
+- **Log Labels**:
+  - `agent_id` - Agent identifier
+  - `kernel_id` - Kernel identifier
+  - `level` - Log level
+
+#### Container Runtime Metrics
+- **Docker**: Container metrics via cAdvisor or Docker API
+- **cgroups**: Direct cgroups filesystem reading
+
+### Container Runtime Requirements
+
+#### Docker
+- **Minimum Version**: Docker 20.10+
+- **Required Features**:
+  - cgroups v2 support (resource limits)
+  - GPU support (NVIDIA Docker Runtime or CDI)
+
+### Storage Requirements
+
+#### Local Scratch Storage
+- **Purpose**: Temporary files, build cache
+- **Recommended Specifications**:
+  - Fast SSD (NVMe recommended)
+  - Minimum 100GB free space
+  - Configurable per-session quota
+
+#### VFolder Mount
+- **Protocol**: NFS, SMB, direct mount
+- **Dependencies**: Storage Proxy or direct storage access
+- **Recommendations**:
+  - High-performance network (10GbE or higher)
+  - Low-latency storage
+
+### Halfstack Configuration
+
+**Recommended**: Use the `./scripts/install-dev.sh` script for development environment setup.
+
+#### Starting Development Environment
+```bash
+# Setup development environment via script (recommended)
+./scripts/install-dev.sh
+
+# Start Agent
+./backend.ai ag start-server
 ```
 
-### Linting
+#### Observability Integration
+Agent automatically registers with Prometheus via Manager's Service Discovery.
 
-We use `flake8` and `mypy` to statically check our code styles and type consistency.
-Enable those linters in your favorite IDE or editor.
+## Metrics and Monitoring
 
-### Halfstack (single-node development & testing)
+### Prometheus Metrics
+Agent exposes metrics:
 
-With the halfstack, you can run the agent simply.
-Note that you need a working manager running with the halfstack already!
+#### RPC Related Metrics
+Metrics related to processing RPC commands received from Manager.
 
-#### Recommended directory structure
+- `backendai_rpc_requests_total`: Total RPC requests
+  - Labels: method
+  - Tracks processing frequency by Manager command type
 
-* `backend.ai-dev`
-  - `manager` (git clone from [the manager repo](https://github.com/lablup/backend.ai-manager))
-  - `agent` (git clone from here)
-  - `common` (git clone from [the common repo](https://github.com/lablup/backend.ai-common))
+- `backendai_rpc_failure_requests_total`: Failed RPC requests
+  - Labels: method, exception
+  - Analyzes RPC command processing failure causes
 
-Install `backend.ai-common` as an editable package in the agent (and the manager) virtualenvs
-to keep the codebase up-to-date.
+- `backendai_rpc_request_duration_seconds`: RPC request processing time (seconds)
+  - Labels: method
+  - Measures performance of RPC commands like kernel creation/deletion
 
-```console
-$ cd agent
-$ pip install -U -e ../common
-```
+#### Resource Utilization Metrics
+Metrics related to container and hardware resource usage.
 
-#### Steps
+- `backendai_container_utilization`: Container resource utilization
+  - Labels: container_metric_name, agent_id, kernel_id, session_id, user_id, project_id, value_type
+  - Tracks resource usage per kernel (CPU, memory, GPU, etc.)
 
-```console
-$ mkdir -p "./scratches"
-$ cp config/halfstack.toml ./agent.toml
-```
+- `backendai_device_utilization`: Physical device utilization
+  - Labels: device_metric_name, agent_id, device_id, value_type
+  - Tracks hardware device usage (GPU, NPU, etc.) on agent node
 
-If you're running agent under linux, make sure you've set appropriate iptables rule 
-before starting agent. This can be done by executing script `scripts/update-metadata-iptables.sh` 
-before each agent start.
+#### Container Lifecycle Synchronization Metrics
+Metrics related to container state synchronization operations.
 
-Then, run it (for debugging, append a `--debug` flag):
+- `backendai_sync_container_lifecycle_trigger_count`: Synchronization trigger count
+  - Labels: agent_id
+  - Frequency of container state synchronization between Manager and Agent
 
-```console
-$ python -m ai.backend.agent.server
-```
+- `backendai_sync_container_lifecycle_success_count`: Synchronization success count
+  - Labels: agent_id
+  - Number of successfully synchronized kernels
 
-To run the agent-watcher:
+- `backendai_sync_container_lifecycle_failure_count`: Synchronization failure count
+  - Labels: agent_id, exception
+  - Tracks synchronization failure causes
 
-```console
-$ python -m ai.backend.agent.watcher
-```
+#### Statistics Collection Task Metrics
+Metrics related to node, container, and process level statistics collection.
 
-The watcher shares the same configuration TOML file with the agent.
-Note that the watcher is only meaningful if the agent is installed as a systemd service
-named `backendai-agent.service`.
+- `backendai_stat_task_trigger_count`: Statistics collection trigger count
+  - Labels: agent_id, stat_scope
+  - Collection frequency by Node/Container/Process level
 
-To run tests:
+- `backendai_stat_task_success_count`: Statistics collection success count
+  - Labels: agent_id, stat_scope
+  - Tracks statistics collection success rate
 
-```console
-$ python -m flake8 src tests
-$ python -m pytest -m 'not integration' tests
-```
+- `backendai_stat_task_failure_count`: Statistics collection failure count
+  - Labels: agent_id, stat_scope, exception
+  - Analyzes statistics collection failure causes
 
+### Logs
+Agent logs include:
+- Kernel creation and termination events
+- Resource allocation and release
+- Error situations and recovery operations
+- RPC request/response tracking
 
-## Deployment
+## Development
 
-### Configuration
+See [README.md](./README.md) for development setup instructions.
 
-Put a TOML-formatted agent configuration (see the sample in `config/sample.toml`)
-in one of the following locations:
+## Related Documentation
 
- * `agent.toml` (current working directory)
- * `~/.config/backend.ai/agent.toml` (user-config directory)
- * `/etc/backend.ai/agent.toml` (system-config directory)
-
-Only the first found one is used by the daemon.
-
-The agent reads most other configurations from the etcd v3 server where the cluster
-administrator or the Backend.AI manager stores all the necessary settings.
-
-The etcd address and namespace must match with the manager to make the agent
-paired and activated.
-By specifying distinguished namespaces, you may share a single etcd cluster with multiple
-separate Backend.AI clusters.
-
-By default the agent uses `/var/cache/scratches` directory for making temporary
-home directories used by kernel containers (the `/home/work` volume mounted in
-containers).  Note that the directory must exist in prior and the agent-running
-user must have ownership of it.  You can change the location by
-`scratch-root` option in `agent.toml`.
-
-### Running from a command line
-
-The minimal command to execute:
-
-```sh
-python -m ai.backend.agent.server
-python -m ai.backend.agent.watcher
-```
-
-For more arguments and options, run the command with `--help` option.
-
-### Example config for systemd
-
-`/etc/systemd/system/backendai-agent.service`:
-
-```dosini
-[Unit]
-Description=Backend.AI Agent
-Requires=docker.service
-After=network.target remote-fs.target docker.service
-
-[Service]
-Type=simple
-User=root
-Group=root
-Environment=HOME=/home/user
-ExecStart=/home/user/backend.ai/agent/run-agent.sh
-WorkingDirectory=/home/user/backend.ai/agent
-KillMode=process
-KillSignal=SIGTERM
-PrivateTmp=false
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-`/home/user/backend.ai/agent/run-agent.sh`:
-
-```sh
-#! /bin/sh
-if [ -z "$PYENV_ROOT" ]; then
-  export PYENV_ROOT="$HOME/.pyenv"
-  export PATH="$PYENV_ROOT/bin:$PATH"
-fi
-eval "$(pyenv init -)"
-eval "$(pyenv virtualenv-init -)"
-
-cd /home/user/backend.ai/agent
-if [ "$#" -eq 0 ]; then
-  sh /home/user/backend.ai/agent/scripts/update-metadata-iptables.sh
-  exec python -m ai.backend.agent.server
-else
-  exec "$@"
-fi
-```
-
-### Networking
-
-The manager and agent should run in the same local network or different
-networks reachable via VPNs, whereas the manager's API service must be exposed to
-the public network or another private network that users have access to.
-
-The manager must be able to access TCP ports 6001, 6009, and 30000 to 31000 of the agents in default
-configurations.  You can of course change those port numbers and ranges in the configuration.
-
-| Manager-to-Agent TCP Ports | Usage |
-|:--------------------------:|-------|
-| 6001                       | ZeroMQ-based RPC calls from managers to agents |
-| 6009                       | HTTP watcher API |
-| 30000-31000                | Port pool for in-container services |
-
-The operation of agent itself does not require both incoming/outgoing access to
-the public Internet, but if the user's computation programs need the Internet, the docker containers
-should be able to access the public Internet (maybe via some corporate firewalls).
-
-| Agent-to-X TCP Ports     | Usage |
-|:------------------------:|-------|
-| manager:5002             | ZeroMQ-based event push from agents to the manager |
-| etcd:2379                | etcd API access |
-| redis:6379               | Redis API access |
-| docker-registry:{80,443} | HTTP watcher API |
-| (Other hosts)            | Depending on user program requirements |
-
-
-LICENSES
---------
-
-[GNU Lesser General Public License](https://github.com/lablup/backend.ai-agent/blob/master/LICENSE)
-[Dependencies](https://github.com/lablup/backend.ai-manager/blob/agent/DEPENDENCIES.md)
+- [Manager Component](../manager/README.ko.md) - Session orchestration
+- [Storage Proxy Component](../storage/README.ko.md) - Virtual folder management
+- [Overall Architecture](../README.ko.md) - System-wide architecture

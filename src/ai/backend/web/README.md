@@ -1,64 +1,308 @@
-# Backend.AI Web Server
+# Backend.AI Webserver
 
-[![GitHub version](https://badge.fury.io/gh/lablup%2Fbackend.ai-webserver.svg)](https://badge.fury.io/gh/lablup%2Fbackend.ai-webserver) [![PyPI version](https://badge.fury.io/py/backend.ai-webserver.svg)](https://badge.fury.io/py/backend.ai-webserver)
+## Purpose
 
-A webapp hosting daemon which serves our `webui` as a SPA and proxies API requests
+The Webserver provides a web-based user interface, maintains user sessions, and proxies requests signed with JWT (for GraphQL) or HMAC (for REST API) using the user's access key and secret key to the Manager API gateway. Login processing and authentication are all handled by the Manager.
 
+## Key Responsibilities
 
-## Installation
+### 1. Web UI Hosting
+- Serve static web UI assets (HTML, CSS, JavaScript)
+- Provide template rendering for server-side pages
+- Handle web UI routing and navigation
+- Provide responsive web interface
 
-Prepare a Python virtualenv (Python 3.9 or higher) and a Redis server (6.2 or higher).
+### 2. Session Management
+- Maintain web sessions (Redis-based)
+- Manage user's access key and secret key stored in sessions
+- Handle session timeouts
+- **Note**: Login processing and authentication are handled by Manager
 
-```console
-$ git clone https://github.com/lablup/backend.ai-webserver webserver
-$ cd webserver
-$ pip install -U -e .
-$ cp webserver.sample.conf webserver.conf
+### 3. Request Signing and Proxying
+- Sign requests using user's access key/secret key
+  - GraphQL requests: JWT signature
+  - REST API requests: HMAC signature
+- Forward signed API requests to Manager
+- Stream API responses
+- Support WebSocket proxying
+
+### 4. Security
+- CORS (Cross-Origin Resource Sharing) handling
+- User input sanitization
+- Rate limiting
+
+## Architecture
+
+```
+┌─────────────────────────────────────┐
+│     Static Assets (static/)         │  ← HTML, CSS, JS
+├─────────────────────────────────────┤
+│    Templates (templates/)           │  ← Jinja2 templates
+├─────────────────────────────────────┤
+│  Authentication (auth.py)           │  ← Session management, JWT/HMAC signing
+├─────────────────────────────────────┤
+│   Session Manager (Redis)           │  ← Session storage
+├─────────────────────────────────────┤
+│     Proxy (proxy.py)                │  ← Request forwarding
+└─────────────────────────────────────┘
 ```
 
-## Mode
+## Directory Structure
 
-If `service.mode` is set "webui" (the default), the webserver handles
-PWA-style fallbacks (e.g., serving `index.html` when there are no matching
-files for the requested URL path).
-The PWA must exclude `/server` and `/func` URL prefixes from its own routing
-to work with the webserver's web sessions and the API proxy.
-
-If it is set "static", the webserver serves the static files as-is,
-without any fallbacks or hooking, while preserving the `/server` and `/func`
-prefixed URLs and their functionalities.
-
-If you want to serve web UI in webserver with "webui" mode, prepare static web UI source by choosing one of the followings.
-
-### Option 1: Build web UI from source
-
-Build **[backend.ai-webui](https://github.com/lablup/backend.ai-webui)** and copy all files under `build/bundle`
-into the `src/ai/backend/web/static` directory.
-
-### Option 2: Use pre-built web UI
-
-To download and deploy web UI from pre-built source, do the following:
-
-```console
-cd src/ai/backend/web
-curl --fail -sL https://github.com/lablup/backend.ai-webui/releases/download/v$TARGET_VERSION/backend.ai-webui-bundle-$TARGET_VERSION.zip > /tmp/bai-webui.zip
-rm -rf static
-mkdir static
-cd static
-unzip /tmp/bai-webui.zip
 ```
-### Setup configuration for webserver
-
-You don't have to write `config.toml` for the web UI as this webserver auto-generates it on-the-fly.
-
-Edit `webserver.conf` to match with your environment.
-
-
-## Usage
-
-To execute web server, run command below. (for debugging, append a `--debug` flag)
-
-
-```console
-$ python -m ai.backend.web.server
+web/
+├── static/              # Static web assets
+│   ├── css/            # Stylesheets
+│   ├── js/             # JavaScript files
+│   └── images/         # Images and icons
+├── templates/           # Jinja2 templates
+│   ├── login.html      # Login page
+│   └── index.html      # Main page
+├── config/              # Configuration
+├── cli/                 # CLI commands
+├── auth.py              # Session management and request signing
+├── proxy.py             # API proxy
+├── security.py          # Security utilities
+├── response.py          # Response helpers
+├── stats.py             # Statistics tracking
+├── server.py            # Main server entry point
+└── template.py          # Template rendering
 ```
+
+## Core Concepts
+
+### Web Sessions
+Web sessions track authenticated users:
+- **Session ID**: Unique identifier stored in cookies
+- **User ID**: Associated user in Manager
+- **Access key**: User's API access key
+- **Created/expires**: Session timestamps
+- **Data**: Additional session data (preferences, etc.)
+
+Session Lifecycle:
+1. User logs in through Manager API
+2. Manager returns access key and secret key
+3. Webserver creates session in Redis and stores access/secret keys
+4. Session cookie is sent to browser
+5. Subsequent requests include session cookie
+6. Webserver retrieves access/secret key from session and signs requests (GraphQL: JWT, REST API: HMAC)
+7. Signed requests are proxied to Manager
+8. Session expires after timeout or logout
+
+### Authentication Flow
+
+```
+1. User visits web UI
+   ↓
+2. Webserver serves login page
+   ↓
+3. User submits credentials
+   ↓
+4. Webserver forwards login request to Manager API
+   ↓
+5. Manager authenticates and returns access key and secret key
+   ↓
+6. Webserver creates session in Redis and stores keys
+   ↓
+7. Session cookie is sent to browser
+   ↓
+8. User is redirected to main page
+```
+
+### Request Proxying
+
+Session-based requests are proxied to Manager:
+
+```
+1. Browser sends API request with session cookie
+   ↓
+2. Webserver retrieves user's access key and secret key from session
+   ↓
+3. Webserver signs request with access key/secret key
+   - GraphQL requests: JWT signature
+   - REST API requests: HMAC signature
+   ↓
+4. Signed request is forwarded to Manager
+   ↓
+5. Manager verifies signature and processes request
+   ↓
+6. Webserver returns response to browser
+```
+
+Proxied Request Headers:
+- `X-BackendAI-Token`: JWT token (GraphQL requests)
+- `Authorization`: HMAC signature (REST API requests, based on access key/secret key)
+- `X-BackendAI-Version`: API version
+- `X-Real-IP`: Original client IP
+- `X-Forwarded-For`: Proxy chain
+
+### Session Storage (Redis)
+
+Session data is stored in Redis:
+- **Key**: `websession:{session_id}`
+- **Value**: JSON-encoded session data
+- **TTL**: Session timeout (e.g., 1 hour)
+
+Example session data:
+```json
+{
+  "user_id": "user@example.com",
+  "access_key": "AKIAIOSFODNN7EXAMPLE",
+  "created_at": "2025-10-28T12:00:00Z",
+  "last_accessed": "2025-10-28T12:30:00Z",
+  "preferences": {
+    "theme": "dark",
+    "language": "en"
+  }
+}
+```
+
+## Security Features
+
+### CORS Configuration
+- Allow cross-origin requests from trusted domains
+- Set appropriate CORS headers
+- Support preflight OPTIONS requests
+- Restrict allowed methods and headers
+
+### Rate Limiting
+Request limiting to prevent brute force attacks:
+- **Limit**: Limited number of requests per 5 minutes per IP
+- **Response**: HTTP 429 Too Many Requests
+- **Tracking**: Redis-based counter per IP
+
+### Input Sanitization
+- HTML escape user input
+- Email format validation
+- Path sanitization
+- Injection attack prevention
+
+## Configuration
+
+See `configs/webserver/halfstack.conf` for configuration file examples.
+
+### Key Configuration Items
+
+**Basic Settings**:
+- Listen address and port
+- Session timeout and secret
+- Manager API endpoint
+- Redis connection information
+
+**Security Settings**:
+- Session timeout and secret
+- Rate limiting configuration
+- CORS configuration
+
+## Infrastructure Dependencies
+
+### Required Infrastructure
+
+#### Redis (Session Storage)
+- **Purpose**:
+  - Store web session data
+  - Validate session cookies
+  - Manage session timeouts
+- **Halfstack Port**: 8111 (host) → 6379 (container)
+- **Key Patterns**:
+  - `websession:{session_id}` - Web session data
+
+#### Manager API Connection
+- **Purpose**:
+  - Forward login requests and receive access key/secret key
+  - Proxy JWT (GraphQL) or HMAC (REST API) signed requests
+  - Retrieve user information
+- **Protocol**: HTTP/HTTPS
+- **Halfstack Port**: 8091 (Manager)
+- **Note**: Authentication is handled by Manager, Webserver only adds signatures
+
+#### etcd (Global Configuration)
+- **Purpose**:
+  - Retrieve global configuration
+  - Auto-discover Manager address
+- **Halfstack Port**: 8121 (host) → 2379 (container)
+
+### Optional Infrastructure (Observability)
+
+#### Prometheus (Metrics Collection)
+- **Purpose**:
+  - Session management metrics
+  - Request processing time
+  - Proxy error tracking
+- **Exposed Endpoint**: `http://localhost:8090/metrics`
+- **Key Metrics**:
+  - `backendai_api_request_count` - Total API requests
+  - `backendai_api_request_duration_sec` - Request processing time
+
+#### Loki (Log Aggregation)
+- **Purpose**:
+  - Session creation/expiration events
+  - Request signing and proxy events
+  - Security violation events
+  - Proxied request tracking
+- **Log Labels**:
+  - `user_id` - User identifier
+  - `event` - Event type (session_create, proxy_request, etc.)
+  - `status` - Success/failure
+
+### SSL/TLS Configuration
+
+**Development Environment**: HTTP mode (port 8090)
+**Production Environment**: HTTPS mode (requires SSL certificate and key, HSTS enforced)
+
+### Security Configuration
+
+**Session Management**: Session timeout and Redis-based session storage configuration
+**Rate Limiting**: API request limiting (default: limited number per 5 minutes per IP)
+**CORS Configuration**: Allowed origins, methods, and credentials
+
+### Halfstack Configuration
+
+**Recommended**: Use the `./scripts/install-dev.sh` script for development environment setup.
+
+#### Starting Development Environment
+```bash
+# Setup development environment via script (recommended)
+./scripts/install-dev.sh
+
+# Start Webserver
+./backend.ai web start-server
+```
+
+#### Web UI Access
+- Web browser: http://localhost:8090
+- Default login: admin@lablup.com / wJalrXUt
+
+## Template Rendering
+
+Webserver uses Jinja2 for server-side rendering to serve login pages and more.
+
+## Metrics and Monitoring
+
+### Prometheus Metrics
+
+#### API Metrics
+Metrics related to web UI and authentication HTTP request processing.
+
+- `backendai_api_request_count`: Total API requests
+  - Labels: method, endpoint, domain, operation, error_detail, status_code
+  - Track session-based request signing (JWT/HMAC) and Manager proxy requests
+
+- `backendai_api_request_duration_sec`: API request processing time (seconds)
+  - Labels: method, endpoint, domain, operation, error_detail, status_code
+  - Measure web UI response time and proxy performance
+
+### Logs
+- Session creation/expiration events
+- Request signing and proxy events
+- Proxied request tracking
+- Security violations
+
+## Development
+
+See [README.md](./README.md) for development setup instructions.
+
+## Related Documentation
+
+- [Manager Component](../manager/COMPONENT.ko.md) - API Gateway
+- [Overall Architecture](../README.ko.md) - System-wide architecture
