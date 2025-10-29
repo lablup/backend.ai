@@ -128,6 +128,49 @@ def get_random_seq(length: float, num_points: int, min_distance: float) -> Itera
         yield cumulative_sum - min_distance
 
 
+def pprint_with_type(
+    data: dict[Any, Any] | list[Any] | set[Any],
+    depth: int = 0,
+) -> None:
+    """
+    A pprint-like function that explitly prints out the types of all objects.
+    It is useful to debug JSON serialization errors due to hidden str-compatible keys
+    in a nested dict.
+    """
+    indent = "  " * depth
+    match data:
+        case dict():  # dict
+            for k, v in data.items():
+                if isinstance(v, dict):
+                    print(f"{indent}{k!r} ({type(k)=}): {{...: ...}}")
+                    pprint_with_type(v, depth=depth + 1)
+                    continue
+                if isinstance(v, list):
+                    print(f"{indent}{k!r} ({type(k)=}): [...]")
+                    pprint_with_type(v, depth=depth + 1)
+                    continue
+                if isinstance(v, set):
+                    print(f"{indent}{k!r} ({type(k)=}): {{...}}")
+                    pprint_with_type(v, depth=depth + 1)
+                    continue
+                print(f"{indent}{k!r} ({type(k)=}): {v!r} ({type(v)=})")
+        case list() | set():  # list, set
+            for v in data:
+                if isinstance(v, dict):
+                    print(f"{indent}- {{...: ...}}")
+                    pprint_with_type(v, depth=depth + 1)
+                    continue
+                if isinstance(v, list):
+                    print(f"{indent}- [...]")
+                    pprint_with_type(v, depth=depth + 1)
+                    continue
+                if isinstance(v, set):
+                    print(f"{indent}- {{...}}")
+                    pprint_with_type(v, depth=depth + 1)
+                    continue
+                print(f"{indent}- {v!r} ({type(v)=})")
+
+
 def nmget(
     o: Mapping[str, Any],
     key_path: str,
