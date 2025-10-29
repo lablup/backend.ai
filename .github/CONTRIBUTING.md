@@ -281,7 +281,9 @@ PRs over 500 lines cause the following issues:
 - Changes needed in the base PR affect all dependent PRs
 - Fixed review priority reduces flexibility
 - Enforced merge order prevents parallel work
-- **Squash Merge Issue**: Since we use squash merge, using Stack PRs causes each PR's history to be merged into one, losing the intended commit structure
+- **Squash Merge Conflicts**: Since we use squash merge, Stack PRs create serious issues:
+  - Merging from top to bottom: All commits get squashed into one, losing the intended PR separation
+  - Merging from bottom to top: Each merge requires time-consuming rebases on all dependent PRs
 
 **Advantages of Flat PRs**:
 - Each PR can be reviewed and merged independently
@@ -453,7 +455,8 @@ git push --force-with-lease
 
 2. **Respond to Feedback**
    - Respond to all comments
-   - Add changes as new commits (avoid force-push)
+   - When applying feedback from reviews, add changes as new commits to preserve review history
+   - Avoid force-pushing after receiving reviews, as it makes it difficult for reviewers to see what changed
    - Request re-review after changes are complete
 
 ### As a Reviewer
