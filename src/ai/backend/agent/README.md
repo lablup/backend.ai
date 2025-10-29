@@ -443,6 +443,6 @@ See [README.md](./README.md) for development setup instructions.
 
 ## Related Documentation
 
-- [Manager Component](../manager/README.ko.md) - Session orchestration
-- [Storage Proxy Component](../storage/README.ko.md) - Virtual folder management
-- [Overall Architecture](../README.ko.md) - System-wide architecture
+- [Manager Component](../manager/README.md) - Session orchestration
+- [Storage Proxy Component](../storage/README.md) - Virtual folder management
+- [Overall Architecture](../README.md) - System-wide architecture

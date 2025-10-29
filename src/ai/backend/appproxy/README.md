@@ -424,6 +424,6 @@ See [README.md](./README.md) for development setup instructions.
 
 - [Coordinator README](./coordinator/README.md) - Coordinator details
 - [Worker README](./worker/README.md) - Worker details
-- [Manager Component](../manager/README.ko.md) - API gateway
-- [Agent Component](../agent/README.ko.md) - Container management
-- [Overall Architecture](../README.ko.md) - System-wide architecture
+- [Manager Component](../manager/README.md) - API gateway
+- [Agent Component](../agent/README.md) - Container management
+- [Overall Architecture](../README.md) - System-wide architecture

@@ -304,5 +304,5 @@ See [README.md](./README.md) for development setup instructions.
 
 ## Related Documentation
 
-- [Manager Component](../manager/COMPONENT.ko.md) - API Gateway
-- [Overall Architecture](../README.ko.md) - System-wide architecture
+- [Manager Component](../manager/README.md) - API Gateway
+- [Overall Architecture](../README.md) - System-wide architecture

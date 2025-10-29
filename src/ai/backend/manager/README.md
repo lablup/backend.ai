@@ -454,6 +454,6 @@ See [README.md](./README.md) for development setup instructions.
 ## Related Documentation
 
 - [Session Scheduling](./scheduler/README.md) - Session scheduling algorithms and policies
-- [Agent Component](../agent/COMPONENT.ko.md) - Agent component
-- [Storage Proxy Component](../storage/COMPONENT.ko.md) - Storage proxy component
-- [Overall Architecture](../README.ko.md) - System-wide architecture
+- [Agent Component](../agent/README.md) - Agent component
+- [Storage Proxy Component](../storage/README.md) - Storage proxy component
+- [Overall Architecture](../README.md) - System-wide architecture

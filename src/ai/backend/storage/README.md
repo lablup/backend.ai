@@ -413,6 +413,6 @@ See [README.md](./README.md) for development setup instructions.
 
 ## Related Documentation
 
-- [Manager Component](../manager/README.ko.md) - Session orchestration
-- [Agent Component](../agent/README.ko.md) - VFolder mounting
-- [Overall Architecture](../README.ko.md) - System-wide architecture
+- [Manager Component](../manager/README.md) - Session orchestration
+- [Agent Component](../agent/README.md) - VFolder mounting
+- [Overall Architecture](../README.md) - System-wide architecture
