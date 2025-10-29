@@ -133,7 +133,7 @@ def pprint_with_type(
     depth: int = 0,
 ) -> None:
     """
-    A pprint-like function that explitly prints out the types of all objects.
+    A pprint-like function that explicitly prints out the types of all objects.
     It is useful to debug JSON serialization errors due to hidden str-compatible keys
     in a nested dict.
     """
