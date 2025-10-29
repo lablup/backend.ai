@@ -21,22 +21,23 @@ from ai.backend.common.types import QuotaConfig, QuotaScopeID
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.watcher import WatcherClient
 
-from ...types import CapacityUsage, QuotaUsage
-from ..abc import (
+from ....types import CapacityUsage, QuotaUsage
+from ...abc import (
     CAP_QUOTA,
     CAP_VFOLDER,
     AbstractQuotaModel,
 )
-from ..vfs import BaseQuotaModel, BaseVolume
-from .client import HammerspaceAPIClient
-from .exception import (
+from ...vfs import BaseQuotaModel
+from ..client import HammerspaceAPIClient
+from ..exception import (
     AuthenticationError,
     ConfigurationError,
 )
-from .request import ClusterMetricParams, CreateShareParams, GetShareParams
-from .schema.metric import ValidClusterMetricRow
-from .schema.share import Share, SimpleShare
-from .types import APIConnectionInfo, SSLConfig
+from ..request import ClusterMetricParams, CreateShareParams, GetShareParams
+from ..schema.metric import ValidClusterMetricRow
+from ..schema.share import Share, SimpleShare
+from ..types import APIConnectionInfo, SSLConfig
+from .base import BaseHammerspaceVolume
 
 METRIC_PRECEDING_DURATION = "1h"
 METRIC_INTERVAL_DURATION = "5m"
@@ -153,7 +154,7 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         pass
 
 
-class HammerspaceVolume(BaseVolume):
+class HammerspaceVolume(BaseHammerspaceVolume):
     name: ClassVar[str] = "hammerspace"
 
     def __init__(
