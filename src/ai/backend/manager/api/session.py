@@ -79,6 +79,11 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import validators as tx
+from ai.backend.common.defs.session import (
+    SESSION_PRIORITY_DEFAULT,
+    SESSION_PRIORITY_MAX,
+    SESSION_PRIORITY_MIN,
+)
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
 )
@@ -106,11 +111,6 @@ from ..models import (
     UserRole,
     kernels,
     keypairs,
-)
-from ..models.session import (
-    SESSION_PRIORITY_DEFAULT,
-    SESSION_PRIORITY_MAX,
-    SESSION_PRIORITY_MIN,
 )
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required

@@ -61,6 +61,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -221,7 +222,6 @@ from .models.container_registry import ContainerRegistryRow
 from .models.image import bulk_get_image_configs
 from .models.session import (
     SESSION_KERNEL_STATUS_MAPPING,
-    SESSION_PRIORITY_DEFAULT,
     ConcurrencyUsed,
     SessionLifecycleManager,
 )

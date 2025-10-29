@@ -9,7 +9,7 @@ Create Date: 2024-09-18 12:22:20.397024
 import sqlalchemy as sa
 from alembic import op
 
-from ai.backend.manager.models.session import SESSION_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 
 # revision identifiers, used by Alembic.
 revision = "20218a73401b"
