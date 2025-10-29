@@ -920,19 +920,16 @@ class ResourceSlot(UserDict[str, Decimal]):
         assert isinstance(other, ResourceSlot), "Only can add ResourceSlot to ResourceSlot."
         self.sync_keys(other)
         return type(self)({
-            k: Decimal(self.get(k, 0)) + Decimal(other.get(k, 0))
-            for k in (self.keys() | other.keys())
+            k: self.get(k, 0) + other.get(k, 0) for k in (self.keys() | other.keys())
         })
 
     def __sub__(self, other: ResourceSlot) -> ResourceSlot:
         assert isinstance(other, ResourceSlot), "Only can subtract ResourceSlot from ResourceSlot."
         self.sync_keys(other)
-        return type(self)({
-            k: Decimal(self.data[k]) - Decimal(other.get(k, 0)) for k in self.keys()
-        })
+        return type(self)({k: self.data[k] - other.get(k, 0) for k in self.keys()})
 
     def __neg__(self):
-        return type(self)({k: -Decimal(v) for k, v in self.data.items()})
+        return type(self)({k: -v for k, v in self.data.items()})
 
     def __eq__(self, other: object) -> bool:
         if other is self:
@@ -967,15 +964,15 @@ class ResourceSlot(UserDict[str, Decimal]):
     def __le__(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
-        self_values = [Decimal(self.data[k]) for k in self.keys()]
-        other_values = [Decimal(other.data[k]) for k in self.keys()]
+        self_values = [self.data[k] for k in self.keys()]
+        other_values = [other.data[k] for k in self.keys()]
         return not any(s > o for s, o in zip(self_values, other_values))
 
     def __lt__(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
-        self_values = [Decimal(self.data[k]) for k in self.keys()]
-        other_values = [Decimal(other.data[k]) for k in self.keys()]
+        self_values = [self.data[k] for k in self.keys()]
+        other_values = [other.data[k] for k in self.keys()]
         return not any(s > o for s, o in zip(self_values, other_values)) and not (
             self_values == other_values
         )
@@ -983,15 +980,15 @@ class ResourceSlot(UserDict[str, Decimal]):
     def __ge__(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
-        self_values = [Decimal(self.data[k]) for k in other.keys()]
-        other_values = [Decimal(other.data[k]) for k in other.keys()]
+        self_values = [self.data[k] for k in other.keys()]
+        other_values = [other.data[k] for k in other.keys()]
         return not any(s < o for s, o in zip(self_values, other_values))
 
     def __gt__(self, other: ResourceSlot) -> bool:
         assert isinstance(other, ResourceSlot), "Only can compare ResourceSlot objects."
         self.sync_keys(other)
-        self_values = [Decimal(self.data[k]) for k in other.keys()]
-        other_values = [Decimal(other.data[k]) for k in other.keys()]
+        self_values = [self.data[k] for k in other.keys()]
+        other_values = [other.data[k] for k in other.keys()]
         return not any(s < o for s, o in zip(self_values, other_values)) and not (
             self_values == other_values
         )
@@ -1007,12 +1004,12 @@ class ResourceSlot(UserDict[str, Decimal]):
         return type(self)(data)
 
     @classmethod
-    def _normalize_value(cls, key: str, value: Any, unit: SlotTypes) -> Decimal:
+    def _normalize_value(cls, key: str, value: RawResourceValue, unit: SlotTypes) -> Decimal:
         try:
             if unit == SlotTypes.BYTES:
                 if isinstance(value, Decimal):
-                    return Decimal(value) if value.is_finite() else value
-                if isinstance(value, int):
+                    return value
+                if isinstance(value, (int, float)):
                     return Decimal(value)
                 value = Decimal(BinarySize.from_str(value))
             else:
