@@ -906,7 +906,7 @@ class ResourceSlot(UserDict[str, Decimal]):
         return self.data[normalized_key]
 
     def copy(self) -> Self:
-        return ResourceSlot(self.data.copy())
+        return type(self)(self.data.copy())
 
     def sync_keys(self, other: ResourceSlot) -> None:
         self_only_keys = self.data.keys() - other.data.keys()
