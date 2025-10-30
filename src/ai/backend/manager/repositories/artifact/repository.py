@@ -22,6 +22,8 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
     ArtifactDataWithRevisions,
+    ArtifactFilterOptions,
+    ArtifactOrderingOptions,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactStatus,
@@ -42,8 +44,6 @@ from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.types import (
-    ArtifactFilterOptions,
-    ArtifactOrderingOptions,
     ArtifactRemoteStatusFilterType,
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
@@ -183,13 +183,15 @@ class ArtifactRevisionFilterApplier(BaseFilterApplier[ArtifactRevisionFilterOpti
 
         # Handle StringFilter-based version filter
         if filters.version_filter is not None:
-            version_condition = filters.version_filter.apply_to_column(ArtifactRevisionRow.version)
+            version_filter_data = filters.version_filter.to_dataclass()
+            version_condition = version_filter_data.apply_to_column(ArtifactRevisionRow.version)
             if version_condition is not None:
                 conditions.append(version_condition)
 
         # Handle IntFilter-based size filter
         if filters.size_filter is not None:
-            size_condition = filters.size_filter.apply_to_column(ArtifactRevisionRow.size)
+            size_filter_data = filters.size_filter.to_dataclass()
+            size_condition = size_filter_data.apply_to_column(ArtifactRevisionRow.size)
             if size_condition is not None:
                 conditions.append(size_condition)
 
@@ -1033,13 +1035,13 @@ class ArtifactRepository:
                         ArtifactRevisionRow.remote_status == remote_status_values[0]
                     )
             if filters.version_filter is not None:
-                version_condition = filters.version_filter.apply_to_column(
-                    ArtifactRevisionRow.version
-                )
+                version_filter_data = filters.version_filter.to_dataclass()
+                version_condition = version_filter_data.apply_to_column(ArtifactRevisionRow.version)
                 if version_condition is not None:
                     count_stmt = count_stmt.where(version_condition)
             if filters.size_filter is not None:
-                size_condition = filters.size_filter.apply_to_column(ArtifactRevisionRow.size)
+                size_filter_data = filters.size_filter.to_dataclass()
+                size_condition = size_filter_data.apply_to_column(ArtifactRevisionRow.size)
                 if size_condition is not None:
                     count_stmt = count_stmt.where(size_condition)
 
