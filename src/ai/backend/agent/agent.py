@@ -5,10 +5,8 @@ import logging
 import os
 import pickle
 import re
-import shutil
 import signal
 import sys
-import time
 import traceback
 import weakref
 import zlib
@@ -229,6 +227,12 @@ from .kernel import (
     RUN_ID_FOR_BATCH_JOB,
     AbstractKernel,
     match_distro_data,
+)
+from .kernel_registry.kernel_registry import KernelRegistry
+from .kernel_registry.loader import (
+    KernelRegistryPickleRecovery,
+    KernelRegistryRecoveryArgs,
+    KernelRegistrySaveMetadata,
 )
 from .observer.heartbeat import HeartbeatObserver
 from .observer.host_port import HostPortObserver
@@ -764,7 +768,7 @@ class AbstractAgent(
     local_config: AgentUnifiedConfig
     etcd: AsyncEtcd
     local_instance_id: str
-    kernel_registry: MutableMapping[KernelId, AbstractKernel]
+    kernel_registry: KernelRegistry
     computers: MutableMapping[DeviceName, ComputerContext]
     images: Mapping[ImageCanonical, ScannedImage]
     port_pool: set[int]
@@ -844,7 +848,7 @@ class AbstractAgent(
         self.id = AgentId(local_config.agent.id or f"agent-{uuid4()}")
         self.local_instance_id = generate_local_instance_id(__file__)
         self.agent_public_key = agent_public_key
-        self.kernel_registry = {}
+        self.kernel_registry = KernelRegistry()
         self.computers = {}
         self.images = {}
         self.restarting_kernels = {}
@@ -867,6 +871,13 @@ class AbstractAgent(
         self._ongoing_exec_batch_tasks = weakref.WeakSet()
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
         self._metric_registry = CommonMetricRegistry.instance()
+        self._kernel_registry_recovery = KernelRegistryPickleRecovery.create(
+            KernelRegistryRecoveryArgs(
+                ipc_base_path=local_config.agent.ipc_base_path,
+                var_base_path=local_config.agent.var_base_path,
+                local_instance_id=self.local_instance_id,
+            )
+        )
 
         # Initialize health monitoring tracking maps
         self._active_pulls = {}
@@ -1006,7 +1017,6 @@ class AbstractAgent(
         )
 
         loop = current_loop()
-        self.last_registry_written_time = time.monotonic()
         self.container_lifecycle_handler = loop.create_task(self.process_lifecycle_events())
 
         # Notify the gateway.
@@ -1063,7 +1073,9 @@ class AbstractAgent(
                 if kernel_obj.runner is not None:
                     await kernel_obj.runner.close()
                 await kernel_obj.close()
-            await self.save_last_registry(force=True)
+            await self._kernel_registry_recovery.save_kernel_registry(
+                self.kernel_registry, KernelRegistrySaveMetadata(force=True)
+            )
 
         # Stop timers.
         await aiotools.cancel_and_wait(self.timer_tasks)
@@ -1105,7 +1117,9 @@ class AbstractAgent(
         if isinstance(event, KernelStartedAnycastEvent) or isinstance(
             event, KernelTerminatedAnycastEvent
         ):
-            await self.save_last_registry()
+            await self._kernel_registry_recovery.save_kernel_registry(
+                self.kernel_registry, KernelRegistrySaveMetadata(force=False)
+            )
 
     async def anycast_event(self, event: AbstractAnycastEvent) -> None:
         """
@@ -1647,7 +1661,9 @@ class AbstractAgent(
                 ev = await self.container_lifecycle_queue.get()
                 log.info("received lifecycle event: {}", str(ev))
                 if isinstance(ev, Sentinel):
-                    await self.save_last_registry(force=True)
+                    await self._kernel_registry_recovery.save_kernel_registry(
+                        self.kernel_registry, KernelRegistrySaveMetadata(force=True)
+                    )
                     return
                 # attrs currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
@@ -2269,20 +2285,9 @@ class AbstractAgent(
         Scan currently running kernels and recreate the kernel objects in
         ``self.kernel_registry`` if any missing.
         """
-        ipc_base_path = self.local_config.agent.ipc_base_path
-        var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.local_instance_id}.dat"
-        if os.path.isfile(ipc_base_path / last_registry_file):
-            shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
-        try:
-            with open(var_base_path / last_registry_file, "rb") as f:
-                self.kernel_registry = pickle.load(f)
-        except EOFError:
-            log.warning(
-                "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
-            )
-        except FileNotFoundError:
-            pass
+        loaded_registry = await self._kernel_registry_recovery.load_kernel_registry()
+        if loaded_registry is not None:
+            self.kernel_registry = loaded_registry
         for kernel_obj in self.kernel_registry.values():
             kernel_obj.agent_config = self.local_config.model_dump(by_alias=True)
             try:
@@ -3734,24 +3739,6 @@ class AbstractAgent(
 
     async def ping_kernel(self, kernel_id: KernelId):
         return await self.kernel_registry[kernel_id].ping()
-
-    async def save_last_registry(self, force=False) -> None:
-        now = time.monotonic()
-        if (not force) and (now <= self.last_registry_written_time + 60):
-            return  # don't save too frequently
-        var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.local_instance_id}.dat"
-        try:
-            with open(var_base_path / last_registry_file, "wb") as f:
-                pickle.dump(self.kernel_registry, f)
-            self.last_registry_written_time = now
-            log.debug("saved {}", last_registry_file)
-        except Exception as e:
-            log.exception("unable to save {}", last_registry_file, exc_info=e)
-            try:
-                os.remove(var_base_path / last_registry_file)
-            except FileNotFoundError:
-                pass
 
 
 async def handle_volume_mount(
