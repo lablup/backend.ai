@@ -19,6 +19,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
     ArtifactRemoteStatus,
     ArtifactStatus,
+    ArtifactType,
 )
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.data.vfs_storage.types import VFSStorageData
@@ -89,11 +90,12 @@ class ArtifactRegistryEventHandler:
                 await processors.artifact.scan.wait_for_complete(
                     ScanArtifactsAction(
                         registry_id=registry.registry_id,
-                        # Ignored in reservoir types
-                        artifact_type=None,
+                        # TODO: Support other artifact types in the future
+                        artifact_type=ArtifactType.MODEL,
+                        # Fetch all artifacts without limit
+                        limit=None,
                         order=None,
                         search=None,
-                        limit=None,
                     )
                 )
                 log.info("Completed scanning reservoir registry: {}.", registry.registry_id)
