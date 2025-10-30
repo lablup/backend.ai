@@ -217,7 +217,6 @@ class ArtifactDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
-    @artifact_repository_resilience.apply()
     async def get_artifact_by_id(self, artifact_id: uuid.UUID) -> ArtifactData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -228,7 +227,6 @@ class ArtifactDBSource:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             return row.to_dataclass()
 
-    @artifact_repository_resilience.apply()
     async def get_artifact_revision_by_id(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -241,7 +239,6 @@ class ArtifactDBSource:
                 )
             return row.to_dataclass()
 
-    @artifact_repository_resilience.apply()
     async def get_model_artifact(self, model_id: str, registry_id: uuid.UUID) -> ArtifactData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -256,7 +253,6 @@ class ArtifactDBSource:
                 )
             return row.to_dataclass()
 
-    @artifact_repository_resilience.apply()
     async def get_artifact_revision(
         self, artifact_id: uuid.UUID, revision: str
     ) -> ArtifactRevisionData:
@@ -274,7 +270,6 @@ class ArtifactDBSource:
                 raise ArtifactRevisionNotFoundError(f"Revision {revision} not found")
             return row.to_dataclass()
 
-    @artifact_repository_resilience.apply()
     async def update_artifact(
         self, artifact_id: uuid.UUID, modifier: ArtifactModifier
     ) -> ArtifactData:
@@ -310,7 +305,6 @@ class ArtifactDBSource:
                 raise ArtifactNotFoundError(f"Artifact with ID {artifact_id} not found")
             return row.to_dataclass()
 
-    @artifact_repository_resilience.apply()
     async def list_artifact_revisions(self, artifact_id: uuid.UUID) -> list[ArtifactRevisionData]:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -320,7 +314,6 @@ class ArtifactDBSource:
             return [row.to_dataclass() for row in rows]
 
     # TODO: Refactor using on_conflict_do_update?
-    @artifact_repository_resilience.apply()
     async def upsert_artifacts(
         self,
         artifacts: list[ArtifactData],
@@ -374,7 +367,6 @@ class ArtifactDBSource:
 
             return result_artifacts
 
-    @artifact_repository_resilience.apply()
     async def upsert_artifact_revisions(
         self,
         revisions: list[ArtifactRevisionData],
@@ -452,7 +444,6 @@ class ArtifactDBSource:
 
             return result_revisions
 
-    @artifact_repository_resilience.apply()
     async def upsert_huggingface_model_artifacts(
         self,
         model_list: list[ModelData],
@@ -561,7 +552,6 @@ class ArtifactDBSource:
 
         return result
 
-    @artifact_repository_resilience.apply()
     async def associate_artifact_with_storage(
         self,
         artifact_revision_id: uuid.UUID,
@@ -602,7 +592,6 @@ class ArtifactDBSource:
                 storage_namespace_id=storage_namespace_id,
             )
 
-    @artifact_repository_resilience.apply()
     async def disassociate_artifact_with_storage(
         self, artifact_revision_id: uuid.UUID, storage_namespace_id: uuid.UUID
     ) -> AssociationArtifactsStoragesData:
@@ -643,7 +632,6 @@ class ArtifactDBSource:
 
             return association_data
 
-    @artifact_repository_resilience.apply()
     async def approve_artifact(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -681,7 +669,6 @@ class ArtifactDBSource:
 
             return updated_row.to_dataclass()
 
-    @artifact_repository_resilience.apply()
     async def reject_artifact(self, revision_id: uuid.UUID) -> ArtifactRevisionData:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -709,7 +696,6 @@ class ArtifactDBSource:
 
             return updated_row.to_dataclass()
 
-    @artifact_repository_resilience.apply()
     async def reset_artifact_revision_status(self, revision_id: uuid.UUID) -> uuid.UUID:
         async with self._db.begin_session() as db_sess:
             stmt = (
@@ -720,7 +706,6 @@ class ArtifactDBSource:
             await db_sess.execute(stmt)
             return revision_id
 
-    @artifact_repository_resilience.apply()
     async def update_artifact_revision_status(
         self, artifact_revision_id: uuid.UUID, status: ArtifactStatus
     ) -> uuid.UUID:
@@ -733,7 +718,6 @@ class ArtifactDBSource:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
-    @artifact_repository_resilience.apply()
     async def update_artifact_revision_remote_status(
         self, artifact_revision_id: uuid.UUID, remote_status: ArtifactRemoteStatus
     ) -> uuid.UUID:
@@ -746,7 +730,6 @@ class ArtifactDBSource:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
-    @artifact_repository_resilience.apply()
     async def delete_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
         async with self._db.begin_session() as db_sess:
             # Update availability to DELETED for the given artifact IDs (only for ALIVE artifacts)
@@ -768,7 +751,6 @@ class ArtifactDBSource:
             rows: list[ArtifactRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
-    @artifact_repository_resilience.apply()
     async def restore_artifacts(self, artifact_ids: list[uuid.UUID]) -> list[ArtifactData]:
         async with self._db.begin_session() as db_sess:
             # Update availability to ALIVE for the given artifact IDs (only for DELETED artifacts)
@@ -790,7 +772,6 @@ class ArtifactDBSource:
             rows: list[ArtifactRow] = result.scalars().all()
             return [row.to_dataclass() for row in rows]
 
-    @artifact_repository_resilience.apply()
     async def update_artifact_revision_bytesize(
         self, artifact_revision_id: uuid.UUID, size: int
     ) -> uuid.UUID:
@@ -803,7 +784,6 @@ class ArtifactDBSource:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
-    @artifact_repository_resilience.apply()
     async def update_artifact_revision_readme(
         self, artifact_revision_id: uuid.UUID, readme: str
     ) -> uuid.UUID:
@@ -816,7 +796,6 @@ class ArtifactDBSource:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
-    @artifact_repository_resilience.apply()
     async def get_artifact_revision_readme(self, artifact_revision_id: uuid.UUID) -> str:
         async with self._db.begin_session() as db_sess:
             result = await db_sess.execute(
@@ -827,7 +806,6 @@ class ArtifactDBSource:
             readme = result.scalar_one_or_none()
             return readme
 
-    @artifact_repository_resilience.apply()
     async def list_artifacts_paginated(
         self,
         *,
@@ -888,7 +866,6 @@ class ArtifactDBSource:
             )
             return data_objects, total_count
 
-    @artifact_repository_resilience.apply()
     async def list_artifacts_with_revisions_paginated(
         self,
         *,
@@ -956,7 +933,6 @@ class ArtifactDBSource:
 
             return data_objects, total_count
 
-    @artifact_repository_resilience.apply()
     async def list_artifact_revisions_paginated(
         self,
         *,
