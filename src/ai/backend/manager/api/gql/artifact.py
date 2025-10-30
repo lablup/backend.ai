@@ -1302,7 +1302,7 @@ async def scan_artifacts(
     Import scanned artifact revisions from external registries.
 
     Downloads the actual files for the specified artifact revisions, transitioning
-    them from SCANNED → PULLING → PULLED → AVAILABLE status.
+    them from SCANNED → PULLING → VERIFYING → AVAILABLE status.
 
     Returns background tasks that can be monitored for import progress.
     Once AVAILABLE, artifacts can be used by users in their sessions.
