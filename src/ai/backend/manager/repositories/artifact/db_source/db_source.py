@@ -17,6 +17,8 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
     ArtifactDataWithRevisions,
+    ArtifactFilterOptions,
+    ArtifactOrderingOptions,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactStatus,
@@ -37,8 +39,6 @@ from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
 from ai.backend.manager.models.association_artifacts_storages import AssociationArtifactsStorageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.types import (
-    ArtifactFilterOptions,
-    ArtifactOrderingOptions,
     ArtifactRemoteStatusFilterType,
     ArtifactRevisionFilterOptions,
     ArtifactRevisionOrderingOptions,
