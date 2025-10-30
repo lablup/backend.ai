@@ -63,6 +63,7 @@ class ReservoirRegistryAPIHandler:
             storage_step_mappings=body.parsed.storage_step_mappings,
             transfer_manager=self._reservoir_service._transfer_manager,
             artifact_verifier_ctx=self._reservoir_service._artifact_verifier_ctx,
+            event_producer=self._reservoir_service._event_producer,
         )
 
         task_id = await self._reservoir_service.import_models_batch(

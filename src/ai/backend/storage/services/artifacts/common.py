@@ -6,6 +6,8 @@ from typing import cast, override
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
+from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.artifact.anycast import ModelVerifyingEvent
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.context_types import ArtifactVerifierContext
 from ai.backend.storage.exception import (
@@ -31,14 +33,17 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
     _artifact_verifier_ctx: ArtifactVerifierContext
     _transfer_manager: StorageTransferManager
+    _event_producer: EventProducer
 
     def __init__(
         self,
         artifact_verifier_ctx: ArtifactVerifierContext,
         transfer_manager: StorageTransferManager,
+        event_producer: EventProducer,
     ) -> None:
         self._artifact_verifier_ctx = artifact_verifier_ctx
         self._transfer_manager = transfer_manager
+        self._event_producer = event_producer
 
     @property
     def step_type(self) -> ArtifactStorageImportStep:
@@ -65,6 +70,16 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
         revision = context.model.resolve_revision(self.registry_type)
         model_prefix = f"{context.model.model_id}/{revision}"
+
+        # Send model verifying event
+        await self._event_producer.anycast_event(
+            ModelVerifyingEvent(
+                model_id=context.model.model_id,
+                revision=revision,
+                registry_type=self.registry_type,
+                registry_name=context.registry_name,
+            )
+        )
 
         await self._transfer_manager.transfer_directory(
             source_storage_name=source_storage_name,

@@ -23,6 +23,7 @@ from ai.backend.common.events.event_types.agent.anycast import (
 from ai.backend.common.events.event_types.artifact.anycast import (
     ModelImportDoneEvent,
     ModelMetadataFetchDoneEvent,
+    ModelVerifyingEvent,
 )
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
     DoPullReservoirRegistryEvent,
@@ -584,6 +585,11 @@ class Dispatchers:
             ModelMetadataFetchDoneEvent,
             None,
             self._artifact_event_handler.handle_model_metadata_fetch_done,
+        )
+        evd.consume(
+            ModelVerifyingEvent,
+            None,
+            self._artifact_event_handler.handle_model_verifying,
         )
         evd.consume(
             ModelImportDoneEvent,

@@ -868,6 +868,7 @@ def create_huggingface_import_pipeline(
     transfer_manager: StorageTransferManager,
     storage_step_mappings: dict[ArtifactStorageImportStep, str],
     artifact_verifier_ctx: ArtifactVerifierContext,
+    event_producer: EventProducer,
 ) -> ImportPipeline:
     """Create ImportPipeline for HuggingFace based on storage step mappings."""
     steps: list[ImportStep[Any]] = []
@@ -877,7 +878,7 @@ def create_huggingface_import_pipeline(
         steps.append(HuggingFaceDownloadStep(registry_configs))
 
     if ArtifactStorageImportStep.VERIFY in storage_step_mappings:
-        steps.append(HuggingFaceVerifyStep(artifact_verifier_ctx, transfer_manager))
+        steps.append(HuggingFaceVerifyStep(artifact_verifier_ctx, transfer_manager, event_producer))
 
     if ArtifactStorageImportStep.ARCHIVE in storage_step_mappings:
         steps.append(HuggingFaceArchiveStep(transfer_manager))

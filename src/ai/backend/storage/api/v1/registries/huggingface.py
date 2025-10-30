@@ -176,6 +176,7 @@ class HuggingFaceRegistryAPIHandler:
             transfer_manager=self._huggingface_service._transfer_manager,
             storage_step_mappings=body.parsed.storage_step_mappings,
             artifact_verifier_ctx=self._huggingface_service._artifact_verifier_ctx,
+            event_producer=self._huggingface_service._event_producer,
         )
 
         task_id = await self._huggingface_service.import_models_batch(

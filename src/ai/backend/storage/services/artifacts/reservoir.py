@@ -814,6 +814,7 @@ def create_reservoir_import_pipeline(
     storage_step_mappings: dict[ArtifactStorageImportStep, str],
     transfer_manager: StorageTransferManager,
     artifact_verifier_ctx: ArtifactVerifierContext,
+    event_producer: EventProducer,
 ) -> ImportPipeline:
     """Create ImportPipeline for Reservoir based on storage step mappings."""
     steps: list[ImportStep[Any]] = []
@@ -829,7 +830,7 @@ def create_reservoir_import_pipeline(
         steps.append(ReservoirDownloadStep(registry_configs, download_storage))
 
     if ArtifactStorageImportStep.VERIFY in storage_step_mappings:
-        steps.append(ReservoirVerifyStep(artifact_verifier_ctx, transfer_manager))
+        steps.append(ReservoirVerifyStep(artifact_verifier_ctx, transfer_manager, event_producer))
 
     if ArtifactStorageImportStep.ARCHIVE in storage_step_mappings:
         steps.append(ReservoirArchiveStep(transfer_manager))
