@@ -182,8 +182,6 @@ class APIHandler:
         """
         processors = processors_ctx.processors
         pagination = body.parsed.pagination
-
-        # Use filters and ordering directly
         filters = body.parsed.filters
         ordering = body.parsed.ordering
 
@@ -196,7 +194,6 @@ class APIHandler:
         )
 
         artifacts = action_result.data
-
         resp = SearchArtifactsResponse(
             artifacts=[
                 ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(artifact)

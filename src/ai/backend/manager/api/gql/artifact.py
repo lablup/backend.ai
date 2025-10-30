@@ -104,7 +104,7 @@ class ArtifactFilter:
     def to_repo_filter(self) -> ArtifactFilterOptions:
         repo_filter = ArtifactFilterOptions()
 
-        # Handle basic filters with conversion
+        # Handle basic filters
         repo_filter.artifact_type = self.type
         repo_filter.name_filter = self.name.to_dataclass() if self.name else None
         repo_filter.registry_filter = self.registry.to_dataclass() if self.registry else None
