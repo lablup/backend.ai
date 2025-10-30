@@ -1,7 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional
 
 from ai.backend.logging import BraceStyleAdapter
 
@@ -20,7 +19,7 @@ class KernelRegistrySaveMetadata:
 
 class AbstractKernelRegistryRecovery(ABC):
     @abstractmethod
-    async def load_kernel_registry(self) -> Optional[KernelRegistry]:
+    async def load_kernel_registry(self) -> KernelRegistry:
         pass
 
     @abstractmethod

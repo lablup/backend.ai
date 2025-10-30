@@ -164,6 +164,7 @@ class ErrorDomain(enum.StrEnum):
     RESOURCE_PRESET = "resource-preset"
     STORAGE = "storage"
     AGENT = "agent"
+    KERNEL_REGISTRY = "kernel-registry"
     PERMISSION = "permission"
     METRIC = "metric"
     STORAGE_PROXY = "storage-proxy"
