@@ -708,7 +708,7 @@ class HuggingFaceService:
 # Import Pipeline Steps
 
 
-class HuggingFaceDownloadStep(ImportStep):
+class HuggingFaceDownloadStep(ImportStep[None]):
     """Step to download files from HuggingFace"""
 
     def __init__(self, registry_configs: dict[str, HuggingfaceConfig]) -> None:
@@ -1010,7 +1010,7 @@ def create_huggingface_import_pipeline(
     artifact_verifier_ctx: ArtifactVerifierContext,
 ) -> ImportPipeline:
     """Create ImportPipeline for HuggingFace based on storage step mappings."""
-    steps: list[ImportStep] = []
+    steps: list[ImportStep[Any]] = []
 
     # Add steps based on what's present in storage_step_mappings
     if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:

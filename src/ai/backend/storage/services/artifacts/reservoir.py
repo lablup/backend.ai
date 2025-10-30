@@ -385,7 +385,7 @@ class ReservoirService:
 # Import Pipeline Steps
 
 
-class ReservoirDownloadStep(ImportStep):
+class ReservoirDownloadStep(ImportStep[None]):
     """Step to copy files from Reservoir (effectively direct copy to download storage)"""
 
     def __init__(
@@ -955,7 +955,7 @@ def create_reservoir_import_pipeline(
     artifact_verifier_ctx: ArtifactVerifierContext,
 ) -> ImportPipeline:
     """Create ImportPipeline for Reservoir based on storage step mappings."""
-    steps: list[ImportStep] = []
+    steps: list[ImportStep[Any]] = []
 
     # Add steps based on what's present in storage_step_mappings
     if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:
