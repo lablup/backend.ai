@@ -8,7 +8,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Callable, Final, Optional, Protocol, cast, override
+from typing import Any, Callable, Final, Optional, Protocol, override
 
 import aiohttp
 
@@ -36,24 +36,21 @@ from ai.backend.storage.client.huggingface import (
 from ai.backend.storage.config.unified import HuggingfaceConfig
 from ai.backend.storage.context_types import ArtifactVerifierContext
 from ai.backend.storage.exception import (
-    ArtifactVerificationFailedError,
-    ArtifactVerifyStorageTypeInvalid,
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
     ObjectStorageConfigInvalidError,
     RegistryNotFoundError,
     StorageStepRequiredStepNotProvided,
 )
+from ai.backend.storage.services.artifacts.common import ModelArchiveStep, ModelVerifyStep
 from ai.backend.storage.services.artifacts.storage_transfer import StorageTransferManager
 from ai.backend.storage.services.artifacts.types import (
     DownloadStepResult,
     ImportPipeline,
     ImportStep,
     ImportStepContext,
-    VerifyStepResult,
 )
 from ai.backend.storage.storages.storage_pool import StoragePool
-from ai.backend.storage.storages.vfs_storage import VFSStorage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -848,159 +845,22 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             )
 
 
-class HuggingFaceVerifyStep(ImportStep[DownloadStepResult]):
-    """Step to verify downloaded files in reservoir storage"""
-
-    _artifact_verifier_ctx: ArtifactVerifierContext
-    _transfer_manager: StorageTransferManager
-
-    def __init__(
-        self,
-        artifact_verifier_ctx: ArtifactVerifierContext,
-        transfer_manager: StorageTransferManager,
-    ) -> None:
-        self._artifact_verifier_ctx = artifact_verifier_ctx
-        self._transfer_manager = transfer_manager
+class HuggingFaceVerifyStep(ModelVerifyStep):
+    """Step to verify downloaded files in HuggingFace model import"""
 
     @property
-    def step_type(self) -> ArtifactStorageImportStep:
-        return ArtifactStorageImportStep.VERIFY
-
     @override
-    async def execute(
-        self, context: ImportStepContext, input_data: DownloadStepResult
-    ) -> VerifyStepResult:
-        source_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.DOWNLOAD)
-        dst_storage_name = context.storage_step_mappings.get(ArtifactStorageImportStep.VERIFY)
-        if source_storage_name is None:
-            raise StorageStepRequiredStepNotProvided(
-                "No storage mapping provided for DOWNLOAD step"
-            )
-        if dst_storage_name is None:
-            raise StorageStepRequiredStepNotProvided("No storage mapping provided for VERIFY step")
-
-        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
-        model_prefix = f"{context.model.model_id}/{revision}"
-
-        await self._transfer_manager.transfer_directory(
-            source_storage_name=source_storage_name,
-            dest_storage_name=dst_storage_name,
-            source_prefix=model_prefix,
-            dest_prefix=model_prefix,
-        )
-
-        dst_storage = context.storage_pool.get_storage(dst_storage_name)
-        if not isinstance(dst_storage, VFSStorage):
-            raise ArtifactVerifyStorageTypeInvalid("Verify step requires VFS storage type")
-        dst_storage = cast(VFSStorage, dst_storage)
-
-        for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
-            dst_path = dst_storage.resolve_path(model_prefix)
-            log.info(
-                f"Starting artifact verification using '{verifier_name}', dst_path: {dst_path}"
-            )
-            result = await verifier.verify(dst_path, context)
-            if result.infected_count > 0:
-                raise ArtifactVerificationFailedError(
-                    f"Artifact '{model_prefix}' verification failed using '{verifier_name}': "
-                    f"infected_count={result.infected_count}"
-                )
-
-            log.info(f"Artifact verification using '{verifier_name}' completed successfully")
-
-        return VerifyStepResult(
-            verified_files=input_data.downloaded_files,
-            storage_name=dst_storage_name,
-            total_bytes=input_data.total_bytes,
-        )
-
-    @override
-    async def cleanup_stage(self, context: ImportStepContext) -> None:
-        """Clean up files from verify storage on failure"""
-        verify_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.VERIFY)
-        if not verify_storage:
-            return
-
-        # Delete entire model (cleaning up individual files is complex)
-        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
-        model_prefix = f"{context.model.model_id}/{revision}"
-
-        try:
-            storage = context.storage_pool.get_storage(verify_storage)
-            await storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed archive files: {verify_storage}:{model_prefix}")
-        except Exception as e:
-            log.warning(
-                f"[cleanup] Failed to cleanup verify: {verify_storage}:{model_prefix}: {str(e)}"
-            )
+    def registry_type(self) -> ArtifactRegistryType:
+        return ArtifactRegistryType.HUGGINGFACE
 
 
-class HuggingFaceArchiveStep(ImportStep):
+class HuggingFaceArchiveStep(ModelArchiveStep):
     """Step to move downloaded files to archive storage"""
 
-    def __init__(self, transfer_manager: StorageTransferManager) -> None:
-        self._transfer_manager = transfer_manager
-
     @property
-    def step_type(self) -> ArtifactStorageImportStep:
-        return ArtifactStorageImportStep.ARCHIVE
-
     @override
-    async def execute(self, context: ImportStepContext, input_data: VerifyStepResult) -> None:
-        download_storage = input_data.storage_name
-        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
-
-        if not archive_storage:
-            raise StorageStepRequiredStepNotProvided("No storage mapping provided for ARCHIVE step")
-
-        # No need to move if download and archive storage are the same
-        if download_storage == archive_storage:
-            log.info(
-                f"Archive step skipped - download and archive storage are the same: {archive_storage}"
-            )
-            return
-
-        log.info(f"Starting archive transfer: {download_storage} -> {archive_storage}")
-
-        archieved_file_cnt = 0
-        # Move each file from download storage to archive storage
-        for file_info, storage_key in input_data.verified_files:
-            try:
-                archieved_file_cnt += await self._transfer_manager.transfer_directory(
-                    source_storage_name=download_storage,
-                    dest_storage_name=archive_storage,
-                    source_prefix=storage_key,
-                    dest_prefix=storage_key,
-                )
-                log.debug(f"Transferred file to archive: {storage_key}")
-            except Exception as e:
-                log.error(f"Failed to transfer file to archive: {storage_key}: {str(e)}")
-                raise
-
-        log.info(
-            f"Archive transfer completed: {download_storage} -> {archive_storage}, "
-            f"files={archieved_file_cnt}"
-        )
-
-    @override
-    async def cleanup_stage(self, context: ImportStepContext) -> None:
-        """Clean up files from archive storage on failure"""
-        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
-        if not archive_storage:
-            return
-
-        # Delete entire model (cleaning up individual files is complex)
-        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
-        model_prefix = f"{context.model.model_id}/{revision}"
-
-        try:
-            storage = context.storage_pool.get_storage(archive_storage)
-            await storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed archive files: {archive_storage}:{model_prefix}")
-        except Exception as e:
-            log.warning(
-                f"[cleanup] Failed to cleanup archive: {archive_storage}:{model_prefix}: {str(e)}"
-            )
+    def registry_type(self) -> ArtifactRegistryType:
+        return ArtifactRegistryType.HUGGINGFACE
 
 
 def create_huggingface_import_pipeline(
