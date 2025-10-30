@@ -68,20 +68,26 @@ class KernelRegistryPickleRecovery(AbstractKernelRegistryRecovery):
         self._local_instance_id = args.local_instance_id
         self._last_saved_time = time.monotonic()
 
+    def _registry_file_name(self) -> str:
+        return f"kernel_registry.{self._local_instance_id}.dat"
+
+    def _get_legacy_registry_file_path(self) -> Path:
+        return self._ipc_base_path / f"last_registry.{self._registry_file_name()}.dat"
+
+    def _get_last_registry_file_path(self) -> Path:
+        return self._var_base_path / f"last_registry.{self._registry_file_name()}.dat"
+
     @override
     async def load_kernel_registry(self) -> KernelRegistry:
-        ipc_base_path = self._ipc_base_path
-        var_base_path = self._var_base_path
-        last_registry_file = f"last_registry.{self._local_instance_id}.dat"
-        if os.path.isfile(ipc_base_path / last_registry_file):
-            shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
+        legacy_registry_file = self._get_legacy_registry_file_path()
+        last_registry_file = self._get_last_registry_file_path()
+        if os.path.isfile(legacy_registry_file):
+            shutil.move(legacy_registry_file, last_registry_file)
         try:
-            with open(var_base_path / last_registry_file, "rb") as f:
+            with open(last_registry_file, "rb") as f:
                 return pickle.load(f)
         except EOFError as e:
-            log.warning(
-                "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
-            )
+            log.warning("Failed to load the last kernel registry: {}", (last_registry_file))
             raise KernelRegistryLoadError from e
         except FileNotFoundError as e:
             raise KernelRegistryNotFound from e
@@ -93,16 +99,15 @@ class KernelRegistryPickleRecovery(AbstractKernelRegistryRecovery):
         now = time.monotonic()
         if (not metadata.force) and (now <= self._last_saved_time + SAVE_COOL_DOWN_SECONDS):
             return  # don't save too frequently
-        var_base_path = self._var_base_path
-        last_registry_file = f"last_registry.{self._local_instance_id}.dat"
+        last_registry_file = self._get_last_registry_file_path()
         try:
-            with open(var_base_path / last_registry_file, "wb") as f:
+            with open(last_registry_file, "wb") as f:
                 pickle.dump(registry, f)
             self._last_saved_time = now
             log.debug("saved {}", last_registry_file)
         except Exception as e:
             log.exception("unable to save {}", last_registry_file, exc_info=e)
             try:
-                os.remove(var_base_path / last_registry_file)
+                os.remove(last_registry_file)
             except FileNotFoundError:
                 pass
