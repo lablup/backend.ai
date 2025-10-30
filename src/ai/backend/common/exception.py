@@ -790,3 +790,29 @@ class ModelRevisionNotFound(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class InvalidParameter(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-parameter"
+    error_title = "Invalid Parameter"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class ASTParsingFailed(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/ast-parsing-failed"
+    error_title = "AST Parsing Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.PARSING,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
