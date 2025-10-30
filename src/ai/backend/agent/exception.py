@@ -168,3 +168,16 @@ class KernelRegistryNotFound(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class KernelRegistryLoadError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://backend.ai/errors/agent/kernel-registry-load-error"
+    error_title = "Kernel Registry Load Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL_REGISTRY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
