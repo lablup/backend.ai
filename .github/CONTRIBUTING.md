@@ -411,13 +411,9 @@ pants test <changed-tests>
 
 ### 3. Conflict Resolution
 
-**⚠️ Use Rebase Instead of Merge**
+You can resolve conflicts using either `rebase` or `merge`:
 
-When resolving conflicts, we **strongly recommend using `rebase` instead of `merge`**:
-- No merge commits created, keeping history clean
-- Only the PR's changes are clearly displayed
-- Prevents conflicts when squash merging
-
+**Using Rebase:**
 ```bash
 # Update main branch to latest state
 git fetch origin
@@ -427,10 +423,20 @@ git rebase origin/main
 git push --force-with-lease
 ```
 
-**Rebase Checklist**:
-- [ ] Rebase with main branch completed
+**Using Merge:**
+```bash
+# Update main branch to latest state
+git fetch origin
+git merge origin/main
+
+# After resolving conflicts
+git push
+```
+
+**Conflict Resolution Checklist**:
+- [ ] Conflicts with main branch resolved
 - [ ] All conflicts resolved
-- [ ] Tests re-run after rebase
+- [ ] Tests re-run after resolution
 
 ## Review Process
 
