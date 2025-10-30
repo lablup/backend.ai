@@ -26,7 +26,7 @@ class AbstractKernelRegistryRecovery(ABC):
     async def load_kernel_registry(self) -> KernelRegistry:
         """
         Load the KernelRegistry from persistent storage.
-        Raise ai.backend.agent.exception.KernelRegistryNotFound if not found.
+        Raises: KernelRegistryNotFound
         Returns: The loaded KernelRegistry.
         """
         pass
