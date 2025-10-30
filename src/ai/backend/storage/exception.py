@@ -289,9 +289,9 @@ class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
-class StorageBucketFileNotFoundError(BackendAIError, web.HTTPNotFound):
-    error_type = "https://api.backend.ai/probs/storage/bucket/file/object-not-found"
-    error_title = "Storage Bucket File Not Found"
+class StorageFileNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/storage/file/object-not-found"
+    error_title = "File Not Found in the Storage"
 
     @classmethod
     def error_code(cls) -> ErrorCode:

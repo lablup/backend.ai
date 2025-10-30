@@ -20,7 +20,7 @@ from ai.backend.storage.exception import (
     ObjectStorageObjectDeletionError,
     PresignedDownloadURLGenerationError,
     PresignedUploadURLGenerationError,
-    StorageBucketFileNotFoundError,
+    StorageFileNotFoundError,
 )
 from ai.backend.storage.storages.base import AbstractStorage
 
@@ -117,7 +117,7 @@ class ObjectStorage(AbstractStorage):
             object_info = await s3_client.get_object_meta(filepath)
 
             if object_info is None:
-                raise StorageBucketFileNotFoundError()
+                raise StorageFileNotFoundError()
 
             return ObjectMetaResponse(
                 content_length=object_info.content_length,

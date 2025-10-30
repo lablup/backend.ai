@@ -27,7 +27,7 @@ from ai.backend.storage.exception import (
     FileStreamUploadError,
     NotImplementedAPI,
     ObjectInfoFetchError,
-    StorageBucketFileNotFoundError,
+    StorageFileNotFoundError,
 )
 from ai.backend.storage.storages.base import AbstractStorage
 from ai.backend.storage.utils import normalize_filepath
@@ -266,7 +266,7 @@ class VFSStorage(AbstractStorage):
             target_path = self._resolve_path(filepath)
 
             if not target_path.exists():
-                raise StorageBucketFileNotFoundError(f"File not found: {filepath}")
+                raise StorageFileNotFoundError(f"File not found: {filepath}")
 
             stat_result = await aiofiles.os.stat(target_path)
 
@@ -338,7 +338,7 @@ class VFSStorage(AbstractStorage):
             target_path = self._resolve_path(directory)
 
             if not target_path.exists():
-                raise StorageBucketFileNotFoundError(f"Directory not found: {directory}")
+                raise StorageFileNotFoundError(f"Directory not found: {directory}")
 
             if not target_path.is_dir():
                 raise FileStreamDownloadError(f"Path is not a directory: {directory}")
@@ -377,7 +377,7 @@ class VFSStorage(AbstractStorage):
             target_path = self._resolve_path(directory)
 
             if not target_path.exists():
-                raise StorageBucketFileNotFoundError(f"Directory not found: {directory}")
+                raise StorageFileNotFoundError(f"Directory not found: {directory}")
 
             if not target_path.is_dir():
                 raise FileStreamDownloadError(f"Path is not a directory: {directory}")
