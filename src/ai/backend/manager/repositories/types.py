@@ -2,7 +2,7 @@ import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import StrEnum
-from typing import Any, Generic, Optional, Protocol, TypeVar
+from typing import Any, Generic, Optional, Protocol, Self, TypeVar
 
 import sqlalchemy as sa
 from lark import Tree
@@ -641,7 +641,7 @@ class BaseMinilangFilterConverter(ABC):
 
     @classmethod
     @abstractmethod
-    def from_minilang(cls, expr: str):
+    def from_minilang(cls, expr: str) -> Self:
         """
         Convert minilang expression string to Filter object.
 
@@ -654,7 +654,7 @@ class BaseMinilangFilterConverter(ABC):
         raise NotImplementedError()
 
     @classmethod
-    def _from_ast(cls, ast: Tree):
+    def _from_ast(cls, ast: Tree) -> Self:
         """
         Convert Lark AST to Filter object recursively.
 
@@ -744,7 +744,7 @@ class BaseMinilangOrderParser(ABC, Generic[TOrderField, TOrderingOptions]):
 
     Type Parameters:
         TOrderField: Enum type for order field names (domain-specific)
-        TOrderBy: Domain-specific OrderingOption type (e.g., AgentOrderingOptions)
+        TOrderingOptions: Domain-specific OrderingOption type (e.g., AgentOrderingOptions)
 
     Example:
         class AgentOrderParser(BaseOrderParser[AgentOrderField, AgentOrderingOptions]):
@@ -773,7 +773,7 @@ class BaseMinilangOrderParser(ABC, Generic[TOrderField, TOrderingOptions]):
         result = {}
         for expr in expr_list:
             # Check for prefix
-            if expr[0] in ("+", "-"):
+            if expr and expr[0] in ("+", "-"):
                 ascending = expr[0] == "+"
                 field_name = expr[1:].strip()
             else:
