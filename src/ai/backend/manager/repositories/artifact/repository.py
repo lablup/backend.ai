@@ -3,6 +3,11 @@ from typing import Optional
 
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
+from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
+from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
@@ -13,10 +18,7 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.artifact.db_source.db_source import (
-    ArtifactDBSource,
-    artifact_repository_resilience,
-)
+from ai.backend.manager.repositories.artifact.db_source.db_source import ArtifactDBSource
 from ai.backend.manager.repositories.artifact.types import (
     ArtifactFilterOptions,
     ArtifactOrderingOptions,
@@ -24,6 +26,20 @@ from ai.backend.manager.repositories.artifact.types import (
     ArtifactRevisionOrderingOptions,
 )
 from ai.backend.manager.repositories.types import PaginationOptions
+
+artifact_repository_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.REPOSITORY, layer=LayerType.ARTIFACT_REPOSITORY)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=10,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
 
 
 class ArtifactRepository:
