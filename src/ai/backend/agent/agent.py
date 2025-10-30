@@ -231,7 +231,7 @@ from .kernel import (
 from .kernel_registry.kernel_registry import KernelRegistry
 from .kernel_registry.loader import (
     KernelRegistryPickleRecovery,
-    KernelRegistryRecoveryArgs,
+    KernelRegistryPickleRecoveryArgs,
     KernelRegistrySaveMetadata,
 )
 from .observer.heartbeat import HeartbeatObserver
@@ -872,7 +872,7 @@ class AbstractAgent(
         self._ongoing_destruction_tasks = weakref.WeakValueDictionary()
         self._metric_registry = CommonMetricRegistry.instance()
         self._kernel_registry_recovery = KernelRegistryPickleRecovery.create(
-            KernelRegistryRecoveryArgs(
+            KernelRegistryPickleRecoveryArgs(
                 ipc_base_path=local_config.agent.ipc_base_path,
                 var_base_path=local_config.agent.var_base_path,
                 local_instance_id=self.local_instance_id,

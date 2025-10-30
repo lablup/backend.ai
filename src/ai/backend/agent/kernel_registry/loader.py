@@ -19,23 +19,11 @@ SAVE_COOL_DOWN_SECONDS = 60
 
 
 @dataclass
-class KernelRegistryRecoveryArgs:
-    ipc_base_path: Path
-    var_base_path: Path
-    local_instance_id: str
-
-
-@dataclass
 class KernelRegistrySaveMetadata:
     force: bool
 
 
 class AbstractKernelRegistryRecovery(ABC):
-    @classmethod
-    @abstractmethod
-    def create(cls, args: KernelRegistryRecoveryArgs) -> Self:
-        pass
-
     @abstractmethod
     async def load_kernel_registry(self) -> Optional[KernelRegistry]:
         pass
@@ -47,16 +35,22 @@ class AbstractKernelRegistryRecovery(ABC):
         pass
 
 
+@dataclass
+class KernelRegistryPickleRecoveryArgs:
+    ipc_base_path: Path
+    var_base_path: Path
+    local_instance_id: str
+
+
 class KernelRegistryPickleRecovery(AbstractKernelRegistryRecovery):
-    def __init__(self, args: KernelRegistryRecoveryArgs) -> None:
+    def __init__(self, args: KernelRegistryPickleRecoveryArgs) -> None:
         self._ipc_base_path = args.ipc_base_path
         self._var_base_path = args.var_base_path
         self._local_instance_id = args.local_instance_id
         self._last_saved_time = time.monotonic()
 
     @classmethod
-    @override
-    def create(cls, args: KernelRegistryRecoveryArgs) -> Self:
+    def create(cls, args: KernelRegistryPickleRecoveryArgs) -> Self:
         return cls(args)
 
     @override
