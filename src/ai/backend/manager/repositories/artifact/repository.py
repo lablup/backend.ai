@@ -788,10 +788,6 @@ class ArtifactRepository:
                 )
             )
             readme = result.scalar_one_or_none()
-            if readme is None:
-                raise ArtifactRevisionNotFoundError(
-                    f"Artifact revision with ID {artifact_revision_id} not found"
-                )
             return readme
 
     @repository_decorator()
