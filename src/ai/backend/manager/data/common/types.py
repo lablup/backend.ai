@@ -26,25 +26,25 @@ class StringFilterData:
         Returns:
             SQLAlchemy condition expression or None if no filter is set
         """
-        if self.equals:
+        if self.equals is not None:
             return column == self.equals
-        elif self.i_equals:
+        elif self.i_equals is not None:
             return column.ilike(self.i_equals)
-        elif self.not_equals:
+        elif self.not_equals is not None:
             return column != self.not_equals
-        elif self.i_not_equals:
+        elif self.i_not_equals is not None:
             return ~column.ilike(self.i_not_equals)
-        elif self.starts_with:
+        elif self.starts_with is not None:
             return column.like(f"{self.starts_with}%")
-        elif self.i_starts_with:
+        elif self.i_starts_with is not None:
             return column.ilike(f"{self.i_starts_with}%")
-        elif self.ends_with:
+        elif self.ends_with is not None:
             return column.like(f"%{self.ends_with}")
-        elif self.i_ends_with:
+        elif self.i_ends_with is not None:
             return column.ilike(f"%{self.i_ends_with}")
-        elif self.contains:
+        elif self.contains is not None:
             return column.like(f"%{self.contains}%")
-        elif self.i_contains:
+        elif self.i_contains is not None:
             return column.ilike(f"%{self.i_contains}%")
 
         return None
