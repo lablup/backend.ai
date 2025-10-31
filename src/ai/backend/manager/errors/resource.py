@@ -291,6 +291,19 @@ class DomainHasGroups(BackendAIError, web.HTTPConflict):
         )
 
 
+class DomainDeletionFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/domain-deletion-failed"
+    error_title = "Failed to delete domain."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOMAIN,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class DomainUpdateNotAllowed(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/domain-update-not-allowed"
     error_title = "Domain update not allowed."
