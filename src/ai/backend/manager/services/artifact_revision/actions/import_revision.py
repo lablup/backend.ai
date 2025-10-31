@@ -24,7 +24,7 @@ class ImportArtifactRevisionAction(ArtifactRevisionAction):
 @dataclass
 class ImportArtifactRevisionActionResult(BaseActionResult):
     result: ArtifactRevisionData
-    task_id: uuid.UUID
+    task_id: Optional[uuid.UUID]
 
     @override
     def entity_id(self) -> Optional[str]:

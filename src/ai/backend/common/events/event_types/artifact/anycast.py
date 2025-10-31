@@ -35,6 +35,7 @@ class ModelImportDoneEvent(BaseArtifactEvent):
     registry_type: ArtifactRegistryType
     registry_name: str
     success: bool
+    digest: Optional[str]
 
     @classmethod
     @override
@@ -42,7 +43,14 @@ class ModelImportDoneEvent(BaseArtifactEvent):
         return "model_import_done"
 
     def serialize(self) -> tuple:
-        return (self.model_id, self.revision, self.registry_type, self.registry_name, self.success)
+        return (
+            self.model_id,
+            self.revision,
+            self.registry_type,
+            self.registry_name,
+            self.success,
+            self.digest,
+        )
 
     @classmethod
     def deserialize(cls, value: tuple):
@@ -52,6 +60,7 @@ class ModelImportDoneEvent(BaseArtifactEvent):
             registry_type=value[2],
             registry_name=value[3],
             success=value[4],
+            digest=value[5],
         )
 
     @override

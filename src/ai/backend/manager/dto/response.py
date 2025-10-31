@@ -71,7 +71,7 @@ class RejectArtifactRevisionResponse(BaseResponseModel):
 
 
 class ArtifactRevisionImportTask(BaseResponseModel):
-    task_id: str
+    task_id: Optional[str]
     artifact_revision: ArtifactRevisionResponseData
 
 

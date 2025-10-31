@@ -48,6 +48,7 @@ class ArtifactRevisionRow(Base):
     version = sa.Column("version", sa.String, nullable=False)
     readme = sa.Column("readme", sa.TEXT, nullable=True, default=None)
     size = sa.Column("size", sa.BigInteger, nullable=True, default=None)
+    digest = sa.Column("digest", sa.String, nullable=True, server_default=None, default=None)
 
     # It's unnatural to include "status" in the revision, but let's put it here for now instead of creating separate table.
     status = sa.Column(sa.String, index=True, nullable=False, default=ArtifactStatus.SCANNED.value)
@@ -95,7 +96,9 @@ class ArtifactRevisionRow(Base):
             f"status={self.status}, "
             f"remote_status={self.remote_status}, "
             f"created_at={self.created_at.isoformat()}, "
-            f"updated_at={self.updated_at.isoformat()})"
+            f"updated_at={self.updated_at.isoformat()}, "
+            f"digest={self.digest}"
+            f")"
         )
 
     def to_dataclass(self) -> ArtifactRevisionData:
@@ -109,6 +112,7 @@ class ArtifactRevisionRow(Base):
             remote_status=ArtifactRemoteStatus(self.remote_status) if self.remote_status else None,
             created_at=self.created_at,
             updated_at=self.updated_at,
+            digest=self.digest,
         )
 
     @classmethod
@@ -126,4 +130,5 @@ class ArtifactRevisionRow(Base):
             remote_status=None,
             created_at=model_data.created_at,
             updated_at=model_data.modified_at,
+            digest=model_data.sha,
         )

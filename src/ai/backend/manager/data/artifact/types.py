@@ -76,6 +76,7 @@ class ArtifactRevisionData:
     remote_status: Optional[ArtifactRemoteStatus]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
+    digest: Optional[str]
 
 
 @dataclass
@@ -90,6 +91,7 @@ class ArtifactRevisionResponseData:
     remote_status: Optional[ArtifactRemoteStatus]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
+    digest: Optional[str]
 
     @classmethod
     def from_revision_data(cls, data: ArtifactRevisionData) -> Self:
@@ -102,6 +104,7 @@ class ArtifactRevisionResponseData:
             remote_status=data.remote_status,
             created_at=data.created_at,
             updated_at=data.updated_at,
+            digest=data.digest,
         )
 
 

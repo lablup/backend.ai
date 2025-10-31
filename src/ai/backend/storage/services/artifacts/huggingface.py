@@ -439,6 +439,23 @@ class HuggingFaceService:
         log.debug(f"Successfully retrieved single model with metadata: {model}")
         return model_data
 
+    async def get_model_commit_hash(
+        self,
+        registry_name: str,
+        model: ModelTarget,
+    ) -> Optional[str]:
+        """Get the commit hash for a specific model revision.
+
+        Args:
+            registry_name: Name of the HuggingFace registry
+            model: Model target with specific revision
+
+        Returns:
+            The commit hash (SHA) for the model revision, or None if not available
+        """
+        scanner = self._make_scanner(registry_name)
+        return await scanner._client.get_model_commit_hash(model)
+
     async def retrieve_models(
         self,
         registry_name: str,
@@ -573,6 +590,11 @@ class HuggingFaceService:
         except Exception as e:
             raise HuggingFaceAPIError(f"Import failed for {model}: {str(e)}") from e
         finally:
+            scanner = self._make_scanner(registry_name)
+            commit_hash = None
+            if success:
+                commit_hash = await scanner.get_model_commit_hash(model)
+
             await self._event_producer.anycast_event(
                 ModelImportDoneEvent(
                     success=success,
@@ -580,6 +602,7 @@ class HuggingFaceService:
                     revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
                     registry_name=registry_name,
                     registry_type=ArtifactRegistryType.HUGGINGFACE,
+                    digest=commit_hash,
                 )
             )
 
