@@ -15,12 +15,23 @@ from ai.backend.manager.data.domain.types import (
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
-from ai.backend.manager.errors.resource import DomainDataProcessingError, DomainNotFound
+from ai.backend.manager.errors.resource import (
+    DomainDataProcessingError,
+    DomainDeletionFailed,
+    DomainHasActiveKernels,
+    DomainHasGroups,
+    DomainHasUsers,
+    DomainNotFound,
+)
 from ai.backend.manager.models import groups
 from ai.backend.manager.models.domain import DomainRow, domains, row_to_data
 from ai.backend.manager.models.group import ProjectType
-from ai.backend.manager.models.kernel import kernels
+from ai.backend.manager.models.kernel import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    kernels,
+)
 from ai.backend.manager.models.scaling_group import ScalingGroupForDomainRow
+from ai.backend.manager.models.user import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 # Layer-specific decorator for admin domain repository
@@ -100,19 +111,63 @@ class AdminDomainRepository:
             if result.rowcount == 0:
                 raise DomainNotFound(f"Domain not found: {domain_name}")
 
-    async def purge_domain_force(self, domain_name: str) -> bool:
+    @admin_repository_decorator()
+    async def purge_domain_force(self, domain_name: str) -> None:
         """
         Permanently deletes a domain without validation checks.
-        For superadmin use only - bypasses all safety checks.
         """
         async with self._db.begin() as conn:
-            # Force clean up kernels
+            # Validate prerequisites
+            if await self._domain_has_active_kernels(conn, domain_name):
+                raise DomainHasActiveKernels(
+                    "Domain has some active kernels. Terminate them first."
+                )
+
+            user_count = await self._get_domain_user_count(conn, domain_name)
+            if user_count > 0:
+                raise DomainHasUsers("There are users bound to the domain. Remove users first.")
+
+            group_count = await self._get_domain_group_count(conn, domain_name)
+            if group_count > 0:
+                raise DomainHasGroups("There are groups bound to the domain. Remove groups first.")
+
+            # Clean up kernels
             await self._delete_kernels(conn, domain_name)
 
             # Delete domain
             delete_query = sa.delete(domains).where(domains.c.name == domain_name)
             result = await conn.execute(delete_query)
-            return result.rowcount > 0
+            if result.rowcount == 0:
+                raise DomainDeletionFailed(f"Failed to delete domain: {domain_name}")
+
+    async def _domain_has_active_kernels(self, conn: SAConnection, domain_name: str) -> bool:
+        """
+        Private method to check if domain has active kernels.
+        """
+        query = (
+            sa.select([sa.func.count()])
+            .select_from(kernels)
+            .where(
+                (kernels.c.domain_name == domain_name)
+                & (kernels.c.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+            )
+        )
+        active_kernel_count = await conn.scalar(query)
+        return active_kernel_count > 0
+
+    async def _get_domain_user_count(self, conn: SAConnection, domain_name: str) -> int:
+        """
+        Private method to get user count for a domain.
+        """
+        query = sa.select([sa.func.count()]).where(users.c.domain_name == domain_name)
+        return await conn.scalar(query)
+
+    async def _get_domain_group_count(self, conn: SAConnection, domain_name: str) -> int:
+        """
+        Private method to get group count for a domain.
+        """
+        query = sa.select([sa.func.count()]).where(groups.c.domain_name == domain_name)
+        return await conn.scalar(query)
 
     async def create_domain_node_force(
         self, creator: DomainCreator, scaling_groups: Optional[list[str]] = None

@@ -15,7 +15,14 @@ from ai.backend.manager.data.domain.types import (
 from ai.backend.manager.decorators.repository_decorator import (
     create_layer_aware_repository_decorator,
 )
-from ai.backend.manager.errors.resource import DomainDataProcessingError, DomainNotFound
+from ai.backend.manager.errors.resource import (
+    DomainDataProcessingError,
+    DomainDeletionFailed,
+    DomainHasActiveKernels,
+    DomainHasGroups,
+    DomainHasUsers,
+    DomainNotFound,
+)
 from ai.backend.manager.models import groups, users
 from ai.backend.manager.models.domain import DomainRow, domains, get_domains
 from ai.backend.manager.models.group import ProjectType
@@ -112,7 +119,7 @@ class DomainRepository:
                 raise DomainNotFound(f"Domain not found: {domain_name}")
 
     @repository_decorator()
-    async def purge_domain_validated(self, domain_name: str) -> bool:
+    async def purge_domain_validated(self, domain_name: str) -> None:
         """
         Permanently deletes a domain after validation checks.
         Validates domain purge permissions and prerequisites.
@@ -120,15 +127,17 @@ class DomainRepository:
         async with self._db.begin() as conn:
             # Validate prerequisites
             if await self._domain_has_active_kernels(conn, domain_name):
-                raise RuntimeError("Domain has some active kernels. Terminate them first.")
+                raise DomainHasActiveKernels(
+                    "Domain has some active kernels. Terminate them first."
+                )
 
             user_count = await self._get_domain_user_count(conn, domain_name)
             if user_count > 0:
-                raise RuntimeError("There are users bound to the domain. Remove users first.")
+                raise DomainHasUsers("There are users bound to the domain. Remove users first.")
 
             group_count = await self._get_domain_group_count(conn, domain_name)
             if group_count > 0:
-                raise RuntimeError("There are groups bound to the domain. Remove groups first.")
+                raise DomainHasGroups("There are groups bound to the domain. Remove groups first.")
 
             # Clean up kernels
             await self._delete_kernels(conn, domain_name)
@@ -136,7 +145,8 @@ class DomainRepository:
             # Delete domain
             delete_query = sa.delete(domains).where(domains.c.name == domain_name)
             result = await conn.execute(delete_query)
-            return result.rowcount > 0
+            if result.rowcount == 0:
+                raise DomainDeletionFailed(f"Failed to delete domain: {domain_name}")
 
     @repository_decorator()
     async def create_domain_node_validated(
