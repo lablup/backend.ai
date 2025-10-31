@@ -4,13 +4,13 @@ from dataclasses import dataclass
 from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.artifact.types import ArtifactDataWithRevisions
-from ai.backend.manager.repositories.artifact.repository import (
+from ai.backend.manager.data.artifact.types import (
+    ArtifactDataWithRevisions,
     ArtifactFilterOptions,
     ArtifactOrderingOptions,
-    PaginationOptions,
 )
 from ai.backend.manager.services.artifact.actions.base import ArtifactAction
+from ai.backend.manager.types import PaginationOptions
 
 
 @dataclass
