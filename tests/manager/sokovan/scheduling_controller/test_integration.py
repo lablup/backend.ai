@@ -82,6 +82,7 @@ async def scheduling_controller(
         event_producer=AsyncMock(),
         valkey_schedule=AsyncMock(),
         network_plugin_ctx=AsyncMock(),
+        hook_plugin_ctx=AsyncMock(),
     )
     return SchedulingController(args)
 
