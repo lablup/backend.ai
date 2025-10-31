@@ -11,6 +11,7 @@ import pytest
 from aiodocker.exceptions import DockerError
 
 from ai.backend.agent.docker.agent import DockerAgent
+from ai.backend.agent.resources import ResourcePartitioner
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import ImageNotAvailable
@@ -28,6 +29,12 @@ async def agent(local_config, test_id, mocker, socket_relay_image):
     mocked_etcd_get_prefix = AsyncMock(return_value={})
     mocker.patch.object(dummy_etcd, "get_prefix", new=mocked_etcd_get_prefix)
     test_case_id = secrets.token_hex(8)
+    # Create a ResourcePartitioner for the agent
+    resource_partitioner = ResourcePartitioner(
+        resource_config=local_config.resource,
+        num_agents=1,
+        agent_idx=0,
+    )
     agent = await DockerAgent.new(
         dummy_etcd,
         local_config,
@@ -35,6 +42,7 @@ async def agent(local_config, test_id, mocker, socket_relay_image):
         error_monitor=None,
         skip_initial_scan=True,
         agent_public_key=None,
+        resource_partitioner=resource_partitioner,
     )  # for faster test iteration
     agent.local_instance_id = test_case_id  # use per-test private registry file
     try:

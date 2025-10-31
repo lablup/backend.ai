@@ -116,6 +116,7 @@ from ..resources import (
     ComputerContext,
     KernelResourceSpec,
     Mount,
+    ResourcePartitioner,
     known_slot_types,
 )
 from ..scratch import create_loop_filesystem, destroy_loop_filesystem
@@ -1314,6 +1315,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
+        resource_partitioner: ResourcePartitioner,
     ) -> None:
         super().__init__(
             etcd,
@@ -1322,6 +1324,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             error_monitor=error_monitor,
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
+            resource_partitioner=resource_partitioner,
         )
         self.checked_invalid_images = set()
         # MetadataServer must be shared across all instances of DockerAgent.

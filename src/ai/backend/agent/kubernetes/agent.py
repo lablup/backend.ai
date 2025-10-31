@@ -74,6 +74,7 @@ from ..resources import (
     ComputerContext,
     KernelResourceSpec,
     Mount,
+    ResourcePartitioner,
     known_slot_types,
 )
 from ..types import Container, KernelOwnershipData, MountInfo, Port
@@ -829,6 +830,7 @@ class KubernetesAgent(
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
+        resource_partitioner: ResourcePartitioner,
     ) -> None:
         super().__init__(
             etcd,
@@ -837,6 +839,7 @@ class KubernetesAgent(
             error_monitor=error_monitor,
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
+            resource_partitioner=resource_partitioner,
         )
 
     async def __ainit__(self) -> None:

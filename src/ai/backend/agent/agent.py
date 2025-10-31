@@ -30,6 +30,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from io import SEEK_END, BytesIO
+from itertools import chain
 from pathlib import Path
 from types import TracebackType
 from typing import (
@@ -174,7 +175,6 @@ from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReportValue,
-    AcceleratorMetadata,
     AgentId,
     AutoPullBehavior,
     BinarySize,
@@ -233,11 +233,11 @@ from .kernel import (
 from .observer.heartbeat import HeartbeatObserver
 from .observer.host_port import HostPortObserver
 from .resources import (
-    AbstractComputeDevice,
     AbstractComputePlugin,
     ComputerContext,
     KernelResourceSpec,
     Mount,
+    ResourcePartitioner,
     align_memory,
     allocate,
     known_slot_types,
@@ -765,7 +765,10 @@ class AbstractAgent(
     etcd: AsyncEtcd
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
+    resource_partitioner: ResourcePartitioner
     computers: MutableMapping[DeviceName, ComputerContext]
+    total_slots: Mapping[SlotName, Decimal]
+    reserved_slots: Mapping[SlotName, Decimal]
     images: Mapping[ImageCanonical, ScannedImage]
     port_pool: set[int]
 
@@ -836,6 +839,7 @@ class AbstractAgent(
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
+        resource_partitioner: ResourcePartitioner,
     ) -> None:
         self._skip_initial_scan = skip_initial_scan
         self.loop = current_loop()
@@ -845,7 +849,10 @@ class AbstractAgent(
         self.local_instance_id = generate_local_instance_id(__file__)
         self.agent_public_key = agent_public_key
         self.kernel_registry = {}
+        self.resource_partitioner = resource_partitioner
         self.computers = {}
+        self.total_slots = {}
+        self.reserved_slots = {}
         self.images = {}
         self.restarting_kernels = {}
         self.stat_ctx = StatContext(
@@ -934,15 +941,17 @@ class AbstractAgent(
         alloc_map_mod.log_alloc_map = self.local_config.debug.log_alloc_map
         computers = await self.load_resources()
 
-        all_devices: list[AbstractComputeDevice] = []
-        metadatas: list[AcceleratorMetadata] = []
         for name, computer in computers.items():
             devices = await computer.list_devices()
-            all_devices.extend(devices)
             alloc_map = await computer.create_alloc_map()
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
-            metadatas.append(computer.get_metadata())
 
+        self.total_slots = self.resource_partitioner.calculate_total_slots(
+            self.computers, self.local_config.resource_common
+        )
+        self.reserved_slots = self.resource_partitioner.restrict_computer_resources(
+            self.computers, self.total_slots
+        )
         self.slots = await self.update_slots()
         log.info("Resource slots: {!r}", self.slots)
         log.info("Slot types: {!r}", known_slot_types)
@@ -950,12 +959,16 @@ class AbstractAgent(
 
         # Use ValkeyStatClient batch operations for better performance
         field_value_map = {}
-        for metadata in metadatas:
+        for computer_ctx in self.computers.values():
+            metadata = computer_ctx.instance.get_metadata()
             field_value_map[metadata["slot_name"]] = dump_json_str(metadata).encode()
 
         if field_value_map:
             await self.valkey_stat_client.store_computer_metadata(field_value_map)
 
+        all_devices = list(
+            chain.from_iterable(computer.devices for computer in self.computers.values())
+        )
         self.affinity_map = AffinityMap.build(all_devices)
 
         if not self._skip_initial_scan:
@@ -1949,6 +1962,7 @@ class AbstractAgent(
         """
         Detect available resources attached on the system and load corresponding device plugin.
         """
+        raise NotImplementedError
 
     @abstractmethod
     async def scan_available_resources(
@@ -1957,6 +1971,7 @@ class AbstractAgent(
         """
         Scan and define the amount of available resource slots in this node.
         """
+        raise NotImplementedError
 
     async def update_slots(
         self,
@@ -1967,14 +1982,9 @@ class AbstractAgent(
         """
         scanned_slots = await self.scan_available_resources()
         usable_slots: dict[SlotName, Decimal] = {}
-        reserved_slots = {
-            SlotName("cpu"): Decimal(self.local_config.resource.reserved_cpu),
-            SlotName("mem"): Decimal(self.local_config.resource.reserved_mem),
-            SlotName("disk"): Decimal(self.local_config.resource.reserved_disk),
-        }
         for slot_name, slot_capacity in scanned_slots.items():
             if slot_name == SlotName("mem"):
-                mem_reserved = int(reserved_slots.get(slot_name, 0))
+                mem_reserved = int(self.reserved_slots.get(slot_name, 0))
                 mem_align = int(self.local_config.resource.memory_align_size)
                 mem_usable, mem_reserved = align_memory(
                     int(slot_capacity), mem_reserved, align=mem_align
@@ -1988,7 +1998,7 @@ class AbstractAgent(
                 )
             else:
                 usable_capacity = max(
-                    Decimal(0), slot_capacity - reserved_slots.get(slot_name, Decimal(0))
+                    Decimal(0), slot_capacity - self.reserved_slots.get(slot_name, Decimal(0))
                 )
             usable_slots[slot_name] = usable_capacity
         return usable_slots
@@ -2100,6 +2110,7 @@ class AbstractAgent(
         This is called periodically to keep the image list up-to-date and allow
         manual image addition and deletions by admins.
         """
+        raise NotImplementedError
 
     async def _scan_images_wrapper(self, interval: float) -> None:
         result = await self.scan_images()
@@ -2120,6 +2131,7 @@ class AbstractAgent(
         """
         Push the given image to the given registry.
         """
+        raise NotImplementedError
 
     @abstractmethod
     async def pull_image(
@@ -2132,12 +2144,14 @@ class AbstractAgent(
         """
         Pull the given image from the given registry.
         """
+        raise NotImplementedError
 
     @abstractmethod
     async def purge_images(self, request: PurgeImagesReq) -> PurgeImagesResp:
         """
         Purge the given images from the agent.
         """
+        raise NotImplementedError
 
     async def check_and_pull(
         self,
@@ -2269,7 +2283,7 @@ class AbstractAgent(
         Check the availability of the image and return a boolean flag that indicates whether
         the agent should try pulling the image from a registry.
         """
-        return False
+        raise NotImplementedError
 
     async def scan_running_kernels(self) -> None:
         """
@@ -3491,6 +3505,7 @@ class AbstractAgent(
         * Send SIGTERM to the kernel's main process.
         * Send SIGKILL if it's not terminated within a few seconds.
         """
+        raise NotImplementedError
 
     @abstractmethod
     async def clean_kernel(
@@ -3514,6 +3529,7 @@ class AbstractAgent(
         The ``container_id`` may be ``None`` if the container has already gone away.
         In such cases, skip container-specific cleanups.
         """
+        raise NotImplementedError
 
     @abstractmethod
     async def create_local_network(self, network_name: str) -> None:
@@ -3525,6 +3541,7 @@ class AbstractAgent(
         It may raise :exc:`NotImplementedError` and then the manager
         will cancel creation of the session.
         """
+        raise NotImplementedError
 
     @abstractmethod
     async def destroy_local_network(self, network_name: str) -> None:
@@ -3533,6 +3550,7 @@ class AbstractAgent(
 
         This is called by the manager after kernel destruction.
         """
+        raise NotImplementedError
 
     @abstractmethod
     async def restart_kernel__load_config(
@@ -3543,7 +3561,7 @@ class AbstractAgent(
         """
         Restore the cluster config from a previous launch of the kernel.
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def restart_kernel__store_config(
@@ -3556,7 +3574,7 @@ class AbstractAgent(
         Store the cluster config to a kernel-related storage (e.g., scratch space),
         so that restarts of this kernel can reuse the configuration.
         """
-        pass
+        raise NotImplementedError
 
     async def restart_kernel(
         self,
