@@ -122,7 +122,7 @@ class DomainRepository:
             return result.rowcount > 0
 
     @domain_repository_resilience.apply()
-    async def purge_domain_validated(self, domain_name: str):
+    async def purge_domain_validated(self, domain_name: str) -> None:
         """
         Permanently deletes a domain after validation checks.
         Validates domain purge permissions and prerequisites.

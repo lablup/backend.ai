@@ -122,7 +122,7 @@ class AdminDomainRepository:
             return result.rowcount > 0
 
     @domain_repository_resilience.apply()
-    async def purge_domain_force(self, domain_name: str):
+    async def purge_domain_force(self, domain_name: str) -> None:
         """
         Permanently deletes a domain without validation checks.
         """
