@@ -32,6 +32,16 @@ All port numbers specified in this document are **based on the development envir
 - **App Proxy Coordinator**: 10200 (HTTP)
 - **App Proxy Worker**: 10205-10300 (Traffic Proxy)
 
+#### Internal Ports
+
+Internal ports are used for internal service requests such as Prometheus metrics collection and service discovery. Currently, only Prometheus integration is implemented.
+
+- **Manager**: 18080 (Prometheus metrics and service discovery)
+- **Agent**: 6003 (Prometheus metrics, HTTP service API)
+- **Storage Proxy**: 16023 (Prometheus metrics)
+
+**Note**: The internal port is separate from the main API port to isolate internal monitoring traffic from user-facing API traffic.
+
 #### Infrastructure Ports
 - **PostgreSQL**: 8101 (host) → 5432 (container)
 - **Redis**: 8111 (host) → 6379 (container)
@@ -143,11 +153,11 @@ Shows connections between all Backend.AI components and infrastructure services.
        ┌──────┴─────────────────┬──────────────────────┐
        │                        │                      │
        │ ZeroMQ RPC             │ HTTP                 │ HTTP
-       │ (6011)                 │ (6021/6022)          │ (10200)
+       │ (6011)                 │ (6022)               │ (10200)
        ↓                        ↓                      ↓
       ┌───────────┐       ┌──────────────┐   ┌─────────────────────┐
       │   Agent   │       │Storage Proxy │   │App Proxy Coordinator│
-      │  (6011)   │       │   (6021)     │   │      (10200)        │
+      │  (6011)   │       │   (6022)     │   │      (10200)        │
       │           │       │              │   │                     │
       │ - Kernel  │       │ - VFolder    │   │ - Circuit mgmt      │
       │   create/ │       │   management │   │ - Health Check      │
@@ -541,13 +551,13 @@ Halfstack includes exporters for infrastructure metrics collection.
 | Infrastructure | Manager | Agent | Storage | Webserver | App Proxy | Note |
 |----------------|---------|-------|---------|-----------|-----------|------|
 | PostgreSQL | **Required** | - | - | - | **Required** (Coordinator) | Main database |
-| Redis | **Required** | - | Optional | **Required** | - | Cache/sessions/locks |
-| etcd | **Required** | - | - | - | **Required** (Coordinator) | Global config store (easy configuration sharing across all components) |
-| Prometheus | **Required** | Recommended | Recommended | Recommended | Recommended | Metrics collection and queries (required for Manager) |
-| Grafana | Recommended | - | - | - | - | Visualization |
-| Loki | Recommended | Recommended | Recommended | Recommended | Recommended | Log aggregation |
-| Tempo | Recommended | - | - | - | Recommended | Tracing |
-| OTEL Collector | Recommended | - | - | - | Recommended | Log and trace collection |
+| Redis | **Required** | **Required** | **Required** | **Required** | **Required** | State storage (App Proxy, Manager, future Agent) & events (all components) |
+| etcd | **Required** | **Required** | **Required** | **Required** | **Required** | Global config store (easy configuration sharing across all components) |
+| Prometheus | **Required** | **Required** | Recommended | Recommended | Recommended | Metrics collection and queries (required for Manager and Agent) |
+| Grafana | Recommended | Recommended | Recommended | Recommended | Recommended | Visualization (component-independent) |
+| Loki | Recommended | Recommended | Recommended | Recommended | Recommended | Log aggregation (component-independent) |
+| Tempo | Recommended | Recommended | Recommended | Recommended | Recommended | Tracing (component-independent) |
+| OTEL Collector | Recommended | Recommended | Recommended | Recommended | Recommended | Log and trace collection (required when using Loki/Tempo) |
 
 ### Starting Halfstack Infrastructure
 
