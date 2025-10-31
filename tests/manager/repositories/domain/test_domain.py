@@ -20,7 +20,10 @@ from ai.backend.manager.data.domain.types import (
     DomainModifier,
     UserInfo,
 )
-from ai.backend.manager.errors.resource import DomainHasUsers
+from ai.backend.manager.errors.resource import (
+    DomainDeletionFailed,
+    DomainHasUsers,
+)
 from ai.backend.manager.models.domain import domains, row_to_data
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.user import UserRole, UserStatus, users
@@ -473,7 +476,8 @@ class TestDomainRepository:
         domain_repository: DomainRepository,
     ) -> None:
         """Test domain purging when domain not found, no error should be raised"""
-        await domain_repository.purge_domain_validated("nonexistent-domain")
+        with pytest.raises(DomainDeletionFailed):
+            await domain_repository.purge_domain_validated("nonexistent-domain")
 
     @pytest.mark.asyncio
     async def test_create_domain_with_all_fields(

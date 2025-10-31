@@ -647,7 +647,7 @@ async def test_delete_domain_in_db(
                 description="domain test-purge-domain purged successfully",
             ),
         ),
-        ScenarioBase.success(
+        ScenarioBase.failure(
             "Purge a domain not exists",
             PurgeDomainAction(
                 name="not-exist-domain",
@@ -657,10 +657,7 @@ async def test_delete_domain_in_db(
                     domain_name="default",
                 ),
             ),
-            PurgeDomainActionResult(
-                success=False,
-                description="no matching not-exist-domain domain to purge",
-            ),
+            DomainDeletionFailed,
         ),
     ],
 )
@@ -802,13 +799,10 @@ async def test_purge_domain_with_active_users_fails(
             await processors.delete_domain.wait_for_complete(
                 DeleteDomainAction(name=domain_name, user_info=admin_user)
             )
-
-            result = await processors.purge_domain.wait_for_complete(
-                PurgeDomainAction(name=domain_name, user_info=admin_user)
-            )
-
-            assert result.success is False
-            assert "users" in result.description.lower()
+            with pytest.raises(DomainHasUsers):
+                await processors.purge_domain.wait_for_complete(
+                    PurgeDomainAction(name=domain_name, user_info=admin_user)
+                )
 
 
 async def test_purge_domain_with_active_groups_fails(
@@ -820,16 +814,10 @@ async def test_purge_domain_with_active_groups_fails(
             await processors.delete_domain.wait_for_complete(
                 DeleteDomainAction(name=domain_name, user_info=admin_user)
             )
-
-            result = await processors.purge_domain.wait_for_complete(
-                PurgeDomainAction(name=domain_name, user_info=admin_user)
-            )
-
-            assert result.success is False
-            assert "groups" in result.description.lower()
-
-
-# Additional Missing Test Cases from test.md
+            with pytest.raises(DomainHasGroups):
+                await processors.purge_domain.wait_for_complete(
+                    PurgeDomainAction(name=domain_name, user_info=admin_user)
+                )
 
 
 @pytest.mark.asyncio
@@ -1252,8 +1240,7 @@ async def test_domain_lifecycle_complete_workflow(
             await session.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
 
 
-# Service Layer Tests for purge_domain
-class TestPurgeDomainService:
+class TestDomainService:
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
         """Create a mock DomainRepository"""
