@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "Идэвхтэй агентууд",
+    "ActiveAgentsTooltip": "Системд ажиллаж байгаа бүх агентуудын тоймыг нэг дор харуулна."
+  },
   "agent": {
     "Agent": "Агент",
     "AgentSetting": "Агент тохиргоо",
@@ -26,6 +30,10 @@
     "Status": "Статус",
     "Terminated": "Цуцлагдсан",
     "Utilization": "Ашиглалт"
+  },
+  "agentStats": {
+    "AgentStats": "Ашиг олгогчийн статистик",
+    "AgentStatsDescription": "Энэ самбар нь бүх агууламж дахь бүх агентуудыг систем дэх бүх агентуудад харуулдаг. \nУтга нь ашигласан бүх нөөцийг бүх идэвхтэй сешнээр илэрхийлнэ."
   },
   "autoScalingRule": {
     "AddAutoScalingRule": "Автомат масштабыг нэмэх",
@@ -213,6 +221,10 @@
     "WarningLessRateLimit": "Хэрэв ханшийн хязгаарын утга бага байвал нэвтрэх гэх мэт API үйлдлүүдийг хааж болно.",
     "YouAreAboutToDeleteCredential": "Та энэ хэрэглэгчийн итгэмжлэлийг устгах гэж байна:"
   },
+  "dashboard": {
+    "Free": "Үнэгүй",
+    "Used": "Ашиг ашиглагдсан"
+  },
   "data": {
     "Active": "Идэвхтэй",
     "Add": "Нэмэх",
@@ -241,6 +253,7 @@
     "FolderInfo": "Компанийн мэдээллийг",
     "FolderNameRequired": "Фолдерын нэр шаардлагатай",
     "FolderNameTooLong": "64 тэмдэгтээс бага фолдерын нэрийг оруулна уу",
+    "FolderStatus": "Фолдерын байдал",
     "FolderToCopy": "Хуулах фолдер",
     "Foldername": "Фолдерын нэр",
     "Folders": "Фолдерууд",
@@ -251,7 +264,7 @@
     "InvalidEmail": "Хүчингүй мэйл хаяг",
     "Invited": "урьсан",
     "InvitedFolders": "Уригдсан хавтаснууд",
-    "InvitedFoldersTooltip": "{{ count }} Фолдерын урилга хариу арга хэмжээ хүлээж байна.",
+    "InvitedFoldersTooltip": "Хүлээгдэж буй {{count}} урилга(ууд) - шалгахын тулд дарна уу",
     "Limit": "Хязгаар",
     "ModelStore": "Загварын дэлгүүр",
     "Models": "Загварууд",
@@ -273,7 +286,6 @@
     "SearchByName": "Нэрээр нь хайх",
     "SelectStorageHost": "Хадгалах хостыг сонгоно уу",
     "SharedFolderPermission": "Фолдерын зөвшөөрөлтэй",
-    "StorageStatus": "Хадгалах статус",
     "Type": "Төрөл",
     "Update": "Шинэчлэх",
     "UsageMode": "Хэрэглээний горим",
@@ -389,7 +401,7 @@
       "MoveToTrashMultipleDescription": "Та {{folderLength}} хавтас руу зөөхийг хүсч байна уу?",
       "MovedToTrashBin": "{{ folderName }} фолдерыг хогийн сав руу зөөв.",
       "MultipleFilesDeleted": "Олон файл устгасан",
-      "MultipleFolderDeleted": "Сонгосон {{follenlength}} хавтас устсан байна.",
+      "MultipleFolderDeleted": "Сонгосон {{folderLength}} хавтас устсан байна.",
       "MultipleFolderRestored": "Сонгосон {{ folderLength }} хавтасыг сэргээв.",
       "Name": "Нэр",
       "NoDeletePermission": "Устгах зөвшөөрөл байхгүй байна",
@@ -429,6 +441,7 @@
       "Invited": "Амжилттай урилаа",
       "LeaveSharedFolder": "Хуваалцсан фолдерыг орхи",
       "LeaveSharedFolderDesc": "Та хуваалцсан фолдерын хавтасыг орхихыг хүсч байна уу? {{Undername}}} '?",
+      "NoMoreInvitation": "Хянах урилга байхгүй байна.",
       "NoOneWasInvited": "Урилга аль хэдийн байгаа тул хэн ч урьсангүй",
       "NoOneWasShared": "Бүлгийн фолдерыг хуваалцаж чадсангүй",
       "NoValidEmails": "Хүчинтэй имэйл оруулаагүй болно",
@@ -638,17 +651,18 @@
     "Title": "Алдаа гарсан байна."
   },
   "explorer": {
-    "FileInProgress": "Файлуудыг '{{fileName}}}' ...",
     "FileUploadCancelled": "Файлын байршуулалтыг хэрэглэгчийн хүсэлтээр цуцлагдсан.",
     "FileUploadFailed": "'{{folderName}}' Файлд файл байршуулж чадсангүй.",
+    "Filename": "Хөдөлгөөний нэр",
     "FolderNotFoundOrNoAccess": "Фолдер олдсонгүй эсвэл хандалтыг үгүйсгэв",
     "InputTooShort": "Хэт богино байна",
     "NoExplorerSupportForUnmanagedFolder": "НҮБ-нээгүй хавтас нь файлын Explorer-ийг дэмждэггүй.",
     "NoPermissions": "Энэ хавтсанд нэвтрэх зөвшөөрөл байхгүй байна",
     "ProcessingUpload": "Таны файлыг байршуулж байна. \nТүр хүлээнэ үү",
-    "SuccessfullyUploadedToFolder": "Файлууд '{{folderName}}' хавтасанд амжилттай байршуулсан файлууд.",
+    "SuccessfullyUploadedToFolder": "Файлуудыг амжилттай байршуулсан.",
     "UploadFailed": "'{{folderName}} -д бүтэлгүйтсэн.",
-    "UploadToFolder": "'{{folderName}}' руу байршуулж байна.",
+    "UploadingFiles": "Файл байршуулах ...",
+    "VFolder": "Хавтас",
     "ValueRequired": "Утга Шаардлагатай"
   },
   "general": {
@@ -977,7 +991,7 @@
     "ServiceInfo": "Үйлчилгээний мэдээлэл",
     "ServiceName": "С УНKЦны нэр",
     "ServiceNameCannotStartWithHyphen": "Хоёр төгсгөлд зураас (-) ашиглах боломжгүй.",
-    "ServiceNameInvalidCharacter": "Үйлчилгээний голд зөвхөн цагаан толгой, цагаан толгой, тоо, '_', '_'.",
+    "ServiceNameInvalidCharacter": "Үйлчилгээний голд зөвхөн цагаан толгой, цагаан толгой, тоо, '_', '-'.",
     "ServiceNameMaxLength": "24 ба түүнээс бага тэмдэгт оруулна уу.",
     "ServiceNameMinLength": "Дор хаяж 4 тэмдэгт оруулна уу.",
     "ServiceNameShouldEndWith": "Сешн нэр нь цагаан толгой, том, жижиг тэмдэгтүүд, тоо, тоонууд, тоонууд, тоонууд, ба '_'.",
@@ -1164,11 +1178,6 @@
     "TypeResourceGroupNameToDelete": "Устгахын тулд нөөцийн бүлгийн нэрийг бичнэ үү",
     "WsproxyAddress": "WSProxy серверийн хаяг"
   },
-  "resourcePanel": {
-    "Limit": "Хязгаар",
-    "RemainingNumber": "Rmaining",
-    "UsingNumber": "Ашиглаж"
-  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Та энэ нөөцийн бодлогыг устгах гэж байна:",
     "AllowedHosts": "Зөвшөөрөгдсөн хостууд",
@@ -1252,10 +1261,12 @@
     "PendingSessions": "Хүлээгдэж буй хуралдаанууд"
   },
   "session": {
+    "ActiveSessions": "Идэвхтэй сешнүүд",
     "Agent": "Агент",
     "AgentId": "Хийнний ID",
     "Agents": "Агентууд",
     "AllowedClientIps": "Зөвшөөрөгдсөн үйлчлүүлэгчийн IP",
+    "AllowedMultipleClientsIps": "Зөвшөөрөгдсөн үйлчлүүлэгч IPS (таслалаар тусгаарлагдсан)",
     "AlreadyTerminatingSession": "Сессийг аль хэдийн дуусгаж байна.",
     "AnotherUserSession": "Энэ хуралдааныг өөр хэрэглэгч үүсгэсэн.",
     "Architecture": "Архитектур",
@@ -1917,6 +1928,8 @@
     "BootstrapScriptDescription": "Ачаалагч скрипт нь сесс үүсгэсний дараа зөвхөн нэг удаа хийгдэх болно",
     "BootstrapScriptEmpty": "Скрипт хоосон байна. \nСкриптийг оруулна уу.",
     "BootstrapScriptUpdated": "Ачаалагч скрипт шинэчлэгдсэн.",
+    "ClassicFeatures": "Сонгодог онцлог",
+    "ClassicFeaturesDesc": "Сонгодог хувилбар руу буцах нь шинэчлэлт, засварыг хүлээж байх үед тогтвортой байдал, тогтвортой байдлыг сэргээхэд тусалдаг.",
     "ClassicSessionList": "Сонгодог хуралдааны жагсаалтын хуудас",
     "ClearSSHKeypairInput": "Бичсэн SSH товчлуурыг устгах болно. Үргэлжлүүлэхийг хүсч байна уу?",
     "ConfigFilename": "Файлын нэрийг тохируулах",
@@ -1926,12 +1939,12 @@
     "DescAutoLogout": "Аппликешнд зориулж суулгасан хуудсуудаас бусад нэвтэрсэн бүх хуудсыг хаасан тохиолдолд автоматаар гарах болно (ж.нь. Jupyter Notebook, вэб терминал гэх мэт).",
     "DescAutomaticUpdateCheck": "Шинэ webui хувилбар гарахад мэдэгдэх.<br />Функц автоматаар идэвхгүй болвол товчийг дахин дарахад шинэчлэлтийн шалгалт үргэлжилнэ.",
     "DescBetaFeatures": "Вэб UI-д бета функцийг ашиглах. <br /> бета функцууд тогтворгүй байж магадгүй. Зарим бета функцийг албан ёсны шинж чанар болгон ашиглахгүй байж магадгүй юм.",
-    "DescClassicSessionLauncher": "NEO сесс эхлүүлэгчийн оронд Classic сесс эхлүүлэгчийг ашиглана уу. \nClassic сесс эхлүүлэгч нь хамгийн сүүлийн үеийн функцгүй байж магадгүй.",
     "DescDesktopNotification": "Ширээний мэдэгдлийг идэвхжүүлнэ. <br />Асаахад Backend.AI нь үйлдлийн системийн мэдэгдлийн системийг ашигладаг. Үүнийг унтрааход вэб UI дотрах мэдэгдэлд нөлөөлөхгүй. Үйлдлийн системээс хамааран мэдэгдлийн зөвшөөрлийг системийн тохиргоонд идэвхжүүлэх шаардлагатай байж болно.",
     "DescExperimentalDashboard": "Хураангуй хуудасны оронд хяналтын самбар ашиглана уу.",
     "DescKeepLoginSessionInformation": "Webui програмыг нэвтрэх Sessionийн мэдээллийг дараагийн удаа хадгалахыг зөвшөөрнө үү. <br /> Хэрэв тохиргоог унтраасан бол нэвтрэх тухай мэдээллийг нэвтрэх бүрээс хасах болно.",
     "DescLanguage": "Интерфейсийн хэлийг тохируулах. Англи хэлнээс бусад хэл, солонгос хэлээр машин орчуулга өгөх болно.",
     "DescLetUserUpdateScriptWithNonEmptyValue": "Хоосон утгатай скриптийг шинэчилнэ үү.",
+    "DescMaxConcurrentUploads": "Файл судлаачаар дамжуулан байршуулж болох файлуудын тоог хязгаарладаг.",
     "DescMyKeypairInfo": "Миний товчлуурын мэдээллийг харна уу",
     "DescNewUserConfigFileCreated": "Хэрэглэгчийн тохиргооны шинэ файлыг хоосон бус өгөгдлөөр үүсгэх боломжтой.",
     "DescNoBetaFeatures": "Бета хувилбар байхгүй. :)",
@@ -1958,6 +1971,7 @@
     "Language": "Хэл",
     "LightMode": "Гэрэл горим",
     "Logs": "Бүртгэл",
+    "MaxConcurrentUploads": "Макс тохиролцсон файлын байршуулалт",
     "MyKeypairInfo": "Миний товчлуурын мэдээлэл",
     "NEODataPage": "Неож өгөгдүүлэгч",
     "NEOSessionList": "Neo-ийн хуралдааны жагсаалт",
@@ -2002,6 +2016,7 @@
       "AIAccelerator": "AI хурдасгуур",
       "AIAgents": "AI агентууд",
       "AboutBackendAI": "Backend.AI-ийн тухай",
+      "AdminDashboard": "Админ хяналтын самбар",
       "Administration": "Админ",
       "AgentSummary": "Агентын хураангуй",
       "Architecture": "Уран барилгач",
@@ -2009,6 +2024,7 @@
       "Cancel": "Цуцлах",
       "ChangePassword": "Нууц үгээ солих",
       "Chat": "Яриа хөрөө",
+      "ClassicDashboardPage": "Сонгодог хяналтын самбар хуудас (хураангуй хуудас)",
       "ClickToDownload": "Татаж авахын тулд дарна уу",
       "ComputationResources": "Тооцооллын нөөц",
       "Configurations": "Тохиргоо",
@@ -2043,10 +2059,10 @@
       "MyAccountInformation": "Хэрэглэгчийн мэдээллийг өөрчлөх",
       "MyEnvironments": "Миний орчин",
       "MyResources": "Миний нийт нөөцийн хязгаар",
-      "MyResourcesDescription": "<p>Энэ самбар нь бүх төсөл болон нөөцийн бүлгүүдийн нийт нөөцийн хэрэглээ болон хязгаарыг харуулна.</p><p>Олон хязгаарлалт хэрэглэх үед (домэйн, төсөл эсвэл түлхүүр хос гэх мэт), тооцоололд хамгийн хатуу хязгаарлалтыг ашиглана.</p>",
+      "MyResourcesDescription": "<p> Энэхүү самбар нь одоогийн эх сурвалжийг одоо ашиглаж, бүх төслөөр ашиглаж, бүх төслөөс ангид хэрэглэгддэг.",
       "MyResourcesIn": "Миний нөөц",
       "MyResourcesInResourceGroup": "Нөөцийн бүлгийн нөөц",
-      "MyResourcesInResourceGroupDescription": "Энэ самбар нь таны нөөцийн ашиглалтыг харуулж, сонгосон нөөцийн бүлэгт үлдсэн.",
+      "MyResourcesInResourceGroupDescription": "Энэ самбар нь таны урьдчилсан төслийн сонгосон нөөцийн бүлэгт хичнээн их ашиглагдаж байгаа бөгөөд одоогийн эх сурвалжийн бүлэгт хичнээн их үнэ төлбөргүй байдаг.",
       "NewPassword": "Шинэ нууц үг",
       "NewPasswordAgain": "Шинэ нууц үг (дахиад)",
       "NewPasswordCannotBeSame": "Таны одоогийн нууц үгээс өөр нууц үг оруулна уу.",
@@ -2079,7 +2095,7 @@
       "TermsOfService": "Үйлчилгээний нөхцөл",
       "TotalResourcesIn": "Нийт нөөц",
       "TotalResourcesInResourceGroup": "Нөөцийн бүлгийн нийт нөөц",
-      "TotalResourcesInResourceGroupDescription": "Энэ самбар нь ашиглагдаж, үлдсэн нөөцийг нийтлүүлнэ. \nУтга нь сонгосон нөөцийн бүлгийг ашиглан бүх агентуудын болон үлдсэн агентуудын үлдэгдлийг нэмж, үлдсэн хэмжээгээр тооцдог.",
+      "TotalResourcesInResourceGroupDescription": "Энэ самбар нь сонгосон нөөцийн бүлэгт ашиглагдсан, үнэгүй нөөцийг харуулж байна. \nЭнэ бүлгийг ашиглан бүх агентуудын ашиглагдаж буй, чөлөөт дүнг тооцоогоор тооцно.",
       "TotpActivated": "2FA идэвхжүүлсэн",
       "Update": "Шинэчлэх",
       "Usage": "Угаалах",

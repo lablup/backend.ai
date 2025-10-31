@@ -6,6 +6,11 @@
 #
 # Generated automatically from the ManagerUnifiedConfig schema.
 
+# Default artifact registry config.
+## artifact_registry = "{ ArtifactRegistryConfig }"
+# Reservoir configuration.
+## reservoir = "{ ReservoirConfig }"
+
 [db]
   # Type of the database system to use.
   # Currently, only PostgreSQL is supported as the main database backend.
@@ -501,6 +506,22 @@
   # bcrypt.
   password-hash-salt-size = 32
 
+# JWT authentication configuration (shared between manager and webserver via
+# etcd).
+#
+# Note: JWT tokens are signed using per-user secret keys (from keypair table),
+# not a shared system secret key. This maintains the same security model as HMAC
+# authentication.
+[jwt]
+  # Algorithm for JWT token signing.
+  # HS256 (HMAC-SHA256) is the default symmetric algorithm.
+  algorithm = "HS256"
+  # JWT token expiration time in seconds.
+  # Default is 900 seconds (15 minutes).
+  # Range: 60 seconds (1 minute) to 86400 seconds (24 hours).
+  # Shorter expiration times are more secure but may impact user experience.
+  token_expiration_seconds = 900
+
 [session]
   [session.hang_tolerance]
     [session.hang_tolerance.threshold]
@@ -562,26 +583,3 @@
 [service-discovery]
   # Type of service discovery to use.
   type = "redis"
-
-[artifact_registry]
-  # Name of the Model registry configuration.
-  # Used to identify this registry in the system.
-  model-registry = "MODEL_REGISTRY_NAME"
-
-[reservoir]
-  # Whether to enable the approval process for artifact uploads.
-  # When enabled, artifacts require approval before being available.
-  enable-approve-process = false
-  # Whether this reservoir is a leaf in a delegation hierarchy.
-  # If true, it cannot delegate to other reservoirs.
-  use-delegation = false
-  # Name of the reservoir storage configuration.
-  # Used to identify this storage in the system.
-  storage-name = "RESERVOIR_STORAGE_NAME"
-  # Configuration for the storage.
-  config = "..."
-
-  # Storage step selection configuration for artifact model imports.
-  # Maps different import steps (download, archive) to specific storage backends.
-  # Required for artifact model import operations.
-  [reservoir.storage_step_selection]

@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "ตัวแทนที่ใช้งานอยู่",
+    "ActiveAgentsTooltip": "แสดงภาพรวม at-a-glance ของตัวแทนทั้งหมดที่ทำงานอยู่ในระบบ"
+  },
   "agent": {
     "Agent": "ตัวแทน",
     "AgentSetting": "การตั้งค่าตัวแทน",
@@ -26,6 +30,10 @@
     "Status": "สถานะ",
     "Terminated": "ยุติแล้ว",
     "Utilization": "การใช้งาน"
+  },
+  "agentStats": {
+    "AgentStats": "สถิติตัวแทน",
+    "AgentStatsDescription": "แผงนี้แสดงทรัพยากรที่ใช้ทั้งหมดจากตัวแทนทั้งหมดในระบบ \nค่านี้แสดงถึงทรัพยากรที่ใช้ทั้งหมดตามเซสชันที่ใช้งานอยู่ทั้งหมด"
   },
   "autoScalingRule": {
     "AddAutoScalingRule": "เพิ่มกฎการปรับขนาดอัตโนมัติ",
@@ -214,6 +222,10 @@
     "WarningLessRateLimit": "หากค่าขีดจำกัดอัตราน้อยเกินไป การดำเนินการ API เช่น การเข้าสู่ระบบอาจถูกบล็อก",
     "YouAreAboutToDeleteCredential": "คุณกำลังจะลบข้อมูลรับรองของผู้ใช้รายนี้:"
   },
+  "dashboard": {
+    "Free": "ฟรี",
+    "Used": "ใช้แล้ว"
+  },
   "data": {
     "Active": "คล่องแคล่ว",
     "Add": "เพิ่ม",
@@ -242,6 +254,7 @@
     "FolderInfo": "ข้อมูล FORDER",
     "FolderNameRequired": "ต้องระบุชื่อโฟลเดอร์",
     "FolderNameTooLong": "ป้อนชื่อโฟลเดอร์ไม่เกิน 64 ตัวอักษร",
+    "FolderStatus": "สถานะโฟลเดอร์",
     "FolderToCopy": "โฟลเดอร์ที่จะคัดลอก",
     "Foldername": "ชื่อโฟลเดอร์",
     "Folders": "โฟลเดอร์",
@@ -252,7 +265,7 @@
     "InvalidEmail": "ที่อยู่อีเมลไม่ถูกต้อง",
     "Invited": "เชิญแล้ว",
     "InvitedFolders": "โฟลเดอร์ที่ได้รับเชิญ",
-    "InvitedFoldersTooltip": "{{ count }} คำเชิญโฟลเดอร์กำลังรอการตอบสนอง",
+    "InvitedFoldersTooltip": "คลิกเพื่อตรวจสอบคำเชิญที่รอดำเนินการ {{count}} รายการ",
     "Limit": "ขีดจำกัด",
     "ModelStore": "คลังโมเดล",
     "Models": "โมเดล",
@@ -274,7 +287,6 @@
     "SearchByName": "ค้นหาตามชื่อ",
     "SelectStorageHost": "เลือกโฮสต์จัดเก็บ",
     "SharedFolderPermission": "การอนุญาตโฟลเดอร์ที่ใช้ร่วมกัน",
-    "StorageStatus": "สถานะการจัดเก็บ",
     "Type": "ประเภท",
     "Update": "อัปเดต",
     "UsageMode": "โหมดการใช้งาน",
@@ -430,6 +442,7 @@
       "Invited": "เชิญสำเร็จแล้ว",
       "LeaveSharedFolder": "ออกจากโฟลเดอร์ที่ใช้ร่วมกัน",
       "LeaveSharedFolderDesc": "คุณต้องการออกจากโฟลเดอร์ที่ใช้ร่วมกัน ‘{{folderName}}’ หรือไม่?",
+      "NoMoreInvitation": "ไม่มีคำเชิญให้ตรวจสอบ",
       "NoOneWasInvited": "ไม่มีใครได้รับเชิญเนื่องจากมีคำเชิญอยู่แล้ว",
       "NoOneWasShared": "ไม่สามารถแชร์โฟลเดอร์กลุ่ม",
       "NoValidEmails": "ไม่มีอีเมลที่ถูกต้องถูกป้อน",
@@ -629,17 +642,18 @@
     "Title": "เกิดข้อผิดพลาด"
   },
   "explorer": {
-    "FileInProgress": "การอัปโหลด '{{fileName}}' ...",
     "FileUploadCancelled": "การอัปโหลดไฟล์ถูกยกเลิกโดยคำขอผู้ใช้",
     "FileUploadFailed": "ไม่สามารถอัปโหลดไฟล์บางไฟล์ในโฟลเดอร์ '{{folderName}}'",
+    "Filename": "ชื่อไฟล์",
     "FolderNotFoundOrNoAccess": "ไม่พบโฟลเดอร์หรือถูกปฏิเสธการเข้าถึง",
     "InputTooShort": "ข้อมูลที่ป้อนสั้นเกินไป",
     "NoExplorerSupportForUnmanagedFolder": "โฟลเดอร์ที่ไม่มีการจัดการไม่รองรับ File Explorer",
     "NoPermissions": "ไม่มีสิทธิ์ในการเข้าถึงโฟลเดอร์นี้",
     "ProcessingUpload": "ไฟล์ของคุณกำลังถูกอัปโหลด \nโปรดรอ.",
-    "SuccessfullyUploadedToFolder": "ไฟล์อัปโหลดสำเร็จในโฟลเดอร์ '{{folderName}}'",
+    "SuccessfullyUploadedToFolder": "อัปโหลดไฟล์เรียบร้อยแล้ว",
     "UploadFailed": "การอัปโหลดล้มเหลวใน '{{folderName}}'",
-    "UploadToFolder": "การอัปโหลดไปยัง '{{folderName}}'",
+    "UploadingFiles": "กำลังอัพโหลดไฟล์...",
+    "VFolder": "โฟลเดอร์",
     "ValueRequired": "ต้องระบุค่า"
   },
   "general": {
@@ -968,7 +982,7 @@
     "ServiceInfo": "ข้อมูลบริการ",
     "ServiceName": "ชื่อบริการ",
     "ServiceNameCannotStartWithHyphen": "เครื่องหมายยัติภังค์ (-) ไม่สามารถใช้ที่ปลายทั้งสองข้างได้",
-    "ServiceNameInvalidCharacter": "ในช่วงกลางของชื่อบริการมีเพียงตัวอักษรเท่านั้นหมายเลข '_', '.', '-' สามารถรวมได้เท่านั้น",
+    "ServiceNameInvalidCharacter": "ในช่วงกลางของชื่อบริการมีเพียงตัวอักษรเท่านั้นหมายเลข '_', '-' สามารถรวมได้เท่านั้น",
     "ServiceNameMaxLength": "โปรดป้อนอักขระ 24 ตัวหรือน้อยกว่า",
     "ServiceNameMinLength": "กรุณากรอกอย่างน้อย 4 ตัวอักษร",
     "ServiceNameShouldEndWith": "ชื่อเซสชันจะต้องจบลงด้วยตัวอักษรอักขระขนาดใหญ่และขนาดเล็กตัวเลขและ '_'",
@@ -1155,11 +1169,6 @@
     "TypeResourceGroupNameToDelete": "พิมพ์ชื่อกลุ่มทรัพยากรเพื่อลบ",
     "WsproxyAddress": "ที่อยู่เซิร์ฟเวอร์ WSProxy"
   },
-  "resourcePanel": {
-    "Limit": "จำกัด",
-    "RemainingNumber": "Rmailing",
-    "UsingNumber": "โดยใช้"
-  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "คุณกำลังจะลบนโยบายทรัพยากรนี้: ",
     "AllowedHosts": "โฮสต์ที่อนุญาต",
@@ -1244,10 +1253,12 @@
     "PendingSessions": "รอการประชุม"
   },
   "session": {
+    "ActiveSessions": "เซสชันที่ใช้งานอยู่",
     "Agent": "ตัวแทน",
     "AgentId": "ID ตัวแทน",
     "Agents": "ตัวแทน",
     "AllowedClientIps": "IP ไคลเอนต์ที่อนุญาต",
+    "AllowedMultipleClientsIps": "IP ไคลเอ็นต์ที่อนุญาต (คั่นด้วยเครื่องหมายจุลภาค)",
     "AlreadyTerminatingSession": "กำลังยุติเซสชันอยู่แล้ว",
     "AnotherUserSession": "เซสชันนี้ถูกสร้างขึ้นโดยผู้ใช้รายอื่น.",
     "Architecture": "สถาปัตยกรรม",
@@ -1903,6 +1914,8 @@
     "BootstrapScriptDescription": "สคริปต์บูตสแตรปจะถูกดำเนินการเพียงครั้งเดียวหลังจากสร้างเซสชัน",
     "BootstrapScriptEmpty": "สคริปต์ว่างเปล่า \nกรุณาป้อนสคริปต์",
     "BootstrapScriptUpdated": "อัปเดตสคริปต์บูตสแตรปแล้ว",
+    "ClassicFeatures": "คุณสมบัติคลาสสิก",
+    "ClassicFeaturesDesc": "การย้อนกลับไปยังเวอร์ชันคลาสสิกสามารถช่วยให้คุณฟื้นความมั่นคงและฟังก์ชั่นในขณะที่คุณรอการอัปเดตหรือแก้ไขที่จะเปิดตัว",
     "ClassicSessionList": "หน้ารายการเซสชันคลาสสิก",
     "ClearSSHKeypairInput": "คู่คีย์ SSH ที่เขียนไว้จะถูกลบ คุณแน่ใจหรือไม่ที่จะดำเนินการต่อ?",
     "ConfigFilename": "ชื่อไฟล์การกำหนดค่า",
@@ -1912,12 +1925,12 @@
     "DescAutoLogout": "ออกจากระบบโดยอัตโนมัติหากปิดหน้าที่เข้าสู่ระบบทั้งหมดยกเว้นหน้าที่มาจากเซสชันสำหรับแอป (เช่น jupyter notebook, เทอร์มินัลเว็บ ฯลฯ)",
     "DescAutomaticUpdateCheck": "แจ้งเตือนเมื่อมี webui เวอร์ชันใหม่ออกมา<br />หากฟีเจอร์ถูกปิดใช้งานอัตโนมัติ การคลิกสวิตช์อีกครั้งจะทำให้การตรวจสอบการอัปเดตกลับมาทำงาน",
     "DescBetaFeatures": "ใช้คุณสมบัติเบต้าสำหรับส่วนติดต่อผู้ใช้บนเว็บ<br />คุณสมบัติเบต้าอาจไม่เสถียร บางคุณสมบัติเบต้าอาจไม่ได้รับการยอมรับให้เป็นคุณสมบัติอย่างเป็นทางการ",
-    "DescClassicSessionLauncher": "ใช้ตัวเรียกใช้เซสชัน Classic แทนตัวเรียกใช้เซสชัน NEO \nตัวเรียกใช้เซสชัน Classic อาจไม่มีคุณสมบัติล่าสุด",
     "DescDesktopNotification": "เปิดใช้งานการแจ้งเตือนเดสก์ท็อป <br />เมื่อเปิด Backend.AI จะใช้ระบบแจ้งเตือนของระบบปฏิบัติการด้วย การปิดสิ่งนี้ไม่ส่งผลต่อการแจ้งเตือนภายใน web UI ขึ้นอยู่กับระบบปฏิบัติการ การอนุญาตแจ้งเตือนอาจต้องเปิดใช้งานในการตั้งค่าระบบ",
     "DescExperimentalDashboard": "ใช้หน้าแดชบอร์ดแทนหน้าสรุป",
     "DescKeepLoginSessionInformation": "ให้แอป webui เก็บข้อมูลเซสชันเข้าสู่ระบบปัจจุบันไว้สำหรับครั้งต่อไป<br />หากปิดตัวเลือกนี้ ข้อมูลการเข้าสู่ระบบจะถูกล้างทุกครั้งที่ออกจากระบบ",
     "DescLanguage": "ตั้งค่าภาษาอินเตอร์เฟส ภาษาอื่นที่ไม่ใช่ภาษาอังกฤษและเกาหลีจะได้รับผ่านการแปลด้วยเครื่อง",
     "DescLetUserUpdateScriptWithNonEmptyValue": "กรุณาอัปเดตสคริปต์ด้วยค่าที่ไม่ว่างเปล่า",
+    "DescMaxConcurrentUploads": "จำกัดจำนวนไฟล์ที่สามารถอัพโหลดพร้อมกันผ่าน File Explorer",
     "DescMyKeypairInfo": "ดูข้อมูลคู่คีย์ของฉัน",
     "DescNewUserConfigFileCreated": "สามารถสร้างไฟล์การกำหนดค่าผู้ใช้ใหม่ได้ด้วยข้อมูลที่ไม่ว่างเปล่า",
     "DescNoBetaFeatures": "ไม่มีคุณสมบัติเบต้าที่พร้อมใช้งานในขณะนี้ :)",
@@ -1944,6 +1957,7 @@
     "Language": "ภาษา",
     "LightMode": "โหมดสว่าง",
     "Logs": "บันทึก",
+    "MaxConcurrentUploads": "ขีดจำกัดการอัพโหลดไฟล์สูงสุดพร้อมกัน",
     "MyKeypairInfo": "ข้อมูลคู่คีย์ของฉัน",
     "NEODataPage": "หน้าข้อมูลนีโอ",
     "NEOSessionList": "รายการเซสชัน NEO",
@@ -1988,6 +2002,7 @@
       "AIAccelerator": "ตัวเร่ง AI",
       "AIAgents": "ตัวแทน AI",
       "AboutBackendAI": "เกี่ยวกับ Backend.AI",
+      "AdminDashboard": "แดชบอร์ดผู้ดูแลระบบ",
       "Administration": "การจัดการระบบ",
       "AgentSummary": "สรุปตัวแทน",
       "Architecture": "สถาปัตยกรรม",
@@ -1995,6 +2010,7 @@
       "Cancel": "ยกเลิก",
       "ChangePassword": "เปลี่ยนรหัสผ่าน",
       "Chat": "แชท",
+      "ClassicDashboardPage": "หน้าแดชบอร์ดคลาสสิก (หน้าสรุป)",
       "ClickToDownload": "คลิกเพื่อดาวน์โหลด",
       "ComputationResources": "ทรัพยากรการคำนวณ",
       "Configurations": "การกำหนดค่า",
@@ -2029,10 +2045,10 @@
       "MyAccountInformation": "ข้อมูลบัญชีของฉัน",
       "MyEnvironments": "สภาพแวดล้อมของฉัน",
       "MyResources": "ขีด จำกัด ทรัพยากรทั้งหมดของฉัน",
-      "MyResourcesDescription": "<p>พาเนลนี้แสดงการใช้ทรัพยากรทั้งหมดและขีดจำกัดในทุกโครงการและกลุ่มทรัพยากร</p><p>เมื่อมีการใช้ขีดจำกัดหลายประการ (เช่น โดเมน โครงการ หรือคู่คีย์) จะใช้ขีดจำกัดที่เข้มงวดที่สุดในการคำนวณ</p>",
+      "MyResourcesDescription": "<p>แผงนี้แสดงทรัพยากรทั้งหมดที่ใช้ในปัจจุบันและว่างในทุกโปรเจ็กต์และกลุ่มทรัพยากร</p><p>เมื่อมีการใช้ขีดจำกัดหลายรายการ (เช่น โดเมน โปรเจ็กต์ หรือคู่คีย์) การคำนวณจะใช้ขีดจำกัดทรัพยากรฟรีที่มีข้อจำกัดมากที่สุด</p>",
       "MyResourcesIn": "ทรัพยากรของฉันใน",
       "MyResourcesInResourceGroup": "ทรัพยากรของฉันในกลุ่มทรัพยากร",
-      "MyResourcesInResourceGroupDescription": "แผงนี้แสดงการใช้ทรัพยากรของฉันในปัจจุบันและยังคงอยู่ในกลุ่มทรัพยากรที่เลือก",
+      "MyResourcesInResourceGroupDescription": "แผงนี้แสดงจำนวนทรัพยากรที่คุณใช้และปริมาณที่ว่างในกลุ่มทรัพยากรที่เลือกของโครงการปัจจุบันของคุณ",
       "NewPassword": "รหัสผ่านใหม่",
       "NewPasswordAgain": "รหัสผ่านใหม่ (อีกครั้ง)",
       "NewPasswordCannotBeSame": "กรุณาใส่รหัสผ่านที่แตกต่างจากรหัสผ่านปัจจุบันของคุณ",
@@ -2065,7 +2081,7 @@
       "TermsOfService": "ข้อตกลงการใช้บริการ",
       "TotalResourcesIn": "ทรัพยากรทั้งหมดใน",
       "TotalResourcesInResourceGroup": "ทรัพยากรทั้งหมดในกลุ่มทรัพยากร",
-      "TotalResourcesInResourceGroupDescription": "แผงนี้แสดงทรัพยากรที่ใช้และที่เหลือทั้งหมด \nค่าจะถูกคำนวณโดยการเพิ่มการใช้งานและจำนวนที่เหลือของตัวแทนทั้งหมดโดยใช้กลุ่มทรัพยากรที่เลือก",
+      "TotalResourcesInResourceGroupDescription": "แผงนี้แสดงทรัพยากรที่ใช้ทั้งหมดและทรัพยากรว่างในกลุ่มทรัพยากรที่เลือก \nค่าจะคำนวณโดยการรวมจำนวนที่ใช้และจำนวนฟรีของตัวแทนทั้งหมดที่ใช้กลุ่มนั้น",
       "TotpActivated": "เปิดใช้งาน 2FA แล้ว",
       "Update": "อัปเดต",
       "Usage": "การใช้งาน",

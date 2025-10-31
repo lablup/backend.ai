@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "Ejen aktif",
+    "ActiveAgentsTooltip": "Menunjukkan gambaran keseluruhan sepintas lalu semua ejen yang sedang berjalan dalam sistem."
+  },
   "agent": {
     "Agent": "Ejen",
     "AgentSetting": "Tetapan Agen",
@@ -26,6 +30,10 @@
     "Status": "Status",
     "Terminated": "Ditamatkan",
     "Utilization": "Penggunaan"
+  },
+  "agentStats": {
+    "AgentStats": "Statistik Ejen",
+    "AgentStatsDescription": "Panel ini menunjukkan semua sumber yang digunakan di semua ejen dalam sistem. \nNilai mewakili jumlah sumber yang digunakan oleh semua sesi aktif."
   },
   "autoScalingRule": {
     "AddAutoScalingRule": "Tambahkan peraturan penskalaan automatik",
@@ -213,6 +221,10 @@
     "WarningLessRateLimit": "Jika nilai Had Kadar adalah kecil, operasi API seperti log masuk mungkin disekat.",
     "YouAreAboutToDeleteCredential": "Anda akan memadamkan kelayakan pengguna ini:"
   },
+  "dashboard": {
+    "Free": "Percuma",
+    "Used": "Digunakan"
+  },
   "data": {
     "Active": "Aktif",
     "Add": "Tambah",
@@ -241,6 +253,7 @@
     "FolderInfo": "Maklumat Forder",
     "FolderNameRequired": "Nama folder diperlukan",
     "FolderNameTooLong": "Masukkan nama folder kurang daripada 64 aksara",
+    "FolderStatus": "Status folder",
     "FolderToCopy": "Folder untuk disalin",
     "Foldername": "Nama folder",
     "Folders": "Folder",
@@ -251,7 +264,7 @@
     "InvalidEmail": "Alamat e -mel tidak sah",
     "Invited": "dijemput",
     "InvitedFolders": "Folder yang dijemput",
-    "InvitedFoldersTooltip": "{{ count }} Jemputan folder sedang menunggu tindak balas.",
+    "InvitedFoldersTooltip": "Klik untuk menyemak jemputan {{count}} (s)",
     "Limit": "Had",
     "ModelStore": "Kedai Model",
     "Models": "Model",
@@ -273,7 +286,6 @@
     "SearchByName": "Cari mengikut nama",
     "SelectStorageHost": "Pilih hos storan",
     "SharedFolderPermission": "Kebenaran folder bersama",
-    "StorageStatus": "Status Penyimpanan",
     "Type": "Jenis",
     "Update": "Kemas kini",
     "UsageMode": "Mod Penggunaan",
@@ -389,7 +401,7 @@
       "MoveToTrashMultipleDescription": "Adakah anda pasti mahu bergerak {{folderLength}} folder ke sampah tong?",
       "MovedToTrashBin": "Folder {{ folderName }} telah dialihkan ke tong sampah.",
       "MultipleFilesDeleted": "Berbilang Fail dipadamkan",
-      "MultipleFolderDeleted": "Dipilih {{folderlength}} Folder telah dipadam.",
+      "MultipleFolderDeleted": "Dipilih {{folderLength}} Folder telah dipadam.",
       "MultipleFolderRestored": "Dipilih {{ folderLength }} Folder telah dipulihkan.",
       "Name": "Nama",
       "NoDeletePermission": "Tiada kebenaran memadam",
@@ -429,6 +441,7 @@
       "Invited": "Berjaya dijemput",
       "LeaveSharedFolder": "Tinggalkan folder kongsi",
       "LeaveSharedFolderDesc": "Adakah anda mahu meninggalkan folder kongsi '{{folderName}}'?",
+      "NoMoreInvitation": "Tiada jemputan untuk dikaji semula.",
       "NoOneWasInvited": "Tidak ada yang dijemput kerana jemputan sudah ada",
       "NoOneWasShared": "Gagal berkongsi folder kumpulan",
       "NoValidEmails": "Tidak ada e-mel yang sah dimasukkan",
@@ -639,17 +652,18 @@
     "Title": "Ralat telah berlaku."
   },
   "explorer": {
-    "FileInProgress": "Memuat naik '{{fileName}}' ...",
     "FileUploadCancelled": "Muat naik fail dibatalkan oleh permintaan pengguna.",
     "FileUploadFailed": "Gagal memuat naik beberapa fail dalam folder '{{folderName}}'.",
+    "Filename": "Nama fail",
     "FolderNotFoundOrNoAccess": "Folder tidak dijumpai atau akses ditolak",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Folder yang tidak dikendalikan tidak menyokong penjelajah fail.",
     "NoPermissions": "Tiada kebenaran untuk mengakses folder ini",
     "ProcessingUpload": "Fail anda sedang dimuat naik. \nTolong tunggu.",
-    "SuccessfullyUploadedToFolder": "Fail yang dimuat naik dengan jayanya dalam folder '{{folderName}}'",
+    "SuccessfullyUploadedToFolder": "Fail dimuat naik dengan jayanya.",
     "UploadFailed": "Muat naik gagal dalam '{{folderName}}'",
-    "UploadToFolder": "Memuat naik ke '{{folderName}}'",
+    "UploadingFiles": "Memuat naik fail ...",
+    "VFolder": "Folder",
     "ValueRequired": "Nilai Diperlukan"
   },
   "general": {
@@ -978,7 +992,7 @@
     "ServiceInfo": "Maklumat Perkhidmatan",
     "ServiceName": "Nama perkhidmatan",
     "ServiceNameCannotStartWithHyphen": "Tanda sempang (-) tidak boleh digunakan pada kedua-dua hujung.",
-    "ServiceNameInvalidCharacter": "Di tengah-tengah nama perkhidmatan, hanya abjad, nombor, '_', '.', '-' hanya boleh dimasukkan.",
+    "ServiceNameInvalidCharacter": "Di tengah-tengah nama perkhidmatan, hanya abjad, nombor, '_', '-' hanya boleh dimasukkan.",
     "ServiceNameMaxLength": "Sila masukkan 24 aksara atau kurang.",
     "ServiceNameMinLength": "Sila masukkan sekurang-kurangnya 4 aksara.",
     "ServiceNameShouldEndWith": "Nama sesi mesti berakhir dengan abjad, aksara besar dan kecil, nombor, dan '_'.",
@@ -1165,11 +1179,6 @@
     "TypeResourceGroupNameToDelete": "Taipkan nama kumpulan sumber untuk dipadamkan",
     "WsproxyAddress": "Alamat Pelayan WSProxy"
   },
-  "resourcePanel": {
-    "Limit": "Had",
-    "RemainingNumber": "Rmaining",
-    "UsingNumber": "Menggunakan"
-  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Anda akan memadamkan dasar sumber ini:",
     "AllowedHosts": "Tuan rumah yang dibenarkan",
@@ -1254,10 +1263,12 @@
     "PendingSessions": "Sesi yang belum selesai"
   },
   "session": {
+    "ActiveSessions": "Sesi aktif",
     "Agent": "Ejen",
     "AgentId": "Id ejen",
     "Agents": "ejen",
     "AllowedClientIps": "IP pelanggan yang dibenarkan",
+    "AllowedMultipleClientsIps": "IPS Pelanggan yang Dibenarkan (dipisahkan koma)",
     "AlreadyTerminatingSession": "Sudah menamatkan sesi.",
     "AnotherUserSession": "Sesi ini dibuat oleh pengguna lain.",
     "Architecture": "Seni bina",
@@ -1918,6 +1929,8 @@
     "BootstrapScriptDescription": "Skrip Bootstrap akan dilaksanakan sekali sahaja selepas penciptaan sesi",
     "BootstrapScriptEmpty": "Skripnya kosong. \nSila masukkan skrip.",
     "BootstrapScriptUpdated": "Skrip bootstrap dikemas kini.",
+    "ClassicFeatures": "Ciri -ciri klasik",
+    "ClassicFeaturesDesc": "Melancarkan kembali ke versi klasik boleh membantu anda mendapatkan semula kestabilan dan fungsi semasa anda menunggu kemas kini atau pembetulan dikeluarkan.",
     "ClassicSessionList": "Halaman Senarai Sesi Klasik",
     "ClearSSHKeypairInput": "Pad Kekunci SSH yang ditulis akan dikeluarkan. Adakah anda pasti mahu meneruskan?",
     "ConfigFilename": "Konfigurasi nama fail",
@@ -1927,12 +1940,12 @@
     "DescAutoLogout": "Log keluar secara automatik jika semua halaman log masuk ditutup kecuali halaman yang berasal dari sesi untuk aplikasi (mis. Notebook jupyter, terminal web, dll.)",
     "DescAutomaticUpdateCheck": "Beritahu apabila versi webui baru dikeluarkan.<br />Jika ciri ini dilumpuhkan secara automatik, mengklik suis sekali lagi akan meneruskan pemeriksaan kemas kini.",
     "DescBetaFeatures": "Gunakan ciri beta untuk UI Web. <br /> Ciri-ciri beta mungkin tidak stabil. Beberapa ciri beta mungkin tidak digunakan sebagai ciri rasmi.",
-    "DescClassicSessionLauncher": "Gunakan pelancar sesi Classic dan bukannya pelancar sesi NEO. \nPelancar sesi Classic mungkin tidak mempunyai ciri terkini.",
     "DescDesktopNotification": "Membolehkan pemberitahuan desktop. <br />Apabila dihidupkan, Backend.AI juga menggunakan sistem pemberitahuan sistem pengoperasian. Mematikan ini tidak menjejaskan pemberitahuan dalam UI web. Bergantung pada sistem pengoperasian, kebenaran pemberitahuan mungkin perlu dibolehkan dalam tetapan sistem.",
     "DescExperimentalDashboard": "Gunakan halaman papan pemuka dan bukannya halaman ringkasan.",
     "DescKeepLoginSessionInformation": "Biarkan aplikasi webui menyimpan maklumat sesi log masuk semasa lain kali. <br /> Sekiranya pilihan dimatikan, maklumat log masuk akan dihapus setiap log keluar.",
     "DescLanguage": "Tetapkan bahasa antara muka. Bahasa selain bahasa Inggeris dan Korea akan disediakan melalui terjemahan mesin.",
     "DescLetUserUpdateScriptWithNonEmptyValue": "Sila kemas kini skrip dengan nilai yang tidak kosong.",
+    "DescMaxConcurrentUploads": "Hadkan bilangan fail yang boleh dimuat naik secara serentak melalui Fail Explorer.",
     "DescMyKeypairInfo": "Lihat maklumat pasangan kunci saya",
     "DescNewUserConfigFileCreated": "Fail konfigurasi Pengguna baru boleh dibuat dengan data yang tidak kosong.",
     "DescNoBetaFeatures": "Tidak ada ciri beta yang tersedia sekarang. :)",
@@ -1959,6 +1972,7 @@
     "Language": "Bahasa",
     "LightMode": "Mod Cahaya",
     "Logs": "Log",
+    "MaxConcurrentUploads": "Had muat naik fail serentak maksimum",
     "MyKeypairInfo": "Maklumat Pasangan Kunci Saya",
     "NEODataPage": "Halaman data NEO",
     "NEOSessionList": "Senarai Sesi NEO",
@@ -2003,6 +2017,7 @@
       "AIAccelerator": "Pemecut AI",
       "AIAgents": "Ejen AI",
       "AboutBackendAI": "Mengenai Backend.AI",
+      "AdminDashboard": "Papan pemuka admin",
       "Administration": "Pentadbiran",
       "AgentSummary": "Ringkasan Agen",
       "Architecture": "Seni bina",
@@ -2010,6 +2025,7 @@
       "Cancel": "Batal",
       "ChangePassword": "Tukar kata laluan",
       "Chat": "Berbual",
+      "ClassicDashboardPage": "Halaman papan pemuka klasik (halaman ringkasan)",
       "ClickToDownload": "Klik untuk memuat turun",
       "ComputationResources": "Sumber Pengiraan",
       "Configurations": "Konfigurasi",
@@ -2044,10 +2060,10 @@
       "MyAccountInformation": "Tukar Maklumat Pengguna",
       "MyEnvironments": "Persekitaran Saya",
       "MyResources": "Had jumlah sumber saya",
-      "MyResourcesDescription": "<p>Panel ini menunjukkan jumlah penggunaan sumber dan had di semua projek dan kumpulan sumber.</p><p>Apabila beberapa had digunakan (seperti domain, projek, atau pasangan kunci), had yang paling ketat digunakan untuk pengiraan.</p>",
+      "MyResourcesDescription": "<p> Panel ini memaparkan jumlah sumber anda yang digunakan dan percuma di semua projek dan kumpulan sumber. </P> <p> Apabila beberapa had digunakan (seperti domain, projek, atau keypair), pengiraan menggunakan had sumber bebas yang paling ketat. </P>",
       "MyResourcesIn": "Sumber saya di",
       "MyResourcesInResourceGroup": "Sumber saya dalam kumpulan sumber",
-      "MyResourcesInResourceGroupDescription": "Panel ini menunjukkan penggunaan sumber saya sekarang dan tinggal di kumpulan sumber yang dipilih.",
+      "MyResourcesInResourceGroupDescription": "Panel ini menunjukkan berapa banyak sumber yang anda gunakan dan berapa banyak yang percuma dalam kumpulan sumber yang dipilih dalam projek semasa anda.",
       "NewPassword": "Kata laluan baharu",
       "NewPasswordAgain": "Kata laluan baru (sekali lagi)",
       "NewPasswordCannotBeSame": "Sila masukkan kata laluan yang berbeza daripada kata laluan semasa anda.",
@@ -2080,7 +2096,7 @@
       "TermsOfService": "Syarat Perkhidmatan",
       "TotalResourcesIn": "Jumlah sumber dalam",
       "TotalResourcesInResourceGroup": "Jumlah sumber dalam kumpulan sumber",
-      "TotalResourcesInResourceGroupDescription": "Panel ini menunjukkan jumlah sumber yang digunakan dan baki. \nNilai dikira dengan menambah penggunaan dan baki jumlah semua ejen menggunakan kumpulan sumber yang dipilih.",
+      "TotalResourcesInResourceGroupDescription": "Panel ini menunjukkan jumlah sumber yang digunakan dan percuma dalam kumpulan sumber yang dipilih. \nNilai -nilai dikira dengan menjumlahkan jumlah yang digunakan dan bebas dari semua ejen menggunakan kumpulan itu.",
       "TotpActivated": "2FA Didayakan",
       "Update": "Kemas kini",
       "Usage": "Penggunaan",

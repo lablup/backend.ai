@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "Đại lý tích cực",
+    "ActiveAgentsTooltip": "Hiển thị tổng quan at-a-glance của tất cả các tác nhân hiện đang chạy trong hệ thống."
+  },
   "agent": {
     "Agent": "Đại lý",
     "AgentSetting": "Cài đặt đại lý",
@@ -26,6 +30,10 @@
     "Status": "Trạng thái",
     "Terminated": "Đã chấm dứt",
     "Utilization": "Sử dụng"
+  },
+  "agentStats": {
+    "AgentStats": "Thống kê đại lý",
+    "AgentStatsDescription": "Bảng này hiển thị tất cả các tài nguyên được sử dụng trên tất cả các tổng đài viên trong hệ thống. \nCác giá trị đại diện cho tổng tài nguyên được sử dụng bởi tất cả các phiên hoạt động."
   },
   "autoScalingRule": {
     "AddAutoScalingRule": "Thêm quy tắc tỷ lệ tự động",
@@ -214,6 +222,10 @@
     "WarningLessRateLimit": "Nếu giá trị Giới hạn tốc độ nhỏ, các hoạt động API như đăng nhập có thể bị chặn.",
     "YouAreAboutToDeleteCredential": "Bạn sắp xóa thông tin xác thực của người dùng này:"
   },
+  "dashboard": {
+    "Free": "Miễn phí",
+    "Used": "Đã sử dụng"
+  },
   "data": {
     "Active": "Tích cực",
     "Add": "Thêm vào",
@@ -242,6 +254,7 @@
     "FolderInfo": "Thông tin Forder",
     "FolderNameRequired": "Tên thư mục là bắt buộc",
     "FolderNameTooLong": "Nhập tên thư mục ít hơn 64 ký tự",
+    "FolderStatus": "Trạng thái thư mục",
     "FolderToCopy": "Thư mục để sao chép",
     "Foldername": "Tên thư mục",
     "Folders": "Thư mục",
@@ -252,7 +265,7 @@
     "InvalidEmail": "Địa chỉ email không hợp lệ",
     "Invited": "được mời",
     "InvitedFolders": "Thư mục được mời",
-    "InvitedFoldersTooltip": "{{ count }} Lời mời thư mục đang chờ phản hồi.",
+    "InvitedFoldersTooltip": "Nhấp để kiểm tra (các) lời mời {{count}} đang chờ xử lý",
     "Limit": "Giới hạn",
     "ModelStore": "Cửa hàng mô hình",
     "Models": "Mô hình",
@@ -274,7 +287,6 @@
     "SearchByName": "Tìm kiếm theo tên",
     "SelectStorageHost": "Chọn máy chủ lưu trữ",
     "SharedFolderPermission": "Quyền thư mục chia sẻ",
-    "StorageStatus": "Tình trạng lưu trữ",
     "Type": "Kiểu",
     "Update": "Cập nhật",
     "UsageMode": "Chế độ sử dụng",
@@ -390,7 +402,7 @@
       "MoveToTrashMultipleDescription": "Bạn có chắc là bạn muốn di chuyển {{folderLength}} các thư mục sang thùng rác không?",
       "MovedToTrashBin": "Thư mục {{ folderName }} đã được chuyển vào thùng rác.",
       "MultipleFilesDeleted": "Nhiều tệp đã bị xóa",
-      "MultipleFolderDeleted": "Đã chọn {{thư mục}} Các thư mục đã bị xóa.",
+      "MultipleFolderDeleted": "Đã chọn {{folderLength}} Các thư mục đã bị xóa.",
       "MultipleFolderRestored": "Đã chọn {{ folderLength }} Các thư mục đã được khôi phục.",
       "Name": "Tên",
       "NoDeletePermission": "Không xóa quyền",
@@ -430,6 +442,7 @@
       "Invited": "Đã mời thành công",
       "LeaveSharedFolder": "Để lại thư mục chia sẻ",
       "LeaveSharedFolderDesc": "Bạn có muốn để lại thư mục được chia sẻ ‘{{furderName}}?",
+      "NoMoreInvitation": "Không có lời mời để xem xét.",
       "NoOneWasInvited": "Không ai được mời vì lời mời đã tồn tại",
       "NoOneWasShared": "Không chia sẻ được thư mục nhóm",
       "NoValidEmails": "Không có email hợp lệ nào được nhập",
@@ -640,17 +653,18 @@
     "Title": "Một lỗi đã xảy ra."
   },
   "explorer": {
-    "FileInProgress": "Tải lên '{{fileName}}' ...",
     "FileUploadCancelled": "Tải lên tệp đã bị hủy bởi yêu cầu người dùng.",
     "FileUploadFailed": "Không thể tải lên một số tệp trong thư mục '{{folderName}}'.",
+    "Filename": "Tên tệp",
     "FolderNotFoundOrNoAccess": "Thư mục không tìm thấy hoặc truy cập bị từ chối",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Các thư mục không được quản lý không hỗ trợ trình thám hiểm tệp.",
     "NoPermissions": "Không có quyền truy cập thư mục này",
     "ProcessingUpload": "Tệp của bạn đang được tải lên. \nVui lòng chờ.",
-    "SuccessfullyUploadedToFolder": "Các tệp được tải lên thành công trong thư mục '{{folderName}}'",
+    "SuccessfullyUploadedToFolder": "Các tập tin được tải lên thành công.",
     "UploadFailed": "Tải lên không thành công trong '{{folderName}}'",
-    "UploadToFolder": "Tải lên '{{folderName}}'",
+    "UploadingFiles": "Đang tải tệp lên...",
+    "VFolder": "Thư mục",
     "ValueRequired": "Giá trị bắt buộc"
   },
   "general": {
@@ -979,7 +993,7 @@
     "ServiceInfo": "Thông tin dịch vụ",
     "ServiceName": "Tên dịch vụ",
     "ServiceNameCannotStartWithHyphen": "Dấu gạch nối (-) không thể được sử dụng ở cả hai đầu.",
-    "ServiceNameInvalidCharacter": "Ở giữa tên dịch vụ, chỉ bảng chữ cái, số, '_', '.', '-' chỉ có thể được bao gồm.",
+    "ServiceNameInvalidCharacter": "Ở giữa tên dịch vụ, chỉ bảng chữ cái, số, '_', '-' chỉ có thể được bao gồm.",
     "ServiceNameMaxLength": "Vui lòng nhập 24 ký tự trở xuống.",
     "ServiceNameMinLength": "Vui lòng nhập ít nhất 4 ký tự.",
     "ServiceNameShouldEndWith": "Tên phiên phải kết thúc bằng bảng chữ cái, các ký tự lớn và nhỏ, số và '_'.",
@@ -1166,11 +1180,6 @@
     "TypeResourceGroupNameToDelete": "Nhập tên nhóm tài nguyên để xóa",
     "WsproxyAddress": "Địa chỉ máy chủ WSProxy"
   },
-  "resourcePanel": {
-    "Limit": "Giới hạn",
-    "RemainingNumber": "Rmaining",
-    "UsingNumber": "Sử dụng"
-  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Bạn sắp xóa chính sách tài nguyên này:",
     "AllowedHosts": "Máy chủ được phép",
@@ -1255,10 +1264,12 @@
     "PendingSessions": "Phiên đang chờ xử lý"
   },
   "session": {
+    "ActiveSessions": "Phiên hoạt động",
     "Agent": "Đặc vụ",
     "AgentId": "Id đại lý",
     "Agents": "Đại lý",
     "AllowedClientIps": "IP khách hàng được phép",
+    "AllowedMultipleClientsIps": "IP khách hàng được phép (được phân tách bằng dấu phẩy)",
     "AlreadyTerminatingSession": "Đã kết thúc phiên.",
     "AnotherUserSession": "Phiên này được tạo bởi người dùng khác.",
     "Architecture": "Ngành kiến ​​​​trúc",
@@ -1920,6 +1931,8 @@
     "BootstrapScriptDescription": "Tập lệnh Bootstrap sẽ chỉ được thực thi một lần sau khi tạo phiên",
     "BootstrapScriptEmpty": "Kịch bản trống rỗng. \nVui lòng nhập kịch bản.",
     "BootstrapScriptUpdated": "Đã cập nhật tập lệnh Bootstrap.",
+    "ClassicFeatures": "Các tính năng cổ điển",
+    "ClassicFeaturesDesc": "Quay trở lại một phiên bản cổ điển có thể giúp bạn lấy lại sự ổn định và chức năng trong khi bạn chờ đợi các bản cập nhật hoặc sửa chữa được phát hành.",
     "ClassicSessionList": "Trang danh sách phiên cổ điển",
     "ClearSSHKeypairInput": "Cặp khóa SSH đã viết sẽ bị xóa. Bạn có chắc chắn muốn tiếp tục không?",
     "ConfigFilename": "Định cấu hình tên tệp",
@@ -1929,12 +1942,12 @@
     "DescAutoLogout": "Tự động đăng xuất nếu tất cả các trang đã đăng nhập đều bị đóng ngoại trừ các trang gốc phiên cho ứng dụng (ví dụ: sổ ghi chép jupyter, thiết bị đầu cuối web, v.v.)",
     "DescAutomaticUpdateCheck": "Thông báo khi phiên bản webui mới được phát hành.<br />Nếu tính năng bị tự động tắt, nhấp vào công tắc lại sẽ tiếp tục kiểm tra cập nhật.",
     "DescBetaFeatures": "Sử dụng các tính năng beta cho giao diện người dùng Web. <br /> Các tính năng beta có thể không ổn định. Một số tính năng beta có thể không được chấp nhận làm tính năng chính thức.",
-    "DescClassicSessionLauncher": "Sử dụng trình khởi chạy phiên Classic thay vì trình khởi chạy phiên NEO. \nTrình khởi chạy phiên Classic có thể không có các tính năng mới nhất.",
     "DescDesktopNotification": "Kích hoạt thông báo desktop. <br />Khi bật, Backend.AI cũng sử dụng hệ thống thông báo của hệ điều hành. Tắt điều này không ảnh hưởng đến thông báo trong giao diện web. Tùy thuộc vào hệ điều hành, quyền thông báo có thể cần được kích hoạt trong cài đặt hệ thống.",
     "DescExperimentalDashboard": "Sử dụng trang bảng điều khiển thay vì trang tóm tắt.",
     "DescKeepLoginSessionInformation": "Hãy để ứng dụng webui giữ thông tin phiên đăng nhập hiện tại vào lần sau. <br /> Nếu tùy chọn bị tắt, thông tin đăng nhập sẽ bị xóa mỗi lần đăng xuất.",
     "DescLanguage": "Đặt ngôn ngữ giao diện. Các ngôn ngữ khác ngoài tiếng Anh và tiếng Hàn sẽ được cung cấp thông qua dịch máy.",
     "DescLetUserUpdateScriptWithNonEmptyValue": "Vui lòng cập nhật tập lệnh với giá trị không trống.",
+    "DescMaxConcurrentUploads": "Giới hạn số lượng tệp có thể được tải lên đồng thời thông qua File Explorer.",
     "DescMyKeypairInfo": "Xem thông tin cặp khóa của tôi",
     "DescNewUserConfigFileCreated": "Tệp cấu hình Người dùng mới có thể được tạo bằng dữ liệu không trống.",
     "DescNoBetaFeatures": "Hiện không có tính năng beta nào. :)",
@@ -1961,6 +1974,7 @@
     "Language": "Ngôn ngữ",
     "LightMode": "Chế độ sáng",
     "Logs": "Nhật ký",
+    "MaxConcurrentUploads": "Giới hạn tải lên tệp đồng thời tối đa",
     "MyKeypairInfo": "Thông tin về cặp khóa của tôi",
     "NEODataPage": "Trang dữ liệu NEO",
     "NEOSessionList": "Danh sách phiên Neo",
@@ -2005,6 +2019,7 @@
       "AIAccelerator": "Máy gia tốc AI",
       "AIAgents": "Đại lý AI",
       "AboutBackendAI": "Giới thiệu về Backend.AI",
+      "AdminDashboard": "Bảng điều khiển quản trị viên",
       "Administration": "Hành chính",
       "AgentSummary": "Tóm tắt đại lý",
       "Architecture": "Ngành kiến ​​​​trúc",
@@ -2012,6 +2027,7 @@
       "Cancel": "Huỷ bỏ",
       "ChangePassword": "Đổi mật khẩu",
       "Chat": "Trò chuyện",
+      "ClassicDashboardPage": "Trang bảng điều khiển cổ điển (trang tóm tắt)",
       "ClickToDownload": "Bấm để tải xuống",
       "ComputationResources": "Tài nguyên tính toán",
       "Configurations": "Cấu hình",
@@ -2046,10 +2062,10 @@
       "MyAccountInformation": "Thay đổi thông tin người dùng",
       "MyEnvironments": "Môi trường của tôi",
       "MyResources": "Tổng giới hạn tài nguyên của tôi",
-      "MyResourcesDescription": "<p>Bảng điều khiển này hiển thị tổng mức sử dụng tài nguyên và giới hạn trong tất cả các dự án và nhóm tài nguyên.</p><p>Khi áp dụng nhiều giới hạn (như domain, dự án hoặc cặp khóa), giới hạn nghiêm ngặt nhất được sử dụng để tính toán.</p>",
+      "MyResourcesDescription": "<p>Bảng này hiển thị tổng tài nguyên hiện đang được sử dụng và miễn phí trên tất cả các dự án và nhóm tài nguyên.</p><p>Khi áp dụng nhiều giới hạn (chẳng hạn như miền, dự án hoặc cặp khóa), phép tính sẽ sử dụng giới hạn tài nguyên miễn phí hạn chế nhất.</p>",
       "MyResourcesIn": "Tài nguyên của tôi trong",
       "MyResourcesInResourceGroup": "Tài nguyên của tôi trong nhóm tài nguyên",
-      "MyResourcesInResourceGroupDescription": "Bảng điều khiển này hiển thị việc sử dụng tài nguyên hiện tại của bạn và còn lại trong nhóm tài nguyên đã chọn.",
+      "MyResourcesInResourceGroupDescription": "Bảng này hiển thị lượng tài nguyên bạn đã sử dụng và lượng tài nguyên còn trống trong nhóm tài nguyên đã chọn của dự án hiện tại của bạn.",
       "NewPassword": "Mật khẩu mới",
       "NewPasswordAgain": "Mật khẩu mới (một lần nữa)",
       "NewPasswordCannotBeSame": "Vui lòng nhập mật khẩu khác với mật khẩu hiện tại của bạn.",
@@ -2082,7 +2098,7 @@
       "TermsOfService": "Điều khoản dịch vụ",
       "TotalResourcesIn": "Tổng tài nguyên trong",
       "TotalResourcesInResourceGroup": "Tổng tài nguyên trong nhóm tài nguyên",
-      "TotalResourcesInResourceGroupDescription": "Bảng điều khiển này cho thấy tổng tài nguyên được sử dụng và còn lại. \nCác giá trị được tính bằng cách thêm sử dụng và số lượng còn lại của tất cả các tác nhân bằng nhóm tài nguyên đã chọn.",
+      "TotalResourcesInResourceGroupDescription": "Bảng này hiển thị tổng số tài nguyên đã sử dụng và miễn phí trong nhóm tài nguyên đã chọn. \nCác giá trị được tính bằng cách tính tổng số tiền đã sử dụng và số tiền còn trống của tất cả các tác nhân sử dụng nhóm đó.",
       "TotpActivated": "Đã bật 2FA",
       "Update": "Cập nhật",
       "Usage": "Cách sử dụng",

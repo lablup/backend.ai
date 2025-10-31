@@ -72,6 +72,11 @@ registries = []
   # Whether to use experimental Redis-based event dispatcher.
   # May provide better performance for event handling.
   use-experimental-redis-event-dispatcher = false
+  # Whether to allow automatic creation of quota scopes.
+  # If true, quota scopes will be created when creating VFolders in non-existent
+  # quota scopes.
+  # If false, VFolder creation will fail if the quota scope does not exist.
+  allow-auto-quota-scope-creation = true
 
 [pyroscope]
   # Whether to enable Pyroscope profiling.
