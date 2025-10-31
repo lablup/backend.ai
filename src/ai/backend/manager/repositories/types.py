@@ -618,7 +618,7 @@ class BaseMinilangFilterConverter(ABC):
 
     @classmethod
     @abstractmethod
-    def _create_from_condition(cls, field: str, operator: str, value: Any):
+    def _create_from_condition(cls, field: str, operator: str, value: Any) -> Self:
         """
         Create Filter instance with single condition from field, operator, and value.
 
