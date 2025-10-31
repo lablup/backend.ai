@@ -816,3 +816,16 @@ class ASTParsingFailed(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.PARSING,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
+
+
+class UnsupportedOperation(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/unsupported-operation"
+    error_title = "Unsupported Operation"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
