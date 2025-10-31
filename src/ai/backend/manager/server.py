@@ -961,6 +961,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             event_producer=root_ctx.event_producer,
             valkey_schedule=root_ctx.valkey_schedule,
             network_plugin_ctx=root_ctx.network_plugin_ctx,
+            hook_plugin_ctx=root_ctx.hook_plugin_ctx,
         )
     )
     # Create deployment controller
