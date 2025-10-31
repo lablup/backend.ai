@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "Aktiiviset edustajat",
+    "ActiveAgentsTooltip": "Näyttää yleiskatsauksen kaikista järjestelmässä tällä hetkellä toimivista edustajista."
+  },
   "agent": {
     "Agent": "Agentti",
     "AgentSetting": "Agentin asetukset",
@@ -26,6 +30,10 @@
     "Status": "Tila",
     "Terminated": "Lopetettu",
     "Utilization": "Käyttö"
+  },
+  "agentStats": {
+    "AgentStats": "Agenttitilastot",
+    "AgentStatsDescription": "Tämä paneeli näyttää kaikki käytetyt resurssit kaikissa järjestelmän agenteissa. \nArvot edustavat kaikkien aktiivisten istuntojen käytettyjä resursseja."
   },
   "autoScalingRule": {
     "AddAutoScalingRule": "Lisää automaattinen skaalaussääntö",
@@ -214,6 +222,10 @@
     "WarningLessRateLimit": "Jos Rate Limit -arvo on pieni, API-toiminnot, kuten kirjautuminen, voivat estyä.",
     "YouAreAboutToDeleteCredential": "Olet poistamassa tämän käyttäjän kirjautumistiedot:"
   },
+  "dashboard": {
+    "Free": "Ilmainen",
+    "Used": "Käytetty"
+  },
   "data": {
     "Active": "Aktiivinen",
     "Add": "Lisätä",
@@ -242,6 +254,7 @@
     "FolderInfo": "Forder Info",
     "FolderNameRequired": "Kansion nimi vaaditaan",
     "FolderNameTooLong": "Kirjoita kansion nimi alle 64 merkkiä",
+    "FolderStatus": "Kansion tila",
     "FolderToCopy": "Kopioitava kansio",
     "Foldername": "Kansion nimi",
     "Folders": "Kansiot",
@@ -252,7 +265,7 @@
     "InvalidEmail": "Virheellinen sähköpostiosoite",
     "Invited": "Kutsuttu",
     "InvitedFolders": "Kutsutut kansiot",
-    "InvitedFoldersTooltip": "{{ count }} -kansiokutsut odottavat vastausta.",
+    "InvitedFoldersTooltip": "Napsauta tarkistaaksesi odottavan {{count}} kutsun",
     "Limit": "Raja",
     "ModelStore": "Mallikauppa",
     "Models": "Mallit",
@@ -274,7 +287,6 @@
     "SearchByName": "Hae nimellä",
     "SelectStorageHost": "Valitse tallennusisäntä",
     "SharedFolderPermission": "Jaettu kansiolupa",
-    "StorageStatus": "Säilytyksen tila",
     "Type": "Tyyppi",
     "Update": "Päivitys",
     "UsageMode": "Käyttötila",
@@ -390,7 +402,7 @@
       "MoveToTrashMultipleDescription": "Haluatko varmasti liikuttaa {{folderLength}} kansioita roskakoriin?",
       "MovedToTrashBin": "Kansio {{ folderName }} on siirretty roskakoriin.",
       "MultipleFilesDeleted": "Useita tiedostoja poistettu",
-      "MultipleFolderDeleted": "Valitut {{kansiota}} kansiot on poistettu.",
+      "MultipleFolderDeleted": "Valitut {{folderLength}} kansiot on poistettu.",
       "MultipleFolderRestored": "Valitut {{ folderLength }} kansiot on palautettu.",
       "Name": "Nimi",
       "NoDeletePermission": "Ei poistolupaa",
@@ -430,6 +442,7 @@
       "Invited": "Kutsuttu onnistuneesti",
       "LeaveSharedFolder": "Jätä jaettu kansio",
       "LeaveSharedFolderDesc": "Haluatko jättää jaetun kansion '{{Folderinimi}}'?",
+      "NoMoreInvitation": "Arvostelukutsuja ei ole.",
       "NoOneWasInvited": "Ketään ei ole kutsuttu, koska kutsu on jo olemassa",
       "NoOneWasShared": "Ryhmäkansion jakaminen epäonnistui",
       "NoValidEmails": "Kelvollisia sähköposteja ei ole syötetty",
@@ -640,17 +653,18 @@
     "Title": "On tapahtunut virhe."
   },
   "explorer": {
-    "FileInProgress": "Lataaminen '{{fileName}}' ...",
     "FileUploadCancelled": "Tiedoston lataus peruutettiin käyttäjäpyynnöllä.",
     "FileUploadFailed": "Joidenkin tiedostojen lähettäminen kansioon '{{folderName}}'.",
+    "Filename": "Tiedoston nimi",
     "FolderNotFoundOrNoAccess": "Kansiota ei löydy tai pääsy kielletty",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Hallitsemattomat kansiot eivät tue tiedostotutkijaa.",
     "NoPermissions": "Ei oikeuksia käyttää tätä kansiota",
     "ProcessingUpload": "Tiedostosi ladataan. \nOdota.",
-    "SuccessfullyUploadedToFolder": "Tiedostot ladataan onnistuneesti kansioon '{{folderName}}'",
+    "SuccessfullyUploadedToFolder": "Tiedostot on ladattu onnistuneesti.",
     "UploadFailed": "Lähettäminen epäonnistui '{{folderName}}'",
-    "UploadToFolder": "Lataaminen '{{folderName}}'",
+    "UploadingFiles": "Ladataan tiedostoja...",
+    "VFolder": "Kansio",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -978,7 +992,7 @@
     "ServiceInfo": "Palvelun tiedot",
     "ServiceName": "Palvelunimi",
     "ServiceNameCannotStartWithHyphen": "Tavuviivoja (-) ei voi käyttää kummassakaan päässä.",
-    "ServiceNameInvalidCharacter": "Palvelun nimen keskellä vain aakkoset, numero '_', '.', '-' voidaan sisällyttää vain.",
+    "ServiceNameInvalidCharacter": "Palvelun nimen keskellä vain aakkoset, numero '_', '-' voidaan sisällyttää vain.",
     "ServiceNameMaxLength": "Anna enintään 24 merkkiä.",
     "ServiceNameMinLength": "Kirjoita vähintään 4 merkkiä.",
     "ServiceNameShouldEndWith": "Istunnon nimen on päätyttävä aakkosella, suurilla ja pienillä merkeillä, numeroilla ja '_'.",
@@ -1165,11 +1179,6 @@
     "TypeResourceGroupNameToDelete": "Kirjoita poistettavan resurssiryhmän nimi",
     "WsproxyAddress": "WSProxy-palvelimen osoite"
   },
-  "resourcePanel": {
-    "Limit": "Rajoittaa",
-    "RemainingNumber": "Rmmitys",
-    "UsingNumber": "Käyttäminen"
-  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Olet poistamassa tätä resurssikäytäntöä:",
     "AllowedHosts": "Sallitut isännät",
@@ -1254,10 +1263,12 @@
     "PendingSessions": "Vireillä olevat istunnot"
   },
   "session": {
+    "ActiveSessions": "Aktiiviset istunnot",
     "Agent": "Agentti",
     "AgentId": "Agenttitunnus",
     "Agents": "Agentit",
     "AllowedClientIps": "Sallitut asiakkaan IP-osoitteet",
+    "AllowedMultipleClientsIps": "Sallitut asiakkaan IP-osoitteet (pilkuilla erotettu)",
     "AlreadyTerminatingSession": "Istunto on jo päättymässä.",
     "AnotherUserSession": "Tämän istunnon on luonut toinen käyttäjä.",
     "Architecture": "Arkkitehtuuri",
@@ -1919,6 +1930,8 @@
     "BootstrapScriptDescription": "Bootstrap-skripti suoritetaan vain kerran istunnon luomisen jälkeen.",
     "BootstrapScriptEmpty": "Käsikirjoitus on tyhjä. \nAnna käsikirjoitus.",
     "BootstrapScriptUpdated": "Bootstrap-skripti päivitetty.",
+    "ClassicFeatures": "Klassiset ominaisuudet",
+    "ClassicFeaturesDesc": "Klassiseen versioon palaaminen voi auttaa sinua palauttamaan vakauden ja toiminnallisuuden odottaessasi päivitysten tai korjausten julkaisua.",
     "ClassicSessionList": "Klassinen istuntoluettelosivu",
     "ClearSSHKeypairInput": "Kirjoitettu SSH-avainpari poistetaan. Haluatko varmasti jatkaa?",
     "ConfigFilename": "Konfigurointitiedoston nimi",
@@ -1928,12 +1941,12 @@
     "DescAutoLogout": "Kirjaudu ulos automaattisesti, jos kaikki kirjautuneet sivut suljetaan, lukuun ottamatta sovellusten (esim. jupyter notebook, verkkopääte jne.) istunnon luomia sivuja.",
     "DescAutomaticUpdateCheck": "Ilmoita kun uusi webui-versio julkaistaan.<br />Jos ominaisuus poistetaan automaattisesti käytöstä, kytkimen uudelleen klikkaaminen jatkaa päivitystarkistuksia.",
     "DescBetaFeatures": "Käytä web-käyttöliittymän beta-ominaisuuksia.<br />Beta-ominaisuudet voivat olla epävakaita. Joitakin beta-ominaisuuksia ei ehkä hyväksytä viralliseksi ominaisuudeksi.",
-    "DescClassicSessionLauncher": "Käytä Classic-istunnonkäynnistysohjelmaa NEO-istunnonkäynnistimen sijaan. \nClassic istunnonkäynnistysohjelmassa ei välttämättä ole uusimpia ominaisuuksia.",
     "DescDesktopNotification": "Ottaa käyttöön työpöytäilmoitukset. <br />Kun päällä, Backend.AI käyttää myös käyttöjärjestelmän ilmoitusjärjestelmää. Tämän sammuttaminen ei vaikuta web-käyttöliittymän sisäisiin ilmoituksiin. Käyttöjärjestelmästä riippuen ilmoitusoikeudet saattaa tarvita ottaa käyttöön järjestelmäasetuksissa.",
     "DescExperimentalDashboard": "Käytä kojelaudan sivua yhteenvetosivun sijasta.",
     "DescKeepLoginSessionInformation": "Anna webui-sovelluksen säilyttää nykyisen kirjautumisistunnon tiedot seuraavalla kerralla.<br />Jos vaihtoehto on pois päältä, kirjautumistiedot tyhjennetään jokaisen uloskirjautumisen yhteydessä.",
     "DescLanguage": "Aseta käyttöliittymäkieli. Muut kielet kuin englanti ja korea tarjotaan koneen käännöksen kautta.",
     "DescLetUserUpdateScriptWithNonEmptyValue": "Päivitä skripti ei-tyhjällä arvolla.",
+    "DescMaxConcurrentUploads": "Rajoittaa tiedostojen määrää, jotka voidaan ladata samanaikaisesti File Explorerin kautta.",
     "DescMyKeypairInfo": "Katso avainparini tiedot",
     "DescNewUserConfigFileCreated": "Uusi User config-tiedosto voidaan luoda ei-tyhjillä tiedoilla.",
     "DescNoBetaFeatures": "Beta-ominaisuutta ei ole nyt saatavilla :)",
@@ -1960,6 +1973,7 @@
     "Language": "Kieli",
     "LightMode": "Valotila",
     "Logs": "Lokit",
+    "MaxConcurrentUploads": "Samanaikaisen tiedostolatauksen enimmäisraja",
     "MyKeypairInfo": "Avainparini tiedot",
     "NEODataPage": "NEO -tietosivu",
     "NEOSessionList": "NEO-istuntoluettelo",
@@ -2004,6 +2018,7 @@
       "AIAccelerator": "AI-kiihdyttämö",
       "AIAgents": "AI-agentit",
       "AboutBackendAI": "Tietoja Backend.AI:sta",
+      "AdminDashboard": "Järjestelmänvalvojan kojelauta",
       "Administration": "Hallinto",
       "AgentSummary": "Agentin yhteenveto",
       "Architecture": "Arkkitehtuuri",
@@ -2011,6 +2026,7 @@
       "Cancel": "Peruuta",
       "ChangePassword": "Vaihda salasana",
       "Chat": "Chat",
+      "ClassicDashboardPage": "Klassinen kojelaudan sivu (yhteenvetosivu)",
       "ClickToDownload": "Napsauta ladataksesi",
       "ComputationResources": "Laskentaresurssit",
       "Configurations": "Kokoonpanot",
@@ -2045,10 +2061,10 @@
       "MyAccountInformation": "Tilini tiedot",
       "MyEnvironments": "Omat ympäristöt",
       "MyResources": "Kokonaisresurssini rajoittavat",
-      "MyResourcesDescription": "<p>Tämä paneeli näyttää resurssien kokonaiskäytön ja rajat kaikissa projekteissa ja resurssiryhmissä.</p><p>Kun useita rajoja on käytössä (verkkotunnus, projekti tai avainpari), tiukinta rajaa käytetään laskennassa.</p>",
+      "MyResourcesDescription": "<p>Tässä paneelissa näytetään tällä hetkellä käytetyt ja vapaat resurssit kaikissa projekteissa ja resurssiryhmissä.</p><p>Kun käytetään useita rajoituksia (kuten verkkotunnus, projekti tai avainpari), laskennassa käytetään kaikkein rajoittavinta ilmaisten resurssien rajaa.</p>",
       "MyResourcesIn": "Resurssini",
       "MyResourcesInResourceGroup": "Resurssini resurssiryhmässä",
-      "MyResourcesInResourceGroupDescription": "Tämä paneeli näyttää nykyisen resurssien käytön ja pysyvän valitussa resurssiryhmässä.",
+      "MyResourcesInResourceGroupDescription": "Tämä paneeli näyttää, kuinka paljon resurssia olet käyttänyt ja kuinka paljon on vapaata nykyisen projektisi valitussa resurssiryhmässä.",
       "NewPassword": "Uusi salasana",
       "NewPasswordAgain": "Uusi salasana (taas)",
       "NewPasswordCannotBeSame": "Kirjoita salasana, joka poikkeaa nykyisestä salasanastasi.",
@@ -2082,7 +2098,7 @@
       "TermsOfService": "Käyttöehdot",
       "TotalResourcesIn": "Resurssien kokonaismäärä",
       "TotalResourcesInResourceGroup": "Resurssien kokonaismäärä resurssiryhmässä",
-      "TotalResourcesInResourceGroupDescription": "Tämä paneeli näyttää käytetyt ja jäljellä olevat resurssit. \nArvot lasketaan lisäämällä kaikkien aineiden käyttö ja jäljellä olevat määrät valitun resurssiryhmän avulla.",
+      "TotalResourcesInResourceGroupDescription": "Tämä paneeli näyttää valitun resurssiryhmän käytetyt ja vapaat resurssit yhteensä. \nArvot lasketaan summaamalla kaikkien kyseistä ryhmää käyttävien aineiden käytetyt ja vapaat määrät.",
       "TotpActivated": "2FA käytössä",
       "Update": "Päivitys",
       "Usage": "Käyttö",
