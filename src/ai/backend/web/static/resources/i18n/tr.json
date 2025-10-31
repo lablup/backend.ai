@@ -368,6 +368,7 @@
       "DownloadingModel": "İndirme Modeli ...",
       "Edit": "Düzenle",
       "EditDelete": "Düzenle+Sil",
+      "ExcludedFolders": "Silme izni olmayan aşağıdaki klasör(ler) hariç tutulacaktır.",
       "FileDeleted": "Dosya Silindi",
       "FileRenamed": "Dosya Yeniden Adlandırıldı",
       "FolderCloneFailed": "Klasör klonlanamadı.",

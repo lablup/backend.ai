@@ -367,6 +367,7 @@
       "DownloadingModel": "モデルのダウンロード...",
       "Edit": "編集",
       "EditDelete": "編集+削除",
+      "ExcludedFolders": "以下の削除権限のないフォルダーは除外されます。",
       "FileDeleted": "ファイルが削除されました",
       "FileRenamed": "ファイルの名前が変更されました",
       "FolderCloneFailed": "フォルダのクローンに失敗しました。",

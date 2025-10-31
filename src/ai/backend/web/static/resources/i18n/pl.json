@@ -368,6 +368,7 @@
       "DownloadingModel": "Model pobierania ...",
       "Edit": "Edytować",
       "EditDelete": "Edytuj+Usuń",
+      "ExcludedFolders": "Następujące foldery bez uprawnień do usuwania zostaną wykluczone.",
       "FileDeleted": "Plik usunięty",
       "FileRenamed": "Zmieniono nazwę pliku",
       "FolderCloneFailed": "Nie udało się sklonować folderu.",

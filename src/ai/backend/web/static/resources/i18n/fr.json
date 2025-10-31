@@ -368,6 +368,7 @@
       "DownloadingModel": "Modèle de téléchargement ...",
       "Edit": "Éditer",
       "EditDelete": "Modifier+Supprimer",
+      "ExcludedFolders": "Les dossiers suivants sans autorisation de suppression seront exclus.",
       "FileDeleted": "Fichier supprimé",
       "FileRenamed": "Fichier renommé",
       "FolderCloneFailed": "Échec du clonage du dossier.",
