@@ -1,5 +1,7 @@
 # Repositories Layer
 
+← [Back to Manager](../README.md#manager-architecture-documentation) | [Architecture Overview](../../README.md#manager)
+
 ## Overview
 
 The Repositories layer encapsulates and abstracts database access. This layer separates data access logic from business logic and is responsible for transaction management and query optimization.
@@ -713,11 +715,20 @@ async def fetch(self, params: dict) -> list:
     ...
 ```
 
+## Repository-Specific Documentation
+
+### Specialized Repositories
+- **[Metric Repository](./metric/README.md)**: Container metrics data access
+  - Prometheus metric querying
+  - Time-series data retrieval
+  - Metric aggregation patterns
+
 ## References
 
 ### Related Documentation
-- [Services Layer](../services/README.md)
-- [Database Models](../models/README.md)
+- [Services Layer](../services/README.md): Business logic patterns and service implementation
+- [Sokovan Orchestration](../sokovan/README.md): Session scheduling and orchestration
+- [Manager Overview](../README.md): Manager component architecture
 
 ### Query Optimization Guide
 - N+1 problem resolution: Use JOIN or separate queries

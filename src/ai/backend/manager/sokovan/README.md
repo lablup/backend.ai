@@ -1,5 +1,7 @@
 # Sokovan
 
+← [Back to Manager](../README.md#manager-architecture-documentation) | [Architecture Overview](../../README.md#manager)
+
 ## Overview
 
 Sokovan is the orchestration layer that comprehensively coordinates session scheduling, deployment management, and route management in Backend.AI.
@@ -557,10 +559,27 @@ PENDING → PROVISIONING → RUNNING → TERMINATING → TERMINATED
 2. Free up agent disk space
 3. Wait for automatic retry on timeout
 
-## Sub-documents
+## Sokovan Component Documentation
 
-Refer to subdirectories for detailed documentation on each layer:
+Detailed documentation for each Sokovan component:
 
-- [Scheduler Architecture](scheduler/README.md): Session scheduling details
-- [Deployment Architecture](deployment/README.md): Deployment management details
-- [SchedulingController Architecture](scheduling_controller/README.md): Session validation and preparation details
+### Core Components
+- **[Scheduler](./scheduler/README.md)**: Core scheduling engine for session placement and resource allocation
+  - Session scheduling algorithm implementation
+  - Resource matching and agent selection
+  - Session state transitions and lifecycle management
+
+- **[Scheduling Controller](./scheduling_controller/README.md)**: Validation and preparation logic for scheduling
+  - Session creation validation rules
+  - Resource requirement preparation
+  - Image and environment preparation
+
+- **[Deployment Controller](./deployment/README.md)**: Deployment lifecycle management
+  - Deployment creation and scaling
+  - Service endpoint management
+  - Deployment health monitoring
+
+### Related Documentation
+- [Manager Overview](../README.md): Manager component architecture and responsibilities
+- [Services Layer](../services/README.md): Business logic patterns and implementation
+- [Repositories Layer](../repositories/README.md): Data access patterns and query optimization

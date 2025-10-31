@@ -1,5 +1,7 @@
 # SchedulingController
 
+← [Back to Sokovan](../README.md#sokovan-component-documentation) | [Manager](../../README.md#manager-architecture-documentation) | [Architecture Overview](../../../README.md#manager)
+
 ## Overview
 
 SchedulingController is the component responsible for pre-validation and preparation of session creation requests, validating request validity and preparing necessary data before the Scheduler schedules sessions.
