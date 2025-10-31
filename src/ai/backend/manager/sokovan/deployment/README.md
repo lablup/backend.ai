@@ -521,8 +521,8 @@ To monitor system state, track deployment creation, update, and deletion counts,
 > **Note**: Scale-up can fail if unable to create new sessions due to resource shortage even if metrics are normal.
 
 ## Parent Document
-- [Sokovan Overall Architecture](../README.ko.md)
+- [Sokovan Overall Architecture](../README.md)
 
 ## Related Documents
-- [Scheduler Architecture](../scheduler/README.ko.md)
-- [SchedulingController Architecture](../scheduling_controller/README.ko.md)
+- [Scheduler Architecture](../scheduler/README.md)
+- [SchedulingController Architecture](../scheduling_controller/README.md)

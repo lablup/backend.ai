@@ -9,7 +9,7 @@ Scheduler is the core module responsible for session scheduling in Backend.AI, a
 - **Resource Constraint Validation**: Verifies that requested resources satisfy system constraints
 - **Lifecycle Management**: Handles session start, termination, retry on failure, etc.
 - **Image Pulling Monitoring**: Tracks agent image pulling and kernel creation processes
-- **State Transition Management**: Tracks kernel state transitions (PREPARING → PULLING → RUNNING → TERMINATING → TERMINATED)
+- **State Transition Management**: Tracks kernel state transitions (SCHEDULED → PREPARING → PULLING → PREPARED → CREATING → RUNNING → TERMINATING → TERMINATED)
 
 ## Architecture
 
@@ -242,12 +242,55 @@ sequenceDiagram
     participant Agent as AgentRPCClient
     participant DB as Database
 
-    Coord->>Sched: start_sessions()
+    Note over Coord: After scheduling (SCHEDULED state)
 
+    Coord->>Sched: check_preconditions()
     Sched->>Repo: fetch_scheduled_sessions()
     Repo->>DB: SELECT sessions WHERE status=SCHEDULED
     DB-->>Repo: Session list
     Repo-->>Sched: scheduled_sessions
+
+    Sched->>Repo: update_sessions_to_preparing()
+    Repo->>DB: UPDATE sessions SET status=PREPARING
+
+    loop For each session (concurrent processing)
+        loop For each kernel in session
+            Sched->>Agent: trigger_image_pulling(image_ref)
+
+            Note over Agent: Check if image exists locally
+            Note over Agent: Pull image if not present
+
+            alt Image check/pull started
+                Agent-->>Sched: Image pulling triggered
+            else RPC failure
+                Note over Sched: Mark session for retry
+            end
+        end
+    end
+
+    Note over Coord: Periodic check of pulling progress
+
+    Coord->>Sched: check_pulling_progress()
+    Sched->>Repo: fetch_pulling_sessions()
+    Repo->>DB: SELECT sessions WHERE status=PREPARING/PULLING
+    DB-->>Repo: Session list
+
+    alt All images ready for session
+        Sched->>Repo: update_session_to_prepared()
+        Repo->>DB: UPDATE session SET status=PREPARED
+    end
+
+    Note over Coord: When session is PREPARED
+
+    Coord->>Sched: start_sessions()
+
+    Sched->>Repo: fetch_prepared_sessions()
+    Repo->>DB: SELECT sessions WHERE status=PREPARED
+    DB-->>Repo: Session list
+    Repo-->>Sched: prepared_sessions
+
+    Sched->>Repo: update_sessions_to_creating()
+    Repo->>DB: UPDATE sessions SET status=CREATING
 
     loop For each session (concurrent processing)
         Sched->>Sched: _start_single_session(session)
@@ -262,26 +305,15 @@ sequenceDiagram
         loop For each kernel in session
             Sched->>Agent: create_kernel(kernel_config)
 
-            Note over Agent: Kernel creation performs container creation
-            Note over Agent: Image is already prepared in PREPARED stage
-            Note over Agent: Additional image pull may occur if needed
+            Note over Agent: Container creation
+            Note over Agent: Image already pulled in PREPARING stage
 
             alt RPC success
                 Agent-->>Sched: Creation start confirmation
-                Sched->>Repo: update_kernel_status(CREATING)
-                Repo->>DB: UPDATE kernel SET status=CREATING
             else RPC failure
                 Note over Sched: Retry up to 3 times
                 Note over Sched: Return to PENDING for rescheduling after 3 failures
             end
-        end
-
-        alt All kernel creation requests successful
-            Note over Sched: Session start complete
-            Sched->>Repo: update_session_status(RUNNING)
-            Repo->>DB: UPDATE session SET status=RUNNING
-        else Some failed
-            Note over Sched: Return to PENDING for rescheduling after retries
         end
     end
 
@@ -290,17 +322,21 @@ sequenceDiagram
 
 **Step-by-Step Explanation:**
 
-The session start flow proceeds through six stages. In the first stage, sessions in SCHEDULED state and kernels belonging to those sessions are queried from the database. Each session's configuration information and assigned agent information are retrieved together.
+The session start flow proceeds through three major phases: Precondition Check, Pulling Progress Check, and Session Start.
 
-The second stage is only performed for cluster sessions. SSH key pairs are generated for communication between nodes in the cluster, and a cluster-dedicated network is configured through network plugins. This establishes an environment where multiple containers can cooperate as a single session.
+**Phase 1: Precondition Check (SCHEDULED → PREPARING)**
 
-In the third stage, all information needed for kernel creation requests is constructed. This includes the name and tag of the container image to use, resource slots to allocate (CPU, memory, GPU, etc.), environment variables to use inside the container, storage volume mount configuration, and network settings—a complete kernel configuration is prepared.
+In the first phase, check_preconditions() queries sessions in SCHEDULED state and their kernels. For each session, it transitions the session state to PREPARING and triggers image check/pull operations on the selected agents. The agent checks if the required container image exists locally, and if not, initiates image pulling. This phase ensures all required images are available before actual kernel creation.
 
-In the fourth stage, the agent's create_kernel RPC method is called for each kernel with the prepared configuration. Multiple kernels can be created concurrently asynchronously, and the agent receiving the call immediately starts container image pulling.
+**Phase 2: Pulling Progress Check (PREPARING → PREPARED)**
 
-In the fifth stage, kernel state is updated according to RPC call results. If RPC succeeds, the kernel's state is changed to PULLING to indicate image pulling is in progress. If an RPC call fails, all kernels in that session are cancelled to maintain consistency.
+In the second phase, check_pulling_progress() periodically queries sessions in PREPARING or PULLING state. For each session, it checks whether all kernels have their images ready. Once all images for a session are confirmed to be pulled and ready, the session state is transitioned to PREPARED. This phase monitors image pulling progress and moves sessions forward when ready.
 
-In the sixth stage, the entire session's state is updated. If all kernel creation requests in the session succeeded, the session state is changed to PREPARING. If even one kernel failed, the entire session is treated as failed to ensure partially created sessions don't remain.
+**Phase 3: Session Start (PREPARED → CREATING)**
+
+In the third phase, start_sessions() queries sessions in PREPARED state—sessions that have passed precondition checks and have all images ready. For cluster sessions, SSH key pairs are generated for inter-node communication, and cluster-dedicated networks are configured. All information needed for kernel creation is constructed, including image references, resource slots, environment variables, volume mounts, and network settings.
+
+The agent's create_kernel RPC method is called for each kernel with the prepared configuration. Since images are already pulled in the PREPARING phase, the agent can immediately create and start containers without additional image pulling. Multiple kernels can be created concurrently. If RPC calls succeed, kernels transition to CREATING state, and when all kernels in a session successfully start, the session transitions to RUNNING state.
 
 ### Session Termination Flow
 
@@ -654,7 +690,7 @@ async def mark_kernel_terminated(
 Sessions follow these state transition paths:
 
 ```
-PENDING → SCHEDULED → PREPARING → RUNNING → TERMINATING → TERMINATED
+PENDING → SCHEDULED → PREPARING → PREPARED → CREATING → RUNNING → TERMINATING → TERMINATED
    ↓
 CANCELLED
 ```
@@ -665,22 +701,25 @@ CANCELLED
 |----------|----------|------------|--------------|------------|
 | PENDING | SCHEDULED | Scheduling success, agent allocation complete | Scheduler | CANCELLED (validation failure) |
 | PENDING | CANCELLED | User cancellation request, timeout | ScheduleCoordinator | - |
-| SCHEDULED | PREPARING | Kernel creation RPC started | Scheduler | ERROR (RPC failure) |
-| PREPARING | RUNNING | All kernels in RUNNING state | KernelStateEngine | TERMINATING (partial failure) |
+| SCHEDULED | PREPARING | Precondition check started, image pull triggered | Scheduler | ERROR (RPC failure) |
+| PREPARING | PREPARED | All images pulled and ready | Scheduler | CANCELLED (pulling failure) |
+| PREPARED | CREATING | Kernel creation RPC started | Scheduler | ERROR (RPC failure) |
+| CREATING | RUNNING | All kernels in RUNNING state | KernelStateEngine | TERMINATING (partial failure) |
 | RUNNING | TERMINATING | Termination request received | Scheduler | - |
 | TERMINATING | TERMINATED | All kernels TERMINATED | KernelStateEngine | - |
 
 **Key Rules:**
 - Can only directly transition to CANCELLED from PENDING state
 - After SCHEDULED must transition to TERMINATED via TERMINATING
-- Failure in PREPARING treats entire session as TERMINATING
+- Image pulling occurs in PREPARING phase before kernel creation
+- Failure in PREPARING or CREATING treats entire session as TERMINATING
 
 ### Kernel State Transitions
 
 Kernels follow these state transition paths:
 
 ```
-PREPARING → PULLING → RUNNING → TERMINATING → TERMINATED
+SCHEDULED → PREPARING → PULLING → PREPARED → CREATING → RUNNING → TERMINATING → TERMINATED
    ↓
 CANCELLED
 ```
@@ -689,22 +728,32 @@ CANCELLED
 
 | Current State | Next State | Transition Trigger | Responsible Component | Failure Handling | Retry Policy |
 |----------|----------|------------|--------------|------------|------------|
-| PREPARING | PULLING | Agent RPC success, image pulling started | Scheduler | CANCELLED | 3 retries |
-| PULLING | RUNNING | Image pulling complete, container started | Agent → Event | CANCELLED | Reschedule |
-| PREPARING | CANCELLED | Cancellation request before start | KernelStateEngine | - | - |
-| PULLING | CANCELLED | Cancellation request during pulling | KernelStateEngine | - | - |
+| SCHEDULED | PREPARING | Session scheduled, kernel allocated | Scheduler | - | - |
+| PREPARING | PULLING | Image pull RPC triggered | Scheduler | CANCELLED | 3 retries |
+| PULLING | PREPARED | Image pulling complete | Agent → Event | CANCELLED | Reschedule |
+| PREPARED | CREATING | Kernel creation RPC started | Scheduler | CANCELLED | 3 retries |
+| CREATING | RUNNING | Container created and started | Agent → Event | CANCELLED | Reschedule |
+| SCHEDULED | CANCELLED | Cancellation request before image pull | KernelStateEngine | - | - |
+| PREPARING | CANCELLED | Cancellation request during image pull trigger | KernelStateEngine | - | - |
+| PULLING | CANCELLED | Cancellation request during image pulling | KernelStateEngine | - | - |
+| PREPARED | CANCELLED | Cancellation request before kernel creation | KernelStateEngine | - | - |
+| CREATING | CANCELLED | Cancellation request during kernel creation | KernelStateEngine | - | - |
 | RUNNING | TERMINATING | Termination RPC called | Scheduler | - | - |
 | TERMINATING | TERMINATED | Container cleanup complete | Agent → Event | - | Force terminate |
 
 **Retry Policies:**
 
-**PREPARING stage failure** (kernel creation RPC failure):
+**PREPARING stage failure** (image pull trigger RPC failure):
 - Up to 3 retries in same stage
 - After 3 failures: Return session to PENDING state for rescheduling (attempt assignment to different agent)
 
 **PULLING stage failure** (image pulling failure):
 - Up to 3 retries in same stage
 - After 3 failures: Return session to PENDING state for rescheduling
+
+**CREATING stage failure** (kernel creation RPC failure):
+- Up to 3 retries in same stage
+- After 3 failures: Return session to PENDING state for rescheduling (attempt assignment to different agent)
 
 **PENDING timeout**:
 - Automatically transition to CANCELLED state if not scheduled within configured time
@@ -795,8 +844,8 @@ CANCELLED
 3. Manually clean up session if necessary
 
 ## Parent Document
-- [Sokovan Overall Architecture](../README.ko.md)
+- [Sokovan Overall Architecture](../README.md)
 
 ## Related Documents
-- [Deployment Architecture](../deployment/README.ko.md)
-- [SchedulingController Architecture](../scheduling_controller/README.ko.md)
+- [Deployment Architecture](../deployment/README.md)
+- [SchedulingController Architecture](../scheduling_controller/README.md)

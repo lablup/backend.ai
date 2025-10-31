@@ -301,7 +301,8 @@ Optional infrastructure for Agent monitoring.
   - Monitor agent resource utilization
   - Collect kernel (container) metrics
   - Track heartbeat and health status
-- **Exposed Endpoint**: `http://localhost:6009/metrics`
+- **HTTP Service Port**: 6003 (separate from RPC port 6011)
+- **Exposed Endpoint**: `http://localhost:6003/metrics`
 - **Key Metrics**:
   - `backendai_agent_heartbeat` - Last heartbeat timestamp
   - `backendai_agent_cpu_usage` - CPU usage percentage
@@ -377,58 +378,281 @@ Agent exposes metrics:
 #### RPC Related Metrics
 Metrics related to processing RPC commands received from Manager.
 
-- `backendai_rpc_requests_total`: Total RPC requests
-  - Labels: method
-  - Tracks processing frequency by Manager command type
+**`backendai_rpc_requests`** (Counter)
+- **Description**: Total RPC requests processed by the agent
+- **Labels**:
+  - `method`: RPC method name (e.g., "create_kernel", "destroy_kernel", "execute_code")
+- Tracks processing frequency by Manager command type
 
-- `backendai_rpc_failure_requests_total`: Failed RPC requests
-  - Labels: method, exception
-  - Analyzes RPC command processing failure causes
+**`backendai_rpc_failure_requests`** (Counter)
+- **Description**: Failed RPC request count
+- **Labels**:
+  - `method`: RPC method name that failed
+  - `exception`: Exception class name (e.g., "ContainerNotFound", "ResourceExhausted")
+- Analyzes RPC command processing failure causes
 
-- `backendai_rpc_request_duration_seconds`: RPC request processing time (seconds)
-  - Labels: method
-  - Measures performance of RPC commands like kernel creation/deletion
+**`backendai_rpc_request_duration_seconds`** (Histogram)
+- **Description**: RPC request processing time in seconds
+- **Labels**:
+  - `method`: RPC method name
+- **Buckets**: [0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30, 60] seconds
+- Measures performance of RPC commands like kernel creation/deletion
 
 #### Resource Utilization Metrics
 Metrics related to container and hardware resource usage.
 
-- `backendai_container_utilization`: Container resource utilization
-  - Labels: container_metric_name, agent_id, kernel_id, session_id, user_id, project_id, value_type
-  - Tracks resource usage per kernel (CPU, memory, GPU, etc.)
+**`backendai_container_utilization`** (Gauge)
+- **Description**: Container resource utilization per kernel
+- **Labels**:
+  - `container_metric_name`: Metric type (cpu_used, cpu_util, mem, cuda_mem, cuda_util, net_rx, net_tx)
+  - `agent_id`: Agent identifier
+  - `kernel_id`: Kernel identifier (Backend.AI's container wrapper, not the actual container ID)
+  - `session_id`: Session identifier
+  - `user_id`: User UUID who owns the session
+  - `project_id`: Project UUID that the session belongs to
+  - `value_type`: Value interpretation (current, capacity, pct)
+- Tracks resource usage per kernel (CPU, memory, GPU, network, etc.)
 
-- `backendai_device_utilization`: Physical device utilization
-  - Labels: device_metric_name, agent_id, device_id, value_type
-  - Tracks hardware device usage (GPU, NPU, etc.) on agent node
+**`backendai_device_utilization`** (Gauge)
+- **Description**: Physical device utilization on the agent node
+- **Labels**:
+  - `device_metric_name`: Metric type (cpu_util, mem, cuda_mem, cuda_util, cuda_temp, cuda_power)
+  - `agent_id`: Agent identifier
+  - `device_id`: Hardware device identifier (e.g., GPU index)
+  - `value_type`: Value interpretation (current, capacity, pct)
+- Tracks hardware device usage (GPU, CPU, memory) on the agent node
 
 #### Container Lifecycle Synchronization Metrics
-Metrics related to container state synchronization operations.
+Metrics related to container state synchronization operations between Manager and Agent.
 
-- `backendai_sync_container_lifecycle_trigger_count`: Synchronization trigger count
-  - Labels: agent_id
-  - Frequency of container state synchronization between Manager and Agent
+**`backendai_sync_container_lifecycle_trigger_count`** (Counter)
+- **Description**: Number of times container lifecycle sync was triggered
+- **Labels**:
+  - `agent_id`: Agent identifier
+- Frequency of container state synchronization between Manager and Agent
 
-- `backendai_sync_container_lifecycle_success_count`: Synchronization success count
-  - Labels: agent_id
-  - Number of successfully synchronized kernels
+**`backendai_sync_container_lifecycle_success_count`** (Counter)
+- **Description**: Number of successfully synchronized containers
+- **Labels**:
+  - `agent_id`: Agent identifier
+- Number of successfully synchronized kernels
 
-- `backendai_sync_container_lifecycle_failure_count`: Synchronization failure count
-  - Labels: agent_id, exception
-  - Tracks synchronization failure causes
+**`backendai_sync_container_lifecycle_failure_count`** (Counter)
+- **Description**: Number of failed container synchronization attempts
+- **Labels**:
+  - `agent_id`: Agent identifier
+  - `exception`: Exception class name causing the failure
+- Tracks synchronization failure causes
 
 #### Statistics Collection Task Metrics
 Metrics related to node, container, and process level statistics collection.
 
-- `backendai_stat_task_trigger_count`: Statistics collection trigger count
-  - Labels: agent_id, stat_scope
-  - Collection frequency by Node/Container/Process level
+**`backendai_stat_task_trigger_count`** (Counter)
+- **Description**: Number of times statistics collection was triggered
+- **Labels**:
+  - `agent_id`: Agent identifier
+  - `stat_scope`: Statistics scope (node, container, process)
+- Collection frequency by Node/Container/Process level
 
-- `backendai_stat_task_success_count`: Statistics collection success count
-  - Labels: agent_id, stat_scope
-  - Tracks statistics collection success rate
+**`backendai_stat_task_success_count`** (Counter)
+- **Description**: Number of successful statistics collection operations
+- **Labels**:
+  - `agent_id`: Agent identifier
+  - `stat_scope`: Statistics scope (node, container, process)
+- Tracks statistics collection success rate
 
-- `backendai_stat_task_failure_count`: Statistics collection failure count
-  - Labels: agent_id, stat_scope, exception
-  - Analyzes statistics collection failure causes
+**`backendai_stat_task_failure_count`** (Counter)
+- **Description**: Number of failed statistics collection operations
+- **Labels**:
+  - `agent_id`: Agent identifier
+  - `stat_scope`: Statistics scope (node, container, process)
+  - `exception`: Exception class name causing the failure
+- Analyzes statistics collection failure causes
+
+### Prometheus Query Examples
+
+The following examples demonstrate common Prometheus queries for Agent metrics. Note that Counter metrics use the `_total` suffix and Histogram metrics use `_bucket`, `_sum`, `_count` suffixes in actual queries.
+
+**Important Notes:**
+- When using `increase()` or `rate()` functions, the time range must be at least 2-4x longer than your Prometheus scrape interval to get reliable data. If the time range is too short, metrics may not appear or show incomplete data.
+- Default Prometheus scrape interval is typically 15s-30s
+- **Time range selection trade-offs**:
+  - Shorter ranges (e.g., `[1m]`): Detect changes faster with more granular data, but more sensitive to noise and short-term fluctuations
+  - Longer ranges (e.g., `[5m]`): Smoother graphs with reduced noise, better for identifying trends, but slower to detect sudden changes
+  - For real-time alerting: Use shorter ranges like `[1m]` or `[2m]`
+  - For dashboards and trend analysis: Use longer ranges like `[5m]` or `[10m]`
+
+#### RPC Request Monitoring
+
+**RPC Request Rate by Method**
+
+Monitor RPC request rate by method. This shows how frequently the Manager sends commands to agents. Use this to understand agent workload and command distribution.
+
+```promql
+sum(rate(backendai_rpc_requests_total{service_group="$service_groups"}[5m])) by (method)
+```
+
+**RPC Failure Rate by Method**
+
+Track RPC failure rate by method and exception type. This helps identify which RPC operations are failing and why.
+
+```promql
+sum(rate(backendai_rpc_failure_requests_total{service_group="$service_groups"}[5m])) by (method, exception)
+```
+
+**P95 RPC Request Duration**
+
+Calculate P95 RPC request duration by method. This shows how long critical operations like kernel creation take. Use this to identify performance bottlenecks in agent operations.
+
+```promql
+histogram_quantile(0.95,
+  sum(rate(backendai_rpc_request_duration_seconds_bucket{service_group="$service_groups"}[5m])) by (le, method)
+)
+```
+
+#### Container Resource Utilization
+
+**Top 5 GPU Memory Usage by Kernel**
+
+Monitor GPU memory usage by kernel (top 5). This identifies kernels consuming the most GPU memory. Note: `topk` returns the top N items at each evaluation time. Over multiple time points, you may see more than 5 unique kernels if different kernels appear in the top 5 at different times.
+
+```promql
+topk(5, sum(backendai_container_utilization{container_metric_name="cuda_mem", value_type="current"}) by (kernel_id))
+```
+
+**Top 5 GPU Utilization by Kernel**
+
+Monitor GPU utilization by kernel (top 5). This shows which kernels are actively using GPU compute. Note: `topk` returns the top N items at each evaluation time. Over multiple time points, you may see more than 5 unique kernels if different kernels appear in the top 5 at different times.
+
+```promql
+topk(5, sum(backendai_container_utilization{container_metric_name="cuda_util", value_type="current"}) by (kernel_id))
+```
+
+**Top 5 CPU Utilization Increase by Kernel**
+
+Track CPU utilization increase rate by kernel (top 5). This shows CPU consumption trends over time. Note: Divided by 1000 to convert from per-mille to percentage. `topk` returns the top N items at each evaluation time. Over multiple time points, you may see more than 5 unique kernels if different kernels appear in the top 5 at different times.
+
+```promql
+topk(5, sum(increase(backendai_container_utilization{container_metric_name="cpu_util", value_type="current"}[5m])) by (kernel_id)) / 1000
+```
+
+**Network RX Traffic by Kernel**
+
+Monitor network RX (receive) traffic by kernel. This tracks inbound network bandwidth usage per container.
+
+```promql
+sum(increase(backendai_container_utilization{container_metric_name="net_rx", value_type="current"}[5m])) by (kernel_id)
+```
+
+**Network TX Traffic by Kernel**
+
+Monitor network TX (transmit) traffic by kernel. This tracks outbound network bandwidth usage per container.
+
+```promql
+sum(increase(backendai_container_utilization{container_metric_name="net_tx", value_type="current"}[5m])) by (kernel_id)
+```
+
+#### Device Utilization (Agent-level)
+
+**GPU Memory Usage by Agent**
+
+Monitor GPU memory usage at the agent level. This shows total GPU memory consumption on each agent node.
+
+```promql
+sum(backendai_device_utilization{device_metric_name="cuda_mem", value_type="current"}) by (agent_id)
+```
+
+**GPU Memory Capacity by Agent**
+
+Monitor GPU memory capacity. This shows the maximum available GPU memory on each agent.
+
+```promql
+sum(backendai_device_utilization{device_metric_name="cuda_mem", value_type="capacity"}) by (agent_id)
+```
+
+**GPU Utilization Percentage by Agent**
+
+Monitor GPU utilization percentage at the agent level. This shows overall GPU usage across all kernels on the agent.
+
+```promql
+sum(backendai_device_utilization{device_metric_name="cuda_util", value_type="current"}) by (agent_id)
+```
+
+**CPU Utilization Increase by Agent**
+
+Track CPU utilization increase rate at the agent level. This shows agent-wide CPU consumption trends.
+
+```promql
+sum(increase(backendai_device_utilization{device_metric_name="cpu_util", value_type="current"}[5m])) by (agent_id) / 1000
+```
+
+**Network RX Traffic by Agent**
+
+Monitor network RX (receive) traffic at the agent level. This tracks total inbound network bandwidth usage on each agent node.
+
+```promql
+sum(increase(backendai_device_utilization{device_metric_name="net_rx", value_type="current"}[5m])) by (agent_id)
+```
+
+**Network TX Traffic by Agent**
+
+Monitor network TX (transmit) traffic at the agent level. This tracks total outbound network bandwidth usage on each agent node.
+
+```promql
+sum(increase(backendai_device_utilization{device_metric_name="net_tx", value_type="current"}[5m])) by (agent_id)
+```
+
+#### Container Lifecycle Synchronization
+
+**Container Sync Trigger Frequency**
+
+Monitor container sync trigger frequency. This shows how often the agent synchronizes container state with the Manager.
+
+```promql
+sum(rate(backendai_sync_container_lifecycle_trigger_count_total[5m])) by (agent_id)
+```
+
+**Container Sync Success Rate**
+
+Track container sync success rate. This helps ensure containers are properly synchronized.
+
+```promql
+sum(rate(backendai_sync_container_lifecycle_success_count_total[5m])) by (agent_id)
+```
+
+**Container Sync Failure Rate**
+
+Monitor container sync failures. This identifies issues with container state synchronization.
+
+```promql
+sum(rate(backendai_sync_container_lifecycle_failure_count_total[5m])) by (agent_id, exception)
+```
+
+#### Statistics Collection
+
+**Statistics Collection Trigger Rate**
+
+Monitor statistics collection trigger rate by scope. This shows how frequently statistics are collected at different levels.
+
+```promql
+sum(rate(backendai_stat_task_trigger_count_total[5m])) by (agent_id, stat_scope)
+```
+
+**Statistics Collection Success Rate**
+
+Track statistics collection success rate. This ensures statistics collection is working properly.
+
+```promql
+sum(rate(backendai_stat_task_success_count_total[5m])) by (agent_id, stat_scope)
+```
+
+**Statistics Collection Failure Rate**
+
+Monitor statistics collection failures. This identifies issues with resource monitoring.
+
+```promql
+sum(rate(backendai_stat_task_failure_count_total[5m])) by (agent_id, stat_scope, exception)
+```
 
 ### Logs
 Agent logs include:
