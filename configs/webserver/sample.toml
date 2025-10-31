@@ -175,6 +175,22 @@
   # This limits the number of concurrent API requests that can be processed.
   connection_limit = 100
 
+# JWT authentication configuration (shared between manager and webserver via
+# etcd).
+#
+# Note: JWT tokens are signed using per-user secret keys (from keypair table),
+# not a shared system secret key. This maintains the same security model as HMAC
+# authentication.
+[jwt]
+  # Algorithm for JWT token signing.
+  # HS256 (HMAC-SHA256) is the default symmetric algorithm.
+  algorithm = "HS256"
+  # JWT token expiration time in seconds.
+  # Default is 900 seconds (15 minutes).
+  # Range: 60 seconds (1 minute) to 86400 seconds (24 hours).
+  # Shorter expiration times are more secure but may impact user experience.
+  token_expiration_seconds = 900
+
 [session]
   # Session maximum age in seconds.
   max_age = 604800
@@ -246,7 +262,10 @@
   valid_until = ""
 
 [webserver]
-  # Event loop type.
+  # Event loop implementation to use.
+  # 'asyncio' is the Python standard library implementation.
+  # 'uvloop' is a faster alternative but may have compatibility issues with some
+  # libraries.
   event_loop = "uvloop"
   # IPC base path.
   ipc_base_path = "/tmp/backend.ai/ipc"
