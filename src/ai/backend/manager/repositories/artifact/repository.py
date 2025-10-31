@@ -160,6 +160,19 @@ class ArtifactRepository:
         return await self._db_source.update_artifact_revision_bytesize(artifact_revision_id, size)
 
     @artifact_repository_resilience.apply()
+    async def update_artifact_revision_digest(
+        self, artifact_revision_id: uuid.UUID, digest: str
+    ) -> uuid.UUID:
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(digest=digest)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    @artifact_repository_resilience.apply()
     async def update_artifact_revision_readme(
         self, artifact_revision_id: uuid.UUID, readme: str
     ) -> uuid.UUID:

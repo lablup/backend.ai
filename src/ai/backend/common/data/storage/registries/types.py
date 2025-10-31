@@ -154,3 +154,11 @@ class ModelData(BaseModel):
         """,
         examples=[2048000, 512000000],
     )
+    sha: Optional[str] = Field(
+        default=None,
+        description="""
+        Git commit hash (SHA) of the specific model revision.
+        Used to track changes and ensure model version consistency.
+        """,
+        examples=["607a30d783dfa663caf39e06633721c8d4cfcd7e", "abc123def456", None],
+    )

@@ -279,6 +279,7 @@ class ArtifactService:
                                 remote_status=remote_status,
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
+                                digest=response_revision.digest,
                             )
                             full_revisions.append(full_revision)
 
@@ -452,6 +453,7 @@ class ArtifactService:
                                 remote_status=remote_status,
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
+                                digest=response_revision.digest,
                             )
                             full_revisions.append(full_revision)
 
@@ -773,6 +775,7 @@ class ArtifactService:
                     remote_status=remote_status,
                     created_at=response_revision.created_at,
                     updated_at=response_revision.updated_at,
+                    digest=response_revision.digest,
                 )
                 full_revisions.append(full_revision)
 
