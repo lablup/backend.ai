@@ -325,7 +325,7 @@ TOrderField = TypeVar("TOrderField", bound=StrEnum)
 TOrderingOptions = TypeVar("TOrderingOptions")
 
 
-class BaseMinilangOrderParser(ABC, Generic[TOrderField, TOrderingOptions]):
+class BaseMinilangOrderConverter(ABC, Generic[TOrderField, TOrderingOptions]):
     """
     Abstract base class for parsing order expressions into OrderingOption objects.
 
