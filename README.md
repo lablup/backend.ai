@@ -334,6 +334,27 @@ Build Python wheels or SCIE (Self-Contained Installable Executables):
 
 Packages are placed in `dist/` directory.
 
+### Code Quality Hooks
+
+Backend.AI uses Git pre-commit hooks to maintain code quality:
+
+```bash
+# Automatically runs on every commit:
+# - Linting (pants lint)
+# - Type checking (pants check)
+
+# Bypass hooks if needed (use sparingly)
+git commit --no-verify
+```
+
+The pre-commit hook validates:
+- Code style and formatting
+- Type annotations
+
+Tests run in CI for comprehensive coverage.
+
+See [CLAUDE.md](CLAUDE.md#hooks-and-code-quality) for detailed hook system documentation.
+
 ### Development Guide
 
 For detailed development setup, build system usage, and contribution guidelines:
