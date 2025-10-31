@@ -368,6 +368,7 @@
       "DownloadingModel": "Mô hình tải xuống ...",
       "Edit": "Biên tập",
       "EditDelete": "Chỉnh sửa + Xóa",
+      "ExcludedFolders": "Các thư mục sau đây sẽ bị loại trừ vì không có quyền xóa.",
       "FileDeleted": "Tệp đã Xóa",
       "FileRenamed": "Tệp được đổi tên",
       "FolderCloneFailed": "Không sao chép được thư mục.",

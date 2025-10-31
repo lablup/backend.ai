@@ -370,6 +370,7 @@
       "DownloadingModel": "모델을 내려받는 중...",
       "Edit": "수정",
       "EditDelete": "수정 및 삭제",
+      "ExcludedFolders": "삭제 권한이 없는 다음 폴더는 제외됩니다.",
       "FileDeleted": "파일이 삭제되었습니다",
       "FileRenamed": "파일명이 변경되었습니다",
       "FolderCloneFailed": "폴더 복제에 실패했습니다.",

@@ -367,6 +367,7 @@
       "DownloadingModel": "Modello di download ...",
       "Edit": "modificare",
       "EditDelete": "Modifica+Cancella",
+      "ExcludedFolders": "Le seguenti cartelle senza permesso di eliminazione saranno escluse.",
       "FileDeleted": "File eliminato",
       "FileRenamed": "File rinominato",
       "FolderCloneFailed": "Non è stato possibile clonare la cartella.",

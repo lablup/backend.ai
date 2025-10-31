@@ -368,6 +368,7 @@
       "DownloadingModel": "Modelo de download ...",
       "Edit": "Editar",
       "EditDelete": "Editar + Excluir",
+      "ExcludedFolders": "As seguintes pastas sem permissão de exclusão serão excluídas.",
       "FileDeleted": "Arquivo excluído",
       "FileRenamed": "Arquivo renomeado",
       "FolderCloneFailed": "Falha ao clonar a pasta.",

@@ -367,6 +367,7 @@
       "DownloadingModel": "Mengunduh model ...",
       "Edit": "Sunting",
       "EditDelete": "Sunting+Hapus",
+      "ExcludedFolders": "Folder berikut yang tidak memiliki izin hapus akan dikecualikan.",
       "FileDeleted": "File sudah dihapus",
       "FileRenamed": "File sudah diganti nama",
       "FolderCloneFailed": "Gagal mengkloning folder.",

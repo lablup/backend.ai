@@ -368,6 +368,7 @@
       "DownloadingModel": "Latausmalli ...",
       "Edit": "Muokkaa",
       "EditDelete": "Muokkaa+Poista",
+      "ExcludedFolders": "Seuraavat kansiot ilman poistooikeutta jätetään pois.",
       "FileDeleted": "Tiedosto poistettu",
       "FileRenamed": "Tiedosto nimetty uudelleen",
       "FolderCloneFailed": "Kansiota ei onnistuttu kloonaamaan.",
