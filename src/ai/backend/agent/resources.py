@@ -29,6 +29,11 @@ from typing import (
 import aiodocker
 import attrs
 
+from ai.backend.agent.config.unified import (
+    CommonResourceConfig,
+    ResourceAllocationMode,
+    ResourceConfig,
+)
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
@@ -306,7 +311,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         Return extra information related to this plugin,
         such as the underlying driver version and feature flags.
         """
-        return {}
+        raise NotImplementedError
 
     @abstractmethod
     async def gather_node_measures(self, ctx: StatContext) -> Sequence[NodeMeasurement]:
@@ -356,7 +361,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
                            "alpine3.8"
         :param str arch: The target CPU architecture such as "amd64"
         """
-        return []
+        raise NotImplementedError
 
     @abstractmethod
     async def generate_docker_args(
@@ -369,14 +374,14 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         docker container create API as a dictionary, referring the given allocation
         map.  The agent will merge it with its own options.
         """
-        return {}
+        raise NotImplementedError
 
     async def generate_resource_data(self, device_alloc: DeviceAllocation) -> Mapping[str, str]:
         """
         Generate extra resource.txt key-value pair sets to be used by the plugin's
         own hook libraries in containers.
         """
-        return {}
+        raise NotImplementedError
 
     @abstractmethod
     async def restore_from_container(
@@ -388,7 +393,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         When the agent restarts, retore the allocation map from the container
         metadata dictionary fetched from aiodocker.
         """
-        pass
+        raise NotImplementedError
 
     @abstractmethod
     async def get_attached_devices(
@@ -398,7 +403,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         """
         Make up container-attached device information with allocated device id.
         """
-        return []
+        raise NotImplementedError
 
     async def get_node_hwinfo(self) -> HardwareMetadata:
         raise NotImplementedError
@@ -412,7 +417,7 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         Returns reference string (e.g. Id, name, ...) of docker networks
         to attach to container for accelerator to work properly.
         """
-        return []
+        raise NotImplementedError
 
     @abstractmethod
     async def generate_mounts(
@@ -425,14 +430,14 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         to mount to container and returns `MountInfo`.
         Agent will then read this `MountInfo`s and mount files/directories.
         """
-        return []
+        raise NotImplementedError
 
     def get_additional_gids(self) -> list[int]:
         """
         Override this function to pass the additional GIDs the 'work' user will belong to in the container.
         This is useful when the accelerator plugin assumes that the 'work' is part of a specific group.
         """
-        return []
+        raise NotImplementedError
 
     def get_additional_allowed_syscalls(self) -> list[str]:
         """
@@ -441,7 +446,143 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
 
         e.g., ["io_uring_enter", "io_uring_setup", "io_uring_register"] for enabling io_uring in the container.
         """
-        return []
+        raise NotImplementedError
+
+
+class ResourcePartitioner:
+    def __init__(
+        self,
+        resource_config: ResourceConfig,
+        num_agents: int,
+        agent_idx: int,
+    ) -> None:
+        self.resource_config = resource_config
+        self.num_agents = num_agents
+        self.agent_idx = agent_idx
+
+    @staticmethod
+    def calculate_total_slots(
+        computers: Mapping[DeviceName, ComputerContext],
+        resource_config: CommonResourceConfig,
+        deduct_reserved: bool = False,
+    ) -> Mapping[SlotName, Decimal]:
+        total_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))
+        for device in computers.values():
+            for slot_info in device.alloc_map.device_slots.values():
+                total_slots[slot_info.slot_name] += slot_info.amount
+        if deduct_reserved:
+            return ResourcePartitioner.deduct_reserved_resources(total_slots, resource_config)
+        else:
+            return total_slots
+
+    @staticmethod
+    def deduct_reserved_resources(
+        total_slots: Mapping[SlotName, Decimal],
+        resource_config: CommonResourceConfig,
+    ) -> Mapping[SlotName, Decimal]:
+        reserved_resources = {
+            SlotName("cpu"): Decimal(resource_config.reserved_cpu),
+            SlotName("mem"): Decimal(resource_config.reserved_mem),
+            SlotName("disk"): Decimal(resource_config.reserved_disk),
+        }
+
+        slots: dict[SlotName, Decimal] = {}
+        for slot_name, slot in total_slots.items():
+            slots[slot_name] = slot - reserved_resources.get(slot_name, Decimal("0"))
+        return slots
+
+    def restrict_computer_resources(
+        self,
+        computers: MutableMapping[DeviceName, ComputerContext],
+        total_slots: Mapping[SlotName, Decimal],
+    ) -> Mapping[SlotName, Decimal]:
+        reserved_slots: dict[SlotName, Decimal] = {}
+        for device in computers.values():
+            device_slots = self._calculate_device_slots(device.alloc_map, total_slots)
+            self._update_alloc_map(device.alloc_map, device_slots)
+
+            device_reserved_slots = self._calculate_reserved_slots(device_slots, total_slots)
+            reserved_slots = {**reserved_slots, **device_reserved_slots}
+        return reserved_slots
+
+    def _calculate_device_slots(
+        self,
+        alloc_map: AbstractAllocMap,
+        total_slots: Mapping[SlotName, Decimal],
+    ) -> Mapping[SlotName, Decimal]:
+        total_slots_no_reserved = ResourcePartitioner.deduct_reserved_resources(
+            total_slots, self.resource_config
+        )
+        return {
+            device_slot.slot_name: self._calculate_device_slot(
+                device_slot.slot_name,
+                total_slots_no_reserved[device_slot.slot_name],
+                type(alloc_map),
+            )
+            for device_slot in alloc_map.device_slots.values()
+        }
+
+    def _calculate_device_slot(
+        self,
+        slot_name: SlotName,
+        total_slot: Decimal,
+        alloc_map_type: Type[AbstractAllocMap],
+    ) -> Decimal:
+        match self.resource_config.allocation_mode:
+            case ResourceAllocationMode.SHARED:
+                return total_slot
+            case ResourceAllocationMode.AUTO_SPLIT:
+                if alloc_map_type is DiscretePropertyAllocMap:
+                    slot, slot_extra = divmod(total_slot, self.num_agents)
+                    remainder_value = 1 if self.agent_idx < slot_extra else 0
+                    return slot + remainder_value
+                elif alloc_map_type is FractionAllocMap:
+                    return total_slot / self.num_agents
+                else:
+                    raise NotImplementedError(
+                        f"Unrecognized AbstractAllocMap type {alloc_map_type}"
+                    )
+            case ResourceAllocationMode.MANUAL:
+                match slot_name:
+                    case "cpu":
+                        assert self.resource_config.allocated_cpu is not None
+                        return Decimal(self.resource_config.allocated_cpu)
+                    case "mem":
+                        assert self.resource_config.allocated_mem is not None
+                        return Decimal(self.resource_config.allocated_mem)
+                    case "disk":
+                        assert self.resource_config.allocated_disk is not None
+                        return Decimal(self.resource_config.allocated_disk)
+                    case slot_name:
+                        if slot_name not in self.resource_config.allocated_devices:
+                            raise ValueError(
+                                f"{slot_name=} not found in config {self.resource_config.allocated_devices!r}"
+                            )
+                        return self.resource_config.allocated_devices[slot_name]
+
+    def _update_alloc_map(
+        self,
+        alloc_map: AbstractAllocMap,
+        device_slots: Mapping[SlotName, Decimal],
+    ) -> None:
+        updated_device_slots: dict[DeviceId, DeviceSlotInfo] = {}
+        for device_id, slot_info in alloc_map.device_slots.items():
+            updated_device_slots[device_id] = DeviceSlotInfo(
+                slot_type=slot_info.slot_type,
+                slot_name=slot_info.slot_name,
+                amount=device_slots[slot_info.slot_name],
+            )
+        alloc_map.device_slots = updated_device_slots
+
+    def _calculate_reserved_slots(
+        self,
+        device_slots: Mapping[SlotName, Decimal],
+        total_slots: Mapping[SlotName, Decimal],
+    ) -> Mapping[SlotName, Decimal]:
+        reserved_slots: dict[SlotName, Decimal] = {}
+        for slot_name, slot in device_slots.items():
+            reserved_slots[slot_name] = max(total_slots[slot_name] - slot, Decimal(0))
+        return reserved_slots
 
 
 class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):

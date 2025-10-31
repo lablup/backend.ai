@@ -15,6 +15,7 @@ import traceback
 from collections import OrderedDict, defaultdict
 from collections.abc import AsyncIterator, Iterator
 from contextlib import AsyncExitStack, asynccontextmanager
+from decimal import Decimal
 from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
@@ -113,6 +114,7 @@ from ai.backend.common.types import (
     QueueSentinel,
     ServiceDiscoveryType,
     SessionId,
+    SlotName,
     aobject,
 )
 from ai.backend.common.utils import current_loop
@@ -128,10 +130,12 @@ from .config.unified import (
     ContainerLogsConfig,
     EventLoopType,
     KernelLifecyclesConfig,
+    ResourceAllocationMode,
 )
 from .exception import ResourceError
 from .kernel import AbstractKernel
 from .monitor import AgentErrorPluginContext, AgentStatsPluginContext
+from .resources import ResourcePartitioner
 from .types import (
     AgentBackend,
     KernelLifecycleStatus,
@@ -447,6 +451,7 @@ class AgentRPCServer(aobject):
         agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
         agent_cls: Type[AbstractAgent] = agent_mod.get_agent_cls()
         async with asyncio.TaskGroup() as tg:
+            num_agents = len(agent_configs)
             tasks = [
                 tg.create_task(
                     agent_cls.new(
@@ -455,11 +460,18 @@ class AgentRPCServer(aobject):
                         stats_monitor=self.stats_monitors[agent_id],
                         error_monitor=self.error_monitors[agent_id],
                         agent_public_key=self.rpc_auth_agent_public_key,
+                        resource_partitioner=ResourcePartitioner(
+                            agent_config.resource,
+                            num_agents,
+                            agent_idx,
+                        ),
                     )
                 )
-                for agent_id, agent_config in agent_configs.items()
+                for agent_idx, (agent_id, agent_config) in enumerate(agent_configs.items())
             ]
         self.agents = {(agent := task.result()).id: agent for task in tasks}
+
+        self._reconcile_agent_device_resources()
 
         if backend == AgentBackend.DOCKER:
             from .docker.agent import DockerAgent
@@ -527,6 +539,37 @@ class AgentRPCServer(aobject):
         async with asyncio.TaskGroup() as tg:
             for agent_id in self.agents:
                 tg.create_task(self.update_status("running", agent_id))
+
+    def _reconcile_agent_device_resources(self) -> None:
+        agents_slots = [
+            set(
+                slot_info.slot_name
+                for computer in agent.computers.values()
+                for slot_info in computer.alloc_map.device_slots.values()
+            )
+            for agent in self.agents.values()
+        ]
+        if not all(agent_slots == agents_slots[0] for agent_slots in agents_slots):
+            raise ValueError("Agents on same runtime see different device slots")
+
+        if self.local_config.resource_common.allocation_mode == ResourceAllocationMode.MANUAL:
+            allocated_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal(0))
+            for agent in self.agents.values():
+                for computer in agent.computers.values():
+                    for slot_info in computer.alloc_map.device_slots.values():
+                        allocated_slots[slot_info.slot_name] += slot_info.amount
+
+            total_slots = ResourcePartitioner.deduct_reserved_resources(
+                self.get_agent(None).total_slots,
+                self.local_config.resource_common,
+            )
+
+            for slot_name, allocated_slot in allocated_slots.items():
+                if total_slots[slot_name] < allocated_slot:
+                    raise ValueError(
+                        f"Resource slot {slot_name} was manually allocated {allocated_slot} across "
+                        f"all agents when total capacity is {total_slots[slot_name]}."
+                    )
 
     async def status_snapshot_request_handler(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
