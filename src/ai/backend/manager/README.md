@@ -1,5 +1,7 @@
 # Backend.AI Manager
 
+← [Back to Architecture Overview](../README.md#manager)
+
 ## Purpose
 
 The Manager is the central orchestrator of the Backend.AI cluster. It schedules computing sessions (sessions and kernels), allocates resources, manages the lifecycle of sessions, and provides API gateway functionality through REST and GraphQL interfaces.
@@ -843,9 +845,19 @@ sum(rate(backendai_sweep_kernel_count_total[5m])) by (success)
 
 See [README.md](./README.md) for development setup instructions.
 
-## Related Documentation
+## Manager Architecture Documentation
 
-- [Session Scheduling](./scheduler/README.md) - Session scheduling algorithms and policies
-- [Agent Component](../agent/README.md) - Agent component
-- [Storage Proxy Component](../storage/README.md) - Storage proxy component
-- [Overall Architecture](../README.md) - System-wide architecture
+### Internal Architecture
+- **[Sokovan Orchestration System](./sokovan/README.md)**: Session scheduling orchestrator with 3-tier architecture
+  - [Scheduler](./sokovan/scheduler/README.md): Core scheduling engine for session placement and resource allocation
+  - [Scheduling Controller](./sokovan/scheduling_controller/README.md): Validation and preparation logic for scheduling
+  - [Deployment Controller](./sokovan/deployment/README.md): Deployment lifecycle management
+- **[Services Layer](./services/README.md)**: Business logic patterns, design principles, and implementation guidelines
+- **[Repositories Layer](./repositories/README.md)**: Data access patterns, query optimization, and transaction management
+- **[Actions Layer](./actions/README.md)**: Permission validation, monitoring, and request handling
+
+### Related Components
+- [Agent Component](../agent/README.md): Kernel lifecycle management on compute nodes
+- [Storage Proxy Component](../storage/README.md): Virtual folder and storage backend management
+- [Webserver Component](../web/README.md): Web UI hosting and session management
+- [Overall Architecture](../README.md): System-wide architecture and component interactions

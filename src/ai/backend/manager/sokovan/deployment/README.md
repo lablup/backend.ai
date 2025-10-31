@@ -1,5 +1,7 @@
 # Deployment
 
+← [Back to Sokovan](../README.md#sokovan-component-documentation) | [Manager](../../README.md#manager-architecture-documentation) | [Architecture Overview](../../../README.md#manager)
+
 ## Overview
 
 Deployment is Backend.AI's deployment management system that handles deployment, scaling, and routing of various services including model serving (vLLM, TGI, SGLang, etc.).

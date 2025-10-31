@@ -1,5 +1,7 @@
 # Scheduler
 
+← [Back to Sokovan](../README.md#sokovan-component-documentation) | [Manager](../../README.md#manager-architecture-documentation) | [Architecture Overview](../../../README.md#manager)
+
 ## Overview
 
 Scheduler is the core module responsible for session scheduling in Backend.AI, allocating pending sessions to appropriate agents and managing the entire lifecycle of sessions.

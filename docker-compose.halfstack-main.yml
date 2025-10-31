@@ -32,7 +32,7 @@ services:
       - "9187:9187"
 
   backendai-half-redis:
-    image: redis:7.2.4-alpine
+    image: redis:7.2.11-alpine
     restart: unless-stopped
     networks:
       - half
@@ -168,7 +168,7 @@ services:
       - "4317" # otlp grpc
 
   backendai-half-apollo-router:
-    image: ghcr.io/graphql-hive/gateway:latest
+    image: ghcr.io/graphql-hive/gateway:2.1.12
     restart: unless-stopped
     networks:
       - half
