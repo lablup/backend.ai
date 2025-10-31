@@ -17,6 +17,8 @@ from ai.backend.common.api_handlers import (
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.dto.storage.request import (
+    HuggingFaceGetCommitHashReqPathParam,
+    HuggingFaceGetCommitHashReqQueryParam,
     HuggingFaceImportModelsReq,
     HuggingFaceRetrieveModelReqPathParam,
     HuggingFaceRetrieveModelReqQueryParam,
@@ -24,6 +26,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceScanModelsReq,
 )
 from ai.backend.common.dto.storage.response import (
+    HuggingFaceGetCommitHashResponse,
     HuggingFaceImportModelsResponse,
     HuggingFaceRetrieveModelResponse,
     HuggingFaceRetrieveModelsResponse,
@@ -161,6 +164,35 @@ class HuggingFaceRegistryAPIHandler:
         )
 
     @api_handler
+    async def get_commit_hash(
+        self,
+        path: PathParam[HuggingFaceGetCommitHashReqPathParam],
+        query: QueryParam[HuggingFaceGetCommitHashReqQueryParam],
+    ) -> APIResponse:
+        """
+        Get the commit hash for a specific HuggingFace model revision.
+        """
+        await log_client_api_entry(log, "get_commit_hash", path.parsed.model_id)
+
+        model_id = unquote(path.parsed.model_id)
+        commit_hash = await self._huggingface_service.get_model_commit_hash(
+            registry_name=query.parsed.registry_name,
+            model=ModelTarget(
+                model_id=model_id,
+                revision=query.parsed.revision,
+            ),
+        )
+
+        response = HuggingFaceGetCommitHashResponse(
+            commit_hash=commit_hash,
+        )
+
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=response,
+        )
+
+    @api_handler
     async def import_models(
         self,
         body: BodyParam[HuggingFaceImportModelsReq],
@@ -226,5 +258,8 @@ def create_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/import", huggingface_api_handler.import_models)
 
     app.router.add_route("GET", "/model/{model_id}", huggingface_api_handler.retrieve_model)
+    app.router.add_route(
+        "GET", "/model/{model_id}/commit-hash", huggingface_api_handler.get_commit_hash
+    )
     app.router.add_route("POST", "/models/batch", huggingface_api_handler.retrieve_models)
     return app

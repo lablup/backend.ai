@@ -123,6 +123,18 @@ class HuggingFaceImportModelsResponse(BaseResponseModel):
     )
 
 
+class HuggingFaceGetCommitHashResponse(BaseResponseModel):
+    """Response for getting HuggingFace model commit hash."""
+
+    commit_hash: Optional[str] = Field(
+        description="""
+        The commit hash (SHA) for the specific model revision.
+        Returns null if commit hash is not available.
+        """,
+        examples=["607a30d783dfa663caf39e06633721c8d4cfcd7e", None],
+    )
+
+
 class ReservoirImportModelsResponse(BaseResponseModel):
     """Response for Reservoir batch model import operation."""
 

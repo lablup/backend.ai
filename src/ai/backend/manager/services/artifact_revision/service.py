@@ -7,6 +7,8 @@ from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
+    HuggingFaceGetCommitHashReqPathParam,
+    HuggingFaceGetCommitHashReqQueryParam,
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
 )
@@ -19,7 +21,6 @@ from ai.backend.manager.config.unified import (
     ReservoirVFSStorageConfig,
 )
 from ai.backend.manager.data.artifact.types import (
-    ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionReadme,
     ArtifactStatus,
@@ -236,9 +237,6 @@ class ArtifactRevisionService:
         self, action: ImportArtifactRevisionAction
     ) -> ImportArtifactRevisionActionResult:
         try:
-            await self._artifact_repository.update_artifact_revision_status(
-                action.artifact_revision_id, ArtifactStatus.PULLING
-            )
             revision_data = await self._artifact_repository.get_artifact_revision_by_id(
                 action.artifact_revision_id
             )
@@ -265,6 +263,30 @@ class ArtifactRevisionService:
                         artifact.id
                     )
 
+                    # Check current commit hash for this revision
+                    commit_hash_resp = await storage_proxy_client.get_huggingface_model_commit_hash(
+                        path=HuggingFaceGetCommitHashReqPathParam(
+                            model_id=artifact.name,
+                        ),
+                        query=HuggingFaceGetCommitHashReqQueryParam(
+                            revision=revision_data.version,
+                            registry_name=huggingface_registry_data.name,
+                        ),
+                    )
+                    latest_commit_hash = commit_hash_resp.commit_hash
+
+                    # Skip import if artifact revision is already Available and commit hash matches
+                    # If current_commit_hash is None, always proceed with import
+                    if self._is_latest_commit_hash(revision_data, latest_commit_hash):
+                        # Return early without calling import API
+                        return ImportArtifactRevisionActionResult(
+                            result=revision_data, task_id=None
+                        )
+
+                    await self._artifact_repository.update_artifact_revision_status(
+                        action.artifact_revision_id, ArtifactStatus.PULLING
+                    )
+
                     huggingface_result = await storage_proxy_client.import_huggingface_models(
                         HuggingFaceImportModelsReq(
                             models=[
@@ -280,6 +302,10 @@ class ArtifactRevisionService:
                         await self._reservoir_registry_repository.get_registry_data_by_artifact_id(
                             artifact.id
                         )
+                    )
+
+                    await self._artifact_repository.update_artifact_revision_status(
+                        action.artifact_revision_id, ArtifactStatus.PULLING
                     )
 
                     result = await storage_proxy_client.import_reservoir_models(
@@ -422,7 +448,7 @@ class ArtifactRevisionService:
                     import_result = await self.import_revision(
                         ImportArtifactRevisionAction(artifact_revision_id=revision_id)
                     )
-                    task_ids.append(import_result.task_id)
+                    task_ids.append(import_result.task_id)  # Keep None values for zip alignment
                     result.append(import_result.result)
             except Exception as e:
                 raise RemoteReservoirArtifactImportError(
@@ -450,9 +476,6 @@ class ArtifactRevisionService:
         # Update remote_status to SCANNED for all revisions before delegation
         result_revisions: list[ArtifactRevisionData] = []
         for revision_id in action.artifact_revision_ids:
-            await self._artifact_repository.update_artifact_revision_remote_status(
-                revision_id, ArtifactRemoteStatus.SCANNED
-            )
             revision_data = await self._artifact_repository.get_artifact_revision_by_id(revision_id)
             result_revisions.append(revision_data)
 
@@ -470,11 +493,8 @@ class ArtifactRevisionService:
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
         client_resp = await remote_reservoir_client.delegate_import_artifacts(req)
 
-        if client_resp is None:
-            raise RemoteReservoirArtifactImportError("Failed to connect to remote reservoir")
-
         # Extract task_ids from remote response
-        task_ids = [uuid.UUID(task.task_id) for task in client_resp.tasks]
+        task_ids = [uuid.UUID(task.task_id) if task.task_id else None for task in client_resp.tasks]
 
         return DelegateImportArtifactRevisionBatchActionResult(
             result=result_revisions, task_ids=task_ids
@@ -502,3 +522,18 @@ class ArtifactRevisionService:
             )
 
         return registry_meta
+
+    def _is_latest_commit_hash(
+        self, artifact_revision: ArtifactRevisionData, latest_commit_hash: Optional[str]
+    ) -> bool:
+        """
+        Used in huggingface import to check if the latest commit hash matches the stored digest.
+        """
+        if latest_commit_hash is None:
+            return False
+        if (
+            artifact_revision.status == ArtifactStatus.AVAILABLE
+            and artifact_revision.digest == latest_commit_hash
+        ):
+            return True
+        return False

@@ -84,6 +84,11 @@ class ArtifactEventHandler:
             )
             return
 
+        if event.digest:
+            await self._artifact_repository.update_artifact_revision_digest(
+                revision.id, event.digest
+            )
+
         try:
             reservoir_config = self._config_provider.config.reservoir
             if reservoir_config is None:

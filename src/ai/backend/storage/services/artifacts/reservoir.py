@@ -268,6 +268,7 @@ class ReservoirService:
             model: Reservoir model to import
             reporter: ProgressReporter for tracking progress
             storage_step_mappings: Mapping of import steps to storage names
+            pipeline: ImportPipeline to execute
         """
         success = False
         try:
@@ -296,6 +297,8 @@ class ReservoirService:
                     revision=model.resolve_revision(ArtifactRegistryType.RESERVOIR),
                     registry_name=registry_name,
                     registry_type=ArtifactRegistryType.RESERVOIR,
+                    # Reservoir registry's artifact's digest will be synced through scan API later
+                    digest=None,
                 )
             )
 

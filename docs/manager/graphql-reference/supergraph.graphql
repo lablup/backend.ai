@@ -548,6 +548,11 @@ type ArtifactRevision implements Node
   size: ByteSize
   createdAt: DateTime
   updatedAt: DateTime
+
+  """
+  Digest at the time of import. None for models that have not been imported. Added in 25.17.0
+  """
+  digest: String
   artifact: Artifact!
 }
 
@@ -613,7 +618,7 @@ being imported from external registries.
 type ArtifactRevisionImportTask
   @join__type(graph: STRAWBERRY)
 {
-  taskId: ID!
+  taskId: ID
   artifactRevision: ArtifactRevision!
 }
 
