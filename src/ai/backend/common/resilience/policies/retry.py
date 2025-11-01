@@ -5,7 +5,7 @@ import enum
 import logging
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from typing import Optional, ParamSpec, TypeVar
+from typing import Final, Optional, ParamSpec, TypeVar
 
 from ai.backend.common.exception import (
     BackendAIError,
@@ -45,6 +45,13 @@ class BackoffStrategy(enum.StrEnum):
 
     FIXED = "fixed"
     EXPONENTIAL = "exponential"
+
+
+DEFAULT_NON_RETRYABLE_ERRORS: Final = (
+    TypeError,
+    NameError,
+    AttributeError,
+)
 
 
 @dataclass
@@ -88,7 +95,10 @@ class RetryPolicy(Policy):
         self._retry_delay = args.retry_delay
         self._backoff_strategy = args.backoff_strategy
         self._max_delay = args.max_delay
-        self._non_retryable_exceptions = args.non_retryable_exceptions
+        self._non_retryable_exceptions = (
+            *DEFAULT_NON_RETRYABLE_ERRORS,
+            *args.non_retryable_exceptions,
+        )
 
     async def execute(
         self,

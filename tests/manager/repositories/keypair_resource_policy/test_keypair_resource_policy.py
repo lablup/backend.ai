@@ -54,7 +54,7 @@ class TestKeypairResourcePolicyRepository:
             name="test-policy",
             created_at=datetime.now(),
             default_for_unspecified=DefaultForUnspecified.UNLIMITED,
-            total_resource_slots=ResourceSlot({"cpu": 8, "mem": "16g"}),
+            total_resource_slots=ResourceSlot({"cpu": "8", "mem": "16g"}),
             max_session_lifetime=86400,
             max_concurrent_sessions=5,
             max_pending_session_count=10,
@@ -356,7 +356,7 @@ class TestKeypairResourcePolicyRepository:
         name = "comprehensive-policy"
         max_concurrent_sessions = 50
         max_containers_per_session = 5
-        total_resource_slots = ResourceSlot({"cpu": 32, "mem": "64g", "cuda.device": 2})
+        total_resource_slots = ResourceSlot({"cpu": "32", "mem": "64g", "cuda.device": "2"})
         idle_timeout = 14400
         max_session_lifetime = 86400
         all_fields = {

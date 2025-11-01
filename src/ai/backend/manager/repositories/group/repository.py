@@ -2,6 +2,7 @@ import copy
 import logging
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from typing import Optional, Sequence, cast
 from uuid import UUID
 
@@ -14,6 +15,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -244,19 +246,18 @@ class GroupRepository:
                     + 1
                 )
             device_type = set()
-            smp = 0
+            gpu_smp_allocated = 0
             gpu_mem_allocated = 0
             if row.attached_devices and row.attached_devices.get("cuda"):
                 for dev_info in row.attached_devices["cuda"]:
                     if dev_info.get("model_name"):
                         device_type.add(dev_info["model_name"])
-                    smp += int(nmget(dev_info, "data.smp", 0))
+                    gpu_smp_allocated += int(nmget(dev_info, "data.smp", 0))
                     gpu_mem_allocated += int(nmget(dev_info, "data.mem", 0))
-            gpu_allocated = 0
-            if "cuda.devices" in row.occupied_slots:
-                gpu_allocated = row.occupied_slots["cuda.devices"]
-            if "cuda.shares" in row.occupied_slots:
-                gpu_allocated = row.occupied_slots["cuda.shares"]
+            gpu_allocated = Decimal(0)
+            for key, value in row.occupied_slots.items():
+                if SlotName(key).is_accelerator():
+                    gpu_allocated += value
             c_info = {
                 "id": str(row["id"]),
                 "session_id": str(row["session_id"]),
@@ -281,9 +282,9 @@ class GroupRepository:
                 "used_time": used_time,
                 "used_days": used_days,
                 "device_type": list(device_type),
-                "smp": float(smp),
+                "smp": float(gpu_smp_allocated),
                 "gpu_mem_allocated": float(gpu_mem_allocated),
-                "gpu_allocated": float(gpu_allocated),  # devices or shares
+                "gpu_allocated": float(gpu_allocated),
                 "nfs": nfs,
                 "image_id": row["image"],  # TODO: image id
                 "image_name": row["image"],
