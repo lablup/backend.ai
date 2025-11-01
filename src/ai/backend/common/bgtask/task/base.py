@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any, Generic, Optional, Self, TypeVar
 
-from ..types import TaskName
+from ..types import BgtaskNameBase
 
 
 class BaseBackgroundTaskArgs(ABC):
@@ -49,7 +49,7 @@ TFunctionArgs = TypeVar("TFunctionArgs", bound=BaseBackgroundTaskArgs)
 class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
     @classmethod
     @abstractmethod
-    def name(cls) -> TaskName:
+    def name(cls) -> BgtaskNameBase:
         """
         Return the name of the background task.
         This method should be implemented by subclasses to provide
