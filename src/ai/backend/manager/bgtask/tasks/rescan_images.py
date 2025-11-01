@@ -3,13 +3,14 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Self, override
+from typing import TYPE_CHECKING, Any, Optional, Self, override
 
 from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskArgs,
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskResult,
 )
+from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 
@@ -17,6 +18,36 @@ if TYPE_CHECKING:
     from ai.backend.manager.models.context import GraphQueryContext
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+
+@dataclass
+class RescanImagesTaskResult(BaseBackgroundTaskResult):
+    """
+    Result of rescan images background task.
+    Contains list of rescanned images and any errors encountered.
+    """
+
+    rescanned_image_ids: list[str]
+    errors: list[str]
+
+    @override
+    def entity_id(self) -> Optional[str]:
+        return None
+
+    @override
+    def serialize(self) -> Optional[str]:
+        return dump_json_str({
+            "rescanned_image_ids": self.rescanned_image_ids,
+            "errors": self.errors,
+        })
+
+    @classmethod
+    def deserialize(cls, data: str) -> RescanImagesTaskResult:
+        parsed = load_json(data)
+        return cls(
+            rescanned_image_ids=parsed["rescanned_image_ids"],
+            errors=parsed["errors"],
+        )
 
 
 @dataclass
@@ -109,8 +140,8 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest]):
             errors.extend(action_result.errors)
             rescanned_images.extend(action_result.images)
 
-        # TODO: Return appropriate result type based on BaseBackgroundTaskResult subclasses
-        # For now returning a placeholder
-        from ai.backend.common.bgtask.task.base import EmptyTaskResult
-
-        return EmptyTaskResult()
+        rescanned_image_ids = [image.id for image in rescanned_images]
+        return RescanImagesTaskResult(
+            rescanned_image_ids=rescanned_image_ids,
+            errors=errors,
+        )
