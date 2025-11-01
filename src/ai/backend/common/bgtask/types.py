@@ -4,7 +4,7 @@ import enum
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, NewType, Self
+from typing import Any, NewType, Protocol, Self
 
 from pydantic import BaseModel, Field
 from pydantic_core import ValidationError
@@ -27,11 +27,18 @@ class BgtaskStatus(enum.StrEnum):
         return self in {self.DONE, self.CANCELLED, self.FAILED, self.PARTIAL_SUCCESS}
 
 
-class TaskName(enum.StrEnum):
-    CLONE_VFOLDER = "clone_vfolder"
-    DELETE_VFOLDER = "delete_vfolder"
+class BgtaskNameProtocol(Protocol):
+    """
+    Protocol for background task names.
 
-    PUSH_IMAGE = "push_image"
+    Each component (storage, manager, agent) should define its own
+    background task name enum implementing this protocol.
+    """
+
+    @property
+    def value(self) -> str:
+        """Return the string value of the background task name."""
+        ...
 
 
 BgTaskKey = NewType("BgTaskKey", str)
@@ -50,7 +57,7 @@ class TaskType(enum.StrEnum):
 
 class BackgroundTaskMetadata(BaseModel):
     task_id: TaskID
-    task_name: TaskName
+    task_name: str
     body: Mapping[str, Any]
 
     def to_json(self) -> str:
@@ -73,7 +80,7 @@ class TaskInfo:
     """
 
     task_id: TaskID
-    task_name: TaskName
+    task_name: str
     task_type: TaskType
     body: Mapping[str, Any]
     ongoing_count: int
@@ -98,7 +105,7 @@ class TaskInfo:
             body = load_json(data[b"body"])
             return cls(
                 task_id=TaskID(uuid.UUID(data[b"task_id"].decode())),
-                task_name=TaskName(data[b"task_name"].decode()),
+                task_name=data[b"task_name"].decode(),
                 task_type=TaskType(data[b"task_type"].decode()),
                 body=body,
                 ongoing_count=int(data[b"ongoing_count"].decode()),

@@ -11,7 +11,6 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskResult,
     EmptyTaskResult,
 )
-from ai.backend.common.bgtask.types import TaskName
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderCloneFailureEvent,
@@ -19,6 +18,7 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 )
 from ai.backend.common.types import VFolderID
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.bgtask.types import StorageBgtaskName
 
 if TYPE_CHECKING:
     from ...volumes.pool import VolumePool
@@ -60,8 +60,8 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
 
     @classmethod
     @override
-    def name(cls) -> TaskName:
-        return TaskName.CLONE_VFOLDER
+    def name(cls) -> StorageBgtaskName:
+        return StorageBgtaskName.CLONE_VFOLDER
 
     @classmethod
     @override
