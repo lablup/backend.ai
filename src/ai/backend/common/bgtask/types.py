@@ -40,14 +40,17 @@ class BgtaskNameBase(ABC):
     @abstractmethod
     def value(self) -> str:
         """Return the string value of the background task name."""
-        ...
+        raise NotImplementedError
 
     @classmethod
     @abstractmethod
     def from_str(cls, value: str) -> Self:
         """Create instance from string value."""
-        ...
+        raise NotImplementedError
 
+
+# Type alias for backward compatibility and clarity
+TaskName = BgtaskNameBase
 
 BgTaskKey = NewType("BgTaskKey", str)
 

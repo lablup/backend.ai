@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Optional, Self, override
+from typing import TYPE_CHECKING, Optional, override
 
 from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskArgs,
@@ -50,29 +49,13 @@ class RescanImagesTaskResult(BaseBackgroundTaskResult):
         )
 
 
-@dataclass
 class RescanImagesManifest(BaseBackgroundTaskArgs):
     """
     Manifest for rescanning container images from registries.
     """
 
-    registry: str | None
-    project: str | None
-
-    @override
-    def to_redis_json(self) -> Mapping[str, Any]:
-        return {
-            "registry": self.registry,
-            "project": self.project,
-        }
-
-    @classmethod
-    @override
-    def from_redis_json(cls, body: Mapping[str, Any]) -> Self:
-        return cls(
-            registry=body.get("registry"),
-            project=body.get("project"),
-        )
+    registry: str | None = None
+    project: str | None = None
 
 
 class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest]):

@@ -42,7 +42,7 @@ class _TaskDefinition(_TaskExecutor, Generic[TFunctionArgs]):
 
     @override
     async def revive_task(self, args: Mapping[str, Any]) -> BaseBackgroundTaskResult:
-        args_instance = self._handler.args_type().from_redis_json(args)
+        args_instance = self._handler.args_type().model_validate(args)
         return await self._handler.execute(args_instance)
 
     @override
@@ -53,19 +53,17 @@ class _TaskDefinition(_TaskExecutor, Generic[TFunctionArgs]):
 
 
 class BackgroundTaskHandlerRegistry:
-    _executor_registry: dict[TaskName, _TaskExecutor]
+    _executor_registry: dict[str, _TaskExecutor]
 
     def __init__(self) -> None:
         self._executor_registry = {}
 
     def register(self, handler: BaseBackgroundTaskHandler) -> None:
-        self._executor_registry[handler.name()] = _TaskDefinition(
+        self._executor_registry[handler.name().value] = _TaskDefinition(
             handler=handler,
         )
 
-    async def revive_task(
-        self, name: TaskName, args: Mapping[str, Any]
-    ) -> BaseBackgroundTaskResult:
+    async def revive_task(self, name: str, args: Mapping[str, Any]) -> BaseBackgroundTaskResult:
         try:
             definition = self._executor_registry[name]
         except KeyError:
@@ -76,7 +74,7 @@ class BackgroundTaskHandlerRegistry:
         self, name: TaskName, args: BaseBackgroundTaskArgs
     ) -> BaseBackgroundTaskResult:
         try:
-            definition = self._executor_registry[name]
+            definition = self._executor_registry[name.value]
         except KeyError:
             raise BgtaskNotRegisteredError(f"Task '{name}' is not registered.")
         return await definition.execute_new_task(args)

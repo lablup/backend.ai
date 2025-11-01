@@ -1,29 +1,21 @@
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from typing import Any, Generic, Optional, Self, TypeVar
+from typing import Generic, Optional, TypeVar
+
+from pydantic import BaseModel, ConfigDict
 
 from ..types import BgtaskNameBase
 
 
-class BaseBackgroundTaskArgs(ABC):
-    @abstractmethod
-    def to_redis_json(self) -> Mapping[str, Any]:
-        """
-        Convert the instance to a metadata body dictionary.
-        This method should be implemented by subclasses to provide
-        the specific conversion logic.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
+class BaseBackgroundTaskArgs(BaseModel):
+    """
+    Base class for background task arguments using Pydantic.
+    Provides automatic serialization/deserialization via model_dump() and model_validate().
+    """
 
-    @classmethod
-    @abstractmethod
-    def from_redis_json(cls, body: Mapping[str, Any]) -> Self:
-        """
-        Create an instance from the given metadata body dictionary.
-        This method should be implemented by subclasses to provide
-        the specific loading logic.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
 
 
 class BaseBackgroundTaskResult(ABC):
