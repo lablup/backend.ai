@@ -15,7 +15,42 @@ Repositories Layer (repositories/)  ← Current document
     ↓
 Database Models (models/)
     ↓
-PostgreSQL Database
+Database
+```
+
+## Service Integration
+
+Repositories are called from the Services Layer to perform data access operations.
+
+**Key Principles**:
+- Services do not create transactions (delegate to Repository)
+- Repository instances are dependency-injected when Services are created
+- Public method naming: `get_*()`, `find_*()`, `list_*()`, `create_*()`, `update_*()`, `delete_*()`, `count_*()`
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Services Layer                                     │
+│  - Execute business logic                           │
+│  - Call Repository                                  │
+└────────────────────┬────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│  Repositories Layer                   ← Current doc │
+│  - Data access abstraction                          │
+│  - Transaction creation and management              │
+│  - Query optimization                               │
+│  - Cache management                                 │
+└────────────────────┬────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│  Database Models & PostgreSQL                       │
+│  - ORM model definitions                            │
+│  - Database schema                                  │
+└─────────────────────────────────────────────────────┘
 ```
 
 ## Key Responsibilities
@@ -92,7 +127,46 @@ class SessionRepository:
     ) -> None:
         self._db_source = db_source
         self._cache_source = cache_source
+
+    async def get_session(
+        self,
+        session_id: SessionId,
+    ) -> Optional[SessionInfo]:
+        """Read: cache first, fallback to DB"""
+        # Check cache first
+        if self._cache_source:
+            cached = await self._cache_source.get_session(session_id)
+            if cached:
+                return cached
+
+        # Cache miss - query from DB
+        session_info = await self._db_source.get_session(session_id)
+
+        # Update cache
+        if session_info and self._cache_source:
+            await self._cache_source.set_session(session_id, session_info)
+
+        return session_info
+
+    async def create_session(
+        self,
+        session_data: SessionData,
+    ) -> SessionId:
+        """Write: DB source handles transaction"""
+        # DB source creates session
+        session_id = await self._db_source.create_session(session_data)
+
+        # Repository decides cache strategy
+        # (cache invalidation or no-op)
+
+        return session_id
 ```
+
+**Pattern explanation:**
+
+- **DBSource**: Only handles database operations. Public methods create their own sessions, private methods receive sessions as parameters.
+- **CacheSource**: Only handles cache operations (no database dependency). Provides get/set methods for cached data.
+- **Repository**: Orchestrates both sources. Read operations check cache first and fall back to DB on cache miss. Write operations delegate to DB source and handle cache invalidation.
 
 **Type hint recommendation**: Using `Optional[T]` is recommended over `| None`.
 
@@ -424,51 +498,57 @@ class SessionDBSource:
 
 
 class SessionCacheSource:
-    """Cache data access"""
+    """Cache data access - only handles cache operations"""
     _redis: RedisConnectionInfo
+
+    def __init__(self, redis: RedisConnectionInfo) -> None:
+        self._redis = redis
+
+    async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
+        """Get session from cache"""
+        return await self._get_from_cache(session_id)
+
+    async def set_session(self, session_id: SessionId, session_info: SessionInfo) -> None:
+        """Store session to cache"""
+        await self._set_to_cache(session_id, session_info)
+
+
+class SessionRepository:
+    """Repository: orchestrates db_source and cache_source"""
     _db_source: SessionDBSource
+    _cache_source: SessionCacheSource
 
     def __init__(
         self,
+        db: ExtendedAsyncSAEngine,
         redis: RedisConnectionInfo,
-        db_source: SessionDBSource,
     ) -> None:
-        self._redis = redis
-        self._db_source = db_source
+        self._db_source = SessionDBSource(db)
+        self._cache_source = SessionCacheSource(redis)
 
     async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
         """Cache-first query, fall back to DB on cache miss"""
-        # Check cache
-        cached = await self._get_from_cache(session_id)
+        # Check cache first
+        cached = await self._cache_source.get_session(session_id)
         if cached:
             return cached
 
         # Cache miss - query from DB
         session_info = await self._db_source.get_session(session_id)
         if session_info:
-            await self._set_to_cache(session_id, session_info)
+            await self._cache_source.set_session(session_id, session_info)
 
         return session_info
 
+    async def create_session(self, session_data: SessionData) -> SessionId:
+        """Repository handles transaction and cache invalidation"""
+        # DB source handles transaction internally
+        session_id = await self._db_source.create_session(session_data)
 
-class SessionRepository:
-    """Repository: orchestrates db_source and cache_source"""
-    _db_source: SessionDBSource
-    _cache_source: Optional[SessionCacheSource]
+        # Repository decides cache invalidation strategy
+        # (no need to cache newly created session immediately)
 
-    def __init__(
-        self,
-        db_source: SessionDBSource,
-        cache_source: Optional[SessionCacheSource] = None,
-    ) -> None:
-        self._db_source = db_source
-        self._cache_source = cache_source
-
-    async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
-        """Use cache if available, otherwise use DB directly"""
-        if self._cache_source:
-            return await self._cache_source.get_session(session_id)
-        return await self._db_source.get_session(session_id)
+        return session_id
 ```
 
 ## Error Handling

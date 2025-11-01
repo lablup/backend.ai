@@ -38,6 +38,95 @@ The Agent is a compute node component responsible for container lifecycle manage
 - Update occupied and available resource slots
 - Report errors and exceptional conditions
 
+## Entry Points
+
+Agent has 4 entry points. The RPC Server handles Manager requests, Event Dispatcher sends and receives events, Background Task Handler performs async tasks, and Internal REST API is used exclusively for metrics exposure.
+
+### 1. RPC Server (Primary Request Handler)
+
+**Framework**: Callosum (ZeroMQ-based RPC, Curve authentication)
+
+**Port**: 6011 (default)
+
+**Key Features**:
+- Only Manager can send RPC requests to Agent (no direct user access)
+
+### 2. Event Dispatcher
+
+**System**: Backend.AI Event Dispatcher
+
+Agent sends Agent and Kernel lifecycle events to Manager.
+
+**Published Events**: Agent and Kernel lifecycle events
+
+**Consumed Events**: Plugin integration events
+
+**Related Documentation**: [Event Dispatcher System](../common/events/README.md)
+
+### 3. Background Task Handler
+
+**System**: Backend.AI Background Task Handler
+
+Handles long-running tasks asynchronously, issues Task IDs, and notifies completion via events.
+
+**Usage Examples**:
+- Image pulling tasks
+- Large-scale container cleanup tasks
+
+**Related Documentation**: [Background Task Handler System](../common/bgtask/README.md)
+
+### 4. Internal REST API (Metrics Only)
+
+**Framework**: aiohttp
+
+**Port**: 6003 (metrics only, separate from RPC port)
+
+**Endpoints**:
+- `GET /metrics` - Expose Prometheus metrics
+
+
+**Key Features**:
+- Metrics exposure only (no service logic triggering)
+- Prometheus scrapes periodically
+- Auto-registered via Manager's Service Discovery
+
+### Entry Point Interactions
+
+Each Entry Point operates independently. However, service logic can coordinate them:
+
+**Background Task Triggering**:
+- Service logic in RPC Server or Event Dispatcher can trigger long-running tasks as Background Tasks.
+
+**Event Publishing**:
+- RPC Server or Background Task can publish events via Event Dispatcher after task completion.
+
+**Integrated Architecture**:
+
+```
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│  RPC Server  │  │Event Dispatch│  │  Background  │
+│   (Callosum) │  │              │  │     Task     │
+│   Port 6011  │  │              │  │              │
+└───────┬──────┘  └───────┬──────┘  └───────┬──────┘
+        │                 │                 │
+        └─────────────────┴─────────────────┘
+                          │
+                ┌─────────▼──────────┐
+                │  Agent Core Logic  │
+                │  - Resource Mgmt   │
+                │  - Kernel Mgmt     │
+                └─────────┬──────────┘
+                          │
+                ┌─────────▼──────────┐
+                │  Container Backend │
+                └────────────────────┘
+
+        ┌──────────────────┐
+        │ Internal REST API│ (Independent, metrics only)
+        │   Port 6003      │
+        └──────────────────┘
+```
+
 ## Architecture
 
 ```

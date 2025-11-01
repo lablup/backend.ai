@@ -31,6 +31,72 @@ The Webserver provides a web-based user interface, maintains user sessions, and 
 - User input sanitization
 - Rate limiting
 
+## Entry Points
+
+Webserver has 1 entry point to receive and process user requests.
+
+### 1. REST API (Web UI + Proxy)
+
+**Framework**: aiohttp (async HTTP server)
+
+**Port**: 8080 (default)
+
+**Key Features**:
+- Session-based authentication (Redis)
+- Request signing and proxying to Manager API (JWT/HMAC)
+
+**Processing Flow**:
+
+#### Login Flow
+```
+Browser → POST /auth/login → Webserver → Manager API (authenticate)
+                                    ↓
+                              Session created in Redis
+                                    ↓
+                          Session cookie sent to Browser
+```
+
+#### API Request Proxy Flow
+```
+Browser → API Request + Session Cookie → Webserver
+                                            ↓
+                                 Retrieve access/secret key from Redis session
+                                            ↓
+                                 Sign request (GraphQL: JWT, REST: HMAC)
+                                            ↓
+                                 Proxy to Manager API
+                                            ↓
+                                 Manager processes request
+                                            ↓
+                                 Response returned to Browser
+```
+
+**Integrated Architecture**:
+
+```
+┌─────────────┐
+│   Browser   │
+│  (Web UI)   │
+└──────┬──────┘
+       │
+       ▼ Session Cookie + API Request
+┌─────────────────────────────────┐
+│      Webserver (Port 8080)      │
+│  - Serve static assets          │
+│  - Session management (Redis)   │
+│  - Request signing (JWT/HMAC)   │
+│  - Proxy to Manager             │
+└──────┬──────────────────────────┘
+       │
+       ▼ Signed API Request (JWT/HMAC)
+┌─────────────────────────────────┐
+│    Manager API (Port 8081)      │
+│  - Verify signature             │
+│  - Process request              │
+│  - Return response              │
+└─────────────────────────────────┘
+```
+
 ## Architecture
 
 ```
