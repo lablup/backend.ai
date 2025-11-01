@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Self, override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskArgs,
@@ -26,25 +24,9 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@dataclass
 class VFolderDeleteTaskArgs(BaseBackgroundTaskArgs):
     volume: str
     vfolder_id: VFolderID
-
-    @override
-    def to_redis_json(self) -> Mapping[str, Any]:
-        return {
-            "volume": self.volume,
-            "vfolder_id": str(self.vfolder_id),
-        }
-
-    @classmethod
-    @override
-    def from_redis_json(cls, body: Mapping[str, Any]) -> Self:
-        return cls(
-            volume=body["volume"],
-            vfolder_id=VFolderID.from_str(body["vfolder_id"]),
-        )
 
 
 class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteTaskArgs]):
