@@ -3,55 +3,20 @@ import os
 import pickle
 import shutil
 import time
-from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
 from ai.backend.logging import BraceStyleAdapter
 
-from ..exception import KernelRegistryLoadError, KernelRegistryNotFound
-from .kernel_registry import KernelRegistry
+from ...exception import KernelRegistryLoadError, KernelRegistryNotFound
+from ..kernel_registry import KernelRegistry
+from .abc import AbstractKernelRegistryRecovery, KernelRegistrySaveMetadata
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 SAVE_COOL_DOWN_SECONDS = 60
-
-
-@dataclass
-class KernelRegistrySaveMetadata:
-    force: bool
-
-
-class AbstractKernelRegistryRecovery(ABC):
-    """
-    Recovery interface for loading and saving KernelRegistry
-    """
-
-    @abstractmethod
-    async def load_kernel_registry(self) -> KernelRegistry:
-        """
-        Load the KernelRegistry from persistent storage.
-        Raises:
-            KernelRegistryNotFound
-            KernelRegistryLoadError
-        Returns: The loaded KernelRegistry.
-        """
-        pass
-
-    @abstractmethod
-    async def save_kernel_registry(
-        self, registry: KernelRegistry, metadata: KernelRegistrySaveMetadata
-    ) -> None:
-        """
-        Save the KernelRegistry to persistent storage.
-        args:
-            registry: The KernelRegistry to save.
-            metadata: Additional metadata for saving.
-        Returns: None
-        """
-        pass
 
 
 @dataclass
