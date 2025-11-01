@@ -58,7 +58,7 @@ class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteTaskArgs])
     @classmethod
     @override
     def name(cls) -> StorageBgtaskName:
-        return StorageBgtaskName.DELETE_VFOLDER
+        return StorageBgtaskName.DELETE_VFOLDER  # type: ignore[return-value]
 
     @override
     async def execute(self, args: VFolderDeleteTaskArgs) -> BaseBackgroundTaskResult:

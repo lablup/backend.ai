@@ -61,7 +61,7 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
     @classmethod
     @override
     def name(cls) -> StorageBgtaskName:
-        return StorageBgtaskName.CLONE_VFOLDER
+        return StorageBgtaskName.CLONE_VFOLDER  # type: ignore[return-value]
 
     @classmethod
     @override
