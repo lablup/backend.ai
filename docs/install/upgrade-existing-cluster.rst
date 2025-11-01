@@ -18,7 +18,7 @@ Performing minor upgrade
 A minor upgrade means upgrading a Backend.AI cluster while keeping the major version same (e.g. 24.03.0 to 24.03.1).
 Usually changes for minor upgrades are meant for fixing critical bugs rather than introducing new features.
 In general there should be only trivial changes between minor versions that won't affect how users interact with the software.
-To plan the upgrade, first check following facts:
+To plan the upgrade, first check the following facts:
 
 * Read every bit of the release changelog.
 
@@ -31,7 +31,7 @@ To plan the upgrade, first check following facts:
   As it is mentioned at the beginning it is best to maintain database schema as concrete, but in rare situations it is
   inevitable to alter it.
 
-* Make sure every mission critical workloads are shut down when performing a rolling upgrade.
+* Make sure every mission critical workloads are shut down before performing a rolling upgrade.
 
 
 Upgrading Backend.AI Manager
@@ -39,7 +39,7 @@ Upgrading Backend.AI Manager
 
 1. Stop the manager process running at server.
 2. Upgrade the Python package by executing ``pip install -U backend.ai-manager==<target version>``.
-3. Match databse schema with latest by executing ``alembic upgrade head``.
+3. Match database schema with latest by executing ``alembic upgrade head``.
 4. Restart the process.
 
 
@@ -65,7 +65,7 @@ A major upgrade involves significant feature additions and structural changes.
 DO NOT perform rolling upgrades in any cases.
 Please make sure to shutdown every workload of the cluster and notify users of a relatively prolonged downtime.
 
-To plan the upgrade, first check following facts:
+To plan the upgrade, first check the following facts:
 
 * Upgrade the Backend.AI cluster to the very latest minor version of the prior release before starting major version upgrade.
 
@@ -96,7 +96,7 @@ Upgrading Backend.AI Manager
 
 1. Stop the manager process running at server.
 2. Upgrade the Python package by executing ``pip install -U backend.ai-manager==<target version>``.
-3. Match databse schema with latest by executing ``alembic upgrade head``.
+3. Match database schema with the latest by executing ``alembic upgrade head``.
 4. Fill out any missing DB revisions by executing ``backend.ai mgr schema apply-mission-revisions <version number of previous Backend.AI software>``.
 5. Start the process again.
 
