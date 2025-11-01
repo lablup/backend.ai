@@ -26,10 +26,12 @@ import asyncpg
 import tomlkit
 from dateutil.tz import tzutc
 from rich.text import Text
+from sqlalchemy.ext.asyncio import create_async_engine
 from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ProgressBar
 
+from ai.backend.appproxy.coordinator.models.base import Base
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
 from .common import detect_os
@@ -586,6 +588,85 @@ class Context(metaclass=ABCMeta):
         ]
         dotenv_path.write_text("\n".join(envs))
 
+    async def install_appproxy_db_for_package(self) -> None:
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
+
+        self.log_header("Setting up databases... (app-proxy)")
+
+        # 1. Connect to core DB
+        core_conn = await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="backend",
+        )
+
+        # 2. Create role/database if not exist
+        await core_conn.execute(
+            """
+            DO $$
+            BEGIN
+               IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'appproxy') THEN
+                  CREATE ROLE appproxy WITH LOGIN PASSWORD 'develove';
+               ELSE
+                  ALTER ROLE appproxy WITH LOGIN PASSWORD 'develove';
+               END IF;
+            END
+            $$;
+            """
+        )
+        exists = await core_conn.fetchval("SELECT 1 FROM pg_database WHERE datname = 'appproxy'")
+        if not exists:
+            await core_conn.execute("CREATE DATABASE appproxy OWNER appproxy;")
+        await core_conn.execute("GRANT ALL PRIVILEGES ON DATABASE appproxy TO appproxy;")
+        await core_conn.close()
+
+        # 3. Grant privileges
+        app_conn = await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="appproxy",
+        )
+        await app_conn.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp";')
+        await app_conn.execute("GRANT ALL ON SCHEMA public TO appproxy;")
+        await app_conn.close()
+
+        # 4. Run Alembic migration for app-proxy
+
+        dsn = (
+            f"postgresql+asyncpg://appproxy:develove@"
+            f"{halfstack.postgres_addr.face.host}:{halfstack.postgres_addr.face.port}/appproxy"
+        )
+        engine = create_async_engine(dsn)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        await engine.dispose()
+
+        # 5. Update scaling_groups in core DB
+        # TODO: Still using wsproxy_* columns for backward compatibility (same with install-dev.sh logic)
+        core_conn = await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="backend",
+        )
+        await core_conn.execute(
+            """
+            UPDATE scaling_groups
+            SET wsproxy_api_token = $1,
+                wsproxy_addr = $2
+            WHERE name = 'default'
+            """,
+            service.appproxy_api_secret,
+            f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
+        )
+        await core_conn.close()
+
     async def install_appproxy_db(self) -> None:
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
@@ -1097,7 +1178,7 @@ class PackageContext(Context):
         # TODO: customize addr/user/password options
         # TODO: multi-node setup
         public_facing_address = self.install_variable.public_facing_address
-        if public_facing_address in ("127.0.0.1", "0.0.0.0"):
+        if public_facing_address in ("127.0.0.1", "localhost"):
             public_component_bind_address = "127.0.0.1"
         else:
             public_component_bind_address = "0.0.0.0"
@@ -1147,6 +1228,11 @@ class PackageContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
+            appproxy_api_secret=secrets.token_hex(32),
+            appproxy_jwt_secret=secrets.token_hex(32),
+            appproxy_permit_hash_secret=secrets.token_hex(32),
+            appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
+            appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -1351,20 +1437,35 @@ class PackageContext(Context):
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
         await self.configure_manager()
+
+        # Manager schema must exist before updating scaling_groups
+        self.log_header("Initializing manager database schema...")
+        await self.run_manager_cli(["mgr", "schema", "oneshot"])
+
         self.log_header("Configuring agent...")
         await self.configure_agent()
+
+        self.log_header("Initializing app-proxy database...")
+        await self.install_appproxy_db_for_package()
+
         self.log_header("Configuring storage-proxy...")
         await self.configure_storage_proxy()
+
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
-        self.log_header("Configuring app-proxy...")
-        await self.install_appproxy_db()
-        await self.configure_appproxy()
-        self.log_header("Generating client environ configs...")
-        await self.configure_client()
+
         self.log_header("Loading fixtures...")
         await self.load_fixtures()
+
+        self.log_header("Configuring app-proxy...")
+        await self.configure_appproxy()
+        await self.configure_appproxy_fixture()
+
+        self.log_header("Generating client environ configs...")
+        await self.configure_client()
+
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
+
         # TODO: install as systemd services?
