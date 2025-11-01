@@ -33,6 +33,7 @@ from ai.backend.logging import BraceStyleAdapter, LocalLogger, LogLevel
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import StorageProxyUnifiedConfig
 from .context import DEFAULT_BACKENDS, EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
+from .context_types import ArtifactVerifierContext
 from .types import VFolderID
 from .volumes.abc import CAP_FAST_SIZE, AbstractVolume
 
@@ -268,6 +269,7 @@ async def check_and_upgrade(
         volume_pool=None,  # type: ignore[arg-type]
         storage_pool=None,  # type: ignore[arg-type]
         background_task_manager=None,  # type: ignore[arg-type]
+        artifact_verifier_ctx=ArtifactVerifierContext(),  # type: ignore[arg-type]
         metric_registry=CommonMetricRegistry(),
         cors_options={},
         backends={**DEFAULT_BACKENDS},

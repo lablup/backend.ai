@@ -69,6 +69,7 @@ from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.storage.context_types import ArtifactVerifierContext
 
 from . import __version__ as VERSION
 from .config.loaders import load_local_config, make_etcd
@@ -614,6 +615,7 @@ async def server_main(
             volumes={
                 NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
             },
+            artifact_verifier_ctx=ArtifactVerifierContext(),
         )
         if pidx == 0:
             await check_latest(root_ctx)

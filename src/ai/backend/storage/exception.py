@@ -456,3 +456,29 @@ class StorageStepRequiredStepNotProvided(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
+
+
+class ArtifactVerifyStorageTypeInvalid(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage/artifact/verify/storage-type/invalid"
+    error_title = "Artifact Verify Storage Type Invalid"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class ArtifactVerificationFailedError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/storage/artifact/verification/failed"
+    error_title = "Artifact Verification Failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )
