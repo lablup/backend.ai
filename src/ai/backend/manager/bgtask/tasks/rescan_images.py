@@ -1,15 +1,13 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskArgs,
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskResult,
 )
-from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 
@@ -19,7 +17,6 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-@dataclass
 class RescanImagesTaskResult(BaseBackgroundTaskResult):
     """
     Result of rescan images background task.
@@ -28,25 +25,6 @@ class RescanImagesTaskResult(BaseBackgroundTaskResult):
 
     rescanned_image_ids: list[str]
     errors: list[str]
-
-    @override
-    def entity_id(self) -> Optional[str]:
-        return None
-
-    @override
-    def serialize(self) -> Optional[str]:
-        return dump_json_str({
-            "rescanned_image_ids": self.rescanned_image_ids,
-            "errors": self.errors,
-        })
-
-    @classmethod
-    def deserialize(cls, data: str) -> RescanImagesTaskResult:
-        parsed = load_json(data)
-        return cls(
-            rescanned_image_ids=parsed["rescanned_image_ids"],
-            errors=parsed["errors"],
-        )
 
 
 class RescanImagesManifest(BaseBackgroundTaskArgs):

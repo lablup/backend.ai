@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, override
+from typing import TYPE_CHECKING, override
 
 from pydantic import BaseModel
 
@@ -11,7 +10,6 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskResult,
 )
-from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 
@@ -29,7 +27,6 @@ class PurgedImageData(BaseModel):
     reserved_bytes: int
 
 
-@dataclass
 class PurgeImagesTaskResult(BaseBackgroundTaskResult):
     """
     Result of purge images background task.
@@ -39,27 +36,6 @@ class PurgeImagesTaskResult(BaseBackgroundTaskResult):
     total_reserved_bytes: int
     purged_images: list[PurgedImageData]
     errors: list[str]
-
-    @override
-    def entity_id(self) -> Optional[str]:
-        return None
-
-    @override
-    def serialize(self) -> Optional[str]:
-        return dump_json_str({
-            "total_reserved_bytes": self.total_reserved_bytes,
-            "purged_images": [img.model_dump() for img in self.purged_images],
-            "errors": self.errors,
-        })
-
-    @classmethod
-    def deserialize(cls, data: str) -> PurgeImagesTaskResult:
-        parsed = load_json(data)
-        return cls(
-            total_reserved_bytes=parsed["total_reserved_bytes"],
-            purged_images=[PurgedImageData.model_validate(img) for img in parsed["purged_images"]],
-            errors=parsed["errors"],
-        )
 
 
 class ImageRefManifest(BaseModel):

@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -18,39 +18,22 @@ class BaseBackgroundTaskArgs(BaseModel):
     )
 
 
-class BaseBackgroundTaskResult(ABC):
+class BaseBackgroundTaskResult(BaseModel):
     """
-    Abstract base class for background task results.
-    This represents the result of a background task execution.
-    Similar to BaseActionResult, each result should provide entity identification
-    and serialization capabilities.
+    Base class for background task results using Pydantic.
+    Provides automatic serialization/deserialization via model_dump() and model_validate().
     """
 
-    @abstractmethod
-    def entity_id(self) -> Optional[str]:
-        """
-        Return the ID of the entity this task result relates to.
-        Returns None if the task doesn't operate on a specific entity.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
-
-    @abstractmethod
-    def serialize(self) -> Optional[str]:
-        """
-        Serialize the task result to a string for storage.
-        Returns None if there's no data to serialize.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+    )
 
 
 class EmptyTaskResult(BaseBackgroundTaskResult):
     """Result class for tasks that don't produce meaningful output."""
 
-    def entity_id(self) -> Optional[str]:
-        return None
-
-    def serialize(self) -> Optional[str]:
-        return None
+    pass
 
 
 TFunctionArgs = TypeVar("TFunctionArgs", bound=BaseBackgroundTaskArgs)
