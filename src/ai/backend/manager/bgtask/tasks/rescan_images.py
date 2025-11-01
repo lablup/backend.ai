@@ -12,7 +12,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.context import GraphQueryContext
+    from ai.backend.manager.services.processors import Processors
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -41,10 +41,10 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest]):
     Background task handler for rescanning container images.
     """
 
-    _graph_ctx: GraphQueryContext
+    _processors: Processors
 
-    def __init__(self, graph_ctx: GraphQueryContext) -> None:
-        self._graph_ctx = graph_ctx
+    def __init__(self, processors: Processors) -> None:
+        self._processors = processors
 
     @classmethod
     @override
@@ -69,12 +69,12 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest]):
         loaded_registries = []
 
         if args.registry is None:
-            all_registries = await self._graph_ctx.processors.container_registry.load_all_container_registries.wait_for_complete(
+            all_registries = await self._processors.container_registry.load_all_container_registries.wait_for_complete(
                 LoadAllContainerRegistriesAction()
             )
             loaded_registries = all_registries.registries
         else:
-            registries = await self._graph_ctx.processors.container_registry.load_container_registries.wait_for_complete(
+            registries = await self._processors.container_registry.load_container_registries.wait_for_complete(
                 LoadContainerRegistriesAction(
                     registry=args.registry,
                     project=args.project,
@@ -86,7 +86,7 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest]):
         errors = []
         for registry_data in loaded_registries:
             action_result = (
-                await self._graph_ctx.processors.container_registry.rescan_images.wait_for_complete(
+                await self._processors.container_registry.rescan_images.wait_for_complete(
                     RescanImagesAction(
                         registry=registry_data.registry_name,
                         project=registry_data.project,
@@ -101,7 +101,7 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest]):
             errors.extend(action_result.errors)
             rescanned_images.extend(action_result.images)
 
-        rescanned_image_ids = [image.id for image in rescanned_images]
+        rescanned_image_ids = [str(image.id) for image in rescanned_images]
         return RescanImagesTaskResult(
             rescanned_image_ids=rescanned_image_ids,
             errors=errors,

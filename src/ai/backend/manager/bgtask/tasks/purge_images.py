@@ -14,7 +14,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.context import GraphQueryContext
+    from ai.backend.manager.services.processors import Processors
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -68,10 +68,10 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest]):
     Background task handler for purging container images from agents.
     """
 
-    _graph_ctx: GraphQueryContext
+    _processors: Processors
 
-    def __init__(self, graph_ctx: GraphQueryContext) -> None:
-        self._graph_ctx = graph_ctx
+    def __init__(self, processors: Processors) -> None:
+        self._processors = processors
 
     @classmethod
     @override
@@ -97,7 +97,7 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest]):
         for key in args.keys:
             agent_id = key.agent_id
             for img in key.images:
-                result = await self._graph_ctx.processors.image.purge_image.wait_for_complete(
+                result = await self._processors.image.purge_image.wait_for_complete(
                     PurgeImageAction(
                         ImageRefData(
                             name=img.name,
