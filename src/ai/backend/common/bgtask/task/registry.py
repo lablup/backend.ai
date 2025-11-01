@@ -36,9 +36,14 @@ class _TaskExecutor(ABC):
 
 class _TaskDefinition(_TaskExecutor, Generic[TFunctionArgs]):
     _handler: BaseBackgroundTaskHandler[TFunctionArgs]
+    _task_name: TaskName
 
     def __init__(self, handler: BaseBackgroundTaskHandler[TFunctionArgs]) -> None:
         self._handler = handler
+        self._task_name = handler.name()
+
+    def task_name(self) -> TaskName:
+        return self._task_name
 
     @override
     async def revive_task(self, args: Mapping[str, Any]) -> BaseBackgroundTaskResult:
@@ -53,7 +58,7 @@ class _TaskDefinition(_TaskExecutor, Generic[TFunctionArgs]):
 
 
 class BackgroundTaskHandlerRegistry:
-    _executor_registry: dict[str, _TaskExecutor]
+    _executor_registry: dict[str, _TaskDefinition]
 
     def __init__(self) -> None:
         self._executor_registry = {}
@@ -62,6 +67,14 @@ class BackgroundTaskHandlerRegistry:
         self._executor_registry[handler.name().value] = _TaskDefinition(
             handler=handler,
         )
+
+    def get_task_name(self, name: str) -> TaskName:
+        """Get TaskName instance from string name."""
+        try:
+            definition = self._executor_registry[name]
+        except KeyError:
+            raise BgtaskNotRegisteredError(f"Task '{name}' is not registered.")
+        return definition.task_name()
 
     async def revive_task(self, name: str, args: Mapping[str, Any]) -> BaseBackgroundTaskResult:
         try:

@@ -25,7 +25,6 @@ from ai.backend.common.bgtask.exception import InvalidTaskMetadataError
 from ai.backend.common.bgtask.types import (
     WHOLE_TASK_KEY,
     BgTaskKey,
-    BgtaskNameBase,
     BgtaskStatus,
     TaskID,
     TaskInfo,
@@ -272,7 +271,6 @@ class BackgroundTaskManager:
     _valkey_client: ValkeyBgtaskClient
     _task_set_key: TaskSetKey
     _task_registry: BackgroundTaskHandlerRegistry
-    _task_name_type: Optional[type[BgtaskNameBase]]
 
     _heartbeat_loop_task: asyncio.Task
     _retry_loop_task: asyncio.Task
@@ -286,7 +284,6 @@ class BackgroundTaskManager:
         tags: Optional[Iterable[str]] = None,
         bgtask_observer: BackgroundTaskObserver = NopBackgroundTaskObserver(),
         task_registry: Optional[BackgroundTaskHandlerRegistry] = None,
-        task_name_type: Optional[type[BgtaskNameBase]] = None,
     ) -> None:
         self._event_producer = event_producer
         self._ongoing_tasks = {}
@@ -302,7 +299,6 @@ class BackgroundTaskManager:
             ValkeyUnregisterHook(valkey_client, self._task_set_key),
         ])
         self._task_registry = task_registry or BackgroundTaskHandlerRegistry()
-        self._task_name_type = task_name_type
         self._heartbeat_loop_task = asyncio.create_task(self._heartbeat_loop())
         self._retry_loop_task = asyncio.create_task(self._retry_loop())
 
@@ -592,11 +588,12 @@ class BackgroundTaskManager:
         task_info = total_info.task_info
         task_name_str = task_info.task_name
 
-        # Convert string task name back to TaskName instance
-        if self._task_name_type is None:
-            log.warning("Cannot revive task {}: task_name_type not configured", task_info.task_id)
+        # Convert string task name back to TaskName instance using registry
+        try:
+            task_name = self._task_registry.get_task_name(task_name_str)
+        except Exception as e:
+            log.warning("Cannot revive task {}: {}", task_info.task_id, e)
             return
-        task_name = self._task_name_type.from_str(task_name_str)
 
         async_tasks: list[asyncio.Task] = []
         for subkey_info in total_info.task_key_list:
