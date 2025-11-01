@@ -36,6 +36,60 @@ The Storage Proxy provides a unified abstraction layer for various storage backe
 - Support parallel uploads/downloads
 - Optimize large file operations
 
+## Entry Points
+
+Storage Proxy has 4 entry points to receive and process external requests.
+
+### 1. REST API (Client)
+
+**Framework**: aiohttp (async HTTP server)
+
+**Port**: 6021 (default)
+
+**Location**: `src/ai/backend/storage/api/client.py`
+
+**Purpose**: External API used by Client SDK/CLI/Web UI
+
+**Key Features**:
+- File upload/download and VFolder management
+- API Key-based authentication
+- HTTP/HTTPS communication
+
+### 2. REST API (Manager)
+
+**Framework**: aiohttp (async HTTP server)
+
+**Port**: 6022 (default, separate from Client API)
+
+**Location**: `src/ai/backend/storage/api/manager.py`
+
+**Purpose**: Internal API used by Manager and Agent
+
+**Key Features**:
+- Manager-only API (internal network access only)
+- Provides VFolder mount information (used by Agent)
+- Volume and Quota management
+
+### 3. Event Dispatcher
+
+**Framework**: Backend.AI Event Dispatcher (Redis Streams-based)
+
+**Location**: `src/ai/backend/common/events/`
+
+**Key Features**:
+- VFolder lifecycle event publishing and consumption
+- Broadcast and Anycast event type support
+
+**Related Documentation**: [Event Dispatcher System](../common/events/README.md)
+
+### 4. Background Task Handler
+
+**Framework**: Backend.AI Background Task Handler (Valkey-based)
+
+**Location**: `src/ai/backend/common/bgtask/`
+
+**Related Documentation**: [Background Task Handler System](../common/bgtask/README.md)
+
 ## Architecture
 
 ```
@@ -47,13 +101,11 @@ The Storage Proxy provides a unified abstraction layer for various storage backe
 │       VFS Layer (vfs/)                  │  ← Virtual filesystem
 ├─────────────────────────────────────────┤
 │  Storage Backends (storages/)           │  ← Backend implementations
-│  ├── CephFS                             │
-│  ├── NetApp                             │
-│  ├── PureStorage                        │
-│  ├── Dell EMC                           │
 │  └── ...                                │
 └─────────────────────────────────────────┘
 ```
+
+**Supported Storage Backends**: See `volumes/` directory for available backend implementations.
 
 ## Directory Structure
 
@@ -69,12 +121,7 @@ storage/
 │   ├── base.py         # VFS base classes
 │   └── local.py        # Local filesystem implementation
 ├── storages/           # Backend-specific implementations
-│   ├── cephfs/         # CephFS support
-│   ├── netapp/         # NetApp support
-│   ├── purestorage/    # Pure Storage support
-│   ├── dellemc/        # Dell EMC support
-│   ├── weka/           # WekaFS support
-│   └── ...
+│   └── ...             # See volumes/ directory
 ├── volumes/            # Volume management
 │   └── quota.py        # Quota tracking
 ├── bgtask/             # Background tasks
@@ -108,16 +155,7 @@ Each backend implements a common interface:
 - `get_quota()`: Query vfolder usage and quota
 - `set_quota()`: Update vfolder quota
 
-Supported backends:
-- **CephFS**: Ceph filesystem
-- **NetApp**: NetApp ONTAP storage
-- **Pure Storage**: Pure Storage FlashBlade
-- **Dell EMC**: Dell EMC Isilon/PowerScale
-- **WekaFS**: Weka filesystem
-- **VAST**: VAST Data storage
-- **DDN**: DataDirect Networks storage
-- **XFS**: Local XFS filesystem
-- **NFS**: Generic NFS mount
+**Supported backends**: See `volumes/` directory for available backend implementations.
 
 ### VFolder Types
 

@@ -39,6 +39,7 @@ Database Models (models/)
 
 **Note**: Authorization is handled by the Action Processor layer, and transaction management is the responsibility of the Repository layer.
 
+
 ## Directory Structure
 
 ```
