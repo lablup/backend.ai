@@ -4,13 +4,17 @@ import enum
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, Self, override
+from typing import TYPE_CHECKING, Any, Optional, Self, override
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import AgentId, DeviceName, ResourceSlot, SlotName, SlotTypes
+from ai.backend.manager.data.base import StringFilter
 
-from ..kernel.types import KernelInfo
+from ..base import FilterGroup, LeafFilterCondition
+
+if TYPE_CHECKING:
+    from ..kernel.types import KernelInfo
 
 
 class AgentStatus(enum.Enum):
@@ -80,6 +84,109 @@ class AgentData:
 class AgentDataExtended(AgentData):
     known_slot_types: Mapping[SlotName, SlotTypes]
     kernels: list[KernelInfo]
+
+
+class AgentOrderField(enum.StrEnum):
+    """Agent ordering fields matching DB column names."""
+
+    ID = "id"
+    STATUS = "status"
+    STATUS_CHANGED = "status_changed"
+    REGION = "region"
+    SCALING_GROUP = "scaling_group"
+    SCHEDULABLE = "schedulable"
+    ADDR = "addr"
+    FIRST_CONTACT = "first_contact"
+    LOST_AT = "lost_at"
+    VERSION = "version"
+
+
+class AgentFilterField(enum.StrEnum):
+    """Agent filter fields matching DB column names."""
+
+    ID = "id"
+    STATUS = "status"
+    STATUS_CHANGED = "status_changed"
+    REGION = "region"
+    SCALING_GROUP = "scaling_group"
+    SCHEDULABLE = "schedulable"
+    ADDR = "addr"
+    FIRST_CONTACT = "first_contact"
+    LOST_AT = "lost_at"
+    VERSION = "version"
+
+
+# Type aliases for domain-specific filter structures
+# Using base operators (BaseFilterOperator, BaseCombineOperator) to reduce generic complexity
+# All domains share the same operators, only fields are domain-specific
+AgentFilterCondition = LeafFilterCondition[AgentFilterField]
+AgentFilterGroup = FilterGroup[AgentFilterField]
+
+
+@dataclass
+class AgentStatusFilter:
+    """
+    Filter for agent status field.
+    Compatible with Strawberry pattern for future migration.
+    """
+
+    in_: Optional[list[AgentStatus]] = None
+    equals: Optional[AgentStatus] = None
+
+
+@dataclass
+class AgentFilter:
+    """
+    Unified filter options for agents following Strawberry GraphQL pattern.
+    This structure is designed for easy migration to Strawberry in the future.
+
+    Supports logical operations (AND, OR, NOT) for complex filtering scenarios.
+    Currently populated from parsed AST, but structure matches Strawberry inputs.
+
+    Note: We import StringFilter at runtime to avoid circular dependencies.
+    StringFilter supports various string operations (equals, contains, ilike, etc.)
+    """
+
+    # Field-specific filters using StringFilter for flexible string matching
+    id: Optional[StringFilter] = None
+    status: Optional[AgentStatusFilter] = None
+    status_changed: Optional[datetime] = None
+    region: Optional[StringFilter] = None
+    scaling_group: Optional[StringFilter] = None
+    schedulable: Optional[bool] = None
+    addr: Optional[StringFilter] = None
+    first_contact: Optional[datetime] = None
+    lost_at: Optional[datetime] = None
+    version: Optional[StringFilter] = None
+
+    # Logical operations (nested filters)
+    AND: Optional[list["AgentFilter"]] = None
+    OR: Optional[list["AgentFilter"]] = None
+    NOT: Optional[list["AgentFilter"]] = None
+
+    def add_AND_filter(self, filter: AgentFilter) -> Self:
+        if self.AND is None:
+            self.AND = []
+        self.AND.append(filter)
+        return self
+
+
+@dataclass
+class AgentOrderBy:
+    """
+    Ordering specification for agents following Strawberry GraphQL pattern.
+    """
+
+    field: AgentOrderField
+    ascending: bool = True  # Default to ascending (matches OrderDirection.ASC)
+
+
+@dataclass
+class AgentFetchConditions:
+    limit: Optional[int]
+    offset: Optional[int]
+    filter: Optional[AgentFilter]
+    order_by: list[AgentOrderBy]
 
 
 @dataclass
