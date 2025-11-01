@@ -16,6 +16,7 @@ class ContainerRegistryType(enum.StrEnum):
     ECR = "ecr"
     ECR_PUB = "ecr-public"
     LOCAL = "local"
+    OCP = "ocp"
 
 
 class AllowedGroupsModel(BaseFieldModel):

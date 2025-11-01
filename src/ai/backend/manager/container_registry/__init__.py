@@ -47,6 +47,10 @@ def get_container_registry_cls(registry_info: ContainerRegistryRow) -> Type[Base
         from .local import LocalRegistry
 
         cr_cls = LocalRegistry
+    elif registry_type == ContainerRegistryType.OCP:
+        from .ocp import OpenShiftPlatformContainerRegistry
+
+        cr_cls = OpenShiftPlatformContainerRegistry
     else:
         raise RuntimeError(f"Unsupported registry type: {registry_type}")
     return cr_cls
