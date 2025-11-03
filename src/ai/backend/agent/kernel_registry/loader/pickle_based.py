@@ -11,7 +11,8 @@ from ai.backend.logging import BraceStyleAdapter
 
 from ...exception import KernelRegistryLoadError, KernelRegistryNotFound
 from ..kernel_registry import KernelRegistry
-from .abc import AbstractKernelRegistryRecovery, KernelRegistrySaveMetadata
+from .abc import AbstractKernelRegistryRecovery
+from .types import KernelRegistrySaveMetadata
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

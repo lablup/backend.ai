@@ -1,17 +1,12 @@
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 
 from ai.backend.logging import BraceStyleAdapter
 
 from ..kernel_registry import KernelRegistry
+from .types import KernelRegistrySaveMetadata
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-@dataclass
-class KernelRegistrySaveMetadata:
-    force: bool
 
 
 class AbstractKernelRegistryRecovery(ABC):
