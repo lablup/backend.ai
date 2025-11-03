@@ -180,7 +180,7 @@ Event Handler → Service Logic → Background Task Trigger (when async processi
 ┌──────────────────┴────────────────────────┐
 │            Models Layer                   │
 │  - SQLAlchemy ORM Models                  │
-│  - Domain Types & DTOs                    │
+│  - Domain Types                           │
 └───────────────────────────────────────────┘
 ```
 
@@ -399,13 +399,6 @@ See `configs/manager/halfstack.conf` for configuration file examples.
 ```bash
 # Setup development environment via script (recommended)
 ./scripts/install-dev.sh
-
-# Initialize database
-./backend.ai mgr schema oneshot
-
-# Populate sample data
-./backend.ai mgr fixture populate sample-configs/example-keypairs.json
-./backend.ai mgr fixture populate sample-configs/example-resource-presets.json
 
 # Start Manager
 ./backend.ai mgr start-server
