@@ -12,7 +12,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
-from ai.backend.common.exception import BackendAIError as BackendAIErrorException
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -1341,7 +1341,7 @@ async def import_artifacts(
                     artifact_revision=artifact_revision,
                 )
             )
-        except BackendAIErrorException as exc:
+        except BackendAIError as exc:
             errors.append(BackendAIGQLError.from_exception(exc))
 
     edges = [
