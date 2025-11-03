@@ -384,6 +384,7 @@ class ArtifactDBSource:
                         remote_status=revision_data.remote_status,
                         created_at=revision_data.created_at,
                         updated_at=revision_data.updated_at,
+                        digest=revision_data.digest,
                     )
                     db_sess.add(new_revision)
                     await db_sess.flush()
@@ -393,11 +394,8 @@ class ArtifactDBSource:
                 else:
                     # Update existing revision only if there are changes
                     has_changes = (
-                        existing_revision.readme != revision_data.readme
+                        existing_revision.digest != revision_data.digest
                         or existing_revision.remote_status != revision_data.remote_status
-                        or existing_revision.size != revision_data.size
-                        or existing_revision.created_at != revision_data.created_at
-                        or existing_revision.updated_at != revision_data.updated_at
                     )
 
                     if has_changes:
@@ -405,6 +403,7 @@ class ArtifactDBSource:
                         existing_revision.size = revision_data.size
                         existing_revision.created_at = revision_data.created_at
                         existing_revision.updated_at = revision_data.updated_at
+                        existing_revision.digest = revision_data.digest
 
                         # This must be done to avoid overwriting local revisions' remote_status with None
                         if revision_data.remote_status is not None:
@@ -480,11 +479,7 @@ class ArtifactDBSource:
                 existing_revision: ArtifactRevisionRow = revision_query_result.scalar_one_or_none()
                 if existing_revision is not None:
                     # Update existing revision only if there are changes
-                    has_changes = (
-                        existing_revision.readme != model.readme
-                        or existing_revision.updated_at != model.modified_at
-                        or existing_revision.created_at != model.created_at
-                    )
+                    has_changes = existing_revision.digest != model.sha
 
                     if has_changes:
                         existing_revision.readme = model.readme
@@ -773,6 +768,18 @@ class ArtifactDBSource:
                 sa.update(ArtifactRevisionRow)
                 .where(ArtifactRevisionRow.id == artifact_revision_id)
                 .values(readme=readme)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    async def update_artifact_revision_digest(
+        self, artifact_revision_id: uuid.UUID, digest: str
+    ) -> uuid.UUID:
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(digest=digest)
             )
             await db_sess.execute(stmt)
             return artifact_revision_id
