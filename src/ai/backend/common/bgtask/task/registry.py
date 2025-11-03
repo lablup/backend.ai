@@ -5,7 +5,7 @@ from ai.backend.common.exception import (
     BgtaskNotRegisteredError,
 )
 
-from ..types import TaskName
+from ..types import BgtaskNameBase
 from .base import (
     BaseBackgroundTaskArgs,
     BaseBackgroundTaskHandler,
@@ -36,13 +36,13 @@ class _TaskExecutor(ABC):
 
 class _TaskDefinition(_TaskExecutor, Generic[TFunctionArgs]):
     _handler: BaseBackgroundTaskHandler[TFunctionArgs]
-    _task_name: TaskName
+    _task_name: BgtaskNameBase
 
     def __init__(self, handler: BaseBackgroundTaskHandler[TFunctionArgs]) -> None:
         self._handler = handler
         self._task_name = handler.name()
 
-    def task_name(self) -> TaskName:
+    def task_name(self) -> BgtaskNameBase:
         return self._task_name
 
     @override
@@ -68,8 +68,8 @@ class BackgroundTaskHandlerRegistry:
             handler=handler,
         )
 
-    def get_task_name(self, name: str) -> TaskName:
-        """Get TaskName instance from string name."""
+    def get_task_name(self, name: str) -> BgtaskNameBase:
+        """Get BgtaskNameBase instance from string name."""
         try:
             definition = self._executor_registry[name]
         except KeyError:
@@ -84,7 +84,7 @@ class BackgroundTaskHandlerRegistry:
         return await definition.revive_task(args)
 
     async def execute_new_task(
-        self, name: TaskName, args: BaseBackgroundTaskArgs
+        self, name: BgtaskNameBase, args: BaseBackgroundTaskArgs
     ) -> BaseBackgroundTaskResult:
         try:
             definition = self._executor_registry[name.value]

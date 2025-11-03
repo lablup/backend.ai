@@ -6,14 +6,14 @@ from dataclasses import dataclass
 from typing import AsyncIterator, Optional
 
 from ..task_result import TaskResult
-from ..types import TaskID, TaskName
+from ..types import BgtaskNameBase, TaskID
 
 
 @dataclass
 class TaskContext:
     """Context object that holds task execution information."""
 
-    task_name: TaskName
+    task_name: BgtaskNameBase
     task_id: TaskID
     result: Optional[TaskResult] = None
 

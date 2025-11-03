@@ -25,10 +25,10 @@ from ai.backend.common.bgtask.exception import InvalidTaskMetadataError
 from ai.backend.common.bgtask.types import (
     WHOLE_TASK_KEY,
     BgTaskKey,
+    BgtaskNameBase,
     BgtaskStatus,
     TaskID,
     TaskInfo,
-    TaskName,
     TaskStatus,
     TaskSubKeyInfo,
     TaskTotalInfo,
@@ -443,7 +443,7 @@ class BackgroundTaskManager:
 
     async def start_retriable(
         self,
-        task_name: TaskName,
+        task_name: BgtaskNameBase,
         args: BaseBackgroundTaskArgs,
     ) -> TaskID:
         task_id = TaskID(uuid.uuid4())
@@ -478,20 +478,20 @@ class BackgroundTaskManager:
     @_exception_to_task_result
     async def _try_to_execute_new_task(
         self,
-        task_name: TaskName,
+        task_name: BgtaskNameBase,
         args: BaseBackgroundTaskArgs,
     ) -> BaseBackgroundTaskResult:
         return await self._task_registry.execute_new_task(task_name, args)
 
     @_exception_to_task_result
     async def _try_to_revive_task(
-        self, task_name: TaskName, task_info: TaskInfo
+        self, task_name: BgtaskNameBase, task_info: TaskInfo
     ) -> BaseBackgroundTaskResult:
         return await self._task_registry.revive_task(task_name.value, task_info.body)
 
     async def _execute_new_task(
         self,
-        task_name: TaskName,
+        task_name: BgtaskNameBase,
         task_id: TaskID,
         subkey: BgTaskKey,
         args: BaseBackgroundTaskArgs,
@@ -521,7 +521,7 @@ class BackgroundTaskManager:
                     )
 
     async def _revive_task(
-        self, task_name: TaskName, task_info: TaskInfo, task_key: BgTaskKey
+        self, task_name: BgtaskNameBase, task_info: TaskInfo, task_key: BgTaskKey
     ) -> None:
         async with self._hook.apply(
             TaskContext(

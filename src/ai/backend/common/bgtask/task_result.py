@@ -54,7 +54,7 @@ class TaskSuccessResult(TaskResult, Generic[R]):
         # For now, convert the result to string for the message
         # This assumes the result has a meaningful string representation
         message = (
-            str(self.result.serialize())
+            str(self.result.model_dump(mode="json"))
             if self.result is not None
             else "Task completed successfully"
         )

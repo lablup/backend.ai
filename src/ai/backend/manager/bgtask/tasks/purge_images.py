@@ -38,7 +38,7 @@ class PurgeImagesTaskResult(BaseBackgroundTaskResult):
     errors: list[str]
 
 
-class ImageRefManifest(BaseModel):
+class ImageRef(BaseModel):
     """Reference to a container image."""
 
     name: str
@@ -46,11 +46,11 @@ class ImageRefManifest(BaseModel):
     architecture: str
 
 
-class PurgeImagesKeyManifest(BaseModel):
+class PurgeImagesKey(BaseModel):
     """Key for purging images on a specific agent."""
 
     agent_id: str
-    images: list[ImageRefManifest]
+    images: list[ImageRef]
 
 
 class PurgeImagesManifest(BaseBackgroundTaskArgs):
@@ -58,7 +58,7 @@ class PurgeImagesManifest(BaseBackgroundTaskArgs):
     Manifest for purging container images from agents.
     """
 
-    keys: list[PurgeImagesKeyManifest]
+    keys: list[PurgeImagesKey]
     force: bool
     noprune: bool
 

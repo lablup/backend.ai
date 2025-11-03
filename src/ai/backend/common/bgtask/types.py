@@ -49,9 +49,6 @@ class BgtaskNameBase(ABC):
         raise NotImplementedError
 
 
-# Type alias for backward compatibility and clarity
-TaskName = BgtaskNameBase
-
 BgTaskKey = NewType("BgTaskKey", str)
 
 # Special key for single tasks without subtasks (represents the entire task)

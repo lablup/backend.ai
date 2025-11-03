@@ -30,7 +30,6 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
-from ai.backend.common.bgtask.types import TaskName
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.dto.storage.response import VFolderCloneResponse, VFolderDeleteResponse
 from ai.backend.common.events.event_types.volume.broadcast import (
@@ -55,6 +54,7 @@ from ai.backend.common.types import (
     VolumeMountableNodeType,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.bgtask.types import StorageBgtaskName
 
 from .. import __version__
 from ..bgtask.tasks.clone import VFolderCloneTaskArgs
@@ -441,7 +441,7 @@ async def delete_vfolder(request: web.Request) -> web.Response:
             vfolder_id=vfid,
         )
         task_id = await ctx.background_task_manager.start_retriable(
-            TaskName.DELETE_VFOLDER,
+            StorageBgtaskName.DELETE_VFOLDER,  # type: ignore[arg-type]
             delete_args,
         )
         data = VFolderDeleteResponse(bgtask_id=task_id).model_dump(mode="json")
@@ -481,7 +481,7 @@ async def clone_vfolder(request: web.Request) -> web.Response:
             dst_vfolder=params["dst_vfid"],
         )
         task_id = await ctx.background_task_manager.start_retriable(
-            TaskName.CLONE_VFOLDER,
+            StorageBgtaskName.CLONE_VFOLDER,  # type: ignore[arg-type]
             clone_args,
         )
         data = VFolderCloneResponse(bgtask_id=task_id).model_dump(mode="json")
