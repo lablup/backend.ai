@@ -3,10 +3,8 @@ from __future__ import annotations
 import enum
 from typing import Self
 
-from ai.backend.common.bgtask.types import BgtaskNameBase
 
-
-class ManagerBgtaskName(enum.StrEnum, BgtaskNameBase):
+class ManagerBgtaskName(enum.StrEnum):
     """Background task names for manager component."""
 
     RESCAN_IMAGES = "rescan_images"

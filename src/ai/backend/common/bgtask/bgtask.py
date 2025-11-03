@@ -70,7 +70,7 @@ from .hooks import (
     ValkeyUnregisterHook,
 )
 from .reporter import ProgressReporter
-from .task.base import BaseBackgroundTaskArgs, BaseBackgroundTaskResult
+from .task.base import BaseBackgroundTaskManifest, BaseBackgroundTaskResult
 from .task.registry import BackgroundTaskHandlerRegistry
 from .task_result import TaskCancelledResult, TaskFailedResult, TaskResult, TaskSuccessResult
 
@@ -231,7 +231,7 @@ class ParallelBgtask(BackgroundTaskMeta):
 
 
 def _exception_to_task_result(
-    func: Callable[P, Awaitable[BaseBackgroundTaskResult]],
+    func: Callable[P, Awaitable[Optional[BaseBackgroundTaskResult]]],
 ) -> Callable[P, Awaitable[TaskResult]]:
     """
     Decorator that converts exceptions raised during background task execution
@@ -444,17 +444,19 @@ class BackgroundTaskManager:
     async def start_retriable(
         self,
         task_name: BgtaskNameBase,
-        args: BaseBackgroundTaskArgs,
+        manifest: BaseBackgroundTaskManifest,
     ) -> TaskID:
         task_id = TaskID(uuid.uuid4())
-        task = asyncio.create_task(self._execute_new_task(task_name, task_id, WHOLE_TASK_KEY, args))
+        task = asyncio.create_task(
+            self._execute_new_task(task_name, task_id, WHOLE_TASK_KEY, manifest)
+        )
 
         # Create TaskTotalInfo for storage
         task_info = TaskInfo(
             task_id=task_id,
             task_name=task_name.value,
             task_type=TaskType.SINGLE,
-            body=args.model_dump(mode="json"),
+            body=manifest.model_dump(mode="json"),
             ongoing_count=1,
             success_count=0,
             failure_count=0,
@@ -479,14 +481,14 @@ class BackgroundTaskManager:
     async def _try_to_execute_new_task(
         self,
         task_name: BgtaskNameBase,
-        args: BaseBackgroundTaskArgs,
-    ) -> BaseBackgroundTaskResult:
-        return await self._task_registry.execute_new_task(task_name, args)
+        manifest: BaseBackgroundTaskManifest,
+    ) -> Optional[BaseBackgroundTaskResult]:
+        return await self._task_registry.execute_new_task(task_name, manifest)
 
     @_exception_to_task_result
     async def _try_to_revive_task(
         self, task_name: BgtaskNameBase, task_info: TaskInfo
-    ) -> BaseBackgroundTaskResult:
+    ) -> Optional[BaseBackgroundTaskResult]:
         return await self._task_registry.revive_task(task_name.value, task_info.body)
 
     async def _execute_new_task(
@@ -494,7 +496,7 @@ class BackgroundTaskManager:
         task_name: BgtaskNameBase,
         task_id: TaskID,
         subkey: BgTaskKey,
-        args: BaseBackgroundTaskArgs,
+        manifest: BaseBackgroundTaskManifest,
     ) -> None:
         async with self._hook.apply(
             TaskContext(
@@ -505,7 +507,7 @@ class BackgroundTaskManager:
             task_status: TaskStatus = TaskStatus.SUCCESS
             last_message = "Task completed successfully"
             try:
-                task_result = await self._try_to_execute_new_task(task_name, args)
+                task_result = await self._try_to_execute_new_task(task_name, manifest)
                 context.result = task_result
             except Exception as e:
                 task_status = TaskStatus.FAILURE
@@ -592,7 +594,19 @@ class BackgroundTaskManager:
         try:
             task_name = self._task_registry.get_task_name(task_name_str)
         except Exception as e:
-            log.warning("Cannot revive task {}: {}", task_info.task_id, e)
+            log.warning(
+                "Cannot revive task {}: {}. Marking all subtasks as failed.", task_info.task_id, e
+            )
+            # Mark all ongoing subtasks as failed to prevent infinite retry
+            for subkey_info in total_info.task_key_list:
+                if subkey_info.status == TaskStatus.ONGOING:
+                    with suppress(Exception):
+                        await self._valkey_client.finish_subtask(
+                            task_id=task_info.task_id,
+                            subkey=subkey_info.key,
+                            status=TaskStatus.FAILURE,
+                            last_message=f"Task handler not registered: {task_name_str}",
+                        )
             return
 
         async_tasks: list[asyncio.Task] = []

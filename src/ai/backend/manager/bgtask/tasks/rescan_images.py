@@ -4,12 +4,19 @@ import logging
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.bgtask.task.base import (
-    BaseBackgroundTaskArgs,
     BaseBackgroundTaskHandler,
+    BaseBackgroundTaskManifest,
     BaseBackgroundTaskResult,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
+from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
+    LoadAllContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.actions.load_container_registries import (
+    LoadContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.actions.rescan_images import RescanImagesAction
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
@@ -27,7 +34,7 @@ class RescanImagesTaskResult(BaseBackgroundTaskResult):
     errors: list[str]
 
 
-class RescanImagesManifest(BaseBackgroundTaskArgs):
+class RescanImagesManifest(BaseBackgroundTaskManifest):
     """
     Manifest for rescanning container images from registries.
     """
@@ -36,7 +43,7 @@ class RescanImagesManifest(BaseBackgroundTaskArgs):
     project: str | None = None
 
 
-class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest]):
+class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest, RescanImagesTaskResult]):
     """
     Background task handler for rescanning container images.
     """
@@ -53,22 +60,16 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest]):
 
     @classmethod
     @override
-    def args_type(cls) -> type[RescanImagesManifest]:
+    def manifest_type(cls) -> type[RescanImagesManifest]:
         return RescanImagesManifest
 
     @override
-    async def execute(self, args: RescanImagesManifest) -> BaseBackgroundTaskResult:
-        from ai.backend.manager.services.image.actions.container_registry import (
-            LoadAllContainerRegistriesAction,
-            LoadContainerRegistriesAction,
-            RescanImagesAction,
-        )
-
+    async def execute(self, manifest: RescanImagesManifest) -> RescanImagesTaskResult:
         # TODO: Import actual result types when available
         # For now using placeholder types
         loaded_registries = []
 
-        if args.registry is None:
+        if manifest.registry is None:
             all_registries = await self._processors.container_registry.load_all_container_registries.wait_for_complete(
                 LoadAllContainerRegistriesAction()
             )
@@ -76,8 +77,8 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest]):
         else:
             registries = await self._processors.container_registry.load_container_registries.wait_for_complete(
                 LoadContainerRegistriesAction(
-                    registry=args.registry,
-                    project=args.project,
+                    registry=manifest.registry,
+                    project=manifest.project,
                 )
             )
             loaded_registries = registries.registries

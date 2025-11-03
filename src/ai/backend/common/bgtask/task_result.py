@@ -22,7 +22,7 @@ from ..exception import (
 )
 from .types import BgtaskStatus
 
-R = TypeVar("R", bound=BaseBackgroundTaskResult)
+R = TypeVar("R", bound=Optional[BaseBackgroundTaskResult])
 
 
 class TaskResult(ABC):

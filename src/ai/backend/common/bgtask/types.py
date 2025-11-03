@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import enum
 import uuid
-from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, NewType, Self
+from typing import Any, NewType, Protocol, Self
 
 from pydantic import BaseModel, Field
 from pydantic_core import ValidationError
@@ -28,25 +27,23 @@ class BgtaskStatus(enum.StrEnum):
         return self in {self.DONE, self.CANCELLED, self.FAILED, self.PARTIAL_SUCCESS}
 
 
-class BgtaskNameBase(ABC):
+class BgtaskNameBase(Protocol):
     """
-    Abstract base class for background task names.
+    Protocol for background task names.
 
     Each component (storage, manager, agent) should define its own
-    background task name enum inheriting from this class and StrEnum.
+    background task name enum inheriting from StrEnum and implementing this protocol.
     """
 
     @property
-    @abstractmethod
     def value(self) -> str:
         """Return the string value of the background task name."""
-        raise NotImplementedError
+        ...
 
     @classmethod
-    @abstractmethod
     def from_str(cls, value: str) -> Self:
         """Create instance from string value."""
-        raise NotImplementedError
+        ...
 
 
 BgTaskKey = NewType("BgTaskKey", str)

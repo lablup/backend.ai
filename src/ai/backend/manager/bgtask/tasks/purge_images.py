@@ -6,12 +6,15 @@ from typing import TYPE_CHECKING, override
 from pydantic import BaseModel
 
 from ai.backend.common.bgtask.task.base import (
-    BaseBackgroundTaskArgs,
     BaseBackgroundTaskHandler,
+    BaseBackgroundTaskManifest,
     BaseBackgroundTaskResult,
 )
+from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
+from ai.backend.manager.services.image.actions.purge_images import PurgeImageAction
+from ai.backend.manager.services.image.types import ImageRefData
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
@@ -38,32 +41,32 @@ class PurgeImagesTaskResult(BaseBackgroundTaskResult):
     errors: list[str]
 
 
-class ImageRef(BaseModel):
-    """Reference to a container image."""
+class PurgeImageSpec(BaseModel):
+    """Specification of a container image to purge."""
 
     name: str
     registry: str
     architecture: str
 
 
-class PurgeImagesKey(BaseModel):
-    """Key for purging images on a specific agent."""
+class PurgeAgentSpec(BaseModel):
+    """Specification for purging images on a specific agent."""
 
     agent_id: str
-    images: list[ImageRef]
+    images: list[PurgeImageSpec]
 
 
-class PurgeImagesManifest(BaseBackgroundTaskArgs):
+class PurgeImagesManifest(BaseBackgroundTaskManifest):
     """
     Manifest for purging container images from agents.
     """
 
-    keys: list[PurgeImagesKey]
+    keys: list[PurgeAgentSpec]
     force: bool
     noprune: bool
 
 
-class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest]):
+class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest, PurgeImagesTaskResult]):
     """
     Background task handler for purging container images from agents.
     """
@@ -80,22 +83,17 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest]):
 
     @classmethod
     @override
-    def args_type(cls) -> type[PurgeImagesManifest]:
+    def manifest_type(cls) -> type[PurgeImagesManifest]:
         return PurgeImagesManifest
 
     @override
-    async def execute(self, args: PurgeImagesManifest) -> BaseBackgroundTaskResult:
-        from ai.backend.manager.services.image.actions.image import (
-            ImageRefData,
-            PurgeImageAction,
-        )
-
+    async def execute(self, manifest: PurgeImagesManifest) -> PurgeImagesTaskResult:
         total_reserved_bytes = 0
         purged_images: list[PurgedImageData] = []
         errors: list[str] = []
 
-        for key in args.keys:
-            agent_id = key.agent_id
+        for key in manifest.keys:
+            agent_id = AgentId(key.agent_id)
             for img in key.images:
                 result = await self._processors.image.purge_image.wait_for_complete(
                     PurgeImageAction(
@@ -105,8 +103,8 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest]):
                             architecture=img.architecture,
                         ),
                         agent_id=agent_id,
-                        force=args.force,
-                        noprune=args.noprune,
+                        force=manifest.force,
+                        noprune=manifest.noprune,
                     )
                 )
 

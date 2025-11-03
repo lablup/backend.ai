@@ -57,8 +57,8 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.bgtask.types import StorageBgtaskName
 
 from .. import __version__
-from ..bgtask.tasks.clone import VFolderCloneTaskArgs
-from ..bgtask.tasks.delete import VFolderDeleteTaskArgs
+from ..bgtask.tasks.clone import VFolderCloneManifest
+from ..bgtask.tasks.delete import VFolderDeleteManifest
 from ..exception import (
     ExternalStorageServiceError,
     InvalidQuotaConfig,
@@ -436,13 +436,13 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: RootContext = request.app["ctx"]
         vfid: VFolderID = params["vfid"]
-        delete_args = VFolderDeleteTaskArgs(
+        delete_manifest = VFolderDeleteManifest(
             volume=params["volume"],
             vfolder_id=vfid,
         )
         task_id = await ctx.background_task_manager.start_retriable(
-            StorageBgtaskName.DELETE_VFOLDER,  # type: ignore[arg-type]
-            delete_args,
+            StorageBgtaskName.DELETE_VFOLDER,
+            delete_manifest,
         )
         data = VFolderDeleteResponse(bgtask_id=task_id).model_dump(mode="json")
         return web.json_response(data, status=HTTPStatus.ACCEPTED)
@@ -475,14 +475,14 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         ctx: RootContext = request.app["ctx"]
         if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
             raise StorageProxyError("Cross-volume vfolder cloning is not implemented yet")
-        clone_args = VFolderCloneTaskArgs(
+        clone_manifest = VFolderCloneManifest(
             volume=params["src_volume"],
             src_vfolder=params["src_vfid"],
             dst_vfolder=params["dst_vfid"],
         )
         task_id = await ctx.background_task_manager.start_retriable(
-            StorageBgtaskName.CLONE_VFOLDER,  # type: ignore[arg-type]
-            clone_args,
+            StorageBgtaskName.CLONE_VFOLDER,
+            clone_manifest,
         )
         data = VFolderCloneResponse(bgtask_id=task_id).model_dump(mode="json")
         return web.json_response(data)

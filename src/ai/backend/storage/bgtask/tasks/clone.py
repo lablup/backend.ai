@@ -4,10 +4,8 @@ import logging
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.bgtask.task.base import (
-    BaseBackgroundTaskArgs,
     BaseBackgroundTaskHandler,
-    BaseBackgroundTaskResult,
-    EmptyTaskResult,
+    BaseBackgroundTaskManifest,
 )
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
@@ -24,13 +22,13 @@ if TYPE_CHECKING:
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class VFolderCloneTaskArgs(BaseBackgroundTaskArgs):
+class VFolderCloneManifest(BaseBackgroundTaskManifest):
     volume: str
     src_vfolder: VFolderID
     dst_vfolder: VFolderID
 
 
-class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
+class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneManifest, None]):
     _volume_pool: VolumePool
     _event_producer: EventProducer
 
@@ -45,25 +43,25 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
 
     @classmethod
     @override
-    def args_type(cls) -> type[VFolderCloneTaskArgs]:
-        return VFolderCloneTaskArgs
+    def manifest_type(cls) -> type[VFolderCloneManifest]:
+        return VFolderCloneManifest
 
     @override
-    async def execute(self, args: VFolderCloneTaskArgs) -> BaseBackgroundTaskResult:
+    async def execute(self, manifest: VFolderCloneManifest) -> None:
         try:
-            async with self._volume_pool.get_volume_by_name(args.volume) as volume:
+            async with self._volume_pool.get_volume_by_name(manifest.volume) as volume:
                 await volume.clone_vfolder(
-                    args.src_vfolder,
-                    args.dst_vfolder,
+                    manifest.src_vfolder,
+                    manifest.dst_vfolder,
                 )
         except Exception as e:
             log.exception(
-                f"VFolder cloning task failed. (src_vfid:{args.src_vfolder}, dst_vfid:{args.dst_vfolder}, e:{str(e)})"
+                f"VFolder cloning task failed. (src_vfid:{manifest.src_vfolder}, dst_vfid:{manifest.dst_vfolder}, e:{str(e)})"
             )
             await self._event_producer.anycast_event(
                 VFolderCloneFailureEvent(
-                    args.src_vfolder,
-                    args.dst_vfolder,
+                    manifest.src_vfolder,
+                    manifest.dst_vfolder,
                     str(e),
                 )
             )
@@ -71,8 +69,7 @@ class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneTaskArgs]):
         else:
             await self._event_producer.anycast_event(
                 VFolderCloneSuccessEvent(
-                    args.src_vfolder,
-                    args.dst_vfolder,
+                    manifest.src_vfolder,
+                    manifest.dst_vfolder,
                 )
             )
-        return EmptyTaskResult()

@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import Generic, Optional, TypeVar
 
 from pydantic import BaseModel, ConfigDict
 
 from ..types import BgtaskNameBase
 
 
-class BaseBackgroundTaskArgs(BaseModel):
+class BaseBackgroundTaskManifest(BaseModel):
     """
-    Base class for background task arguments using Pydantic.
+    Base class for background task manifests using Pydantic.
     Provides automatic serialization/deserialization via model_dump() and model_validate().
     """
 
@@ -30,16 +30,11 @@ class BaseBackgroundTaskResult(BaseModel):
     )
 
 
-class EmptyTaskResult(BaseBackgroundTaskResult):
-    """Result class for tasks that don't produce meaningful output."""
-
-    pass
+TManifest = TypeVar("TManifest", bound=BaseBackgroundTaskManifest)
+TResult = TypeVar("TResult", bound=Optional[BaseBackgroundTaskResult])
 
 
-TFunctionArgs = TypeVar("TFunctionArgs", bound=BaseBackgroundTaskArgs)
-
-
-class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
+class BaseBackgroundTaskHandler(Generic[TManifest, TResult], ABC):
     @classmethod
     @abstractmethod
     def name(cls) -> BgtaskNameBase:
@@ -52,18 +47,19 @@ class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
 
     @classmethod
     @abstractmethod
-    def args_type(cls) -> type[TFunctionArgs]:
+    def manifest_type(cls) -> type[TManifest]:
         """
-        Return the type of arguments that this task expects.
+        Return the type of manifest that this task expects.
         This method should be implemented by subclasses to provide
-        the specific argument type.
+        the specific manifest type.
         """
         raise NotImplementedError("Subclasses must implement this method")
 
     @abstractmethod
-    async def execute(self, args: TFunctionArgs) -> BaseBackgroundTaskResult:
+    async def execute(self, manifest: TManifest) -> TResult:
         """
-        Execute the background task with the provided reporter and arguments.
+        Execute the background task with the provided manifest.
+        Returns the result or None if no meaningful result is produced.
         This method should be implemented by subclasses to provide
         the specific execution logic.
         """
