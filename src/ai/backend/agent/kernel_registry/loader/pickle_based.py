@@ -47,8 +47,16 @@ class KernelRegistryPickleRecovery(AbstractKernelRegistryRecovery):
     async def load_kernel_registry(self) -> KernelRegistry:
         legacy_registry_file = self._get_legacy_registry_file_path()
         last_registry_file = self._get_last_registry_file_path()
-        if os.path.isfile(legacy_registry_file):
-            shutil.move(legacy_registry_file, last_registry_file)
+        try:
+            if os.path.isfile(legacy_registry_file):
+                shutil.move(legacy_registry_file, last_registry_file)
+        except Exception as e:
+            log.warning(
+                "Failed to move legacy kernel registry file {} to {} (err: {})",
+                str(legacy_registry_file),
+                str(last_registry_file),
+                str(e),
+            )
         try:
             with open(last_registry_file, "rb") as f:
                 return pickle.load(f)
