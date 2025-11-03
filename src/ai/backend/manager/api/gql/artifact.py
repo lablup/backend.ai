@@ -21,7 +21,7 @@ from ai.backend.manager.api.gql.base import (
     build_pagination_options,
     to_global_id,
 )
-from ai.backend.manager.api.gql.error import BackendAIError
+from ai.backend.manager.api.gql.error import BackendAIGQLError
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
@@ -743,7 +743,7 @@ class ArtifactRevisionImportTask:
 class ImportArtifactsPayload:
     artifact_revisions: ArtifactRevisionConnection
     tasks: list[ArtifactRevisionImportTask]
-    errors: list[BackendAIError] = strawberry.field(
+    errors: list[BackendAIGQLError] = strawberry.field(
         default_factory=list, description="Errors that occurred during import artifacts"
     )
 
@@ -1342,7 +1342,7 @@ async def import_artifacts(
                 )
             )
         except BackendAIErrorException as exc:
-            errors.append(BackendAIError.from_exception(exc))
+            errors.append(BackendAIGQLError.from_exception(exc))
 
     edges = [
         ArtifactRevisionEdge(node=artifact, cursor=to_global_id(ArtifactRevisionEdge, artifact.id))

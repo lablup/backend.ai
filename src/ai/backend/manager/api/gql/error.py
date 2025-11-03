@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Self
 
 import strawberry
 
 if TYPE_CHECKING:
-    from ai.backend.common.exception import BackendAIError as BackendAIErrorException
+    from ai.backend.common.exception import BackendAIError
     from ai.backend.common.exception import ErrorCode as ErrorCodeData
 
 
@@ -34,10 +34,8 @@ class ErrorCode:
         )
 
 
-@strawberry.type(
-    name="BackendAIError", description="Structured error information from Backend.AI API"
-)
-class BackendAIError:
+@strawberry.type(description="Structured error information from Backend.AI API")
+class BackendAIGQLError:
     error_code: ErrorCode = strawberry.field(
         description="Structured error code with domain, operation, and error detail"
     )
@@ -50,7 +48,7 @@ class BackendAIError:
     )
 
     @classmethod
-    def from_exception(cls, exc: BackendAIErrorException) -> BackendAIError:
+    def from_exception(cls, exc: BackendAIError) -> Self:
         """
         Create a GraphQL BackendAIError from a BackendAIError exception.
         """
