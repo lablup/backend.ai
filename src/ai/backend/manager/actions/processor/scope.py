@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
@@ -17,14 +18,14 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class ScopeActionProcessor(Generic[TScopeAction, TScopeActionResult]):
-    _validators: list[ScopeActionValidator]
+    _validators: Sequence[ScopeActionValidator]
     _runner: ActionRunner[TScopeAction, TScopeActionResult]
 
     def __init__(
         self,
         func: Callable[[TScopeAction], Awaitable[TScopeActionResult]],
-        monitors: Optional[list[ActionMonitor]] = None,
-        validators: Optional[list[ScopeActionValidator]] = None,
+        monitors: Optional[Sequence[ActionMonitor]] = None,
+        validators: Optional[Sequence[ScopeActionValidator]] = None,
     ) -> None:
         self._runner = ActionRunner(func, monitors)
         self._validators = validators or []

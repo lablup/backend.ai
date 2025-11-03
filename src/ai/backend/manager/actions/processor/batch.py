@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
@@ -17,15 +18,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class BatchActionProcessor(Generic[TBatchAction, TBatchActionResult]):
-    _validators: list[BatchActionValidator]
+    _validators: Sequence[BatchActionValidator]
 
     _runner: ActionRunner[TBatchAction, TBatchActionResult]
 
     def __init__(
         self,
         func: Callable[[TBatchAction], Awaitable[TBatchActionResult]],
-        monitors: Optional[list[ActionMonitor]] = None,
-        validators: Optional[list[BatchActionValidator]] = None,
+        monitors: Optional[Sequence[ActionMonitor]] = None,
+        validators: Optional[Sequence[BatchActionValidator]] = None,
     ) -> None:
         self._runner = ActionRunner(func, monitors)
 
