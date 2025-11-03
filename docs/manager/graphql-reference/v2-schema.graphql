@@ -487,7 +487,7 @@ type AutoScalingRule implements Node {
 }
 
 """Structured error information from Backend.AI API"""
-type BackendAIError {
+type BackendAIGQLError {
   """Structured error code with domain, operation, and error detail"""
   errorCode: ErrorCode!
 
@@ -1102,7 +1102,7 @@ type ImportArtifactsPayload {
   tasks: [ArtifactRevisionImportTask!]!
 
   """Errors that occurred during import artifacts"""
-  errors: [BackendAIError!]!
+  errors: [BackendAIGQLError!]!
 }
 
 input IntFilter {
