@@ -829,3 +829,16 @@ class UnsupportedOperation(BackendAIError, web.HTTPBadRequest):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.BAD_REQUEST,
         )
+
+
+class UnsupportedFieldType(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/unsupported-field-type"
+    error_title = "Unsupported Field Type"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
+        )

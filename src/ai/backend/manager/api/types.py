@@ -19,12 +19,13 @@ from typing import (
 import aiohttp_cors
 from aiohttp import web
 from aiohttp.typedefs import Middleware
-from lark import Tree
+from lark import Tree, UnexpectedCharacters, UnexpectedToken
 from lark.lexer import Token
 from typing_extensions import TypeAlias
 
 from ai.backend.common.exception import ASTParsingFailed, InvalidParameter, UnsupportedOperation
 from ai.backend.manager.api.gql.base import StringFilter
+from ai.backend.manager.models.minilang.queryfilter import _parser as parser
 
 if TYPE_CHECKING:
     from .context import RootContext
@@ -235,18 +236,17 @@ class BaseMinilangFilterConverter(ABC):
         raise NotImplementedError()
 
     @classmethod
-    @abstractmethod
     def from_minilang(cls, expr: str) -> Self:
         """
         Convert minilang expression string to Filter object.
-
-        Args:
-            expr: Minilang filter expression string
-
-        Returns:
-            Filter object of the calling class type
         """
-        raise NotImplementedError()
+        try:
+            ast = parser.parse(expr)
+        except UnexpectedToken as e:
+            raise ASTParsingFailed(f"Failed to parse minilang expression: {e}")
+        except UnexpectedCharacters as e:
+            raise UnsupportedOperation(f"Failed to parse minilang expression: {e}")
+        return cls._from_ast(ast)
 
     @classmethod
     def _from_ast(cls, ast: Tree) -> Self:
