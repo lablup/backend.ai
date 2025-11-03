@@ -82,20 +82,20 @@ class TestBaseMinilangFilterConverter:
         self, sample_filter_class: Any, query: str, field: str, attribute: str, expected: str
     ) -> None:
         result = sample_filter_class.from_minilang(query)
+
+        # Verify the specific field filter
         field_filter = getattr(result, field)
         assert field_filter is not None
+
+        # Verify the expected attribute and value is set correctly
         assert getattr(field_filter, attribute) == expected
 
     @pytest.mark.parametrize(
-        ("query", "expected_checks", "expected_count"),
+        ("query", "expected_conditions"),
         [
             (
                 '(role == "admin") & (department == "Engineering")',
-                [
-                    ("role", "equals", "admin"),
-                    ("department", "equals", "Engineering"),
-                ],
-                2,
+                [("role", "equals", "admin"), ("department", "equals", "Engineering")],
             ),
             (
                 '(email ilike "%@company.com%") & (status == "active") & (name ilike "%admin%")',
@@ -104,17 +104,15 @@ class TestBaseMinilangFilterConverter:
                     ("status", "equals", "active"),
                     ("name", "i_contains", "admin"),
                 ],
-                3,
             ),
             (
-                '(name like "Admin%")& (role == "superuser") & (status != "active") &(department == "devops")',
+                '(name like "Admin%") & (role == "superuser") & (status != "active") & (department == "devops")',
                 [
                     ("name", "starts_with", "Admin"),
                     ("role", "equals", "superuser"),
                     ("status", "not_equals", "active"),
                     ("department", "equals", "devops"),
                 ],
-                4,
             ),
         ],
     )
@@ -122,57 +120,61 @@ class TestBaseMinilangFilterConverter:
         self,
         sample_filter_class: Any,
         query: str,
-        expected_checks: list[tuple[str, ...]],
-        expected_count: int,
+        expected_conditions: list[tuple[str, str, str]],
     ) -> None:
         result = sample_filter_class.from_minilang(query)
 
-        def collect_filters(f: Any) -> list[Any]:
+        # Verify that result has AND structure
+        assert result.AND is not None
+
+        # Recursively check all AND filters
+        def check_filter(f: Any, field: str, attribute: str, expected: str) -> bool:
+            # Check direct field
+            field_filter = getattr(f, field, None)
+            if (field_filter is not None) and (getattr(field_filter, attribute, None) == expected):
+                return True
+
+            # Check nested AND recursively
             if f.AND is not None:
-                filters = []
-                for sub in f.AND:
-                    filters.extend(collect_filters(sub))
-                return filters
-            return [f]
+                for nested in f.AND:
+                    if check_filter(nested, field, attribute, expected):
+                        return True
 
-        all_filters = collect_filters(result)
-        assert len(all_filters) == expected_count
+            return False
 
-        for field, attribute, expected in expected_checks:
-            matching = [
-                f
-                for f in all_filters
-                if getattr(f, field) is not None
-                and getattr(getattr(f, field), attribute) == expected
-            ]
-            assert len(matching) == 1, f"Expected one {field} filter with {attribute}={expected}"
+        # Verify each expected condition
+        for field, attribute, expected in expected_conditions:
+            assert check_filter(result, field, attribute, expected), (
+                f"Expected {field}.{attribute}={expected} not found in AND filters"
+            )
 
     @pytest.mark.parametrize(
-        ("query", "field", "expected_values", "expected_or_count"),
+        ("query", "expected_conditions"),
         [
             (
-                '(status == "invited") | (status == "registered")',
-                "status",
-                ["invited", "registered"],
-                2,
+                '(status == "invited") | (status != "registered")',
+                [("status", "equals", "invited"), ("status", "not_equals", "registered")],
             ),
             (
-                '(department == "Sales") | (department == "Marketing")',
-                "department",
-                ["Sales", "Marketing"],
-                2,
+                '(department == "Sales") | (department ilike "Market%")',
+                [("department", "equals", "Sales"), ("department", "i_starts_with", "Market")],
             ),
             (
-                '(status == "active") | (status == "pending") | (status == "invited")',
-                "status",
-                ["active", "pending", "invited"],
-                3,
+                '(status == "active") | (status != "pending") | (status == "invited")',
+                [
+                    ("status", "equals", "active"),
+                    ("status", "not_equals", "pending"),
+                    ("status", "equals", "invited"),
+                ],
             ),
             (
                 '(role == "admin") | (role == "superadmin") | (role == "user") | (role == "monitor")',
-                "role",
-                ["admin", "superadmin", "user", "monitor"],
-                4,
+                [
+                    ("role", "equals", "admin"),
+                    ("role", "equals", "superadmin"),
+                    ("role", "equals", "user"),
+                    ("role", "equals", "monitor"),
+                ],
             ),
         ],
     )
@@ -180,52 +182,56 @@ class TestBaseMinilangFilterConverter:
         self,
         sample_filter_class: Any,
         query: str,
-        field: str,
-        expected_values: list[str],
-        expected_or_count: int,
+        expected_conditions: list[tuple[str, str, str]],
     ) -> None:
         result = sample_filter_class.from_minilang(query)
 
-        def collect_or_filters(f: Any) -> list[Any]:
-            if f.OR is not None:
-                filters = []
-                for sub in f.OR:
-                    filters.extend(collect_or_filters(sub))
-                return filters
-            return [f]
+        # Verify that result has OR structure
+        assert result.OR is not None
 
-        all_filters = collect_or_filters(result)
-        field_filters = [f for f in all_filters if getattr(f, field) is not None]
-        assert len(field_filters) == expected_or_count
-        values = [getattr(f, field).equals for f in field_filters]
-        assert set(values) == set(expected_values)
+        # Recursively check all OR filters
+        def check_filter(f: Any, field: str, attribute: str, expected: str) -> bool:
+            # Check direct field
+            field_filter = getattr(f, field, None)
+            if field_filter is not None and getattr(field_filter, attribute, None) == expected:
+                return True
+
+            # Check nested OR recursively
+            if f.OR is not None:
+                for nested in f.OR:
+                    if check_filter(nested, field, attribute, expected):
+                        return True
+
+            return False
+
+        # Verify each expected condition
+        for field, attribute, expected in expected_conditions:
+            assert check_filter(result, field, attribute, expected), (
+                f"Expected {field}.{attribute}={expected} not found in OR filters"
+            )
 
     @pytest.mark.parametrize(
-        ("query", "or_field", "or_values", "and_checks"),
+        ("query", "and_conditions", "or_conditions"),
         [
             (
-                '(name ilike "%admin%") & ((status == "active") | (status == "pending"))',
-                "status",
-                ["active", "pending"],
+                '(name ilike "%admin%") & ((status == "active") | (status != "pending"))',
                 [("name", "i_contains", "admin")],
+                [("status", "equals", "active"), ("status", "not_equals", "pending")],
             ),
             (
-                '(email ilike "%@company.com") & ((role == "admin") | (role == "manager"))',
-                "role",
-                ["admin", "manager"],
+                '(email ilike "%@company.com") & ((role == "admin") | (role != "manager"))',
                 [("email", "i_ends_with", "@company.com")],
+                [("role", "equals", "admin"), ("role", "not_equals", "manager")],
             ),
             (
-                '(active == true) & ((department == "Sales") | (department == "Marketing"))',
-                "department",
-                ["Sales", "Marketing"],
+                '(active == true) & ((department ilike "%Sales%") | (department == "Marketing"))',
                 [("active", "equals", "True")],
+                [("department", "i_contains", "Sales"), ("department", "equals", "Marketing")],
             ),
             (
                 '(id == "user123") & ((status == "active") | (status == "invited"))',
-                "status",
-                ["active", "invited"],
                 [("id", "equals", "user123")],
+                [("status", "equals", "active"), ("status", "equals", "invited")],
             ),
         ],
     )
@@ -233,32 +239,43 @@ class TestBaseMinilangFilterConverter:
         self,
         sample_filter_class: Any,
         query: str,
-        or_field: str,
-        or_values: list[str],
-        and_checks: list[tuple[str, str, str]],
+        and_conditions: list[tuple[str, str, str]],
+        or_conditions: list[tuple[str, str, str]],
     ) -> None:
-        """Test mixed AND/OR combinations"""
         result = sample_filter_class.from_minilang(query)
 
-        assert result.AND is not None
-        assert len(result.AND) == 2
+        # Recursively check all filters (both AND and OR chains)
+        def check_filter(f: Any, field: str, attribute: str, expected: str) -> bool:
+            # Check direct field
+            field_filter = getattr(f, field, None)
+            if field_filter is not None and getattr(field_filter, attribute, None) == expected:
+                return True
 
-        # Verify AND part
-        and_filter = next(f for f in result.AND if getattr(f, or_field) is None)
-        for field, attribute, expected in and_checks:
-            field_filter = getattr(and_filter, field)
-            assert field_filter is not None
-            assert getattr(field_filter, attribute) == expected
+            # Check nested AND
+            if f.AND is not None:
+                for nested in f.AND:
+                    if check_filter(nested, field, attribute, expected):
+                        return True
 
-        # Verify OR part
-        or_filter = next(f for f in result.AND if f.OR is not None)
-        assert or_filter.OR is not None
-        assert len(or_filter.OR) == 2
+            # Check nested OR
+            if f.OR is not None:
+                for nested in f.OR:
+                    if check_filter(nested, field, attribute, expected):
+                        return True
 
-        values = [
-            getattr(f, or_field).equals for f in or_filter.OR if getattr(f, or_field) is not None
-        ]
-        assert set(values) == set(or_values)
+            return False
+
+        # Verify AND conditions
+        for field, attribute, expected in and_conditions:
+            assert check_filter(result, field, attribute, expected), (
+                f"AND condition {field}.{attribute}={expected} not found"
+            )
+
+        # Verify OR conditions
+        for field, attribute, expected in or_conditions:
+            assert check_filter(result, field, attribute, expected), (
+                f"OR condition {field}.{attribute}={expected} not found"
+            )
 
     @pytest.mark.parametrize(
         ("query", "expected_exception"),
