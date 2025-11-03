@@ -349,7 +349,6 @@ This script:
 - Checks Docker availability
 - Sets up PostgreSQL, Redis, etcd containers
 - Configures development environment
-- Requires sudo access on Linux/macOS
 
 **Manual Component Startup**:
 ```bash
@@ -663,7 +662,6 @@ Halfstack includes exporters for infrastructure metrics collection.
 - **Halfstack Port**: 9000 (API), 9001 (Console)
 - **Default Auth**: minioadmin / minioadmin
 - **Data Volume**: `half-minio`
-- **Storage Modes**: Provides both MinIO Storage mode and VFS Storage mode
 - **Note**: Not required when using only VFS Storage. Optional for typical Backend.AI use cases
 
 ### Infrastructure Dependency Matrix
@@ -783,12 +781,12 @@ See [Port Number Guide](#port-number-guide) for detailed port information.
 | Webserver → Manager | HTTP | 8091 | REST API proxy |
 | Manager → Agent | ZeroMQ RPC | 6011 | Session management commands (create, destroy, execute) |
 | Agent → Manager | ZeroMQ Event Push | 5002 | Status reports (kernel_created, stats) |
-| Manager → Storage Proxy | HTTP/gRPC | 6022 | VFolder management tasks |
+| Manager → Storage Proxy | HTTP | 6022 | VFolder management tasks |
 | Client → Storage Proxy | HTTP | 6021 | File upload/download (direct access) |
 | Manager → App Proxy Coordinator | HTTP | 10200 | Circuit registration and management |
 | Client → App Proxy Worker | HTTP/WebSocket | 10205-10300 | Container app access |
 | App Proxy Worker → Agent | HTTP/WebSocket | 30000-31000 | Container port forwarding |
-| Agent → Storage Proxy | HTTP/gRPC | 6021/6022 | VFolder mount info queries |
+| Agent → Storage Proxy | HTTP | 6021/6022 | VFolder mount info queries |
 
 ### Infrastructure Communication
 

@@ -50,7 +50,7 @@ The Manager accepts and processes external requests through 4 entry points.
 
 ### 1. REST API
 
-**Framework**: Starlette (async ASGI web framework)
+**Framework**: aiohttp (async ASGI web framework)
 
 **Location**: `src/ai/backend/manager/api/`
 
@@ -127,7 +127,7 @@ Event Handler → Service Logic → Background Task Trigger (when async processi
 ```
 ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
 │  REST API   │  │ GraphQL API │  │   Event     │  │ Background  │
-│ (Starlette) │  │(Strawberry) │  │ Dispatcher  │  │    Task     │
+│  (aiohttp)  │  │(Strawberry) │  │ Dispatcher  │  │    Task     │
 └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
        │                │                │                │
        │                │                │                │
@@ -147,7 +147,7 @@ Event Handler → Service Logic → Background Task Trigger (when async processi
 ```
 ┌───────────────────────────────────────────┐
 │              API Layer                    │
-│  - REST API Handler (Starlette)           │
+│  - REST API Handler (aiohttp)             │
 │  - GraphQL Handler (GraphQL Core)         │
 │  - Authentication & Authorization         │
 │  - Request Validation                     │
