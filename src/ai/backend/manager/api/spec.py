@@ -90,8 +90,8 @@ GRAPHIQL_V2_HTML = """
 
     <script>
       const fetcher = GraphiQL.createFetcher({
-        url: 'http://0.0.0.0:8090/func/admin/gql',
-        subscriptionUrl: 'ws://0.0.0.0:8090/func/admin/gql'
+        url: '/func/admin/gql',
+        subscriptionUrl: '/func/admin/gql'
       });
 
       ReactDOM.render(
