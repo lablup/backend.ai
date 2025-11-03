@@ -328,12 +328,12 @@ class ArtifactRevisionService:
                     revision_data.id, namespace_id, ArtifactStorageType(storage_type)
                 )
             )
-
+        except ArtifactImportAlreadyAvailableError as e:
+            raise e
         except Exception as e:
-            if not isinstance(e, ArtifactImportAlreadyAvailableError):
-                await self._artifact_repository.update_artifact_revision_status(
-                    action.artifact_revision_id, ArtifactStatus.FAILED
-                )
+            await self._artifact_repository.update_artifact_revision_status(
+                action.artifact_revision_id, ArtifactStatus.FAILED
+            )
             raise e
 
         return ImportArtifactRevisionActionResult(result=revision_data, task_id=task_id)
