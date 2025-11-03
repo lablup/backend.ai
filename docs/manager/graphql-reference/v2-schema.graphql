@@ -486,6 +486,21 @@ type AutoScalingRule implements Node {
   lastTriggeredAt: DateTime!
 }
 
+"""Structured error information from Backend.AI API"""
+type BackendAIError {
+  """Structured error code with domain, operation, and error detail"""
+  errorCode: ErrorCode!
+
+  """Human-readable error title"""
+  title: String!
+
+  """Additional error message with context"""
+  message: String
+
+  """RFC-7807 error type URL"""
+  errorType: String
+}
+
 """Background task event payload"""
 type BackgroundTaskEventPayload {
   taskId: ID!
@@ -952,6 +967,18 @@ extend type DomainNode @key(fields: "id") {
   id: ID! @external
 }
 
+"""Structured error code representing domain, operation and error detail"""
+type ErrorCode {
+  """Error domain (e.g., 'api', 'kernel', 'session')"""
+  domain: String!
+
+  """Operation where error occurred (e.g., 'create', 'delete', 'update')"""
+  operation: String!
+
+  """Specific error detail (e.g., 'not-found', 'timeout', 'forbidden')"""
+  errorDetail: String!
+}
+
 type ExtraVFolderMount implements Node {
   """The Globally Unique ID of this object"""
   id: ID!
@@ -1073,6 +1100,9 @@ Tasks can be monitored to track the import progress from SCANNED to AVAILABLE st
 type ImportArtifactsPayload {
   artifactRevisions: ArtifactRevisionConnection!
   tasks: [ArtifactRevisionImportTask!]!
+
+  """Errors that occurred during import artifacts"""
+  errors: [BackendAIError!]!
 }
 
 input IntFilter {

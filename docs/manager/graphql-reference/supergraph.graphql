@@ -937,6 +937,23 @@ type AvailableServiceNode implements Node
   service_variants: [String]!
 }
 
+"""Structured error information from Backend.AI API"""
+type BackendAIError
+  @join__type(graph: STRAWBERRY)
+{
+  """Structured error code with domain, operation, and error detail"""
+  errorCode: ErrorCode!
+
+  """Human-readable error title"""
+  title: String!
+
+  """Additional error message with context"""
+  message: String
+
+  """RFC-7807 error type URL"""
+  errorType: String
+}
+
 """Background task event payload"""
 type BackgroundTaskEventPayload
   @join__type(graph: STRAWBERRY)
@@ -2626,6 +2643,20 @@ type EndpointTokenList implements PaginatedList
   total_count: Int!
 }
 
+"""Structured error code representing domain, operation and error detail"""
+type ErrorCode
+  @join__type(graph: STRAWBERRY)
+{
+  """Error domain (e.g., 'api', 'kernel', 'session')"""
+  domain: String!
+
+  """Operation where error occurred (e.g., 'create', 'delete', 'update')"""
+  operation: String!
+
+  """Specific error detail (e.g., 'not-found', 'timeout', 'forbidden')"""
+  errorDetail: String!
+}
+
 """Added in 24.03.4."""
 input ExtraMountInput
   @join__type(graph: GRAPHENE)
@@ -3075,6 +3106,9 @@ type ImportArtifactsPayload
 {
   artifactRevisions: ArtifactRevisionConnection!
   tasks: [ArtifactRevisionImportTask!]!
+
+  """Errors that occurred during import artifacts"""
+  errors: [BackendAIError!]!
 }
 
 type InferenceSessionError

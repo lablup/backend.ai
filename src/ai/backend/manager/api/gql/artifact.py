@@ -12,6 +12,7 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
+from ai.backend.common.exception import BackendAIError as BackendAIErrorException
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -20,6 +21,7 @@ from ai.backend.manager.api.gql.base import (
     build_pagination_options,
     to_global_id,
 )
+from ai.backend.manager.api.gql.error import BackendAIError
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
@@ -741,6 +743,9 @@ class ArtifactRevisionImportTask:
 class ImportArtifactsPayload:
     artifact_revisions: ArtifactRevisionConnection
     tasks: list[ArtifactRevisionImportTask]
+    errors: list[BackendAIError] = strawberry.field(
+        default_factory=list, description="Errors that occurred during import artifacts"
+    )
 
 
 @strawberry.type(
@@ -1317,22 +1322,27 @@ async def import_artifacts(
 ) -> ImportArtifactsPayload:
     imported_artifacts = []
     tasks = []
+    errors = []
+
     for revision_id in input.artifact_revision_ids:
-        action_result = (
-            await info.context.processors.artifact_revision.import_revision.wait_for_complete(
-                ImportArtifactRevisionAction(
-                    artifact_revision_id=uuid.UUID(revision_id),
+        try:
+            action_result = (
+                await info.context.processors.artifact_revision.import_revision.wait_for_complete(
+                    ImportArtifactRevisionAction(
+                        artifact_revision_id=uuid.UUID(revision_id),
+                    )
                 )
             )
-        )
-        artifact_revision = ArtifactRevision.from_dataclass(action_result.result)
-        imported_artifacts.append(artifact_revision)
-        tasks.append(
-            ArtifactRevisionImportTask(
-                task_id=ID(str(action_result.task_id)),
-                artifact_revision=artifact_revision,
+            artifact_revision = ArtifactRevision.from_dataclass(action_result.result)
+            imported_artifacts.append(artifact_revision)
+            tasks.append(
+                ArtifactRevisionImportTask(
+                    task_id=ID(str(action_result.task_id)),
+                    artifact_revision=artifact_revision,
+                )
             )
-        )
+        except BackendAIErrorException as exc:
+            errors.append(BackendAIError.from_exception(exc))
 
     edges = [
         ArtifactRevisionEdge(node=artifact, cursor=to_global_id(ArtifactRevisionEdge, artifact.id))
@@ -1350,7 +1360,9 @@ async def import_artifacts(
         ),
     )
 
-    return ImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
+    return ImportArtifactsPayload(
+        artifact_revisions=artifacts_connection, tasks=tasks, errors=errors
+    )
 
 
 @strawberry.mutation(

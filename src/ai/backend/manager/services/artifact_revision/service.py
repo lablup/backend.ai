@@ -31,6 +31,7 @@ from ai.backend.manager.dto.request import DelegateImportArtifactsReq
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
+    ArtifactImportAlreadyAvailableError,
     ArtifactImportBadRequestError,
     RemoteReservoirArtifactImportError,
 )
@@ -278,9 +279,8 @@ class ArtifactRevisionService:
                     # Skip import if artifact revision is already Available and commit hash matches
                     # If current_commit_hash is None, always proceed with import
                     if self._is_latest_commit_hash(revision_data, latest_commit_hash):
-                        # Return early without calling import API
-                        return ImportArtifactRevisionActionResult(
-                            result=revision_data, task_id=None
+                        raise ArtifactImportAlreadyAvailableError(
+                            f"Artifact revision {revision_data.id} is available, and up-to-date."
                         )
 
                     await self._artifact_repository.update_artifact_revision_status(
@@ -330,9 +330,10 @@ class ArtifactRevisionService:
             )
 
         except Exception as e:
-            await self._artifact_repository.update_artifact_revision_status(
-                action.artifact_revision_id, ArtifactStatus.FAILED
-            )
+            if not isinstance(e, ArtifactImportAlreadyAvailableError):
+                await self._artifact_repository.update_artifact_revision_status(
+                    action.artifact_revision_id, ArtifactStatus.FAILED
+                )
             raise e
 
         return ImportArtifactRevisionActionResult(result=revision_data, task_id=task_id)
