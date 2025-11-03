@@ -53,7 +53,7 @@ class KernelRegistryPickleRecovery(AbstractKernelRegistryRecovery):
             with open(last_registry_file, "rb") as f:
                 return pickle.load(f)
         except EOFError as e:
-            log.warning("Failed to load the last kernel registry: {}", (last_registry_file))
+            log.warning("Failed to load the last kernel registry: {}", str(last_registry_file))
             raise KernelRegistryLoadError from e
         except FileNotFoundError as e:
             raise KernelRegistryNotFound from e
@@ -70,9 +70,11 @@ class KernelRegistryPickleRecovery(AbstractKernelRegistryRecovery):
             with open(last_registry_file, "wb") as f:
                 pickle.dump(registry, f)
             self._last_saved_time = now
-            log.debug("saved {}", last_registry_file)
+            log.debug("Saved kernel registry to {}", str(last_registry_file))
         except Exception as e:
-            log.exception("unable to save {}", last_registry_file, exc_info=e)
+            log.exception(
+                "Failed to save kernel registry to {}", str(last_registry_file), exc_info=e
+            )
             try:
                 os.remove(last_registry_file)
             except FileNotFoundError:
