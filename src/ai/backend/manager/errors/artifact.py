@@ -200,7 +200,7 @@ class ArtifactImportAlreadyAvailableError(BackendAIError, web.HTTPBadRequest):
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.CREATE,
-            error_detail=ErrorDetail.BAD_REQUEST,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 
