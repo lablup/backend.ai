@@ -52,7 +52,7 @@ class PurgeImageSpec(BaseModel):
 class PurgeAgentSpec(BaseModel):
     """Specification for purging images on a specific agent."""
 
-    agent_id: str
+    agent_id: AgentId
     images: list[PurgeImageSpec]
 
 
@@ -93,7 +93,6 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest, PurgeIma
         errors: list[str] = []
 
         for key in manifest.keys:
-            agent_id = AgentId(key.agent_id)
             for img in key.images:
                 result = await self._processors.image.purge_image.wait_for_complete(
                     PurgeImageAction(
@@ -102,7 +101,7 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest, PurgeIma
                             registry=img.registry,
                             architecture=img.architecture,
                         ),
-                        agent_id=agent_id,
+                        agent_id=key.agent_id,
                         force=manifest.force,
                         noprune=manifest.noprune,
                     )
@@ -111,7 +110,7 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest, PurgeIma
                 total_reserved_bytes += result.reserved_bytes
                 purged_images.append(
                     PurgedImageData(
-                        agent_id=agent_id,
+                        agent_id=key.agent_id,
                         image_name=result.purged_image.name,
                         reserved_bytes=result.reserved_bytes,
                     )
