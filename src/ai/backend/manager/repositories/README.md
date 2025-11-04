@@ -264,7 +264,7 @@ When the `@*_resilience.apply()` decorator is applied to Repository methods, Pro
   - Cache Source: `"agent_cache_source"`, `"schedule_cache_source"`, etc.
 - `operation`: Method name (e.g., `"get_session_by_id"`, `"create_session"`)
 - `success`: `"true"` or `"false"`
-- `error_code`: Exception class name (e.g., `"SessionNotFound"`, `"IntegrityError"`)
+- `error_code`: Error code
 
 ### 4. Explicit Return Types
 

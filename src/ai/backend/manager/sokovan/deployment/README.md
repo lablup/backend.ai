@@ -16,29 +16,25 @@ Deployment is Backend.AI's deployment management system that handles deployment,
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────┐
-│      DeploymentCoordinator                  │
-│  - Orchestrates deployment lifecycle        │
-│  - Manages state-specific handlers          │
-└──────────────┬──────────────────────────────┘
-               │
-    ┌──────────┼──────────┐
-    │          │          │
-    ▼          ▼          ▼
-┌──────────┐ ┌──────────┐ ┌──────────┐
-│Deploy-   │ │ Route    │ │Handlers  │
-│ment      │ │Control-  │ │          │
-│Control-  │ │ler       │ │          │
-│ler       │ │          │ │          │
-└────┬─────┘ └────┬─────┘ └──────────┘
-     │            │
-     ▼            ▼
-┌──────────┐ ┌──────────┐
-│Defini-   │ │ Route    │
-│tion      │ │Coordi-   │
-│Gene-     │ │nator     │
-│rators    │ │          │
-└──────────┘ └──────────┘
+┌──────────────────────────────────────────────────┐
+│         DeploymentCoordinator                    │
+│  - Orchestrates deployment lifecycle             │
+│  - Manages state-specific handlers               │
+└────────────────────┬─────────────────────────────┘
+                     │
+        ┌────────────┼────────────┐
+        │            │            │
+        ▼            ▼            ▼
+┌──────────────┐ ┌────────────┐ ┌──────────────┐
+│  Deployment  │ │   Route    │ │   Handlers   │
+│  Controller  │ │ Controller │ │              │
+└──────┬───────┘ └──────┬─────┘ └──────────────┘
+       │                │
+       ▼                ▼
+┌──────────────┐ ┌────────────┐
+│  Definition  │ │   Route    │
+│  Generators  │ │ Coordinator│
+└──────────────┘ └────────────┘
 ```
 
 ## Dependencies
