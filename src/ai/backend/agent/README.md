@@ -207,7 +207,7 @@ The Agent tracks:
 
 ### Scratch Storage
 Each kernel receives local scratch storage:
-- **Location**: `/tmp/backend.ai/scratches/{kernel_id}`
+- **Location**: `/scratches/{kernel_id}`
 - **Quota**: Configurable size limit per kernel
 - **Cleanup**: Automatically removed after kernel termination
 - **Performance**: Local SSD for fast I/O

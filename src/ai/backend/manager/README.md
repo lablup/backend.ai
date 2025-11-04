@@ -899,7 +899,7 @@ sum(rate(backendai_sweep_kernel_count_total[5m])) by (success)
 - **Main Operations**: Kernel lifecycle management, code execution, file operations, container statistics
 
 ### Storage Proxy Communication
-- **Protocol**: HTTP/gRPC
+- **Protocol**: HTTP
 - **Port**: 6021 (client API), 6022 (manager API)
 - **Main Operations**: VFolder management, file upload/download, file listing
 
