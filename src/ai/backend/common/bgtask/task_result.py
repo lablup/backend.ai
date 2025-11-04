@@ -22,7 +22,7 @@ from ..exception import (
 )
 from .types import BgtaskStatus
 
-R = TypeVar("R", bound=BaseBackgroundTaskResult)
+R = TypeVar("R", bound=Optional[BaseBackgroundTaskResult])
 
 
 class TaskResult(ABC):
@@ -54,7 +54,7 @@ class TaskSuccessResult(TaskResult, Generic[R]):
         # For now, convert the result to string for the message
         # This assumes the result has a meaningful string representation
         message = (
-            str(self.result.serialize())
+            self.result.model_dump_json()
             if self.result is not None
             else "Task completed successfully"
         )

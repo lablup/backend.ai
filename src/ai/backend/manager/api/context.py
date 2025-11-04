@@ -8,6 +8,7 @@ from ai.backend.manager.sokovan.deployment.route.route_controller import RouteCo
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+    from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
     from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
     from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
         ValkeyContainerLogClient,
@@ -98,6 +99,7 @@ class RootContext(BaseContext):
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
+    manager_bgtask_registry: BackgroundTaskHandlerRegistry
     metrics: CommonMetricRegistry
     repositories: Repositories
     processors: Processors

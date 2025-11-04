@@ -132,6 +132,7 @@ from .config.loader.types import AbstractConfigLoader
 from .config.provider import ManagerConfigProvider
 from .config.unified import EventLoopType
 from .config.watchers.etcd import EtcdConfigWatcher
+from .server_bgtask_ctx import manager_bgtask_registry_ctx
 from .sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
@@ -1476,6 +1477,7 @@ def build_root_app(
             stale_session_sweeper_ctx,
             stale_kernel_sweeper_ctx,
             processors_ctx,
+            manager_bgtask_registry_ctx,
             service_discovery_ctx,
         ]
     shutdown_context_instances = []

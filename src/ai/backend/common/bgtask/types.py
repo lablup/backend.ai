@@ -4,7 +4,7 @@ import enum
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, NewType, Self
+from typing import Any, NewType, Protocol, Self
 
 from pydantic import BaseModel, Field
 from pydantic_core import ValidationError
@@ -27,11 +27,23 @@ class BgtaskStatus(enum.StrEnum):
         return self in {self.DONE, self.CANCELLED, self.FAILED, self.PARTIAL_SUCCESS}
 
 
-class TaskName(enum.StrEnum):
-    CLONE_VFOLDER = "clone_vfolder"
-    DELETE_VFOLDER = "delete_vfolder"
+class BgtaskNameBase(Protocol):
+    """
+    Protocol for background task names.
 
-    PUSH_IMAGE = "push_image"
+    Each component (storage, manager, agent) should define its own
+    background task name enum inheriting from StrEnum and implementing this protocol.
+    """
+
+    @property
+    def value(self) -> str:
+        """Return the string value of the background task name."""
+        ...
+
+    @classmethod
+    def from_str(cls, value: str) -> Self:
+        """Create instance from string value."""
+        ...
 
 
 BgTaskKey = NewType("BgTaskKey", str)
@@ -48,24 +60,6 @@ class TaskType(enum.StrEnum):
     PARALLEL = "parallel"
 
 
-class BackgroundTaskMetadata(BaseModel):
-    task_id: TaskID
-    task_name: TaskName
-    body: Mapping[str, Any]
-
-    def to_json(self) -> str:
-        data = self.model_dump_json()
-        return data
-
-    @classmethod
-    def from_json(cls, data: str | bytes) -> Self:
-        """Create from Redis hash data"""
-        try:
-            return cls.model_validate_json(data)
-        except ValidationError as e:
-            raise InvalidTaskMetadataError from e
-
-
 @dataclass
 class TaskInfo:
     """
@@ -73,7 +67,7 @@ class TaskInfo:
     """
 
     task_id: TaskID
-    task_name: TaskName
+    task_name: str
     task_type: TaskType
     body: Mapping[str, Any]
     ongoing_count: int
@@ -98,7 +92,7 @@ class TaskInfo:
             body = load_json(data[b"body"])
             return cls(
                 task_id=TaskID(uuid.UUID(data[b"task_id"].decode())),
-                task_name=TaskName(data[b"task_name"].decode()),
+                task_name=data[b"task_name"].decode(),
                 task_type=TaskType(data[b"task_type"].decode()),
                 body=body,
                 ongoing_count=int(data[b"ongoing_count"].decode()),
