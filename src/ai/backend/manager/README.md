@@ -50,7 +50,7 @@ The Manager accepts and processes external requests through 4 entry points.
 
 ### 1. REST API
 
-**Framework**: Starlette (async ASGI web framework)
+**Framework**: aiohttp (async HTTP web framework)
 
 **Location**: `src/ai/backend/manager/api/`
 
@@ -127,7 +127,7 @@ Event Handler → Service Logic → Background Task Trigger (when async processi
 ```
 ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
 │  REST API   │  │ GraphQL API │  │   Event     │  │ Background  │
-│ (Starlette) │  │(Strawberry) │  │ Dispatcher  │  │    Task     │
+│  (aiohttp)  │  │(Strawberry) │  │ Dispatcher  │  │    Task     │
 └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
        │                │                │                │
        │                │                │                │
@@ -147,8 +147,8 @@ Event Handler → Service Logic → Background Task Trigger (when async processi
 ```
 ┌───────────────────────────────────────────┐
 │              API Layer                    │
-│  - REST API Handler (Starlette)           │
-│  - GraphQL Handler (GraphQL Core)         │
+│  - REST API Handler (aiohttp)             │
+│  - GraphQL Handler (strawberry)           │
 │  - Authentication & Authorization         │
 │  - Request Validation                     │
 └──────────────────┬────────────────────────┘
@@ -180,7 +180,7 @@ Event Handler → Service Logic → Background Task Trigger (when async processi
 ┌──────────────────┴────────────────────────┐
 │            Models Layer                   │
 │  - SQLAlchemy ORM Models                  │
-│  - Domain Types & DTOs                    │
+│  - Domain Types                           │
 └───────────────────────────────────────────┘
 ```
 
@@ -197,36 +197,29 @@ manager/
 │   ├── scaling_group.py # Scaling group models
 │   └── ...
 ├── repositories/        # Data access layer
-│   ├── session.py      # Session data access
-│   ├── agent.py        # Agent data access
-│   ├── user.py         # User data access
+│   ├── session/        # Session data access
+│   ├── agent/          # Agent data access
+│   ├── user/           # User data access
 │   └── ...
 ├── services/            # Business logic layer
-│   ├── scheduler/      # Session scheduling service
 │   ├── session/        # Session lifecycle management
-│   ├── quota/          # Resource quota management
 │   └── ...
 ├── api/                 # API handlers and routes
-│   ├── rest.py         # REST API endpoints
-│   ├── graphql.py      # GraphQL schema and resolvers
-│   ├── auth.py         # Authentication handlers
+│   ├── gql/             # GraphQL schema and resolvers
+│   ├── auth.py          # Authentication handlers
 │   └── ...
 ├── config/              # Configuration management
-│   ├── sample.toml     # Sample configuration
-│   └── ...
 ├── cli/                 # CLI commands
-│   ├── schema.py       # Database schema management
-│   ├── fixture.py      # Test data management
+│   ├── fixture.py       # Test data management
 │   └── ...
 ├── clients/             # External service clients
-│   ├── agent.py        # Agent RPC client
-│   ├── storage.py      # Storage proxy client
+│   ├── agent/           # Agent RPC client
+│   ├── storage_proxy/   # Storage proxy client
 │   └── ...
 ├── scheduler/           # Scheduling algorithms and logic
 │   ├── dispatcher.py   # Scheduling dispatcher
 │   ├── predicates.py   # Scheduling predicates
 │   └── ...
-├── events.py            # Event definitions and processing
 ├── server.py            # Main server entry point
 └── defs.py              # Shared constants and types
 ```
@@ -368,28 +361,19 @@ See `configs/manager/halfstack.conf` for configuration file examples.
 **Redis Settings**:
 - Redis connection information
 - Connection pool configuration
-- Key expiration time
 
 **etcd Settings**:
 - etcd endpoint addresses
-- Configuration key prefixes
-- Watch settings
+- Configuration key prefix (namespace)
 
 **API Settings**:
 - Listen address and port
 - CORS configuration
-- Rate limiting settings
-- Authentication method
 
 **Scheduling Settings**:
 - Default scheduler type
 - Scheduling interval
 - Resource allocation policy
-
-**Session Settings**:
-- Session timeout
-- Maximum session duration
-- Container creation timeout
 
 ### Halfstack Configuration
 
@@ -399,13 +383,6 @@ See `configs/manager/halfstack.conf` for configuration file examples.
 ```bash
 # Setup development environment via script (recommended)
 ./scripts/install-dev.sh
-
-# Initialize database
-./backend.ai mgr schema oneshot
-
-# Populate sample data
-./backend.ai mgr fixture populate sample-configs/example-keypairs.json
-./backend.ai mgr fixture populate sample-configs/example-resource-presets.json
 
 # Start Manager
 ./backend.ai mgr start-server
@@ -899,7 +876,7 @@ sum(rate(backendai_sweep_kernel_count_total[5m])) by (success)
 - **Main Operations**: Kernel lifecycle management, code execution, file operations, container statistics
 
 ### Storage Proxy Communication
-- **Protocol**: HTTP/gRPC
+- **Protocol**: HTTP
 - **Port**: 6021 (client API), 6022 (manager API)
 - **Main Operations**: VFolder management, file upload/download, file listing
 

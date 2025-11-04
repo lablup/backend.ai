@@ -135,11 +135,11 @@ Each Entry Point operates independently. However, service logic can coordinate t
 ├────────────────────────────────────────┤
 │    Container Backend (docker/)         │  ← Docker
 ├────────────────────────────────────────┤
-│  Resource Monitor (watcher/ stats.py)  │  ← CPU, GPU, Memory
+│      Resource Monitor (stats.py)       │  ← CPU, GPU, Memory
 ├────────────────────────────────────────┤
 │   Storage Manager (scratch.py fs.py)   │  ← Local and mounted storage
 ├────────────────────────────────────────┤
-│      Plugin System (plugin/)           │  ← Accelerator plugins
+│      Plugin System (plugin/)           │  ← Plugin
 └────────────────────────────────────────┘
 ```
 
@@ -150,16 +150,9 @@ agent/
 ├── docker/              # Docker container backend
 │   ├── agent.py        # Docker-specific agent implementation
 │   └── resources.py    # Docker resource management
-├── watcher/             # Resource monitoring
-│   ├── cpu.py          # CPU monitoring
-│   ├── mem.py          # Memory monitoring
-│   └── gpu.py          # GPU monitoring
-├── plugin/              # Accelerator plugins
-│   ├── cuda.py         # NVIDIA CUDA support
-│   ├── rocm.py         # AMD ROCm support
-│   └── tpu.py          # Google TPU support
+├── watcher/             # Agent watcher
+├── plugin/              # Plugin system
 ├── observer/            # Metrics observers
-│   └── stat.py         # Statistics collection
 ├── cli/                 # CLI commands
 ├── config/              # Configuration
 ├── agent.py             # Main agent logic
@@ -207,17 +200,15 @@ The Agent tracks:
 
 ### Scratch Storage
 Each kernel receives local scratch storage:
-- **Location**: `/tmp/backend.ai/scratches/{kernel_id}`
+- **Location**: `/scratches/{kernel_id}`
 - **Quota**: Configurable size limit per kernel
 - **Cleanup**: Automatically removed after kernel termination
-- **Performance**: Local SSD for fast I/O
 
 ### Virtual Folder Mounting
 VFolders are mounted to containers at runtime:
 - **Mount Point**: `/home/work/{vfolder_name}`
 - **Permissions**: RO, RW, or RW-DELETE
 - **Backend**: Storage Proxy manages actual storage
-- **Protocol**: NFS, SMB, or direct mount
 
 ## Resource Monitoring
 
@@ -247,7 +238,7 @@ VFolders are mounted to containers at runtime:
 
 ## Plugin System
 
-The Agent uses plugins for accelerator support:
+Agent can uses plugin system for accelerator support:
 
 ### CUDA Plugin
 - Detect NVIDIA GPUs via `nvidia-smi`
@@ -288,7 +279,7 @@ The Agent uses plugins for accelerator support:
   - Error notifications
 
 ### Agent → Storage Proxy
-- **Protocol**: HTTP or NFS/SMB
+- **Protocol**: HTTP
 - **Operations**:
   - Mount vfolder
   - Unmount vfolder
@@ -378,7 +369,7 @@ See `configs/agent/halfstack.toml` for configuration file examples.
 
 #### etcd (Global Configuration)
 - **Purpose**:
-  - Retrieve global configuration (container registry, storage volumes, etc.)
+  - Retrieve global configuration (storage volumes, etc.)
   - Auto-discover Manager address
 
 ### Optional Infrastructure (Observability)
@@ -437,7 +428,6 @@ Optional infrastructure for Agent monitoring.
   - Configurable per-session quota
 
 #### VFolder Mount
-- **Protocol**: NFS, SMB, direct mount
 - **Dependencies**: Storage Proxy or direct storage access
 - **Recommendations**:
   - High-performance network (10GbE or higher)

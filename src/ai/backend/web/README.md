@@ -122,8 +122,6 @@ web/
 │   ├── js/             # JavaScript files
 │   └── images/         # Images and icons
 ├── templates/           # Jinja2 templates
-│   ├── login.html      # Login page
-│   └── index.html      # Main page
 ├── config/              # Configuration
 ├── cli/                 # CLI commands
 ├── auth.py              # Session management and request signing
@@ -199,7 +197,6 @@ Proxied Request Headers:
 - `X-BackendAI-Token`: JWT token (GraphQL requests)
 - `Authorization`: HMAC signature (REST API requests, based on access key/secret key)
 - `X-BackendAI-Version`: API version
-- `X-Real-IP`: Original client IP
 - `X-Forwarded-For`: Proxy chain
 
 ### Session Storage (Redis)
@@ -233,9 +230,9 @@ Example session data:
 
 ### Rate Limiting
 Request limiting to prevent brute force attacks:
-- **Limit**: Limited number of requests per 5 minutes per IP
+- **Limit**: Limited number of requests per access key
 - **Response**: HTTP 429 Too Many Requests
-- **Tracking**: Redis-based counter per IP
+- **Tracking**: Redis-based counter per access key
 
 ### Input Sanitization
 - HTML escape user input
@@ -302,7 +299,7 @@ See `configs/webserver/halfstack.conf` for configuration file examples.
 
 #### Loki (Log Aggregation)
 - **Purpose**:
-  - Session creation/expiration events
+  - Session creation/termination events
   - Request signing and proxy events
   - Security violation events
   - Proxied request tracking
@@ -319,7 +316,7 @@ See `configs/webserver/halfstack.conf` for configuration file examples.
 ### Security Configuration
 
 **Session Management**: Session timeout and Redis-based session storage configuration
-**Rate Limiting**: API request limiting (default: limited number per 5 minutes per IP)
+**Rate Limiting**: API request limiting
 **CORS Configuration**: Allowed origins, methods, and credentials
 
 ### Halfstack Configuration

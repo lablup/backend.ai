@@ -10,7 +10,6 @@ Scheduler is the core module responsible for session scheduling in Backend.AI, a
 - **Session Scheduling**: Allocates waiting sessions to available agents
 - **Resource Constraint Validation**: Verifies that requested resources satisfy system constraints
 - **Lifecycle Management**: Handles session start, termination, retry on failure, etc.
-- **Image Pulling Monitoring**: Tracks agent image pulling and kernel creation processes
 - **State Transition Management**: Tracks kernel state transitions (SCHEDULED → PREPARING → PULLING → PREPARED → CREATING → RUNNING → TERMINATING → TERMINATED)
 
 ## Architecture
@@ -460,7 +459,7 @@ Sequencer is a plugin that determines the scheduling order for pending sessions 
 
 **Basic Interface:**
 ```python
-class SessionSequencer(abc.ABC):
+class WorkloadSequencer(abc.ABC):
     @abc.abstractmethod
     def sequence(
         self,
@@ -526,7 +525,7 @@ Allocator is a plugin that actually allocates session resources on the agent sel
 
 **Basic Interface:**
 ```python
-class SessionAllocator(abc.ABC):
+class SchedulingAllocator(abc.ABC):
     @abc.abstractmethod
     async def allocate(
         self,

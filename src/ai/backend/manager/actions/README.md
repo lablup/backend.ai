@@ -574,11 +574,11 @@ Batch operation on multiple entities.
 @dataclass
 class DestroySessionsBatchAction(BaseBatchAction):
     """Batch termination of multiple sessions"""
-    session_names: list[str]
+    session_ids: list[str]
     owner_access_key: AccessKey
 
     def entity_ids(self) -> list[str]:
-        return self.session_names
+        return self.session_ids
 
     @classmethod
     def entity_type(cls) -> str:
