@@ -435,9 +435,9 @@ class VASTAPIClient:
                 raise VASTNotFoundError
 
     async def get_cluster_info(self, cluster_id: int) -> Optional[VASTClusterInfo]:
+        current_time = time.time()
         if (cached := self._cache) is not None:
-            curret_time = time.time()
-            if curret_time - cached.timestamp < self._cache_ttl:
+            if current_time - cached.timestamp < self._cache_ttl:
                 return cached.cluster_info
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
@@ -449,7 +449,7 @@ class VASTAPIClient:
                     result = VASTClusterInfo.from_json(data)
                     self._cache = Cache(
                         cluster_info=result,
-                        timestamp=time.time(),
+                        timestamp=current_time,
                     )
                     return result
                 case 404:
