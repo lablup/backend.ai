@@ -139,7 +139,7 @@ Each Entry Point operates independently. However, service logic can coordinate t
 ├────────────────────────────────────────┤
 │   Storage Manager (scratch.py fs.py)   │  ← Local and mounted storage
 ├────────────────────────────────────────┤
-│      Plugin System (plugin/)           │  ← Network plugin
+│      Plugin System (plugin/)           │  ← Plugin
 └────────────────────────────────────────┘
 ```
 

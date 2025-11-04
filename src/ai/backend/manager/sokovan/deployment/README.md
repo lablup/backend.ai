@@ -32,8 +32,8 @@ Deployment is Backend.AI's deployment management system that handles deployment,
        │                │
        ▼                ▼
 ┌──────────────┐ ┌────────────┐
-│  Definition  │ │   Route    │
-│  Generators  │ │ Coordinator│
+│  Deployment  │ │   Route    │
+│  Coordinator │ │ Coordinator│
 └──────────────┘ └────────────┘
 ```
 
