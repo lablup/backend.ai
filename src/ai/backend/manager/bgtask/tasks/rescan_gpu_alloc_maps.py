@@ -9,17 +9,15 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskManifest,
 )
-from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 
 if TYPE_CHECKING:
-    from ai.backend.manager.registry import AgentRegistry
+    from ai.backend.manager.clients.agent.pool import AgentPool
+    from ai.backend.manager.repositories.agent.repository import AgentRepository
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-GPU_ALLOC_MAP_CACHE_PERIOD = 3600 * 24  # 24 hours
 
 
 class RescanGPUAllocMapsManifest(BaseBackgroundTaskManifest):
@@ -35,10 +33,16 @@ class RescanGPUAllocMapsHandler(BaseBackgroundTaskHandler[RescanGPUAllocMapsMani
     Background task handler for rescanning GPU allocation maps.
     """
 
-    _registry: AgentRegistry
+    _agent_repository: AgentRepository
+    _agent_pool: AgentPool
 
-    def __init__(self, registry: AgentRegistry) -> None:
-        self._registry = registry
+    def __init__(
+        self,
+        agent_repository: AgentRepository,
+        agent_pool: AgentPool,
+    ) -> None:
+        self._agent_repository = agent_repository
+        self._agent_pool = agent_pool
 
     @classmethod
     @override
@@ -53,13 +57,15 @@ class RescanGPUAllocMapsHandler(BaseBackgroundTaskHandler[RescanGPUAllocMapsMani
     @override
     async def execute(self, manifest: RescanGPUAllocMapsManifest) -> None:
         try:
-            alloc_map = await self._registry.scan_gpu_alloc_map(manifest.agent_id)
-            key = f"gpu_alloc_map.{manifest.agent_id}"
-            await self._registry.valkey_stat.setex(
-                name=key,
-                value=dump_json_str(alloc_map),
-                time=GPU_ALLOC_MAP_CACHE_PERIOD,
-            )
+            # Get agent data from repository (DB)
+            agent_data = await self._agent_repository.get_by_id(manifest.agent_id)
+
+            # Get agent client from pool and scan GPU allocation map
+            agent_client = self._agent_pool.get_agent_client(agent_data.id)
+            alloc_map = await agent_client.scan_gpu_alloc_map()
+
+            # Store result in cache via repository
+            await self._agent_repository.update_gpu_alloc_map(manifest.agent_id, alloc_map)
             log.info("Agent {} GPU alloc map scanned successfully", manifest.agent_id)
         except Exception as e:
             log.error("Failed to scan GPU alloc map for agent {}: {}", manifest.agent_id, e)
