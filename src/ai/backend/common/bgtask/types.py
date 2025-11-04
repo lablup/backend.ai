@@ -60,24 +60,6 @@ class TaskType(enum.StrEnum):
     PARALLEL = "parallel"
 
 
-class BackgroundTaskMetadata(BaseModel):
-    task_id: TaskID
-    task_name: str  # Stored as string, convert to BgtaskNameBase subclass when needed
-    body: Mapping[str, Any]
-
-    def to_json(self) -> str:
-        data = self.model_dump_json()
-        return data
-
-    @classmethod
-    def from_json(cls, data: str | bytes) -> Self:
-        """Create from Redis hash data"""
-        try:
-            return cls.model_validate_json(data)
-        except ValidationError as e:
-            raise InvalidTaskMetadataError from e
-
-
 @dataclass
 class TaskInfo:
     """
