@@ -35,7 +35,7 @@ Client and abstraction layer for integration with external services and systems.
 
 - **clients/** - External service client wrappers
   - Agent client (ZeroMQ RPC)
-  - Storage Proxy client (HTTP/gRPC)
+  - Storage Proxy client (HTTP)
   - Valkey/Redis client
   - etcd client
 
