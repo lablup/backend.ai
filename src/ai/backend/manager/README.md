@@ -50,7 +50,7 @@ The Manager accepts and processes external requests through 4 entry points.
 
 ### 1. REST API
 
-**Framework**: aiohttp (async ASGI web framework)
+**Framework**: aiohttp (async HTTP web framework)
 
 **Location**: `src/ai/backend/manager/api/`
 
@@ -207,20 +207,16 @@ manager/
 │   ├── quota/          # Resource quota management
 │   └── ...
 ├── api/                 # API handlers and routes
-│   ├── rest.py         # REST API endpoints
-│   ├── graphql.py      # GraphQL schema and resolvers
-│   ├── auth.py         # Authentication handlers
+│   ├── gql/             # GraphQL schema and resolvers
+│   ├── auth.py          # Authentication handlers
 │   └── ...
 ├── config/              # Configuration management
-│   ├── sample.toml     # Sample configuration
-│   └── ...
 ├── cli/                 # CLI commands
-│   ├── schema.py       # Database schema management
-│   ├── fixture.py      # Test data management
+│   ├── fixture.py       # Test data management
 │   └── ...
 ├── clients/             # External service clients
-│   ├── agent.py        # Agent RPC client
-│   ├── storage.py      # Storage proxy client
+│   ├── agent/           # Agent RPC client
+│   ├── storage_proxy/   # Storage proxy client
 │   └── ...
 ├── scheduler/           # Scheduling algorithms and logic
 │   ├── dispatcher.py   # Scheduling dispatcher
