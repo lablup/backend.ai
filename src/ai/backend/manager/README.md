@@ -148,7 +148,7 @@ Event Handler → Service Logic → Background Task Trigger (when async processi
 ┌───────────────────────────────────────────┐
 │              API Layer                    │
 │  - REST API Handler (aiohttp)             │
-│  - GraphQL Handler (GraphQL Core)         │
+│  - GraphQL Handler (strawberry)           │
 │  - Authentication & Authorization         │
 │  - Request Validation                     │
 └──────────────────┬────────────────────────┘
@@ -197,14 +197,12 @@ manager/
 │   ├── scaling_group.py # Scaling group models
 │   └── ...
 ├── repositories/        # Data access layer
-│   ├── session.py      # Session data access
-│   ├── agent.py        # Agent data access
-│   ├── user.py         # User data access
+│   ├── session/        # Session data access
+│   ├── agent/          # Agent data access
+│   ├── user/           # User data access
 │   └── ...
 ├── services/            # Business logic layer
-│   ├── scheduler/      # Session scheduling service
 │   ├── session/        # Session lifecycle management
-│   ├── quota/          # Resource quota management
 │   └── ...
 ├── api/                 # API handlers and routes
 │   ├── gql/             # GraphQL schema and resolvers
@@ -222,7 +220,6 @@ manager/
 │   ├── dispatcher.py   # Scheduling dispatcher
 │   ├── predicates.py   # Scheduling predicates
 │   └── ...
-├── events.py            # Event definitions and processing
 ├── server.py            # Main server entry point
 └── defs.py              # Shared constants and types
 ```
