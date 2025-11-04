@@ -82,7 +82,7 @@ event_types/
 ├── agent/           # Agent state events
 ├── vfolder/         # Virtual folder events
 ├── volume/          # Volume management events
-├── image/           # Image registry events
+├── image/           # Image events
 ├── schedule/        # Scheduling events
 ├── artifact/        # Artifact events
 ├── artifact_registry/ # Artifact registry events
