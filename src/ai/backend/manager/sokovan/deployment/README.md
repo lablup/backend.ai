@@ -64,10 +64,10 @@ DeploymentCoordinator acts as the top-level orchestrator of deployment lifecycle
 2. Select handler by deployment state
    ↓
 3. Execute handler
-   ├─ PendingHandler: Initial setup
-   ├─ ReplicaHandler: Replica management
-   ├─ ScalingHandler: Auto-scaling
-   └─ DestroyingHandler: Termination processing
+   ├─ CheckPendingDeploymentHandler: Initial setup
+   ├─ CheckReplicaDeploymentHandler: Replica management
+   ├─ ScalingDeploymentHandler: Auto-scaling
+   └─ DestroyingDeploymentHandler: Termination processing
    ↓
 4. Update RouteController
 ```
@@ -227,20 +227,20 @@ Key methods include `create_route()` for creating new routes, `update_route()` f
 
 ### Route Handlers
 
-#### ProvisioningHandler
+#### ProvisioningRouteHandler
 
-ProvisioningHandler processes the provisioning stage of routes. It configures initial route setup, validates the validity of replica endpoints, and completes initial load balancer configuration.
+ProvisioningRouteHandler processes the provisioning stage of routes. It configures initial route setup, validates the validity of replica endpoints, and completes initial load balancer configuration.
 
-#### RunningHandler
+#### RunningRouteHandler
 
-RunningHandler manages running routes. It routes client requests to appropriate replicas, synchronizes the endpoint list as replicas are added or removed, and applies configured load balancing policies. Load balancing strategies include ROUND_ROBIN which distributes sequentially, LEAST_CONNECTIONS which selects the endpoint with the fewest connections, and WEIGHTED which distributes based on weights.
+RunningRouteHandler manages running routes. It routes client requests to appropriate replicas, synchronizes the endpoint list as replicas are added or removed, and applies configured load balancing policies. Load balancing strategies include ROUND_ROBIN which distributes sequentially, LEAST_CONNECTIONS which selects the endpoint with the fewest connections, and WEIGHTED which distributes based on weights.
 
-#### HealthCheckHandler
+#### HealthCheckRouteHandler
 
-HealthCheckHandler performs periodic health checks to verify normal operation of replicas. It detects unhealthy endpoints that don't respond or return errors, and triggers automatic recovery when configured thresholds are exceeded.
+HealthCheckRouteHandler performs periodic health checks to verify normal operation of replicas. It detects unhealthy endpoints that don't respond or return errors, and triggers automatic recovery when configured thresholds are exceeded.
 
 **Health Check Configuration:**
-```python
+```json
 {
     "interval": 10,            # Check interval
     "timeout": 5,              # Timeout
@@ -266,9 +266,9 @@ HealthCheckHandler performs periodic health checks to verify normal operation of
        └─ Activate endpoint
 ```
 
-#### TerminatingHandler
+#### TerminatingRouteHandler
 
-TerminatingHandler is responsible for termination processing of routes. It blocks new requests and performs traffic draining by waiting for in-progress requests to complete, then removes endpoints and cleans up related resources once all requests are completed.
+TerminatingRouteHandler is responsible for termination processing of routes. It blocks new requests and performs traffic draining by waiting for in-progress requests to complete, then removes endpoints and cleans up related resources once all requests are completed.
 
 ## Complete Processing Flow
 
@@ -301,7 +301,7 @@ TerminatingHandler is responsible for termination processing of routes. It block
    └─ Configure load balancer
    ↓
 8. RouteCoordinator.process_routes()
-   └─ Execute HealthCheckHandler
+   └─ Execute HealthCheckRouteHandler
        ├─ Perform health checks
        └─ Handle unhealthy replicas
    ↓
