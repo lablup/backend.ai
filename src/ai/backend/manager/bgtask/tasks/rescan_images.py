@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, override
+from typing import TYPE_CHECKING, Optional, override
 
 from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskHandler,
@@ -39,8 +39,8 @@ class RescanImagesManifest(BaseBackgroundTaskManifest):
     Manifest for rescanning container images from registries.
     """
 
-    registry: str | None = None
-    project: str | None = None
+    registry: Optional[str] = None
+    project: Optional[str] = None
 
 
 class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest, RescanImagesTaskResult]):
