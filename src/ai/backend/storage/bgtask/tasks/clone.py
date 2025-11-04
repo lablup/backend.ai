@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, override
 
+from pydantic import Field
+
 from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskManifest,
@@ -23,9 +25,13 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class VFolderCloneManifest(BaseBackgroundTaskManifest):
-    volume: str
-    src_vfolder: VFolderID
-    dst_vfolder: VFolderID
+    """
+    Manifest for cloning a virtual folder.
+    """
+
+    volume: str = Field(description="Volume name where the vfolders are located")
+    src_vfolder: VFolderID = Field(description="Source vfolder ID to clone from")
+    dst_vfolder: VFolderID = Field(description="Destination vfolder ID to clone to")
 
 
 class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneManifest, None]):

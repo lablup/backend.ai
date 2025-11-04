@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, override
 
+from pydantic import Field
+
 from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskManifest,
@@ -23,8 +25,12 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class VFolderDeleteManifest(BaseBackgroundTaskManifest):
-    volume: str
-    vfolder_id: VFolderID
+    """
+    Manifest for deleting a virtual folder.
+    """
+
+    volume: str = Field(description="Volume name where the vfolder is located")
+    vfolder_id: VFolderID = Field(description="VFolder ID to delete")
 
 
 class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteManifest, None]):

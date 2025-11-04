@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Optional, override
 
+from pydantic import Field
+
 from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskManifest,
@@ -39,8 +41,13 @@ class RescanImagesManifest(BaseBackgroundTaskManifest):
     Manifest for rescanning container images from registries.
     """
 
-    registry: Optional[str] = None
-    project: Optional[str] = None
+    registry: Optional[str] = Field(
+        default=None, description="Registry name to rescan (if None, rescans all registries)"
+    )
+    project: Optional[str] = Field(
+        default=None,
+        description="Project name within the registry to rescan (if None, rescans all projects)",
+    )
 
 
 class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest, RescanImagesTaskResult]):

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, override
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskHandler,
@@ -44,16 +44,16 @@ class PurgeImagesTaskResult(BaseBackgroundTaskResult):
 class PurgeImageSpec(BaseModel):
     """Specification of a container image to purge."""
 
-    name: str
-    registry: str
-    architecture: str
+    name: str = Field(description="Image name")
+    registry: str = Field(description="Registry URL where the image is stored")
+    architecture: str = Field(description="Image architecture (e.g., x86_64, aarch64)")
 
 
 class PurgeAgentSpec(BaseModel):
     """Specification for purging images on a specific agent."""
 
-    agent_id: AgentId
-    images: list[PurgeImageSpec]
+    agent_id: AgentId = Field(description="Agent ID where images will be purged")
+    images: list[PurgeImageSpec] = Field(description="List of images to purge from this agent")
 
 
 class PurgeImagesManifest(BaseBackgroundTaskManifest):
@@ -61,9 +61,9 @@ class PurgeImagesManifest(BaseBackgroundTaskManifest):
     Manifest for purging container images from agents.
     """
 
-    keys: list[PurgeAgentSpec]
-    force: bool
-    noprune: bool
+    keys: list[PurgeAgentSpec] = Field(description="List of agent-specific purge specifications")
+    force: bool = Field(description="Force purge even if image is in use")
+    noprune: bool = Field(description="Skip pruning dangling images after purge")
 
 
 class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest, PurgeImagesTaskResult]):
