@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import ssl
+import time
 from dataclasses import dataclass, field, fields
 from datetime import datetime, timedelta, timezone
 from enum import Enum
@@ -124,7 +125,8 @@ class VASTQuota:
 
 @dataclass
 class Cache:
-    cluster_info: VASTClusterInfo | None
+    cluster_info: VASTClusterInfo
+    timestamp: float
 
 
 class VASTAPIClient:
@@ -134,9 +136,9 @@ class VASTAPIClient:
     password: str
     ssl_context: ssl.SSLContext | bool
     storage_base_dir: Path
-    cache: Cache
+    _cache: Optional[Cache]
 
-    _auth_token: TokenPair | None
+    _auth_token: Optional[TokenPair]
 
     def __init__(
         self,
@@ -148,13 +150,15 @@ class VASTAPIClient:
         storage_base_dir: str,
         ssl: ssl.SSLContext | bool = False,
         force_login: bool = True,
+        cluster_info_cache_ttl: float,
     ) -> None:
         self.api_endpoint = URL(endpoint)
         self.api_version = api_version
         self.username = username
         self.password = password
         self.storage_base_dir = Path(storage_base_dir)
-        self.cache = Cache(cluster_info=None)
+        self._cache = None
+        self._cache_ttl = cluster_info_cache_ttl
 
         self._auth_token = None
         self.ssl_context = ssl
@@ -430,9 +434,11 @@ class VASTAPIClient:
             if response.status == 404:
                 raise VASTNotFoundError
 
-    async def get_cluster_info(self, cluster_id: int) -> VASTClusterInfo | None:
-        if (_cached := self.cache.cluster_info) is not None:
-            return _cached
+    async def get_cluster_info(self, cluster_id: int) -> Optional[VASTClusterInfo]:
+        current_time = time.time()
+        if (cached := self._cache) is not None:
+            if current_time - cached.timestamp < self._cache_ttl:
+                return cached.cluster_info
         async with aiohttp.ClientSession(
             base_url=self.api_endpoint,
         ) as sess:
@@ -441,9 +447,13 @@ class VASTAPIClient:
                 case 200:
                     data: Mapping[str, Any] = await response.json()
                     result = VASTClusterInfo.from_json(data)
-                    self.cache.cluster_info = result
+                    self._cache = Cache(
+                        cluster_info=result,
+                        timestamp=current_time,
+                    )
                     return result
                 case 404:
+                    log.warning(f"Cluster with id {cluster_id} not found in VAST data.")
                     return None
                 case _:
                     raise VASTUnknownError(
