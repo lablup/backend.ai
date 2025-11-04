@@ -79,7 +79,7 @@ class PurgeImagesHandler(BaseBackgroundTaskHandler[PurgeImagesManifest, PurgeIma
     @classmethod
     @override
     def name(cls) -> ManagerBgtaskName:
-        return ManagerBgtaskName.PURGE_IMAGES  # type: ignore[return-value]
+        return ManagerBgtaskName.PURGE_IMAGES
 
     @classmethod
     @override

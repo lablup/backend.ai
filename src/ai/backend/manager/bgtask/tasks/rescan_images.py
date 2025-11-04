@@ -63,7 +63,7 @@ class RescanImagesHandler(BaseBackgroundTaskHandler[RescanImagesManifest, Rescan
     @classmethod
     @override
     def name(cls) -> ManagerBgtaskName:
-        return ManagerBgtaskName.RESCAN_IMAGES  # type: ignore[return-value]
+        return ManagerBgtaskName.RESCAN_IMAGES
 
     @classmethod
     @override
