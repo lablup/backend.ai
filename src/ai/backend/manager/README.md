@@ -364,28 +364,19 @@ See `configs/manager/halfstack.conf` for configuration file examples.
 **Redis Settings**:
 - Redis connection information
 - Connection pool configuration
-- Key expiration time
 
 **etcd Settings**:
 - etcd endpoint addresses
-- Configuration key prefixes
-- Watch settings
+- Configuration key prefix (namespace)
 
 **API Settings**:
 - Listen address and port
 - CORS configuration
-- Rate limiting settings
-- Authentication method
 
 **Scheduling Settings**:
 - Default scheduler type
 - Scheduling interval
 - Resource allocation policy
-
-**Session Settings**:
-- Session timeout
-- Maximum session duration
-- Container creation timeout
 
 ### Halfstack Configuration
 
