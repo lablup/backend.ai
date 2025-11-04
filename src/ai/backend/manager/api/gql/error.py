@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING, Optional, Self
 import strawberry
 
 if TYPE_CHECKING:
-    from ai.backend.common.exception import BackendAIError
-    from ai.backend.common.exception import ErrorCode as ErrorCodeData
+    from ai.backend.common.data.error.types import ErrorCodeData, ErrorData
 
 
 @strawberry.type(
@@ -48,13 +47,17 @@ class BackendAIGQLError:
     )
 
     @classmethod
-    def from_exception(cls, exc: BackendAIError) -> Self:
+    def from_dataclass(cls, error_data: ErrorData) -> Self:
         """
-        Create a GraphQL BackendAIError from a BackendAIError exception.
+        Create a GraphQL BackendAIError from an ErrorData.
         """
         return cls(
-            error_code=ErrorCode.from_dataclass(exc.error_code()),
-            title=exc.error_title,
-            message=exc.extra_msg,
-            error_type=exc.error_type,
+            error_code=ErrorCode(
+                domain=error_data.error_code.domain,
+                operation=error_data.error_code.operation,
+                error_detail=error_data.error_code.error_detail,
+            ),
+            title=error_data.title,
+            message=error_data.message,
+            error_type=error_data.error_type,
         )

@@ -12,12 +12,14 @@ from typing import (
     Coroutine,
     Generic,
     Optional,
+    Protocol,
     Self,
     Type,
     TypeAlias,
     TypeVar,
     get_args,
     get_origin,
+    runtime_checkable,
 )
 
 from aiohttp import web
@@ -26,6 +28,7 @@ from multidict import CIMultiDictProxy, MultiMapping
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import ValidationError
 
+from ai.backend.common.data.error.types import ErrorData
 from ai.backend.common.types import StreamReader
 
 from .exception import (
@@ -53,6 +56,38 @@ class BaseFieldModel(BaseModel):
 
 class BaseResponseModel(BaseModel):
     pass
+
+
+@runtime_checkable
+class BatchResponseProtocol(Protocol):
+    """
+    Protocol for batch operation responses that support automatic status code determination.
+
+    Response models implementing this protocol will have their HTTP status code automatically
+    determined by batch_api_handler based on the success/failure ratio and error severity:
+    - 200: All succeeded
+    - 207: Partial success
+    - 400: All failed (4XX errors only)
+    - 500: All failed (at least one 5XX error)
+    """
+
+    @abstractmethod
+    def get_success_count(self) -> int:
+        """Return the number of successful operations"""
+        ...
+
+    @abstractmethod
+    def get_error_count(self) -> int:
+        """Return the number of failed operations"""
+        ...
+
+    @abstractmethod
+    def get_errors(self) -> list[ErrorData]:
+        """
+        Return the list of errors. Each error must have a status_code attribute
+        for proper HTTP status code determination.
+        """
+        ...
 
 
 TRequestModel = TypeVar("TRequestModel", bound=BaseRequestModel)
@@ -173,8 +208,11 @@ class APIResponse:
     _data: Optional[BaseResponseModel]
 
     @classmethod
-    def build(cls, status_code: int, response_model: BaseResponseModel) -> Self:
-        return cls(_status_code=status_code, _data=response_model)
+    def build(cls, *, response_model: BaseResponseModel, status_code: Optional[int] = None) -> Self:
+        # Default to 200 if not specified; batch_api_handler will override for BatchResponse
+        return cls(
+            _status_code=status_code if status_code is not None else 200, _data=response_model
+        )
 
     @classmethod
     def no_content(cls, status_code: int) -> Self:
@@ -187,6 +225,10 @@ class APIResponse:
     @property
     def status_code(self) -> int:
         return self._status_code
+
+    @property
+    def response_model(self) -> Optional[BaseResponseModel]:
+        return self._data
 
 
 @dataclass
@@ -466,6 +508,80 @@ def api_handler(handler: BaseHandler) -> ParsedRequestHandler:
             param_instance = await _serialize_parameter(request, param_instance_or_class)
             kwargs[name] = param_instance
         response = await handler(first_arg, **kwargs)
+        return _parse_response(response)
+
+    return wrapped
+
+
+def batch_api_handler(handler: BaseHandler) -> ParsedRequestHandler:
+    """
+    This decorator extends api_handler with automatic status code determination for batch operations.
+
+    For responses implementing BatchResponseProtocol:
+    - 200 OK: All operations succeeded (error_count == 0)
+    - 207 Multi-Status: Partial success (success_count > 0 and error_count > 0)
+    - 400 Bad Request: All operations failed with 4XX errors (success_count == 0 and all errors are 4XX)
+    - 500 Internal Server Error: All operations failed with at least one 5XX error (success_count == 0 and has 5XX error)
+
+    The response model must implement BatchResponseProtocol with methods:
+    - get_success_count() -> int
+    - get_error_count() -> int
+    - get_errors() -> list[ErrorData]  # Errors must have status_code attribute
+
+    Usage:
+        @batch_api_handler
+        async def import_artifacts(self, body: BodyParam[ImportArtifactsReq]) -> APIResponse:
+            # ... batch processing logic
+            errors: list[ErrorData] = []
+            tasks: list[ArtifactRevisionImportTask] = []
+            # Process items and collect errors/tasks...
+            resp = ImportArtifactsResponse(tasks=tasks, errors=errors)
+            return APIResponse.build(response_model=resp)  # status_code determined automatically
+    """
+
+    original_signature: Signature = inspect.signature(handler, eval_str=True)
+
+    sanitized_signature = original_signature.replace(
+        parameters=list(original_signature.parameters.values())[1:]
+    )
+    signature_parser_map = _register_parameter_parser(
+        sanitized_signature, handler_name=str(handler)
+    )
+
+    @functools.wraps(handler)
+    async def wrapped(first_arg: Any, request: web.Request) -> web.Response:
+        kwargs: dict[str, _ParamType] = {}
+        for name, param_instance_or_class in signature_parser_map.items():
+            param_instance = await _serialize_parameter(request, param_instance_or_class)
+            kwargs[name] = param_instance
+
+        response: APIResponse = await handler(first_arg, **kwargs)
+
+        # Check if response model implements BatchResponse protocol
+        if isinstance(response.response_model, BatchResponseProtocol):
+            success_count = response.response_model.get_success_count()
+            error_count = response.response_model.get_error_count()
+
+            # Determine appropriate status code based on success/failure ratio and error severity
+            if error_count == 0:
+                # All operations succeeded
+                status_code = 200
+            elif success_count == 0:
+                # All operations failed - check error severity
+                errors = response.response_model.get_errors()
+                has_5xx_error = any(
+                    hasattr(err, "status_code") and 500 <= err.status_code < 600 for err in errors
+                )
+                status_code = 500 if has_5xx_error else 400
+            else:
+                # Partial success - some succeeded, some failed
+                status_code = 207
+
+            # Create new response with determined status code
+            response = APIResponse.build(
+                status_code=status_code, response_model=response.response_model
+            )
+
         return _parse_response(response)
 
     return wrapped

@@ -3,8 +3,9 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseResponseModel, BatchResponseProtocol
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.error.types import ErrorData
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
@@ -75,12 +76,32 @@ class ArtifactRevisionImportTask(BaseResponseModel):
     artifact_revision: ArtifactRevisionResponseData
 
 
-class ImportArtifactsResponse(BaseResponseModel):
+class ImportArtifactsResponse(BaseResponseModel, BatchResponseProtocol):
     tasks: list[ArtifactRevisionImportTask]
+    errors: list[ErrorData]
+
+    def get_success_count(self) -> int:
+        return len(self.tasks)
+
+    def get_error_count(self) -> int:
+        return len(self.errors)
+
+    def get_errors(self) -> list[ErrorData]:
+        return self.errors
 
 
-class DelegateImportArtifactsResponse(BaseResponseModel):
+class DelegateImportArtifactsResponse(BaseResponseModel, BatchResponseProtocol):
     tasks: list[ArtifactRevisionImportTask]
+    errors: list[ErrorData] = []
+
+    def get_success_count(self) -> int:
+        return len(self.tasks)
+
+    def get_error_count(self) -> int:
+        return len(self.errors)
+
+    def get_errors(self) -> list[ErrorData]:
+        return self.errors
 
 
 class UpdateArtifactResponse(BaseResponseModel):

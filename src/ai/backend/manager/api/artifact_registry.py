@@ -13,6 +13,7 @@ from ai.backend.common.api_handlers import (
     PathParam,
     QueryParam,
     api_handler,
+    batch_api_handler,
 )
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.logging import BraceStyleAdapter
@@ -128,7 +129,7 @@ class APIHandler:
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     @auth_required_for_method
-    @api_handler
+    @batch_api_handler
     async def delegate_import_artifacts(
         self,
         body: BodyParam[DelegateImportArtifactsReq],
@@ -164,8 +165,8 @@ class APIHandler:
                 )
             )
 
-        resp = DelegateImportArtifactsResponse(tasks=tasks)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+        resp = DelegateImportArtifactsResponse(tasks=tasks, errors=action_result.errors)
+        return APIResponse.build(response_model=resp)
 
     @auth_required_for_method
     @api_handler

@@ -5,6 +5,8 @@ from typing import Any, Mapping, Optional, Self
 
 from aiohttp import web
 
+from ai.backend.common.data.error.types import ErrorCodeData, ErrorData
+
 from .json import dump_json
 
 
@@ -371,6 +373,22 @@ class BackendAIError(web.HTTPError, ABC):
             (),  # empty the constructor args to make unpickler to use
             # only the exact current state in __dict__
             self.__dict__,
+        )
+
+    def to_dataclass(self) -> ErrorData:
+        """Convert this exception to an ErrorData for data layer"""
+
+        error_code = self.error_code()
+        return ErrorData(
+            error_code=ErrorCodeData(
+                domain=error_code.domain,
+                operation=error_code.operation,
+                error_detail=error_code.error_detail,
+            ),
+            title=self.error_title,
+            message=self.extra_msg,
+            error_type=self.error_type,
+            status_code=self.status_code,
         )
 
     @classmethod
