@@ -95,13 +95,12 @@ event_types/
 
 #### Kernel Events
 - `KernelTerminatedBroadcastEvent`: Kernel termination notification
-- `KernelStartedEvent`: Kernel start notification
-- `KernelPullingImageEvent`: Image download progress
+- `KernelStartedBroadcastEvent`: Kernel start notification
+- `KernelPullingBroadcastEvent`: Image download progress
 
 #### Session Events
-- `SessionStartedEvent`: Session start
-- `SessionTerminatedEvent`: Session termination
-- `SessionStatusChangedEvent`: Session status change
+- `SessionStartedBroadcastEvent`: Session start
+- `SessionTerminatedBroadcastEvent`: Session termination
 
 #### Background Task Events
 - `BgtaskUpdatedEvent`: Task progress update
