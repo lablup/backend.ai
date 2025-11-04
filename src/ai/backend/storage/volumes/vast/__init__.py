@@ -229,10 +229,11 @@ class VASTVolume(BaseVolume):
             api_version=self.config["vast_api_version"],
             ssl=ssl_verify,
             force_login=self.config["vast_force_login"],
+            cluster_info_cache_ttl=self.config["vast_cluster_info_cache_ttl"],
         )
 
     async def shutdown(self) -> None:
-        self.api_client.cache.cluster_info = None
+        pass
 
     async def create_quota_model(self) -> VASTQuotaModel:
         return VASTQuotaModel(self.mount_path, self.api_client)
