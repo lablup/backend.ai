@@ -32,8 +32,8 @@ class RescanImagesTaskResult(BaseBackgroundTaskResult):
     Contains list of rescanned images and any errors encountered.
     """
 
-    rescanned_image_ids: list[str]
-    errors: list[str]
+    rescanned_image_ids: list[str] = Field(description="List of image IDs that were rescanned")
+    errors: list[str] = Field(description="List of errors encountered during the rescan operation")
 
 
 class RescanImagesManifest(BaseBackgroundTaskManifest):

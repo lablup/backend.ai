@@ -25,9 +25,9 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class PurgedImageData(BaseModel):
     """Data about a purged image."""
 
-    agent_id: str
-    image_name: str
-    reserved_bytes: int
+    agent_id: str = Field(description="Agent ID where the image was purged")
+    image_name: str = Field(description="Name of the purged image")
+    reserved_bytes: int = Field(description="Amount of disk space freed by purging this image")
 
 
 class PurgeImagesTaskResult(BaseBackgroundTaskResult):
@@ -36,9 +36,9 @@ class PurgeImagesTaskResult(BaseBackgroundTaskResult):
     Contains information about purged images and any errors encountered.
     """
 
-    total_reserved_bytes: int
-    purged_images: list[PurgedImageData]
-    errors: list[str]
+    total_reserved_bytes: int = Field(description="Total disk space freed by purging all images")
+    purged_images: list[PurgedImageData] = Field(description="List of successfully purged images")
+    errors: list[str] = Field(description="List of errors encountered during the purge operation")
 
 
 class PurgeImageSpec(BaseModel):
