@@ -5,6 +5,7 @@ from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.events.event_types.artifact.anycast import (
     ModelImportDoneEvent,
     ModelMetadataFetchDoneEvent,
+    ModelVerifyingEvent,
 )
 from ai.backend.common.types import (
     AgentId,
@@ -40,6 +41,47 @@ class ArtifactEventHandler:
         self._huggingface_repository = huggingface_repository
         self._reservoir_repository = reservoir_repository
         self._config_provider = config_provider
+
+    async def handle_model_verifying(
+        self,
+        context: None,
+        source: AgentId,
+        event: ModelVerifyingEvent,
+    ) -> None:
+        try:
+            registry_type = ArtifactRegistryType(event.registry_type)
+        except Exception:
+            raise InvalidArtifactRegistryTypeError(
+                f"Unsupported artifact registry type: {event.registry_type}"
+            )
+        registry_id: UUID
+        match registry_type:
+            case ArtifactRegistryType.HUGGINGFACE:
+                huggingface_registry_data = (
+                    await self._huggingface_repository.get_registry_data_by_name(
+                        event.registry_name
+                    )
+                )
+                registry_id = huggingface_registry_data.id
+            case ArtifactRegistryType.RESERVOIR:
+                registry_data = await self._reservoir_repository.get_registry_data_by_name(
+                    event.registry_name
+                )
+                registry_id = registry_data.id
+
+        artifact = await self._artifact_repository.get_model_artifact(
+            event.model_id, registry_id=registry_id
+        )
+
+        # Get the specific revision
+        revision = await self._artifact_repository.get_artifact_revision(
+            artifact.id, revision=event.revision
+        )
+
+        if revision.status == ArtifactStatus.PULLING:
+            await self._artifact_repository.update_artifact_revision_status(
+                revision.id, ArtifactStatus.VERIFYING
+            )
 
     async def handle_model_import_done(
         self,

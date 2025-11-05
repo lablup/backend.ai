@@ -207,6 +207,8 @@ class HuggingFaceRegistryAPIHandler:
             registry_configs=self._huggingface_service._registry_configs,
             transfer_manager=self._huggingface_service._transfer_manager,
             storage_step_mappings=body.parsed.storage_step_mappings,
+            artifact_verifier_ctx=self._huggingface_service._artifact_verifier_ctx,
+            event_producer=self._huggingface_service._event_producer,
         )
 
         task_id = await self._huggingface_service.import_models_batch(
@@ -249,6 +251,7 @@ def create_app(ctx: RootContext) -> web.Application:
             storage_pool=ctx.storage_pool,
             registry_configs=huggingface_registry_configs,
             event_producer=ctx.event_producer,
+            artifact_verifier_ctx=ctx.artifact_verifier_ctx,
         )
     )
     huggingface_api_handler = HuggingFaceRegistryAPIHandler(huggingface_service=huggingface_service)

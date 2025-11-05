@@ -12,6 +12,7 @@ from typing import Any, Callable, Final, Optional, Protocol, override
 
 import aiohttp
 
+from ai.backend.common.artifact_storage import AbstractStoragePool
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import (
@@ -33,6 +34,7 @@ from ai.backend.storage.client.huggingface import (
     HuggingFaceScanner,
 )
 from ai.backend.storage.config.unified import HuggingfaceConfig
+from ai.backend.storage.context_types import ArtifactVerifierContext
 from ai.backend.storage.exception import (
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
@@ -40,6 +42,7 @@ from ai.backend.storage.exception import (
     RegistryNotFoundError,
     StorageStepRequiredStepNotProvided,
 )
+from ai.backend.storage.services.artifacts.common import ModelArchiveStep, ModelVerifyStep
 from ai.backend.storage.services.artifacts.storage_transfer import StorageTransferManager
 from ai.backend.storage.services.artifacts.types import (
     DownloadStepResult,
@@ -309,6 +312,7 @@ class HuggingFaceServiceArgs:
     background_task_manager: BackgroundTaskManager
     storage_pool: StoragePool
     event_producer: EventProducer
+    artifact_verifier_ctx: ArtifactVerifierContext
 
 
 class HuggingFaceService:
@@ -319,6 +323,7 @@ class HuggingFaceService:
     _registry_configs: dict[str, HuggingfaceConfig]
     _event_producer: EventProducer
     _transfer_manager: StorageTransferManager
+    _artifact_verifier_ctx: ArtifactVerifierContext
 
     def __init__(self, args: HuggingFaceServiceArgs):
         self._storage_pool = args.storage_pool
@@ -326,6 +331,7 @@ class HuggingFaceService:
         self._registry_configs = args.registry_configs
         self._event_producer = args.event_producer
         self._transfer_manager = StorageTransferManager(args.storage_pool)
+        self._artifact_verifier_ctx = args.artifact_verifier_ctx
 
     def _make_scanner(self, registry_name: str) -> HuggingFaceScanner:
         config = self._registry_configs.get(registry_name)
@@ -575,7 +581,6 @@ class HuggingFaceService:
                 model=model,
                 registry_name=registry_name,
                 storage_pool=self._storage_pool,
-                progress_reporter=None,  # Not needed for single model import
                 storage_step_mappings=storage_step_mappings,
                 step_metadata={},
             )
@@ -810,7 +815,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         file_info: FileObjectData,
         model: ModelTarget,
         storage_name: str,
-        storage_pool: StoragePool,
+        storage_pool: AbstractStoragePool,
         download_chunk_size: int,
     ) -> str:
         """Download file from HuggingFace to specified storage"""
@@ -863,78 +868,30 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             )
 
 
-class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
-    """Step to move downloaded files to archive storage"""
-
-    def __init__(self, transfer_manager: StorageTransferManager) -> None:
-        self._transfer_manager = transfer_manager
+class HuggingFaceVerifyStep(ModelVerifyStep):
+    """Step to verify downloaded files in HuggingFace model import"""
 
     @property
-    def step_type(self) -> ArtifactStorageImportStep:
-        return ArtifactStorageImportStep.ARCHIVE
-
     @override
-    async def execute(self, context: ImportStepContext, input_data: DownloadStepResult) -> None:
-        download_storage = input_data.storage_name
-        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
+    def registry_type(self) -> ArtifactRegistryType:
+        return ArtifactRegistryType.HUGGINGFACE
 
-        if not archive_storage:
-            raise StorageStepRequiredStepNotProvided("No storage mapping provided for ARCHIVE step")
 
-        # No need to move if download and archive storage are the same
-        if download_storage == archive_storage:
-            log.info(
-                f"Archive step skipped - download and archive storage are the same: {archive_storage}"
-            )
-            return
+class HuggingFaceArchiveStep(ModelArchiveStep):
+    """Step to move downloaded files to archive storage"""
 
-        log.info(f"Starting archive transfer: {download_storage} -> {archive_storage}")
-
-        archieved_file_cnt = 0
-        # Move each file from download storage to archive storage
-        for file_info, storage_key in input_data.downloaded_files:
-            try:
-                archieved_file_cnt += await self._transfer_manager.transfer_directory(
-                    source_storage_name=download_storage,
-                    dest_storage_name=archive_storage,
-                    source_prefix=storage_key,
-                    dest_prefix=storage_key,
-                )
-                log.debug(f"Transferred file to archive: {storage_key}")
-            except Exception as e:
-                log.error(f"Failed to transfer file to archive: {storage_key}: {str(e)}")
-                raise
-
-        log.info(
-            f"Archive transfer completed: {download_storage} -> {archive_storage}, "
-            f"files={archieved_file_cnt}"
-        )
-
+    @property
     @override
-    async def cleanup_stage(self, context: ImportStepContext) -> None:
-        """Clean up files from archive storage on failure"""
-        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
-        if not archive_storage:
-            return
-
-        # Delete entire model (cleaning up individual files is complex)
-        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
-        model_prefix = f"{context.model.model_id}/{revision}"
-
-        try:
-            storage = context.storage_pool.get_storage(archive_storage)
-            await storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed archive files: {archive_storage}:{model_prefix}")
-        except Exception as e:
-            log.warning(
-                f"[cleanup] Failed to cleanup archive: {archive_storage}:{model_prefix}: {str(e)}"
-            )
+    def registry_type(self) -> ArtifactRegistryType:
+        return ArtifactRegistryType.HUGGINGFACE
 
 
 def create_huggingface_import_pipeline(
     registry_configs: dict[str, Any],
     transfer_manager: StorageTransferManager,
     storage_step_mappings: dict[ArtifactStorageImportStep, str],
+    artifact_verifier_ctx: ArtifactVerifierContext,
+    event_producer: EventProducer,
 ) -> ImportPipeline:
     """Create ImportPipeline for HuggingFace based on storage step mappings."""
     steps: list[ImportStep[Any]] = []
@@ -942,6 +899,9 @@ def create_huggingface_import_pipeline(
     # Add steps based on what's present in storage_step_mappings
     if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:
         steps.append(HuggingFaceDownloadStep(registry_configs))
+
+    if ArtifactStorageImportStep.VERIFY in storage_step_mappings:
+        steps.append(HuggingFaceVerifyStep(artifact_verifier_ctx, transfer_manager, event_producer))
 
     if ArtifactStorageImportStep.ARCHIVE in storage_step_mappings:
         steps.append(HuggingFaceArchiveStep(transfer_manager))

@@ -3,6 +3,7 @@ from typing import Optional
 
 import pytest
 
+from ai.backend.common.artifact_storage import AbstractStorage
 from ai.backend.common.types import StreamReader
 from ai.backend.storage.config.unified import ObjectStorageConfig, ReservoirConfig
 from ai.backend.storage.exception import (
@@ -12,7 +13,6 @@ from ai.backend.storage.exception import (
     StorageNotFoundError,
 )
 from ai.backend.storage.services.storages.object_storage import ObjectStorageService
-from ai.backend.storage.storages.base import AbstractStorage
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.storage_pool import StoragePool
 
