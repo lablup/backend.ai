@@ -27,6 +27,8 @@ class BaseBackgroundTaskResult(BaseModel):
     """
 
     model_config = ConfigDict(
+        # Allow custom types in results (e.g., UUID, custom domain types)
+        arbitrary_types_allowed=True,
         extra="forbid",
         frozen=True,
     )

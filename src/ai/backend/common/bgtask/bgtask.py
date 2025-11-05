@@ -302,6 +302,9 @@ class BackgroundTaskManager:
         self._heartbeat_loop_task = asyncio.create_task(self._heartbeat_loop())
         self._retry_loop_task = asyncio.create_task(self._retry_loop())
 
+    def set_registry(self, registry: BackgroundTaskHandlerRegistry) -> None:
+        self._task_registry = registry
+
     async def start(
         self,
         func: BackgroundTask,
