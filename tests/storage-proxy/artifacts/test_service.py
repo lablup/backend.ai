@@ -259,6 +259,7 @@ def reservoir_download_step(
     return ReservoirDownloadStep(
         registry_configs=mock_reservoir_registry_configs,
         download_storage=mock_download_storage,
+        manager_http_clients={},
     )
 
 
@@ -928,6 +929,7 @@ class TestReservoirDownloadStep:
         step = ReservoirDownloadStep(
             registry_configs={},
             download_storage=mock_download_storage,
+            manager_http_clients={},
         )
 
         with pytest.raises(ReservoirStorageConfigInvalidError):

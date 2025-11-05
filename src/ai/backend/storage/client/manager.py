@@ -39,6 +39,7 @@ class ManagerHTTPClient:
     _access_key: str
     _secret_key: str
     _api_version: str
+    _session: aiohttp.ClientSession
 
     def __init__(self, registry_data: ManagerHTTPClientArgs):
         self._name = registry_data.name
@@ -46,6 +47,12 @@ class ManagerHTTPClient:
         self._access_key = registry_data.access_key
         self._secret_key = registry_data.secret_key
         self._api_version = registry_data.api_version
+        timeout = aiohttp.ClientTimeout(total=None, connect=None, sock_connect=None, sock_read=None)
+        self._session = aiohttp.ClientSession(timeout=timeout)
+
+    async def cleanup(self) -> None:
+        """Close the HTTP client session."""
+        await self._session.close()
 
     def _build_header(self, method: str, rel_url: str) -> Mapping[str, str]:
         date = datetime.now(tzutc())
@@ -72,26 +79,22 @@ class ManagerHTTPClient:
     async def _request(self, method: str, rel_url: str, **kwargs) -> Any:
         header = self._build_header(method=method, rel_url=rel_url)
         url = yarl.URL(self._endpoint) / rel_url.lstrip("/")
-        timeout = aiohttp.ClientTimeout(total=None, connect=None, sock_connect=None, sock_read=None)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.request(method, str(url), headers=header, **kwargs) as response:
-                response.raise_for_status()
-                return await response.json()
+        async with self._session.request(method, str(url), headers=header, **kwargs) as response:
+            response.raise_for_status()
+            return await response.json()
 
     async def _request_stream(self, method: str, rel_url: str, **kwargs) -> AsyncIterator[bytes]:
         headers = self._build_header(method=method, rel_url=rel_url)
         url = yarl.URL(self._endpoint) / rel_url.lstrip("/")
 
-        timeout = aiohttp.ClientTimeout(total=None, connect=None, sock_connect=None, sock_read=None)
-        async with aiohttp.ClientSession(timeout=timeout) as session:
-            async with session.request(method, str(url), headers=headers, **kwargs) as response:
-                response.raise_for_status()
+        async with self._session.request(method, str(url), headers=headers, **kwargs) as response:
+            response.raise_for_status()
 
-                # Stream the response content in chunks
-                chunk_size = 8192  # 8KB chunks
-                async for chunk in response.content.iter_chunked(chunk_size):
-                    if chunk:
-                        yield chunk
+            # Stream the response content in chunks
+            chunk_size = 8192  # 8KB chunks
+            async for chunk in response.content.iter_chunked(chunk_size):
+                if chunk:
+                    yield chunk
 
     async def download_vfs_file_streaming(
         self, storage_name: str, filepath: str

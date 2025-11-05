@@ -4,7 +4,7 @@ import mimetypes
 import tarfile
 import tempfile
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, cast, override
@@ -201,6 +201,7 @@ class ReservoirServiceArgs:
     storage_pool: StoragePool
     reservoir_registry_configs: dict[str, ReservoirConfig]
     artifact_verifier_ctx: ArtifactVerifierContext
+    manager_http_clients: MutableMapping[str, ManagerHTTPClient]
 
 
 class ReservoirFileDownloadStreamReader(StreamReader):
@@ -260,6 +261,7 @@ class ReservoirService:
     _storage_pool: StoragePool
     _transfer_manager: StorageTransferManager
     _artifact_verifier_ctx: ArtifactVerifierContext
+    _manager_http_clients: MutableMapping[str, ManagerHTTPClient]
 
     def __init__(self, args: ReservoirServiceArgs):
         self._background_task_manager = args.background_task_manager
@@ -268,6 +270,7 @@ class ReservoirService:
         self._storage_pool = args.storage_pool
         self._transfer_manager = StorageTransferManager(args.storage_pool)
         self._artifact_verifier_ctx = args.artifact_verifier_ctx
+        self._manager_http_clients = args.manager_http_clients
 
     async def import_model(
         self,
@@ -402,10 +405,14 @@ class ReservoirDownloadStep(ImportStep[None]):
     """Step to copy files from Reservoir (effectively direct copy to download storage)"""
 
     def __init__(
-        self, registry_configs: dict[str, ReservoirConfig], download_storage: AbstractStorage
+        self,
+        registry_configs: dict[str, ReservoirConfig],
+        download_storage: AbstractStorage,
+        manager_http_clients: MutableMapping[str, ManagerHTTPClient],
     ) -> None:
         self._registry_configs = registry_configs
         self._download_storage = download_storage
+        self._manager_http_clients = manager_http_clients
 
     @property
     def step_type(self) -> ArtifactStorageImportStep:
@@ -507,16 +514,23 @@ class ReservoirDownloadStep(ImportStep[None]):
                     f"Manager access key not configured for reservoir registry: {context.registry_name}"
                 )
 
-            # Create ManagerHTTPClient from config
-            manager_client = ManagerHTTPClient(
-                ManagerHTTPClientArgs(
-                    name=context.registry_name,
-                    endpoint=registry_config.manager_endpoint,
-                    access_key=registry_config.manager_access_key,
-                    secret_key=registry_config.manager_secret_key,
-                    api_version=registry_config.manager_api_version,
+            # Get or create ManagerHTTPClient from shared pool
+            if context.registry_name not in self._manager_http_clients:
+                manager_client = ManagerHTTPClient(
+                    ManagerHTTPClientArgs(
+                        name=context.registry_name,
+                        endpoint=registry_config.manager_endpoint,
+                        access_key=registry_config.manager_access_key,
+                        secret_key=registry_config.manager_secret_key,
+                        api_version=registry_config.manager_api_version,
+                    )
                 )
-            )
+                self._manager_http_clients[context.registry_name] = manager_client
+                log.info(
+                    f"Created and initialized ManagerHTTPClient for registry: {context.registry_name}"
+                )
+            else:
+                manager_client = self._manager_http_clients[context.registry_name]
 
             if not registry_config.storage_name:
                 raise ReservoirStorageConfigInvalidError(
@@ -830,6 +844,7 @@ def create_reservoir_import_pipeline(
     transfer_manager: StorageTransferManager,
     artifact_verifier_ctx: ArtifactVerifierContext,
     event_producer: EventProducer,
+    manager_http_clients: MutableMapping[str, ManagerHTTPClient],
 ) -> ImportPipeline:
     """Create ImportPipeline for Reservoir based on storage step mappings."""
     steps: list[ImportStep[Any]] = []
@@ -842,7 +857,9 @@ def create_reservoir_import_pipeline(
             raise StorageStepRequiredStepNotProvided("Download storage not specified in mappings")
 
         download_storage = storage_pool.get_storage(download_storage_name)
-        steps.append(ReservoirDownloadStep(registry_configs, download_storage))
+        steps.append(
+            ReservoirDownloadStep(registry_configs, download_storage, manager_http_clients)
+        )
 
     if ArtifactStorageImportStep.VERIFY in storage_step_mappings:
         steps.append(ReservoirVerifyStep(artifact_verifier_ctx, transfer_manager, event_producer))

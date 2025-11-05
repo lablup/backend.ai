@@ -22,6 +22,7 @@ from ai.backend.common.events.dispatcher import (
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.logging import BraceStyleAdapter
 
+from .client.manager import ManagerHTTPClient
 from .config.unified import StorageProxyUnifiedConfig
 from .context_types import ArtifactVerifierContext
 from .exception import InvalidVolumeError
@@ -96,6 +97,7 @@ class RootContext:
     metric_registry: CommonMetricRegistry
     background_task_manager: BackgroundTaskManager
     cors_options: Mapping[str, aiohttp_cors.ResourceOptions]
+    manager_http_clients: MutableMapping[str, ManagerHTTPClient]
 
     # volume backend states
     backends: MutableMapping[str, type[AbstractVolume]]
@@ -142,3 +144,8 @@ class RootContext:
     async def shutdown_volumes(self) -> None:
         for volume in self.volumes.values():
             await volume.shutdown()
+
+    async def shutdown_manager_http_clients(self) -> None:
+        """Close all manager HTTP client sessions."""
+        for client in self.manager_http_clients.values():
+            await client.cleanup()
