@@ -72,7 +72,8 @@ class ManagerHTTPClient:
     async def _request(self, method: str, rel_url: str, **kwargs) -> Any:
         header = self._build_header(method=method, rel_url=rel_url)
         url = yarl.URL(self._endpoint) / rel_url.lstrip("/")
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=None, connect=None, sock_connect=None, sock_read=None)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.request(method, str(url), headers=header, **kwargs) as response:
                 response.raise_for_status()
                 return await response.json()
@@ -81,7 +82,8 @@ class ManagerHTTPClient:
         headers = self._build_header(method=method, rel_url=rel_url)
         url = yarl.URL(self._endpoint) / rel_url.lstrip("/")
 
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=None, connect=None, sock_connect=None, sock_read=None)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.request(method, str(url), headers=headers, **kwargs) as response:
                 response.raise_for_status()
 

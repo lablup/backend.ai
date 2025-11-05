@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Optional, cast, override
 
 import aiofiles
+import aiohttp
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
@@ -113,9 +114,20 @@ class ReservoirVFSFileDownloader:
         )
 
         async with aiofiles.open(local_path, "wb") as f:
-            async for chunk in stream_reader.read():
-                await f.write(chunk)
-                bytes_downloaded += len(chunk)
+            try:
+                async for chunk in stream_reader.read():
+                    await f.write(chunk)
+                    bytes_downloaded += len(chunk)
+            except aiohttp.ClientError as e:
+                log.error(f"Network error during download: {e}")
+                log.error(f"Downloaded {bytes_downloaded} bytes before failure")
+                raise
+            except asyncio.TimeoutError:
+                log.error(f"Timeout after downloading {bytes_downloaded} bytes")
+                raise
+            except Exception as e:
+                log.error(f"Unexpected error: {type(e).__name__}: {e}")
+                log.error(f"Downloaded {bytes_downloaded} bytes before failure")
 
         log.debug(f"Downloaded file: {remote_path} -> {local_path} ({bytes_downloaded} bytes)")
         return bytes_downloaded
