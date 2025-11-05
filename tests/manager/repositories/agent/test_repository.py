@@ -3,16 +3,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.auth import PublicKey
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.agent.types import AgentInfo
 from ai.backend.common.types import (
     AgentId,
-    DeviceName,
-    ResourceSlot,
-    SlotName,
-    SlotTypes,
     ValkeyTarget,
 )
 from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
@@ -100,47 +94,28 @@ class TestAgentRepository:
         return mock
 
     @pytest.fixture
+    def mock_database_engine(self) -> MagicMock:
+        """Mock database engine - not needed for cache-only tests"""
+        return MagicMock(spec=ExtendedAsyncSAEngine)
+
+    @pytest.fixture
     async def agent_repository(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        mock_database_engine: MagicMock,
         valkey_image_client: ValkeyImageClient,
         valkey_live_client: ValkeyLiveClient,
         valkey_stat_client: ValkeyStatClient,
         mock_config_provider: MagicMock,
     ) -> AsyncGenerator[AgentRepository, None]:
-        """Create AgentRepository with real database and Redis clients"""
+        """Create AgentRepository with real Redis clients and mock database"""
         repo = AgentRepository(
-            db=database_engine,
+            db=mock_database_engine,
             valkey_image=valkey_image_client,
             valkey_live=valkey_live_client,
             valkey_stat=valkey_stat_client,
             config_provider=mock_config_provider,
         )
         yield repo
-
-    @pytest.fixture
-    def sample_agent_info(self) -> AgentInfo:
-        return AgentInfo(
-            ip="192.168.1.100",
-            version="24.12.0",
-            scaling_group="default",
-            available_resource_slots=ResourceSlot({
-                SlotName("cpu"): "8",
-                SlotName("mem"): "32768",
-            }),
-            slot_key_and_units={
-                SlotName("cpu"): SlotTypes.COUNT,
-                SlotName("mem"): SlotTypes.BYTES,
-            },
-            addr="tcp://192.168.1.100:6001",
-            public_key=PublicKey(b"test-public-key"),
-            public_host="192.168.1.100",
-            images=b"\x82\xc4\x00\x00",  # msgpack compressed data
-            region="us-west-1",
-            architecture="x86_64",
-            compute_plugins={DeviceName("cpu"): {}},
-            auto_terminate_abusing_kernel=False,
-        )
 
     @pytest.mark.asyncio
     async def test_update_gpu_alloc_map(

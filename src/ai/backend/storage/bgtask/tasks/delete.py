@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, override
 
-from pydantic import ConfigDict, Field
+from pydantic import Field
 
 from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskHandler,
@@ -28,8 +28,6 @@ class VFolderDeleteManifest(BaseBackgroundTaskManifest):
     """
     Manifest for deleting a virtual folder.
     """
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     volume: str = Field(description="Volume name where the vfolder is located")
     vfolder_id: VFolderIDField = Field(description="VFolder ID to delete")
