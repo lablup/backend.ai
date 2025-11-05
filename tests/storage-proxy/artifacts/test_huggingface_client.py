@@ -25,6 +25,7 @@ def mock_hf_model_info() -> MagicMock:
     mock_model.tags = ["pytorch", "text-generation"]
     mock_model.created_at = datetime(2021, 1, 1)
     mock_model.last_modified = datetime(2023, 6, 15)
+    mock_model.gated = None
     return mock_model
 
 
@@ -303,6 +304,7 @@ class TestHuggingFaceScanner:
         mock_good_model.tags = ["pytorch"]
         mock_good_model.created_at = datetime(2021, 1, 1)
         mock_good_model.last_modified = datetime(2023, 6, 15)
+        mock_good_model.gated = False
 
         mock_bad_model = MagicMock(spec=HfModelInfo)
         mock_bad_model.id = None  # This will cause an error
