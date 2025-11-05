@@ -913,7 +913,7 @@ class LegacyReservoirConfig(ReservoirConfig):
 
 class ReservoirClientConfig(BaseConfigSchema):
     timeout_total: Optional[float] = Field(
-        default=None,
+        default=300.0,
         description="""
         Total timeout for the entire request (in seconds).
         None means no timeout.
@@ -933,7 +933,7 @@ class ReservoirClientConfig(BaseConfigSchema):
         serialization_alias="timeout-connect",
     )
     timeout_sock_connect: Optional[float] = Field(
-        default=None,
+        default=30.0,
         description="""
         Timeout for connecting to a peer for a new connection (in seconds).
         None means no timeout.
