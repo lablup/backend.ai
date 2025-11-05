@@ -83,6 +83,7 @@ class HuggingFaceClient:
                     direction=-1,  # Descending order
                     limit=limit,
                     token=self._token,
+                    expand=["gated"],
                 ),
             )
             return list(models)
