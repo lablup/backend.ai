@@ -18,6 +18,7 @@ async def manager_bgtask_registry_ctx(root_ctx: RootContext) -> AsyncIterator[No
     """
     from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
 
+    from .bgtask.tasks.commit_session import CommitSessionHandler
     from .bgtask.tasks.purge_images import PurgeImagesHandler
     from .bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAllocMapsHandler
     from .bgtask.tasks.rescan_images import RescanImagesHandler
@@ -33,6 +34,14 @@ async def manager_bgtask_registry_ctx(root_ctx: RootContext) -> AsyncIterator[No
         RescanGPUAllocMapsHandler(
             agent_repository=root_ctx.repositories.agent.repository,
             agent_pool=agent_pool,
+        )
+    )
+    registry.register(
+        CommitSessionHandler(
+            session_repository=root_ctx.repositories.session.repository,
+            agent_registry=root_ctx.registry,
+            event_hub=root_ctx.event_hub,
+            event_fetcher=root_ctx.event_fetcher,
         )
     )
 
