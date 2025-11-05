@@ -22,6 +22,7 @@ from ai.backend.storage.client.huggingface import HuggingFaceClient
 from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
     ObjectStorageConfig,
+    ReservoirClientConfig,
     ReservoirConfig,
 )
 from ai.backend.storage.exception import (
@@ -212,6 +213,7 @@ def mock_import_step_context(
         ArtifactStorageImportStep.DOWNLOAD: "test_storage",
         ArtifactStorageImportStep.ARCHIVE: "test_storage",
     }
+
     return ImportStepContext(
         model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
         registry_name="test_registry",
@@ -259,6 +261,8 @@ def reservoir_download_step(
     return ReservoirDownloadStep(
         registry_configs=mock_reservoir_registry_configs,
         download_storage=mock_download_storage,
+        manager_http_clients={},
+        reservoir_client_config=ReservoirClientConfig(),
     )
 
 
@@ -929,6 +933,8 @@ class TestReservoirDownloadStep:
         step = ReservoirDownloadStep(
             registry_configs={},
             download_storage=mock_download_storage,
+            manager_http_clients={},
+            reservoir_client_config=ReservoirClientConfig(),
         )
 
         with pytest.raises(ReservoirStorageConfigInvalidError):

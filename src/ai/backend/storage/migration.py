@@ -272,6 +272,7 @@ async def check_and_upgrade(
         artifact_verifier_ctx=ArtifactVerifierContext(),  # type: ignore[arg-type]
         metric_registry=CommonMetricRegistry(),
         cors_options={},
+        manager_http_clients={},
         backends={**DEFAULT_BACKENDS},
         volumes={},
     )

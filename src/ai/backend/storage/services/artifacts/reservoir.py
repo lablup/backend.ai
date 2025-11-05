@@ -4,12 +4,13 @@ import mimetypes
 import tarfile
 import tempfile
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, MutableMapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, cast, override
 
 import aiofiles
+import aiohttp
 
 from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
@@ -25,6 +26,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.manager import ManagerHTTPClient, ManagerHTTPClientArgs
 from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.unified import (
+    ReservoirClientConfig,
     ReservoirConfig,
 )
 from ai.backend.storage.context_types import ArtifactVerifierContext
@@ -113,9 +115,18 @@ class ReservoirVFSFileDownloader:
         )
 
         async with aiofiles.open(local_path, "wb") as f:
-            async for chunk in stream_reader.read():
-                await f.write(chunk)
-                bytes_downloaded += len(chunk)
+            try:
+                async for chunk in stream_reader.read():
+                    await f.write(chunk)
+                    bytes_downloaded += len(chunk)
+            except aiohttp.ClientError as e:
+                log.error(
+                    f"Network error during download: {e}, Downloaded {bytes_downloaded} bytes before failure"
+                )
+                raise
+            except asyncio.TimeoutError:
+                log.error(f"Timeout after downloading {bytes_downloaded} bytes")
+                raise
 
         log.debug(f"Downloaded file: {remote_path} -> {local_path} ({bytes_downloaded} bytes)")
         return bytes_downloaded
@@ -189,6 +200,8 @@ class ReservoirServiceArgs:
     storage_pool: StoragePool
     reservoir_registry_configs: dict[str, ReservoirConfig]
     artifact_verifier_ctx: ArtifactVerifierContext
+    manager_http_clients: MutableMapping[str, ManagerHTTPClient]
+    reservoir_client_config: ReservoirClientConfig  # Passed to ImportStepContext
 
 
 class ReservoirFileDownloadStreamReader(StreamReader):
@@ -248,6 +261,8 @@ class ReservoirService:
     _storage_pool: StoragePool
     _transfer_manager: StorageTransferManager
     _artifact_verifier_ctx: ArtifactVerifierContext
+    _manager_http_clients: MutableMapping[str, ManagerHTTPClient]
+    _reservoir_client_config: ReservoirClientConfig
 
     def __init__(self, args: ReservoirServiceArgs):
         self._background_task_manager = args.background_task_manager
@@ -256,6 +271,8 @@ class ReservoirService:
         self._storage_pool = args.storage_pool
         self._transfer_manager = StorageTransferManager(args.storage_pool)
         self._artifact_verifier_ctx = args.artifact_verifier_ctx
+        self._manager_http_clients = args.manager_http_clients
+        self._reservoir_client_config = args.reservoir_client_config
 
     async def import_model(
         self,
@@ -390,10 +407,16 @@ class ReservoirDownloadStep(ImportStep[None]):
     """Step to copy files from Reservoir (effectively direct copy to download storage)"""
 
     def __init__(
-        self, registry_configs: dict[str, ReservoirConfig], download_storage: AbstractStorage
+        self,
+        registry_configs: dict[str, ReservoirConfig],
+        download_storage: AbstractStorage,
+        manager_http_clients: MutableMapping[str, ManagerHTTPClient],
+        reservoir_client_config: ReservoirClientConfig,
     ) -> None:
         self._registry_configs = registry_configs
         self._download_storage = download_storage
+        self._manager_http_clients = manager_http_clients
+        self._reservoir_client_config = reservoir_client_config
 
     @property
     def step_type(self) -> ArtifactStorageImportStep:
@@ -439,7 +462,7 @@ class ReservoirDownloadStep(ImportStep[None]):
                 cast(VFSStorage, self._download_storage).base_path / model.model_id / revision
             )
             bytes_copied = await self._handle_vfs_download(
-                registry_config, context, model_prefix, dest_path
+                registry_config, context, model_prefix, dest_path, self._reservoir_client_config
             )
             # For VFS downloads, create a single entry representing the extracted archive
             file_obj = FileObjectData(
@@ -474,6 +497,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         context: ImportStepContext,
         model_prefix: str,
         dest_path: Path,
+        reservoir_client_config: ReservoirClientConfig,
     ) -> int:
         """Handle file downloads for VFS storage type using individual file downloads."""
 
@@ -495,16 +519,21 @@ class ReservoirDownloadStep(ImportStep[None]):
                     f"Manager access key not configured for reservoir registry: {context.registry_name}"
                 )
 
-            # Create ManagerHTTPClient from config
-            manager_client = ManagerHTTPClient(
-                ManagerHTTPClientArgs(
-                    name=context.registry_name,
-                    endpoint=registry_config.manager_endpoint,
-                    access_key=registry_config.manager_access_key,
-                    secret_key=registry_config.manager_secret_key,
-                    api_version=registry_config.manager_api_version,
+            # Get or create ManagerHTTPClient from the pool
+            if context.registry_name not in self._manager_http_clients:
+                manager_client = ManagerHTTPClient(
+                    ManagerHTTPClientArgs(
+                        name=context.registry_name,
+                        endpoint=registry_config.manager_endpoint,
+                        access_key=registry_config.manager_access_key,
+                        secret_key=registry_config.manager_secret_key,
+                        api_version=registry_config.manager_api_version,
+                        client_config=reservoir_client_config,
+                    )
                 )
-            )
+                self._manager_http_clients[context.registry_name] = manager_client
+            else:
+                manager_client = self._manager_http_clients[context.registry_name]
 
             if not registry_config.storage_name:
                 raise ReservoirStorageConfigInvalidError(
@@ -818,6 +847,8 @@ def create_reservoir_import_pipeline(
     transfer_manager: StorageTransferManager,
     artifact_verifier_ctx: ArtifactVerifierContext,
     event_producer: EventProducer,
+    manager_http_clients: MutableMapping[str, ManagerHTTPClient],
+    reservoir_client_config: ReservoirClientConfig,
 ) -> ImportPipeline:
     """Create ImportPipeline for Reservoir based on storage step mappings."""
     steps: list[ImportStep[Any]] = []
@@ -830,7 +861,11 @@ def create_reservoir_import_pipeline(
             raise StorageStepRequiredStepNotProvided("Download storage not specified in mappings")
 
         download_storage = storage_pool.get_storage(download_storage_name)
-        steps.append(ReservoirDownloadStep(registry_configs, download_storage))
+        steps.append(
+            ReservoirDownloadStep(
+                registry_configs, download_storage, manager_http_clients, reservoir_client_config
+            )
+        )
 
     if ArtifactStorageImportStep.VERIFY in storage_step_mappings:
         steps.append(ReservoirVerifyStep(artifact_verifier_ctx, transfer_manager, event_producer))

@@ -466,6 +466,7 @@ async def api_ctx(
         finally:
             # volume instances are lazily initialized upon their first usage by the API layers.
             await root_ctx.shutdown_volumes()
+            await root_ctx.shutdown_manager_http_clients()
 
 
 @asynccontextmanager
@@ -611,6 +612,7 @@ async def server_main(
                     allow_credentials=False, expose_headers="*", allow_headers="*"
                 ),
             },
+            manager_http_clients={},
             backends={**DEFAULT_BACKENDS},
             volumes={
                 NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
