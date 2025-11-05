@@ -1,7 +1,7 @@
 """add_extra_column_to_artifacts
 
 Revision ID: 96e9056b8e72
-Revises: d811b103dbfc
+Revises: 5a5142f6d251
 Create Date: 2025-11-04 09:51:43.152737
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "96e9056b8e72"
-down_revision = "d811b103dbfc"
+down_revision = "5a5142f6d251"
 branch_labels = None
 depends_on = None
 
