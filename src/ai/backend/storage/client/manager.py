@@ -13,6 +13,7 @@ from dateutil.tz import tzutc
 from ai.backend.common.auth.utils import generate_signature
 from ai.backend.common.dto.storage.response import VFSListFilesResponse
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.config.unified import ReservoirClientConfig
 
 _HASH_TYPE = "sha256"
 
@@ -26,6 +27,7 @@ class ManagerHTTPClientArgs:
     access_key: str
     secret_key: str
     api_version: str
+    client_config: ReservoirClientConfig
 
 
 # TODO: Remove this and reconstruct to request storage proxy directly.
@@ -47,7 +49,12 @@ class ManagerHTTPClient:
         self._access_key = registry_data.access_key
         self._secret_key = registry_data.secret_key
         self._api_version = registry_data.api_version
-        timeout = aiohttp.ClientTimeout(total=None, connect=None, sock_connect=None, sock_read=None)
+        timeout = aiohttp.ClientTimeout(
+            total=registry_data.client_config.timeout_total,
+            connect=registry_data.client_config.timeout_connect,
+            sock_connect=registry_data.client_config.timeout_sock_connect,
+            sock_read=registry_data.client_config.timeout_sock_read,
+        )
         self._session = aiohttp.ClientSession(timeout=timeout)
 
     async def cleanup(self) -> None:

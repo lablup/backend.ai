@@ -26,6 +26,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.client.manager import ManagerHTTPClient, ManagerHTTPClientArgs
 from ai.backend.storage.client.s3 import S3Client
 from ai.backend.storage.config.unified import (
+    ReservoirClientConfig,
     ReservoirConfig,
 )
 from ai.backend.storage.context_types import ArtifactVerifierContext
@@ -202,6 +203,7 @@ class ReservoirServiceArgs:
     reservoir_registry_configs: dict[str, ReservoirConfig]
     artifact_verifier_ctx: ArtifactVerifierContext
     manager_http_clients: MutableMapping[str, ManagerHTTPClient]
+    reservoir_client_config: ReservoirClientConfig  # Passed to ImportStepContext
 
 
 class ReservoirFileDownloadStreamReader(StreamReader):
@@ -262,6 +264,7 @@ class ReservoirService:
     _transfer_manager: StorageTransferManager
     _artifact_verifier_ctx: ArtifactVerifierContext
     _manager_http_clients: MutableMapping[str, ManagerHTTPClient]
+    _reservoir_client_config: ReservoirClientConfig
 
     def __init__(self, args: ReservoirServiceArgs):
         self._background_task_manager = args.background_task_manager
@@ -271,6 +274,7 @@ class ReservoirService:
         self._transfer_manager = StorageTransferManager(args.storage_pool)
         self._artifact_verifier_ctx = args.artifact_verifier_ctx
         self._manager_http_clients = args.manager_http_clients
+        self._reservoir_client_config = args.reservoir_client_config
 
     async def import_model(
         self,
@@ -409,10 +413,12 @@ class ReservoirDownloadStep(ImportStep[None]):
         registry_configs: dict[str, ReservoirConfig],
         download_storage: AbstractStorage,
         manager_http_clients: MutableMapping[str, ManagerHTTPClient],
+        reservoir_client_config: ReservoirClientConfig,
     ) -> None:
         self._registry_configs = registry_configs
         self._download_storage = download_storage
         self._manager_http_clients = manager_http_clients
+        self._reservoir_client_config = reservoir_client_config
 
     @property
     def step_type(self) -> ArtifactStorageImportStep:
@@ -458,7 +464,7 @@ class ReservoirDownloadStep(ImportStep[None]):
                 cast(VFSStorage, self._download_storage).base_path / model.model_id / revision
             )
             bytes_copied = await self._handle_vfs_download(
-                registry_config, context, model_prefix, dest_path
+                registry_config, context, model_prefix, dest_path, self._reservoir_client_config
             )
             # For VFS downloads, create a single entry representing the extracted archive
             file_obj = FileObjectData(
@@ -493,6 +499,7 @@ class ReservoirDownloadStep(ImportStep[None]):
         context: ImportStepContext,
         model_prefix: str,
         dest_path: Path,
+        reservoir_client_config: ReservoirClientConfig,
     ) -> int:
         """Handle file downloads for VFS storage type using individual file downloads."""
 
@@ -523,6 +530,7 @@ class ReservoirDownloadStep(ImportStep[None]):
                         access_key=registry_config.manager_access_key,
                         secret_key=registry_config.manager_secret_key,
                         api_version=registry_config.manager_api_version,
+                        client_config=reservoir_client_config,
                     )
                 )
                 self._manager_http_clients[context.registry_name] = manager_client
@@ -845,6 +853,7 @@ def create_reservoir_import_pipeline(
     artifact_verifier_ctx: ArtifactVerifierContext,
     event_producer: EventProducer,
     manager_http_clients: MutableMapping[str, ManagerHTTPClient],
+    reservoir_client_config: ReservoirClientConfig,
 ) -> ImportPipeline:
     """Create ImportPipeline for Reservoir based on storage step mappings."""
     steps: list[ImportStep[Any]] = []
@@ -858,7 +867,9 @@ def create_reservoir_import_pipeline(
 
         download_storage = storage_pool.get_storage(download_storage_name)
         steps.append(
-            ReservoirDownloadStep(registry_configs, download_storage, manager_http_clients)
+            ReservoirDownloadStep(
+                registry_configs, download_storage, manager_http_clients, reservoir_client_config
+            )
         )
 
     if ArtifactStorageImportStep.VERIFY in storage_step_mappings:
