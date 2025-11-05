@@ -24,6 +24,7 @@ from ai.backend.common.exception import BgtaskCancelledError, BgtaskFailedError
 from ai.backend.common.types import ImageRegistry, SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
+from ai.backend.manager.data.image.types import ImageIdentifier
 
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
@@ -115,8 +116,6 @@ class CommitSessionHandler(BaseBackgroundTaskHandler[CommitSessionManifest, Comm
                 return CommitSessionResult(error_message=error_msg)
 
             # Resolve base image
-            from ai.backend.manager.models.image import ImageIdentifier
-
             image_row = await self._session_repository.resolve_image([
                 ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)
             ])

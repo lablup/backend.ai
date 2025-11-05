@@ -45,6 +45,6 @@ async def manager_bgtask_registry_ctx(root_ctx: RootContext) -> AsyncIterator[No
         )
     )
 
-    root_ctx.manager_bgtask_registry = registry
+    root_ctx.background_task_manager.set_registry(registry)
 
     yield
