@@ -143,6 +143,7 @@ type Artifact implements Node {
   registry: SourceInfo!
   source: SourceInfo!
   readonly: Boolean!
+  extra: JSON
   scannedAt: DateTime!
   updatedAt: DateTime!
   availability: ArtifactAvailability!

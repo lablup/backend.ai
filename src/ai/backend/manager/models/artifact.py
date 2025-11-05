@@ -50,6 +50,7 @@ class ArtifactRow(Base):
     source_registry_type = sa.Column("source_registry_type", sa.String, nullable=False, index=True)
     description = sa.Column("description", sa.String, nullable=True)
     readonly = sa.Column("readonly", sa.Boolean, default=False, nullable=False)
+    extra = sa.Column("extra", sa.JSON, nullable=True, default=None)
     scanned_at = sa.Column(
         "scanned_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
@@ -99,7 +100,8 @@ class ArtifactRow(Base):
             f"availability={self.availability}, "
             f"scanned_at={self.scanned_at}, "
             f"updated_at={self.updated_at}, "
-            f"readonly={self.readonly})"
+            f"readonly={self.readonly}, "
+            f"extra={self.extra})"
         )
 
     def __repr__(self) -> str:
@@ -119,4 +121,5 @@ class ArtifactRow(Base):
             scanned_at=self.scanned_at,
             updated_at=self.updated_at,
             readonly=self.readonly,
+            extra=self.extra,
         )

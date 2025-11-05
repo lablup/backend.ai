@@ -9,6 +9,7 @@ from aiotools import apartial
 from strawberry import ID, UNSET, Info
 from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.scalars import JSON
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
@@ -508,6 +509,7 @@ class Artifact(Node):
     registry: SourceInfo
     source: SourceInfo
     readonly: bool
+    extra: Optional[JSON]
     scanned_at: datetime
     updated_at: datetime
     availability: ArtifactAvailability
@@ -522,6 +524,7 @@ class Artifact(Node):
             registry=SourceInfo(name=data.registry_type.value, url=registry_url),
             source=SourceInfo(name=data.source_registry_type.value, url=source_url),
             readonly=data.readonly,
+            extra=data.extra,
             scanned_at=data.scanned_at,
             updated_at=data.updated_at,
             availability=data.availability,
