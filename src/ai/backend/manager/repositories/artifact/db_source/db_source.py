@@ -328,6 +328,7 @@ class ArtifactDBSource:
                         registry_type=artifact_data.registry_type,
                         source_registry_type=artifact_data.source_registry_type,
                         readonly=True,  # always overwrite readonly to True
+                        extra=artifact_data.extra,
                     )
                     db_sess.add(new_artifact)
                     await db_sess.flush()
@@ -339,6 +340,7 @@ class ArtifactDBSource:
                     # Update existing artifact
                     has_changes = existing_artifact.description != artifact_data.description
                     if has_changes:
+                        existing_artifact.extra = artifact_data.extra
                         existing_artifact.description = artifact_data.description
                         existing_artifact.updated_at = datetime.now(timezone.utc)
 
@@ -457,12 +459,17 @@ class ArtifactDBSource:
                         source_registry_id=registry_id,
                         source_registry_type=ArtifactRegistryType.HUGGINGFACE,
                         readonly=True,
+                        extra=model.extra,
                     )
                     db_sess.add(artifact_row)
                     await db_sess.flush()
                     await db_sess.refresh(
                         artifact_row, attribute_names=["scanned_at", "updated_at"]
                     )
+                else:
+                    # Update existing artifact's extra field if changed
+                    artifact_row.extra = model.extra
+                    artifact_ids_to_update.add(artifact_row.id)
 
                 # Initialize artifact in map if not exists
                 if artifact_row.id not in artifacts_map:

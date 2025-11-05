@@ -268,6 +268,7 @@ class HuggingFaceScanner:
                             readme=None,
                             size=None,
                             sha=None,
+                            extra={"gated": model.gated},
                         )
                         model_data_list.append(model_data)
 
@@ -321,6 +322,7 @@ class HuggingFaceScanner:
                 readme=readme_content,
                 size=total_size,
                 sha=None,
+                extra={"gated": model_info.gated},
             )
 
             log.info(
@@ -356,6 +358,7 @@ class HuggingFaceScanner:
                 readme=None,
                 size=None,
                 sha=None,
+                extra={"gated": model_info.gated},
             )
 
             log.info(
