@@ -103,6 +103,7 @@ class TestHuggingFaceClient:
             direction=-1,
             limit=5,
             token="test_token",
+            expand=["gated"],
         )
 
     @pytest.mark.asyncio
@@ -289,6 +290,7 @@ class TestHuggingFaceScanner:
             direction=-1,
             limit=5,
             token="test_token",
+            expand=["gated"],
         )
 
     @pytest.mark.asyncio
