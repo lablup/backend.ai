@@ -183,19 +183,22 @@ class APIHandler:
         """
         processors = processors_ctx.processors
         pagination = body.parsed.pagination
+        filters = body.parsed.filters
+        ordering = body.parsed.ordering
 
         action_result = await processors.artifact.list_artifacts_with_revisions.wait_for_complete(
             ListArtifactsWithRevisionsAction(
                 pagination=pagination,
-                ordering=None,
-                filters=None,
+                ordering=ordering,
+                filters=filters,
             )
         )
 
+        artifacts = action_result.data
         resp = SearchArtifactsResponse(
             artifacts=[
                 ArtifactDataWithRevisionsResponse.from_artifact_with_revisions(artifact)
-                for artifact in action_result.data
+                for artifact in artifacts
             ],
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)

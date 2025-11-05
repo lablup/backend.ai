@@ -19,6 +19,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
+    ArtifactFilterOptions,
     ArtifactRegistryType,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
@@ -27,6 +28,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
+from ai.backend.manager.data.common.types import StringFilterData
 from ai.backend.manager.dto.request import (
     DelegateScanArtifactsReq,
     SearchArtifactsReq,
@@ -197,20 +199,32 @@ class ArtifactService:
 
                 # TODO: Apply client_decorator instead of retrying here
                 offset = 0
-                limit = 10
+                limit = 10  # Fetch 10 items per request
                 all_artifacts: list[ArtifactDataWithRevisions] = []
                 MAX_RETRIES = 3
 
-                while True:
+                # Use action.limit to determine total number of artifacts to fetch
+                total_limit = action.limit if action.limit is not None else float("inf")
+                fetched_count = 0
+
+                while fetched_count < total_limit:
                     retry_count = 0
                     client_resp = None
 
                     while retry_count < MAX_RETRIES:
                         try:
+                            # Create filters from action parameters
+                            filters = None
+                            if action.search is not None:
+                                filters = ArtifactFilterOptions(
+                                    name_filter=StringFilterData(contains=action.search)
+                                )
+
                             req = SearchArtifactsReq(
                                 pagination=PaginationOptions(
                                     offset=OffsetBasedPaginationOptions(offset=offset, limit=limit)
-                                )
+                                ),
+                                filters=filters,
                             )
                             client_resp = await remote_reservoir_client.search_artifacts(req)
                             break
@@ -242,6 +256,9 @@ class ArtifactService:
 
                     # Convert response data back to full data with readme
                     for response_artifact in parsed.artifacts:
+                        if fetched_count >= total_limit:
+                            break
+
                         # Convert response revisions back to full revisions
                         full_revisions = []
                         for response_revision in response_artifact.revisions:
@@ -300,8 +317,9 @@ class ArtifactService:
                             revisions=full_revisions,
                         )
                         all_artifacts.append(full_artifact)
+                        fetched_count += 1
 
-                    if len(parsed.artifacts) < limit:
+                    if len(parsed.artifacts) < limit or fetched_count >= total_limit:
                         break
 
                     offset += limit
@@ -374,20 +392,31 @@ class ArtifactService:
 
                 # TODO: Apply client_decorator instead of retrying here
                 offset = 0
-                limit = 10
+                limit = 10  # Fetch 10 items per request
                 all_artifacts: list[ArtifactDataWithRevisions] = []
                 MAX_RETRIES = 3
 
-                while True:
+                # Use action.limit to determine total number of artifacts to fetch
+                total_limit = action.limit if action.limit is not None else float("inf")
+                fetched_count = 0
+
+                while fetched_count < total_limit:
                     retry_count = 0
                     client_resp = None
 
                     while retry_count < MAX_RETRIES:
                         try:
+                            filters = None
+                            if action.search is not None:
+                                filters = ArtifactFilterOptions(
+                                    name_filter=StringFilterData(contains=action.search)
+                                )
+
                             req = SearchArtifactsReq(
                                 pagination=PaginationOptions(
                                     offset=OffsetBasedPaginationOptions(offset=offset, limit=limit)
-                                )
+                                ),
+                                filters=filters,
                             )
                             client_resp = await remote_reservoir_client.search_artifacts(req)
                             break
@@ -419,6 +448,9 @@ class ArtifactService:
 
                     # Convert response data back to full data with readme
                     for response_artifact in parsed.artifacts:
+                        if fetched_count >= total_limit:
+                            break
+
                         # Convert response revisions back to full revisions
                         full_revisions = []
                         for response_revision in response_artifact.revisions:
@@ -474,8 +506,9 @@ class ArtifactService:
                             revisions=full_revisions,
                         )
                         all_artifacts.append(full_artifact)
+                        fetched_count += 1
 
-                    if len(parsed.artifacts) < limit:
+                    if len(parsed.artifacts) < limit or fetched_count >= total_limit:
                         break
 
                     offset += limit

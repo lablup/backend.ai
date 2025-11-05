@@ -26,7 +26,9 @@ from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
+    ArtifactFilterOptions,
     ArtifactOrderField,
+    ArtifactOrderingOptions,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionOrderField,
@@ -40,8 +42,6 @@ from ai.backend.manager.errors.artifact import (
     ArtifactScanLimitExceededError,
 )
 from ai.backend.manager.repositories.artifact.types import (
-    ArtifactFilterOptions,
-    ArtifactOrderingOptions,
     ArtifactRemoteStatusFilter,
     ArtifactRemoteStatusFilterType,
     ArtifactRevisionFilterOptions,
@@ -106,9 +106,9 @@ class ArtifactFilter:
 
         # Handle basic filters
         repo_filter.artifact_type = self.type
-        repo_filter.name_filter = self.name
-        repo_filter.registry_filter = self.registry
-        repo_filter.source_filter = self.source
+        repo_filter.name_filter = self.name.to_dataclass() if self.name else None
+        repo_filter.registry_filter = self.registry.to_dataclass() if self.registry else None
+        repo_filter.source_filter = self.source.to_dataclass() if self.source else None
         repo_filter.availability = self.availability
 
         # Handle logical operations
@@ -1306,7 +1306,7 @@ async def scan_artifacts(
     Import scanned artifact revisions from external registries.
 
     Downloads the actual files for the specified artifact revisions, transitioning
-    them from SCANNED → PULLING → PULLED → AVAILABLE status.
+    them from SCANNED → PULLING → VERIFYING → AVAILABLE status.
 
     Returns background tasks that can be monitored for import progress.
     Once AVAILABLE, artifacts can be used by users in their sessions.
