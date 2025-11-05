@@ -35,6 +35,14 @@ class TestCommitSessionHandler:
             user_email="test@example.com",
         )
 
+    def test_handler_name(self) -> None:
+        """Test handler returns correct name."""
+        assert CommitSessionHandler.name() == ManagerBgtaskName.COMMIT_SESSION
+
+    def test_handler_manifest_type(self) -> None:
+        """Test handler returns correct manifest type."""
+        assert CommitSessionHandler.manifest_type() == CommitSessionManifest
+
     def test_manifest_creation(self, sample_session_id: SessionId) -> None:
         """Test manifest can be created with required fields."""
         manifest = CommitSessionManifest(
@@ -69,13 +77,11 @@ class TestCommitSessionHandler:
         assert restored.registry_hostname == sample_manifest.registry_hostname
         assert restored.image_visibility == sample_manifest.image_visibility
 
-    def test_handler_name(self) -> None:
-        """Test handler returns correct name."""
-        assert CommitSessionHandler.name() == ManagerBgtaskName.COMMIT_SESSION
-
-    def test_handler_manifest_type(self) -> None:
-        """Test handler returns correct manifest type."""
-        assert CommitSessionHandler.manifest_type() == CommitSessionManifest
+    def test_result_default_values(self) -> None:
+        """Test result default values are None."""
+        result = CommitSessionResult()
+        assert result.image_id is None
+        assert result.error_message is None
 
     def test_result_success_serialization(self) -> None:
         """Test result can be serialized and deserialized with success case."""
@@ -106,9 +112,3 @@ class TestCommitSessionHandler:
         restored = CommitSessionResult.model_validate(data)
         assert restored.image_id is None
         assert restored.error_message == error_msg
-
-    def test_result_default_values(self) -> None:
-        """Test result default values are None."""
-        result = CommitSessionResult()
-        assert result.image_id is None
-        assert result.error_message is None
