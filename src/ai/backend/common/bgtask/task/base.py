@@ -13,6 +13,8 @@ class BaseBackgroundTaskManifest(BaseModel):
     """
 
     model_config = ConfigDict(
+        # Allow custom types in manifests
+        arbitrary_types_allowed=True,
         extra="forbid",
         frozen=True,
     )
