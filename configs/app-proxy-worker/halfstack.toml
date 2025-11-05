@@ -11,10 +11,14 @@ aiomonitor_webui_port = 49610
 frontend_mode = "port"
 protocol = "http"
 accepted_traffics = ["inference", "interactive"]
-api_bind_addr = { host = "127.0.0.1", port = 10201 }
+api_bind_addr = { host = "0.0.0.0", port = 10201 }
+# Change `host` and `port` to the actual host and port for user access
+api_advertised_addr = { host = "127.0.0.1", port = 10201 }
 
 [proxy_worker.port_proxy]
-bind_host = "127.0.0.1"
+bind_host = "0.0.0.0"
+# Change `host` and `port` to the actual host and port for user access
+advertised_host = "127.0.0.1"
 bind_port_range = [10205, 10300]
 
 [secrets]
