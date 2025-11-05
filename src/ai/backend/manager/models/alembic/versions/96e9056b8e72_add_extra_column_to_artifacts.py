@@ -18,7 +18,9 @@ depends_on = None
 
 def upgrade() -> None:
     # Add extra column to artifacts table
-    op.add_column("artifacts", sa.Column("extra", sa.JSON, nullable=True, default=None))
+    op.add_column(
+        "artifacts", sa.Column("extra", sa.JSON(none_as_null=True), nullable=True, default=None)
+    )
 
 
 def downgrade() -> None:

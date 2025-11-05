@@ -338,7 +338,9 @@ class ArtifactDBSource:
                     result_artifacts.append(new_artifact.to_dataclass())
                 else:
                     # Update existing artifact
-                    has_changes = existing_artifact.description != artifact_data.description
+                    has_changes = (existing_artifact.description != artifact_data.description) or (
+                        existing_artifact.extra != artifact_data.extra
+                    )
                     if has_changes:
                         existing_artifact.extra = artifact_data.extra
                         existing_artifact.description = artifact_data.description

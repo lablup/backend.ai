@@ -50,7 +50,7 @@ class ArtifactRow(Base):
     source_registry_type = sa.Column("source_registry_type", sa.String, nullable=False, index=True)
     description = sa.Column("description", sa.String, nullable=True)
     readonly = sa.Column("readonly", sa.Boolean, default=False, nullable=False)
-    extra = sa.Column("extra", sa.JSON, nullable=True, default=None)
+    extra = sa.Column("extra", sa.JSON(none_as_null=True), nullable=True, default=None)
     scanned_at = sa.Column(
         "scanned_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()
     )
