@@ -519,7 +519,7 @@ class ReservoirDownloadStep(ImportStep[None]):
                     f"Manager access key not configured for reservoir registry: {context.registry_name}"
                 )
 
-            # Get or create ManagerHTTPClient from shared pool
+            # Get or create ManagerHTTPClient from the pool
             if context.registry_name not in self._manager_http_clients:
                 manager_client = ManagerHTTPClient(
                     ManagerHTTPClientArgs(
@@ -532,9 +532,6 @@ class ReservoirDownloadStep(ImportStep[None]):
                     )
                 )
                 self._manager_http_clients[context.registry_name] = manager_client
-                log.info(
-                    f"Created and initialized ManagerHTTPClient for registry: {context.registry_name}"
-                )
             else:
                 manager_client = self._manager_http_clients[context.registry_name]
 

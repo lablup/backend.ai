@@ -69,10 +69,7 @@ class StorageSessionManager:
         self._proxies = {}
         for proxy_name, proxy_config in self.config.proxies.items():
             connector = aiohttp.TCPConnector(ssl=proxy_config.ssl_verify)
-            timeout = aiohttp.ClientTimeout(
-                total=None, connect=None, sock_connect=None, sock_read=None
-            )
-            session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+            session = aiohttp.ClientSession(connector=connector)
             self._proxies[proxy_name] = StorageProxyInfo(
                 session=session,
                 secret=proxy_config.secret,
@@ -94,10 +91,7 @@ class StorageSessionManager:
                 log.error("Storage proxy {} is already registered.", proxy_name)
                 continue
             connector = aiohttp.TCPConnector(ssl=proxy_config.ssl_verify)
-            timeout = aiohttp.ClientTimeout(
-                total=None, connect=None, sock_connect=None, sock_read=None
-            )
-            session = aiohttp.ClientSession(connector=connector, timeout=timeout)
+            session = aiohttp.ClientSession(connector=connector)
             manager_facing_clients[proxy_name] = StorageProxyManagerFacingClient(
                 StorageProxyHTTPClient(
                     session,
