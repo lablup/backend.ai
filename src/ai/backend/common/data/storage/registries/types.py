@@ -1,6 +1,6 @@
 import enum
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -161,4 +161,11 @@ class ModelData(BaseModel):
         Used to track changes and ensure model version consistency.
         """,
         examples=["607a30d783dfa663caf39e06633721c8d4cfcd7e", "abc123def456", None],
+    )
+    extra: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="""
+        Additional metadata about the model (e.g., gated status).
+        Stored as JSON in the database for extensibility.
+        """,
     )

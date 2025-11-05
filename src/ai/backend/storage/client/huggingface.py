@@ -83,6 +83,7 @@ class HuggingFaceClient:
                     direction=-1,  # Descending order
                     limit=limit,
                     token=self._token,
+                    expand=["gated"],
                 ),
             )
             return list(models)
@@ -268,6 +269,7 @@ class HuggingFaceScanner:
                             readme=None,
                             size=None,
                             sha=None,
+                            extra={"gated": model.gated},
                         )
                         model_data_list.append(model_data)
 
@@ -321,6 +323,7 @@ class HuggingFaceScanner:
                 readme=readme_content,
                 size=total_size,
                 sha=None,
+                extra={"gated": model_info.gated},
             )
 
             log.info(
@@ -356,6 +359,7 @@ class HuggingFaceScanner:
                 readme=None,
                 size=None,
                 sha=None,
+                extra={"gated": model_info.gated},
             )
 
             log.info(
@@ -478,8 +482,8 @@ class HuggingFaceScanner:
                         await event_producer.anycast_event(
                             ModelMetadataFetchDoneEvent(model=metadata_info)
                         )
-                except Exception as e:
-                    log.warning(f"Failed to download metadata for {model_data.id}: {str(e)}")
+                except Exception:
+                    pass
 
         # Download metadata concurrently with semaphore limit
         tasks = [download_metadata(model) for model in models]
@@ -512,8 +516,8 @@ class HuggingFaceScanner:
                     # Update the model data with README content and size
                     model_data.readme = readme_content
                     model_data.size = total_size
-                except Exception as e:
-                    log.warning(f"Failed to download metadata for {model_data.id}: {str(e)}")
+                except Exception:
+                    pass
 
         # Download metadata concurrently with semaphore limit
         tasks = [download_and_update_metadata(model) for model in models]
@@ -537,19 +541,14 @@ class HuggingFaceScanner:
                         content = await response.text()
                         return content
                     else:
-                        log.warning(
-                            f"Failed to download README for {model}, status code: {response.status}"
-                        )
                         return None
 
-        except Exception as e:
-            log.warning(f"Failed to download README for {model}: {str(e)}")
+        except Exception:
             return None
 
     async def _calculate_model_size(self, model: ModelTarget) -> int:
         try:
             file_infos = await self.list_model_files_info(model)
             return sum(file.size for file in file_infos)
-        except Exception as size_error:
-            log.warning(f"Failed to calculate size for {model}: {str(size_error)}")
+        except Exception:
             return 0

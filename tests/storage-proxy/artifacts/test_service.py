@@ -305,6 +305,7 @@ class TestHuggingFaceDownloadStep:
             direction=-1,
             limit=5,
             token="test_token",
+            expand=["gated"],
         )
 
     @pytest.mark.asyncio

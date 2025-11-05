@@ -314,6 +314,7 @@ class ArtifactService:
                             updated_at=response_artifact.updated_at,
                             readonly=response_artifact.readonly,
                             availability=response_artifact.availability,
+                            extra=response_artifact.extra,
                             revisions=full_revisions,
                         )
                         all_artifacts.append(full_artifact)
@@ -503,6 +504,7 @@ class ArtifactService:
                             updated_at=response_artifact.updated_at,
                             readonly=response_artifact.readonly,
                             availability=response_artifact.availability,
+                            extra=response_artifact.extra,
                             revisions=full_revisions,
                         )
                         all_artifacts.append(full_artifact)
@@ -826,6 +828,7 @@ class ArtifactService:
                 updated_at=response_artifact.updated_at,
                 readonly=response_artifact.readonly,
                 availability=response_artifact.availability,
+                extra=response_artifact.extra,
                 revisions=full_revisions,
             )
             all_artifacts.append(full_artifact)

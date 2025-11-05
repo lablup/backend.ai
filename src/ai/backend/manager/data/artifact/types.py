@@ -2,7 +2,7 @@ import enum
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Self
+from typing import Any, Optional, Self
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.data.common.types import StringFilterData
@@ -64,6 +64,7 @@ class ArtifactData:
     scanned_at: datetime
     updated_at: datetime
     readonly: bool
+    extra: Optional[dict[str, Any]]
 
 
 @dataclass
@@ -135,6 +136,7 @@ class ArtifactDataWithRevisions(ArtifactData):
             updated_at=artifact_data.updated_at,
             readonly=artifact_data.readonly,
             availability=artifact_data.availability,
+            extra=artifact_data.extra,
             revisions=revisions,
         )
 
@@ -162,6 +164,7 @@ class ArtifactDataWithRevisionsResponse(ArtifactData):
             updated_at=artifact_data.updated_at,
             readonly=artifact_data.readonly,
             availability=artifact_data.availability,
+            extra=artifact_data.extra,
             revisions=[ArtifactRevisionResponseData.from_revision_data(rev) for rev in revisions],
         )
 
@@ -182,6 +185,7 @@ class ArtifactDataWithRevisionsResponse(ArtifactData):
             updated_at=artifact_with_revisions.updated_at,
             readonly=artifact_with_revisions.readonly,
             availability=artifact_with_revisions.availability,
+            extra=artifact_with_revisions.extra,
             revisions=[
                 ArtifactRevisionResponseData.from_revision_data(rev)
                 for rev in artifact_with_revisions.revisions
