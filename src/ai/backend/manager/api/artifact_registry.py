@@ -155,10 +155,11 @@ class APIHandler:
 
         # Convert to ArtifactRevisionImportTask format
         tasks = []
-        for task_id, revision in zip(action_result.task_ids, action_result.result, strict=True):
+        for task_uuid, revision in zip(action_result.task_ids, action_result.result, strict=True):
+            task_id = str(task_uuid) if task_uuid is not None else None
             tasks.append(
                 ArtifactRevisionImportTask(
-                    task_id=str(task_id),
+                    task_id=task_id,
                     artifact_revision=ArtifactRevisionResponseData.from_revision_data(revision),
                 )
             )

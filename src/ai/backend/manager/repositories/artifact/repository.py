@@ -160,6 +160,12 @@ class ArtifactRepository:
         return await self._db_source.update_artifact_revision_bytesize(artifact_revision_id, size)
 
     @artifact_repository_resilience.apply()
+    async def update_artifact_revision_digest(
+        self, artifact_revision_id: uuid.UUID, digest: str
+    ) -> uuid.UUID:
+        return await self._db_source.update_artifact_revision_digest(artifact_revision_id, digest)
+
+    @artifact_repository_resilience.apply()
     async def update_artifact_revision_readme(
         self, artifact_revision_id: uuid.UUID, readme: str
     ) -> uuid.UUID:

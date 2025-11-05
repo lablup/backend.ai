@@ -583,6 +583,9 @@ class ArtifactRevision(Node):
     size: Optional[ByteSize]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
+    digest: Optional[str] = strawberry.field(
+        description="Digest at the time of import. None for models that have not been imported. Added in 25.17.0"
+    )
 
     @classmethod
     def from_dataclass(cls, data: ArtifactRevisionData) -> Self:
@@ -595,6 +598,7 @@ class ArtifactRevision(Node):
             size=ByteSize(data.size) if data.size is not None else None,
             created_at=data.created_at,
             updated_at=data.updated_at,
+            digest=data.digest,
         )
 
     @strawberry.field
@@ -719,7 +723,7 @@ class DelegateScanArtifactsPayload:
     """)
 )
 class ArtifactRevisionImportTask:
-    task_id: ID
+    task_id: Optional[ID]
     artifact_revision: ArtifactRevision
 
 
@@ -1445,10 +1449,13 @@ async def delegate_import_artifacts(
             "Mismatch between artifact revisions and task IDs returned"
         )
 
-    for task_id, artifact_revision in zip(action_result.task_ids, artifact_revisions, strict=True):
+    for task_uuid, artifact_revision in zip(
+        action_result.task_ids, artifact_revisions, strict=True
+    ):
+        task_id = ID(str(task_uuid)) if task_uuid is not None else None
         tasks.append(
             ArtifactRevisionImportTask(
-                task_id=ID(str(task_id)),
+                task_id=task_id,
                 artifact_revision=artifact_revision,
             )
         )

@@ -32,7 +32,7 @@ class DelegateImportArtifactRevisionBatchAction(ArtifactRevisionAction):
 @dataclass
 class DelegateImportArtifactRevisionBatchActionResult(BaseActionResult):
     result: list[ArtifactRevisionData]
-    task_ids: list[uuid.UUID]
+    task_ids: list[Optional[uuid.UUID]]
 
     @override
     def entity_id(self) -> Optional[str]:

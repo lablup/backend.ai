@@ -138,6 +138,25 @@ class HuggingFaceClient:
         except Exception as e:
             raise HuggingFaceAPIError(f"Failed to get model info for {model}: {str(e)}") from e
 
+    async def get_model_commit_hash(self, model: ModelTarget) -> Optional[str]:
+        """Get the commit hash for a specific model revision.
+
+        Args:
+            model: HuggingFace model with specific revision
+
+        Returns:
+            The commit hash (SHA) for the model revision, or None if not available
+        """
+        model_id = model.model_id
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: model_info(model_id, revision=revision, token=self._token)
+            )
+            return result.sha
+        except Exception as e:
+            raise HuggingFaceAPIError(f"Failed to get commit hash for {model}: {str(e)}") from e
+
     async def list_model_filepaths(self, model: ModelTarget) -> list[str]:
         """List files in a model repository.
 
@@ -248,6 +267,7 @@ class HuggingFaceScanner:
                             modified_at=model.last_modified,
                             readme=None,
                             size=None,
+                            sha=None,
                         )
                         model_data_list.append(model_data)
 
@@ -300,6 +320,7 @@ class HuggingFaceScanner:
                 modified_at=model_info.last_modified,
                 readme=readme_content,
                 size=total_size,
+                sha=None,
             )
 
             log.info(
@@ -334,6 +355,7 @@ class HuggingFaceScanner:
                 modified_at=model_info.last_modified,
                 readme=None,
                 size=None,
+                sha=None,
             )
 
             log.info(
@@ -355,6 +377,17 @@ class HuggingFaceScanner:
             Download URL
         """
         return self._client.get_download_url(model, filename)
+
+    async def get_model_commit_hash(self, model: ModelTarget) -> Optional[str]:
+        """Get the commit hash for a specific model revision.
+
+        Args:
+            model: HuggingFace model with specific revision
+
+        Returns:
+            The commit hash (SHA) for the model revision, or None if not available
+        """
+        return await self._client.get_model_commit_hash(model)
 
     async def list_model_files_info(self, model: ModelTarget) -> list[FileObjectData]:
         """Get model file information list as FileInfo objects.
