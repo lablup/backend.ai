@@ -14,7 +14,7 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderCloneFailureEvent,
     VFolderCloneSuccessEvent,
 )
-from ai.backend.common.types import VFolderID
+from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.bgtask.types import StorageBgtaskName
 
@@ -30,8 +30,8 @@ class VFolderCloneManifest(BaseBackgroundTaskManifest):
     """
 
     volume: str = Field(description="Volume name where the vfolders are located")
-    src_vfolder: VFolderID = Field(description="Source vfolder ID to clone from")
-    dst_vfolder: VFolderID = Field(description="Destination vfolder ID to clone to")
+    src_vfolder: VFolderIDField = Field(description="Source vfolder ID to clone from")
+    dst_vfolder: VFolderIDField = Field(description="Destination vfolder ID to clone to")
 
 
 class VFolderCloneTaskHandler(BaseBackgroundTaskHandler[VFolderCloneManifest, None]):

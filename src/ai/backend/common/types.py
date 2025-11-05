@@ -51,7 +51,13 @@ import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
-from pydantic import BaseModel, ConfigDict, Field, PlainValidator, TypeAdapter
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    PlainValidator,
+    TypeAdapter,
+)
 from redis.asyncio import Redis
 
 from .defs import UNKNOWN_CONTAINER_ID, RedisRole

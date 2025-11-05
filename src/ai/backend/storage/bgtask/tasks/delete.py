@@ -14,7 +14,7 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
-from ai.backend.common.types import VFolderID
+from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.storage.bgtask.types import StorageBgtaskName
 
@@ -30,7 +30,7 @@ class VFolderDeleteManifest(BaseBackgroundTaskManifest):
     """
 
     volume: str = Field(description="Volume name where the vfolder is located")
-    vfolder_id: VFolderID = Field(description="VFolder ID to delete")
+    vfolder_id: VFolderIDField = Field(description="VFolder ID to delete")
 
 
 class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteManifest, None]):

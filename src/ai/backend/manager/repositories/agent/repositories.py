@@ -15,6 +15,7 @@ class AgentRepositories:
             args.db,
             args.valkey_image_client,
             args.valkey_live_client,
+            args.valkey_stat_client,
             args.config_provider,
         )
 
