@@ -9,6 +9,8 @@ from .list_rules import ListRulesAction, ListRulesActionResult
 from .process_notification import ProcessNotificationAction, ProcessNotificationActionResult
 from .update_channel import UpdateChannelAction, UpdateChannelActionResult
 from .update_rule import UpdateRuleAction, UpdateRuleActionResult
+from .validate_channel import ValidateChannelAction, ValidateChannelActionResult
+from .validate_rule import ValidateRuleAction, ValidateRuleActionResult
 
 __all__ = (
     "CreateChannelAction",
@@ -33,4 +35,8 @@ __all__ = (
     "UpdateChannelActionResult",
     "UpdateRuleAction",
     "UpdateRuleActionResult",
+    "ValidateChannelAction",
+    "ValidateChannelActionResult",
+    "ValidateRuleAction",
+    "ValidateRuleActionResult",
 )

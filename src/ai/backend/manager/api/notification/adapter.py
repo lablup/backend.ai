@@ -1,6 +1,7 @@
 """
 Adapters to convert notification DTOs to repository Querier objects.
 Handles conversion of filter, order, and pagination parameters.
+Also provides data-to-DTO conversion functions.
 """
 
 from __future__ import annotations
@@ -8,18 +9,27 @@ from __future__ import annotations
 from typing import Optional
 
 from ai.backend.common.dto.manager.notification import (
+    NotificationChannelDTO,
     NotificationChannelFilter,
     NotificationChannelOrder,
     NotificationChannelOrderField,
+    NotificationRuleDTO,
     NotificationRuleFilter,
     NotificationRuleOrder,
     NotificationRuleOrderField,
     OrderDirection,
+    SearchNotificationChannelsRequest,
+    SearchNotificationRulesRequest,
+    UpdateNotificationChannelRequest,
+    UpdateNotificationRuleRequest,
+    WebhookConfigResponse,
 )
 from ai.backend.manager.api.adapter import BaseFilterAdapter
-from ai.backend.manager.dto.notification_request import (
-    SearchNotificationChannelsReq,
-    SearchNotificationRulesReq,
+from ai.backend.manager.data.notification import (
+    NotificationChannelData,
+    NotificationChannelModifier,
+    NotificationRuleData,
+    NotificationRuleModifier,
 )
 from ai.backend.manager.repositories.base import (
     OffsetPagination,
@@ -33,6 +43,7 @@ from ai.backend.manager.repositories.notification.options import (
     NotificationRuleConditions,
     NotificationRuleOrders,
 )
+from ai.backend.manager.types import OptionalState
 
 __all__ = (
     "NotificationChannelAdapter",
@@ -43,7 +54,40 @@ __all__ = (
 class NotificationChannelAdapter(BaseFilterAdapter):
     """Adapter for converting notification channel requests to repository queries."""
 
-    def build_querier(self, request: SearchNotificationChannelsReq) -> Querier:
+    def convert_to_dto(self, data: NotificationChannelData) -> NotificationChannelDTO:
+        """Convert NotificationChannelData to DTO."""
+        return NotificationChannelDTO(
+            id=data.id,
+            name=data.name,
+            description=data.description,
+            channel_type=data.channel_type,
+            config=WebhookConfigResponse(url=data.config.url),
+            enabled=data.enabled,
+            created_at=data.created_at,
+            created_by=data.created_by,
+            updated_at=data.updated_at,
+        )
+
+    def build_modifier(
+        self, request: UpdateNotificationChannelRequest
+    ) -> NotificationChannelModifier:
+        """Convert update request to modifier."""
+        from ai.backend.common.data.notification import WebhookConfig
+
+        modifier = NotificationChannelModifier()
+        if request.name is not None:
+            modifier.name = OptionalState.update(request.name)
+        if request.description is not None:
+            modifier.description = OptionalState.update(request.description)
+        if request.config is not None:
+            # config validator ensures this is WebhookConfig
+            assert isinstance(request.config, WebhookConfig)
+            modifier.config = OptionalState.update(request.config)
+        if request.enabled is not None:
+            modifier.enabled = OptionalState.update(request.enabled)
+        return modifier
+
+    def build_querier(self, request: SearchNotificationChannelsRequest) -> Querier:
         """
         Build a Querier for notification channels from search request.
 
@@ -108,7 +152,36 @@ class NotificationChannelAdapter(BaseFilterAdapter):
 class NotificationRuleAdapter(BaseFilterAdapter):
     """Adapter for converting notification rule requests to repository queries."""
 
-    def build_querier(self, request: SearchNotificationRulesReq) -> Querier:
+    def convert_to_dto(self, data: NotificationRuleData) -> NotificationRuleDTO:
+        """Convert NotificationRuleData to DTO."""
+        channel_adapter = NotificationChannelAdapter()
+        return NotificationRuleDTO(
+            id=data.id,
+            name=data.name,
+            description=data.description,
+            rule_type=data.rule_type,
+            channel=channel_adapter.convert_to_dto(data.channel),
+            message_template=data.message_template,
+            enabled=data.enabled,
+            created_at=data.created_at,
+            created_by=data.created_by,
+            updated_at=data.updated_at,
+        )
+
+    def build_modifier(self, request: UpdateNotificationRuleRequest) -> NotificationRuleModifier:
+        """Convert update request to modifier."""
+        modifier = NotificationRuleModifier()
+        if request.name is not None:
+            modifier.name = OptionalState.update(request.name)
+        if request.description is not None:
+            modifier.description = OptionalState.update(request.description)
+        if request.message_template is not None:
+            modifier.message_template = OptionalState.update(request.message_template)
+        if request.enabled is not None:
+            modifier.enabled = OptionalState.update(request.enabled)
+        return modifier
+
+    def build_querier(self, request: SearchNotificationRulesRequest) -> Querier:
         """
         Build a Querier for notification rules from search request.
 

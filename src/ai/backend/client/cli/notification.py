@@ -5,12 +5,28 @@ from __future__ import annotations
 import json
 import sys
 from typing import Optional
+from uuid import UUID
 
 import click
 
 from ai.backend.cli.main import main
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.session import Session
+from ai.backend.common.data.notification import (
+    NotificationChannelType,
+    NotificationRuleType,
+    WebhookConfig,
+)
+from ai.backend.common.dto.manager.notification import (
+    CreateNotificationChannelRequest,
+    CreateNotificationRuleRequest,
+    NotificationChannelFilter,
+    NotificationRuleFilter,
+    SearchNotificationChannelsRequest,
+    SearchNotificationRulesRequest,
+    UpdateNotificationChannelRequest,
+    UpdateNotificationRuleRequest,
+)
 
 from .extensions import pass_ctx_obj
 from .pretty import print_done, print_fail
@@ -39,17 +55,23 @@ def list_channels_cmd(ctx: CLIContext, enabled_only: bool) -> None:
     """
     with Session() as session:
         try:
-            result = session.Notification.list_channels(enabled_only=enabled_only)
-            channels = result.get("channels", [])
+            filter_cond = None
+            if enabled_only:
+                filter_cond = NotificationChannelFilter(enabled=True)
+
+            request = SearchNotificationChannelsRequest(filter=filter_cond)
+            result = session.Notification.list_channels(request)
+
+            channels = result.channels
             if not channels:
                 print("No channels found")
                 return
             for channel in channels:
-                print(f"ID: {channel.get('id')}")
-                print(f"Name: {channel.get('name')}")
-                print(f"Type: {channel.get('channel_type')}")
-                print(f"Enabled: {channel.get('enabled')}")
-                print(f"Description: {channel.get('description', '')}")
+                print(f"ID: {channel.id}")
+                print(f"Name: {channel.name}")
+                print(f"Type: {channel.channel_type}")
+                print(f"Enabled: {channel.enabled}")
+                print(f"Description: {channel.description or ''}")
                 print("---")
         except Exception as e:
             ctx.output.print_error(e)
@@ -68,9 +90,9 @@ def info_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
     """
     with Session() as session:
         try:
-            result = session.Notification.get_channel(channel_id)
-            channel = result.get("channel", {})
-            print(json.dumps(channel, indent=2, default=str))
+            result = session.Notification.get_channel(UUID(channel_id))
+            channel = result.channel
+            print(json.dumps(channel.model_dump(mode="json"), indent=2, default=str))
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -100,18 +122,17 @@ def create_channel_cmd(
     """
     with Session() as session:
         try:
-            config = {"url": url}
-
-            result = session.Notification.create_channel(
+            request = CreateNotificationChannelRequest(
                 name=name,
-                channel_type=channel_type,
-                config=config,
+                channel_type=NotificationChannelType(channel_type),
+                config=WebhookConfig(url=url),
                 description=description,
                 enabled=not disabled,
             )
-            channel = result.get("channel", {})
-            print_done(f"Channel created: {channel.get('id')}")
-            print(json.dumps(channel, indent=2, default=str))
+            result = session.Notification.create_channel(request)
+            channel = result.channel
+            print_done(f"Channel created: {channel.id}")
+            print(json.dumps(channel.model_dump(mode="json"), indent=2, default=str))
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -143,18 +164,18 @@ def update_channel_cmd(
         try:
             config = None
             if url:
-                config = {"url": url}
+                config = WebhookConfig(url=url)
 
-            result = session.Notification.update_channel(
-                channel_id=channel_id,
+            request = UpdateNotificationChannelRequest(
                 name=name,
                 description=description,
                 config=config,
                 enabled=enabled,
             )
-            channel = result.get("channel", {})
+            result = session.Notification.update_channel(UUID(channel_id), request)
+            channel = result.channel
             print_done(f"Channel updated: {channel_id}")
-            print(json.dumps(channel, indent=2, default=str))
+            print(json.dumps(channel.model_dump(mode="json"), indent=2, default=str))
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -172,8 +193,8 @@ def delete_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
     """
     with Session() as session:
         try:
-            result = session.Notification.delete_channel(channel_id)
-            if result.get("deleted", False):
+            result = session.Notification.delete_channel(UUID(channel_id))
+            if result.deleted:
                 print_done(f"Channel deleted: {channel_id}")
             else:
                 print_fail(f"Failed to delete channel: {channel_id}")
@@ -194,27 +215,42 @@ def rule():
 @rule.command("list")
 @pass_ctx_obj
 @click.option("--enabled-only", is_flag=True, help="Only list enabled rules")
-@click.option("--rule-type", type=str, default=None, help="Filter by rule type")
-def list_rules_cmd(ctx: CLIContext, enabled_only: bool, rule_type: Optional[str]) -> None:
+@click.option(
+    "--rule-types",
+    type=str,
+    multiple=True,
+    help="Filter by rule types (can be specified multiple times)",
+)
+def list_rules_cmd(ctx: CLIContext, enabled_only: bool, rule_types: tuple[str, ...]) -> None:
     """
     List all notification rules.
     """
     with Session() as session:
         try:
-            result = session.Notification.list_rules(
-                enabled_only=enabled_only,
-                rule_type=rule_type,
-            )
-            rules = result.get("rules", [])
+            filter_cond = None
+            if enabled_only or rule_types:
+                # Convert string rule types to enum
+                enum_rule_types = (
+                    [NotificationRuleType(rt) for rt in rule_types] if rule_types else None
+                )
+                filter_cond = NotificationRuleFilter(
+                    enabled=True if enabled_only else None,
+                    rule_types=enum_rule_types,
+                )
+
+            request = SearchNotificationRulesRequest(filter=filter_cond)
+            result = session.Notification.list_rules(request)
+
+            rules = result.rules
             if not rules:
                 print("No rules found")
                 return
             for rule in rules:
-                print(f"ID: {rule.get('id')}")
-                print(f"Name: {rule.get('name')}")
-                print(f"Type: {rule.get('rule_type')}")
-                print(f"Enabled: {rule.get('enabled')}")
-                print(f"Description: {rule.get('description', '')}")
+                print(f"ID: {rule.id}")
+                print(f"Name: {rule.name}")
+                print(f"Type: {rule.rule_type}")
+                print(f"Enabled: {rule.enabled}")
+                print(f"Description: {rule.description or ''}")
                 print("---")
         except Exception as e:
             ctx.output.print_error(e)
@@ -233,9 +269,9 @@ def info_rule_cmd(ctx: CLIContext, rule_id: str) -> None:
     """
     with Session() as session:
         try:
-            result = session.Notification.get_rule(rule_id)
-            rule = result.get("rule", {})
-            print(json.dumps(rule, indent=2, default=str))
+            result = session.Notification.get_rule(UUID(rule_id))
+            rule = result.rule
+            print(json.dumps(rule.model_dump(mode="json"), indent=2, default=str))
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -269,17 +305,18 @@ def create_rule_cmd(
     """
     with Session() as session:
         try:
-            result = session.Notification.create_rule(
+            request = CreateNotificationRuleRequest(
                 name=name,
-                rule_type=rule_type,
-                channel_id=channel_id,
+                rule_type=NotificationRuleType(rule_type),
+                channel_id=UUID(channel_id),
                 message_template=message_template,
                 description=description,
                 enabled=not disabled,
             )
-            rule = result.get("rule", {})
-            print_done(f"Rule created: {rule.get('id')}")
-            print(json.dumps(rule, indent=2, default=str))
+            result = session.Notification.create_rule(request)
+            rule = result.rule
+            print_done(f"Rule created: {rule.id}")
+            print(json.dumps(rule.model_dump(mode="json"), indent=2, default=str))
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -309,16 +346,16 @@ def update_rule_cmd(
     """
     with Session() as session:
         try:
-            result = session.Notification.update_rule(
-                rule_id=rule_id,
+            request = UpdateNotificationRuleRequest(
                 name=name,
                 description=description,
                 message_template=message_template,
                 enabled=enabled,
             )
-            rule = result.get("rule", {})
+            result = session.Notification.update_rule(UUID(rule_id), request)
+            rule = result.rule
             print_done(f"Rule updated: {rule_id}")
-            print(json.dumps(rule, indent=2, default=str))
+            print(json.dumps(rule.model_dump(mode="json"), indent=2, default=str))
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)
@@ -336,8 +373,8 @@ def delete_rule_cmd(ctx: CLIContext, rule_id: str) -> None:
     """
     with Session() as session:
         try:
-            result = session.Notification.delete_rule(rule_id)
-            if result.get("deleted", False):
+            result = session.Notification.delete_rule(UUID(rule_id))
+            if result.deleted:
                 print_done(f"Rule deleted: {rule_id}")
             else:
                 print_fail(f"Failed to delete rule: {rule_id}")

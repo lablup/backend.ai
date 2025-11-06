@@ -5,24 +5,37 @@ Tests conversion from DTO objects to repository Querier objects.
 
 from __future__ import annotations
 
+from datetime import datetime
+from uuid import uuid4
+
 from ai.backend.common.data.notification import NotificationChannelType, NotificationRuleType
+from ai.backend.common.data.notification import WebhookConfig as WebhookConfigData
 from ai.backend.common.dto.manager.notification import (
+    NotificationChannelDTO,
     NotificationChannelFilter,
     NotificationChannelOrder,
     NotificationChannelOrderField,
+    NotificationRuleDTO,
     NotificationRuleFilter,
     NotificationRuleOrder,
     NotificationRuleOrderField,
     OrderDirection,
     StringFilter,
+    UpdateNotificationChannelRequest,
+    UpdateNotificationRuleRequest,
+    WebhookConfigResponse,
+)
+from ai.backend.common.dto.manager.notification.request import (
+    SearchNotificationChannelsRequest,
+    SearchNotificationRulesRequest,
 )
 from ai.backend.manager.api.notification.adapter import (
     NotificationChannelAdapter,
     NotificationRuleAdapter,
 )
-from ai.backend.manager.dto.notification_request import (
-    SearchNotificationChannelsReq,
-    SearchNotificationRulesReq,
+from ai.backend.manager.data.notification import (
+    NotificationChannelData,
+    NotificationRuleData,
 )
 from ai.backend.manager.repositories.base import OffsetPagination
 
@@ -31,18 +44,21 @@ class TestNotificationChannelAdapter:
     """Test cases for NotificationChannelAdapter"""
 
     def test_empty_querier(self) -> None:
-        """Test building querier with no filters, orders, or pagination"""
-        request = SearchNotificationChannelsReq()
+        """Test building querier with no filters, orders, and default limit"""
+        request = SearchNotificationChannelsRequest()
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
 
         assert len(querier.conditions) == 0
         assert len(querier.orders) == 0
-        assert querier.pagination is None
+        assert querier.pagination is not None
+        assert isinstance(querier.pagination, OffsetPagination)
+        assert querier.pagination.limit == 50
+        assert querier.pagination.offset == 0
 
     def test_name_equals_case_sensitive(self) -> None:
         """Test name equals filter (case-sensitive)"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             filter=NotificationChannelFilter(
                 name=StringFilter(equals="Test Channel"),
             )
@@ -57,7 +73,7 @@ class TestNotificationChannelAdapter:
 
     def test_name_equals_case_insensitive(self) -> None:
         """Test name equals filter (case-insensitive)"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             filter=NotificationChannelFilter(
                 name=StringFilter(i_equals="test channel"),
             )
@@ -71,7 +87,7 @@ class TestNotificationChannelAdapter:
 
     def test_name_contains_case_sensitive(self) -> None:
         """Test name contains filter (case-sensitive)"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             filter=NotificationChannelFilter(
                 name=StringFilter(contains="Test"),
             )
@@ -85,7 +101,7 @@ class TestNotificationChannelAdapter:
 
     def test_name_contains_case_insensitive(self) -> None:
         """Test name contains filter (case-insensitive)"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             filter=NotificationChannelFilter(
                 name=StringFilter(i_contains="test"),
             )
@@ -99,7 +115,7 @@ class TestNotificationChannelAdapter:
 
     def test_channel_types_filter(self) -> None:
         """Test channel types filter"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             filter=NotificationChannelFilter(
                 channel_types=[NotificationChannelType.WEBHOOK],
             )
@@ -113,7 +129,7 @@ class TestNotificationChannelAdapter:
 
     def test_enabled_filter_true(self) -> None:
         """Test enabled filter (True)"""
-        request = SearchNotificationChannelsReq(filter=NotificationChannelFilter(enabled=True))
+        request = SearchNotificationChannelsRequest(filter=NotificationChannelFilter(enabled=True))
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
 
@@ -123,7 +139,7 @@ class TestNotificationChannelAdapter:
 
     def test_enabled_filter_false(self) -> None:
         """Test enabled filter (False)"""
-        request = SearchNotificationChannelsReq(filter=NotificationChannelFilter(enabled=False))
+        request = SearchNotificationChannelsRequest(filter=NotificationChannelFilter(enabled=False))
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
 
@@ -133,7 +149,7 @@ class TestNotificationChannelAdapter:
 
     def test_multiple_filters_combined(self) -> None:
         """Test multiple filters combined"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             filter=NotificationChannelFilter(
                 name=StringFilter(contains="Test"),
                 channel_types=[NotificationChannelType.WEBHOOK],
@@ -150,7 +166,7 @@ class TestNotificationChannelAdapter:
 
     def test_order_by_name_ascending(self) -> None:
         """Test ordering by name ascending"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             order=NotificationChannelOrder(
                 field=NotificationChannelOrderField.NAME,
                 direction=OrderDirection.ASC,
@@ -164,7 +180,7 @@ class TestNotificationChannelAdapter:
 
     def test_order_by_name_descending(self) -> None:
         """Test ordering by name descending"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             order=NotificationChannelOrder(
                 field=NotificationChannelOrderField.NAME,
                 direction=OrderDirection.DESC,
@@ -178,7 +194,7 @@ class TestNotificationChannelAdapter:
 
     def test_order_by_created_at_ascending(self) -> None:
         """Test ordering by created_at ascending"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             order=NotificationChannelOrder(
                 field=NotificationChannelOrderField.CREATED_AT,
                 direction=OrderDirection.ASC,
@@ -192,7 +208,7 @@ class TestNotificationChannelAdapter:
 
     def test_order_by_created_at_descending(self) -> None:
         """Test ordering by created_at descending"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             order=NotificationChannelOrder(
                 field=NotificationChannelOrderField.CREATED_AT,
                 direction=OrderDirection.DESC,
@@ -206,7 +222,7 @@ class TestNotificationChannelAdapter:
 
     def test_order_by_updated_at_ascending(self) -> None:
         """Test ordering by updated_at ascending"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             order=NotificationChannelOrder(
                 field=NotificationChannelOrderField.UPDATED_AT,
                 direction=OrderDirection.ASC,
@@ -220,7 +236,7 @@ class TestNotificationChannelAdapter:
 
     def test_order_by_updated_at_descending(self) -> None:
         """Test ordering by updated_at descending"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             order=NotificationChannelOrder(
                 field=NotificationChannelOrderField.UPDATED_AT,
                 direction=OrderDirection.DESC,
@@ -234,7 +250,7 @@ class TestNotificationChannelAdapter:
 
     def test_pagination(self) -> None:
         """Test pagination parameters"""
-        request = SearchNotificationChannelsReq(limit=10, offset=5)
+        request = SearchNotificationChannelsRequest(limit=10, offset=5)
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
 
@@ -245,7 +261,7 @@ class TestNotificationChannelAdapter:
 
     def test_filter_order_pagination_combined(self) -> None:
         """Test filter, order, and pagination all combined"""
-        request = SearchNotificationChannelsReq(
+        request = SearchNotificationChannelsRequest(
             filter=NotificationChannelFilter(
                 name=StringFilter(contains="Test"),
                 enabled=True,
@@ -272,18 +288,21 @@ class TestNotificationRuleAdapter:
     """Test cases for NotificationRuleAdapter"""
 
     def test_empty_querier(self) -> None:
-        """Test building querier with no filters, orders, or pagination"""
-        request = SearchNotificationRulesReq()
+        """Test building querier with no filters, orders, and default limit"""
+        request = SearchNotificationRulesRequest()
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
 
         assert len(querier.conditions) == 0
         assert len(querier.orders) == 0
-        assert querier.pagination is None
+        assert querier.pagination is not None
+        assert isinstance(querier.pagination, OffsetPagination)
+        assert querier.pagination.limit == 50
+        assert querier.pagination.offset == 0
 
     def test_name_equals_case_sensitive(self) -> None:
         """Test name equals filter (case-sensitive)"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             filter=NotificationRuleFilter(
                 name=StringFilter(equals="Test Rule"),
             )
@@ -297,7 +316,7 @@ class TestNotificationRuleAdapter:
 
     def test_name_equals_case_insensitive(self) -> None:
         """Test name equals filter (case-insensitive)"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             filter=NotificationRuleFilter(
                 name=StringFilter(i_equals="test rule"),
             )
@@ -311,7 +330,7 @@ class TestNotificationRuleAdapter:
 
     def test_name_contains_case_sensitive(self) -> None:
         """Test name contains filter (case-sensitive)"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             filter=NotificationRuleFilter(
                 name=StringFilter(contains="Test"),
             )
@@ -325,7 +344,7 @@ class TestNotificationRuleAdapter:
 
     def test_name_contains_case_insensitive(self) -> None:
         """Test name contains filter (case-insensitive)"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             filter=NotificationRuleFilter(
                 name=StringFilter(i_contains="test"),
             )
@@ -339,7 +358,7 @@ class TestNotificationRuleAdapter:
 
     def test_rule_types_filter(self) -> None:
         """Test rule types filter"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             filter=NotificationRuleFilter(
                 rule_types=[NotificationRuleType.SESSION_STARTED],
             )
@@ -353,7 +372,7 @@ class TestNotificationRuleAdapter:
 
     def test_enabled_filter_true(self) -> None:
         """Test enabled filter (True)"""
-        request = SearchNotificationRulesReq(filter=NotificationRuleFilter(enabled=True))
+        request = SearchNotificationRulesRequest(filter=NotificationRuleFilter(enabled=True))
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
 
@@ -363,7 +382,7 @@ class TestNotificationRuleAdapter:
 
     def test_enabled_filter_false(self) -> None:
         """Test enabled filter (False)"""
-        request = SearchNotificationRulesReq(filter=NotificationRuleFilter(enabled=False))
+        request = SearchNotificationRulesRequest(filter=NotificationRuleFilter(enabled=False))
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
 
@@ -373,7 +392,7 @@ class TestNotificationRuleAdapter:
 
     def test_multiple_filters_combined(self) -> None:
         """Test multiple filters combined"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             filter=NotificationRuleFilter(
                 name=StringFilter(contains="Test"),
                 rule_types=[NotificationRuleType.SESSION_STARTED],
@@ -390,7 +409,7 @@ class TestNotificationRuleAdapter:
 
     def test_order_by_name_ascending(self) -> None:
         """Test ordering by name ascending"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             order=NotificationRuleOrder(
                 field=NotificationRuleOrderField.NAME,
                 direction=OrderDirection.ASC,
@@ -404,7 +423,7 @@ class TestNotificationRuleAdapter:
 
     def test_order_by_name_descending(self) -> None:
         """Test ordering by name descending"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             order=NotificationRuleOrder(
                 field=NotificationRuleOrderField.NAME,
                 direction=OrderDirection.DESC,
@@ -418,7 +437,7 @@ class TestNotificationRuleAdapter:
 
     def test_order_by_created_at_ascending(self) -> None:
         """Test ordering by created_at ascending"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             order=NotificationRuleOrder(
                 field=NotificationRuleOrderField.CREATED_AT,
                 direction=OrderDirection.ASC,
@@ -432,7 +451,7 @@ class TestNotificationRuleAdapter:
 
     def test_order_by_created_at_descending(self) -> None:
         """Test ordering by created_at descending"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             order=NotificationRuleOrder(
                 field=NotificationRuleOrderField.CREATED_AT,
                 direction=OrderDirection.DESC,
@@ -446,7 +465,7 @@ class TestNotificationRuleAdapter:
 
     def test_order_by_updated_at_ascending(self) -> None:
         """Test ordering by updated_at ascending"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             order=NotificationRuleOrder(
                 field=NotificationRuleOrderField.UPDATED_AT,
                 direction=OrderDirection.ASC,
@@ -460,7 +479,7 @@ class TestNotificationRuleAdapter:
 
     def test_order_by_updated_at_descending(self) -> None:
         """Test ordering by updated_at descending"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             order=NotificationRuleOrder(
                 field=NotificationRuleOrderField.UPDATED_AT,
                 direction=OrderDirection.DESC,
@@ -474,7 +493,7 @@ class TestNotificationRuleAdapter:
 
     def test_pagination(self) -> None:
         """Test pagination parameters"""
-        request = SearchNotificationRulesReq(limit=10, offset=5)
+        request = SearchNotificationRulesRequest(limit=10, offset=5)
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
 
@@ -485,7 +504,7 @@ class TestNotificationRuleAdapter:
 
     def test_filter_order_pagination_combined(self) -> None:
         """Test filter, order, and pagination all combined"""
-        request = SearchNotificationRulesReq(
+        request = SearchNotificationRulesRequest(
             filter=NotificationRuleFilter(
                 name=StringFilter(contains="Test"),
                 enabled=True,
@@ -506,3 +525,157 @@ class TestNotificationRuleAdapter:
         assert isinstance(querier.pagination, OffsetPagination)
         assert querier.pagination.limit == 20
         assert querier.pagination.offset == 10
+
+
+class TestNotificationChannelAdapterConversion:
+    """Test cases for NotificationChannelAdapter data conversion methods"""
+
+    def test_convert_to_dto(self) -> None:
+        """Test converting NotificationChannelData to NotificationChannelDTO"""
+        now = datetime.now()
+        channel_id = uuid4()
+        user_id = uuid4()
+
+        channel_data = NotificationChannelData(
+            id=channel_id,
+            name="Test Channel",
+            description="Test description",
+            channel_type=NotificationChannelType.WEBHOOK,
+            config=WebhookConfigData(url="https://example.com/webhook"),
+            enabled=True,
+            created_by=user_id,
+            created_at=now,
+            updated_at=now,
+        )
+
+        adapter = NotificationChannelAdapter()
+        dto = adapter.convert_to_dto(channel_data)
+
+        assert isinstance(dto, NotificationChannelDTO)
+        assert dto.id == channel_id
+        assert dto.name == "Test Channel"
+        assert dto.description == "Test description"
+        assert dto.channel_type == NotificationChannelType.WEBHOOK
+        assert isinstance(dto.config, WebhookConfigResponse)
+        assert dto.config.url == "https://example.com/webhook"
+        assert dto.enabled is True
+        assert dto.created_by == user_id
+        assert dto.created_at == now
+        assert dto.updated_at == now
+
+    def test_build_modifier_with_all_fields(self) -> None:
+        """Test building modifier with all fields updated"""
+        request = UpdateNotificationChannelRequest(
+            name="Updated Name",
+            description="Updated description",
+            config=WebhookConfigData(url="https://new-url.com"),
+            enabled=False,
+        )
+
+        adapter = NotificationChannelAdapter()
+        modifier = adapter.build_modifier(request)
+
+        assert modifier.name.value() == "Updated Name"
+        assert modifier.description.value() == "Updated description"
+        assert modifier.config.value().url == "https://new-url.com"
+        assert modifier.enabled.value() is False
+
+    def test_build_modifier_with_partial_fields(self) -> None:
+        """Test building modifier with only some fields updated"""
+        request = UpdateNotificationChannelRequest(
+            name="Updated Name",
+            enabled=False,
+        )
+
+        adapter = NotificationChannelAdapter()
+        modifier = adapter.build_modifier(request)
+
+        assert modifier.name.value() == "Updated Name"
+        assert modifier.description.optional_value() is None
+        assert modifier.config.optional_value() is None
+        assert modifier.enabled.value() is False
+
+
+class TestNotificationRuleAdapterConversion:
+    """Test cases for NotificationRuleAdapter data conversion methods"""
+
+    def test_convert_to_dto(self) -> None:
+        """Test converting NotificationRuleData to NotificationRuleDTO"""
+        now = datetime.now()
+        rule_id = uuid4()
+        channel_id = uuid4()
+        user_id = uuid4()
+
+        channel_data = NotificationChannelData(
+            id=channel_id,
+            name="Test Channel",
+            description="Channel description",
+            channel_type=NotificationChannelType.WEBHOOK,
+            config=WebhookConfigData(url="https://example.com/webhook"),
+            enabled=True,
+            created_by=user_id,
+            created_at=now,
+            updated_at=now,
+        )
+
+        rule_data = NotificationRuleData(
+            id=rule_id,
+            name="Test Rule",
+            description="Rule description",
+            rule_type=NotificationRuleType.SESSION_STARTED,
+            channel=channel_data,
+            message_template="Session {{ session_id }} started",
+            enabled=True,
+            created_by=user_id,
+            created_at=now,
+            updated_at=now,
+        )
+
+        adapter = NotificationRuleAdapter()
+        dto = adapter.convert_to_dto(rule_data)
+
+        assert isinstance(dto, NotificationRuleDTO)
+        assert dto.id == rule_id
+        assert dto.name == "Test Rule"
+        assert dto.description == "Rule description"
+        assert dto.rule_type == NotificationRuleType.SESSION_STARTED
+        assert isinstance(dto.channel, NotificationChannelDTO)
+        assert dto.channel.id == channel_id
+        assert dto.channel.name == "Test Channel"
+        assert dto.message_template == "Session {{ session_id }} started"
+        assert dto.enabled is True
+        assert dto.created_by == user_id
+        assert dto.created_at == now
+        assert dto.updated_at == now
+
+    def test_build_modifier_with_all_fields(self) -> None:
+        """Test building modifier with all fields updated"""
+        request = UpdateNotificationRuleRequest(
+            name="Updated Rule",
+            description="Updated description",
+            message_template="New template {{ data }}",
+            enabled=False,
+        )
+
+        adapter = NotificationRuleAdapter()
+        modifier = adapter.build_modifier(request)
+
+        assert modifier.name.value() == "Updated Rule"
+        assert modifier.description.value() == "Updated description"
+        assert modifier.message_template.value() == "New template {{ data }}"
+        assert modifier.enabled.value() is False
+
+    def test_build_modifier_with_partial_fields(self) -> None:
+        """Test building modifier with only some fields updated"""
+        request = UpdateNotificationRuleRequest(
+            name="Updated Rule",
+            enabled=False,
+        )
+
+        adapter = NotificationRuleAdapter()
+        modifier = adapter.build_modifier(request)
+
+        assert modifier.name.value() == "Updated Rule"
+        assert modifier.description.optional_value() is None
+        assert modifier.message_template.optional_value() is None
+        assert modifier.enabled.value() is False
