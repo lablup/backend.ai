@@ -1580,6 +1580,9 @@ type Mutation {
   """Delete a notification channel"""
   deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload!
 
+  """Validate a notification channel"""
+  validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload!
+
   """Create a new notification rule"""
   createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload!
 
@@ -1588,6 +1591,9 @@ type Mutation {
 
   """Delete a notification rule"""
   deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload!
+
+  """Validate a notification rule"""
+  validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload!
 
   """Added in 25.14.0"""
   createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
@@ -2624,6 +2630,30 @@ type VFSStorageEdge {
 
   """The item at the end of the edge"""
   node: VFSStorage!
+}
+
+"""Input for validate notification channel mutation"""
+input ValidateNotificationChannelInput {
+  id: ID!
+}
+
+"""Payload for validate notification channel mutation"""
+type ValidateNotificationChannelPayload {
+  success: Boolean!
+  message: String!
+}
+
+"""Input for validate notification rule mutation"""
+input ValidateNotificationRuleInput {
+  id: ID!
+  notificationData: JSON
+}
+
+"""Payload for validate notification rule mutation"""
+type ValidateNotificationRulePayload {
+  success: Boolean!
+  message: String!
+  renderedMessage: String
 }
 
 extend type VirtualFolderNode @key(fields: "id") {
