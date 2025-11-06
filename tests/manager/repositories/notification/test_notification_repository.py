@@ -4,6 +4,7 @@ Tests the repository layer with real database operations.
 """
 
 import uuid
+from datetime import datetime
 from typing import AsyncGenerator
 
 import pytest
@@ -37,24 +38,40 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import Querier
+from ai.backend.manager.repositories.base import OffsetPagination, Querier
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.db_source import NotificationDBSource
-from ai.backend.manager.repositories.notification.options import NotificationChannelConditions
+from ai.backend.manager.repositories.notification.options import (
+    NotificationChannelConditions,
+    NotificationChannelOrders,
+)
 
 
 class TestNotificationRepository:
     """Test cases for NotificationRepository"""
 
     @pytest.fixture
-    async def test_domain_name(
+    async def db_with_cleanup(
         self,
         database_engine: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        """Database engine that auto-cleans notification data after each test"""
+        yield database_engine
+
+        # Cleanup all notification data after test
+        async with database_engine.begin_session() as db_sess:
+            await db_sess.execute(sa.delete(NotificationRuleRow))
+            await db_sess.execute(sa.delete(NotificationChannelRow))
+
+    @pytest.fixture
+    async def test_domain_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[str, None]:
         """Create test domain and return domain name"""
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             domain = DomainRow(
                 name=domain_name,
                 description="Test domain for notification",
@@ -70,18 +87,18 @@ class TestNotificationRepository:
             yield domain_name
         finally:
             # Cleanup
-            async with database_engine.begin_session() as db_sess:
+            async with db_with_cleanup.begin_session() as db_sess:
                 await db_sess.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
 
     @pytest.fixture
     async def test_resource_policy_name(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[str, None]:
         """Create test resource policy and return policy name"""
         policy_name = f"test-policy-{uuid.uuid4().hex[:8]}"
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             policy = UserResourcePolicyRow(
                 name=policy_name,
                 max_vfolder_count=10,
@@ -96,7 +113,7 @@ class TestNotificationRepository:
             yield policy_name
         finally:
             # Cleanup
-            async with database_engine.begin_session() as db_sess:
+            async with db_with_cleanup.begin_session() as db_sess:
                 await db_sess.execute(
                     sa.delete(UserResourcePolicyRow).where(
                         UserResourcePolicyRow.name == policy_name
@@ -106,7 +123,7 @@ class TestNotificationRepository:
     @pytest.fixture
     async def test_user(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
     ) -> AsyncGenerator[uuid.UUID, None]:
@@ -120,7 +137,7 @@ class TestNotificationRepository:
             salt_size=32,
         )
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             user = UserRow(
                 uuid=user_uuid,
                 username=f"testuser-{user_uuid.hex[:8]}",
@@ -140,13 +157,13 @@ class TestNotificationRepository:
             yield user_uuid
         finally:
             # Cleanup
-            async with database_engine.begin_session() as db_sess:
+            async with db_with_cleanup.begin_session() as db_sess:
                 await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
 
     @pytest.fixture
     async def sample_channel_id(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create sample notification channel directly in DB and return its ID"""
@@ -155,7 +172,7 @@ class TestNotificationRepository:
         channel_id = uuid.uuid4()
         config = WebhookConfig(url="https://example.com/webhook", method="POST")
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             channel = NotificationChannelRow(
                 id=channel_id,
                 name="Sample Channel",
@@ -170,16 +187,12 @@ class TestNotificationRepository:
             db_sess.add(channel)
             await db_sess.flush()
 
-        try:
-            yield channel_id
-        finally:
-            # Cleanup handled by CASCADE when user is deleted
-            pass
+        yield channel_id
 
     @pytest.fixture
     async def sample_rule_id(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         sample_channel_id: uuid.UUID,
         test_user: uuid.UUID,
     ) -> AsyncGenerator[uuid.UUID, None]:
@@ -188,7 +201,7 @@ class TestNotificationRepository:
 
         rule_id = uuid.uuid4()
 
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             rule = NotificationRuleRow(
                 id=rule_id,
                 name="Sample Rule",
@@ -204,11 +217,123 @@ class TestNotificationRepository:
             db_sess.add(rule)
             await db_sess.flush()
 
-        try:
-            yield rule_id
-        finally:
-            # Cleanup handled by CASCADE when channel or user is deleted
-            pass
+        yield rule_id
+
+    @pytest.fixture
+    async def sample_channels_for_pagination(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user: uuid.UUID,
+    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        """Create 25 sample channels for pagination testing"""
+        channel_ids = []
+        async with db_with_cleanup.begin_session() as db_sess:
+            for i in range(25):
+                channel_id = uuid.uuid4()
+                config = WebhookConfig(url=f"https://example{i}.com/webhook")
+                channel = NotificationChannelRow(
+                    id=channel_id,
+                    name=f"Channel {i:02d}",
+                    description=None,
+                    channel_type=NotificationChannelType.WEBHOOK,
+                    config=config.model_dump(),
+                    enabled=True,
+                    created_by=test_user,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                )
+                db_sess.add(channel)
+                channel_ids.append(channel_id)
+            await db_sess.flush()
+
+        yield channel_ids
+
+    @pytest.fixture
+    async def sample_channels_small(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user: uuid.UUID,
+    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        """Create 5 sample channels for boundary testing"""
+        channel_ids = []
+        async with db_with_cleanup.begin_session() as db_sess:
+            for i in range(5):
+                channel_id = uuid.uuid4()
+                config = WebhookConfig(url=f"https://example{i}.com/webhook")
+                channel = NotificationChannelRow(
+                    id=channel_id,
+                    name=f"Channel {i}",
+                    description=None,
+                    channel_type=NotificationChannelType.WEBHOOK,
+                    config=config.model_dump(),
+                    enabled=True,
+                    created_by=test_user,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                )
+                db_sess.add(channel)
+                channel_ids.append(channel_id)
+            await db_sess.flush()
+
+        yield channel_ids
+
+    @pytest.fixture
+    async def sample_channels_mixed_enabled(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user: uuid.UUID,
+    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        """Create 20 sample channels (10 enabled, 10 disabled) for filter testing"""
+        channel_ids = []
+        async with db_with_cleanup.begin_session() as db_sess:
+            for i in range(20):
+                channel_id = uuid.uuid4()
+                config = WebhookConfig(url=f"https://example{i}.com/webhook")
+                channel = NotificationChannelRow(
+                    id=channel_id,
+                    name=f"Channel {i:02d}",
+                    description=None,
+                    channel_type=NotificationChannelType.WEBHOOK,
+                    config=config.model_dump(),
+                    enabled=(i % 2 == 0),  # Even indexes enabled
+                    created_by=test_user,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                )
+                db_sess.add(channel)
+                channel_ids.append(channel_id)
+            await db_sess.flush()
+
+        yield channel_ids
+
+    @pytest.fixture
+    async def sample_channels_medium(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user: uuid.UUID,
+    ) -> AsyncGenerator[list[uuid.UUID], None]:
+        """Create 15 sample channels for no-pagination testing"""
+        channel_ids = []
+        async with db_with_cleanup.begin_session() as db_sess:
+            for i in range(15):
+                channel_id = uuid.uuid4()
+                config = WebhookConfig(url=f"https://example{i}.com/webhook")
+                channel = NotificationChannelRow(
+                    id=channel_id,
+                    name=f"Channel {i}",
+                    description=None,
+                    channel_type=NotificationChannelType.WEBHOOK,
+                    config=config.model_dump(),
+                    enabled=True,
+                    created_by=test_user,
+                    created_at=datetime.now(),
+                    updated_at=datetime.now(),
+                )
+                db_sess.add(channel)
+                channel_ids.append(channel_id)
+            await db_sess.flush()
+
+        yield channel_ids
 
     @pytest.fixture
     async def notification_db_source(
@@ -643,3 +768,121 @@ class TestNotificationRepository:
         # Verify channel is deleted
         with pytest.raises(NotificationChannelNotFound):
             await notification_repository.get_channel_by_id(channel_id)
+
+    # Pagination Tests
+
+    @pytest.mark.asyncio
+    async def test_list_channels_offset_pagination_first_page(
+        self,
+        notification_repository: NotificationRepository,
+        sample_channels_for_pagination: list[uuid.UUID],
+    ) -> None:
+        """Test first page of offset-based pagination"""
+        # sample_channels_for_pagination fixture creates 25 channels
+        querier = Querier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+        channels = await notification_repository.list_channels(querier=querier)
+        assert len(channels) == 10
+
+    @pytest.mark.asyncio
+    async def test_list_channels_offset_pagination_second_page(
+        self,
+        notification_repository: NotificationRepository,
+        sample_channels_for_pagination: list[uuid.UUID],
+    ) -> None:
+        """Test second page of offset-based pagination"""
+        # sample_channels_for_pagination fixture creates 25 channels
+        querier = Querier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=10),
+        )
+        channels = await notification_repository.list_channels(querier=querier)
+        assert len(channels) == 10
+
+    @pytest.mark.asyncio
+    async def test_list_channels_offset_pagination_last_page(
+        self,
+        notification_repository: NotificationRepository,
+        sample_channels_for_pagination: list[uuid.UUID],
+    ) -> None:
+        """Test last page of offset-based pagination with partial results"""
+        # sample_channels_for_pagination fixture creates 25 channels
+        querier = Querier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=20),
+        )
+        channels = await notification_repository.list_channels(querier=querier)
+        assert len(channels) == 5
+
+    @pytest.mark.asyncio
+    async def test_list_channels_pagination_limit_exceeds_total(
+        self,
+        notification_repository: NotificationRepository,
+        sample_channels_small: list[uuid.UUID],
+    ) -> None:
+        """Test pagination when limit exceeds total count"""
+        # sample_channels_small fixture creates 5 channels
+        querier = Querier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=100, offset=0),
+        )
+        channels = await notification_repository.list_channels(querier=querier)
+        assert len(channels) == 5
+
+    @pytest.mark.asyncio
+    async def test_list_channels_pagination_offset_exceeds_total(
+        self,
+        notification_repository: NotificationRepository,
+        sample_channels_small: list[uuid.UUID],
+    ) -> None:
+        """Test pagination when offset exceeds total count returns empty"""
+        # sample_channels_small fixture creates 5 channels
+        querier = Querier(
+            conditions=[],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=100),
+        )
+        channels = await notification_repository.list_channels(querier=querier)
+        assert len(channels) == 0
+
+    @pytest.mark.asyncio
+    async def test_list_channels_pagination_with_filter_and_order(
+        self,
+        notification_repository: NotificationRepository,
+        sample_channels_mixed_enabled: list[uuid.UUID],
+    ) -> None:
+        """Test pagination combined with filtering and ordering"""
+        # sample_channels_mixed_enabled fixture creates 20 channels (10 enabled, 10 disabled)
+        querier = Querier(
+            conditions=[NotificationChannelConditions.by_enabled(True)],
+            orders=[NotificationChannelOrders.name(ascending=True)],
+            pagination=OffsetPagination(limit=5, offset=0),
+        )
+        channels = await notification_repository.list_channels(querier=querier)
+        assert len(channels) == 5
+        assert all(c.enabled for c in channels)
+        # Verify ordering (Channel 00, 02, 04, 06, 08)
+        assert channels[0].name == "Channel 00"
+        assert channels[1].name == "Channel 02"
+
+    @pytest.mark.asyncio
+    async def test_list_channels_no_pagination(
+        self,
+        notification_repository: NotificationRepository,
+        sample_channels_medium: list[uuid.UUID],
+    ) -> None:
+        """Test listing channels without pagination returns all items"""
+        # sample_channels_medium fixture creates 15 channels
+        querier = Querier(
+            conditions=[],
+            orders=[],
+            pagination=None,
+        )
+        channels = await notification_repository.list_channels(querier=querier)
+        assert len(channels) == 15
