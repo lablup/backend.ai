@@ -21,6 +21,11 @@ class UpdateChannelAction(NotificationAction):
     modifier: NotificationChannelModifier
 
     @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "update_channel"
+
+    @override
     def entity_id(self) -> Optional[str]:
         return str(self.channel_id)
 

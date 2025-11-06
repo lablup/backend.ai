@@ -5,6 +5,7 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.notification import NotificationChannelData
+from ai.backend.manager.repositories.base import Querier
 
 from .base import NotificationAction
 
@@ -13,7 +14,12 @@ from .base import NotificationAction
 class ListChannelsAction(NotificationAction):
     """Action to list notification channels."""
 
-    enabled_only: bool = False
+    querier: Optional[Querier] = None
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "list_channels"
 
     @override
     def entity_id(self) -> Optional[str]:

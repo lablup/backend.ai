@@ -17,6 +17,11 @@ class GetRuleAction(NotificationAction):
     rule_id: UUID
 
     @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "get_rule"
+
+    @override
     def entity_id(self) -> Optional[str]:
         return str(self.rule_id)
 

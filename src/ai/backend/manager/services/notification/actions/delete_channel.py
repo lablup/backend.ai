@@ -16,6 +16,11 @@ class DeleteChannelAction(NotificationAction):
     channel_id: UUID
 
     @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "delete_channel"
+
+    @override
     def entity_id(self) -> Optional[str]:
         return str(self.channel_id)
 

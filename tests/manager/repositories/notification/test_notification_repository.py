@@ -37,8 +37,10 @@ from ai.backend.manager.models.user import (
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.repositories.notification import NotificationRepository
 from ai.backend.manager.repositories.notification.db_source import NotificationDBSource
+from ai.backend.manager.repositories.notification.options import NotificationChannelConditions
 
 
 class TestNotificationRepository:
@@ -357,10 +359,14 @@ class TestNotificationRepository:
             db_sess.add(disabled_channel)
             await db_sess.flush()
 
-        all_channels = await notification_repository.list_channels(enabled_only=False)
+        all_channels = await notification_repository.list_channels()
         assert len(all_channels) >= 2
 
-        enabled_channels = await notification_repository.list_channels(enabled_only=True)
+        enabled_querier = Querier(
+            conditions=[NotificationChannelConditions.by_enabled(True)],
+            orders=[],
+        )
+        enabled_channels = await notification_repository.list_channels(querier=enabled_querier)
         assert all(ch.enabled for ch in enabled_channels)
 
     @pytest.mark.asyncio
@@ -561,18 +567,29 @@ class TestNotificationRepository:
             db_sess.add(rule3)
             await db_sess.flush()
 
+        from ai.backend.manager.repositories.base import Querier
+        from ai.backend.manager.repositories.notification.options import NotificationRuleConditions
+
         # List all rules
-        all_rules = await notification_repository.list_rules(enabled_only=False)
+        all_rules = await notification_repository.list_rules()
         assert len(all_rules) >= 3
 
         # List enabled rules only
-        enabled_rules = await notification_repository.list_rules(enabled_only=True)
+        enabled_querier = Querier(
+            conditions=[NotificationRuleConditions.by_enabled(True)],
+            orders=[],
+        )
+        enabled_rules = await notification_repository.list_rules(querier=enabled_querier)
         assert all(r.enabled for r in enabled_rules)
 
         # List rules by rule_type
-        started_rules = await notification_repository.list_rules(
-            rule_type=NotificationRuleType.SESSION_STARTED
+        started_querier = Querier(
+            conditions=[
+                NotificationRuleConditions.by_rule_types([NotificationRuleType.SESSION_STARTED])
+            ],
+            orders=[],
         )
+        started_rules = await notification_repository.list_rules(querier=started_querier)
         assert len(started_rules) >= 2
         assert all(r.rule_type == NotificationRuleType.SESSION_STARTED for r in started_rules)
 

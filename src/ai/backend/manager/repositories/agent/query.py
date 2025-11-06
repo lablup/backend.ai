@@ -1,42 +1,32 @@
 from collections.abc import Collection
-from typing import Callable, Optional
 
 import sqlalchemy as sa
 
 from ai.backend.common.types import AgentId
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.models.agent import AgentRow
-
-type QueryConditionCallable = Callable[
-    [Optional[sa.sql.expression.BinaryExpression]], sa.sql.expression.BinaryExpression
-]
-type QueryCondition = Callable[[sa.sql.Select], QueryConditionCallable]
-
-type QueryOrder = sa.sql.ClauseElement
+from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 
 class QueryConditions:
     @staticmethod
     def by_ids(agent_ids: Collection[AgentId]) -> QueryCondition:
-        def inner(stmt: sa.sql.Select) -> sa.sql.Select:
-            cond = AgentRow.id.in_(agent_ids)
-            return stmt.where(cond)
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AgentRow.id.in_(agent_ids)
 
         return inner
 
     @staticmethod
     def by_scaling_group(scaling_group: str) -> QueryCondition:
-        def inner(stmt: sa.sql.Select) -> sa.sql.Select:
-            cond = AgentRow.scaling_group == scaling_group
-            return stmt.where(cond)
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AgentRow.scaling_group == scaling_group
 
         return inner
 
     @staticmethod
     def by_statuses(statuses: Collection[AgentStatus]) -> QueryCondition:
-        def inner(stmt: sa.sql.Select) -> sa.sql.Select:
-            cond = AgentRow.status.in_(statuses)
-            return stmt.where(cond)
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return AgentRow.status.in_(statuses)
 
         return inner
 

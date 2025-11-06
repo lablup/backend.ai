@@ -21,6 +21,7 @@ from ai.backend.manager.data.notification import (
     NotificationRuleModifier,
     NotificationRuleType,
 )
+from ai.backend.manager.repositories.base import Querier
 
 from .db_source import NotificationDBSource
 
@@ -128,16 +129,15 @@ class NotificationRepository:
     @notification_repository_resilience.apply()
     async def list_channels(
         self,
-        enabled_only: bool = False,
+        querier: Optional[Querier] = None,
     ) -> list[NotificationChannelData]:
         """Lists all notification channels."""
-        return await self._db_source.list_channels(enabled_only=enabled_only)
+        return await self._db_source.list_channels(querier=querier)
 
     @notification_repository_resilience.apply()
     async def list_rules(
         self,
-        enabled_only: bool = False,
-        rule_type: Optional[NotificationRuleType] = None,
+        querier: Optional[Querier] = None,
     ) -> list[NotificationRuleData]:
-        """Lists all notification rules, optionally filtered by rule type."""
-        return await self._db_source.list_rules(enabled_only=enabled_only, rule_type=rule_type)
+        """Lists all notification rules."""
+        return await self._db_source.list_rules(querier=querier)

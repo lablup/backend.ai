@@ -212,7 +212,7 @@ class NotificationService:
     ) -> ListChannelsActionResult:
         """Lists all notification channels."""
         channels = await self._repository.list_channels(
-            enabled_only=action.enabled_only,
+            querier=action.querier,
         )
 
         return ListChannelsActionResult(
@@ -225,8 +225,7 @@ class NotificationService:
     ) -> ListRulesActionResult:
         """Lists all notification rules."""
         rules = await self._repository.list_rules(
-            enabled_only=action.enabled_only,
-            rule_type=action.rule_type,
+            querier=action.querier,
         )
 
         return ListRulesActionResult(

@@ -19,6 +19,11 @@ class CreateChannelAction(NotificationAction):
     creator: NotificationChannelCreator
 
     @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "create_channel"
+
+    @override
     def entity_id(self) -> Optional[str]:
         return self.creator.name
 
