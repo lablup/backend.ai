@@ -338,10 +338,10 @@ class TestNotificationRepository:
     @pytest.fixture
     async def notification_db_source(
         self,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[NotificationDBSource, None]:
         """Create NotificationDBSource instance with real database"""
-        db_source = NotificationDBSource(db=database_engine)
+        db_source = NotificationDBSource(db=db_with_cleanup)
         yield db_source
 
     @pytest.fixture
@@ -448,7 +448,7 @@ class TestNotificationRepository:
     async def test_list_channels(
         self,
         notification_repository: NotificationRepository,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         test_user: uuid.UUID,
     ) -> None:
         """Test listing all channels"""
@@ -457,7 +457,7 @@ class TestNotificationRepository:
         config = WebhookConfig(url="https://example.com/webhook")
 
         # Create channels directly in DB
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             enabled_channel = NotificationChannelRow(
                 id=uuid.uuid4(),
                 name="Enabled Channel",
@@ -534,7 +534,7 @@ class TestNotificationRepository:
     async def test_get_matching_rules(
         self,
         notification_repository: NotificationRepository,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         sample_channel_id: uuid.UUID,
         test_user: uuid.UUID,
     ) -> None:
@@ -542,7 +542,7 @@ class TestNotificationRepository:
         from datetime import datetime
 
         # Create rules directly in DB
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             # Create matching enabled rule
             matching_rule = NotificationRuleRow(
                 id=uuid.uuid4(),
@@ -639,7 +639,7 @@ class TestNotificationRepository:
     async def test_list_rules(
         self,
         notification_repository: NotificationRepository,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         sample_channel_id: uuid.UUID,
         test_user: uuid.UUID,
     ) -> None:
@@ -647,7 +647,7 @@ class TestNotificationRepository:
         from datetime import datetime
 
         # Create rules directly in DB
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             # Create session.started rule (enabled)
             rule1 = NotificationRuleRow(
                 id=uuid.uuid4(),
@@ -723,7 +723,7 @@ class TestNotificationRepository:
         self,
         notification_repository: NotificationRepository,
         test_user: uuid.UUID,
-        database_engine: ExtendedAsyncSAEngine,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> None:
         """Test deleting a channel that has associated rules"""
         from datetime import datetime
@@ -733,7 +733,7 @@ class TestNotificationRepository:
         rule_id = uuid.uuid4()
 
         # Create channel and rule directly in DB
-        async with database_engine.begin_session() as db_sess:
+        async with db_with_cleanup.begin_session() as db_sess:
             channel = NotificationChannelRow(
                 id=channel_id,
                 name="Test Channel",
