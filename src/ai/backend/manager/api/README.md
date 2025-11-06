@@ -90,13 +90,131 @@ REST API handlers and GraphQL handlers invoke Action Processor to execute busine
 
 See [Actions Layer Documentation](../actions/README.md) for details.
 
+## Adapter Pattern
+
+The API layer uses adapters to convert between API DTOs and repository queries.
+
+### Architecture
+
+```
+Client Request (JSON/Form)
+    ↓
+API Handler
+    ↓ parse & validate
+DTO Objects (Pydantic models)
+    ↓ convert
+Adapter
+    ↓ build
+Querier (conditions, orders, pagination)
+    ↓ pass through
+Service Layer
+    ↓ delegate
+Repository
+    ↓ query
+Database
+```
+
+### Adapter Responsibilities
+
+**REST Adapters** convert API request DTOs to repository `Querier` objects:
+
+```python
+from ai.backend.manager.api.adapter import BaseFilterAdapter
+from ai.backend.manager.repositories.base import Querier
+
+class NotificationChannelAdapter(BaseFilterAdapter):
+    """Converts notification channel DTOs to Querier."""
+
+    def build_querier(self, request: SearchNotificationChannelsReq) -> Querier:
+        """Build repository query from API request."""
+        conditions = []
+        orders = []
+        pagination = None
+
+        # Convert filters
+        if request.filter:
+            conditions.extend(request.filter.build_conditions())
+
+        # Convert ordering
+        if request.order:
+            orders.append(request.order.to_query_order())
+
+        # Convert pagination
+        if request.limit:
+            pagination = OffsetPagination(
+                limit=request.limit,
+                offset=request.offset or 0
+            )
+
+        return Querier(
+            conditions=conditions,
+            orders=orders,
+            pagination=pagination
+        )
+```
+
+### Base Adapter Utilities
+
+`BaseFilterAdapter` provides common filter conversion utilities:
+
+```python
+class BaseFilterAdapter:
+    """Base adapter for common filter patterns."""
+
+    def convert_string_filter(
+        self,
+        string_filter: StringFilter,
+        equals_fn: Callable[[str, bool], QueryCondition],
+        contains_fn: Callable[[str, bool], QueryCondition],
+    ) -> Optional[QueryCondition]:
+        """Convert StringFilter to QueryCondition."""
+        if string_filter.equals:
+            return equals_fn(string_filter.equals, False)
+        elif string_filter.i_equals:
+            return equals_fn(string_filter.i_equals, True)
+        elif string_filter.contains:
+            return contains_fn(string_filter.contains, False)
+        elif string_filter.i_contains:
+            return contains_fn(string_filter.i_contains, True)
+        return None
+```
+
+### Handler Integration
+
+API handlers instantiate adapters as instance fields for reuse:
+
+```python
+class NotificationAPIHandler:
+    """REST API handler for notification operations."""
+
+    def __init__(self) -> None:
+        self.channel_adapter = NotificationChannelAdapter()
+        self.rule_adapter = NotificationRuleAdapter()
+
+    @api_handler
+    async def search_channels(
+        self,
+        body: BodyParam[SearchNotificationChannelsReq],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Search notification channels."""
+        # Convert DTO to Querier
+        querier = self.channel_adapter.build_querier(body.parsed)
+
+        # Pass Querier through Service Layer
+        channels = await processors_ctx.notification.search_channels(querier)
+
+        return APIResponse(data=channels)
+```
+
 ## Error Handling
 
 Exceptions from each layer are converted to appropriate HTTP responses via Error Handling Middleware.
 
 ## Related Documentation
 
-- [GraphQL API](./gql/README.md) - GraphQL endpoints
+- [GraphQL API](./gql/README.md) - GraphQL endpoints with GQL adapters
+- [Repositories Layer](../repositories/README.md) - Querier pattern and data access
 - [Actions Layer](../actions/README.md) - Action Processor details
 - [Services Layer](../services/README.md) - Business logic
 - [Event Stream API](./events.py) - Server-Sent Events

@@ -348,6 +348,260 @@ class MixedRepository:
     async def get_session_with_kernels_and_agents(self, ...): ...
 ```
 
+## Querier Pattern
+
+The Querier pattern provides a unified way to build database queries from API requests, supporting filtering, ordering, and pagination.
+
+### Architecture
+
+```
+API Layer (adapters)
+    ↓ build
+Querier (conditions, orders, pagination)
+    ↓ pass through
+Service Layer
+    ↓ delegate
+Repository
+    ↓ apply
+SQLAlchemy Query
+    ↓
+Database
+```
+
+### Querier Structure
+
+```python
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass(frozen=True)
+class Querier:
+    """Unified query specification."""
+    conditions: list[QueryCondition]  # WHERE clauses
+    orders: list[QueryOrder]          # ORDER BY clauses
+    pagination: Optional[QueryPagination]  # LIMIT/OFFSET or cursor
+
+
+# Type aliases
+QueryCondition = Callable[[], ColumnElement[bool]]
+QueryOrder = Callable[[SAColumn], ColumnElement]
+
+# Pagination strategies
+@dataclass(frozen=True)
+class OffsetPagination:
+    limit: int
+    offset: int
+
+@dataclass(frozen=True)
+class CursorForwardPagination:
+    first: int
+    after: str  # base64 encoded cursor
+
+@dataclass(frozen=True)
+class CursorBackwardPagination:
+    last: int
+    before: str  # base64 encoded cursor
+```
+
+### Condition Builders
+
+Repository `options.py` modules provide condition builders:
+
+```python
+# repositories/notification/options.py
+class NotificationChannelConditions:
+    """Condition builders for notification channels."""
+
+    @staticmethod
+    def name_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+        """Build name equals condition."""
+        def condition() -> ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(NotificationChannelRow.name) == value.lower()
+            return NotificationChannelRow.name == value
+        return condition
+
+    @staticmethod
+    def name_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+        """Build name contains condition."""
+        def condition() -> ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(NotificationChannelRow.name).contains(value.lower())
+            return NotificationChannelRow.name.contains(value)
+        return condition
+
+    @staticmethod
+    def enabled_equals(value: bool) -> QueryCondition:
+        """Build enabled equals condition."""
+        def condition() -> ColumnElement[bool]:
+            return NotificationChannelRow.enabled == value
+        return condition
+```
+
+### Order Builders
+
+```python
+class NotificationChannelOrders:
+    """Order builders for notification channels."""
+
+    @staticmethod
+    def name(ascending: bool = True) -> QueryOrder:
+        """Order by name."""
+        def order(column: SAColumn) -> ColumnElement:
+            return column.asc() if ascending else column.desc()
+        return lambda: order(NotificationChannelRow.name)
+
+    @staticmethod
+    def created_at(ascending: bool = True) -> QueryOrder:
+        """Order by creation time."""
+        def order(column: SAColumn) -> ColumnElement:
+            return column.asc() if ascending else column.desc()
+        return lambda: order(NotificationChannelRow.created_at)
+```
+
+### Repository Integration
+
+Repositories accept `Querier` objects and apply them to SQLAlchemy queries:
+
+```python
+class NotificationChannelRepository:
+    """Repository using Querier pattern."""
+
+    async def search_channels(
+        self,
+        querier: Querier,
+    ) -> list[NotificationChannelData]:
+        """Search channels using Querier."""
+        async with self._db.begin_readonly_session() as db_sess:
+            # Build base query
+            stmt = sa.select(NotificationChannelRow)
+
+            # Apply conditions (WHERE)
+            for condition in querier.conditions:
+                stmt = stmt.where(condition())
+
+            # Apply ordering (ORDER BY)
+            for order in querier.orders:
+                stmt = stmt.order_by(order())
+
+            # Apply pagination (LIMIT/OFFSET or cursor)
+            if querier.pagination:
+                stmt = self._apply_pagination(stmt, querier.pagination)
+
+            # Execute query
+            result = await db_sess.execute(stmt)
+            rows = result.scalars().all()
+
+            # Convert to domain objects
+            return [self._to_data(row) for row in rows]
+
+    def _apply_pagination(
+        self,
+        stmt: Select,
+        pagination: QueryPagination,
+    ) -> Select:
+        """Apply pagination to query."""
+        if isinstance(pagination, OffsetPagination):
+            return stmt.limit(pagination.limit).offset(pagination.offset)
+        elif isinstance(pagination, CursorForwardPagination):
+            # Decode cursor and apply
+            decoded = decode_cursor(pagination.after)
+            return stmt.where(row_id > decoded).limit(pagination.first)
+        elif isinstance(pagination, CursorBackwardPagination):
+            # Decode cursor and apply
+            decoded = decode_cursor(pagination.before)
+            return stmt.where(row_id < decoded).limit(pagination.last)
+        return stmt
+```
+
+### Example Usage Flow
+
+```python
+# 1. API Layer: Build Querier from request
+@api_handler
+async def search_channels(
+    body: BodyParam[SearchNotificationChannelsReq],
+    processors_ctx: ProcessorsCtx,
+) -> APIResponse:
+    # Adapter converts DTO to Querier
+    querier = adapter.build_querier(body.parsed)
+
+    # Service layer executes query (service delegates to repository)
+    results = await processors.notification.search_channels(querier)
+
+    return APIResponse(data=results)
+
+# 2. Adapter: Convert DTO to Querier
+class NotificationChannelAdapter:
+    def build_querier(self, request: SearchNotificationChannelsReq) -> Querier:
+        conditions = []
+
+        # Build conditions
+        if request.filter:
+            if request.filter.name:
+                conditions.append(
+                    NotificationChannelConditions.name_contains(
+                        request.filter.name.contains
+                    )
+                )
+            if request.filter.enabled is not None:
+                conditions.append(
+                    NotificationChannelConditions.enabled_equals(
+                        request.filter.enabled
+                    )
+                )
+
+        # Build orders
+        orders = []
+        if request.order:
+            orders.append(request.order.to_query_order())
+
+        # Build pagination
+        pagination = None
+        if request.limit:
+            pagination = OffsetPagination(
+                limit=request.limit,
+                offset=request.offset or 0
+            )
+
+        return Querier(
+            conditions=conditions,
+            orders=orders,
+            pagination=pagination
+        )
+
+# 3. Service Layer: Pass through to repository
+class NotificationService:
+    async def search_channels(self, querier: Querier) -> list[ChannelData]:
+        """Service delegates to repository."""
+        return await self._repository.search_channels(querier)
+
+# 4. Repository: Execute query
+class NotificationChannelRepository:
+    async def search_channels(self, querier: Querier) -> list[ChannelData]:
+        async with self._db.begin_readonly_session() as db_sess:
+            stmt = sa.select(NotificationChannelRow)
+
+            # Apply querier
+            for condition in querier.conditions:
+                stmt = stmt.where(condition())
+            for order in querier.orders:
+                stmt = stmt.order_by(order())
+            if querier.pagination:
+                stmt = self._apply_pagination(stmt, querier.pagination)
+
+            result = await db_sess.execute(stmt)
+            return [self._to_data(row) for row in result.scalars()]
+```
+
+### Benefits
+
+1. **Type Safety**: Strong typing throughout the pipeline
+2. **Reusability**: Condition/order builders reused across API layers
+3. **Testability**: Each component can be tested independently
+4. **Flexibility**: Easy to add new filters/orders without changing repository
+5. **Consistency**: Uniform query building across REST and GraphQL APIs
+
 ## Data Access Patterns
 
 ### 1. Basic Queries
