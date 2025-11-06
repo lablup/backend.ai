@@ -5,9 +5,16 @@ Tests conversion utilities for common filter patterns.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+import sqlalchemy as sa
+
 from ai.backend.common.dto.manager.notification import StringFilter
 from ai.backend.manager.api.adapter import BaseFilterAdapter
 from ai.backend.manager.repositories.base import QueryCondition
+
+if TYPE_CHECKING:
+    from sqlalchemy.sql.expression import ColumnElement
 
 
 class TestBaseFilterAdapter:
@@ -23,11 +30,19 @@ class TestBaseFilterAdapter:
 
         def equals_fn(value: str, case_insensitive: bool) -> QueryCondition:
             called_with["equals"] = (value, case_insensitive)
-            return lambda: "equals_condition"
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
 
         def contains_fn(value: str, case_insensitive: bool) -> QueryCondition:
             called_with["contains"] = (value, case_insensitive)
-            return lambda: "contains_condition"
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
 
         result = adapter.convert_string_filter(string_filter, equals_fn, contains_fn)
 
@@ -45,11 +60,19 @@ class TestBaseFilterAdapter:
 
         def equals_fn(value: str, case_insensitive: bool) -> QueryCondition:
             called_with["equals"] = (value, case_insensitive)
-            return lambda: "equals_condition"
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
 
         def contains_fn(value: str, case_insensitive: bool) -> QueryCondition:
             called_with["contains"] = (value, case_insensitive)
-            return lambda: "contains_condition"
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
 
         result = adapter.convert_string_filter(string_filter, equals_fn, contains_fn)
 
@@ -67,11 +90,19 @@ class TestBaseFilterAdapter:
 
         def equals_fn(value: str, case_insensitive: bool) -> QueryCondition:
             called_with["equals"] = (value, case_insensitive)
-            return lambda: "equals_condition"
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
 
         def contains_fn(value: str, case_insensitive: bool) -> QueryCondition:
             called_with["contains"] = (value, case_insensitive)
-            return lambda: "contains_condition"
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
 
         result = adapter.convert_string_filter(string_filter, equals_fn, contains_fn)
 
@@ -89,11 +120,19 @@ class TestBaseFilterAdapter:
 
         def equals_fn(value: str, case_insensitive: bool) -> QueryCondition:
             called_with["equals"] = (value, case_insensitive)
-            return lambda: "equals_condition"
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
 
         def contains_fn(value: str, case_insensitive: bool) -> QueryCondition:
             called_with["contains"] = (value, case_insensitive)
-            return lambda: "contains_condition"
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
 
         result = adapter.convert_string_filter(string_filter, equals_fn, contains_fn)
 
@@ -111,11 +150,19 @@ class TestBaseFilterAdapter:
 
         def equals_fn(value: str, case_insensitive: bool) -> QueryCondition:
             called_with["equals"] = (value, case_insensitive)
-            return lambda: "equals_condition"
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
 
         def contains_fn(value: str, case_insensitive: bool) -> QueryCondition:
             called_with["contains"] = (value, case_insensitive)
-            return lambda: "contains_condition"
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
 
         result = adapter.convert_string_filter(string_filter, equals_fn, contains_fn)
 
@@ -133,11 +180,19 @@ class TestBaseFilterAdapter:
 
         def equals_fn(value: str, case_insensitive: bool) -> QueryCondition:
             called_with["equals"] = (value, case_insensitive)
-            return lambda: "equals_condition"
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
 
         def contains_fn(value: str, case_insensitive: bool) -> QueryCondition:
             called_with["contains"] = (value, case_insensitive)
-            return lambda: "contains_condition"
+
+            def condition() -> ColumnElement[bool]:
+                return sa.literal(True)
+
+            return condition
 
         result = adapter.convert_string_filter(string_filter, equals_fn, contains_fn)
 

@@ -5,8 +5,7 @@ Tests conversion from DTO objects to repository Querier objects.
 
 from __future__ import annotations
 
-import pytest
-
+from ai.backend.common.data.notification import NotificationChannelType, NotificationRuleType
 from ai.backend.common.dto.manager.notification import (
     NotificationChannelFilter,
     NotificationChannelOrder,
@@ -17,7 +16,6 @@ from ai.backend.common.dto.manager.notification import (
     OrderDirection,
     StringFilter,
 )
-from ai.backend.common.data.notification import NotificationChannelType, NotificationRuleType
 from ai.backend.manager.api.notification.adapter import (
     NotificationChannelAdapter,
     NotificationRuleAdapter,
@@ -26,6 +24,7 @@ from ai.backend.manager.dto.notification_request import (
     SearchNotificationChannelsReq,
     SearchNotificationRulesReq,
 )
+from ai.backend.manager.repositories.base import OffsetPagination
 
 
 class TestNotificationChannelAdapter:
@@ -114,9 +113,7 @@ class TestNotificationChannelAdapter:
 
     def test_enabled_filter_true(self) -> None:
         """Test enabled filter (True)"""
-        request = SearchNotificationChannelsReq(
-            filter=NotificationChannelFilter(enabled=True)
-        )
+        request = SearchNotificationChannelsReq(filter=NotificationChannelFilter(enabled=True))
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
 
@@ -126,9 +123,7 @@ class TestNotificationChannelAdapter:
 
     def test_enabled_filter_false(self) -> None:
         """Test enabled filter (False)"""
-        request = SearchNotificationChannelsReq(
-            filter=NotificationChannelFilter(enabled=False)
-        )
+        request = SearchNotificationChannelsReq(filter=NotificationChannelFilter(enabled=False))
         adapter = NotificationChannelAdapter()
         querier = adapter.build_querier(request)
 
@@ -244,6 +239,7 @@ class TestNotificationChannelAdapter:
         querier = adapter.build_querier(request)
 
         assert querier.pagination is not None
+        assert isinstance(querier.pagination, OffsetPagination)
         assert querier.pagination.limit == 10
         assert querier.pagination.offset == 5
 
@@ -267,6 +263,7 @@ class TestNotificationChannelAdapter:
         assert len(querier.conditions) == 2
         assert len(querier.orders) == 1
         assert querier.pagination is not None
+        assert isinstance(querier.pagination, OffsetPagination)
         assert querier.pagination.limit == 20
         assert querier.pagination.offset == 10
 
@@ -356,9 +353,7 @@ class TestNotificationRuleAdapter:
 
     def test_enabled_filter_true(self) -> None:
         """Test enabled filter (True)"""
-        request = SearchNotificationRulesReq(
-            filter=NotificationRuleFilter(enabled=True)
-        )
+        request = SearchNotificationRulesReq(filter=NotificationRuleFilter(enabled=True))
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
 
@@ -368,9 +363,7 @@ class TestNotificationRuleAdapter:
 
     def test_enabled_filter_false(self) -> None:
         """Test enabled filter (False)"""
-        request = SearchNotificationRulesReq(
-            filter=NotificationRuleFilter(enabled=False)
-        )
+        request = SearchNotificationRulesReq(filter=NotificationRuleFilter(enabled=False))
         adapter = NotificationRuleAdapter()
         querier = adapter.build_querier(request)
 
@@ -486,6 +479,7 @@ class TestNotificationRuleAdapter:
         querier = adapter.build_querier(request)
 
         assert querier.pagination is not None
+        assert isinstance(querier.pagination, OffsetPagination)
         assert querier.pagination.limit == 10
         assert querier.pagination.offset == 5
 
@@ -509,5 +503,6 @@ class TestNotificationRuleAdapter:
         assert len(querier.conditions) == 2
         assert len(querier.orders) == 1
         assert querier.pagination is not None
+        assert isinstance(querier.pagination, OffsetPagination)
         assert querier.pagination.limit == 20
         assert querier.pagination.offset == 10
