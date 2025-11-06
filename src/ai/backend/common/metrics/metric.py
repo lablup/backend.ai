@@ -413,6 +413,7 @@ class LayerType(enum.StrEnum):
     KEYPAIR_RESOURCE_POLICY_REPOSITORY = "keypair_resource_policy_repository"
     METRIC_REPOSITORY = "metric_repository"
     MODEL_SERVING_REPOSITORY = "model_serving_repository"
+    NOTIFICATION_REPOSITORY = "notification_repository"
     OBJECT_STORAGE_REPOSITORY = "object_storage_repository"
     PERMISSION_CONTROLLER_REPOSITORY = "permission_controller_repository"
     PROJECT_RESOURCE_POLICY_REPOSITORY = "project_resource_policy_repository"
