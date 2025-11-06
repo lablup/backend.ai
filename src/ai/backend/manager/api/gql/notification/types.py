@@ -8,7 +8,7 @@ from typing import Optional, Self
 
 import strawberry
 from strawberry import ID, UNSET
-from strawberry.relay import Node
+from strawberry.relay import Node, NodeID
 
 from ai.backend.common.data.notification import (
     NotificationChannelType,
@@ -105,7 +105,7 @@ class WebhookConfigGQL:
 
 @strawberry.type(description="Notification channel")
 class NotificationChannel(Node):
-    id: ID
+    id: NodeID[str]
     name: str
     description: Optional[str]
     channel_type: NotificationChannelTypeGQL
@@ -126,7 +126,7 @@ class NotificationChannel(Node):
 
 @strawberry.type(description="Notification rule")
 class NotificationRule(Node):
-    id: ID
+    id: NodeID[str]
     name: str
     description: Optional[str]
     rule_type: NotificationRuleTypeGQL
