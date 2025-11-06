@@ -2,6 +2,7 @@ import uuid
 from dataclasses import dataclass
 
 from .id import ScopeId
+from .permission import PermissionData
 
 
 @dataclass
@@ -26,3 +27,12 @@ class PermissionGroupData:
     id: uuid.UUID
     role_id: uuid.UUID
     scope_id: ScopeId
+
+
+@dataclass
+class PermissionGroupExtendedData:
+    id: uuid.UUID
+    role_id: uuid.UUID
+    scope_id: ScopeId
+
+    permissions: list[PermissionData]

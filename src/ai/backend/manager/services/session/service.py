@@ -13,36 +13,22 @@ import aiohttp
 import aiotools
 import multidict
 import trafaret as t
+from aiohttp.multipart import BodyPartReader
 from dateutil.tz import tzutc
 
-from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
-from ai.backend.common.bgtask.types import BgtaskStatus
-from ai.backend.common.docker import DEFAULT_KERNEL_FEATURE, ImageRef, KernelFeatures, LabelName
-from ai.backend.common.events.event_types.bgtask.broadcast import (
-    BaseBgtaskDoneEvent,
-    BaseBgtaskEvent,
-)
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
-from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
-from ai.backend.common.events.types import (
-    EventCacheDomain,
-    EventDomain,
-)
 from ai.backend.common.exception import (
     BackendAIError,
-    BgtaskCancelledError,
-    BgtaskFailedError,
     InvalidAPIParameters,
     UnknownImageReference,
 )
 from ai.backend.common.json import load_json
 from ai.backend.common.plugin.monitor import ErrorPluginContext
 from ai.backend.common.types import (
-    DispatchResult,
     ImageAlias,
-    ImageRegistry,
     SessionId,
     SessionTypes,
 )
@@ -54,6 +40,8 @@ from ai.backend.manager.api.session import (
     overwritten_param_check,
 )
 from ai.backend.manager.api.utils import undefined
+from ai.backend.manager.bgtask.tasks.commit_session import CommitSessionManifest
+from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.common import (
@@ -304,6 +292,23 @@ class SessionService:
         if image_visibility != CustomizedImageVisibilityScope.USER:
             raise InvalidAPIParameters(f"Unsupported visibility scope {image_visibility}")
 
+        # check if user has passed its limit of customized image count
+        existing_image_count = await self._session_repository.get_customized_image_count(
+            image_visibility.value, str(image_owner_id)
+        )
+        customized_image_count_limit = action.max_customized_image_count
+        if customized_image_count_limit <= existing_image_count:
+            raise QuotaExceeded(
+                extra_msg=(
+                    "You have reached your customized image count quota. "
+                    f"(current: {existing_image_count}, limit: {customized_image_count_limit})"
+                ),
+                extra_data={
+                    "limit": customized_image_count_limit,
+                    "current": existing_image_count,
+                },
+            )
+
         session = await self._session_repository.get_session_with_group(
             session_name,
             owner_access_key,
@@ -327,186 +332,26 @@ class SessionService:
                 f"Project {registry_project} not found in registry {registry_hostname}."
             )
 
-        image_row = await self._session_repository.resolve_image([
+        # Validate image exists
+        await self._session_repository.resolve_image([
             ImageIdentifier(session.main_kernel.image, session.main_kernel.architecture)
         ])
 
-        base_image_ref = image_row.image_ref
+        # Create manifest for background task
+        manifest = CommitSessionManifest(
+            session_id=session.id,
+            registry_hostname=registry_hostname,
+            registry_project=registry_project,
+            image_name=image_name,
+            image_visibility=image_visibility,
+            image_owner_id=str(image_owner_id),
+            user_email=action.user_email,
+        )
 
-        async def _commit_and_upload(
-            reporter: ProgressReporter,
-        ) -> DispatchResult[uuid.UUID]:
-            reporter.total_progress = 3
-            await reporter.update(message="Commit started")
-            # remove any existing customized related tag from base canonical
-            filtered_tag_set = [
-                x for x in base_image_ref.tag.split("-") if not x.startswith("customized_")
-            ]
-
-            if base_image_ref.name == "":
-                new_name = base_image_ref.project
-            else:
-                new_name = base_image_ref.name
-
-            new_canonical = (
-                f"{registry_hostname}/{registry_project}/{new_name}:{'-'.join(filtered_tag_set)}"
-            )
-
-            # check if user has passed its limit of customized image count
-            existing_image_count = await self._session_repository.get_customized_image_count(
-                image_visibility.value, str(image_owner_id)
-            )
-
-            customized_image_count_limit = action.max_customized_image_count
-            if customized_image_count_limit <= existing_image_count:
-                raise QuotaExceeded(
-                    extra_msg="You have reached your customized image count quota",
-                    extra_data={
-                        "limit": customized_image_count_limit,
-                        "current": existing_image_count,
-                    },
-                )
-
-            # check if image with same name exists and reuse ID it if is
-            existing_row = await self._session_repository.get_existing_customized_image(
-                new_canonical, image_visibility.value, str(image_owner_id), image_name
-            )
-
-            customized_image_id: str
-            kern_features: list[str]
-            if existing_row is not None:
-                from ai.backend.manager.models.image import ImageRow
-
-                existing_image: ImageRow = existing_row
-                labels = existing_image.labels or {}
-                kern_features_str = labels.get(LabelName.FEATURES, DEFAULT_KERNEL_FEATURE)
-                kern_features = (
-                    kern_features_str.split() if kern_features_str else [DEFAULT_KERNEL_FEATURE]
-                )
-                customized_image_id = labels.get(LabelName.CUSTOMIZED_ID, str(uuid.uuid4()))
-                log.debug("reusing existing customized image ID {}", customized_image_id)
-            else:
-                kern_features = [DEFAULT_KERNEL_FEATURE]
-                customized_image_id = str(uuid.uuid4())
-                # Remove PRIVATE label for customized images
-                kern_features = [
-                    feat for feat in kern_features if feat != KernelFeatures.PRIVATE.value
-                ]
-
-            new_canonical += f"-customized_{customized_image_id.replace('-', '')}"
-            new_image_ref = ImageRef.from_image_str(
-                new_canonical,
-                None,
-                registry_hostname,
-                architecture=base_image_ref.architecture,
-                is_local=base_image_ref.is_local,
-            )
-
-            image_labels: dict[str | LabelName, str] = {
-                LabelName.CUSTOMIZED_OWNER: f"{image_visibility.value}:{image_owner_id}",
-                LabelName.CUSTOMIZED_NAME: image_name,
-                LabelName.CUSTOMIZED_ID: customized_image_id,
-                LabelName.FEATURES: " ".join(kern_features),
-            }
-            match image_visibility:
-                case CustomizedImageVisibilityScope.USER:
-                    image_labels[LabelName.CUSTOMIZED_USER_EMAIL] = action.user_email
-
-            # commit image with new tag set
-            resp = await self._agent_registry.commit_session(
-                session,
-                new_image_ref,
-                extra_labels=image_labels,
-            )
-            bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
-            propagator = WithCachePropagator(self._event_fetcher)
-            self._event_hub.register_event_propagator(
-                propagator, [(EventDomain.BGTASK, str(bgtask_id))]
-            )
-            try:
-                cache_id = EventCacheDomain.BGTASK.cache_id(str(bgtask_id))
-                async for event in propagator.receive(cache_id):
-                    if not isinstance(event, BaseBgtaskEvent):
-                        log.warning("unexpected event: {}", event)
-                        continue
-                    match event.status():
-                        case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
-                            # TODO: PARTIAL_SUCCESS should be handled
-                            await reporter.update(increment=1, message="Committed image")
-                            break
-                        case BgtaskStatus.FAILED:
-                            raise BgtaskFailedError(
-                                extra_msg=cast(BaseBgtaskDoneEvent, event).message
-                            )
-                        case BgtaskStatus.CANCELLED:
-                            raise BgtaskCancelledError(extra_msg="Operation cancelled")
-                        case BgtaskStatus.UPDATED:
-                            continue
-                        case _:
-                            log.warning("unexpected bgtask done event: {}", event)
-            finally:
-                self._event_hub.unregister_event_propagator(propagator.id())
-
-            if not new_image_ref.is_local:
-                # push image to registry from local agent
-                image_registry = ImageRegistry(
-                    name=registry_hostname,
-                    url=str(registry_conf.url),
-                    username=registry_conf.username,
-                    password=registry_conf.password,
-                )
-                resp = await self._agent_registry.push_image(
-                    session.main_kernel.agent,
-                    new_image_ref,
-                    image_registry,
-                )
-                bgtask_id = cast(uuid.UUID, resp["bgtask_id"])
-                propagator = WithCachePropagator(self._event_fetcher)
-                self._event_hub.register_event_propagator(
-                    propagator, [(EventDomain.BGTASK, str(bgtask_id))]
-                )
-                try:
-                    cache_id = EventCacheDomain.BGTASK.cache_id(str(bgtask_id))
-                    async for event in propagator.receive(cache_id):
-                        if not isinstance(event, BaseBgtaskEvent):
-                            log.warning("unexpected event: {}", event)
-                            continue
-                        match event.status():
-                            case BgtaskStatus.DONE | BgtaskStatus.PARTIAL_SUCCESS:
-                                break
-                            case BgtaskStatus.FAILED:
-                                raise BgtaskFailedError(
-                                    extra_msg=cast(BaseBgtaskDoneEvent, event).message
-                                )
-                            case BgtaskStatus.CANCELLED:
-                                raise BgtaskCancelledError(extra_msg="Operation cancelled")
-                            case BgtaskStatus.UPDATED:
-                                continue
-                            case _:
-                                log.warning("unexpected bgtask done event: {}", event)
-                finally:
-                    self._event_hub.unregister_event_propagator(propagator.id())
-
-            await reporter.update(increment=1, message="Pushed image to registry")
-            # rescan updated image only
-            rescan_result = await self._session_repository.rescan_images(
-                new_image_ref.canonical,
-                registry_project,
-                reporter=reporter,
-            )
-            await reporter.update(increment=1, message="Completed")
-            if len(rescan_result.images) == 0:
-                rescan_errors = ",".join(rescan_result.errors)
-                return DispatchResult.error(
-                    f"Session commit succeeded, but no image was rescanned, Error: {rescan_errors}"
-                )
-            elif len(rescan_result.images) > 1:
-                log.warning(
-                    f"More than two images were rescanned unexpectedly. Rescanned Images: {rescan_result.images}"
-                )
-            return DispatchResult.success(rescan_result.images[0].id)
-
-        task_id = await self._background_task_manager.start(_commit_and_upload)
+        task_id = await self._background_task_manager.start_retriable(
+            ManagerBgtaskName.COMMIT_SESSION,
+            manifest,
+        )
 
         return ConvertSessionToImageActionResult(
             task_id=task_id, session_data=session.to_dataclass()
@@ -1496,8 +1341,6 @@ class SessionService:
         owner_access_key = action.owner_access_key
         reader = action.reader
 
-        loop = asyncio.get_event_loop()
-
         session = await self._session_repository.get_session_validated(
             session_name,
             owner_access_key,
@@ -1506,28 +1349,32 @@ class SessionService:
 
         await self._agent_registry.increment_session_usage(session)
         file_count = 0
-        upload_tasks = []
-        async for file in aiotools.aiter(reader.next, None):
-            if file_count == 20:
-                raise InvalidAPIParameters("Too many files")
-            file_count += 1
-            # This API handles only small files, so let's read it at once.
-            chunks = []
-            recv_size = 0
-            while True:
-                chunk = await file.read_chunk(size=1048576)
-                if not chunk:
+
+        async with aiotools.TaskScope() as ts:
+            async for file in aiotools.aiter(reader.next, None):
+                if file_count == 20:
+                    raise InvalidAPIParameters("Too many files")
+                if file is None:
                     break
-                chunk_size = len(chunk)
-                if recv_size + chunk_size >= 1048576:
-                    raise InvalidAPIParameters("Too large file")
-                chunks.append(chunk)
-                recv_size += chunk_size
-            data = file.decode(b"".join(chunks))
-            log.debug("received file: {0} ({1:,} bytes)", file.filename, recv_size)
-            t = loop.create_task(self._agent_registry.upload_file(session, file.filename, data))
-            upload_tasks.append(t)
-        await asyncio.gather(*upload_tasks)
+                if not isinstance(file, BodyPartReader):
+                    raise InvalidAPIParameters("Nested multipart upload is not supported")
+                file_name = file.filename or f"upload-{secrets.token_hex(12)}"
+                file_count += 1
+                # This API handles only small files, so let's read it at once.
+                chunks = []
+                recv_size = 0
+                while True:
+                    chunk = await file.read_chunk(size=1048576)
+                    if not chunk:
+                        break
+                    chunk_size = len(chunk)
+                    if recv_size + chunk_size >= 1048576:
+                        raise InvalidAPIParameters("Too large file")
+                    chunks.append(chunk)
+                    recv_size += chunk_size
+                data = file.decode(b"".join(chunks))
+                log.debug("received file: {0} ({1:,} bytes)", file_name, recv_size)
+                ts.create_task(self._agent_registry.upload_file(session, file_name, data))
 
         return UploadFilesActionResult(result=None, session_data=session.to_dataclass())
 

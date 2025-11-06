@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from dateutil.parser import parse as dtparse
 
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import (
     AccessKey,
@@ -30,7 +31,7 @@ from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.session import SESSION_PRIORITY_DEFAULT, SessionRow
+from ai.backend.manager.models.session import SessionRow
 
 ARCH_FOR_TEST: Final = "x86_64"
 

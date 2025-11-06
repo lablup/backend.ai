@@ -413,6 +413,7 @@ class LayerType(enum.StrEnum):
     KEYPAIR_RESOURCE_POLICY_REPOSITORY = "keypair_resource_policy_repository"
     METRIC_REPOSITORY = "metric_repository"
     MODEL_SERVING_REPOSITORY = "model_serving_repository"
+    NOTIFICATION_REPOSITORY = "notification_repository"
     OBJECT_STORAGE_REPOSITORY = "object_storage_repository"
     PERMISSION_CONTROLLER_REPOSITORY = "permission_controller_repository"
     PROJECT_RESOURCE_POLICY_REPOSITORY = "project_resource_policy_repository"
@@ -467,6 +468,7 @@ class LayerMetricObserver:
 
     _layer_operation_triggered_count: Gauge
     _layer_operation_count: Counter
+    _layer_operation_error_count: Counter
     _layer_retry_count: Counter
     _layer_operation_duration_sec: Histogram
 
@@ -480,6 +482,11 @@ class LayerMetricObserver:
             name="backendai_layer_operation_count",
             documentation="Total number of layer operations",
             labelnames=["domain", "layer", "operation", "success"],
+        )
+        self._layer_operation_error_count = Counter(
+            name="backendai_layer_operation_error_count",
+            documentation="Total number of layer operation errors",
+            labelnames=["domain", "layer", "operation", "error_code"],
         )
         self._layer_retry_count = Counter(
             name="backendai_layer_retry_count",
@@ -531,9 +538,10 @@ class LayerMetricObserver:
         domain: DomainType,
         layer: LayerType,
         operation: str,
-        success: bool,
         duration: float,
+        exception: Optional[BaseException] = None,
     ) -> None:
+        success = exception is None
         self._layer_operation_triggered_count.labels(
             domain=domain,
             layer=layer,
@@ -545,6 +553,17 @@ class LayerMetricObserver:
             operation=operation,
             success=str(success),
         ).inc()
+        if not success:
+            self._layer_operation_error_count.labels(
+                domain=domain,
+                layer=layer,
+                operation=operation,
+                error_code=(
+                    exception.error_code()
+                    if isinstance(exception, BackendAIError)
+                    else "internal_error"
+                ),
+            ).inc()
         self._layer_operation_duration_sec.labels(
             domain=domain,
             layer=layer,

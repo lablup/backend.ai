@@ -220,14 +220,6 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         """,
         examples=["huggingface", "my-huggingface"],
     )
-    storage_name: str = Field(
-        description="""
-        Target storage name where all models will be imported.
-        Must be a configured and accessible storage backend.
-        Used as fallback when storage_step_mappings is not provided.
-        """,
-        examples=["default-minio", "s3-storage", "local-storage"],
-    )
     storage_step_mappings: dict[ArtifactStorageImportStep, str] = Field(
         description="""
         Optional mapping of import steps to specific storage backends.
@@ -235,6 +227,33 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
         If None, storage_name is used for all steps.
         """,
         examples=[{"download": "fast-storage", "archive": "long-term-storage"}],
+    )
+
+
+class HuggingFaceGetCommitHashReqPathParam(BaseRequestModel):
+    """
+    Path parameters for getting HuggingFace model commit hash.
+    """
+
+    model_id: str = Field(description="The model to get commit hash for.")
+
+
+class HuggingFaceGetCommitHashReqQueryParam(BaseRequestModel):
+    """
+    Query parameters for getting HuggingFace model commit hash.
+    """
+
+    registry_name: str = Field(
+        description="""
+        Name of the HuggingFace registry.
+        This should match the configured registry name in the system.
+        """,
+        examples=["huggingface", "my-huggingface-registry"],
+    )
+    revision: Optional[str] = Field(
+        default=None,
+        description="The revision (branch/tag) of the model.",
+        examples=["main", "v1.0"],
     )
 
 
@@ -259,14 +278,6 @@ class ReservoirImportModelsReq(BaseRequestModel):
         This should match the configured registry name in the system.
         """,
         examples=["reservoir", "my-reservoir"],
-    )
-    storage_name: str = Field(
-        description="""
-        Target storage name where all models will be imported.
-        Must be a configured and accessible storage backend.
-        Used as fallback when storage_step_mappings is not provided.
-        """,
-        examples=["default-minio", "s3-storage", "local-storage"],
     )
     storage_step_mappings: dict[ArtifactStorageImportStep, str] = Field(
         description="""

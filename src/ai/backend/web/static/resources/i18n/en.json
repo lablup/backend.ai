@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "Active Agents",
+    "ActiveAgentsTooltip": "Shows an at-a-glance overview of all agents currently running in the system."
+  },
   "agent": {
     "Agent": "Agent",
     "AgentSetting": "Agent Settings",
@@ -26,6 +30,11 @@
     "Status": "Status",
     "Terminated": "Terminated",
     "Utilization": "Utilization"
+  },
+  "agentStats": {
+    "AgentStats": "Agent Statistics",
+    "AgentStatsDescription": "This panel shows all used resources across all agents in the system. The values represent the total used resources by all active sessions.",
+    "UsedResources": "Used Resources"
   },
   "autoScalingRule": {
     "AddAutoScalingRule": "Add Auto Scaling Rule",
@@ -216,6 +225,10 @@
     "WarningLessRateLimit": "If the Rate Limit value is small, API operations such as login may be blocked.",
     "YouAreAboutToDeleteCredential": "You are about to delete this user's credential:"
   },
+  "dashboard": {
+    "Free": "Free",
+    "Used": "Used"
+  },
   "data": {
     "Active": "Active",
     "Add": "Add",
@@ -244,6 +257,7 @@
     "FolderInfo": "Forder Info",
     "FolderNameRequired": "Folder name is required",
     "FolderNameTooLong": "Enter folder name less than 64 characters",
+    "FolderStatus": "Folder Status",
     "FolderToCopy": "Folder to copy",
     "Foldername": "Folder name",
     "Folders": "Folders",
@@ -254,7 +268,7 @@
     "InvalidEmail": "Invalid email address",
     "Invited": "Invited",
     "InvitedFolders": "Invited Folders",
-    "InvitedFoldersTooltip": "{{ count }} folder invitations are pending response.",
+    "InvitedFoldersTooltip": "Click to check pending {{count}} invitation(s)",
     "Limit": "Limit",
     "ModelStore": "Model Store",
     "Models": "Models",
@@ -276,7 +290,6 @@
     "SearchByName": "Search by name",
     "SelectStorageHost": "Select storage host",
     "SharedFolderPermission": "Shared Folder Permission",
-    "StorageStatus": "Storage Status",
     "Type": "Type",
     "Update": "Update",
     "UsageMode": "Usage Mode",
@@ -358,6 +371,7 @@
       "DownloadingModel": "Downloading Model...",
       "Edit": "Edit",
       "EditDelete": "Edit+Delete",
+      "ExcludedFolders": "The following folder(s) without delete permission will be excluded.",
       "FileDeleted": "File deleted",
       "FileRenamed": "File renamed",
       "FolderCloneFailed": "Failed to clone the folder.",
@@ -392,7 +406,7 @@
       "MoveToTrashMultipleDescription": "Are you sure you want to move {{ folderLength }} folders to trash bin?",
       "MovedToTrashBin": "The {{ folderName }} folder has been moved to the trash bin.",
       "MultipleFilesDeleted": "Multiple Files deleted",
-      "MultipleFolderDeleted": "Selected {{ folderLength }} folders has been deleted.",
+      "MultipleFolderDeleted": "Selected {{folderLength}} folders has been deleted.",
       "MultipleFolderRestored": "Selected {{ folderLength }} folders has been restored.",
       "Name": "Name",
       "NoDeletePermission": "No delete permission",
@@ -432,6 +446,7 @@
       "Invited": "Successfully invited",
       "LeaveSharedFolder": "Leave the shared folder",
       "LeaveSharedFolderDesc": "Do you want to leave the shared folder ‘{{folderName}}’?",
+      "NoMoreInvitation": "There are no invitations to review.",
       "NoOneWasInvited": "No one invited since invitation already exists",
       "NoOneWasShared": "Failed to share the group folder",
       "NoValidEmails": "No valid emails were entered",
@@ -644,17 +659,18 @@
     "Title": "An error has occurred."
   },
   "explorer": {
-    "FileInProgress": "Uploading '{{fileName}}'...",
     "FileUploadCancelled": "The file upload was canceled by user request.",
     "FileUploadFailed": "Failed to upload some files in folder '{{folderName}}'.",
+    "Filename": "File Name",
     "FolderNotFoundOrNoAccess": "Folder not found or access denied",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "Unmanaged folders do not support the file explorer.",
     "NoPermissions": "No permissions to access this folder",
     "ProcessingUpload": "Your file is being uploaded. Please wait.",
-    "SuccessfullyUploadedToFolder": "Files uploaded successfully in folder '{{folderName}}'",
+    "SuccessfullyUploadedToFolder": "Files uploaded successfully.",
     "UploadFailed": "Upload failed in '{{folderName}}'",
-    "UploadToFolder": "Uploading to '{{folderName}}'",
+    "UploadingFiles": "Uploading files...",
+    "VFolder": "Folder",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -984,7 +1000,7 @@
     "ServiceInfo": "Service Info",
     "ServiceName": "Service Name",
     "ServiceNameCannotStartWithHyphen": "Hyphens (-) cannot be used at either end.",
-    "ServiceNameInvalidCharacter": "In the middle of the service name, only the alphabet, the number, the '_', '.', '-' can only be included.",
+    "ServiceNameInvalidCharacter": "In the middle of the service name, only the alphabet, the number, the '_', '-' can only be included.",
     "ServiceNameMaxLength": "Please enter 24 characters or less.",
     "ServiceNameMinLength": "Please enter at least 4 characters.",
     "ServiceNameShouldEndWith": "It must end with alphabet, large and small characters, numbers, and '_'.",
@@ -1125,7 +1141,7 @@
     "SuccessFullyPulledArtifact": "Successfully pulled artifact {{name}}: {{version}}",
     "Type": "Type",
     "Version": "Version",
-    "VersionList": "Available List"
+    "VersionList": "Available List "
   },
   "resourceGroup": {
     "Activate": "Activate",
@@ -1170,11 +1186,6 @@
     "TimeoutSeconds": "Seconds",
     "TypeResourceGroupNameToDelete": "Type resource group name to delete",
     "WsproxyAddress": "WSProxy Server Address"
-  },
-  "resourcePanel": {
-    "Limit": "Limit",
-    "RemainingNumber": "Remaining",
-    "UsingNumber": "Using"
   },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "You are about to delete this resource policy: ",
@@ -1260,10 +1271,12 @@
     "PendingSessions": "Pending Sessions"
   },
   "session": {
+    "ActiveSessions": "Active Sessions",
     "Agent": "Agent",
     "AgentId": "Agent ID",
     "Agents": "Agents",
     "AllowedClientIps": "Allowed client IPs",
+    "AllowedMultipleClientsIps": "Allowed client IPs (comma-separated)",
     "AlreadyTerminatingSession": "Already terminating the session.",
     "AnotherUserSession": "This session was created by another user.",
     "Architecture": "Architecture",
@@ -1927,6 +1940,8 @@
     "BootstrapScriptDescription": "Bootstrap script will be executed only once after session creation",
     "BootstrapScriptEmpty": "The script is empty. \nPlease enter the script.",
     "BootstrapScriptUpdated": "Bootstrap script updated.",
+    "ClassicFeatures": "Classic features",
+    "ClassicFeaturesDesc": "Rolling back to a classic version can help you regain stability and functionality while you wait for updates or fixes to be released.",
     "ClassicSessionList": "Classic Session list page",
     "ClearSSHKeypairInput": "Written SSH Keypair will be removed. Are you sure you want to continue?",
     "ConfigFilename": "Config file name",
@@ -1936,12 +1951,12 @@
     "DescAutoLogout": "Log out automatically if all logined pages are closed except session originated pages for apps(e.g. jupyter notebook, web terminal, etc.)",
     "DescAutomaticUpdateCheck": "Notify when a new webui version is released.<br />If the feature is automatically disabled, clicking the toggle again will resume update checks.",
     "DescBetaFeatures": "Use beta features for Web UI.<br />Beta features may be unstable. Some beta features may not be adopted as official feature.",
-    "DescClassicSessionLauncher": "Use the Classic session launcher instead of the NEO session launcher. Classic session launcher may not have the latest features.",
     "DescDesktopNotification": "Enables desktop notifications. <br />When turned on, Backend.AI also uses the operating system’s notification system. Turning this off does not affect notifications within the web UI. Depending on the operating system, notification permissions may need to be enabled in system settings.",
     "DescExperimentalDashboard": "Use Dashboard page instead of Summary page.",
     "DescKeepLoginSessionInformation": "Let webui app keep current login session information next time.<br />If the option is turned off, login information will be cleared each logout.",
     "DescLanguage": "Set interface language. Languages other than English and Korean will be provided via machine translation.",
     "DescLetUserUpdateScriptWithNonEmptyValue": "Please update script with non empty value.",
+    "DescMaxConcurrentUploads": "Limits the number of files that can be uploaded simultaneously through the File Explorer.",
     "DescMyKeypairInfo": "See my keypair information",
     "DescNewUserConfigFileCreated": "New User config file can be created with non-empty data.",
     "DescNoBetaFeatures": "No beta feature available now. :)",
@@ -1968,6 +1983,7 @@
     "Language": "Language",
     "LightMode": "Light mode",
     "Logs": "Logs",
+    "MaxConcurrentUploads": "Max Concurrent File Upload Limit",
     "MyKeypairInfo": "My Keypair Information",
     "NEODataPage": "NEO Data page",
     "NEOSessionList": "NEO Session list",
@@ -2012,6 +2028,7 @@
       "AIAccelerator": "AI Accelerator",
       "AIAgents": "AI Agents",
       "AboutBackendAI": "About Backend.AI",
+      "AdminDashboard": "Admin Dashboard",
       "Administration": "Administration",
       "AgentSummary": "Agent Summary",
       "Architecture": "Architecture",
@@ -2019,6 +2036,7 @@
       "Cancel": "Cancel",
       "ChangePassword": "Change Password",
       "Chat": "Chat",
+      "ClassicDashboardPage": "Classic Dashboard Page (Summary Page)",
       "ClickToDownload": "Click to download",
       "ComputationResources": "Computation Resources",
       "Configurations": "Configurations",
@@ -2053,10 +2071,10 @@
       "MyAccountInformation": "My Account Information",
       "MyEnvironments": "My Environments",
       "MyResources": "My Total Resources Limit",
-      "MyResourcesDescription": "<p>This panel shows your total resource usage and limits across all projects and resource groups.</p><p>When multiple limits are applied (such as domain, project, or keypair), the most restrictive limit is used for calculation.</p>",
+      "MyResourcesDescription": "<p>This panel displays your total resources currently used and free across all projects and resource groups.</p><p>When multiple limits are applied (such as domain, project, or keypair), the calculation uses the most restrictive free resource limit.</p>",
       "MyResourcesIn": "My Resources in",
       "MyResourcesInResourceGroup": "My Resources in Resource Group",
-      "MyResourcesInResourceGroupDescription": "This panel shows your current my resource usage and remaining in the selected resource group.",
+      "MyResourcesInResourceGroupDescription": "This panel shows how much resource you have used and how much is free in the selected resource group of your current project.",
       "NewPassword": "New password",
       "NewPasswordAgain": "New password (again)",
       "NewPasswordCannotBeSame": "Please enter a password that is different from your current password.",
@@ -2088,7 +2106,7 @@
       "TermsOfService": "Terms of Service",
       "TotalResourcesIn": "Total Resources in",
       "TotalResourcesInResourceGroup": "Total Resources in Resource Group",
-      "TotalResourcesInResourceGroupDescription": "This panel shows the total used and remaining resources. The values are calculated by adding up the usage and remaining amounts of all agents using the selected resource group.",
+      "TotalResourcesInResourceGroupDescription": "This panel shows the total used and free resources in the selected resource group. The values are calculated by summing the used and free amounts of all agents using that group.",
       "TotpActivated": "2FA Enabled",
       "Update": "Update",
       "Usage": "Usage",

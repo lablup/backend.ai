@@ -8,11 +8,11 @@ from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
-    Final,
     List,
     Optional,
     Self,
@@ -41,6 +41,7 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.events.dispatcher import (
     EventProducer,
 )
@@ -211,9 +212,6 @@ USER_RESOURCE_OCCUPYING_SESSION_STATUSES = tuple(
 )
 
 PRIVATE_SESSION_TYPES = (SessionTypes.SYSTEM,)
-SESSION_PRIORITY_DEFAULT: Final = 10
-SESSION_PRIORITY_MIN: Final = 0
-SESSION_PRIORITY_MAX: Final = 100
 
 OP_EXC = {
     "create_session": KernelCreationFailed,
@@ -1329,9 +1327,9 @@ class SessionRow(Base):
 
         if isinstance(session_reference, list):
             query_list = [
-                aiotools.apartial(
+                partial(
                     _match_sessions_by_id,
-                    session_id_or_list=session_reference,
+                    session_id_or_list=[SessionId(item) for item in session_reference],
                     allow_prefix=False,
                 )
             ]

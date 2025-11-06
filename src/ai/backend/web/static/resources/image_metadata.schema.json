@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "imageInfo": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9.-]+$": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Display name of the image"
+            },
+            "description": {
+              "type": "string",
+              "description": "Detailed description of the image"
+            },
+            "group": {
+              "type": "string",
+              "description": "Category group for the image",
+              "enum": [
+                "Language",
+                "Machine Learning / Deep Learning",
+                "Scientific Language",
+                "Big Data",
+                "Desktop Environment",
+                "Application",
+                "Benchmarks",
+                "Inference",
+                "Framework",
+                "Molecular Dynamics",
+                "NPU",
+                "Scientific Environment",
+                "Scientific Toolkit",
+                "Deep Learning Toolkit",
+                "Utilities"
+              ]
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "description": "Additional tags for the image"
+            },
+            "icon": {
+              "type": "string",
+              "description": "Icon filename for the image"
+            },
+            "label": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "description": "Label category (e.g., Env)",
+                    "enum": ["Env"]
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Label tag text"
+                  },
+                  "color": {
+                    "type": "string",
+                    "description": "Label color",
+                    "enum": ["blue", "green", "yellow", "gray", "red"]
+                  }
+                },
+                "required": ["tag", "color"]
+              },
+              "description": "Labels to display for the image"
+            }
+          },
+          "required": ["name", "description", "group", "tags", "label"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "tagAlias": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-zA-Z0-9.-]+$": {
+          "type": "string",
+          "description": "Human-readable alias for the tag"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Mapping of tag names to their display aliases"
+    },
+    "tagReplace": {
+      "type": "object",
+      "patternProperties": {
+        ".*": {
+          "type": "string",
+          "description": "Replacement pattern for matching tags"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Regular expression patterns for tag replacement"
+    },
+    "groupSortKeyMap": {
+      "type": "object",
+      "patternProperties": {
+        ".*": {
+          "type": "string",
+          "description": "Sort order key for the group"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Mapping of group names to their sort order"
+    }
+  },
+  "required": ["imageInfo", "tagAlias", "tagReplace"]
+}

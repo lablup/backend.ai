@@ -22,6 +22,7 @@ class EventDomain(enum.StrEnum):
     KERNEL = "kernel"
     MODEL_SERVING = "model_serving"
     MODEL_ROUTE = "model_route"
+    NOTIFICATION = "notification"
     SCHEDULE = "schedule"
     IDLE_CHECK = "idle_check"
     SESSION = "session"

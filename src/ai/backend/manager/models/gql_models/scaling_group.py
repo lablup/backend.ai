@@ -24,7 +24,7 @@ from sqlalchemy.orm import load_only
 
 from ai.backend.common.types import AccessKey, ResourceSlot
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.errors.resource import ScalingGroupDeletionFailure
+from ai.backend.manager.errors.resource import ScalingGroupDeletionFailure, ScalingGroupNotFound
 from ai.backend.manager.models.agent import AgentStatus
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.models.utils import execute_with_txn_retry
@@ -121,6 +121,19 @@ class ScalingGroupNode(graphene.ObjectType):
             scheduler_opts=row.scheduler_opts,
             use_host_network=row.use_host_network,
         )
+
+    # TODO: Refactor with action-processor structure, check permission
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> "ScalingGroupNode":
+        _, scaling_group_name = AsyncNode.resolve_global_id(info, self.id)
+        graph_ctx: GraphQueryContext = info.context
+        async with graph_ctx.db.begin_readonly_session() as db_session:
+            query_stmt = sa.select(ScalingGroupRow).where(
+                ScalingGroupRow.name == scaling_group_name
+            )
+            result = await db_session.scalar(query_stmt)
+            if result is None:
+                raise ScalingGroupNotFound(f"Scaling group not found: {scaling_group_name}")
+            return ScalingGroupNode.from_row(graph_ctx, result)
 
     @classmethod
     async def batch_load_by_group(

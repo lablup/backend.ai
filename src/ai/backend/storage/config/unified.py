@@ -40,8 +40,8 @@ except IOError:
 
 
 class EventLoopType(enum.StrEnum):
-    asyncio = "asyncio"
-    uvloop = "uvloop"
+    ASYNCIO = "asyncio"
+    UVLOOP = "uvloop"
 
 
 class VolumeInfoConfig(BaseConfigSchema):
@@ -439,7 +439,7 @@ class StorageProxyConfig(BaseConfigSchema):
         serialization_alias="pid-file",
     )
     event_loop: EventLoopType = Field(
-        default=EventLoopType.asyncio,
+        default=EventLoopType.ASYNCIO,
         description="""
         Event loop implementation to use.
         'asyncio' is the standard library implementation.
@@ -569,6 +569,19 @@ class StorageProxyConfig(BaseConfigSchema):
             "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
         ),
         serialization_alias="use-experimental-redis-event-dispatcher",
+    )
+    auto_quota_scope_creation: bool = Field(
+        default=True,
+        description="""
+        Whether to allow automatic creation of quota scopes.
+        If true, quota scopes will be created when creating VFolders in non-existent quota scopes.
+        If false, VFolder creation will fail if the quota scope does not exist.
+        """,
+        examples=[True, False],
+        validation_alias=AliasChoices(
+            "allow-auto-quota-scope-creation", "auto_quota_scope_creation"
+        ),
+        serialization_alias="allow-auto-quota-scope-creation",
     )
 
 
@@ -898,6 +911,49 @@ class LegacyReservoirConfig(ReservoirConfig):
     )
 
 
+class ReservoirClientConfig(BaseConfigSchema):
+    timeout_total: Optional[float] = Field(
+        default=300.0,
+        description="""
+        Total timeout for the entire request (in seconds).
+        None means no timeout.
+        """,
+        examples=[300.0],
+        validation_alias=AliasChoices("timeout-total", "timeout_total"),
+        serialization_alias="timeout-total",
+    )
+    timeout_connect: Optional[float] = Field(
+        default=None,
+        description="""
+        Timeout for acquiring a connection from the pool (in seconds).
+        None means no timeout.
+        """,
+        examples=[60.0],
+        validation_alias=AliasChoices("timeout-connect", "timeout_connect"),
+        serialization_alias="timeout-connect",
+    )
+    timeout_sock_connect: Optional[float] = Field(
+        default=30.0,
+        description="""
+        Timeout for connecting to a peer for a new connection (in seconds).
+        None means no timeout.
+        """,
+        examples=[60.0],
+        validation_alias=AliasChoices("timeout-sock-connect", "timeout_sock_connect"),
+        serialization_alias="timeout-sock-connect",
+    )
+    timeout_sock_read: Optional[float] = Field(
+        default=None,
+        description="""
+        Timeout for reading a portion of data from a peer (in seconds).
+        None means no timeout.
+        """,
+        examples=[300.0],
+        validation_alias=AliasChoices("timeout-sock-read", "timeout_sock_read"),
+        serialization_alias="timeout-sock-read",
+    )
+
+
 class ArtifactRegistryStorageConfig(BaseConfigSchema):
     storage_type: ArtifactStorageType = Field(
         description="""
@@ -1098,6 +1154,15 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
         """,
         validation_alias=AliasChoices("artifact-registries", "artifact_registries"),
         serialization_alias="artifact-registries",
+    )
+    reservoir_client: ReservoirClientConfig = Field(
+        default_factory=ReservoirClientConfig,
+        description="""
+        Reservoir client configuration.
+        Controls timeout settings for HTTP client connections to reservoir registries.
+        """,
+        validation_alias=AliasChoices("reservoir-client", "reservoir_client"),
+        serialization_alias="reservoir-client",
     )
 
     # TODO: Remove me after changing config injection logic

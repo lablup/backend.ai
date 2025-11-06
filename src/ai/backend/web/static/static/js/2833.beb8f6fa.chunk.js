@@ -1,0 +1,2 @@
+"use strict";(self.webpackChunkbackend_ai_webui_react=self.webpackChunkbackend_ai_webui_react||[]).push([[2833],{72833:(e,a,n)=>{n.r(a),n.d(a,{default:()=>s});var r=n(91313),c=n(84100),t=n(42667),u=n(7960);const i=c.lazy((()=>n.e(3124).then(n.bind(n,83124)))),s=()=>{const[e,a]=(0,t.useQueryParam)("invitation",t.StringParam);return(0,u.jsx)(r.Xc,{children:(0,u.jsx)(i,{open:"true"===e,onCancel:()=>{a(null,"replaceIn")}})})}}}]);
+//# sourceMappingURL=2833.beb8f6fa.chunk.js.map

@@ -11,6 +11,22 @@ This project uses a monorepo structure containing multiple Python pacakges under
 Consult `src/ai/backend/{package}/README.md` for package-specific descriptions.
 
 
+## README-First Development
+
+**Always read the component README before making changes.**
+
+Key README locations:
+- Component: `src/ai/backend/{component}/README.md`
+- Manager sub-components: `manager/sokovan/`, `manager/services/`, `manager/repositories/`
+
+Update README when:
+- Adding new components, services, repositories, or APIs
+- Changing architecture or component dependencies
+- Adding new directories or significant structural changes
+
+Example: Adding a new service → Read `services/README.md` → Follow patterns → Update service index
+
+
 ## General
 
 ### Tidy First Approach
@@ -229,3 +245,25 @@ When you observe migration failures due to multiple heads, do the followings:
   rebase the alembic history, where base_head is the topmost revision ID of the migrations from the Git
   base branch like main and top_head is the topmost revision ID of the migrations added in the current working
   branch.
+
+## Hooks and Code Quality
+
+Backend.AI uses Claude Code hooks and Git pre-commit hooks for code quality:
+
+**Claude Code Hooks** (configured in `.claude/settings.local.json`, gitignored):
+- **PostToolUse**: Runs `pants fmt` after Edit/Write operations
+  - Formats code immediately but does NOT run `pants fix` to avoid removing imports prematurely
+- **Stop**: Runs `pants fix` on all modified Python files when Claude finishes
+  - Removes unused imports and fixes auto-fixable lint issues
+
+**Git Pre-commit Hook** (`scripts/pre-commit.sh`):
+- Runs on every `git commit`
+- Validates: `pants lint`, `pants check` on changed files only
+- Tests run in CI for comprehensive coverage
+- Bypass with `git commit --no-verify` for WIP commits (never on main/master/release/merge commits)
+
+**Manual execution:**
+```bash
+pants lint --changed-since=HEAD~1
+pants check --changed-since=HEAD~1
+```

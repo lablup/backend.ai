@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from functools import partial
 from typing import Self
 
 import strawberry
-from aiotools import apartial
 from strawberry import ID
 from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID
@@ -76,16 +76,14 @@ class ArtifactRegistryMeta(Node):
 
             match registry_type:
                 case ArtifactRegistryType.HUGGINGFACE:
-                    registry_meta_loader = DataLoader(
-                        apartial(HuggingFaceRegistry.load_by_id, ctx),
-                    )
-                    hf_registry = await registry_meta_loader.load(registry_id)
+                    hf_registry = await DataLoader(
+                        partial(HuggingFaceRegistry.load_by_id, ctx),
+                    ).load(registry_id)
                     url = hf_registry.url
                 case ArtifactRegistryType.RESERVOIR:
-                    registry_meta_loader = DataLoader(
-                        apartial(ReservoirRegistry.load_by_id, ctx),
-                    )
-                    reservoir_registry = await registry_meta_loader.load(registry_id)
+                    reservoir_registry = await DataLoader(
+                        partial(ReservoirRegistry.load_by_id, ctx),
+                    ).load(registry_id)
                     url = reservoir_registry.endpoint
 
             registries.append(cls.from_dataclass(registry_meta, url=url))

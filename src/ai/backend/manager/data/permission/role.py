@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -10,12 +12,15 @@ from .object_permission import (
     ObjectPermissionCreateInputBeforeRoleCreation,
     ObjectPermissionData,
 )
-from .permission_group import PermissionGroupCreatorBeforeRoleCreation
+from .permission_group import (
+    PermissionGroupCreatorBeforeRoleCreation,
+    PermissionGroupExtendedData,
+)
 from .status import RoleStatus
 from .types import EntityType, OperationType, RoleSource
 
 
-@dataclass
+@dataclass(frozen=True)
 class RoleCreateInput:
     name: str
     source: RoleSource = RoleSource.CUSTOM
@@ -28,7 +33,7 @@ class RoleCreateInput:
     )
 
 
-@dataclass
+@dataclass(frozen=True)
 class RoleUpdateInput(PartialModifier):
     id: uuid.UUID
     name: OptionalState[str]
@@ -46,13 +51,13 @@ class RoleUpdateInput(PartialModifier):
         return to_update
 
 
-@dataclass
+@dataclass(frozen=True)
 class RoleDeleteInput:
     id: uuid.UUID
     _status: RoleStatus = RoleStatus.DELETED
 
 
-@dataclass
+@dataclass(frozen=True)
 class RoleData:
     id: uuid.UUID
     name: str
@@ -64,13 +69,14 @@ class RoleData:
     description: Optional[str] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class RoleDataWithPermissions:
     id: uuid.UUID
     name: str
     source: RoleSource
     status: RoleStatus
 
+    permission_groups: list[PermissionGroupExtendedData]
     object_permissions: list[ObjectPermissionData]
 
     created_at: datetime
@@ -79,7 +85,7 @@ class RoleDataWithPermissions:
     description: Optional[str] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class ScopePermissionCheckInput:
     user_id: uuid.UUID
     target_entity_type: EntityType
@@ -87,14 +93,21 @@ class ScopePermissionCheckInput:
     operation: OperationType
 
 
-@dataclass
+@dataclass(frozen=True)
 class SingleEntityPermissionCheckInput:
     user_id: uuid.UUID
     target_object_id: ObjectId
     operation: OperationType
 
 
-@dataclass
+@dataclass(frozen=True)
+class BatchEntityPermissionCheckInput:
+    user_id: uuid.UUID
+    target_object_ids: list[ObjectId]
+    operation: OperationType
+
+
+@dataclass(frozen=True)
 class UserRoleAssignmentInput:
     """
     Input to create a new user-role association.
@@ -105,7 +118,7 @@ class UserRoleAssignmentInput:
     granted_by: Optional[uuid.UUID] = None
 
 
-@dataclass
+@dataclass(frozen=True)
 class UserRoleAssignmentData:
     user_id: uuid.UUID
     role_id: uuid.UUID

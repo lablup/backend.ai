@@ -1,5 +1,7 @@
 {
     "roles": [
+        {"id": "942d7613-27f1-49c5-944a-5c79045346a1", "name": "role_superadmin", "description": "", "source": "system", "status": "active", "created_at": "2025-09-12 09:51:58.265582+00", "updated_at": null, "deleted_at": null},
+        {"id": "02d084f3-49e1-4fcb-bc62-e9d06637e60d", "name": "role_monitor", "description": "", "source": "system", "status": "active", "created_at": "2025-09-12 09:51:58.265582+00", "updated_at": null, "deleted_at": null},
         {"id": "31f74f6d-04f7-418b-b375-ab0c39fa3058", "name": "role_user_user2", "description": "", "source": "system", "status": "active", "created_at": "2025-09-12 09:51:58.265582+00", "updated_at": null, "deleted_at": null},
         {"id": "5e96b4ee-2296-495b-90b4-0fc845d13c67", "name": "role_user_monitor", "description": "", "source": "system", "status": "active", "created_at": "2025-09-12 09:51:58.265582+00", "updated_at": null, "deleted_at": null},
         {"id": "cb0768f1-3b35-415d-beef-8916a5c3c88b", "name": "role_user_domain-admin", "description": "", "source": "system", "status": "active", "created_at": "2025-09-12 09:51:58.265582+00", "updated_at": null, "deleted_at": null},
@@ -13,6 +15,8 @@
         {"id": "bfb69730-1374-4ba4-bc26-0ea0b8dd2708", "name": "role_domain_default_member", "description": "", "source": "custom", "status": "active", "created_at": "2025-09-12 09:51:58.265582+00", "updated_at": null, "deleted_at": null}
     ],
     "user_roles": [
+        {"id": "29f8e1cd-f3e8-46d6-8140-51c2c20d94cb", "user_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4", "role_id": "942d7613-27f1-49c5-944a-5c79045346a1", "granted_by": null, "granted_at": "2025-09-12 09:51:58.265582+00"},
+        {"id": "6b3e31a7-507f-49ab-bd6c-510bd8fc4a0a", "user_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6", "role_id": "02d084f3-49e1-4fcb-bc62-e9d06637e60d", "granted_by": null, "granted_at": "2025-09-12 09:51:58.265582+00"},
         {"id": "c247af29-63da-4fa9-91fd-a5e4c8f7dce9", "user_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040", "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058", "granted_by": null, "granted_at": "2025-09-12 09:51:58.265582+00"},
         {"id": "f0222c16-e666-4dde-8421-ed7bcd60f812", "user_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6", "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67", "granted_by": null, "granted_at": "2025-09-12 09:51:58.265582+00"},
         {"id": "e24244d7-dad1-43f8-bf99-1b93976eac59", "user_id": "4f13d193-f646-425a-a340-270c4d2b9860", "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b", "granted_by": null, "granted_at": "2025-09-12 09:51:58.265582+00"},
@@ -29,6 +33,9 @@
         {"id": "63d98ac0-20af-4f85-8fec-66a5eb71a6b1", "user_id": "dfa9da54-4b28-432f-be29-c0d680c7a412", "role_id": "bfb69730-1374-4ba4-bc26-0ea0b8dd2708", "granted_by": null, "granted_at": "2025-09-12 09:51:58.265582+00"}
     ],
     "permission_groups": [
+        {"id": "99229fe4-14cc-491e-ab22-03b59a47fe53", "role_id": "942d7613-27f1-49c5-944a-5c79045346a1", "scope_type": "global", "scope_id": ""},
+        {"id": "df8d2c87-12f3-4147-a88e-33de5146f3d3", "role_id": "02d084f3-49e1-4fcb-bc62-e9d06637e60d", "scope_type": "global", "scope_id": ""},
+        {"id": "83154bad-db1d-4257-870c-b130c6978200", "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058", "scope_type": "user", "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"},
         {"id": "83154bad-db1d-4257-870c-b130c6978200", "role_id": "31f74f6d-04f7-418b-b375-ab0c39fa3058", "scope_type": "user", "scope_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040"},
         {"id": "57b52295-41e2-47b5-a384-5e89d969c0a2", "role_id": "5e96b4ee-2296-495b-90b4-0fc845d13c67", "scope_type": "user", "scope_id": "2e10157d-20ca-4bd0-9806-3f909cbcd0e6"},
         {"id": "9495c816-18c6-4647-93b7-72f0c9aaeaba", "role_id": "cb0768f1-3b35-415d-beef-8916a5c3c88b", "scope_type": "user", "scope_id": "4f13d193-f646-425a-a340-270c4d2b9860"},
@@ -42,6 +49,17 @@
         {"id": "0b2d07af-2409-4585-98d8-c1848d7d30ea", "role_id": "bfb69730-1374-4ba4-bc26-0ea0b8dd2708", "scope_type": "domain", "scope_id": "default"}
     ],
     "permissions": [
+        {"id": "c90a7514-68f2-40c0-88f9-159dce6856cd", "permission_group_id": "99229fe4-14cc-491e-ab22-03b59a47fe53", "entity_type": "user", "operation": "grant:all"},
+        {"id": "6dc1c67d-bc50-4778-936e-0630dfb83a8a", "permission_group_id": "99229fe4-14cc-491e-ab22-03b59a47fe53", "entity_type": "user", "operation": "read"},
+        {"id": "1d3ed696-904f-4af2-a326-5e35ecc71695", "permission_group_id": "99229fe4-14cc-491e-ab22-03b59a47fe53", "entity_type": "user", "operation": "hard-delete"},
+        {"id": "c1109646-9d08-4ccb-acc6-9438830c2fff", "permission_group_id": "99229fe4-14cc-491e-ab22-03b59a47fe53", "entity_type": "user", "operation": "grant:read"},
+        {"id": "6540be54-c760-4fee-bc5a-ec72ef50ea49", "permission_group_id": "99229fe4-14cc-491e-ab22-03b59a47fe53", "entity_type": "user", "operation": "grant:hard-delete"},
+        {"id": "b057323f-9f91-4d3d-9bdd-70883672f8b0", "permission_group_id": "99229fe4-14cc-491e-ab22-03b59a47fe53", "entity_type": "user", "operation": "grant:soft-delete"},
+        {"id": "9639fa62-3751-48e1-8454-86319a945832", "permission_group_id": "99229fe4-14cc-491e-ab22-03b59a47fe53", "entity_type": "user", "operation": "update"},
+        {"id": "4f5c7bf1-45dc-4ac5-8866-0c472147af09", "permission_group_id": "99229fe4-14cc-491e-ab22-03b59a47fe53", "entity_type": "user", "operation": "soft-delete"},
+        {"id": "7b0b5bfe-aae9-4887-9fa7-a78ba9243883", "permission_group_id": "99229fe4-14cc-491e-ab22-03b59a47fe53", "entity_type": "user", "operation": "grant:update"},
+        {"id": "831b4e1c-427a-4ea9-b882-7753d1daa721", "permission_group_id": "99229fe4-14cc-491e-ab22-03b59a47fe53", "entity_type": "user", "operation": "create"},
+        {"id": "5e983bd3-77cb-4271-9629-3b311b9f43d9", "permission_group_id": "df8d2c87-12f3-4147-a88e-33de5146f3d3", "entity_type": "user", "operation": "read"},
         {"id": "064b0ba0-93bd-4f69-a5e9-80db199586a7", "permission_group_id": "83154bad-db1d-4257-870c-b130c6978200", "entity_type": "user", "operation": "soft-delete"},
         {"id": "dc96e05d-29e7-4a90-ba50-2e3e7ea4a65b", "permission_group_id": "83154bad-db1d-4257-870c-b130c6978200", "entity_type": "user", "operation": "read"},
         {"id": "a70798b6-aad2-448e-b438-c82930444252", "permission_group_id": "83154bad-db1d-4257-870c-b130c6978200", "entity_type": "user", "operation": "hard-delete"},
@@ -196,7 +214,6 @@
         {"id": "90172aa9-231f-4691-aae5-68b67106f43b", "permission_group_id": "916314f7-6cd6-441d-a16f-865a43102fed", "entity_type": "vfolder", "operation": "grant:soft-delete"}
     ],
     "association_scopes_entities": [
-        {"id": "e096b03c-579e-4e13-9550-cd9ad2072352", "scope_type": "user", "scope_id": "f38dea23-50fa-42a0-b5ae-338f5f4693f4", "entity_type": "vfolder", "entity_id": "c5f0b0a4-e0ff-4b61-8d93-0f37694d7576", "registered_at": "2025-09-04 08:27:17.905121+00"},
         {"id": "bc5a998f-479c-4f1b-85ac-f71a6ce55c0c", "scope_type": "project", "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831", "entity_type": "user", "entity_id": "4f13d193-f646-425a-a340-270c4d2b9860", "registered_at": "2025-09-12 09:51:58.265582+00"},
         {"id": "8dba017e-9e94-4c8f-88d3-649806b94610", "scope_type": "project", "scope_id": "8e32dd28-d319-4e3b-8851-ea37837699a5", "entity_type": "user", "entity_id": "4f13d193-f646-425a-a340-270c4d2b9860", "registered_at": "2025-09-12 09:51:58.265582+00"},
         {"id": "fd06bdf3-da3a-4db5-8ff9-235312735846", "scope_type": "project", "scope_id": "2de2b969-1d04-48a6-af16-0bc8adb3c831", "entity_type": "user", "entity_id": "009fb1a4-487c-4f6e-9b1b-228b94b1d040", "registered_at": "2025-09-12 09:51:58.265582+00"},

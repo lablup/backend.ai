@@ -31,3 +31,14 @@ class ProcessorsCtx(MiddlewareParam):
     async def from_request(cls, request: web.Request) -> Self:
         root_ctx: RootContext = request.app["_root.context"]
         return cls(processors=root_ctx.processors)
+
+
+class RequestCtx(MiddlewareParam):
+    request: web.Request
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @override
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        return cls(request=request)

@@ -40,7 +40,15 @@ from ai.backend.plugin.entrypoint import find_build_root
 from . import __version__
 from .common import detect_os
 from .context import DevContext, PackageContext, current_log
-from .types import CliArgs, DistInfo, InstallInfo, InstallModes, InstallVariable, PrerequisiteError
+from .types import (
+    Accelerator,
+    CliArgs,
+    DistInfo,
+    InstallInfo,
+    InstallModes,
+    InstallVariable,
+    PrerequisiteError,
+)
 
 top_tasks: WeakSet[asyncio.Task] = WeakSet()
 
@@ -331,25 +339,25 @@ class InstallReport(Static):
                 """
                     )
                 )
-            with TabPane("Local Proxy", id="wsproxy"):
+            with TabPane("App-Proxy Coordinator", id="appproxy-coordinator"):
                 yield Markdown(
                     textwrap.dedent(
                         f"""
-                Run the following commands in a separate shell:
                 ```console
                 $ cd {self.install_info.base_path.resolve()}
-                $ ./backendai-wsproxy wsproxy start-server
+                $ ./backend.ai app-proxy coordinator start-server --debug
                 ```
-
-                It works if the console output ends with something like:
+                """
+                    )
+                )
+            with TabPane("App-Proxy Worker", id="appproxy-worker"):
+                yield Markdown(
+                    textwrap.dedent(
+                        f"""
+                ```console
+                $ cd {self.install_info.base_path.resolve()}
+                $ ./backend.ai app-proxy worker start-server --debug
                 ```
-                ...
-                2024-07-03 13:19:44.536 INFO ai.backend.wsproxy.proxy.frontend.http.port [2596460] accepting proxy requests from 0.0.0.0:10200~10300
-                2024-07-03 13:19:44.536 INFO ai.backend.wsproxy.server [2596460] started handling API requests at 0.0.0.0:{service.local_proxy_addr.bind.port}
-                ...
-                ```
-
-                To terminate, send SIGINT or press Ctrl+C in the console.
                 """
                     )
                 )
@@ -402,7 +410,10 @@ class ModeMenu(Static):
         self._enabled_menus.add(InstallModes.CONFIGURE)
         assert mode is not None
         self._mode = mode
-        self.install_variable = InstallVariable(public_facing_address=args.public_facing_address)
+        self.install_variable = InstallVariable(
+            public_facing_address=args.public_facing_address,
+            accelerator=Accelerator(args.accelerator) if args.accelerator is not None else None,
+        )
 
     def compose(self) -> ComposeResult:
         yield Label(id="heading")
@@ -526,6 +537,7 @@ class InstallerApp(App):
                 show_guide=False,
                 non_interactive=False,
                 public_facing_address="127.0.0.1",
+                accelerator=None,
             )
         self._args = args
 
@@ -610,6 +622,13 @@ class InstallerApp(App):
     help="Show the post-install guide using INSTALL-INFO if present.",
 )
 @click.option(
+    "--accelerator",
+    type=click.Choice([a.value for a in Accelerator], case_sensitive=False),
+    default=None,
+    show_default=True,
+    help="Select accelerator plugin (cuda, cuda_mock, cuda_mig_mock, rocm_mock, none)",
+)
+@click.option(
     "--headless",
     is_flag=True,
     default=False,
@@ -631,6 +650,7 @@ def main(
     non_interactive: bool,
     headless: bool,
     public_facing_address: str,
+    accelerator: str,
 ) -> None:
     """The installer"""
     # check sudo permission
@@ -648,6 +668,7 @@ def main(
         show_guide=show_guide,
         non_interactive=non_interactive,
         public_facing_address=public_facing_address,
+        accelerator=accelerator,
     )
     app = InstallerApp(args)
     app.run(headless=headless)

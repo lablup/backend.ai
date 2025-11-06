@@ -2,7 +2,16 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Optional, Sequence
 
-from ..common.types import DeviceId, SlotName
+from aiohttp import web
+
+from ai.backend.common.exception import (
+    BackendAIError,
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+)
+from ai.backend.common.types import DeviceId, SlotName
 
 
 class InitializationError(Exception):
@@ -146,3 +155,29 @@ class InvalidModelConfigurationError(RuntimeError):
     """
     Raised when a model configuration is invalid.
     """
+
+
+class KernelRegistryNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://backend.ai/errors/agent/kernel-registry-not-found"
+    error_title = "Kernel Registry Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL_REGISTRY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class KernelRegistryLoadError(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://backend.ai/errors/agent/kernel-registry-load-error"
+    error_title = "Kernel Registry Load Error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL_REGISTRY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

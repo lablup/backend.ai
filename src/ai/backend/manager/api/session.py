@@ -22,6 +22,7 @@ import sqlalchemy as sa
 import sqlalchemy.exc
 import trafaret as t
 from aiohttp import web
+from aiotools import cancel_and_wait
 from dateutil.tz import tzutc
 from pydantic import AliasChoices, Field
 from sqlalchemy.sql.expression import null, true
@@ -79,6 +80,11 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common import validators as tx
+from ai.backend.common.defs.session import (
+    SESSION_PRIORITY_DEFAULT,
+    SESSION_PRIORITY_MAX,
+    SESSION_PRIORITY_MIN,
+)
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentTerminatedEvent,
 )
@@ -106,11 +112,6 @@ from ..models import (
     UserRole,
     kernels,
     keypairs,
-)
-from ..models.session import (
-    SESSION_PRIORITY_DEFAULT,
-    SESSION_PRIORITY_MAX,
-    SESSION_PRIORITY_MIN,
 )
 from ..utils import query_userinfo as _query_userinfo
 from .auth import auth_required
@@ -584,14 +585,6 @@ async def create_from_params(request: web.Request, params: dict[str, Any]) -> we
             raise InsufficientPrivilege(
                 "You are not allowed to manually assign agents for your session."
             )
-        agent_count = len(agent_list)
-        if params["cluster_mode"] == ClusterMode.MULTI_NODE:
-            if agent_count != params["cluster_size"]:
-                raise InvalidAPIParameters(
-                    "For multi-node cluster sessions, the number of manually assigned"
-                    " agents must be same to the cluster size. Note that you may specify"
-                    " duplicate agents in the list.",
-                )
 
     if params["domain"] is None:
         domain_name = request["user"]["domain_name"]
@@ -1680,10 +1673,8 @@ async def init(app: web.Application) -> None:
 
 async def shutdown(app: web.Application) -> None:
     app_ctx: PrivateContext = app["session.context"]
-    app_ctx.agent_lost_checker.cancel()
-    await app_ctx.agent_lost_checker
-    app_ctx.stats_task.cancel()
-    await app_ctx.stats_task
+    await cancel_and_wait(app_ctx.agent_lost_checker)
+    await cancel_and_wait(app_ctx.stats_task)
 
     await app_ctx.webhook_ptask_group.shutdown()
     await app_ctx.database_ptask_group.shutdown()

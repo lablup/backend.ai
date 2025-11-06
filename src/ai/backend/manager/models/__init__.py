@@ -1,5 +1,6 @@
 from . import acl as _acl
 from . import agent as _agent
+from . import app_config as _app_config
 from . import artifact as _artifact
 from . import artifact_registries as _artifact_registries
 from . import artifact_revision as _artifact_revision
@@ -19,6 +20,7 @@ from . import image as _image
 from . import kernel as _kernel
 from . import keypair as _keypair
 from . import network as _network
+from . import notification as _notification
 from . import object_storage as _object_storage
 from . import rbac as _rbac
 from . import rbac_models as _rbac_models
@@ -43,6 +45,7 @@ from .gql_models import session as _relay_session
 __all__ = (
     "metadata",
     *_acl.__all__,
+    *_app_config.__all__,
     *_artifact_registries.__all__,
     *_auditlog.__all__,
     *_agent.__all__,
@@ -60,6 +63,7 @@ __all__ = (
     *_kernel.__all__,
     *_keypair.__all__,
     *_network.__all__,
+    *_notification.__all__,
     *_object_storage.__all__,
     *_user.__all__,
     *_vfolder.__all__,
@@ -85,6 +89,7 @@ __all__ = (
 )
 
 from .acl import *  # noqa
+from .app_config import *  # noqa
 from .artifact_registries import *  # noqa
 from .audit_log import *  # noqa
 from .artifact import *  # noqa
@@ -104,6 +109,7 @@ from .image import *  # noqa
 from .kernel import *  # noqa
 from .keypair import *  # noqa
 from .network import *  # noqa
+from .notification import *  # noqa
 from .object_storage import *  # noqa
 from .resource_policy import *  # noqa
 from .resource_preset import *  # noqa

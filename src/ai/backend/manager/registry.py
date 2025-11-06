@@ -12,6 +12,7 @@ import time
 import uuid
 from collections import defaultdict
 from collections.abc import (
+    Coroutine,
     Iterable,
     Mapping,
     MutableMapping,
@@ -57,18 +58,15 @@ from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
     tcp_client_session_factory,
 )
-from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
+from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.agent.anycast import (
-    AgentImagesRemoveEvent,
-    AgentStartedEvent,
-    AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
 )
 from ai.backend.common.events.event_types.image.anycast import (
@@ -155,6 +153,7 @@ from ai.backend.manager.clients.appproxy.types import (
     SessionTagsModel,
     TagsModel,
 )
+from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -221,7 +220,6 @@ from .models.container_registry import ContainerRegistryRow
 from .models.image import bulk_get_image_configs
 from .models.session import (
     SESSION_KERNEL_STATUS_MAPPING,
-    SESSION_PRIORITY_DEFAULT,
     ConcurrencyUsed,
     SessionLifecycleManager,
 )
@@ -1850,7 +1848,7 @@ class AgentRegistry:
         })
 
         # Aggregate by agents to minimize RPC calls
-        per_agent_tasks = []
+        per_agent_coros: list[Coroutine[Any, Any, None]] = []
         keyfunc = lambda binding: binding.agent_alloc_ctx.agent_id
         for agent_id, group_iterator in itertools.groupby(
             sorted(kernel_agent_bindings, key=keyfunc),
@@ -1859,37 +1857,30 @@ class AgentRegistry:
             items = [*group_iterator]
             # Within a group, agent_alloc_ctx are same.
             agent_alloc_ctx = items[0].agent_alloc_ctx
-            per_agent_tasks.append(
-                (
+            per_agent_coros.append(
+                self._create_kernels_in_one_agent(
                     agent_alloc_ctx,
-                    self._create_kernels_in_one_agent(
-                        agent_alloc_ctx,
-                        scheduled_session,
-                        items,
-                        img_configs,
-                        cluster_info,
-                        idle_timeout,
-                    ),
+                    scheduled_session,
+                    items,
+                    img_configs,
+                    cluster_info,
+                    idle_timeout,
                 ),
             )
-        if per_agent_tasks:
-            agent_errors = []
-            results = await asyncio.gather(
-                *[item[1] for item in per_agent_tasks],
-                return_exceptions=True,
+        agent_errors: list[BaseException] = []
+        async for task in aiotools.as_completed_safe(per_agent_coros):
+            try:
+                await task
+            except ExceptionGroup as e:
+                agent_errors.extend(e.exceptions)
+            except Exception as e:
+                agent_errors.append(e)
+        if agent_errors:
+            raise MultiAgentError(
+                "agent(s) raise errors during kernel creation",
+                agent_errors,
             )
-            for agent_alloc_tx, result in zip((item[0] for item in per_agent_tasks), results):
-                if isinstance(result, aiotools.TaskGroupError):
-                    agent_errors.extend(result.__errors__)
-                elif isinstance(result, Exception):
-                    # mark to be destroyed afterwards
-                    agent_errors.append(result)
-            if agent_errors:
-                raise MultiAgentError(
-                    "agent(s) raise errors during kernel creation",
-                    agent_errors,
-                )
-            await self.settle_agent_alloc(kernel_agent_bindings)
+        await self.settle_agent_alloc(kernel_agent_bindings)
 
     def convert_resource_spec_to_resource_slot(
         self,
@@ -3112,50 +3103,6 @@ class AgentRegistry:
         # noop for performance reasons
         pass
 
-    async def handle_agent_images_remove(
-        self, agent_id: AgentId, image_canonicals: list[str]
-    ) -> None:
-        await self.valkey_image.remove_agent_from_images(agent_id, image_canonicals)
-
-    async def mark_agent_terminated(self, agent_id: AgentId, status: AgentStatus) -> None:
-        await self.valkey_live.remove_agent_last_seen(agent_id)
-
-        async def _update() -> None:
-            async with self.db.begin() as conn:
-                fetch_query = (
-                    sa.select([
-                        agents.c.status,
-                        agents.c.addr,
-                    ])
-                    .select_from(agents)
-                    .where(agents.c.id == agent_id)
-                    .with_for_update()
-                )
-                result = await conn.execute(fetch_query)
-                row = result.first()
-                prev_status = row["status"]
-                if prev_status in (None, AgentStatus.LOST, AgentStatus.TERMINATED):
-                    return
-
-                if status == AgentStatus.LOST:
-                    log.warning("agent {0} heartbeat timeout detected.", agent_id)
-                elif status == AgentStatus.TERMINATED:
-                    log.info("agent {0} has terminated.", agent_id)
-                now = datetime.now(tzutc())
-                update_query = (
-                    sa.update(agents)
-                    .values({
-                        "status": status,
-                        "status_changed": now,
-                        "lost_at": now,
-                    })
-                    .where(agents.c.id == agent_id)
-                )
-                await conn.execute(update_query)
-
-        await self.valkey_image.remove_agent_from_all_images(agent_id)
-        await execute_with_retry(_update)
-
     async def sync_kernel_stats(
         self,
         kernel_ids: Sequence[KernelId],
@@ -4083,46 +4030,6 @@ async def handle_batch_result(
     )
 
     await invoke_session_callback(context, source, event)
-
-
-async def handle_agent_images_remove(
-    context: AgentRegistry,
-    source: AgentId,
-    event: AgentImagesRemoveEvent,
-) -> None:
-    await context.handle_agent_images_remove(source, event.image_canonicals)
-
-
-async def handle_agent_lifecycle(
-    context: AgentRegistry,
-    source: AgentId,
-    event: AgentStartedEvent | AgentTerminatedEvent,
-) -> None:
-    if isinstance(event, AgentStartedEvent):
-        log.info("instance_lifecycle: ag:{0} joined (via event, {1})", source, event.reason)
-        await context.update_instance(
-            source,
-            {
-                "status": AgentStatus.ALIVE,
-            },
-        )
-    if isinstance(event, AgentTerminatedEvent):
-        if event.reason == "agent-lost":
-            await context.mark_agent_terminated(source, AgentStatus.LOST)
-            context.agent_cache.discard(source)
-        elif event.reason == "agent-restart":
-            log.info("agent@{0} restarting for maintenance.", source)
-            await context.update_instance(
-                source,
-                {
-                    "status": AgentStatus.RESTARTING,
-                },
-            )
-        else:
-            # On normal instance termination, kernel_terminated events were already
-            # triggered by the agent.
-            await context.mark_agent_terminated(source, AgentStatus.TERMINATED)
-            context.agent_cache.discard(source)
 
 
 async def handle_route_creation(

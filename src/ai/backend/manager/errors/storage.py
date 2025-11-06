@@ -74,7 +74,7 @@ class QuotaScopeNotFoundError(ObjectNotFound):
         )
 
 
-class VFolderAlreadyExists(BackendAIError, web.HTTPBadRequest):
+class VFolderAlreadyExists(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/vfolder-already-exists"
     error_title = "The virtual folder already exists with the same name."
 
@@ -304,6 +304,19 @@ class StorageProxyNotFound(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class StorageProxyConnectionError(BackendAIError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/storage-proxy-connection-error"
+    error_title = "Failed to connect to storage proxy."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.UNAVAILABLE,
         )
 
 

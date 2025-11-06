@@ -19,7 +19,9 @@ from strawberry.aiohttp.views import GraphQLView
 
 from ai.backend.common import validators as tx
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.api.gql.data_loader.registry import DataLoaderRegistry
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.auth import AuthorizationFailed
 
 from ..api.gql.schema import schema as strawberry_schema
 from ..errors.api import GraphQLError as BackendGQLError
@@ -29,13 +31,12 @@ from ..models.gql import (
     GQLMetricMiddleware,
     GQLMutationPrivilegeCheckMiddleware,
     GraphQueryContext,
-    Mutation,
-    Query,
+    graphene_schema,
 )
 from .auth import auth_required
 from .manager import GQLMutationUnfrozenRequiredMiddleware
 from .types import CORSOptions, WebMiddleware
-from .utils import check_api_params
+from .utils import check_api_params, set_handler_attr
 
 if TYPE_CHECKING:
     from graphql import FieldNode
@@ -56,6 +57,14 @@ class CustomGraphQLView(GraphQLView):
 
         Supports both query/mutation via POST and subscriptions via WebSocket.
         """
+        # Set handler attributes for middleware compatibility
+        set_handler_attr(self, "auth_required", True)
+        set_handler_attr(self, "auth_scope", "user")
+
+    async def __call__(self, request: web.Request) -> web.StreamResponse:
+        if request.get("is_authorized", False):
+            return await super().__call__(request)
+        raise AuthorizationFailed("Unauthorized access to GraphQL endpoint")
 
     async def get_context(  # type: ignore[override]
         self, request: web.Request, response: web.Response | web.WebSocketResponse
@@ -66,6 +75,7 @@ class CustomGraphQLView(GraphQLView):
             config_provider=root_context.config_provider,
             event_hub=root_context.event_hub,
             event_fetcher=root_context.event_fetcher,
+            dataloader_registry=DataLoaderRegistry(),
         )
 
 
@@ -212,11 +222,7 @@ class PrivateContext:
 
 async def init(app: web.Application) -> None:
     app_ctx: PrivateContext = app["admin.context"]
-    app_ctx.gql_schema = graphene.Schema(
-        query=Query,
-        mutation=Mutation,
-        auto_camelcase=False,
-    )
+    app_ctx.gql_schema = graphene_schema
     app_ctx.gql_v2_schema = strawberry_schema
     root_ctx: RootContext = app["_root.context"]
     if root_ctx.config_provider.config.api.allow_graphql_schema_introspection:

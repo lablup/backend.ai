@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Mapping
+from dataclasses import dataclass
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any, Optional, Type
+from typing import TYPE_CHECKING, Any, Optional, Protocol, Type, TypeVar, cast
 
-import orjson
+import graphene
 import strawberry
 from graphql import StringValueNode
 from graphql_relay.utils import base64, unbase64
 from strawberry.types import get_object_definition, has_object_definition
+
+from ai.backend.common.json import dump_json_str, load_json
+from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.common.types import IntFilterData, StringFilterData
 
 if TYPE_CHECKING:
     from ai.backend.manager.types import (
@@ -48,38 +54,19 @@ class StringFilter:
     i_equals: Optional[str] = strawberry.field(name="iEquals", default=None)
     i_not_equals: Optional[str] = strawberry.field(name="iNotEquals", default=None)
 
-    def apply_to_column(self, column):
-        """Apply this string filter to a SQLAlchemy column and return the condition.
-
-        Args:
-            column: SQLAlchemy column to apply the filter to
-
-        Returns:
-            SQLAlchemy condition expression or None if no filter is set
-        """
-
-        if self.equals:
-            return column == self.equals
-        elif self.i_equals:
-            return column.ilike(self.i_equals)
-        elif self.not_equals:
-            return column != self.not_equals
-        elif self.i_not_equals:
-            return ~column.ilike(self.i_not_equals)
-        elif self.starts_with:
-            return column.like(f"{self.starts_with}%")
-        elif self.i_starts_with:
-            return column.ilike(f"{self.i_starts_with}%")
-        elif self.ends_with:
-            return column.like(f"%{self.ends_with}")
-        elif self.i_ends_with:
-            return column.ilike(f"%{self.i_ends_with}")
-        elif self.contains:
-            return column.like(f"%{self.contains}%")
-        elif self.i_contains:
-            return column.ilike(f"%{self.i_contains}%")
-
-        return None
+    def to_dataclass(self) -> StringFilterData:
+        return StringFilterData(
+            contains=self.contains,
+            starts_with=self.starts_with,
+            ends_with=self.ends_with,
+            equals=self.equals,
+            not_equals=self.not_equals,
+            i_contains=self.i_contains,
+            i_starts_with=self.i_starts_with,
+            i_ends_with=self.i_ends_with,
+            i_equals=self.i_equals,
+            i_not_equals=self.i_not_equals,
+        )
 
 
 @strawberry.input
@@ -91,30 +78,15 @@ class IntFilter:
     less_than: Optional[int] = None
     less_than_or_equal: Optional[int] = None
 
-    def apply_to_column(self, column):
-        """Apply this int filter to a SQLAlchemy column and return the condition.
-
-        Args:
-            column: SQLAlchemy column to apply the filter to
-
-        Returns:
-            SQLAlchemy condition expression or None if no filter is set
-        """
-
-        if self.equals is not None:
-            return column == self.equals
-        elif self.not_equals is not None:
-            return column != self.not_equals
-        elif self.greater_than is not None:
-            return column > self.greater_than
-        elif self.greater_than_or_equal is not None:
-            return column >= self.greater_than_or_equal
-        elif self.less_than is not None:
-            return column < self.less_than
-        elif self.less_than_or_equal is not None:
-            return column <= self.less_than_or_equal
-
-        return None
+    def to_dataclass(self) -> IntFilterData:
+        return IntFilterData(
+            equals=self.equals,
+            not_equals=self.not_equals,
+            greater_than=self.greater_than,
+            greater_than_or_equal=self.greater_than_or_equal,
+            less_than=self.less_than,
+            less_than_or_equal=self.less_than_or_equal,
+        )
 
 
 @strawberry.enum
@@ -133,36 +105,41 @@ class Ordering(StrEnum):
     DESC_NULLS_LAST = "DESC_NULLS_LAST"
 
 
-def serialize_json(value: Any) -> str:
-    if isinstance(value, (dict, list)):
-        return orjson.dumps(value).decode("utf-8")
-    elif isinstance(value, str):
-        return value
-    else:
-        return orjson.dumps(value).decode("utf-8")
-
-
-def parse_json(value: str | bytes) -> Any:
-    if isinstance(value, str):
-        return orjson.loads(value)
-    elif isinstance(value, bytes):
-        return orjson.loads(value)
-    else:
-        return value
-
-
-@strawberry.scalar(
-    name="JSONString",
-    description="A custom scalar for JSON strings using orjson",
-    serialize=serialize_json,
-    parse_value=parse_json,
-    parse_literal=lambda v: parse_json(v.value) if hasattr(v, "value") else v,
-)
+@strawberry.scalar(description="Added in 25.15.0")
 class JSONString:
-    pass
+    @staticmethod
+    def parse_value(value: str | bytes) -> Mapping[str, Any]:
+        if isinstance(value, str):
+            return load_json(value)
+        if isinstance(value, bytes):
+            return load_json(value)
+        return value
+
+    @staticmethod
+    def serialize(value: Any) -> JSONString:
+        if isinstance(value, (dict, list)):
+            return cast(JSONString, dump_json_str(value))
+        elif isinstance(value, str):
+            return cast(JSONString, value)
+        else:
+            return cast(JSONString, dump_json_str(value))
+
+    @staticmethod
+    def from_resource_slot(resource_slot: ResourceSlot) -> JSONString:
+        return JSONString.serialize(resource_slot.to_json())
 
 
-def to_global_id(type_: Type[Any], local_id: uuid.UUID | str) -> str:
+def to_global_id(
+    type_: Type[Any], local_id: uuid.UUID | str, is_target_graphene_object: bool = False
+) -> str:
+    if is_target_graphene_object:
+        # For compatibility with existing Graphene-based global IDs
+        if not issubclass(type_, graphene.ObjectType):
+            raise TypeError(
+                "type_ must be a graphene ObjectType when is_target_graphene_object is True."
+            )
+        typename = type_.__name__
+        return base64(f"{typename}:{local_id}")
     if not has_object_definition(type_):
         raise TypeError("type_ must be a Strawberry object type (Node or Edge).")
     typename = get_object_definition(type_, strict=True).name
@@ -205,3 +182,75 @@ def build_pagination_options(
         pagination.backward = BackwardPaginationOptions(before=before, last=last)
 
     return pagination
+
+
+@dataclass
+class PageInfo:
+    has_next_page: bool
+    has_previous_page: bool
+    start_cursor: Optional[str] = None
+    end_cursor: Optional[str] = None
+
+    def to_strawberry_page_info(self) -> "strawberry.relay.PageInfo":
+        return strawberry.relay.PageInfo(
+            has_next_page=self.has_next_page,
+            has_previous_page=self.has_previous_page,
+            start_cursor=self.start_cursor,
+            end_cursor=self.end_cursor,
+        )
+
+
+class HasCursor(Protocol):
+    cursor: str
+
+
+TEdge = TypeVar("TEdge", bound=HasCursor)
+
+
+def build_page_info(
+    edges: list[TEdge], total_count: int, pagination_options: PaginationOptions
+) -> PageInfo:
+    """Build PageInfo from edges and pagination options"""
+    has_next_page = False
+    has_previous_page = False
+
+    if pagination_options.offset:
+        # Offset-based pagination
+        offset = pagination_options.offset.offset or 0
+
+        has_previous_page = offset > 0
+        has_next_page = (offset + len(edges)) < total_count
+
+    elif pagination_options.forward:
+        # Forward pagination (after/first)
+        first = pagination_options.forward.first
+        if first is not None:
+            # If we got exactly the requested number and there might be more
+            has_next_page = len(edges) == first
+        else:
+            # If no first specified, check if we have all items
+            has_next_page = len(edges) < total_count
+        has_previous_page = pagination_options.forward.after is not None
+
+    elif pagination_options.backward:
+        # Backward pagination (before/last)
+        last = pagination_options.backward.last
+        if last is not None:
+            # If we got exactly the requested number, there might be more before
+            has_previous_page = len(edges) == last
+        else:
+            # If no last specified, assume there could be previous items
+            has_previous_page = True
+        has_next_page = pagination_options.backward.before is not None
+
+    else:
+        # Default case - assume we have all items if no pagination specified
+        has_next_page = len(edges) < total_count
+        has_previous_page = False
+
+    return PageInfo(
+        has_next_page=has_next_page,
+        has_previous_page=has_previous_page,
+        start_cursor=edges[0].cursor if edges else None,
+        end_cursor=edges[-1].cursor if edges else None,
+    )

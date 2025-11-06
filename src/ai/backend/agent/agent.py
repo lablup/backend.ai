@@ -79,6 +79,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
+from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
@@ -107,7 +108,7 @@ from ai.backend.common.events.dispatcher import (
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentErrorEvent,
     AgentHeartbeatEvent,
-    AgentImagesRemoveEvent,
+    AgentInstalledImagesRemoveEvent,
     AgentStartedEvent,
     AgentTerminatedEvent,
     DoAgentResourceCheckEvent,
@@ -185,6 +186,7 @@ from ai.backend.common.types import (
     DeviceId,
     DeviceName,
     HardwareMetadata,
+    ImageCanonical,
     ImageConfig,
     ImageRegistry,
     KernelCreationConfig,
@@ -292,15 +294,9 @@ def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int
 
 
 @dataclass
-class ScannedImage:
-    canonical: str
-    digest: str
-
-
-@dataclass
 class ScanImagesResult:
-    scanned_images: Mapping[str, ScannedImage]
-    removed_images: Mapping[str, ScannedImage]
+    scanned_images: Mapping[ImageCanonical, ScannedImage]
+    removed_images: Mapping[ImageCanonical, ScannedImage]
 
 
 @dataclass
@@ -770,7 +766,7 @@ class AbstractAgent(
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
     computers: MutableMapping[DeviceName, ComputerContext]
-    images: Mapping[str, ScannedImage]
+    images: Mapping[ImageCanonical, ScannedImage]
     port_pool: set[int]
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
@@ -1070,10 +1066,7 @@ class AbstractAgent(
             await self.save_last_registry(force=True)
 
         # Stop timers.
-        cancel_results = await cancel_tasks(self.timer_tasks)
-        for result in cancel_results:
-            if isinstance(result, Exception):
-                log.error("timer cancellation error: {}", result)
+        await aiotools.cancel_and_wait(self.timer_tasks)
         await self._agent_runner.close()
         self._clean_kernel_registry_task.cancel()
 
@@ -1202,7 +1195,10 @@ class AbstractAgent(
                     for key, computer in self.computers.items()
                 },
                 images=zlib.compress(
-                    msgpack.packb([(repo_tag, digest) for repo_tag, digest in self.images.items()])
+                    msgpack.packb([
+                        (str(canonical), scanned_image.digest)
+                        for canonical, scanned_image in self.images.items()
+                    ])
                 ),
                 images_opts=ImageOpts(compression="zlib"),  # compression: zlib or None
                 architecture=get_arch_name(),
@@ -2103,7 +2099,7 @@ class AbstractAgent(
         self.images = result.scanned_images
         if result.removed_images:
             await self.anycast_event(
-                AgentImagesRemoveEvent(image_canonicals=list(result.removed_images.keys()))
+                AgentInstalledImagesRemoveEvent(scanned_images=result.removed_images)
             )
 
     @abstractmethod

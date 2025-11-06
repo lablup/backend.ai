@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
@@ -17,15 +18,15 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class SingleEntityActionProcessor(Generic[TSingleEntityAction, TSingleEntityActionResult]):
-    _validators: list[SingleEntityActionValidator]
+    _validators: Sequence[SingleEntityActionValidator]
 
     _runner: ActionRunner[TSingleEntityAction, TSingleEntityActionResult]
 
     def __init__(
         self,
         func: Callable[[TSingleEntityAction], Awaitable[TSingleEntityActionResult]],
-        monitors: Optional[list[ActionMonitor]] = None,
-        validators: Optional[list[SingleEntityActionValidator]] = None,
+        monitors: Optional[Sequence[ActionMonitor]] = None,
+        validators: Optional[Sequence[SingleEntityActionValidator]] = None,
     ) -> None:
         self._runner = ActionRunner(func, monitors)
 

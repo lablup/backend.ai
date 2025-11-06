@@ -22,6 +22,7 @@ from ai.backend.storage.client.huggingface import HuggingFaceClient
 from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
     ObjectStorageConfig,
+    ReservoirClientConfig,
     ReservoirConfig,
 )
 from ai.backend.storage.exception import (
@@ -212,11 +213,11 @@ def mock_import_step_context(
         ArtifactStorageImportStep.DOWNLOAD: "test_storage",
         ArtifactStorageImportStep.ARCHIVE: "test_storage",
     }
+
     return ImportStepContext(
         model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
         registry_name="test_registry",
         storage_pool=mock_storage_pool,
-        progress_reporter=mock_progress_reporter,
         storage_step_mappings=storage_step_mappings,
         step_metadata={},
     )
@@ -260,6 +261,8 @@ def reservoir_download_step(
     return ReservoirDownloadStep(
         registry_configs=mock_reservoir_registry_configs,
         download_storage=mock_download_storage,
+        manager_http_clients={},
+        reservoir_client_config=ReservoirClientConfig(),
     )
 
 
@@ -306,6 +309,7 @@ class TestHuggingFaceDownloadStep:
             direction=-1,
             limit=5,
             token="test_token",
+            expand=["gated"],
         )
 
     @pytest.mark.asyncio
@@ -648,7 +652,6 @@ class TestHuggingFaceDownloadStep:
             model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
             registry_name="test_registry",
             storage_pool=None,  # type: ignore
-            progress_reporter=None,
             storage_step_mappings={
                 ArtifactStorageImportStep.DOWNLOAD: "test_storage",
                 ArtifactStorageImportStep.ARCHIVE: "test_storage",
@@ -854,7 +857,7 @@ class TestReservoirDownloadStep:
                 storage_name="test_storage",
                 storage_pool=mock_import_step_context.storage_pool,
                 options=BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0),
-                progress_reporter=mock_import_step_context.progress_reporter,
+                progress_reporter=None,
                 key_prefix="models/",
             )
 
@@ -883,7 +886,7 @@ class TestReservoirDownloadStep:
                     storage_name="test_storage",
                     storage_pool=mock_import_step_context.storage_pool,
                     options=BucketCopyOptions(concurrency=1, progress_log_interval_bytes=0),
-                    progress_reporter=mock_import_step_context.progress_reporter,
+                    progress_reporter=None,
                     key_prefix="models/",
                 )
 
@@ -930,6 +933,8 @@ class TestReservoirDownloadStep:
         step = ReservoirDownloadStep(
             registry_configs={},
             download_storage=mock_download_storage,
+            manager_http_clients={},
+            reservoir_client_config=ReservoirClientConfig(),
         )
 
         with pytest.raises(ReservoirStorageConfigInvalidError):

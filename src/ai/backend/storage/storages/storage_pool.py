@@ -1,20 +1,20 @@
 import logging
-from typing import Optional, Self
+from typing import Optional, Self, override
 
+from ai.backend.common.artifact_storage import AbstractStorage, AbstractStoragePool
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.config.unified import (
     StorageProxyUnifiedConfig,
 )
-from ai.backend.storage.storages.base import AbstractStorage
 from ai.backend.storage.storages.object_storage import ObjectStorage
 from ai.backend.storage.storages.vfs_storage import VFSStorage
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class StoragePool:
+class StoragePool(AbstractStoragePool):
     """
     Storage pool that manages different types of storage backends.
     Supports both Object Storage (S3-compatible) and VFS storage.
@@ -79,6 +79,7 @@ class StoragePool:
 
         return cls(storages)
 
+    @override
     def get_storage(self, name: str) -> AbstractStorage:
         """
         Get storage by name.
@@ -94,6 +95,7 @@ class StoragePool:
         """
         return self._storages[name]
 
+    @override
     def add_storage(self, name: str, storage: AbstractStorage) -> None:
         """
         Add a storage to the pool.
@@ -104,6 +106,7 @@ class StoragePool:
         """
         self._storages[name] = storage
 
+    @override
     def remove_storage(self, name: str) -> None:
         """
         Remove a storage from the pool.
@@ -114,6 +117,7 @@ class StoragePool:
         if name in self._storages:
             del self._storages[name]
 
+    @override
     def list_storages(self) -> list[str]:
         """
         List all storage names in the pool.
@@ -123,6 +127,7 @@ class StoragePool:
         """
         return list(self._storages.keys())
 
+    @override
     def has_storage(self, name: str) -> bool:
         """
         Check if storage exists in the pool.

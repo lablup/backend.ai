@@ -10,10 +10,12 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.common.plugin.hook import ALL_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import ResourceSlot, SessionId
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.metrics.scheduler import (
     SchedulerOperationMetricObserver,
     SchedulerPhaseMetricObserver,
@@ -43,8 +45,10 @@ from .validators import (
     ClusterValidationRule,
     ContainerLimitRule,
     MountNameValidationRule,
-    ScalingGroupAccessRule,
+    PublicPrivateFilterRule,
+    ScalingGroupFilter,
     ServicePortRule,
+    SessionTypeFilterRule,
     SessionValidator,
 )
 
@@ -61,6 +65,7 @@ class SchedulingControllerArgs:
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
     network_plugin_ctx: NetworkPluginContext
+    hook_plugin_ctx: HookPluginContext
 
 
 class SchedulingController:
@@ -75,11 +80,13 @@ class SchedulingController:
 
     # Services
     _scaling_group_resolver: ScalingGroupResolver
+    _scaling_group_filter: ScalingGroupFilter
     _validator: SessionValidator
     _preparer: SessionPreparer
     _resource_calculator: ResourceCalculator
     _metric_observer: SchedulerPhaseMetricObserver
     _operation_metrics: SchedulerOperationMetricObserver
+    _hook_plugin_ctx: HookPluginContext
 
     def __init__(self, args: SchedulingControllerArgs) -> None:
         """Initialize the scheduling controller with required services."""
@@ -89,6 +96,7 @@ class SchedulingController:
         self._event_producer = args.event_producer
         self._valkey_schedule = args.valkey_schedule
         self._network_plugin_ctx = args.network_plugin_ctx
+        self._hook_plugin_ctx = args.hook_plugin_ctx
 
         # Initialize metric observers (singletons)
         self._metric_observer = SchedulerPhaseMetricObserver.instance()
@@ -97,10 +105,16 @@ class SchedulingController:
         # Initialize services
         self._scaling_group_resolver = ScalingGroupResolver()
 
+        # Initialize scaling group filter with rules
+        filter_rules = [
+            PublicPrivateFilterRule(),
+            SessionTypeFilterRule(),
+        ]
+        self._scaling_group_filter = ScalingGroupFilter(filter_rules)
+
         # Initialize validator with rules
         validator_rules = [
             ContainerLimitRule(),
-            ScalingGroupAccessRule(),
             ServicePortRule(),
             ClusterValidationRule(),
             MountNameValidationRule(),
@@ -194,10 +208,22 @@ class SchedulingController:
                 allowed_vfolder_types,
             )
 
-        # Phase 3: Validate
+        # Phase 3: Filter and validate
         with self._metric_observer.measure_phase(
             "scheduling_controller", validated_scaling_group.name, "validation"
         ):
+            # Filter scaling groups based on session requirements
+            # This will raise NoAvailableScalingGroup if filtering fails
+            filter_result = self._scaling_group_filter.filter(
+                session_spec,
+                creation_context.allowed_scaling_groups,
+            )
+
+            # Update context with filtered scaling groups for remaining validation
+            creation_context.allowed_scaling_groups = filter_result.allowed_groups
+            session_spec.scaling_group = filter_result.selected_scaling_group
+
+            # Run remaining validation rules
             self._validator.validate(
                 session_spec,
                 creation_context,
@@ -222,6 +248,14 @@ class SchedulingController:
                 calculated_resources,
             )
 
+        hook_result = await self._hook_plugin_ctx.dispatch(
+            "PRE_ENQUEUE_SESSION",
+            (session_data.id, session_data.name, session_data.access_key),
+            return_when=ALL_COMPLETED,
+        )
+        if hook_result.status != PASSED:
+            raise RejectedByHook.from_hook_result(hook_result)
+
         # Phase 5: Enqueue in repository
         with self._metric_observer.measure_phase(
             "scheduling_controller", validated_scaling_group.name, "enqueue"
@@ -241,6 +275,10 @@ class SchedulingController:
                 session_id,
                 e,
             )
+        await self._hook_plugin_ctx.notify(
+            "POST_ENQUEUE_SESSION",
+            (session_id, session_data.name, session_data.access_key),
+        )
         return session_id
 
     async def mark_scheduling_needed(self, schedule_type: ScheduleType) -> None:

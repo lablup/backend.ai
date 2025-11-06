@@ -2,7 +2,6 @@
 
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.repositories.scheduler.types.session_creation import (
-    AllowedScalingGroup,
     SessionCreationContext,
     SessionCreationSpec,
 )
@@ -20,7 +19,6 @@ class ClusterValidationRule(SessionValidatorRule):
         self,
         spec: SessionCreationSpec,
         context: SessionCreationContext,
-        allowed_groups: list[AllowedScalingGroup],
     ) -> None:
         """Validate cluster configuration and kernel specifications."""
         # Check if kernel_specs exists

@@ -164,10 +164,12 @@ class ErrorDomain(enum.StrEnum):
     RESOURCE_PRESET = "resource-preset"
     STORAGE = "storage"
     AGENT = "agent"
+    KERNEL_REGISTRY = "kernel-registry"
     PERMISSION = "permission"
     METRIC = "metric"
     STORAGE_PROXY = "storage-proxy"
     MESSAGE_QUEUE = "message-queue"
+    NOTIFICATION = "notification"
 
 
 class ErrorOperation(enum.StrEnum):
@@ -476,7 +478,7 @@ class BgtaskNotRegisteredError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
-class BgtaskNotFoundError(BackendAIError, web.HTTPNotFound):
+class BgtaskNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/bgtask-not-found"
     error_title = "Background Task Not Found"
 
@@ -635,6 +637,19 @@ class GenericNotImplementedError(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/object-storage-bucket-not-found"
+    error_title = "Object Storage Bucket Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.OBJECT_STORAGE,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
 class InvalidConfigError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/invalid-configuration"
     error_title = "Invalid Configuration"
@@ -669,6 +684,110 @@ class AgentNotFound(BackendAIError, web.HTTPNotFound):
     def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/scaling-group-not-found"
+    error_title = "Scaling Group Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class VFolderNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/vfolder-not-found"
+    error_title = "Virtual Folder Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.VFOLDER,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class UserNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/user-not-found"
+    error_title = "User Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class GroupNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/group-not-found"
+    error_title = "Project Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.GROUP,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class DomainNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/domain-not-found"
+    error_title = "Domain Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOMAIN,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ModelDeploymentNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/model-deployment-not-found"
+    error_title = "Model Deployment Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ModelDeploymentUnavailable(BackendAIError, web.HTTPServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/model-deployment-unavailable"
+    error_title = "Model Deployment Unavailable"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
+            operation=ErrorOperation.EXECUTE,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class ModelRevisionNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/model-revision-not-found"
+    error_title = "Model Revision Not Found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_DEPLOYMENT,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )

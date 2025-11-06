@@ -10,6 +10,8 @@ import aiohttp
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     DownloadObjectReq,
+    HuggingFaceGetCommitHashReqPathParam,
+    HuggingFaceGetCommitHashReqQueryParam,
     HuggingFaceImportModelsReq,
     HuggingFaceRetrieveModelReqPathParam,
     HuggingFaceRetrieveModelReqQueryParam,
@@ -23,6 +25,7 @@ from ai.backend.common.dto.storage.request import (
     VFSListFilesReq,
 )
 from ai.backend.common.dto.storage.response import (
+    HuggingFaceGetCommitHashResponse,
     HuggingFaceImportModelsResponse,
     HuggingFaceRetrieveModelResponse,
     HuggingFaceRetrieveModelsResponse,
@@ -757,6 +760,28 @@ class StorageProxyManagerFacingClient:
         return HuggingFaceImportModelsResponse.model_validate(resp)
 
     @storage_proxy_client_resilience.apply()
+    async def get_huggingface_model_commit_hash(
+        self,
+        path: HuggingFaceGetCommitHashReqPathParam,
+        query: HuggingFaceGetCommitHashReqQueryParam,
+    ) -> HuggingFaceGetCommitHashResponse:
+        """
+        Get the commit hash for a specific HuggingFace model revision.
+        """
+        params = {"registry_name": query.registry_name}
+        if query.revision:
+            params["revision"] = query.revision
+
+        encoded_model_id = quote(path.model_id, safe="")
+        resp = await self._client.request_with_response(
+            "GET",
+            f"v1/registries/huggingface/model/{encoded_model_id}/commit-hash",
+            params=params,
+        )
+
+        return HuggingFaceGetCommitHashResponse.model_validate(resp)
+
+    @storage_proxy_client_resilience.apply()
     async def import_reservoir_models(
         self,
         req: ReservoirImportModelsReq,
@@ -837,6 +862,7 @@ class StorageProxyManagerFacingClient:
             body=req.model_dump(by_alias=True),
         )
 
+    # TODO: Support storage_proxy_client_resilience
     @actxmgr
     async def download_vfs_file_streaming(
         self,

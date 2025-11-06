@@ -12,6 +12,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import graphql
 import sqlalchemy as sa
 from dateutil.parser import parse as dtparse
@@ -20,6 +21,7 @@ from graphql import Undefined
 from sqlalchemy.engine.row import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from ai.backend.common.exception import DomainNotFound
 from ai.backend.common.types import ResourceSlot, Sentinel
 from ai.backend.manager.data.domain.types import (
     DomainCreator,
@@ -130,6 +132,7 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
 }
 
 
+@graphene_federation.key("id")
 class DomainNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -313,6 +316,12 @@ class DomainNode(graphene.ObjectType):
                     cls.from_rbac_model(graph_ctx, DomainModel.from_row(row, permissions))
                 )
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> DomainNode:
+        domain_node = await DomainNode.get_node(info, self.id)
+        if domain_node is None:
+            raise DomainNotFound(f"Domain not found: {self.id}")
+        return domain_node
 
 
 class DomainConnection(Connection):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -20,12 +21,14 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 from sqlalchemy.engine.row import Row
 
+from ai.backend.common.exception import UserNotFound
 from ai.backend.manager.data.user.types import (
     UserCreator,
     UserData,
     UserInfoContext,
 )
 from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.minilang import ExternalTableFilterSpec, ORMFieldItem
 from ai.backend.manager.services.user.actions.create_user import (
     CreateUserAction,
 )
@@ -53,8 +56,8 @@ from ..base import (
     generate_sql_info_for_gql_connection,
 )
 from ..gql_relay import AsyncNode, Connection, ConnectionResolverResult
+from ..group import AssocGroupUserRow, GroupRow, groups
 from ..group import association_groups_users as agus
-from ..group import groups
 from ..minilang.ordering import OrderSpecItem, QueryOrderParser
 from ..minilang.queryfilter import FieldSpecItem, QueryFilterParser
 from ..user import (
@@ -191,6 +194,8 @@ class UserNode(graphene.ObjectType):
         query = sa.select(UserRow).where(UserRow.uuid == user_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_row = (await db_session.scalars(query)).first()
+            if user_row is None:
+                raise UserNotFound(f"User not found: {user_id}")
             return cls.from_row(graph_ctx, user_row)
 
     _queryfilter_fieldspec: Mapping[str, FieldSpecItem] = {
@@ -215,6 +220,21 @@ class UserNode(graphene.ObjectType):
         "main_access_key": ("main_access_key", None),
     }
 
+    # External table filter specifications
+    # These define filters on related tables that require JOINs
+    _external_table_filters: Mapping[str, ExternalTableFilterSpec] = {
+        "project_name": ExternalTableFilterSpec(
+            field_name="project_name",
+            target_table=cast(sa.Table, GroupRow.__table__),
+            target_column="name",
+            join_builder=lambda base_table: sa.join(
+                base_table,
+                AssocGroupUserRow,
+                base_table.c.uuid == AssocGroupUserRow.user_id,
+            ).join(GroupRow, AssocGroupUserRow.group_id == GroupRow.id),
+        ),
+    }
+
     _queryorder_colmap: Mapping[str, OrderSpecItem] = {
         "uuid": ("uuid", None),
         "username": ("username", None),
@@ -235,6 +255,58 @@ class UserNode(graphene.ObjectType):
         "main_access_key": ("main_access_key", None),
     }
 
+    @staticmethod
+    def _split_filter_by_external_fields(
+        filter_expr: str,
+        external_field_names: set[str],
+    ) -> tuple[str | None, str | None]:
+        """
+        Split filter expression into user table filter and external table filter.
+
+        Args:
+            filter_expr: Original filter expression
+            external_field_names: Set of external field names to split out
+
+        Returns:
+            Tuple of (user_table_filter, external_table_filter)
+            Either or both can be None if no matching fields found
+        """
+        _FIELD_EXPR_PATTERN = r'\b{field}\s*(==|!=|>|>=|<|<=|contains|in|is|isnot|like|ilike)\s*(?:"[^"]*"|\[[^\]]*\]|\'[^\']*\'|\S+)'
+
+        # Extract external field expressions
+        external_parts = []
+        for field_name in external_field_names:
+            pattern = _FIELD_EXPR_PATTERN.format(field=re.escape(field_name))
+            match = re.search(pattern, filter_expr)
+            if match:
+                external_parts.append(match.group(0))
+
+        external_filter = " & ".join(external_parts) if external_parts else None
+
+        # Remove external fields from original filter to get user table filter
+        user_filter = filter_expr
+        for field_name in external_field_names:
+            pattern = _FIELD_EXPR_PATTERN.format(field=re.escape(field_name))
+            user_filter = re.sub(pattern, "", user_filter)
+
+        # Clean up leftover operators and empty parentheses in user filter
+        for _ in range(3):
+            user_filter = re.sub(r"\(\s*[&|]\s*", "(", user_filter)
+            user_filter = re.sub(r"\s*[&|]\s*\)", ")", user_filter)
+            user_filter = re.sub(r"\(\s*\)", "", user_filter)
+            user_filter = re.sub(r"\(\s*\)\s*[&|]\s*", "", user_filter)
+            user_filter = re.sub(r"\s*[&|]\s*\(\s*\)", "", user_filter)
+            user_filter = re.sub(r"\s*&\s*&\s*", " & ", user_filter)
+            user_filter = re.sub(r"\s*\|\s*\|\s*", " | ", user_filter)
+            user_filter = re.sub(r"^\s*[&|]\s*|\s*[&|]\s*$", "", user_filter)
+            user_filter = user_filter.strip()
+
+        user_filter_result: str | None = (
+            user_filter if user_filter and user_filter not in ("&", "|", "()", "") else None
+        )
+
+        return (user_filter_result, external_filter)
+
     @classmethod
     async def get_connection(
         cls,
@@ -248,9 +320,29 @@ class UserNode(graphene.ObjectType):
         last: int | None = None,
     ) -> ConnectionResolverResult[Self]:
         graph_ctx: GraphQueryContext = info.context
+
+        # Detect which external table filters are present and split the filter expression
+        external_filters_to_apply: dict[str, ExternalTableFilterSpec] = {}
+        user_table_filter = filter_expr
+        external_table_filter: str | None = None
+
+        if filter_expr:
+            external_filters_to_apply = {
+                field_name: spec
+                for field_name, spec in cls._external_table_filters.items()
+                if field_name in filter_expr
+            }
+            if external_filters_to_apply:
+                user_table_filter, external_table_filter = cls._split_filter_by_external_fields(
+                    filter_expr, set(external_filters_to_apply.keys())
+                )
+
         _filter_arg = (
-            FilterExprArg(filter_expr, QueryFilterParser(cls._queryfilter_fieldspec))
-            if filter_expr is not None
+            FilterExprArg(
+                user_table_filter,
+                QueryFilterParser(cls._queryfilter_fieldspec),
+            )
+            if user_table_filter is not None
             else None
         )
         _order_expr = (
@@ -261,7 +353,7 @@ class UserNode(graphene.ObjectType):
         (
             query,
             cnt_query,
-            _,
+            conditions,
             cursor,
             pagination_order,
             page_size,
@@ -277,6 +369,34 @@ class UserNode(graphene.ObjectType):
             before=before,
             last=last,
         )
+
+        if external_filters_to_apply and external_table_filter:
+            user_table = cast(sa.Table, UserRow.__table__)
+
+            join_clause = user_table
+            for spec in external_filters_to_apply.values():
+                join_clause = spec.join_builder(join_clause)
+
+            combined_fieldspec: dict[str, FieldSpecItem] = {}
+            for spec in external_filters_to_apply.values():
+                col = spec.target_table.c[spec.target_column]
+                combined_fieldspec[spec.field_name] = (ORMFieldItem(col), spec.transform)
+
+            parser = QueryFilterParser(combined_fieldspec)
+            ext_clause = parser.parse_filter(join_clause, external_table_filter)
+
+            updated_query = query.select_from(join_clause)
+            if updated_query is not None:
+                query = updated_query.distinct().where(ext_clause)
+
+            cnt_query = (
+                sa.select(sa.func.count(sa.distinct(UserRow.uuid)))
+                .select_from(join_clause)
+                .where(ext_clause)
+            )
+            for cond in conditions:
+                cnt_query = cnt_query.where(cond)
+
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_rows = (await db_session.scalars(query)).all()
             result = [cls.from_row(graph_ctx, row) for row in user_rows]
@@ -337,6 +457,9 @@ class UserNode(graphene.ObjectType):
                 prj_row = cast(GroupRow, row)
                 result.append(GroupNode.from_row(graph_ctx, prj_row))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs) -> "UserNode":
+        return await UserNode.get_node(info, self.id)
 
 
 class UserConnection(Connection):

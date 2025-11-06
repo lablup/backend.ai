@@ -7,6 +7,8 @@ from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
+    HuggingFaceGetCommitHashReqPathParam,
+    HuggingFaceGetCommitHashReqQueryParam,
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
 )
@@ -19,7 +21,6 @@ from ai.backend.manager.config.unified import (
     ReservoirVFSStorageConfig,
 )
 from ai.backend.manager.data.artifact.types import (
-    ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionReadme,
     ArtifactStatus,
@@ -36,6 +37,7 @@ from ai.backend.manager.errors.artifact import (
 from ai.backend.manager.errors.artifact_registry import (
     InvalidArtifactRegistryTypeError,
 )
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.errors.storage import UnsupportedStorageTypeError
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
@@ -235,22 +237,22 @@ class ArtifactRevisionService:
         self, action: ImportArtifactRevisionAction
     ) -> ImportArtifactRevisionActionResult:
         try:
-            await self._artifact_repository.update_artifact_revision_status(
-                action.artifact_revision_id, ArtifactStatus.PULLING
-            )
             revision_data = await self._artifact_repository.get_artifact_revision_by_id(
                 action.artifact_revision_id
             )
             artifact = await self._artifact_repository.get_artifact_by_id(revision_data.artifact_id)
 
             reservoir_config = self._config_provider.config.reservoir
+            if reservoir_config is None:
+                raise ServerMisconfiguredError("Reservoir configuration is missing")
+
             storage_type = reservoir_config.config.storage_type
-            reservoir_storage_name = reservoir_config.storage_name
+            reservoir_archive_storage = reservoir_config.archive_storage
 
             # Get bucket name or subpath depending on storage type
             namespace = self._resolve_storage_namespace(reservoir_config)
-            storage_host, namespace_id, storage_name = await self._get_storage_info(
-                reservoir_storage_name, namespace
+            storage_host, namespace_id, _ = await self._get_storage_info(
+                reservoir_archive_storage, namespace
             )
 
             storage_proxy_client = self._storage_manager.get_manager_facing_client(storage_host)
@@ -261,14 +263,37 @@ class ArtifactRevisionService:
                         artifact.id
                     )
 
+                    # Check current commit hash for this revision
+                    commit_hash_resp = await storage_proxy_client.get_huggingface_model_commit_hash(
+                        path=HuggingFaceGetCommitHashReqPathParam(
+                            model_id=artifact.name,
+                        ),
+                        query=HuggingFaceGetCommitHashReqQueryParam(
+                            revision=revision_data.version,
+                            registry_name=huggingface_registry_data.name,
+                        ),
+                    )
+                    latest_commit_hash = commit_hash_resp.commit_hash
+
+                    # Skip import if artifact revision is already Available and commit hash matches
+                    # If current_commit_hash is None, always proceed with import
+                    if self._is_latest_commit_hash(revision_data, latest_commit_hash):
+                        # Return early without calling import API
+                        return ImportArtifactRevisionActionResult(
+                            result=revision_data, task_id=None
+                        )
+
+                    await self._artifact_repository.update_artifact_revision_status(
+                        action.artifact_revision_id, ArtifactStatus.PULLING
+                    )
+
                     huggingface_result = await storage_proxy_client.import_huggingface_models(
                         HuggingFaceImportModelsReq(
                             models=[
                                 ModelTarget(model_id=artifact.name, revision=revision_data.version)
                             ],
                             registry_name=huggingface_registry_data.name,
-                            storage_name=storage_name,
-                            storage_step_mappings=reservoir_config.storage_step_selection,
+                            storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
                         )
                     )
                     task_id = huggingface_result.task_id
@@ -279,14 +304,17 @@ class ArtifactRevisionService:
                         )
                     )
 
+                    await self._artifact_repository.update_artifact_revision_status(
+                        action.artifact_revision_id, ArtifactStatus.PULLING
+                    )
+
                     result = await storage_proxy_client.import_reservoir_models(
                         ReservoirImportModelsReq(
                             models=[
                                 ModelTarget(model_id=artifact.name, revision=revision_data.version)
                             ],
                             registry_name=registry_data.name,
-                            storage_name=storage_name,
-                            storage_step_mappings=reservoir_config.storage_step_selection,
+                            storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
                         )
                     )
                     task_id = result.task_id
@@ -327,7 +355,10 @@ class ArtifactRevisionService:
         )
 
         reservoir_config = self._config_provider.config.reservoir
-        reservoir_storage_name = reservoir_config.storage_name
+        if reservoir_config is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
+
+        reservoir_archive_storage = reservoir_config.archive_storage
         # TODO: Abstract this.
         namespace = self._resolve_storage_namespace(reservoir_config)
 
@@ -339,7 +370,9 @@ class ArtifactRevisionService:
         storage_name = None
 
         try:
-            storage_data = await self._object_storage_repository.get_by_name(reservoir_storage_name)
+            storage_data = await self._object_storage_repository.get_by_name(
+                reservoir_archive_storage
+            )
             storage_namespace = (
                 await self._storage_namespace_repository.get_by_storage_and_namespace(
                     storage_data.id, namespace
@@ -350,7 +383,7 @@ class ArtifactRevisionService:
             storage_name = storage_data.name
         except Exception:
             vfs_storage_data = await self._vfs_storage_repository.get_by_name(
-                reservoir_storage_name
+                reservoir_archive_storage
             )
             storage_namespace = (
                 await self._storage_namespace_repository.get_by_storage_and_namespace(
@@ -394,7 +427,11 @@ class ArtifactRevisionService:
         self, action: DelegateImportArtifactRevisionBatchAction
     ) -> DelegateImportArtifactRevisionBatchActionResult:
         # If this is a leaf node, perform local import instead of delegation
-        if not self._config_provider.config.reservoir.use_delegation:
+        reservoir_cfg = self._config_provider.config.reservoir
+        if reservoir_cfg is None:
+            raise ServerMisconfiguredError("Reservoir configuration is missing")
+
+        if not reservoir_cfg.use_delegation:
             registry_id = None
             if action.delegatee_target:
                 registry_id = action.delegatee_target.target_registry_id
@@ -411,7 +448,7 @@ class ArtifactRevisionService:
                     import_result = await self.import_revision(
                         ImportArtifactRevisionAction(artifact_revision_id=revision_id)
                     )
-                    task_ids.append(import_result.task_id)
+                    task_ids.append(import_result.task_id)  # Keep None values for zip alignment
                     result.append(import_result.result)
             except Exception as e:
                 raise RemoteReservoirArtifactImportError(
@@ -439,9 +476,6 @@ class ArtifactRevisionService:
         # Update remote_status to SCANNED for all revisions before delegation
         result_revisions: list[ArtifactRevisionData] = []
         for revision_id in action.artifact_revision_ids:
-            await self._artifact_repository.update_artifact_revision_remote_status(
-                revision_id, ArtifactRemoteStatus.SCANNED
-            )
             revision_data = await self._artifact_repository.get_artifact_revision_by_id(revision_id)
             result_revisions.append(revision_data)
 
@@ -459,11 +493,8 @@ class ArtifactRevisionService:
         remote_reservoir_client = ReservoirRegistryClient(registry_data=registry_data)
         client_resp = await remote_reservoir_client.delegate_import_artifacts(req)
 
-        if client_resp is None:
-            raise RemoteReservoirArtifactImportError("Failed to connect to remote reservoir")
-
         # Extract task_ids from remote response
-        task_ids = [uuid.UUID(task.task_id) for task in client_resp.tasks]
+        task_ids = [uuid.UUID(task.task_id) if task.task_id else None for task in client_resp.tasks]
 
         return DelegateImportArtifactRevisionBatchActionResult(
             result=result_revisions, task_ids=task_ids
@@ -473,8 +504,12 @@ class ArtifactRevisionService:
         self, artifact_type: Optional[ArtifactType], registry_id_or_none: Optional[uuid.UUID]
     ) -> ArtifactRegistryData:
         if registry_id_or_none is None:
+            artifact_registry_cfg = self._config_provider.config.artifact_registry
+            if artifact_registry_cfg is None:
+                raise ServerMisconfiguredError("Artifact registry configuration is missing.")
+
             # TODO: Handle `artifact_type` for other types
-            registry_name = self._config_provider.config.artifact_registry.model_registry
+            registry_name = artifact_registry_cfg.model_registry
             registry_meta = (
                 await self._artifact_registry_repository.get_artifact_registry_data_by_name(
                     registry_name
@@ -487,3 +522,18 @@ class ArtifactRevisionService:
             )
 
         return registry_meta
+
+    def _is_latest_commit_hash(
+        self, artifact_revision: ArtifactRevisionData, latest_commit_hash: Optional[str]
+    ) -> bool:
+        """
+        Used in huggingface import to check if the latest commit hash matches the stored digest.
+        """
+        if latest_commit_hash is None:
+            return False
+        if (
+            artifact_revision.status == ArtifactStatus.AVAILABLE
+            and artifact_revision.digest == latest_commit_hash
+        ):
+            return True
+        return False

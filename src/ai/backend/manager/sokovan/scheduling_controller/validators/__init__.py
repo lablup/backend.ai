@@ -1,13 +1,22 @@
 """Validators for session creation."""
 
-from .base import SessionValidatorRule
+from .base import (
+    ScalingGroupFilterResult,
+    ScalingGroupFilterRule,
+    ScalingGroupFilterRuleResult,
+    SessionValidatorRule,
+)
 from .cluster import ClusterValidationRule
 from .mount import MountNameValidationRule
 from .rules import (
     ContainerLimitRule,
     ResourceLimitRule,
-    ScalingGroupAccessRule,
     ServicePortRule,
+)
+from .scaling_group_filter import (
+    PublicPrivateFilterRule,
+    ScalingGroupFilter,
+    SessionTypeFilterRule,
 )
 from .validator import SessionValidator
 
@@ -15,7 +24,12 @@ __all__ = [
     "SessionValidator",
     "SessionValidatorRule",
     "ContainerLimitRule",
-    "ScalingGroupAccessRule",
+    "ScalingGroupFilter",
+    "ScalingGroupFilterRule",
+    "ScalingGroupFilterResult",
+    "ScalingGroupFilterRuleResult",
+    "PublicPrivateFilterRule",
+    "SessionTypeFilterRule",
     "ServicePortRule",
     "ResourceLimitRule",
     "ClusterValidationRule",

@@ -9,6 +9,7 @@ import random
 import re
 import secrets
 import shutil
+import sys
 import tempfile
 from abc import ABCMeta, abstractmethod
 from contextlib import asynccontextmanager as actxmgr
@@ -48,6 +49,7 @@ from .docker import (
 from .http import wget
 from .python import check_python
 from .types import (
+    Accelerator,
     DistInfo,
     HalfstackConfig,
     HostPortPair,
@@ -103,6 +105,10 @@ class Context(metaclass=ABCMeta):
 
     @abstractmethod
     def hydrate_install_info(self) -> InstallInfo:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
         raise NotImplementedError
 
     def add_post_guide(self, guide: PostGuide) -> None:
@@ -291,8 +297,6 @@ class Context(metaclass=ABCMeta):
         )
 
     async def load_fixtures(self) -> None:
-        await self.run_manager_cli(["mgr", "schema", "oneshot"])
-
         with self.resource_path("ai.backend.install.fixtures", "example-users.json") as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
 
@@ -311,23 +315,6 @@ class Context(metaclass=ABCMeta):
             "ai.backend.install.fixtures", "example-resource-presets.json"
         ) as path:
             await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with tempfile.TemporaryDirectory() as tmpdir:
-            service = self.install_info.service_config
-            fixture_path = Path(tmpdir) / "fixture.json"
-            with open(fixture_path, "w") as fw:
-                fw.write(
-                    json.dumps({
-                        "__mode": "update",
-                        "scaling_groups": [
-                            {
-                                "name": "default",
-                                "wsproxy_addr": f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}",
-                                "wsproxy_api_token": service.wsproxy_api_token,
-                            }
-                        ],
-                    })
-                )
-            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
@@ -414,7 +401,7 @@ class Context(metaclass=ABCMeta):
                 "proxies": {
                     "local": {
                         "client_api": f"http://{storage_client_facing_addr.face.host}:{storage_client_facing_addr.face.port}",
-                        "manager_api": f"http://{storage_manager_facing_addr.face.host}:{storage_manager_facing_addr.face.port}",
+                        "manager_api": f"https://{storage_manager_facing_addr.face.host}:{storage_manager_facing_addr.face.port}",
                         "secret": self.install_info.service_config.storage_proxy_manager_auth_key,
                         "ssl_verify": "false",
                     }
@@ -461,6 +448,7 @@ class Context(metaclass=ABCMeta):
     async def configure_agent(self) -> None:
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
+        accelerator = self.install_info.accelerator
         toml_path = self.copy_config("agent.toml")
         self.sed_in_place_multi(
             toml_path,
@@ -485,25 +473,27 @@ class Context(metaclass=ABCMeta):
         Path(self.install_info.service_config.agent_var_base_path).mkdir(
             parents=True, exist_ok=True
         )
-        # enable the CUDA plugin (open-source version)
-        # The agent will show an error log if the CUDA is not available in the system and report
-        # "cuda.devices = 0" as the agent capacity, but it will still run.
+        if accelerator is not None:
+            if accelerator == Accelerator.CUDA:
+                plugin_list = ['"ai.backend.accelerator.cuda_open"']
+            elif accelerator in (
+                Accelerator.CUDA_MOCK,
+                Accelerator.CUDA_MIG_MOCK,
+                Accelerator.ROCM_MOCK,
+            ):
+                plugin_list = ['"ai.backend.accelerator.mock"']
+            else:
+                plugin_list = []
+
+            await self._configure_mock_accelerator(accelerator)
+        else:
+            plugin_list = []
+
         self.sed_in_place(
             toml_path,
-            re.compile("^(# )?allow-compute-plugins = .*", flags=re.M),
-            'allow-compute-plugins = ["ai.backend.accelerator.cuda_open"]',
+            re.compile(r"^(# )?allow-compute-plugins = .*", flags=re.M),
+            f"allow-compute-plugins = [{', '.join(plugin_list)}]",
         )
-        # TODO: let the installer enable the CUDA plugin only when it verifies CUDA availability or
-        #       via an explicit installer option/config.
-        r"""
-        if [ $ENABLE_CUDA -eq 1 ]; then
-          sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.cuda_open\"]/" ./agent.toml
-        elif [ $ENABLE_CUDA_MOCK -eq 1 ]; then
-          sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = [\"ai.backend.accelerator.mock\"]/" ./agent.toml
-        else
-          sed_inplace "s/# allow-compute-plugins =.*/allow-compute-plugins = []/" ./agent.toml
-        fi
-        """
 
     async def configure_storage_proxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -548,11 +538,11 @@ class Context(metaclass=ABCMeta):
         assert halfstack.redis_addr is not None
         with conf_path.open("r") as fp:
             data = tomlkit.load(fp)
-            wsproxy_itable = tomlkit.inline_table()
-            wsproxy_itable["url"] = (
-                f"http://{service.local_proxy_addr.face.host}:{service.local_proxy_addr.face.port}"
+            appproxy_itable = tomlkit.inline_table()
+            appproxy_itable["url"] = (
+                f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}"
             )
-            data["service"]["wsproxy"] = wsproxy_itable  # type: ignore
+            data["service"]["appproxy"] = appproxy_itable  # type: ignore
             data["api"][  # type: ignore
                 "endpoint"
             ] = f"http://{service.manager_addr.face.host}:{service.manager_addr.face.port}"
@@ -585,23 +575,6 @@ class Context(metaclass=ABCMeta):
         with conf_path.open("w") as fp:
             tomlkit.dump(data, fp)
 
-    async def configure_wsproxy(self) -> None:
-        conf_path = self.copy_config("wsproxy.toml")
-        halfstack = self.install_info.halfstack_config
-        service = self.install_info.service_config
-        assert halfstack.redis_addr is not None
-        with conf_path.open("r") as fp:
-            data = tomlkit.load(fp)
-            data["wsproxy"]["bind_host"] = service.local_proxy_addr.bind.host  # type: ignore
-            data["wsproxy"]["advertised_host"] = service.local_proxy_addr.face.host  # type: ignore
-            data["wsproxy"]["bind_api_port"] = service.local_proxy_addr.bind.port  # type: ignore
-            data["wsproxy"]["advertised_api_port"] = service.local_proxy_addr.face.port  # type: ignore
-            data["wsproxy"]["jwt_encrypt_key"] = service.wsproxy_jwt_key  # type: ignore
-            data["wsproxy"]["permit_hash_key"] = service.wsproxy_hash_key  # type: ignore
-            data["wsproxy"]["api_secret"] = service.wsproxy_api_token  # type: ignore
-        with conf_path.open("w") as fp:
-            tomlkit.dump(data, fp)
-
     async def configure_webui(self) -> None:
         dotenv_path = self.install_info.base_path / ".env"
         service = self.install_info.service_config
@@ -612,6 +585,173 @@ class Context(metaclass=ABCMeta):
             "",
         ]
         dotenv_path.write_text("\n".join(envs))
+
+    async def install_appproxy_db(self) -> None:
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
+
+        self.log_header("Setting up databases... (app-proxy)")
+
+        # 1. Connect to core DB
+        core_conn = await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="backend",
+        )
+
+        # 2. Create role/database if not exist
+        await core_conn.execute(
+            """
+            DO $$
+            BEGIN
+               IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'appproxy') THEN
+                  CREATE ROLE appproxy WITH LOGIN PASSWORD 'develove';
+               ELSE
+                  ALTER ROLE appproxy WITH LOGIN PASSWORD 'develove';
+               END IF;
+            END
+            $$;
+            """
+        )
+        exists = await core_conn.fetchval("SELECT 1 FROM pg_database WHERE datname = 'appproxy'")
+        if not exists:
+            await core_conn.execute("CREATE DATABASE appproxy OWNER appproxy;")
+        await core_conn.execute("GRANT ALL PRIVILEGES ON DATABASE appproxy TO appproxy;")
+        await core_conn.close()
+
+        # 3. Grant privileges
+        app_conn = await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="appproxy",
+        )
+        await app_conn.execute("GRANT ALL ON SCHEMA public TO appproxy;")
+        await app_conn.close()
+
+        # 4. Run Alembic migration for app-proxy
+        alembic_ini = self.copy_config("alembic-appproxy.ini")
+        await self.run_exec(
+            [sys.executable, "-m", "alembic", "-c", str(alembic_ini), "upgrade", "head"],
+            cwd=self.install_info.base_path,
+        )
+
+        # 5. Update scaling_groups in core DB
+        # TODO: Still using wsproxy_* columns for backward compatibility (same with install-dev.sh logic)
+        core_conn = await asyncpg.connect(
+            host=halfstack.postgres_addr.face.host,
+            port=halfstack.postgres_addr.face.port,
+            user=halfstack.postgres_user,
+            password=halfstack.postgres_password,
+            database="backend",
+        )
+        await core_conn.execute(
+            """
+            UPDATE scaling_groups
+            SET wsproxy_api_token = $1,
+                wsproxy_addr = $2
+            WHERE name = 'default'
+            """,
+            service.appproxy_api_secret,
+            f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
+        )
+        await core_conn.close()
+
+    async def configure_appproxy(self) -> None:
+        halfstack = self.install_info.halfstack_config
+        service = self.install_info.service_config
+
+        # Coordinator
+        coord_conf = self.copy_config("app-proxy-coordinator.toml")
+
+        self.log.write(f"DB HOST = {halfstack.postgres_addr.face.host}")
+        self.log.write(f"DB PORT = {halfstack.postgres_addr.face.port}")
+        self.log.write(f"API SECRET = {service.appproxy_api_secret}")
+
+        with coord_conf.open("r") as fp:
+            data = tomlkit.load(fp)
+            data["db"]["type"] = "postgresql"  # type: ignore[index]
+            data["db"]["name"] = "appproxy"  # type: ignore[index]
+            data["db"]["user"] = "appproxy"  # type: ignore[index]
+            data["db"]["password"] = "develove"  # type: ignore[index]
+            data["db"]["pool_size"] = 8  # type: ignore[index]
+            data["db"]["max_overflow"] = 64  # type: ignore[index]
+            data["db"]["addr"]["host"] = halfstack.postgres_addr.face.host  # type: ignore[index]
+            data["db"]["addr"]["port"] = halfstack.postgres_addr.face.port  # type: ignore[index]
+            data["redis"]["host"] = halfstack.redis_addr.face.host  # type: ignore
+            data["redis"]["port"] = halfstack.redis_addr.face.port  # type: ignore
+            data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
+            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
+            data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+            data["proxy_coordinator"]["bind_addr"]["host"] = (  # type: ignore[index]
+                service.appproxy_coordinator_addr.bind.host
+            )
+            data["proxy_coordinator"]["bind_addr"]["port"] = (  # type: ignore[index]
+                service.appproxy_coordinator_addr.bind.port
+            )
+        with coord_conf.open("w") as fp:
+            tomlkit.dump(data, fp)
+
+        # Worker
+        worker_conf = self.copy_config("app-proxy-worker.toml")
+        with worker_conf.open("r") as fp:
+            data = tomlkit.load(fp)
+            data["redis"]["host"] = halfstack.redis_addr.face.host  # type: ignore
+            data["redis"]["port"] = halfstack.redis_addr.face.port  # type: ignore
+            data["proxy_worker"]["coordinator_endpoint"] = (  # type: ignore[index]
+                f"http://{service.appproxy_coordinator_addr.bind.host}:{service.appproxy_coordinator_addr.bind.port}"
+            )
+            data["proxy_worker"]["api_bind_addr"] = {  # type: ignore[index]
+                "host": service.appproxy_worker_addr.bind.host,
+                "port": service.appproxy_worker_addr.bind.port,
+            }
+            data["proxy_worker"]["port_proxy"]["bind_port"] = service.appproxy_worker_addr.bind.port  # type: ignore[index]
+            data["proxy_worker"]["port_proxy"]["bind_host"] = service.appproxy_worker_addr.bind.host  # type: ignore[index]
+            data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
+            data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
+            data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
+        with worker_conf.open("w") as fp:
+            tomlkit.dump(data, fp)
+
+        # Alembic migration config
+        alembic_cfg = self.copy_config("alembic-appproxy.ini")
+        self.sed_in_place_multi(
+            alembic_cfg,
+            [
+                (
+                    "localhost:8100",
+                    f"{halfstack.postgres_addr.face.host}:{halfstack.postgres_addr.face.port}",
+                ),
+                (
+                    re.compile(r"^#?sqlalchemy.url\s*=.*", flags=re.M),
+                    f"sqlalchemy.url = postgresql+asyncpg://appproxy:develove@{halfstack.postgres_addr.face.host}:{halfstack.postgres_addr.face.port}/appproxy",
+                ),
+            ],
+        )
+
+    async def configure_appproxy_fixture(self) -> None:
+        self.log_header("Updating manager scaling_groups to point to appproxy coordinator...")
+
+        service = self.install_info.service_config
+        with tempfile.TemporaryDirectory() as tmpdir:
+            fixture_path = Path(tmpdir) / "fixture.json"
+            with open(fixture_path, "w") as fw:
+                fw.write(
+                    json.dumps({
+                        "__mode": "update",
+                        "scaling_groups": [
+                            {
+                                "name": "default",
+                                "wsproxy_addr": f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
+                                "wsproxy_api_token": service.appproxy_api_secret,
+                            }
+                        ],
+                    })
+                )
+            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
 
     async def configure_client(self) -> None:
         # TODO: add an option to generate keypairs
@@ -764,13 +904,13 @@ class Context(metaclass=ABCMeta):
                     if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
                         await self.alias_image(
                             "python",
-                            "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+                            "cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64",
                             "aarch64",
                         )
                     else:
                         await self.alias_image(
                             "python",
-                            "cr.backend.ai/stable/python:3.9-ubuntu20.04",
+                            "cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64",
                             "x86_64",
                         )
                 case ImageSource.DOCKER_HUB:
@@ -859,10 +999,13 @@ class DevContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
-            wsproxy_hash_key=self.generate_passphrase(),
-            wsproxy_jwt_key=self.generate_passphrase(),
-            wsproxy_api_token=self.generate_passphrase(),
+            appproxy_api_secret=secrets.token_hex(32),
+            appproxy_jwt_secret=secrets.token_hex(32),
+            appproxy_permit_hash_secret=secrets.token_hex(32),
+            appproxy_coordinator_addr=ServerAddr(HostPortPair(public_facing_address, 10200)),
+            appproxy_worker_addr=ServerAddr(HostPortPair(public_facing_address, 10201)),
         )
+
         return InstallInfo(
             version=self.dist_info.version,
             base_path=Path.cwd(),
@@ -870,6 +1013,7 @@ class DevContext(Context):
             last_updated=datetime.now(tzutc()),
             halfstack_config=halfstack_config,
             service_config=service_config,
+            accelerator=self.install_variable.accelerator,
         )
 
     def copy_config(self, template_name: str) -> Path:
@@ -895,27 +1039,55 @@ class DevContext(Context):
         await install_editable_webui(self)
         await self.install_halfstack()
 
-    async def _configure_mock_accelerator(self) -> None:
+    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
         """
         cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
         """
+        mapping = {
+            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
+            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
+            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
+        }
+
+        src = mapping.get(accelerator)
+        if not src:
+            return
+
+        dst = Path("mock-accelerator.toml")
+        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
+        shutil.copy(src, dst)
 
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
         await self.configure_manager()
+
+        # Manager schema must exist before updating scaling_groups
+        self.log_header("Initializing manager database schema...")
+        await self.run_manager_cli(["mgr", "schema", "oneshot"])
+
         self.log_header("Configuring agent...")
         await self.configure_agent()
+
+        self.log_header("Initializing app-proxy database...")
+        await self.install_appproxy_db()
+
         self.log_header("Configuring storage-proxy...")
         await self.configure_storage_proxy()
+
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
-        self.log_header("Configuring wsproxy...")
-        await self.configure_wsproxy()
-        self.log_header("Generating client environ configs...")
-        await self.configure_client()
+
         self.log_header("Loading fixtures...")
         await self.load_fixtures()
+
+        self.log_header("Configuring app-proxy...")
+        await self.configure_appproxy()
+        await self.configure_appproxy_fixture()
+
+        self.log_header("Generating client environ configs...")
+        await self.configure_client()
+
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
 
@@ -975,9 +1147,6 @@ class PackageContext(Context):
             storage_agent_ipc_base_path="ipc/storage-agent",
             storage_agent_var_base_path="var/storage-agent",
             vfolder_relpath="vfolder/local/volume1",
-            wsproxy_hash_key=self.generate_passphrase(),
-            wsproxy_jwt_key=self.generate_passphrase(),
-            wsproxy_api_token=self.generate_passphrase(),
         )
         return InstallInfo(
             version=self.dist_info.version,
@@ -986,6 +1155,7 @@ class PackageContext(Context):
             last_updated=datetime.now(tzutc()),
             halfstack_config=halfstack_config,
             service_config=service_config,
+            accelerator=self.install_variable.accelerator,
         )
 
     def copy_config(self, template_name: str) -> Path:
@@ -1106,7 +1276,8 @@ class PackageContext(Context):
                         tg.create_task(self._fetch_package("agent", vpane))
                         tg.create_task(self._fetch_package("agent-watcher", vpane))
                         tg.create_task(self._fetch_package("webserver", vpane))
-                        tg.create_task(self._fetch_package("wsproxy", vpane))
+                        tg.create_task(self._fetch_package("app-proxy-coordinator", vpane))
+                        tg.create_task(self._fetch_package("app-proxy-worker", vpane))
                         tg.create_task(self._fetch_package("storage-proxy", vpane))
                         tg.create_task(self._fetch_package("client", vpane))
                         tg.create_task(self._fetch_checksums(vpane))
@@ -1115,7 +1286,8 @@ class PackageContext(Context):
                     await self._verify_package("agent", fat=False)
                     await self._verify_package("agent-watcher", fat=False)
                     await self._verify_package("webserver", fat=False)
-                    await self._verify_package("wsproxy", fat=False)
+                    await self._verify_package("app-proxy-coordinator", fat=False)
+                    await self._verify_package("app-proxy-worker", fat=False)
                     await self._verify_package("storage-proxy", fat=False)
                     await self._verify_package("client", fat=False)
                 case PackageSource.LOCAL_DIR:
@@ -1130,7 +1302,12 @@ class PackageContext(Context):
                     await self._install_package(
                         "webserver", vpane, fat=self.dist_info.use_fat_binary
                     )
-                    await self._install_package("wsproxy", vpane, fat=self.dist_info.use_fat_binary)
+                    await self._install_package(
+                        "app-proxy-coordinator", vpane, fat=self.dist_info.use_fat_binary
+                    )
+                    await self._install_package(
+                        "app-proxy-worker", vpane, fat=self.dist_info.use_fat_binary
+                    )
                     await self._install_package(
                         "storage-proxy", vpane, fat=self.dist_info.use_fat_binary
                     )
@@ -1140,13 +1317,36 @@ class PackageContext(Context):
                     await self._verify_package("agent", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
-                    await self._verify_package("wsproxy", fat=self.dist_info.use_fat_binary)
+                    await self._verify_package(
+                        "app-proxy-coordinator", fat=self.dist_info.use_fat_binary
+                    )
+                    await self._verify_package(
+                        "app-proxy-worker", fat=self.dist_info.use_fat_binary
+                    )
                     await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("client", fat=self.dist_info.use_fat_binary)
         finally:
             vpane.remove()
         self.log_header("Installing databases (halfstack)...")
         await self.install_halfstack()
+
+    async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
+        """
+        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
+        """
+        mapping = {
+            Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
+            Accelerator.CUDA_MIG_MOCK: "configs/accelerator/cuda-mock-mig.toml",
+            Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
+        }
+
+        src = mapping.get(accelerator)
+        if not src:
+            return
+
+        dst = Path("mock-accelerator.toml")
+        print(f"[Installer] Copying accelerator config: {src} -> {dst}")
+        shutil.copy(src, dst)
 
     async def configure(self) -> None:
         self.log_header("Configuring manager...")
@@ -1158,8 +1358,9 @@ class PackageContext(Context):
         self.log_header("Configuring webserver and webui...")
         await self.configure_webserver()
         await self.configure_webui()
-        self.log_header("Configuring wsproxy...")
-        await self.configure_wsproxy()
+        self.log_header("Configuring app-proxy...")
+        await self.install_appproxy_db()
+        await self.configure_appproxy()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
         self.log_header("Loading fixtures...")

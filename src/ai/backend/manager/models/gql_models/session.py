@@ -13,6 +13,7 @@ from typing import (
 )
 
 import graphene
+import graphene_federation
 import graphql
 import more_itertools
 import sqlalchemy as sa
@@ -23,6 +24,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common import validators as tx
+from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
     ClusterMode,
@@ -32,6 +34,7 @@ from ai.backend.common.types import (
     SessionResult,
     VFolderMount,
 )
+from ai.backend.manager.api.gql.base import resolve_global_id
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.idle import ReportInfo
@@ -74,8 +77,6 @@ from ..rbac.permission_defs import ComputeSessionPermission
 from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
 from ..session import (
     DEFAULT_SESSION_ORDERING,
-    SESSION_PRIORITY_MAX,
-    SESSION_PRIORITY_MIN,
     SessionDependencyRow,
     SessionRow,
     SessionTypes,
@@ -190,6 +191,7 @@ class SessionPermissionValueField(graphene.Scalar):
         return ComputeSessionPermission(value)
 
 
+@graphene_federation.key("id")
 class ComputeSessionNode(graphene.ObjectType):
     class Meta:
         interfaces = (AsyncNode,)
@@ -446,6 +448,16 @@ class ComputeSessionNode(graphene.ObjectType):
         )
         result.permissions = [] if permissions is None else permissions
         return result
+
+    async def __resolve_reference(
+        self, info: graphene.ResolveInfo, **kwargs
+    ) -> Optional["ComputeSessionNode"]:
+        # TODO: Confirm if scope and permsission are correct
+        # Parse the global ID from Federation (converts base64 encoded string to tuple)
+        resolved_id = resolve_global_id(self.id)
+        return await ComputeSessionNode.get_accessible_node(
+            info, resolved_id, SystemScope(), ComputeSessionPermission.READ_ATTRIBUTE
+        )
 
     async def resolve_idle_checks(self, info: graphene.ResolveInfo) -> dict[str, Any] | None:
         graph_ctx: GraphQueryContext = info.context

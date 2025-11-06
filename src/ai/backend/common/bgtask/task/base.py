@@ -1,55 +1,47 @@
 from abc import ABC, abstractmethod
-from collections.abc import Mapping
-from typing import Any, Generic, Optional, Self, TypeVar
+from typing import Generic, Optional, TypeVar
 
-from ..types import TaskName
+from pydantic import BaseModel, ConfigDict
 
-
-class BaseBackgroundTaskArgs(ABC):
-    @abstractmethod
-    def to_redis_json(self) -> Mapping[str, Any]:
-        """
-        Convert the instance to a metadata body dictionary.
-        This method should be implemented by subclasses to provide
-        the specific conversion logic.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
-
-    @classmethod
-    @abstractmethod
-    def from_redis_json(cls, body: Mapping[str, Any]) -> Self:
-        """
-        Create an instance from the given metadata body dictionary.
-        This method should be implemented by subclasses to provide
-        the specific loading logic.
-        """
-        raise NotImplementedError("Subclasses must implement this method")
+from ..types import BgtaskNameBase
 
 
-class BaseBackgroundTaskResult(ABC):
+class BaseBackgroundTaskManifest(BaseModel):
     """
-    Abstract base class for background task results.
-    This represents the result of a background task execution.
+    Base class for background task manifests using Pydantic.
+    Provides automatic serialization/deserialization via model_dump() and model_validate().
     """
 
-    @abstractmethod
-    def serialize(self) -> Optional[str]:
-        """Serialize the task result to a string."""
-        raise NotImplementedError("Subclasses must implement this method")
+    model_config = ConfigDict(
+        # Allow custom types in manifests
+        arbitrary_types_allowed=True,
+        extra="forbid",
+        frozen=True,
+    )
 
 
-class EmptyTaskResult(BaseBackgroundTaskResult):
-    def serialize(self) -> Optional[str]:
-        return None
+class BaseBackgroundTaskResult(BaseModel):
+    """
+    Base class for background task results using Pydantic.
+    Provides automatic serialization/deserialization via model_dump() and model_validate().
+    """
+
+    model_config = ConfigDict(
+        # Allow custom types in results (e.g., UUID, custom domain types)
+        arbitrary_types_allowed=True,
+        extra="forbid",
+        frozen=True,
+    )
 
 
-TFunctionArgs = TypeVar("TFunctionArgs", bound=BaseBackgroundTaskArgs)
+TManifest = TypeVar("TManifest", bound=BaseBackgroundTaskManifest)
+TResult = TypeVar("TResult", bound=Optional[BaseBackgroundTaskResult])
 
 
-class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
+class BaseBackgroundTaskHandler(Generic[TManifest, TResult], ABC):
     @classmethod
     @abstractmethod
-    def name(cls) -> TaskName:
+    def name(cls) -> BgtaskNameBase:
         """
         Return the name of the background task.
         This method should be implemented by subclasses to provide
@@ -59,18 +51,19 @@ class BaseBackgroundTaskHandler(Generic[TFunctionArgs], ABC):
 
     @classmethod
     @abstractmethod
-    def args_type(cls) -> type[TFunctionArgs]:
+    def manifest_type(cls) -> type[TManifest]:
         """
-        Return the type of arguments that this task expects.
+        Return the type of manifest that this task expects.
         This method should be implemented by subclasses to provide
-        the specific argument type.
+        the specific manifest type.
         """
         raise NotImplementedError("Subclasses must implement this method")
 
     @abstractmethod
-    async def execute(self, args: TFunctionArgs) -> BaseBackgroundTaskResult:
+    async def execute(self, manifest: TManifest) -> TResult:
         """
-        Execute the background task with the provided reporter and arguments.
+        Execute the background task with the provided manifest.
+        Returns the result or None if no meaningful result is produced.
         This method should be implemented by subclasses to provide
         the specific execution logic.
         """

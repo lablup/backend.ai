@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.common.types import (
     AccessKey,
     ClusterMode,
@@ -75,6 +76,10 @@ async def scheduling_controller(
     mock_config_provider,
 ):
     """Create a SchedulingController instance with mocks."""
+    hook_result = HookResult(status=HookResults.PASSED)
+    hook_plugin_ctx = AsyncMock()
+    hook_plugin_ctx.notify = AsyncMock(return_value=hook_result)
+    hook_plugin_ctx.dispatch = AsyncMock(return_value=hook_result)
     args = SchedulingControllerArgs(
         repository=mock_repository,
         config_provider=mock_config_provider,
@@ -82,6 +87,7 @@ async def scheduling_controller(
         event_producer=AsyncMock(),
         valkey_schedule=AsyncMock(),
         network_plugin_ctx=AsyncMock(),
+        hook_plugin_ctx=hook_plugin_ctx,
     )
     return SchedulingController(args)
 

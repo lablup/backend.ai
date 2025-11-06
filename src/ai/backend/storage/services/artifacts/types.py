@@ -3,27 +3,14 @@ from __future__ import annotations
 import abc
 import logging
 from dataclasses import dataclass
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
-from ai.backend.common.bgtask.bgtask import ProgressReporter
-from ai.backend.common.data.storage.registries.types import FileObjectData, ModelTarget
+from ai.backend.common.artifact_storage import ImportStepContext
+from ai.backend.common.data.storage.registries.types import FileObjectData
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.storage.storages.storage_pool import StoragePool
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
-
-
-@dataclass
-class ImportStepContext:
-    """Context shared across import steps"""
-
-    model: ModelTarget
-    registry_name: str
-    storage_pool: StoragePool
-    progress_reporter: Optional[ProgressReporter]
-    storage_step_mappings: dict[ArtifactStorageImportStep, str]
-    step_metadata: dict[str, Any]  # For passing data between steps
 
 
 @dataclass
@@ -31,6 +18,15 @@ class DownloadStepResult:
     """Result of download step"""
 
     downloaded_files: list[tuple[FileObjectData, str]]  # (file_info, storage_key)
+    storage_name: str
+    total_bytes: int
+
+
+@dataclass
+class VerifyStepResult:
+    """Result of verify step"""
+
+    verified_files: list[tuple[FileObjectData, str]]  # (file_info, storage_key)
     storage_name: str
     total_bytes: int
 
@@ -75,8 +71,16 @@ class ImportPipeline:
                 completed_steps.append(step)
 
             # On success, cleanup all non-archive steps
+            archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
+
             for step in completed_steps:
                 if step.step_type != ArtifactStorageImportStep.ARCHIVE:
+                    step_storage = context.storage_step_mappings.get(step.step_type)
+
+                    # Skip cleanup if this step uses the same storage as archive step
+                    if step_storage == archive_storage:
+                        continue
+
                     try:
                         await step.cleanup_stage(context)
                     except Exception:

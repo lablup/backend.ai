@@ -10,6 +10,7 @@ from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.permission.permission_group import (
     PermissionGroupCreator,
     PermissionGroupData,
+    PermissionGroupExtendedData,
 )
 from ai.backend.manager.data.permission.types import (
     ScopeType,
@@ -23,6 +24,7 @@ from ...base import (
 )
 
 if TYPE_CHECKING:
+    from ..association_scopes_entities import AssociationScopesEntitiesRow
     from ..role import RoleRow
     from .permission import PermissionRow
 
@@ -44,6 +46,11 @@ class PermissionGroupRow(Base):
         "RoleRow",
         back_populates="permission_group_rows",
         primaryjoin="RoleRow.id == foreign(PermissionGroupRow.role_id)",
+    )
+    mapped_entities: list[AssociationScopesEntitiesRow] = relationship(
+        "AssociationScopesEntitiesRow",
+        primaryjoin="PermissionGroupRow.scope_id == foreign(AssociationScopesEntitiesRow.scope_id)",
+        viewonly=True,
     )
     permission_rows: list[PermissionRow] = relationship(
         "PermissionRow",
@@ -67,4 +74,12 @@ class PermissionGroupRow(Base):
             id=self.id,
             role_id=self.role_id,
             scope_id=ScopeId(scope_type=self.scope_type, scope_id=self.scope_id),
+        )
+
+    def to_extended_data(self) -> PermissionGroupExtendedData:
+        return PermissionGroupExtendedData(
+            id=self.id,
+            role_id=self.role_id,
+            scope_id=ScopeId(scope_type=self.scope_type, scope_id=self.scope_id),
+            permissions=[permission.to_data() for permission in self.permission_rows],
         )

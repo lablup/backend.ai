@@ -3,7 +3,10 @@ from __future__ import annotations
 import enum
 import os
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
+
+if TYPE_CHECKING:
+    pass
 
 from pydantic import (
     AliasChoices,
@@ -15,6 +18,7 @@ from pydantic import (
 )
 
 from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.data.config.types import EtcdConfigData
 from ai.backend.common.typed_validators import (
@@ -1024,17 +1028,19 @@ class LicenseConfig(BaseConfigSchema):
 
 
 class EventLoopType(enum.StrEnum):
-    asyncio = "asyncio"
-    uvloop = "uvloop"
+    ASYNCIO = "asyncio"
+    UVLOOP = "uvloop"
 
 
 class WebServerConfig(BaseConfigSchema):
     event_loop: EventLoopType = Field(
-        default=EventLoopType.uvloop,
+        default=EventLoopType.UVLOOP,
         description="""
-        Event loop type.
+        Event loop implementation to use.
+        'asyncio' is the Python standard library implementation.
+        'uvloop' is a faster alternative but may have compatibility issues with some libraries.
         """,
-        examples=["asyncio", "uvloop"],
+        examples=[item.value for item in EventLoopType],
         validation_alias=AliasChoices("event_loop", "event-loop"),
         serialization_alias="event-loop",
     )
@@ -1168,6 +1174,14 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         API configuration.
         """,
     )
+    jwt: SharedJWTConfig = Field(
+        default_factory=SharedJWTConfig,
+        description="""
+        JWT authentication configuration.
+        Shared configuration for JWT token signing and verification.
+        Used by both manager and webserver for stateless authentication.
+        """,
+    )
     session: SessionConfig = Field(
         default_factory=SessionConfig,
         description="""
@@ -1198,7 +1212,7 @@ class WebServerUnifiedConfig(BaseConfigSchema):
         Apollo Router configuration.
         """,
         validation_alias=AliasChoices("apollo_router", "apollo-router"),
-        serialization_alias="sapollo-router",
+        serialization_alias="apollo-router",
     )
     logging: LoggingConfig = Field(
         default_factory=LoggingConfig,

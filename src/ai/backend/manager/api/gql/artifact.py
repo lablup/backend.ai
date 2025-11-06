@@ -9,6 +9,7 @@ from aiotools import apartial
 from strawberry import ID, UNSET, Info
 from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.scalars import JSON
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
@@ -26,7 +27,9 @@ from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
+    ArtifactFilterOptions,
     ArtifactOrderField,
+    ArtifactOrderingOptions,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionOrderField,
@@ -40,8 +43,6 @@ from ai.backend.manager.errors.artifact import (
     ArtifactScanLimitExceededError,
 )
 from ai.backend.manager.repositories.artifact.types import (
-    ArtifactFilterOptions,
-    ArtifactOrderingOptions,
     ArtifactRemoteStatusFilter,
     ArtifactRemoteStatusFilterType,
     ArtifactRevisionFilterOptions,
@@ -106,9 +107,9 @@ class ArtifactFilter:
 
         # Handle basic filters
         repo_filter.artifact_type = self.type
-        repo_filter.name_filter = self.name
-        repo_filter.registry_filter = self.registry
-        repo_filter.source_filter = self.source
+        repo_filter.name_filter = self.name.to_dataclass() if self.name else None
+        repo_filter.registry_filter = self.registry.to_dataclass() if self.registry else None
+        repo_filter.source_filter = self.source.to_dataclass() if self.source else None
         repo_filter.availability = self.availability
 
         # Handle logical operations
@@ -508,6 +509,7 @@ class Artifact(Node):
     registry: SourceInfo
     source: SourceInfo
     readonly: bool
+    extra: Optional[JSON]
     scanned_at: datetime
     updated_at: datetime
     availability: ArtifactAvailability
@@ -522,6 +524,7 @@ class Artifact(Node):
             registry=SourceInfo(name=data.registry_type.value, url=registry_url),
             source=SourceInfo(name=data.source_registry_type.value, url=source_url),
             readonly=data.readonly,
+            extra=data.extra,
             scanned_at=data.scanned_at,
             updated_at=data.updated_at,
             availability=data.availability,
@@ -583,6 +586,9 @@ class ArtifactRevision(Node):
     size: Optional[ByteSize]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
+    digest: Optional[str] = strawberry.field(
+        description="Digest at the time of import. None for models that have not been imported. Added in 25.17.0"
+    )
 
     @classmethod
     def from_dataclass(cls, data: ArtifactRevisionData) -> Self:
@@ -595,6 +601,7 @@ class ArtifactRevision(Node):
             size=ByteSize(data.size) if data.size is not None else None,
             created_at=data.created_at,
             updated_at=data.updated_at,
+            digest=data.digest,
         )
 
     @strawberry.field
@@ -719,7 +726,7 @@ class DelegateScanArtifactsPayload:
     """)
 )
 class ArtifactRevisionImportTask:
-    task_id: ID
+    task_id: Optional[ID]
     artifact_revision: ArtifactRevision
 
 
@@ -1302,7 +1309,7 @@ async def scan_artifacts(
     Import scanned artifact revisions from external registries.
 
     Downloads the actual files for the specified artifact revisions, transitioning
-    them from SCANNED → PULLING → PULLED → AVAILABLE status.
+    them from SCANNED → PULLING → VERIFYING → AVAILABLE status.
 
     Returns background tasks that can be monitored for import progress.
     Once AVAILABLE, artifacts can be used by users in their sessions.
@@ -1445,10 +1452,13 @@ async def delegate_import_artifacts(
             "Mismatch between artifact revisions and task IDs returned"
         )
 
-    for task_id, artifact_revision in zip(action_result.task_ids, artifact_revisions, strict=True):
+    for task_uuid, artifact_revision in zip(
+        action_result.task_ids, artifact_revisions, strict=True
+    ):
+        task_id = ID(str(task_uuid)) if task_uuid is not None else None
         tasks.append(
             ArtifactRevisionImportTask(
-                task_id=ID(str(task_id)),
+                task_id=task_id,
                 artifact_revision=artifact_revision,
             )
         )

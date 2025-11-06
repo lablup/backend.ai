@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "25.16.0rc1",
+    "version": "25.16.0",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -5038,8 +5038,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": "\nGraphQL endpoint using Strawberry schema.\n\nSupports both query/mutation via POST and subscriptions via WebSocket.\n"
+        "description": "\nGraphQL endpoint using Strawberry schema.\n\nSupports both query/mutation via POST and subscriptions via WebSocket.\n\n\n**Preconditions:**\n* User privilege required.\n"
       },
       "post": {
         "operationId": "root.handle_graphql_strawberry.2",
@@ -5051,8 +5056,13 @@
             "description": "Successful response"
           }
         },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
         "parameters": [],
-        "description": "\nGraphQL endpoint using Strawberry schema.\n\nSupports both query/mutation via POST and subscriptions via WebSocket.\n"
+        "description": "\nGraphQL endpoint using Strawberry schema.\n\nSupports both query/mutation via POST and subscriptions via WebSocket.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/spec/graphiql": {

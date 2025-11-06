@@ -137,7 +137,7 @@ class ProjectNotFound(BackendAIError, web.HTTPNotFound):
     error_title = "Project not found."
 
     def __init__(self, project_id: Optional[Union[str, Any]] = None) -> None:
-        self._project_id = project_id
+        super().__init__(f"Project not found: {project_id}")
 
     @classmethod
     def error_code(cls) -> ErrorCode:
@@ -291,6 +291,19 @@ class DomainHasGroups(BackendAIError, web.HTTPConflict):
         )
 
 
+class DomainDeletionFailed(BackendAIError, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/domain-deletion-failed"
+    error_title = "Failed to delete domain."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DOMAIN,
+            operation=ErrorOperation.HARD_DELETE,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class DomainUpdateNotAllowed(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/domain-update-not-allowed"
     error_title = "Domain update not allowed."
@@ -353,4 +366,17 @@ class InvalidPresetQuery(BackendAIError, web.HTTPBadRequest):
             domain=ErrorDomain.RESOURCE_PRESET,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
+class NoAvailableScalingGroup(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/no-available-scaling-group"
+    error_title = "No scaling groups available for this session."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.SCALING_GROUP,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.NOT_FOUND,
         )

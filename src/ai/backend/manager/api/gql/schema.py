@@ -5,6 +5,15 @@ from strawberry.schema.config import StrawberryConfig
 from .agent_stats import (
     agent_stats,
 )
+from .app_config import (
+    delete_domain_app_config,
+    delete_user_app_config,
+    domain_app_config,
+    merged_app_config,
+    upsert_domain_app_config,
+    upsert_user_app_config,
+    user_app_config,
+)
 from .artifact import (
     approve_artifact_revision,
     artifact,
@@ -34,18 +43,27 @@ from .huggingface_registry import (
     huggingface_registry,
     update_huggingface_registry,
 )
+from .model_deployment.access_token import create_access_token
+from .model_deployment.auto_scaling_rule import (
+    create_auto_scaling_rule,
+    delete_auto_scaling_rule,
+    update_auto_scaling_rule,
+)
 from .model_deployment.model_deployment import (
     create_model_deployment,
     delete_model_deployment,
     deployment,
     deployment_status_changed,
     deployments,
-    replica,
-    replica_status_changed,
+    sync_replicas,
     update_model_deployment,
 )
+from .model_deployment.model_replica import replica, replica_status_changed, replicas
 from .model_deployment.model_revision import (
+    add_model_revision,
     create_model_revision,
+    inference_runtime_config,
+    inference_runtime_configs,
     revision,
     revisions,
 )
@@ -87,10 +105,14 @@ class Query:
     artifacts = artifacts
     artifact_revision = artifact_revision
     artifact_revisions = artifact_revisions
+    domain_app_config = domain_app_config
+    user_app_config = user_app_config
+    merged_app_config = merged_app_config
     deployments = deployments
     deployment = deployment
     revisions = revisions
     revision = revision
+    replicas = replicas
     replica = replica
     object_storage = object_storage
     object_storages = object_storages
@@ -102,6 +124,8 @@ class Query:
     reservoir_registries = reservoir_registries
     default_artifact_registry = default_artifact_registry
     agent_stats = agent_stats
+    inference_runtime_configs = inference_runtime_configs
+    inference_runtime_config = inference_runtime_config
 
 
 @strawberry.type
@@ -109,6 +133,10 @@ class Mutation:
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
+    upsert_domain_app_config = upsert_domain_app_config
+    upsert_user_app_config = upsert_user_app_config
+    delete_domain_app_config = delete_domain_app_config
+    delete_user_app_config = delete_user_app_config
     delegate_scan_artifacts = delegate_scan_artifacts
     delegate_import_artifacts = delegate_import_artifacts
     update_artifact = update_artifact
@@ -119,9 +147,14 @@ class Mutation:
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
+    sync_replicas = sync_replicas
+    add_model_revision = add_model_revision
     create_model_revision = create_model_revision
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
+    create_auto_scaling_rule = create_auto_scaling_rule
+    update_auto_scaling_rule = update_auto_scaling_rule
+    delete_auto_scaling_rule = delete_auto_scaling_rule
     delete_object_storage = delete_object_storage
     create_vfs_storage = create_vfs_storage
     update_vfs_storage = update_vfs_storage
@@ -138,6 +171,7 @@ class Mutation:
     get_presigned_upload_url = get_presigned_upload_url
     approve_artifact_revision = approve_artifact_revision
     reject_artifact_revision = reject_artifact_revision
+    create_access_token = create_access_token
 
 
 @strawberry.type

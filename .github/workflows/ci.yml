@@ -149,7 +149,7 @@ jobs:
         fi
         pants lint --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: pants.lint.log
         path: .pants.d/workdir/pants.log
@@ -273,7 +273,7 @@ jobs:
         fi
         pants check --changed-since=$BASE_REF --changed-dependents=transitive
     - name: Upload pants log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: pants.check.log
         path: .pants.d/workdir/pants.log
@@ -340,7 +340,7 @@ jobs:
         fi
         pants test --changed-since=$BASE_REF --changed-dependents=transitive -- -v
     - name: Upload pants log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: pants.test.log
         path: .pants.d/workdir/pants.log
@@ -402,12 +402,12 @@ jobs:
         mv dist/checksum.txt dist/checksum-${platform_suffix}.txt
         rm dist/*.sha256
     - name: Upload scies
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: scies-${{ matrix.os }}
         path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: pants-${{ matrix.os }}.build-scies.log
         path: .pants.d/workdir/pants.log
@@ -448,12 +448,12 @@ jobs:
       run: |
         ./scripts/build-wheels.sh
     - name: Upload wheels
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: wheels
         path: dist/*
     - name: Upload pants log
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: pants.build-wheels.log
         path: .pants.d/workdir/pants.log
@@ -507,12 +507,12 @@ jobs:
         python ./scripts/extract-release-changelog.py
         python ./scripts/determine-release-type.py
     - name: Download wheels
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v6
       with:
         name: wheels
         path: dist
     - name: Download scies
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v6
       with:
         pattern: scies-*
         path: dist
@@ -522,7 +522,7 @@ jobs:
         cat dist/checksum-*.txt > dist/checksum.txt
         sort -u -k2 dist/checksum.txt -o dist/checksum.txt
     - name: Download SBOM report
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v6
       with:
         name: SBOM report
         path: dist
@@ -659,7 +659,7 @@ jobs:
       with:
         activate-conda: false
     - name: Download wheels
-      uses: actions/download-artifact@v5
+      uses: actions/download-artifact@v6
       with:
         name: wheels
         path: dist
