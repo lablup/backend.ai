@@ -11,13 +11,7 @@ from typing import Iterable, Tuple
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.api_handlers import (
-    APIResponse,
-    BodyParam,
-    PathParam,
-    QueryParam,
-    api_handler,
-)
+from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.common.contexts.user import current_user
 from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.notification_request import (
@@ -27,8 +21,8 @@ from ai.backend.manager.dto.notification_request import (
     DeleteNotificationRulePathParam,
     GetNotificationChannelPathParam,
     GetNotificationRulePathParam,
-    ListNotificationChannelsReq,
-    ListNotificationRulesReq,
+    SearchNotificationChannelsReq,
+    SearchNotificationRulesReq,
     UpdateNotificationChannelBodyParam,
     UpdateNotificationChannelPathParam,
     UpdateNotificationRuleBodyParam,
@@ -48,11 +42,6 @@ from ai.backend.manager.dto.notification_response import (
     UpdateNotificationChannelResponse,
     UpdateNotificationRuleResponse,
 )
-from ai.backend.manager.repositories.base import Querier
-from ai.backend.manager.repositories.notification.options import (
-    NotificationChannelConditions,
-    NotificationRuleConditions,
-)
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
     CreateRuleAction,
@@ -66,15 +55,20 @@ from ai.backend.manager.services.notification.actions import (
     UpdateRuleAction,
 )
 
-from ..data.notification import NotificationChannelCreator, NotificationRuleCreator
-from .auth import auth_required_for_method
-from .types import CORSOptions, WebMiddleware
+from ...data.notification import NotificationChannelCreator, NotificationRuleCreator
+from ..auth import auth_required_for_method
+from ..types import CORSOptions, WebMiddleware
+from .adapter import NotificationChannelAdapter, NotificationRuleAdapter
 
 __all__ = ("create_app",)
 
 
 class NotificationAPIHandler:
     """REST API handler class for notification operations."""
+
+    def __init__(self) -> None:
+        self.channel_adapter = NotificationChannelAdapter()
+        self.rule_adapter = NotificationRuleAdapter()
 
     # Notification Channel Endpoints
 
@@ -91,6 +85,10 @@ class NotificationAPIHandler:
         assert me is not None
 
         # Convert request to creator
+        # config validator in request DTO ensures this is WebhookConfig
+        from ai.backend.common.data.notification import WebhookConfig
+
+        assert isinstance(body.parsed.config, WebhookConfig)
         creator = NotificationChannelCreator(
             name=body.parsed.name,
             description=body.parsed.description,
@@ -113,20 +111,16 @@ class NotificationAPIHandler:
 
     @auth_required_for_method
     @api_handler
-    async def list_channels(
+    async def search_channels(
         self,
-        query: QueryParam[ListNotificationChannelsReq],
+        body: BodyParam[SearchNotificationChannelsReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        """List all notification channels."""
+        """Search notification channels with filters, orders, and pagination."""
         processors = processors_ctx.processors
 
-        # Build querier from query parameters
-        conditions = []
-        if query.parsed.enabled_only:
-            conditions.append(NotificationChannelConditions.by_enabled(True))
-
-        querier = Querier(conditions=conditions, orders=[])
+        # Build querier using adapter
+        querier = self.channel_adapter.build_querier(body.parsed)
 
         # Call service action
         action_result = await processors.notification.list_channels.wait_for_complete(
@@ -242,22 +236,16 @@ class NotificationAPIHandler:
 
     @auth_required_for_method
     @api_handler
-    async def list_rules(
+    async def search_rules(
         self,
-        query: QueryParam[ListNotificationRulesReq],
+        body: BodyParam[SearchNotificationRulesReq],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
-        """List all notification rules."""
+        """Search notification rules with filters, orders, and pagination."""
         processors = processors_ctx.processors
 
-        # Build querier from query parameters
-        conditions = []
-        if query.parsed.enabled_only:
-            conditions.append(NotificationRuleConditions.by_enabled(True))
-        if query.parsed.rule_type is not None:
-            conditions.append(NotificationRuleConditions.by_rule_types([query.parsed.rule_type]))
-
-        querier = Querier(conditions=conditions, orders=[])
+        # Build querier using adapter
+        querier = self.rule_adapter.build_querier(body.parsed)
 
         # Call service action
         action_result = await processors.notification.list_rules.wait_for_complete(
@@ -349,14 +337,14 @@ def create_app(
 
     # Channel routes
     cors.add(app.router.add_route("POST", "/channels", api_handler.create_channel))
-    cors.add(app.router.add_route("GET", "/channels", api_handler.list_channels))
+    cors.add(app.router.add_route("POST", "/channels/search", api_handler.search_channels))
     cors.add(app.router.add_route("GET", "/channels/{channel_id}", api_handler.get_channel))
     cors.add(app.router.add_route("PATCH", "/channels/{channel_id}", api_handler.update_channel))
     cors.add(app.router.add_route("DELETE", "/channels/{channel_id}", api_handler.delete_channel))
 
     # Rule routes
     cors.add(app.router.add_route("POST", "/rules", api_handler.create_rule))
-    cors.add(app.router.add_route("GET", "/rules", api_handler.list_rules))
+    cors.add(app.router.add_route("POST", "/rules/search", api_handler.search_rules))
     cors.add(app.router.add_route("GET", "/rules/{rule_id}", api_handler.get_rule))
     cors.add(app.router.add_route("PATCH", "/rules/{rule_id}", api_handler.update_rule))
     cors.add(app.router.add_route("DELETE", "/rules/{rule_id}", api_handler.delete_rule))

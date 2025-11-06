@@ -1,81 +1,57 @@
 import uuid
-from typing import Optional, Union
+from typing import Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dto.manager.notification import (
+    CreateNotificationChannelRequest,
+    CreateNotificationRuleRequest,
+    NotificationChannelFilter,
+    NotificationChannelOrder,
+    NotificationRuleFilter,
+    NotificationRuleOrder,
+    UpdateNotificationChannelRequest,
+    UpdateNotificationRuleRequest,
+)
 from ai.backend.manager.data.notification import (
     NotificationChannelModifier,
-    NotificationChannelType,
     NotificationRuleModifier,
-    NotificationRuleType,
-    WebhookConfig,
 )
 from ai.backend.manager.types import OptionalState
 
-# Type alias for channel configuration union (currently only webhook, can be extended)
-NotificationChannelConfig = Union[WebhookConfig]
+
+# Re-export common DTOs with BaseRequestModel for manager API
+class CreateNotificationChannelReq(CreateNotificationChannelRequest, BaseRequestModel):
+    """Manager API request to create a notification channel."""
+
+    pass
 
 
-class CreateNotificationChannelReq(BaseRequestModel):
-    name: str = Field(description="Channel name")
-    description: Optional[str] = Field(default=None, description="Channel description")
-    channel_type: NotificationChannelType = Field(description="Channel type (e.g., WEBHOOK)")
-    config: NotificationChannelConfig = Field(description="Channel configuration")
-    enabled: bool = Field(default=True, description="Whether the channel is enabled")
+class CreateNotificationRuleReq(CreateNotificationRuleRequest, BaseRequestModel):
+    """Manager API request to create a notification rule."""
 
-    @field_validator("config", mode="before")
-    @classmethod
-    def validate_config(
-        cls, v: Union[dict, NotificationChannelConfig], info
-    ) -> NotificationChannelConfig:
-        """Validate and convert config based on channel_type."""
-        if isinstance(v, WebhookConfig):
-            return v
-        # For dict input, convert to appropriate config type
-        if isinstance(v, dict):
-            channel_type = info.data.get("channel_type")
-            match channel_type:
-                case NotificationChannelType.WEBHOOK:
-                    return WebhookConfig(**v)
-                case _:
-                    raise ValueError(f"Unsupported channel_type: {channel_type}")
-        raise ValueError(f"Invalid config type: {type(v)}")
+    pass
 
 
 class UpdateNotificationChannelPathParam(BaseRequestModel):
     channel_id: uuid.UUID = Field(description="The notification channel ID to update")
 
 
-class UpdateNotificationChannelBodyParam(BaseRequestModel):
-    name: Optional[str] = Field(default=None, description="Updated channel name")
-    description: Optional[str] = Field(default=None, description="Updated channel description")
-    config: Optional[NotificationChannelConfig] = Field(
-        default=None, description="Updated channel configuration"
-    )
-    enabled: Optional[bool] = Field(default=None, description="Updated enabled status")
-
-    @field_validator("config", mode="before")
-    @classmethod
-    def validate_config(
-        cls, v: Optional[Union[dict, NotificationChannelConfig]]
-    ) -> Optional[NotificationChannelConfig]:
-        """Validate and convert config if provided."""
-        if v is None:
-            return None
-        if isinstance(v, WebhookConfig):
-            return v
-        if isinstance(v, dict):
-            return WebhookConfig(**v)
-        raise ValueError(f"Invalid config type: {type(v)}")
+class UpdateNotificationChannelBodyParam(UpdateNotificationChannelRequest, BaseRequestModel):
+    """Manager API request to update a notification channel."""
 
     def to_modifier(self) -> NotificationChannelModifier:
+        from ai.backend.common.data.notification import WebhookConfig
+
         modifier = NotificationChannelModifier()
         if self.name is not None:
             modifier.name = OptionalState.update(self.name)
         if self.description is not None:
             modifier.description = OptionalState.update(self.description)
         if self.config is not None:
+            # config validator ensures this is WebhookConfig
+            assert isinstance(self.config, WebhookConfig)
             modifier.config = OptionalState.update(self.config)
         if self.enabled is not None:
             modifier.enabled = OptionalState.update(self.enabled)
@@ -90,35 +66,28 @@ class DeleteNotificationChannelPathParam(BaseRequestModel):
     channel_id: uuid.UUID = Field(description="The notification channel ID to delete")
 
 
-class ListNotificationChannelsReq(BaseRequestModel):
-    enabled_only: bool = Field(default=False, description="Only list enabled channels")
+class SearchNotificationChannelsReq(BaseRequestModel):
+    """Request body for searching notification channels with filters, orders, and pagination."""
+
+    filter: Optional[NotificationChannelFilter] = Field(
+        default=None, description="Filter conditions"
+    )
+    order: Optional[NotificationChannelOrder] = Field(
+        default=None, description="Order specification"
+    )
+    limit: Optional[int] = Field(default=None, ge=1, le=1000, description="Maximum items to return")
+    offset: Optional[int] = Field(default=None, ge=0, description="Number of items to skip")
 
 
 # Notification Rule Request DTOs
-
-
-class CreateNotificationRuleReq(BaseRequestModel):
-    name: str = Field(description="Rule name")
-    description: Optional[str] = Field(default=None, description="Rule description")
-    rule_type: NotificationRuleType = Field(
-        description="Rule type (e.g., SESSION_STARTED, SESSION_TERMINATED)"
-    )
-    channel_id: uuid.UUID = Field(description="ID of the channel to use for notifications")
-    message_template: str = Field(
-        description="Jinja2 template for notification message (e.g., 'Session {{ session_id }} started')"
-    )
-    enabled: bool = Field(default=True, description="Whether the rule is enabled")
 
 
 class UpdateNotificationRulePathParam(BaseRequestModel):
     rule_id: uuid.UUID = Field(description="The notification rule ID to update")
 
 
-class UpdateNotificationRuleBodyParam(BaseRequestModel):
-    name: Optional[str] = Field(default=None, description="Updated rule name")
-    description: Optional[str] = Field(default=None, description="Updated rule description")
-    message_template: Optional[str] = Field(default=None, description="Updated message template")
-    enabled: Optional[bool] = Field(default=None, description="Updated enabled status")
+class UpdateNotificationRuleBodyParam(UpdateNotificationRuleRequest, BaseRequestModel):
+    """Manager API request to update a notification rule."""
 
     def to_modifier(self) -> NotificationRuleModifier:
         modifier = NotificationRuleModifier()
@@ -141,8 +110,10 @@ class DeleteNotificationRulePathParam(BaseRequestModel):
     rule_id: uuid.UUID = Field(description="The notification rule ID to delete")
 
 
-class ListNotificationRulesReq(BaseRequestModel):
-    enabled_only: bool = Field(default=False, description="Only list enabled rules")
-    rule_type: Optional[NotificationRuleType] = Field(
-        default=None, description="Filter by rule type"
-    )
+class SearchNotificationRulesReq(BaseRequestModel):
+    """Request body for searching notification rules with filters, orders, and pagination."""
+
+    filter: Optional[NotificationRuleFilter] = Field(default=None, description="Filter conditions")
+    order: Optional[NotificationRuleOrder] = Field(default=None, description="Order specification")
+    limit: Optional[int] = Field(default=None, ge=1, le=1000, description="Maximum items to return")
+    offset: Optional[int] = Field(default=None, ge=0, description="Number of items to skip")

@@ -92,7 +92,7 @@ class NotificationChannelFilter(BaseModel):
     """Filter for notification channels."""
 
     name: Optional[StringFilter] = Field(default=None, description="Filter by name")
-    channel_type: Optional[list[NotificationChannelType]] = Field(
+    channel_types: Optional[list[NotificationChannelType]] = Field(
         default=None, description="Filter by channel types"
     )
     enabled: Optional[bool] = Field(default=None, description="Filter by enabled status")
@@ -138,7 +138,7 @@ class NotificationRuleFilter(BaseModel):
     """Filter for notification rules."""
 
     name: Optional[StringFilter] = Field(default=None, description="Filter by name")
-    rule_type: Optional[list[NotificationRuleType]] = Field(
+    rule_types: Optional[list[NotificationRuleType]] = Field(
         default=None, description="Filter by rule types"
     )
     enabled: Optional[bool] = Field(default=None, description="Filter by enabled status")

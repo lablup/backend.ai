@@ -5,13 +5,15 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.notification import (
+    NotificationChannelType,
+    NotificationRuleType,
+    WebhookConfig,
+)
 from ai.backend.manager.data.notification import (
     NotificationChannelData,
-    NotificationChannelType,
     NotificationRuleData,
-    NotificationRuleType,
 )
-from ai.backend.manager.dto.notification_request import NotificationChannelConfig
 
 # Notification DTO Models (Pydantic models for external API)
 
@@ -23,7 +25,7 @@ class NotificationChannelDTO(BaseModel):
     name: str = Field(description="Channel name")
     description: Optional[str] = Field(default=None, description="Channel description")
     channel_type: NotificationChannelType = Field(description="Channel type")
-    config: NotificationChannelConfig = Field(description="Channel configuration")
+    config: WebhookConfig = Field(description="Channel configuration")
     enabled: bool = Field(description="Whether the channel is enabled")
     created_by: uuid.UUID = Field(description="User ID who created this channel")
     created_at: datetime = Field(description="Creation timestamp")

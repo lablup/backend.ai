@@ -6,7 +6,11 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from ai.backend.common.data.notification import (
+    NotificationChannelType,
+    NotificationRuleType,
+    WebhookConfig,
+)
 
 __all__ = (
     "NotificationChannelType",
@@ -16,26 +20,6 @@ __all__ = (
     "NotificationChannelOrderField",
     "NotificationRuleOrderField",
 )
-
-
-class NotificationChannelType(StrEnum):
-    """Notification channel types."""
-
-    WEBHOOK = "webhook"
-
-
-class NotificationRuleType(StrEnum):
-    """Notification rule types."""
-
-    SESSION_STARTED = "session.started"
-    SESSION_TERMINATED = "session.terminated"
-    ARTIFACT_DOWNLOAD_COMPLETED = "artifact.download.completed"
-
-
-class WebhookConfig(BaseModel):
-    """Configuration for webhook notification channel."""
-
-    url: str = Field(description="Webhook URL")
 
 
 class OrderDirection(StrEnum):
