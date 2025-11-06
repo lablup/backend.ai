@@ -204,6 +204,31 @@ def delete_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
             sys.exit(ExitCode.FAILURE)
 
 
+@channel.command("validate")
+@pass_ctx_obj
+@click.argument("channel_id", type=str)
+def validate_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
+    """
+    Validate a notification channel by sending a test webhook.
+
+    \b
+    CHANNEL_ID: The channel ID to validate
+    """
+    with Session() as session:
+        try:
+            result = session.Notification.validate_channel(UUID(channel_id))
+            if result.success:
+                print_done(f"Channel validation successful: {channel_id}")
+                print(result.message)
+            else:
+                print_fail(f"Channel validation failed: {channel_id}")
+                print(result.message)
+                sys.exit(ExitCode.FAILURE)
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
 # Rule commands
 
 
@@ -379,6 +404,53 @@ def delete_rule_cmd(ctx: CLIContext, rule_id: str) -> None:
             else:
                 print_fail(f"Failed to delete rule: {rule_id}")
                 sys.exit(ExitCode.FAILURE)
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
+
+
+@rule.command("validate")
+@pass_ctx_obj
+@click.argument("rule_id", type=str)
+@click.option(
+    "--data",
+    type=str,
+    default=None,
+    help='Test notification data as JSON string (e.g., \'{"session_id": "test"}\')',
+)
+def validate_rule_cmd(ctx: CLIContext, rule_id: str, data: Optional[str]) -> None:
+    """
+    Validate a notification rule by rendering its template with test data.
+
+    \b
+    RULE_ID: The rule ID to validate
+    """
+    with Session() as session:
+        try:
+            notification_data = {}
+            if data:
+                notification_data = json.loads(data)
+
+            from ai.backend.common.dto.manager.notification import (
+                ValidateNotificationRuleRequest,
+            )
+
+            request = ValidateNotificationRuleRequest(notification_data=notification_data)
+            result = session.Notification.validate_rule(UUID(rule_id), request)
+
+            if result.success:
+                print_done(f"Rule validation successful: {rule_id}")
+                print(f"Message: {result.message}")
+                if result.rendered_message:
+                    print("\nRendered message:")
+                    print(result.rendered_message)
+            else:
+                print_fail(f"Rule validation failed: {rule_id}")
+                print(result.message)
+                sys.exit(ExitCode.FAILURE)
+        except json.JSONDecodeError as e:
+            print_fail(f"Invalid JSON data: {e}")
+            sys.exit(ExitCode.FAILURE)
         except Exception as e:
             ctx.output.print_error(e)
             sys.exit(ExitCode.FAILURE)

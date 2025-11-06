@@ -78,6 +78,8 @@ from .notification import (
     notification_rules,
     update_notification_channel,
     update_notification_rule,
+    validate_notification_channel,
+    validate_notification_rule,
 )
 from .object_storage import (
     create_object_storage,
@@ -169,9 +171,11 @@ class Mutation:
     create_notification_channel = create_notification_channel
     update_notification_channel = update_notification_channel
     delete_notification_channel = delete_notification_channel
+    validate_notification_channel = validate_notification_channel
     create_notification_rule = create_notification_rule
     update_notification_rule = update_notification_rule
     delete_notification_rule = delete_notification_rule
+    validate_notification_rule = validate_notification_rule
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     create_auto_scaling_rule = create_auto_scaling_rule
