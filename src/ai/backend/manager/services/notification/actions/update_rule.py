@@ -18,6 +18,11 @@ class UpdateRuleAction(NotificationAction):
     modifier: NotificationRuleModifier
 
     @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "update_rule"
+
+    @override
     def entity_id(self) -> Optional[str]:
         return str(self.rule_id)
 

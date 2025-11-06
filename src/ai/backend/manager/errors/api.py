@@ -78,3 +78,16 @@ class RateLimitExceeded(BackendAIError, web.HTTPTooManyRequests):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+
+class InvalidGraphQLParameters(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/invalid-graphql-params"
+    error_title = "Invalid GraphQL parameters."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.API,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

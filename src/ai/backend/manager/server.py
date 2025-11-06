@@ -112,6 +112,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.manager.server_gql_ctx import gql_adapters_ctx
 
 from . import __version__
 from .api.context import RootContext
@@ -1479,6 +1480,7 @@ def build_root_app(
             processors_ctx,
             manager_bgtask_registry_ctx,
             service_discovery_ctx,
+            gql_adapters_ctx,
         ]
     shutdown_context_instances = []
 

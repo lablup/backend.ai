@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Optional, Protocol, Type, TypeVar, cast
@@ -15,6 +15,7 @@ from strawberry.types import get_object_definition, has_object_definition
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.common.types import IntFilterData, StringFilterData
+from ai.backend.manager.repositories.base import QueryCondition
 
 if TYPE_CHECKING:
     from ai.backend.manager.types import (
@@ -67,6 +68,30 @@ class StringFilter:
             i_equals=self.i_equals,
             i_not_equals=self.i_not_equals,
         )
+
+    def build_query_condition(
+        self,
+        contains_factory: Callable[[str, bool], QueryCondition],
+        equals_factory: Callable[[str, bool], QueryCondition],
+    ) -> Optional[QueryCondition]:
+        """Build a query condition from this filter using the provided factory callables.
+
+        Args:
+            contains_factory: Factory function that takes (value, case_insensitive) and returns QueryCondition
+            equals_factory: Factory function that takes (value, case_insensitive) and returns QueryCondition
+
+        Returns:
+            QueryCondition if any filter field is set, None otherwise
+        """
+        if self.equals:
+            return equals_factory(self.equals, False)
+        elif self.i_equals:
+            return equals_factory(self.i_equals, True)
+        elif self.contains:
+            return contains_factory(self.contains, False)
+        elif self.i_contains:
+            return contains_factory(self.i_contains, True)
+        return None
 
 
 @strawberry.input

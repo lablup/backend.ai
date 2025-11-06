@@ -16,6 +16,11 @@ class CreateRuleAction(NotificationAction):
     creator: NotificationRuleCreator
 
     @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "create_rule"
+
+    @override
     def entity_id(self) -> Optional[str]:
         return self.creator.name
 

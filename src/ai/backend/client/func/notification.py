@@ -1,0 +1,220 @@
+"""Client SDK functions for notification system."""
+
+from __future__ import annotations
+
+from uuid import UUID
+
+from ai.backend.common.dto.manager.notification import (
+    CreateNotificationChannelRequest,
+    CreateNotificationChannelResponse,
+    CreateNotificationRuleRequest,
+    CreateNotificationRuleResponse,
+    DeleteNotificationChannelResponse,
+    DeleteNotificationRuleResponse,
+    GetNotificationChannelResponse,
+    GetNotificationRuleResponse,
+    ListNotificationChannelsRequest,
+    ListNotificationChannelsResponse,
+    ListNotificationRulesRequest,
+    ListNotificationRulesResponse,
+    UpdateNotificationChannelRequest,
+    UpdateNotificationChannelResponse,
+    UpdateNotificationRuleRequest,
+    UpdateNotificationRuleResponse,
+)
+
+from ..request import Request
+from .base import BaseFunction, api_function
+
+__all__ = ("Notification",)
+
+
+class Notification(BaseFunction):
+    """
+    Provides functions to interact with the notification system.
+    Supports both notification channels and rules.
+    """
+
+    # Channel CRUD operations
+
+    @api_function
+    @classmethod
+    async def create_channel(
+        cls,
+        request: CreateNotificationChannelRequest,
+    ) -> CreateNotificationChannelResponse:
+        """
+        Create a new notification channel.
+
+        :param request: Channel creation request
+        :returns: The created channel data
+        """
+        rqst = Request("POST", "/notifications/channels")
+        rqst.set_json(request.model_dump(mode="json"))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return CreateNotificationChannelResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def list_channels(
+        cls,
+        request: ListNotificationChannelsRequest,
+    ) -> ListNotificationChannelsResponse:
+        """
+        List all notification channels.
+
+        :param request: Channel listing request
+        :returns: List of channels
+        """
+        rqst = Request("GET", "/notifications/channels")
+        rqst.set_json(request.model_dump(mode="json"))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return ListNotificationChannelsResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def get_channel(
+        cls,
+        channel_id: str | UUID,
+    ) -> GetNotificationChannelResponse:
+        """
+        Get a notification channel by ID.
+
+        :param channel_id: Channel ID
+        :returns: The channel data
+        """
+        rqst = Request("GET", f"/notifications/channels/{channel_id}")
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return GetNotificationChannelResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def update_channel(
+        cls,
+        channel_id: str | UUID,
+        request: UpdateNotificationChannelRequest,
+    ) -> UpdateNotificationChannelResponse:
+        """
+        Update a notification channel.
+
+        :param channel_id: Channel ID to update
+        :param request: Channel update request
+        :returns: The updated channel data
+        """
+        rqst = Request("PATCH", f"/notifications/channels/{channel_id}")
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return UpdateNotificationChannelResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def delete_channel(
+        cls,
+        channel_id: str | UUID,
+    ) -> DeleteNotificationChannelResponse:
+        """
+        Delete a notification channel.
+
+        :param channel_id: Channel ID to delete
+        :returns: Deletion confirmation
+        """
+        rqst = Request("DELETE", f"/notifications/channels/{channel_id}")
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return DeleteNotificationChannelResponse.model_validate(data)
+
+    # Rule CRUD operations
+
+    @api_function
+    @classmethod
+    async def create_rule(
+        cls,
+        request: CreateNotificationRuleRequest,
+    ) -> CreateNotificationRuleResponse:
+        """
+        Create a new notification rule.
+
+        :param request: Rule creation request
+        :returns: The created rule data
+        """
+        rqst = Request("POST", "/notifications/rules")
+        rqst.set_json(request.model_dump(mode="json"))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return CreateNotificationRuleResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def list_rules(
+        cls,
+        request: ListNotificationRulesRequest,
+    ) -> ListNotificationRulesResponse:
+        """
+        List all notification rules.
+
+        :param request: Rule listing request
+        :returns: List of rules
+        """
+        rqst = Request("GET", "/notifications/rules")
+        rqst.set_json(request.model_dump(mode="json"))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return ListNotificationRulesResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def get_rule(
+        cls,
+        rule_id: str | UUID,
+    ) -> GetNotificationRuleResponse:
+        """
+        Get a notification rule by ID.
+
+        :param rule_id: Rule ID
+        :returns: The rule data
+        """
+        rqst = Request("GET", f"/notifications/rules/{rule_id}")
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return GetNotificationRuleResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def update_rule(
+        cls,
+        rule_id: str | UUID,
+        request: UpdateNotificationRuleRequest,
+    ) -> UpdateNotificationRuleResponse:
+        """
+        Update a notification rule.
+
+        :param rule_id: Rule ID to update
+        :param request: Rule update request
+        :returns: The updated rule data
+        """
+        rqst = Request("PATCH", f"/notifications/rules/{rule_id}")
+        rqst.set_json(request.model_dump(mode="json", exclude_none=True))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return UpdateNotificationRuleResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def delete_rule(
+        cls,
+        rule_id: str | UUID,
+    ) -> DeleteNotificationRuleResponse:
+        """
+        Delete a notification rule.
+
+        :param rule_id: Rule ID to delete
+        :returns: Deletion confirmation
+        """
+        rqst = Request("DELETE", f"/notifications/rules/{rule_id}")
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return DeleteNotificationRuleResponse.model_validate(data)

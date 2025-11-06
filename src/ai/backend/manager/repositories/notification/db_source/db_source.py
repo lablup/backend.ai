@@ -25,6 +25,7 @@ from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
+from ai.backend.manager.repositories.base import Querier, apply_querier
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -208,13 +209,14 @@ class NotificationDBSource:
 
     async def list_channels(
         self,
-        enabled_only: bool = False,
+        querier: Optional[Querier] = None,
     ) -> list[NotificationChannelData]:
         """Lists all notification channels."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(NotificationChannelRow)
-            if enabled_only:
-                query = query.where(NotificationChannelRow.enabled == sa.true())
+
+            if querier:
+                query = apply_querier(query, querier)
 
             result = await db_sess.execute(query)
             rows = result.scalars().all()
@@ -222,19 +224,16 @@ class NotificationDBSource:
 
     async def list_rules(
         self,
-        enabled_only: bool = False,
-        rule_type: Optional[NotificationRuleType] = None,
+        querier: Optional[Querier] = None,
     ) -> list[NotificationRuleData]:
-        """Lists all notification rules, optionally filtered by rule type."""
+        """Lists all notification rules."""
         async with self._db.begin_readonly_session() as db_sess:
             query = sa.select(NotificationRuleRow).options(
                 selectinload(NotificationRuleRow.channel)
             )
 
-            if enabled_only:
-                query = query.where(NotificationRuleRow.enabled == sa.true())
-            if rule_type:
-                query = query.where(NotificationRuleRow.rule_type == str(rule_type))
+            if querier:
+                query = apply_querier(query, querier)
 
             result = await db_sess.execute(query)
             rows = result.scalars().all()
