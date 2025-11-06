@@ -1707,6 +1707,43 @@ type CreateNetwork
   network: NetworkNode
 }
 
+"""Input for creating a notification channel"""
+input CreateNotificationChannelInput
+  @join__type(graph: STRAWBERRY)
+{
+  name: String!
+  description: String = null
+  channelType: NotificationChannelType! = WEBHOOK
+  config: WebhookConfigInput!
+  enabled: Boolean! = true
+}
+
+"""Payload for create notification channel mutation"""
+type CreateNotificationChannelPayload
+  @join__type(graph: STRAWBERRY)
+{
+  channel: NotificationChannel!
+}
+
+"""Input for creating a notification rule"""
+input CreateNotificationRuleInput
+  @join__type(graph: STRAWBERRY)
+{
+  name: String!
+  description: String = null
+  ruleType: NotificationRuleType!
+  channelId: ID!
+  messageTemplate: String!
+  enabled: Boolean! = true
+}
+
+"""Payload for create notification rule mutation"""
+type CreateNotificationRulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  rule: NotificationRule!
+}
+
 """Added in 25.14.0"""
 input CreateObjectStorageInput
   @join__type(graph: STRAWBERRY)
@@ -2139,6 +2176,34 @@ type DeleteNetwork
 {
   ok: Boolean
   msg: String
+}
+
+"""Input for deleting a notification channel"""
+input DeleteNotificationChannelInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+}
+
+"""Payload for delete notification channel mutation"""
+type DeleteNotificationChannelPayload
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+}
+
+"""Input for deleting a notification rule"""
+input DeleteNotificationRuleInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+}
+
+"""Payload for delete notification rule mutation"""
+type DeleteNotificationRulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
 }
 
 """Added in 25.14.0"""
@@ -4724,6 +4789,24 @@ type Mutation
   """
   createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload! @join__field(graph: STRAWBERRY)
 
+  """Create a new notification channel"""
+  createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+
+  """Update a notification channel"""
+  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+
+  """Delete a notification channel"""
+  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+
+  """Create a new notification rule"""
+  createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload! @join__field(graph: STRAWBERRY)
+
+  """Update a notification rule"""
+  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload! @join__field(graph: STRAWBERRY)
+
+  """Delete a notification rule"""
+  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload! @join__field(graph: STRAWBERRY)
+
   """Added in 25.14.0"""
   createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload! @join__field(graph: STRAWBERRY)
 
@@ -4866,6 +4949,153 @@ interface Node
 {
   """The ID of the object"""
   id: ID!
+}
+
+"""Notification channel"""
+type NotificationChannel implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String
+  channelType: NotificationChannelType!
+  config: WebhookConfigGQL!
+  enabled: Boolean!
+}
+
+"""Notification channel connection"""
+type NotificationChannelConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [NotificationChannelEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type NotificationChannelEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: NotificationChannel!
+}
+
+"""Filter for notification channels"""
+input NotificationChannelFilter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  channelType: [NotificationChannelType!] = null
+  enabled: Boolean = null
+  AND: [NotificationChannelFilter!] = null
+  OR: [NotificationChannelFilter!] = null
+  NOT: [NotificationChannelFilter!] = null
+}
+
+"""Order by specification for notification channels"""
+input NotificationChannelOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: NotificationChannelOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum NotificationChannelOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Notification channel types"""
+enum NotificationChannelType
+  @join__type(graph: STRAWBERRY)
+{
+  WEBHOOK @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Notification rule"""
+type NotificationRule implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String
+  ruleType: NotificationRuleType!
+  channel: NotificationChannel!
+  messageTemplate: String!
+  enabled: Boolean!
+}
+
+"""Notification rule connection"""
+type NotificationRuleConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [NotificationRuleEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type NotificationRuleEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: NotificationRule!
+}
+
+"""Filter for notification rules"""
+input NotificationRuleFilter
+  @join__type(graph: STRAWBERRY)
+{
+  name: StringFilter = null
+  ruleType: [NotificationRuleType!] = null
+  enabled: Boolean = null
+  AND: [NotificationRuleFilter!] = null
+  OR: [NotificationRuleFilter!] = null
+  NOT: [NotificationRuleFilter!] = null
+}
+
+"""Order by specification for notification rules"""
+input NotificationRuleOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  field: NotificationRuleOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum NotificationRuleOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Notification rule types"""
+enum NotificationRuleType
+  @join__type(graph: STRAWBERRY)
+{
+  SESSION_STARTED @join__enumValue(graph: STRAWBERRY)
+  SESSION_TERMINATED @join__enumValue(graph: STRAWBERRY)
+  ARTIFACT_DOWNLOAD_COMPLETED @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 25.14.0"""
@@ -5550,6 +5780,18 @@ type Query
 
   """Added in 25.16.0"""
   replica(id: ID!): ModelReplica @join__field(graph: STRAWBERRY)
+
+  """Get a notification channel by ID"""
+  notificationChannel(id: ID!): NotificationChannel @join__field(graph: STRAWBERRY)
+
+  """List notification channels"""
+  notificationChannels(filter: NotificationChannelFilter = null, orderBy: NotificationChannelOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection! @join__field(graph: STRAWBERRY)
+
+  """Get a notification rule by ID"""
+  notificationRule(id: ID!): NotificationRule @join__field(graph: STRAWBERRY)
+
+  """List notification rules"""
+  notificationRules(filter: NotificationRuleFilter = null, orderBy: NotificationRuleOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
   objectStorage(id: ID!): ObjectStorage @join__field(graph: STRAWBERRY)
@@ -6510,6 +6752,42 @@ type UpdateModelDeploymentPayload
   deployment: ModelDeployment!
 }
 
+"""Input for updating a notification channel"""
+input UpdateNotificationChannelInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+  name: String
+  description: String
+  config: WebhookConfigInput
+  enabled: Boolean
+}
+
+"""Payload for update notification channel mutation"""
+type UpdateNotificationChannelPayload
+  @join__type(graph: STRAWBERRY)
+{
+  channel: NotificationChannel!
+}
+
+"""Input for updating a notification rule"""
+input UpdateNotificationRuleInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+  name: String
+  description: String
+  messageTemplate: String
+  enabled: Boolean
+}
+
+"""Payload for update notification rule mutation"""
+type UpdateNotificationRulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  rule: NotificationRule!
+}
+
 """Added in 25.14.0"""
 input UpdateObjectStorageInput
   @join__type(graph: STRAWBERRY)
@@ -7045,4 +7323,17 @@ type VirtualFolderPermissionList implements PaginatedList
 {
   items: [VirtualFolderPermission]!
   total_count: Int!
+}
+
+type WebhookConfigGQL
+  @join__type(graph: STRAWBERRY)
+{
+  url: String!
+}
+
+"""Input for webhook configuration"""
+input WebhookConfigInput
+  @join__type(graph: STRAWBERRY)
+{
+  url: String!
 }
