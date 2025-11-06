@@ -12,6 +12,8 @@ from .resolver import (
     notification_rules,
     update_notification_channel,
     update_notification_rule,
+    validate_notification_channel,
+    validate_notification_rule,
 )
 from .types import (
     CreateNotificationChannelInput,
@@ -32,6 +34,10 @@ from .types import (
     UpdateNotificationChannelPayload,
     UpdateNotificationRuleInput,
     UpdateNotificationRulePayload,
+    ValidateNotificationChannelInput,
+    ValidateNotificationChannelPayload,
+    ValidateNotificationRuleInput,
+    ValidateNotificationRulePayload,
 )
 
 __all__ = (
@@ -57,6 +63,10 @@ __all__ = (
     "UpdateNotificationRulePayload",
     "DeleteNotificationRuleInput",
     "DeleteNotificationRulePayload",
+    "ValidateNotificationChannelInput",
+    "ValidateNotificationChannelPayload",
+    "ValidateNotificationRuleInput",
+    "ValidateNotificationRulePayload",
     # Resolvers
     "notification_channel",
     "notification_channels",
@@ -68,4 +78,6 @@ __all__ = (
     "create_notification_rule",
     "update_notification_rule",
     "delete_notification_rule",
+    "validate_notification_channel",
+    "validate_notification_rule",
 )

@@ -11,12 +11,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from ai.backend.common.api_handlers import BaseResponseModel
+
 from .types import NotificationChannelType, NotificationRuleType
 
 __all__ = (
     "WebhookConfigResponse",
-    "NotificationChannelResponse",
-    "NotificationRuleResponse",
+    "NotificationChannelDTO",
+    "NotificationRuleDTO",
     "CreateNotificationChannelResponse",
     "UpdateNotificationChannelResponse",
     "DeleteNotificationChannelResponse",
@@ -27,18 +29,20 @@ __all__ = (
     "DeleteNotificationRuleResponse",
     "GetNotificationRuleResponse",
     "ListNotificationRulesResponse",
+    "ValidateNotificationChannelResponse",
+    "ValidateNotificationRuleResponse",
     "PaginationInfo",
 )
 
 
-class WebhookConfigResponse(BaseModel):
+class WebhookConfigResponse(BaseResponseModel):
     """Response model for webhook configuration."""
 
     url: str = Field(description="Webhook URL")
 
 
-class NotificationChannelResponse(BaseModel):
-    """Response model for notification channel."""
+class NotificationChannelDTO(BaseModel):
+    """DTO for notification channel data."""
 
     id: UUID = Field(description="Channel ID")
     name: str = Field(description="Channel name")
@@ -48,44 +52,46 @@ class NotificationChannelResponse(BaseModel):
     enabled: bool = Field(description="Whether the channel is enabled")
     created_at: datetime = Field(description="Creation timestamp")
     created_by: UUID = Field(description="ID of user who created the channel")
+    updated_at: datetime = Field(description="Last update timestamp")
 
 
-class NotificationRuleResponse(BaseModel):
-    """Response model for notification rule."""
+class NotificationRuleDTO(BaseModel):
+    """DTO for notification rule data."""
 
     id: UUID = Field(description="Rule ID")
     name: str = Field(description="Rule name")
     description: Optional[str] = Field(default=None, description="Rule description")
     rule_type: NotificationRuleType = Field(description="Rule type")
-    channel: NotificationChannelResponse = Field(description="Associated channel")
+    channel: NotificationChannelDTO = Field(description="Associated channel")
     message_template: str = Field(description="Jinja2 template for notification message")
     enabled: bool = Field(description="Whether the rule is enabled")
     created_at: datetime = Field(description="Creation timestamp")
     created_by: UUID = Field(description="ID of user who created the rule")
+    updated_at: datetime = Field(description="Last update timestamp")
 
 
-class CreateNotificationChannelResponse(BaseModel):
+class CreateNotificationChannelResponse(BaseResponseModel):
     """Response for creating a notification channel."""
 
-    channel: NotificationChannelResponse = Field(description="Created channel")
+    channel: NotificationChannelDTO = Field(description="Created channel")
 
 
-class UpdateNotificationChannelResponse(BaseModel):
+class UpdateNotificationChannelResponse(BaseResponseModel):
     """Response for updating a notification channel."""
 
-    channel: NotificationChannelResponse = Field(description="Updated channel")
+    channel: NotificationChannelDTO = Field(description="Updated channel")
 
 
-class DeleteNotificationChannelResponse(BaseModel):
+class DeleteNotificationChannelResponse(BaseResponseModel):
     """Response for deleting a notification channel."""
 
-    id: UUID = Field(description="Deleted channel ID")
+    deleted: bool = Field(description="Whether the channel was deleted")
 
 
-class GetNotificationChannelResponse(BaseModel):
+class GetNotificationChannelResponse(BaseResponseModel):
     """Response for getting a notification channel."""
 
-    channel: NotificationChannelResponse = Field(description="Channel data")
+    channel: NotificationChannelDTO = Field(description="Channel data")
 
 
 class PaginationInfo(BaseModel):
@@ -96,39 +102,54 @@ class PaginationInfo(BaseModel):
     limit: Optional[int] = Field(default=None, description="Maximum items returned")
 
 
-class ListNotificationChannelsResponse(BaseModel):
+class ListNotificationChannelsResponse(BaseResponseModel):
     """Response for listing notification channels."""
 
-    channels: list[NotificationChannelResponse] = Field(description="List of channels")
+    channels: list[NotificationChannelDTO] = Field(description="List of channels")
     pagination: PaginationInfo = Field(description="Pagination information")
 
 
-class CreateNotificationRuleResponse(BaseModel):
+class CreateNotificationRuleResponse(BaseResponseModel):
     """Response for creating a notification rule."""
 
-    rule: NotificationRuleResponse = Field(description="Created rule")
+    rule: NotificationRuleDTO = Field(description="Created rule")
 
 
-class UpdateNotificationRuleResponse(BaseModel):
+class UpdateNotificationRuleResponse(BaseResponseModel):
     """Response for updating a notification rule."""
 
-    rule: NotificationRuleResponse = Field(description="Updated rule")
+    rule: NotificationRuleDTO = Field(description="Updated rule")
 
 
-class DeleteNotificationRuleResponse(BaseModel):
+class DeleteNotificationRuleResponse(BaseResponseModel):
     """Response for deleting a notification rule."""
 
-    id: UUID = Field(description="Deleted rule ID")
+    deleted: bool = Field(description="Whether the rule was deleted")
 
 
-class GetNotificationRuleResponse(BaseModel):
+class GetNotificationRuleResponse(BaseResponseModel):
     """Response for getting a notification rule."""
 
-    rule: NotificationRuleResponse = Field(description="Rule data")
+    rule: NotificationRuleDTO = Field(description="Rule data")
 
 
-class ListNotificationRulesResponse(BaseModel):
+class ListNotificationRulesResponse(BaseResponseModel):
     """Response for listing notification rules."""
 
-    rules: list[NotificationRuleResponse] = Field(description="List of rules")
+    rules: list[NotificationRuleDTO] = Field(description="List of rules")
     pagination: PaginationInfo = Field(description="Pagination information")
+
+
+class ValidateNotificationChannelResponse(BaseResponseModel):
+    """Response for validating a notification channel."""
+
+    success: bool = Field(description="Whether the channel validation was successful")
+    message: str = Field(description="Result message describing the validation outcome")
+
+
+class ValidateNotificationRuleResponse(BaseResponseModel):
+    """Response for validating a notification rule."""
+
+    success: bool = Field(description="Whether the rule validation was successful")
+    message: str = Field(description="Result message describing the validation outcome")
+    rendered_message: str = Field(description="The rendered message from the template")

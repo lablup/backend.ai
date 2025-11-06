@@ -4798,6 +4798,9 @@ type Mutation
   """Delete a notification channel"""
   deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload! @join__field(graph: STRAWBERRY)
 
+  """Validate a notification channel"""
+  validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload! @join__field(graph: STRAWBERRY)
+
   """Create a new notification rule"""
   createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload! @join__field(graph: STRAWBERRY)
 
@@ -4806,6 +4809,9 @@ type Mutation
 
   """Delete a notification rule"""
   deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload! @join__field(graph: STRAWBERRY)
+
+  """Validate a notification rule"""
+  validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload! @join__field(graph: STRAWBERRY)
 
   """Added in 25.14.0"""
   createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload! @join__field(graph: STRAWBERRY)
@@ -7151,6 +7157,38 @@ Verifies that the key is a UUID (represented as a string) and the value is a flo
 """
 scalar UUIDFloatMap
   @join__type(graph: GRAPHENE)
+
+"""Input for validate notification channel mutation"""
+input ValidateNotificationChannelInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+}
+
+"""Payload for validate notification channel mutation"""
+type ValidateNotificationChannelPayload
+  @join__type(graph: STRAWBERRY)
+{
+  success: Boolean!
+  message: String!
+}
+
+"""Input for validate notification rule mutation"""
+input ValidateNotificationRuleInput
+  @join__type(graph: STRAWBERRY)
+{
+  id: ID!
+  notificationData: JSON
+}
+
+"""Payload for validate notification rule mutation"""
+type ValidateNotificationRulePayload
+  @join__type(graph: STRAWBERRY)
+{
+  success: Boolean!
+  message: String!
+  renderedMessage: String
+}
 
 """
 Added in 24.09.0. One of ['clone', 'assign_permission_to_others', 'read_attribute', 'update_attribute', 'delete_vfolder', 'read_content', 'write_content', 'delete_content', 'mount_ro', 'mount_rw', 'mount_wd'].

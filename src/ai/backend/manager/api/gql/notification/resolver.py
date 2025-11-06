@@ -6,7 +6,7 @@ import uuid
 from typing import Optional
 
 import strawberry
-from strawberry import ID, Info
+from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge
 
 from ai.backend.common.contexts.user import current_user
@@ -22,6 +22,8 @@ from ai.backend.manager.services.notification.actions import (
     ListRulesAction,
     UpdateChannelAction,
     UpdateRuleAction,
+    ValidateChannelAction,
+    ValidateRuleAction,
 )
 
 from ..types import StrawberryGQLContext
@@ -44,6 +46,10 @@ from .types import (
     UpdateNotificationChannelPayload,
     UpdateNotificationRuleInput,
     UpdateNotificationRulePayload,
+    ValidateNotificationChannelInput,
+    ValidateNotificationChannelPayload,
+    ValidateNotificationRuleInput,
+    ValidateNotificationRulePayload,
 )
 
 # Connection types
@@ -284,3 +290,43 @@ async def delete_notification_rule(
     )
 
     return DeleteNotificationRulePayload(id=input.id)
+
+
+@strawberry.mutation(description="Validate a notification channel")
+async def validate_notification_channel(
+    input: ValidateNotificationChannelInput, info: Info[StrawberryGQLContext]
+) -> ValidateNotificationChannelPayload:
+    processors = info.context.processors
+
+    action_result = await processors.notification.validate_channel.wait_for_complete(
+        ValidateChannelAction(channel_id=uuid.UUID(input.id))
+    )
+
+    return ValidateNotificationChannelPayload(
+        success=action_result.success,
+        message=action_result.message,
+    )
+
+
+@strawberry.mutation(description="Validate a notification rule")
+async def validate_notification_rule(
+    input: ValidateNotificationRuleInput, info: Info[StrawberryGQLContext]
+) -> ValidateNotificationRulePayload:
+    processors = info.context.processors
+
+    notification_data = {}
+    if input.notification_data is not UNSET and input.notification_data is not None:
+        notification_data = dict(input.notification_data)
+
+    action_result = await processors.notification.validate_rule.wait_for_complete(
+        ValidateRuleAction(
+            rule_id=uuid.UUID(input.id),
+            notification_data=notification_data,
+        )
+    )
+
+    return ValidateNotificationRulePayload(
+        success=action_result.success,
+        message=action_result.message,
+        rendered_message=action_result.rendered_message,
+    )

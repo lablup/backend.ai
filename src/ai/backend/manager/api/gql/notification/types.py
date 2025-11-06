@@ -453,3 +453,30 @@ class UpdateNotificationRulePayload:
 @strawberry.type(description="Payload for delete notification rule mutation")
 class DeleteNotificationRulePayload:
     id: ID
+
+
+# Validate mutations
+
+
+@strawberry.input(description="Input for validate notification channel mutation")
+class ValidateNotificationChannelInput:
+    id: ID
+
+
+@strawberry.type(description="Payload for validate notification channel mutation")
+class ValidateNotificationChannelPayload:
+    success: bool
+    message: str
+
+
+@strawberry.input(description="Input for validate notification rule mutation")
+class ValidateNotificationRuleInput:
+    id: ID
+    notification_data: Optional[strawberry.scalars.JSON] = UNSET
+
+
+@strawberry.type(description="Payload for validate notification rule mutation")
+class ValidateNotificationRulePayload:
+    success: bool
+    message: str
+    rendered_message: Optional[str]

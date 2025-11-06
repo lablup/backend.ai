@@ -13,23 +13,10 @@ from aiohttp import web
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
 from ai.backend.common.contexts.user import current_user
-from ai.backend.manager.dto.context import ProcessorsCtx
-from ai.backend.manager.dto.notification_request import (
-    CreateNotificationChannelReq,
-    CreateNotificationRuleReq,
-    DeleteNotificationChannelPathParam,
-    DeleteNotificationRulePathParam,
-    GetNotificationChannelPathParam,
-    GetNotificationRulePathParam,
-    SearchNotificationChannelsReq,
-    SearchNotificationRulesReq,
-    UpdateNotificationChannelBodyParam,
-    UpdateNotificationChannelPathParam,
-    UpdateNotificationRuleBodyParam,
-    UpdateNotificationRulePathParam,
-)
-from ai.backend.manager.dto.notification_response import (
+from ai.backend.common.dto.manager.notification import (
+    CreateNotificationChannelRequest,
     CreateNotificationChannelResponse,
+    CreateNotificationRuleRequest,
     CreateNotificationRuleResponse,
     DeleteNotificationChannelResponse,
     DeleteNotificationRuleResponse,
@@ -37,10 +24,27 @@ from ai.backend.manager.dto.notification_response import (
     GetNotificationRuleResponse,
     ListNotificationChannelsResponse,
     ListNotificationRulesResponse,
-    NotificationChannelDTO,
-    NotificationRuleDTO,
+    PaginationInfo,
+    SearchNotificationChannelsRequest,
+    SearchNotificationRulesRequest,
+    UpdateNotificationChannelRequest,
     UpdateNotificationChannelResponse,
+    UpdateNotificationRuleRequest,
     UpdateNotificationRuleResponse,
+    ValidateNotificationChannelResponse,
+    ValidateNotificationRuleRequest,
+    ValidateNotificationRuleResponse,
+)
+from ai.backend.manager.dto.context import ProcessorsCtx
+from ai.backend.manager.dto.notification_request import (
+    DeleteNotificationChannelPathParam,
+    DeleteNotificationRulePathParam,
+    GetNotificationChannelPathParam,
+    GetNotificationRulePathParam,
+    UpdateNotificationChannelPathParam,
+    UpdateNotificationRulePathParam,
+    ValidateNotificationChannelPathParam,
+    ValidateNotificationRulePathParam,
 )
 from ai.backend.manager.services.notification.actions import (
     CreateChannelAction,
@@ -53,6 +57,8 @@ from ai.backend.manager.services.notification.actions import (
     ListRulesAction,
     UpdateChannelAction,
     UpdateRuleAction,
+    ValidateChannelAction,
+    ValidateRuleAction,
 )
 
 from ...data.notification import NotificationChannelCreator, NotificationRuleCreator
@@ -76,7 +82,7 @@ class NotificationAPIHandler:
     @api_handler
     async def create_channel(
         self,
-        body: BodyParam[CreateNotificationChannelReq],
+        body: BodyParam[CreateNotificationChannelRequest],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Create a new notification channel."""
@@ -105,7 +111,7 @@ class NotificationAPIHandler:
 
         # Build response
         resp = CreateNotificationChannelResponse(
-            channel=NotificationChannelDTO.from_data(action_result.channel_data)
+            channel=self.channel_adapter.convert_to_dto(action_result.channel_data)
         )
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
@@ -113,7 +119,7 @@ class NotificationAPIHandler:
     @api_handler
     async def search_channels(
         self,
-        body: BodyParam[SearchNotificationChannelsReq],
+        body: BodyParam[SearchNotificationChannelsRequest],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Search notification channels with filters, orders, and pagination."""
@@ -129,7 +135,12 @@ class NotificationAPIHandler:
 
         # Build response
         resp = ListNotificationChannelsResponse(
-            channels=[NotificationChannelDTO.from_data(ch) for ch in action_result.channels]
+            channels=[self.channel_adapter.convert_to_dto(ch) for ch in action_result.channels],
+            pagination=PaginationInfo(
+                total=len(action_result.channels),
+                offset=body.parsed.offset or 0,
+                limit=body.parsed.limit,
+            ),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -150,7 +161,7 @@ class NotificationAPIHandler:
 
         # Build response
         resp = GetNotificationChannelResponse(
-            channel=NotificationChannelDTO.from_data(action_result.channel_data)
+            channel=self.channel_adapter.convert_to_dto(action_result.channel_data)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -159,7 +170,7 @@ class NotificationAPIHandler:
     async def update_channel(
         self,
         path: PathParam[UpdateNotificationChannelPathParam],
-        body: BodyParam[UpdateNotificationChannelBodyParam],
+        body: BodyParam[UpdateNotificationChannelRequest],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Update an existing notification channel."""
@@ -169,13 +180,13 @@ class NotificationAPIHandler:
         action_result = await processors.notification.update_channel.wait_for_complete(
             UpdateChannelAction(
                 channel_id=path.parsed.channel_id,
-                modifier=body.parsed.to_modifier(),
+                modifier=self.channel_adapter.build_modifier(body.parsed),
             )
         )
 
         # Build response
         resp = UpdateNotificationChannelResponse(
-            channel=NotificationChannelDTO.from_data(action_result.channel_data)
+            channel=self.channel_adapter.convert_to_dto(action_result.channel_data)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -198,13 +209,64 @@ class NotificationAPIHandler:
         resp = DeleteNotificationChannelResponse(deleted=action_result.deleted)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
+    @auth_required_for_method
+    @api_handler
+    async def validate_channel(
+        self,
+        path: PathParam[ValidateNotificationChannelPathParam],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Validate a notification channel by sending a test webhook."""
+        processors = processors_ctx.processors
+
+        # Call service action
+        action_result = await processors.notification.validate_channel.wait_for_complete(
+            ValidateChannelAction(
+                channel_id=path.parsed.channel_id,
+            )
+        )
+
+        # Build response
+        resp = ValidateNotificationChannelResponse(
+            success=action_result.success,
+            message=action_result.message,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def validate_rule(
+        self,
+        path: PathParam[ValidateNotificationRulePathParam],
+        body: BodyParam[ValidateNotificationRuleRequest],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """Validate a notification rule by rendering its template with test data."""
+        processors = processors_ctx.processors
+
+        # Call service action
+        action_result = await processors.notification.validate_rule.wait_for_complete(
+            ValidateRuleAction(
+                rule_id=path.parsed.rule_id,
+                notification_data=body.parsed.notification_data,
+            )
+        )
+
+        # Build response
+        resp = ValidateNotificationRuleResponse(
+            success=action_result.success,
+            message=action_result.message,
+            rendered_message=action_result.rendered_message,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
     # Notification Rule Endpoints
 
     @auth_required_for_method
     @api_handler
     async def create_rule(
         self,
-        body: BodyParam[CreateNotificationRuleReq],
+        body: BodyParam[CreateNotificationRuleRequest],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Create a new notification rule."""
@@ -230,7 +292,7 @@ class NotificationAPIHandler:
 
         # Build response
         resp = CreateNotificationRuleResponse(
-            rule=NotificationRuleDTO.from_data(action_result.rule_data)
+            rule=self.rule_adapter.convert_to_dto(action_result.rule_data)
         )
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
 
@@ -238,7 +300,7 @@ class NotificationAPIHandler:
     @api_handler
     async def search_rules(
         self,
-        body: BodyParam[SearchNotificationRulesReq],
+        body: BodyParam[SearchNotificationRulesRequest],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Search notification rules with filters, orders, and pagination."""
@@ -254,7 +316,12 @@ class NotificationAPIHandler:
 
         # Build response
         resp = ListNotificationRulesResponse(
-            rules=[NotificationRuleDTO.from_data(rule) for rule in action_result.rules]
+            rules=[self.rule_adapter.convert_to_dto(rule) for rule in action_result.rules],
+            pagination=PaginationInfo(
+                total=len(action_result.rules),
+                offset=body.parsed.offset or 0,
+                limit=body.parsed.limit,
+            ),
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -275,7 +342,7 @@ class NotificationAPIHandler:
 
         # Build response
         resp = GetNotificationRuleResponse(
-            rule=NotificationRuleDTO.from_data(action_result.rule_data)
+            rule=self.rule_adapter.convert_to_dto(action_result.rule_data)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -284,7 +351,7 @@ class NotificationAPIHandler:
     async def update_rule(
         self,
         path: PathParam[UpdateNotificationRulePathParam],
-        body: BodyParam[UpdateNotificationRuleBodyParam],
+        body: BodyParam[UpdateNotificationRuleRequest],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Update an existing notification rule."""
@@ -294,13 +361,13 @@ class NotificationAPIHandler:
         action_result = await processors.notification.update_rule.wait_for_complete(
             UpdateRuleAction(
                 rule_id=path.parsed.rule_id,
-                modifier=body.parsed.to_modifier(),
+                modifier=self.rule_adapter.build_modifier(body.parsed),
             )
         )
 
         # Build response
         resp = UpdateNotificationRuleResponse(
-            rule=NotificationRuleDTO.from_data(action_result.rule_data)
+            rule=self.rule_adapter.convert_to_dto(action_result.rule_data)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -341,6 +408,11 @@ def create_app(
     cors.add(app.router.add_route("GET", "/channels/{channel_id}", api_handler.get_channel))
     cors.add(app.router.add_route("PATCH", "/channels/{channel_id}", api_handler.update_channel))
     cors.add(app.router.add_route("DELETE", "/channels/{channel_id}", api_handler.delete_channel))
+    cors.add(
+        app.router.add_route(
+            "POST", "/channels/{channel_id}/validate", api_handler.validate_channel
+        )
+    )
 
     # Rule routes
     cors.add(app.router.add_route("POST", "/rules", api_handler.create_rule))
@@ -348,5 +420,6 @@ def create_app(
     cors.add(app.router.add_route("GET", "/rules/{rule_id}", api_handler.get_rule))
     cors.add(app.router.add_route("PATCH", "/rules/{rule_id}", api_handler.update_rule))
     cors.add(app.router.add_route("DELETE", "/rules/{rule_id}", api_handler.delete_rule))
+    cors.add(app.router.add_route("POST", "/rules/{rule_id}/validate", api_handler.validate_rule))
 
     return app, []

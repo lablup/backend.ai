@@ -13,14 +13,17 @@ from ai.backend.common.dto.manager.notification import (
     DeleteNotificationRuleResponse,
     GetNotificationChannelResponse,
     GetNotificationRuleResponse,
-    ListNotificationChannelsRequest,
     ListNotificationChannelsResponse,
-    ListNotificationRulesRequest,
     ListNotificationRulesResponse,
+    SearchNotificationChannelsRequest,
+    SearchNotificationRulesRequest,
     UpdateNotificationChannelRequest,
     UpdateNotificationChannelResponse,
     UpdateNotificationRuleRequest,
     UpdateNotificationRuleResponse,
+    ValidateNotificationChannelResponse,
+    ValidateNotificationRuleRequest,
+    ValidateNotificationRuleResponse,
 )
 
 from ..request import Request
@@ -59,7 +62,7 @@ class Notification(BaseFunction):
     @classmethod
     async def list_channels(
         cls,
-        request: ListNotificationChannelsRequest,
+        request: SearchNotificationChannelsRequest,
     ) -> ListNotificationChannelsResponse:
         """
         List all notification channels.
@@ -67,7 +70,7 @@ class Notification(BaseFunction):
         :param request: Channel listing request
         :returns: List of channels
         """
-        rqst = Request("GET", "/notifications/channels")
+        rqst = Request("POST", "/notifications/channels/search")
         rqst.set_json(request.model_dump(mode="json"))
         async with rqst.fetch() as resp:
             data = await resp.json()
@@ -77,7 +80,7 @@ class Notification(BaseFunction):
     @classmethod
     async def get_channel(
         cls,
-        channel_id: str | UUID,
+        channel_id: UUID,
     ) -> GetNotificationChannelResponse:
         """
         Get a notification channel by ID.
@@ -94,7 +97,7 @@ class Notification(BaseFunction):
     @classmethod
     async def update_channel(
         cls,
-        channel_id: str | UUID,
+        channel_id: UUID,
         request: UpdateNotificationChannelRequest,
     ) -> UpdateNotificationChannelResponse:
         """
@@ -114,7 +117,7 @@ class Notification(BaseFunction):
     @classmethod
     async def delete_channel(
         cls,
-        channel_id: str | UUID,
+        channel_id: UUID,
     ) -> DeleteNotificationChannelResponse:
         """
         Delete a notification channel.
@@ -126,6 +129,23 @@ class Notification(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             return DeleteNotificationChannelResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def validate_channel(
+        cls,
+        channel_id: UUID,
+    ) -> ValidateNotificationChannelResponse:
+        """
+        Validate a notification channel by sending a test webhook.
+
+        :param channel_id: Channel ID to validate
+        :returns: Validation result
+        """
+        rqst = Request("POST", f"/notifications/channels/{channel_id}/validate")
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return ValidateNotificationChannelResponse.model_validate(data)
 
     # Rule CRUD operations
 
@@ -151,7 +171,7 @@ class Notification(BaseFunction):
     @classmethod
     async def list_rules(
         cls,
-        request: ListNotificationRulesRequest,
+        request: SearchNotificationRulesRequest,
     ) -> ListNotificationRulesResponse:
         """
         List all notification rules.
@@ -159,7 +179,7 @@ class Notification(BaseFunction):
         :param request: Rule listing request
         :returns: List of rules
         """
-        rqst = Request("GET", "/notifications/rules")
+        rqst = Request("POST", "/notifications/rules/search")
         rqst.set_json(request.model_dump(mode="json"))
         async with rqst.fetch() as resp:
             data = await resp.json()
@@ -169,7 +189,7 @@ class Notification(BaseFunction):
     @classmethod
     async def get_rule(
         cls,
-        rule_id: str | UUID,
+        rule_id: UUID,
     ) -> GetNotificationRuleResponse:
         """
         Get a notification rule by ID.
@@ -186,7 +206,7 @@ class Notification(BaseFunction):
     @classmethod
     async def update_rule(
         cls,
-        rule_id: str | UUID,
+        rule_id: UUID,
         request: UpdateNotificationRuleRequest,
     ) -> UpdateNotificationRuleResponse:
         """
@@ -206,7 +226,7 @@ class Notification(BaseFunction):
     @classmethod
     async def delete_rule(
         cls,
-        rule_id: str | UUID,
+        rule_id: UUID,
     ) -> DeleteNotificationRuleResponse:
         """
         Delete a notification rule.
@@ -218,3 +238,23 @@ class Notification(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             return DeleteNotificationRuleResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def validate_rule(
+        cls,
+        rule_id: UUID,
+        request: ValidateNotificationRuleRequest,
+    ) -> ValidateNotificationRuleResponse:
+        """
+        Validate a notification rule by rendering its template with test data.
+
+        :param rule_id: Rule ID to validate
+        :param request: Validation request containing test notification data
+        :returns: Validation result with rendered message
+        """
+        rqst = Request("POST", f"/notifications/rules/{rule_id}/validate")
+        rqst.set_json(request.model_dump(mode="json"))
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return ValidateNotificationRuleResponse.model_validate(data)
