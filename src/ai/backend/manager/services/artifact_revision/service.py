@@ -232,16 +232,14 @@ class ArtifactRevisionService:
         # 4. Query remote progress when delegation is enabled
         remote_download_progress: Optional[ArtifactRevisionDownloadProgress] = None
 
-        # Check if delegation is enabled
-        reservoir_cfg = self._config_provider.config.reservoir
-        if reservoir_cfg and reservoir_cfg.use_delegation:
-            # Get artifact's registry to find remote reservoir
-            if artifact.registry_type == ArtifactRegistryType.RESERVOIR:
-                # Default: create remote progress object with None progress and remote_status
-                remote_status = (
-                    revision.remote_status.value if revision.remote_status else "UNSCANNED"
-                )
+        # Only set remote for RESERVOIR type
+        if artifact.registry_type == ArtifactRegistryType.RESERVOIR:
+            reservoir_cfg = self._config_provider.config.reservoir
+            # Default: create remote progress object with None progress and remote_status
+            remote_status = revision.remote_status.value if revision.remote_status else "UNSCANNED"
 
+            # Check if delegation is enabled
+            if reservoir_cfg and reservoir_cfg.use_delegation:
                 # If local is PULLING, return remote status without making remote request
                 if revision.status == ArtifactStatus.PULLING:
                     remote_download_progress = ArtifactRevisionDownloadProgress(
@@ -294,6 +292,13 @@ class ArtifactRevisionService:
                         progress=None,
                         status=remote_status,
                     )
+            else:
+                # No delegation but still RESERVOIR type
+                remote_download_progress = ArtifactRevisionDownloadProgress(
+                    progress=None,
+                    status=remote_status,
+                )
+        # else: Not RESERVOIR type, remote_download_progress remains None
 
         # 5. Build combined response
         combined_progress = CombinedDownloadProgress(

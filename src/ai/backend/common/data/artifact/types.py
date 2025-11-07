@@ -108,5 +108,5 @@ class CombinedDownloadProgress(BaseModel):
     )
     remote: Optional[ArtifactRevisionDownloadProgress] = Field(
         default=None,
-        description="Remote download progress and status, None if local is PULLING",
+        description="Remote download progress and status. None if not RESERVOIR type, required object if RESERVOIR type",
     )
