@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "アクティブなエージェント",
+    "ActiveAgentsTooltip": "現在システムで実行されているすべてのエージェントの概要を示しています。"
+  },
   "agent": {
     "Agent": "代理店",
     "AgentSetting": "エージェント設定",
@@ -26,6 +30,10 @@
     "Status": "状態",
     "Terminated": "終了しました",
     "Utilization": "使用量"
+  },
+  "agentStats": {
+    "AgentStats": "エージェントの統計",
+    "AgentStatsDescription": "このパネルには、システム内のすべてのエージェントにわたって使用されているすべてのリソースが表示されます。\n値は、すべてのアクティブなセッションで使用されたリソースの合計を表します。"
   },
   "autoScalingRule": {
     "AddAutoScalingRule": "自動スケーリングルールを追加します",
@@ -213,6 +221,10 @@
     "WarningLessRateLimit": "Rate Limit値が小さいと、ログインなどのAPI操作がブロックされることがあります。",
     "YouAreAboutToDeleteCredential": "このユーザーの資格情報を削除しようとしています:"
   },
+  "dashboard": {
+    "Free": "無料",
+    "Used": "使用済み"
+  },
   "data": {
     "Active": "アクティブ",
     "Add": "追加",
@@ -241,6 +253,7 @@
     "FolderInfo": "フォーダー情報",
     "FolderNameRequired": "フォルダ名が必要です",
     "FolderNameTooLong": "64文字未満のフォルダ名を入力してください",
+    "FolderStatus": "フォルダーのステータス",
     "FolderToCopy": "コピーするフォルダ",
     "Foldername": "フォルダ名",
     "Folders": "フォルダー",
@@ -251,7 +264,7 @@
     "InvalidEmail": "無効なメールアドレス",
     "Invited": "招待",
     "InvitedFolders": "招待されたフォルダー",
-    "InvitedFoldersTooltip": "{{ count }}フォルダーの招待状は、回答が保留されています。",
+    "InvitedFoldersTooltip": "クリックして保留中の {{count}} 件の招待状を確認してください",
     "Limit": "制限",
     "ModelStore": "モデルストア",
     "Models": "モデル",
@@ -273,7 +286,6 @@
     "SearchByName": "名前で検索",
     "SelectStorageHost": "ホストを選択してください",
     "SharedFolderPermission": "共有フォルダー許可",
-    "StorageStatus": "ストレージ利用状況",
     "Type": "タイプ",
     "Update": "更新",
     "UsageMode": "使用モード",
@@ -355,6 +367,7 @@
       "DownloadingModel": "モデルのダウンロード...",
       "Edit": "編集",
       "EditDelete": "編集+削除",
+      "ExcludedFolders": "以下の削除権限のないフォルダーは除外されます。",
       "FileDeleted": "ファイルが削除されました",
       "FileRenamed": "ファイルの名前が変更されました",
       "FolderCloneFailed": "フォルダのクローンに失敗しました。",
@@ -429,6 +442,7 @@
       "Invited": "招待に成功",
       "LeaveSharedFolder": "共有フォルダーを残します",
       "LeaveSharedFolderDesc": "共有フォルダー「{{foldername}}」を残しますか？",
+      "NoMoreInvitation": "レビューへの招待はありません。",
       "NoOneWasInvited": "招待状が既に存在するため、誰も招待されていません",
       "NoOneWasShared": "グループフォルダの共有に失敗しました",
       "NoValidEmails": "有効なメールが入力されていません",
@@ -639,17 +653,18 @@
     "Title": "エラーが発生しました。"
   },
   "explorer": {
-    "FileInProgress": "'{{fileName}}'のアップロード...",
     "FileUploadCancelled": "ファイルのアップロードは、ユーザーリクエストによってキャンセルされました。",
     "FileUploadFailed": "Folder '{{folderName}}'にいくつかのファイルをアップロードできませんでした。",
+    "Filename": "ファイル名",
     "FolderNotFoundOrNoAccess": "フォルダーが見つかりませんまたはアクセスが拒否されません",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "管理されていないフォルダーは、ファイルエクスプローラーをサポートしていません。",
     "NoPermissions": "このフォルダーにアクセスする権限はありません",
     "ProcessingUpload": "ファイルがアップロードされています。\nお待ちください。",
-    "SuccessfullyUploadedToFolder": "FilesがFolder '{{folderName}}'に正常にアップロードされました '",
+    "SuccessfullyUploadedToFolder": "ファイルは正常にアップロードされました。",
     "UploadFailed": "'{{folderName}}'で故障したアップロード",
-    "UploadToFolder": "'{{folderName}}にアップロードする",
+    "UploadingFiles": "ファイルをアップロードしています...",
+    "VFolder": "フォルダ",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -978,7 +993,7 @@
     "ServiceInfo": "サービス情報",
     "ServiceName": "サービス名",
     "ServiceNameCannotStartWithHyphen": "両端にハイフン（-）を使用することはできません。",
-    "ServiceNameInvalidCharacter": "サービス名の中央では、アルファベット、数字、「_」、 '、'  -  'のみを含めることができます。",
+    "ServiceNameInvalidCharacter": "サービス名の中央では、アルファベット、数字、'_', '-' のみを含めることができます。",
     "ServiceNameMaxLength": "24文字以内で入力してください。",
     "ServiceNameMinLength": "少なくとも 4 文字を入力してください。",
     "ServiceNameShouldEndWith": "アルファベット、大小の文字、数字、および「_」で終わる必要があります。",
@@ -1165,11 +1180,6 @@
     "TypeResourceGroupNameToDelete": "削除するリソースグループ名を入力します",
     "WsproxyAddress": "WSProxy サーバアドレス"
   },
-  "resourcePanel": {
-    "Limit": "制限",
-    "RemainingNumber": "rmaining",
-    "UsingNumber": "使用"
-  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "このリソースポリシーを削除しようとしています。",
     "AllowedHosts": "許可されたホスト",
@@ -1254,10 +1264,12 @@
     "PendingSessions": "保留中のセッション"
   },
   "session": {
+    "ActiveSessions": "アクティブセッション",
     "Agent": "エージェント",
     "AgentId": "エージェントID",
     "Agents": "エージェント",
     "AllowedClientIps": "許可されたクライアントIP",
+    "AllowedMultipleClientsIps": "許可されたクライアント IP (カンマ区切り)",
     "AlreadyTerminatingSession": "すでに終了しているセッションです",
     "AnotherUserSession": "このセッションは、別のユーザーによって作成されました.",
     "Architecture": "アーキテクチャ",
@@ -1919,6 +1931,8 @@
     "BootstrapScriptDescription": "ブートストラップスクリプトはセッション作成後一度だけ実行されます。",
     "BootstrapScriptEmpty": "スクリプトが空です。\nスクリプトを入力してください。",
     "BootstrapScriptUpdated": "ブートストラップスクリプトが更新されました。",
+    "ClassicFeatures": "古典的な機能",
+    "ClassicFeaturesDesc": "古典的なバージョンに戻ると、更新や修正がリリースされるのを待っている間、安定性と機能を取り戻すのに役立ちます。",
     "ClassicSessionList": "クラシックセッションリストページ",
     "ClearSSHKeypairInput": "書き込まれたSSHキーペアは削除されます。続行してもよろしいですか？",
     "ConfigFilename": "構成ファイル名",
@@ -1928,12 +1942,12 @@
     "DescAutoLogout": "アプリのセッション開始ページ（jupyterノートブック、Webターミナルなど）を除き、ログインしたすべてのページが閉じている場合は、自動的にログアウトします。",
     "DescAutomaticUpdateCheck": "新しいwebuiバージョンがリリースされたときに通知します。<br />機能が自動的に無効になった場合、トグルを再度クリックすると更新チェックが再開されます。",
     "DescBetaFeatures": "WebUIのベータ機能を使用します。 <br />ベータ機能が不安定な場合があります。一部のベータ機能は、公式機能として採用されない場合があります。",
-    "DescClassicSessionLauncher": "NEO セッション ランチャーの代わりに Classic セッション ランチャーを使用します。\nClassic セッション ランチャーには最新の機能が含まれていない可能性があります。",
     "DescDesktopNotification": "デスクトップ通知を有効にします。<br />オンにすると、Backend.AIはオペレーティングシステムの通知システムも使用します。これをオフにしても、WebUI内の通知には影響しません。オペレーティングシステムによっては、システム設定で通知権限を有効にする必要がある場合があります。",
     "DescExperimentalDashboard": "要約ページの代わりにダッシュボードページを使用します。",
     "DescKeepLoginSessionInformation": "次回、webuiアプリに現在のログインセッション情報を保持させます。 <br />オプションがオフの場合、ログイン情報はログアウトごとにクリアされます。",
     "DescLanguage": "インターフェイス言語を設定します。英語と韓国以外の言語は、機械翻訳によって提供されます。",
     "DescLetUserUpdateScriptWithNonEmptyValue": "空でない値でスクリプトを更新してください。",
+    "DescMaxConcurrentUploads": "ファイル エクスプローラーを通じて同時にアップロードできるファイルの数を制限します。",
     "DescMyKeypairInfo": "私のキーペア情報を参照してください",
     "DescNewUserConfigFileCreated": "空でないデータを使用して、新しいユーザー構成ファイルを作成できます。",
     "DescNoBetaFeatures": "現在、ベータ機能は利用できません。 :)",
@@ -1960,6 +1974,7 @@
     "Language": "言語",
     "LightMode": "ライトモード",
     "Logs": "ログ",
+    "MaxConcurrentUploads": "最大同時ファイルアップロード制限",
     "MyKeypairInfo": "私のキーペア情報",
     "NEODataPage": "NEOデータページ",
     "NEOSessionList": "NEOセッションリスト",
@@ -2004,6 +2019,7 @@
       "AIAccelerator": "AIアクセラレータ",
       "AIAgents": "AIエージェント",
       "AboutBackendAI": "Backend.AIについて",
+      "AdminDashboard": "管理ダッシュボード",
       "Administration": "管理",
       "AgentSummary": "リソース概要",
       "Architecture": "建築",
@@ -2011,6 +2027,7 @@
       "Cancel": "キャンセル",
       "ChangePassword": "パスワードを変更する",
       "Chat": "チャット",
+      "ClassicDashboardPage": "クラシックダッシュボードページ（要約ページ）",
       "ClickToDownload": "クリックしてダウンロードします",
       "ComputationResources": "計算リソース",
       "Configurations": "構成",
@@ -2045,10 +2062,10 @@
       "MyAccountInformation": "ユーザー情報の変更",
       "MyEnvironments": "利用環境",
       "MyResources": "私の総リソース制限",
-      "MyResourcesDescription": "<p>このパネルは、全てのプロジェクトとリソースグループを合算した総リソース使用量と制限を表示します。</p><p>複数の制限（ドメイン、プロジェクト、キーペアなど）が適用される場合、最も厳しい制限に基づいて計算されます。</p>",
+      "MyResourcesDescription": "<p>このパネルには、すべてのプロジェクトおよびリソース グループにわたって現在使用されているリソースと空きリソースの合計が表示されます。</p><p>複数の制限が適用されている場合 (ドメイン、プロジェクト、キーペアなど)、計算では最も制限の厳しい無料リソース制限が使用されます。</p>",
       "MyResourcesIn": "私のリソース",
       "MyResourcesInResourceGroup": "リソースグループの私のリソース",
-      "MyResourcesInResourceGroupDescription": "このパネルは、現在の私のリソースの使用と選択したリソースグループに残っていることを示しています。",
+      "MyResourcesInResourceGroupDescription": "このパネルには、現在のプロジェクトで選択したリソース グループで使用したリソースの量と空き容量が表示されます。",
       "NewPassword": "新しいパスワード",
       "NewPasswordAgain": "新しいパスワードを再入力）",
       "NewPasswordCannotBeSame": "既存のパスワードとは異なる新しいパスワードを入力してください。",
@@ -2081,7 +2098,7 @@
       "TermsOfService": "利用規約",
       "TotalResourcesIn": "総リソース",
       "TotalResourcesInResourceGroup": "リソースグループの総リソース",
-      "TotalResourcesInResourceGroupDescription": "このパネルは、使用されている合計と残りのリソースを示しています。\n値は、選択したリソースグループを使用して、すべてのエージェントの使用量と残りの量を追加することによって計算されます。",
+      "TotalResourcesInResourceGroupDescription": "このパネルには、選択したリソース グループ内の使用済みリソースと空きリソースの合計が表示されます。\n値は、そのグループを使用するすべてのエージェントの使用量と空き量を合計することによって計算されます。",
       "TotpActivated": "二要素認証の使用",
       "Update": "更新",
       "Usage": "使用法",

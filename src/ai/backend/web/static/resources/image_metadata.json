@@ -1,6 +1,7 @@
 {
+  "$schema": "./image_metadata.schema.json",
   "imageInfo": {
-	  "rbln-ubuntu": {
+    "rbln-ubuntu": {
       "name": "Rebellions Ubuntu",
       "description": "Rebellions Ubuntu is a basic image for Rebellions NPU.",
       "group": "NPU",
@@ -860,9 +861,9 @@
     "python": "Python",
     "tensorflow": "TensorFlow",
     "pytorch": "PyTorch",
-    "pytorch2.1":"PyTorch 2.1",
-    "pytorch2.0":"PyTorch 2.0",
-    "pytorch2.2":"PyTorch 2.2",
+    "pytorch2.1": "PyTorch 2.1",
+    "pytorch2.0": "PyTorch 2.0",
+    "pytorch2.2": "PyTorch 2.2",
     "lua": "Lua",
     "r": "R",
     "r-base": "R",
@@ -986,5 +987,8 @@
     "^gromacs*$": "GROMACS",
     "^(customized)_.*$": "Customized",
     "^(-_)$": " "
+  },
+  "groupSortKeyMap": {
+    "Custom Environments": "00000"
   }
 }

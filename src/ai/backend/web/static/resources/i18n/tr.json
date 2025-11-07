@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "Aktif ajanlar",
+    "ActiveAgentsTooltip": "Şu anda sistemde çalışan tüm ajanlara bir bakışta genel bir bakış gösterir."
+  },
   "agent": {
     "Agent": "Ajan",
     "AgentSetting": "Temsilci Ayarları",
@@ -26,6 +30,10 @@
     "Status": "Durum",
     "Terminated": "Sonlandırılmış",
     "Utilization": "Kullanım"
+  },
+  "agentStats": {
+    "AgentStats": "Temsilci İstatistikleri",
+    "AgentStatsDescription": "Bu panel, sistemdeki tüm aracılarda kullanılan tüm kaynakları gösterir. \nDeğerler, tüm etkin oturumlar tarafından kullanılan toplam kaynakları temsil eder."
   },
   "autoScalingRule": {
     "AddAutoScalingRule": "Otomatik ölçeklendirme kuralı ekleyin",
@@ -214,6 +222,10 @@
     "WarningLessRateLimit": "Hız Sınırı değeri küçükse, oturum açma gibi API işlemleri engellenebilir.",
     "YouAreAboutToDeleteCredential": "Bu kullanıcının kimlik bilgilerini silmek üzeresiniz:"
   },
+  "dashboard": {
+    "Free": "Özgür",
+    "Used": "Kullanılmış"
+  },
   "data": {
     "Active": "Aktif",
     "Add": "Ekle",
@@ -242,6 +254,7 @@
     "FolderInfo": "Forder Bilgisi",
     "FolderNameRequired": "Klasör adı gerekli",
     "FolderNameTooLong": "64 karakterden az klasör adı girin",
+    "FolderStatus": "Klasör Durumu",
     "FolderToCopy": "Kopyalanacak klasör",
     "Foldername": "Klasör adı",
     "Folders": "klasörler",
@@ -252,7 +265,7 @@
     "InvalidEmail": "Geçersiz e -posta adresi",
     "Invited": "davetli",
     "InvitedFolders": "Davet edilen klasörler",
-    "InvitedFoldersTooltip": "{{ count }} klasör davetiyeleri beklemededir.",
+    "InvitedFoldersTooltip": "Bekleyen {{count}} davetiyeyi kontrol etmek için tıklayın",
     "Limit": "Limit",
     "ModelStore": "Model Mağazası",
     "Models": "Modeller",
@@ -274,7 +287,6 @@
     "SearchByName": "Ada göre ara",
     "SelectStorageHost": "Depolama ana bilgisayarını seçin",
     "SharedFolderPermission": "Paylaşılan klasör izni",
-    "StorageStatus": "Depolama Durumu",
     "Type": "Tür",
     "Update": "Güncelleme",
     "UsageMode": "Kullanım Modu",
@@ -356,6 +368,7 @@
       "DownloadingModel": "İndirme Modeli ...",
       "Edit": "Düzenle",
       "EditDelete": "Düzenle+Sil",
+      "ExcludedFolders": "Silme izni olmayan aşağıdaki klasör(ler) hariç tutulacaktır.",
       "FileDeleted": "Dosya Silindi",
       "FileRenamed": "Dosya Yeniden Adlandırıldı",
       "FolderCloneFailed": "Klasör klonlanamadı.",
@@ -430,6 +443,7 @@
       "Invited": "Başarıyla davet edildi",
       "LeaveSharedFolder": "Paylaşılan klasörü bırakın",
       "LeaveSharedFolderDesc": "Paylaşılan klasörden ayrılmak ister misiniz?",
+      "NoMoreInvitation": "İncelemeye davet yok.",
       "NoOneWasInvited": "Davetiye zaten mevcut olduğundan kimse davet edilmedi",
       "NoOneWasShared": "Grup klasörü paylaşılamadı",
       "NoValidEmails": "Geçerli e-posta girilmedi",
@@ -640,17 +654,18 @@
     "Title": "Bir hata oluştu."
   },
   "explorer": {
-    "FileInProgress": "'{{fileName}}' yükleme ...",
     "FileUploadCancelled": "Dosya yükleme kullanıcı isteği ile iptal edildi.",
     "FileUploadFailed": "Bazı dosyaları '{{{folderName}}' klasörüne yükleyemedi.",
+    "Filename": "Dosya adı",
     "FolderNotFoundOrNoAccess": "Klasör bulunamadı veya erişim reddedildi",
     "InputTooShort": "GirişÇok Kısa",
     "NoExplorerSupportForUnmanagedFolder": "Yönetilmeyen klasörler Dosya Gezgini'ni desteklemez.",
     "NoPermissions": "Bu klasöre erişmek için izin yok",
     "ProcessingUpload": "Dosyanız yükleniyor. \nLütfen bekleyin.",
-    "SuccessfullyUploadedToFolder": "Dosyalar '{{folderName}}' klasörüne başarıyla yüklendi",
+    "SuccessfullyUploadedToFolder": "Dosyalar başarıyla yüklendi.",
     "UploadFailed": "Yükleme başarısız oldu '{{folderName}}'",
-    "UploadToFolder": "'{{folderName}}' adresine yükleme",
+    "UploadingFiles": "Dosyalar yükleniyor...",
+    "VFolder": "Dosya",
     "ValueRequired": "DeğerGerekli"
   },
   "general": {
@@ -979,7 +994,7 @@
     "ServiceInfo": "Servis Bilgileri",
     "ServiceName": "Hizmet adı",
     "ServiceNameCannotStartWithHyphen": "Kısa çizgi (-) her iki uçta da kullanılamaz.",
-    "ServiceNameInvalidCharacter": "Servis adının ortasında, yalnızca alfabe, sayı, '_', '.', '-'-'sadece dahil edilebilir.",
+    "ServiceNameInvalidCharacter": "Servis adının ortasında, yalnızca alfabe, sayı, '_', '-' sadece dahil edilebilir.",
     "ServiceNameMaxLength": "Lütfen 24 veya daha az karakter girin.",
     "ServiceNameMinLength": "Lütfen en az 4 karakter giriniz.",
     "ServiceNameShouldEndWith": "Oturum adı alfabe, büyük ve küçük karakterler, sayılar ve '_' ile bitmelidir.",
@@ -1166,11 +1181,6 @@
     "TypeResourceGroupNameToDelete": "Silmek için kaynak grubu adını yazın",
     "WsproxyAddress": "WSProxy Sunucu Adresi"
   },
-  "resourcePanel": {
-    "Limit": "Sınırlamak",
-    "RemainingNumber": "Zırhlı",
-    "UsingNumber": "Kullanma"
-  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Bu kaynak politikasını silmek üzeresiniz:",
     "AllowedHosts": "İzin verilen ana bilgisayarlar",
@@ -1255,10 +1265,12 @@
     "PendingSessions": "Bekleyen seanslar"
   },
   "session": {
+    "ActiveSessions": "Aktif oturumlar",
     "Agent": "Temsilci",
     "AgentId": "Ajan kimliği",
     "Agents": "Temsilciler",
     "AllowedClientIps": "İzin verilen istemci IP'leri",
+    "AllowedMultipleClientsIps": "İzin verilen istemci IP'leri (virgülle ayrılmış)",
     "AlreadyTerminatingSession": "Oturum zaten sonlandırılıyor.",
     "AnotherUserSession": "Bu oturum başka bir kullanıcı tarafından oluşturuldu.",
     "Architecture": "Mimarlık",
@@ -1920,6 +1932,8 @@
     "BootstrapScriptDescription": "Bootstrap komut dosyası oturum oluşturulduktan sonra yalnızca bir kez çalıştırılacaktır",
     "BootstrapScriptEmpty": "Senaryo boş. \nLütfen betiği girin.",
     "BootstrapScriptUpdated": "Önyükleme komut dosyası güncellendi.",
+    "ClassicFeatures": "Klasik Özellikler",
+    "ClassicFeaturesDesc": "Klasik bir sürüme geri dönmek, güncellemelerin veya düzeltmelerin yayınlanmasını beklerken istikrar ve işlevselliği yeniden kazanmanıza yardımcı olabilir.",
     "ClassicSessionList": "Klasik Oturum Listesi Sayfası",
     "ClearSSHKeypairInput": "Yazılı SSH Anahtar Çifti kaldırılacaktır. Devam etmek istediğine emin misin?",
     "ConfigFilename": "Yapılandırma dosyası adı",
@@ -1929,12 +1943,12 @@
     "DescAutoLogout": "Uygulamalar için oturum kaynaklı sayfalar (örneğin jupyter notebook, web terminal, vb.)",
     "DescAutomaticUpdateCheck": "Yeni bir webui sürümü yayınlandığında bildirim gönder.<br />Özellik otomatik olarak devre dışı bırakılırsa, anahtara tekrar tıklamak güncelleme kontrollerini sürdürecektir.",
     "DescBetaFeatures": "Web kullanıcı arayüzü için beta özelliklerini kullanın. <br /> Beta özellikleri kararsız olabilir. Bazı beta özellikler resmi özellik olarak kabul edilmeyebilir.",
-    "DescClassicSessionLauncher": "NEO oturum başlatıcısı yerine Classic oturum başlatıcıyı kullanın. \nClassic oturum başlatıcı en son özelliklere sahip olmayabilir.",
     "DescDesktopNotification": "Masaüstü bildirimlerini etkinleştirir. <br />Açıldığında, Backend.AI işletim sisteminin bildirim sistemini de kullanır. Bunu kapatmak web UI içindeki bildirimleri etkilemez. İşletim sistemine bağlı olarak, bildirim izinlerinin sistem ayarlarında etkinleştirilmesi gerekebilir.",
     "DescExperimentalDashboard": "Özet sayfası yerine gösterge paneli sayfasını kullanın.",
     "DescKeepLoginSessionInformation": "Webui uygulamasının bir dahaki sefere mevcut oturum açma bilgilerini tutmasına izin verin. <br /> Seçenek kapatılırsa, oturum açma bilgileri her oturum kapatıldığında temizlenir.",
     "DescLanguage": "Arayüz dilini ayarlayın. İngilizce ve Korece dışındaki diller makine çevirisi ile sağlanacaktır.",
     "DescLetUserUpdateScriptWithNonEmptyValue": "Lütfen komut dosyasını boş olmayan bir değerle güncelleyin.",
+    "DescMaxConcurrentUploads": "Dosya Gezgini aracılığıyla aynı anda yüklenebilecek dosya sayısını sınırlar.",
     "DescMyKeypairInfo": "Anahtar çifti bilgilerimi görün",
     "DescNewUserConfigFileCreated": "Boş olmayan verilerle yeni Kullanıcı yapılandırma dosyası oluşturulabilir.",
     "DescNoBetaFeatures": "Şu anda mevcut beta özelliği yok. :)",
@@ -1961,6 +1975,7 @@
     "Language": "Dil",
     "LightMode": "Işık Modu",
     "Logs": "Kütükler",
+    "MaxConcurrentUploads": "Maksimum Eşzamanlı Dosya Yükleme Sınırı",
     "MyKeypairInfo": "Anahtar Çifti Bilgilerim",
     "NEODataPage": "NEO veri sayfası",
     "NEOSessionList": "NEO Oturum listesi",
@@ -2005,6 +2020,7 @@
       "AIAccelerator": "Yapay Zeka Hızlandırıcı",
       "AIAgents": "Yapay Zeka Ajanları",
       "AboutBackendAI": "Backend.AI hakkında",
+      "AdminDashboard": "Yönetici Gösterge Tablosu",
       "Administration": "yönetim",
       "AgentSummary": "Temsilci Özeti",
       "Architecture": "Mimarlık",
@@ -2012,6 +2028,7 @@
       "Cancel": "İptal etmek",
       "ChangePassword": "Şifre değiştir",
       "Chat": "Sohbet",
+      "ClassicDashboardPage": "Klasik Gösterge Tablosu Sayfası (özet sayfası)",
       "ClickToDownload": "İndirmek için tıklayın",
       "ComputationResources": "Hesaplama Kaynakları",
       "Configurations": "Yapılandırmalar",
@@ -2046,10 +2063,10 @@
       "MyAccountInformation": "Kullanıcı Bilgilerini Değiştir",
       "MyEnvironments": "Ortamlarım",
       "MyResources": "Toplam kaynak sınırım",
-      "MyResourcesDescription": "<p>Bu panel, tüm projeler ve kaynak gruplarındaki toplam kaynak kullanımınızı ve limitlerinizi gösterir.</p><p>Birden fazla limit uygulandığında (alan adı, proje veya anahtar çifti gibi), hesaplama için en kısıtlayıcı limit kullanılır.</p>",
+      "MyResourcesDescription": "<p>Bu panel, tüm projelerde ve kaynak gruplarında halihazırda kullanılan ve ücretsiz olan toplam kaynaklarınızı görüntüler.</p><p>Birden fazla sınır uygulandığında (etki alanı, proje veya anahtar çifti gibi), hesaplama en kısıtlayıcı ücretsiz kaynak sınırını kullanır.</p>",
       "MyResourcesIn": "Kaynaklarım",
       "MyResourcesInResourceGroup": "Kaynak Grubundaki Kaynaklarım",
-      "MyResourcesInResourceGroupDescription": "Bu panel, mevcut kaynak kullanımınızı ve seçilen kaynak grubunda kaldığınızı gösterir.",
+      "MyResourcesInResourceGroupDescription": "Bu panel, mevcut projenizin seçilen kaynak grubunda ne kadar kaynak kullandığınızı ve ne kadarının ücretsiz olduğunu gösterir.",
       "NewPassword": "Yeni Şifre",
       "NewPasswordAgain": "Yeni Şifre Tekrar)",
       "NewPasswordCannotBeSame": "Lütfen mevcut şifrenizden farklı bir şifre girin.",
@@ -2082,7 +2099,7 @@
       "TermsOfService": "Kullanım Şartları",
       "TotalResourcesIn": "Toplam Kaynaklar",
       "TotalResourcesInResourceGroup": "Kaynak Grubundaki Toplam Kaynaklar",
-      "TotalResourcesInResourceGroupDescription": "Bu panel, kullanılan ve kalan toplam kaynakları gösterir. \nDeğerler, seçilen kaynak grubunu kullanan tüm ajanların kullanımını ve kalan miktarlarını ekleyerek hesaplanır.",
+      "TotalResourcesInResourceGroupDescription": "Bu panel, seçilen kaynak grubundaki toplam kullanılan ve boş kaynakları gösterir. \nDeğerler, o grubu kullanan tüm acentelerin kullanılmış ve serbest miktarlarının toplanmasıyla hesaplanır.",
       "TotpActivated": "2FA Etkin",
       "Update": "Güncelleme",
       "Usage": "Kullanım",

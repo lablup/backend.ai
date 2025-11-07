@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "活性代理",
+    "ActiveAgentsTooltip": "顯示了當前在系統中運行的所有代理的一目了然的概述。"
+  },
   "agent": {
     "Agent": "代理",
     "AgentSetting": "代理设置",
@@ -26,6 +30,10 @@
     "Status": "地位",
     "Terminated": "已終止",
     "Utilization": "利用率"
+  },
+  "agentStats": {
+    "AgentStats": "代理統計",
+    "AgentStatsDescription": "此面板顯示系統中所有代理的所有已使用資源。這些值表示所有活動會話使用的總資源。"
   },
   "autoScalingRule": {
     "AddAutoScalingRule": "添加自動縮放規則",
@@ -214,6 +222,10 @@
     "WarningLessRateLimit": "如果速率限制值较小，可能会阻止登录等 API 操作。",
     "YouAreAboutToDeleteCredential": "您將要刪除該使用者的憑證："
   },
+  "dashboard": {
+    "Free": "自由的",
+    "Used": "用過的"
+  },
   "data": {
     "Active": "積極的",
     "Add": "添加",
@@ -242,6 +254,7 @@
     "FolderInfo": "福德信息",
     "FolderNameRequired": "文件夾名稱為必填項",
     "FolderNameTooLong": "輸入少於 64 個字符的文件夾名稱",
+    "FolderStatus": "文件夾狀態",
     "FolderToCopy": "要復制的文件夾",
     "Foldername": "文件夾名稱",
     "Folders": "文件夾",
@@ -252,7 +265,7 @@
     "InvalidEmail": "無效的電子郵件地址",
     "Invited": "受邀",
     "InvitedFolders": "邀請的文件夾",
-    "InvitedFoldersTooltip": "{{ count }}文件夾邀請正在待定響應。",
+    "InvitedFoldersTooltip": "點擊查看待處理的 {{count}} 個邀請",
     "Limit": "限制",
     "ModelStore": "模型店",
     "Models": "楷模",
@@ -274,7 +287,6 @@
     "SearchByName": "按名稱搜尋",
     "SelectStorageHost": "选择存储主机",
     "SharedFolderPermission": "共享文件夾權限",
-    "StorageStatus": "存儲狀態",
     "Type": "類型",
     "Update": "更新",
     "UsageMode": "使用方式",
@@ -356,6 +368,7 @@
       "DownloadingModel": "下載型號...",
       "Edit": "編輯",
       "EditDelete": "編輯+刪除",
+      "ExcludedFolders": "下列無刪除權限的資料夾將被排除在外。",
       "FileDeleted": "文件已刪除",
       "FileRenamed": "文件重命名",
       "FolderCloneFailed": "克隆文件夹失败。",
@@ -431,6 +444,7 @@
       "Invited": "已成功邀請",
       "LeaveSharedFolder": "留下共享文件夾",
       "LeaveSharedFolderDesc": "您要留下共享文件夾“ {{foldername}}”？",
+      "NoMoreInvitation": "沒有審查邀請。",
       "NoOneWasInvited": "沒有人被邀請，因為邀請已經存在",
       "NoOneWasShared": "無法共享群組文件夾",
       "NoValidEmails": "沒有輸入有效的電子郵件",
@@ -640,16 +654,17 @@
     "Title": "发生错误。"
   },
   "explorer": {
-    "FileInProgress": "上傳'{{fileName}}'...",
     "FileUploadCancelled": "文件上傳已通過用戶請求取消。",
     "FileUploadFailed": "無法將某些文件上傳到文件夾'{{folderName}}'中。",
+    "Filename": "文件名",
     "FolderNotFoundOrNoAccess": "未找到或拒絕訪問的文件夾",
     "InputTooShort": "輸入太短",
     "NoExplorerSupportForUnmanagedFolder": "未管理的文件夾不支持文件資源管理器。",
     "ProcessingUpload": "您的文件正在上傳。請稍等。",
-    "SuccessfullyUploadedToFolder": "文件在文件夾'{{folderName}}'中成功上傳",
+    "SuccessfullyUploadedToFolder": "文件上傳成功。",
     "UploadFailed": "上傳失敗在'{{folderName}}'中",
-    "UploadToFolder": "上傳到'{{folderName}}'",
+    "UploadingFiles": "正在上傳文件...",
+    "VFolder": "文件夾",
     "ValueRequired": "需要值"
   },
   "general": {
@@ -978,7 +993,7 @@
     "ServiceInfo": "服务信息",
     "ServiceName": "服務名稱",
     "ServiceNameCannotStartWithHyphen": "兩端不能使用連字符 (-)。",
-    "ServiceNameInvalidCharacter": "在服務名稱的中間，只有字母，數字，'_'，'。'，' - '只能包括在內。",
+    "ServiceNameInvalidCharacter": "在服務名稱的中間，只有字母，數字，'_', '-'只能包括在內。",
     "ServiceNameMaxLength": "請輸入 24 個或更少的字元。",
     "ServiceNameMinLength": "請輸入至少 4 個字元。",
     "ServiceNameShouldEndWith": "會話名稱必須以字母，大字符，數字和“ _”結尾。",
@@ -1165,11 +1180,6 @@
     "TypeResourceGroupNameToDelete": "輸入要刪除的資源組名稱",
     "WsproxyAddress": "WSProxy 服务器地址"
   },
-  "resourcePanel": {
-    "Limit": "限制",
-    "RemainingNumber": "rming",
-    "UsingNumber": "使用"
-  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "您即將刪除此資源策略：",
     "AllowedHosts": "允許的主機",
@@ -1254,10 +1264,12 @@
     "PendingSessions": "等待會議"
   },
   "session": {
+    "ActiveSessions": "活動會話",
     "Agent": "代理人",
     "AgentId": "代理ID",
     "Agents": "代理商",
     "AllowedClientIps": "允许的客户端 IP",
+    "AllowedMultipleClientsIps": "允許的客戶端 IP（以逗號分隔）",
     "AlreadyTerminatingSession": "已经终止会话。",
     "AnotherUserSession": "此會話是由另一個用戶創建的。",
     "Architecture": "建筑学",
@@ -1918,6 +1930,8 @@
     "BootstrapScriptDescription": "Bootstrap 脚本只会在会话创建后执行一次",
     "BootstrapScriptEmpty": "腳本是空的。\n請輸入腳本。",
     "BootstrapScriptUpdated": "引導腳本已更新。",
+    "ClassicFeatures": "經典功能",
+    "ClassicFeaturesDesc": "回到經典版本可以幫助您在等待更新或釋放更新或修復時恢復穩定性和功能。",
     "ClassicSessionList": "經典會話列表頁面",
     "ClearSSHKeypairInput": "書面 SSH 密鑰對將被刪除。你確定你要繼續嗎？",
     "ConfigFilename": "配置文件名",
@@ -1927,12 +1941,12 @@
     "DescAutoLogout": "如果所有登錄頁面都關閉，除了應用程序的會話發起頁面（例如 jupyter 筆記本、網絡終端等），則自動註銷",
     "DescAutomaticUpdateCheck": "當發佈新的webui版本時通知。<br />如果功能自動停用，再次點擊開關將恢復更新檢查。",
     "DescBetaFeatures": "使用 Web UI 的測試版功能。 <br /> Beta 功能可能不穩定。某些測試版功能可能不會被採用為正式功能。",
-    "DescClassicSessionLauncher": "使用 Classic 會話啟動器而不是 NEO 會話啟動器。 \nClassic 會話啟動器可能不具有最新功能。",
     "DescDesktopNotification": "啟用桌面通知。<br />開啟時，Backend.AI也會使用作業系統的通知系統。關閉此功能不會影響網頁介面內的通知。根據作業系統，可能需要在系統設定中啟用通知權限。",
     "DescExperimentalDashboard": "使用儀表板頁面而不是摘要頁面。",
     "DescKeepLoginSessionInformation": "下次讓 webui 應用程序保留當前登錄會話信息。 <br /> 如果關閉該選項，則每次註銷時都會清除登錄信息。",
     "DescLanguage": "設置接口語言。英語和韓文以外的語言將通過機器翻譯提供。",
     "DescLetUserUpdateScriptWithNonEmptyValue": "請使用非空值更新腳本。",
+    "DescMaxConcurrentUploads": "限制可以通過文件資源管理器同時上傳的文件數量。",
     "DescMyKeypairInfo": "查看我的密鑰對訊息",
     "DescNewUserConfigFileCreated": "可以使用非空數據創建新用戶配置文件。",
     "DescNoBetaFeatures": "現在沒有可用的測試版功能。 :)",
@@ -1959,6 +1973,7 @@
     "Language": "語",
     "LightMode": "燈光模式",
     "Logs": "日誌",
+    "MaxConcurrentUploads": "最大並發文件上傳限制",
     "MyKeypairInfo": "我的密鑰對訊息",
     "NEODataPage": "NEO數據頁",
     "NEOSessionList": "近地天体会议列表",
@@ -2003,6 +2018,7 @@
       "AIAccelerator": "人工智能加速器",
       "AIAgents": "人工智能代理",
       "AboutBackendAI": "關於後端.AI",
+      "AdminDashboard": "管理儀表板",
       "Administration": "行政",
       "AgentSummary": "代理摘要",
       "Architecture": "建築學",
@@ -2010,6 +2026,7 @@
       "Cancel": "取消",
       "ChangePassword": "更改密碼",
       "Chat": "聊天",
+      "ClassicDashboardPage": "經典儀表板頁面（摘要頁面）",
       "ClickToDownload": "點擊下載",
       "ComputationResources": "計算資源",
       "Configurations": "配置",
@@ -2044,10 +2061,10 @@
       "MyAccountInformation": "更改用戶信息",
       "MyEnvironments": "我的環境",
       "MyResources": "我的總資源限制",
-      "MyResourcesDescription": "<p>此面板顯示所有專案和資源群組的總資源使用量和限制。</p><p>當應用多個限制（如網域、專案或金鑰對）時，將根據最嚴格的限制進行計算。</p>",
+      "MyResourcesDescription": "<p>此面板顯示您當前在所有項目和資源組中使用和免費的總資源。 </p><p>應用多個限制（例如域、項目或密鑰對）時，計算將使用最嚴格的免費資源限制。 </p>",
       "MyResourcesIn": "我的資源",
       "MyResourcesInResourceGroup": "我在資源組中的資源",
-      "MyResourcesInResourceGroupDescription": "該面板顯示您當前的我的資源使用情況，並保留在選定的資源組中。",
+      "MyResourcesInResourceGroupDescription": "此面板顯示您當前項目的所選資源組中已使用了多少資源以及有多少可用資源。",
       "NewPassword": "新密碼",
       "NewPasswordAgain": "確認新密碼）",
       "NewPasswordCannotBeSame": "请输入与当前密码不同的密码。",
@@ -2080,7 +2097,7 @@
       "TermsOfService": "服務條款",
       "TotalResourcesIn": "總資源中",
       "TotalResourcesInResourceGroup": "資源組的總資源",
-      "TotalResourcesInResourceGroupDescription": "該面板顯示了使用的總和剩餘資源。這些值是通過使用所選資源組添加所有代理的使用量和剩餘數量來計算的。",
+      "TotalResourcesInResourceGroupDescription": "此面板顯示所選資源組中已用資源和可用資源的總數。這些值是通過將使用該組的所有代理的已用量和可用量相加來計算的。",
       "TotpActivated": "已启用 2FA",
       "Update": "更新",
       "Usage": "用法",

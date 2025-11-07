@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "Aktywni agenci",
+    "ActiveAgentsTooltip": "Pokazuje przegląd w skrócie wszystkich agentów obecnie działających w systemie."
+  },
   "agent": {
     "Agent": "Agent",
     "AgentSetting": "Ustawienia agenta",
@@ -26,6 +30,10 @@
     "Status": "Status",
     "Terminated": "Zakończony",
     "Utilization": "Wykorzystanie"
+  },
+  "agentStats": {
+    "AgentStats": "Statystyki agentów",
+    "AgentStatsDescription": "Ten panel pokazuje wszystkie wykorzystane zasoby wszystkich agentów w systemie. \nWartości reprezentują całkowite zasoby wykorzystane przez wszystkie aktywne sesje."
   },
   "autoScalingRule": {
     "AddAutoScalingRule": "Dodaj regułę automatycznego skalowania",
@@ -214,6 +222,10 @@
     "WarningLessRateLimit": "Jeśli wartość Rate Limit jest niska, operacje API, takie jak logowanie, mogą zostać zablokowane.",
     "YouAreAboutToDeleteCredential": "Zamierzasz usunąć dane uwierzytelniające tego użytkownika:"
   },
+  "dashboard": {
+    "Free": "Bezpłatny",
+    "Used": "Używany"
+  },
   "data": {
     "Active": "Aktywny",
     "Add": "Dodaj",
@@ -242,6 +254,7 @@
     "FolderInfo": "Informacje o Floder",
     "FolderNameRequired": "Nazwa folderu jest wymagana",
     "FolderNameTooLong": "Wpisz nazwę folderu krótszą niż 64 znaki",
+    "FolderStatus": "Stan folderu",
     "FolderToCopy": "Folder do skopiowania",
     "Foldername": "Nazwa folderu",
     "Folders": "Lornetka składana",
@@ -252,7 +265,7 @@
     "InvalidEmail": "Nieprawidłowy adres e -mail",
     "Invited": "zaproszony",
     "InvitedFolders": "Zaproszone foldery",
-    "InvitedFoldersTooltip": "{{ count }} Zaproszenia do folderów oczekują odpowiedzi.",
+    "InvitedFoldersTooltip": "Kliknij, aby sprawdzić oczekujące zaproszenia ({{count}})",
     "Limit": "Limit",
     "ModelStore": "Sklep modelarski",
     "Models": "Modele",
@@ -274,7 +287,6 @@
     "SearchByName": "Szukaj według nazwy",
     "SelectStorageHost": "Wybór hosta pamięci masowej",
     "SharedFolderPermission": "Udostępniono uprawnienia do folderu",
-    "StorageStatus": "Stan przechowywania",
     "Type": "Rodzaj",
     "Update": "Aktualizacja",
     "UsageMode": "Tryb użytkowania",
@@ -356,6 +368,7 @@
       "DownloadingModel": "Model pobierania ...",
       "Edit": "Edytować",
       "EditDelete": "Edytuj+Usuń",
+      "ExcludedFolders": "Następujące foldery bez uprawnień do usuwania zostaną wykluczone.",
       "FileDeleted": "Plik usunięty",
       "FileRenamed": "Zmieniono nazwę pliku",
       "FolderCloneFailed": "Nie udało się sklonować folderu.",
@@ -430,6 +443,7 @@
       "Invited": "Pomyślnie zaproszono",
       "LeaveSharedFolder": "Zostaw wspólny folder",
       "LeaveSharedFolderDesc": "Czy chcesz zostawić udostępniony folder „{{foldername}}”?",
+      "NoMoreInvitation": "Brak zaproszeń do recenzji.",
       "NoOneWasInvited": "Nikt nie został zaproszony, ponieważ zaproszenie już istnieje",
       "NoOneWasShared": "Nie udało się udostępnić folderu grupy",
       "NoValidEmails": "Nie wprowadzono poprawnych adresów e-mail",
@@ -640,16 +654,17 @@
     "Title": "Wystąpił błąd."
   },
   "explorer": {
-    "FileInProgress": "Przesyłanie „{{fileName}}” ...",
     "FileUploadCancelled": "Przesłanie pliku zostało anulowane na żądanie użytkownika.",
     "FileUploadFailed": "Nie udało się przesłać niektórych plików w folderze „{{folderName}}”.",
+    "Filename": "Nazwa pliku",
     "FolderNotFoundOrNoAccess": "Folder nie został znaleziony ani nie ma dostępu",
     "InputTooShort": "Wejście zbyt krótkie",
     "NoExplorerSupportForUnmanagedFolder": "Foldery niezarządzane nie obsługują eksploratora plików.",
     "ProcessingUpload": "Twój plik jest przesyłany. \nProszę poczekaj.",
-    "SuccessfullyUploadedToFolder": "Pliki przesłane pomyślnie w folderze '{{folderName}}'",
+    "SuccessfullyUploadedToFolder": "Pliki przesłane pomyślnie.",
     "UploadFailed": "Przesyłanie nie powiodło się w '{{folderName}}' '",
-    "UploadToFolder": "Przesyłanie do „{{folderName}}”",
+    "UploadingFiles": "Przesyłanie plików...",
+    "VFolder": "Falcówka",
     "ValueRequired": "Wymagana wartość"
   },
   "general": {
@@ -978,7 +993,7 @@
     "ServiceInfo": "Informacje o usłudze",
     "ServiceName": "Nazwa usługi",
     "ServiceNameCannotStartWithHyphen": "Łączników (-) nie można używać na żadnym końcu.",
-    "ServiceNameInvalidCharacter": "W środku nazwy usługi, tylko alfabet, liczba,„ _ ”, '.', '-' może być tylko uwzględnione.",
+    "ServiceNameInvalidCharacter": "W środku nazwy usługi, tylko alfabet, liczba,'_', '-' może być tylko uwzględnione.",
     "ServiceNameMaxLength": "Wprowadź maksymalnie 24 znaki.",
     "ServiceNameMinLength": "Proszę wpisać co najmniej 4 znaki.",
     "ServiceNameShouldEndWith": "Nazwa sesji musi zakończyć się alfabetem, dużymi i małymi znakami, liczbami i „_”.",
@@ -1165,11 +1180,6 @@
     "TypeResourceGroupNameToDelete": "Wpisz nazwę grupy zasobów do usunięcia",
     "WsproxyAddress": "Adres serwera WSProxy"
   },
-  "resourcePanel": {
-    "Limit": "Limit",
-    "RemainingNumber": "Rmaring",
-    "UsingNumber": "Używając"
-  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Zamierzasz usunąć tę zasadę dotyczącą zasobów:",
     "AllowedHosts": "Dozwolone hosty",
@@ -1254,10 +1264,12 @@
     "PendingSessions": "Oczekujące sesje"
   },
   "session": {
+    "ActiveSessions": "Aktywne sesje",
     "Agent": "Agent",
     "AgentId": "Identyfikator agenta",
     "Agents": "Agenci",
     "AllowedClientIps": "Dozwolone adresy IP klientów",
+    "AllowedMultipleClientsIps": "Dozwolone adresy IP klientów (oddzielone przecinkami)",
     "AlreadyTerminatingSession": "Zakończono już sesję.",
     "AnotherUserSession": "Ta sesja została stworzona przez innego użytkownika.",
     "Architecture": "Architektura",
@@ -1919,6 +1931,8 @@
     "BootstrapScriptDescription": "Skrypt Bootstrap zostanie wykonany tylko raz po utworzeniu sesji.",
     "BootstrapScriptEmpty": "Skrypt jest pusty. \nProszę wprowadzić skrypt.",
     "BootstrapScriptUpdated": "Zaktualizowano skrypt Bootstrap.",
+    "ClassicFeatures": "Klasyczne funkcje",
+    "ClassicFeaturesDesc": "Powrót do klasycznej wersji może pomóc w odzyskaniu stabilności i funkcjonalności podczas oczekiwania na wydanie aktualizacji lub poprawek.",
     "ClassicSessionList": "Klasyczna strona listy sesji",
     "ClearSSHKeypairInput": "Zapisana para kluczy SSH zostanie usunięta. Jesteś pewien, że chcesz kontynuować?",
     "ConfigFilename": "Nazwa pliku konfiguracyjnego",
@@ -1928,12 +1942,12 @@
     "DescAutoLogout": "Wyloguj się automatycznie, jeśli wszystkie zalogowane strony są zamknięte, z wyjątkiem stron pochodzących z sesji dla aplikacji (np. notatnik jupyter, terminal internetowy itp.)",
     "DescAutomaticUpdateCheck": "Powiadom o wydaniu nowej wersji webui.<br />Jeśli funkcja jest automatycznie wyłączona, ponowne kliknięcie przełącznika wznowi sprawdzanie aktualizacji.",
     "DescBetaFeatures": "Korzystaj z funkcji beta interfejsu internetowego. <br /> Funkcje beta mogą być niestabilne. Niektóre funkcje beta mogą nie zostać przyjęte jako funkcja oficjalna.",
-    "DescClassicSessionLauncher": "Użyj Classic programu uruchamiającego sesję zamiast programu uruchamiającego sesję NEO. \nClassic program uruchamiający sesję może nie mieć najnowszych funkcji.",
     "DescDesktopNotification": "Włącza powiadomienia pulpitu. <br />Po włączeniu Backend.AI używa również systemu powiadomień systemu operacyjnego. Wyłączenie tego nie wpływa na powiadomienia w interfejsie web. W zależności od systemu operacyjnego uprawnienia do powiadomień mogą wymagać włączenia w ustawieniach systemu.",
     "DescExperimentalDashboard": "Użyj strony Dashboard zamiast strony podsumowującej.",
     "DescKeepLoginSessionInformation": "Pozwól aplikacji webui zachować bieżące informacje o sesji logowania następnym razem. <br /> Jeśli opcja jest wyłączona, dane logowania będą usuwane przy każdym wylogowaniu.",
     "DescLanguage": "Ustaw język interfejsu. Języki inne niż angielski i koreański będą dostarczane przez tłumaczenie maszynowe.",
     "DescLetUserUpdateScriptWithNonEmptyValue": "Proszę zaktualizować skrypt o niepustą wartość.",
+    "DescMaxConcurrentUploads": "Ogranicza liczbę plików, które można przesłać jednocześnie za pomocą Eksploratora plików.",
     "DescMyKeypairInfo": "Zobacz informacje o mojej parze kluczy",
     "DescNewUserConfigFileCreated": "Nowy plik konfiguracji użytkownika można utworzyć z niepustymi danymi.",
     "DescNoBetaFeatures": "Obecnie nie ma dostępnej funkcji beta. :)",
@@ -1960,6 +1974,7 @@
     "Language": "Język",
     "LightMode": "Tryb światła",
     "Logs": "Dzienniki",
+    "MaxConcurrentUploads": "Maksymalny limit jednoczesnego przesyłania plików",
     "MyKeypairInfo": "Informacje o mojej parze kluczy",
     "NEODataPage": "Strona danych NEO",
     "NEOSessionList": "Lista sesji NEO",
@@ -2004,6 +2019,7 @@
       "AIAccelerator": "Akcelerator AI",
       "AIAgents": "Agenci AI",
       "AboutBackendAI": "O Backend.AI",
+      "AdminDashboard": "Pulpit nawigacyjny administratora",
       "Administration": "Administracja",
       "AgentSummary": "Podsumowanie agenta",
       "Architecture": "Architektura",
@@ -2011,6 +2027,7 @@
       "Cancel": "Anuluj",
       "ChangePassword": "Zmień hasło",
       "Chat": "Czat",
+      "ClassicDashboardPage": "Klasyczna strona deski rozdzielczej (strona podsumowująca)",
       "ClickToDownload": "Kliknij, aby pobrać",
       "ComputationResources": "Zasoby obliczeniowe",
       "Configurations": "Konfiguracje",
@@ -2045,10 +2062,10 @@
       "MyAccountInformation": "Zmień informacje o użytkowniku",
       "MyEnvironments": "Moje Środowiska",
       "MyResources": "Mój całkowity limit zasobów",
-      "MyResourcesDescription": "<p>Ten panel pokazuje całkowite wykorzystanie zasobów i limity we wszystkich projektach i grupach zasobów.</p><p>Gdy stosowanych jest wiele limitów (domena, projekt lub para kluczy), do obliczeń używany jest najbardziej restrykcyjny limit.</p>",
+      "MyResourcesDescription": "<p>Ten panel wyświetla całkowitą liczbę aktualnie używanych i wolnych zasobów we wszystkich projektach i grupach zasobów.</p><p>W przypadku zastosowania wielu limitów (takich jak domena, projekt lub para kluczy) do obliczeń używany jest najbardziej restrykcyjny limit wolnych zasobów.</p>",
       "MyResourcesIn": "Moje zasoby",
       "MyResourcesInResourceGroup": "Moje zasoby w grupie zasobów",
-      "MyResourcesInResourceGroupDescription": "Ten panel pokazuje twoje bieżące wykorzystanie i pozostanie w wybranej grupie zasobów.",
+      "MyResourcesInResourceGroupDescription": "Ten panel pokazuje, ile zasobów wykorzystałeś i ile jest wolnych w wybranej grupie zasobów Twojego bieżącego projektu.",
       "NewPassword": "Nowe hasło",
       "NewPasswordAgain": "Powtórz nowe hasło)",
       "NewPasswordCannotBeSame": "Wprowadź hasło, które różni się od aktualnego hasła.",
@@ -2081,7 +2098,7 @@
       "TermsOfService": "Warunki usługi",
       "TotalResourcesIn": "Całkowite zasoby w",
       "TotalResourcesInResourceGroup": "Całkowite zasoby w grupie zasobów",
-      "TotalResourcesInResourceGroupDescription": "Ten panel pokazuje całkowite wykorzystane i pozostałe zasoby. \nWartości są obliczane przez dodanie użycia i pozostałych ilości wszystkich agentów za pomocą wybranej grupy zasobów.",
+      "TotalResourcesInResourceGroupDescription": "Ten panel pokazuje całkowitą liczbę wykorzystanych i wolnych zasobów w wybranej grupie zasobów. \nWartości obliczane są poprzez zsumowanie wykorzystanych i wolnych ilości wszystkich środków korzystających z danej grupy.",
       "TotpActivated": "Włączone 2FA",
       "Update": "Aktualizacja",
       "Usage": "Stosowanie",
