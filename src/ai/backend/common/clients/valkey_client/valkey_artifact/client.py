@@ -49,7 +49,6 @@ valkey_artifact_resilience = Resilience(
 
 _ARTIFACT_DOWNLOAD_PREFIX: Final[str] = "artifact:download"
 _ARTIFACT_DOWNLOAD_EXPIRATION: Final[int] = 86400  # 24 hours
-_FILE_PROGRESS_UPDATE_INTERVAL: Final[int] = 30  # seconds
 
 
 class ValkeyArtifactDownloadTrackingClient:
