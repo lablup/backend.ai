@@ -2,6 +2,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
 from ai.backend.manager.repositories.artifact_registry.repository import ArtifactRegistryRepository
 from ai.backend.manager.repositories.huggingface_registry.repository import HuggingFaceRepository
@@ -29,6 +32,7 @@ def processors(extra_fixtures, database_fixture, database_engine, registry_ctx):
     reservoir_registry_repository = MagicMock(spec=ReservoirRegistryRepository)
     storage_manager = MagicMock()
     config_provider = MagicMock()
+    valkey_artifact_client = MagicMock(spec=ValkeyArtifactDownloadTrackingClient)
 
     artifact_revision_service = ArtifactRevisionService(
         artifact_repository=artifact_repository,
@@ -40,5 +44,6 @@ def processors(extra_fixtures, database_fixture, database_engine, registry_ctx):
         reservoir_registry_repository=reservoir_registry_repository,
         storage_manager=storage_manager,
         config_provider=config_provider,
+        valkey_artifact_client=valkey_artifact_client,
     )
     return ArtifactRevisionProcessors(artifact_revision_service, [])
