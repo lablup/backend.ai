@@ -150,19 +150,22 @@ class ValkeyArtifactDownloadTrackingClient:
         self,
         model_id: str,
         revision: str,
-        total_files: int,
-        total_bytes: int,
+        file_info_list: list[tuple[str, int]],
     ) -> None:
         """
         Initialize artifact download tracking in Redis.
+        Pre-registers all files with initial progress (0 bytes downloaded).
 
         :param model_id: Model identifier
         :param revision: Model revision
-        :param total_files: Total number of files in the artifact
-        :param total_bytes: Total bytes to download
+        :param file_info_list: List of (file_path, file_size) tuples
         """
         artifact_key = self._get_artifact_key(model_id, revision)
         current_time = time.time()
+
+        total_files = len(file_info_list)
+        total_bytes = sum(size for _, size in file_info_list)
+
         artifact_data = ArtifactDownloadTrackingData(
             model_id=model_id,
             revision=revision,
@@ -175,6 +178,8 @@ class ValkeyArtifactDownloadTrackingClient:
         )
 
         batch = self._create_batch(is_atomic=False)
+
+        # Set artifact-level data
         batch.set(
             artifact_key,
             artifact_data.model_dump_json(),
@@ -183,6 +188,27 @@ class ValkeyArtifactDownloadTrackingClient:
                 value=_ARTIFACT_DOWNLOAD_EXPIRATION,
             ),
         )
+
+        # Pre-register all files with initial progress (0 bytes)
+        for file_path, file_size in file_info_list:
+            file_key = self._get_file_key(model_id, revision, file_path)
+            file_data = FileDownloadProgressData(
+                file_path=file_path,
+                success=False,
+                current_bytes=0,
+                total_bytes=file_size,
+                last_updated=current_time,
+                error_message=None,
+            )
+            batch.set(
+                file_key,
+                file_data.model_dump_json(),
+                expiry=ExpirySet(
+                    expiry_type=ExpiryType.SEC,
+                    value=_ARTIFACT_DOWNLOAD_EXPIRATION,
+                ),
+            )
+
         await self._client.client.exec(batch, raise_on_error=True)
         log.debug(
             "Initialized artifact download tracking: model_id={}, revision={}, total_files={}, total_bytes={}",
@@ -225,7 +251,7 @@ class ValkeyArtifactDownloadTrackingClient:
                 previous_data = FileDownloadProgressData.model_validate_json(previous_data_bytes)
                 previous_current_bytes = previous_data.current_bytes
             except (ValidationError, UnicodeDecodeError):
-                pass
+                log.warning("Failed to parse previous file data for progress update")
 
         # Calculate bytes delta for artifact aggregation
         bytes_delta = current_bytes - previous_current_bytes
@@ -239,16 +265,13 @@ class ValkeyArtifactDownloadTrackingClient:
             error_message=error_message,
         )
 
-        # Update file progress
-        # If file key doesn't exist yet, set TTL; otherwise keep existing TTL
+        # Update file progress (file key should already exist from init_artifact_download)
         batch = self._create_batch(is_atomic=False)
-        if previous_data_bytes:
-            # File key exists, keep existing TTL
-            file_expiry = ExpirySet(expiry_type=ExpiryType.KEEP_TTL, value=None)
-        else:
-            # First time creating file key, set 24-hour TTL
-            file_expiry = ExpirySet(expiry_type=ExpiryType.SEC, value=_ARTIFACT_DOWNLOAD_EXPIRATION)
-        batch.set(file_key, file_data.model_dump_json(), expiry=file_expiry)
+        batch.set(
+            file_key,
+            file_data.model_dump_json(),
+            expiry=ExpirySet(expiry_type=ExpiryType.KEEP_TTL, value=None),
+        )
 
         # Update artifact aggregates if there's a change
         if bytes_delta != 0:

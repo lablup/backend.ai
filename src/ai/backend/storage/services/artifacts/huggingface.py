@@ -788,13 +788,13 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             f"total_size={file_total_size / (1024 * 1024)} MB"
         )
 
-        # Initialize artifact download tracking in Redis
+        # Initialize artifact download tracking in Redis with all file information
         revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+        file_info_list = [(file.path, file.size) for file in file_infos]
         await self._redis_client.init_artifact_download(
             model_id=context.model.model_id,
             revision=revision,
-            total_files=file_count,
-            total_bytes=file_total_size,
+            file_info_list=file_info_list,
         )
 
         downloaded_files: list[tuple[FileObjectData, str]] = []
