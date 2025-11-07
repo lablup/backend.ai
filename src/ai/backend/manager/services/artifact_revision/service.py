@@ -308,6 +308,20 @@ class ArtifactRevisionService:
                         action.artifact_revision_id, ArtifactStatus.PULLING
                     )
 
+                    if reservoir_config.use_delegation:
+                        remote_reservoir_client = ReservoirRegistryClient(
+                            registry_data=registry_data
+                        )
+                        delegate_import_req = DelegateImportArtifactsReq(
+                            artifact_revision_ids=[revision_data.id],
+                            artifact_type=artifact.type,
+                            # We can't pass delegatee_reservoir_id here since we don't have it.
+                            # So we depends on default.
+                            delegator_reservoir_id=None,
+                            delegatee_target=None,
+                        )
+                        await remote_reservoir_client.delegate_import_artifacts(delegate_import_req)
+
                     result = await storage_proxy_client.import_reservoir_models(
                         ReservoirImportModelsReq(
                             models=[
