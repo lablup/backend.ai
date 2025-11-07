@@ -17,6 +17,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.notification import NotificationCenter
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.services.agent.processors import AgentProcessors
@@ -113,6 +114,7 @@ class ServiceArgs:
     deployment_controller: DeploymentController
     event_producer: EventProducer
     agent_cache: AgentRPCCache
+    notification_center: NotificationCenter
 
 
 @dataclass
@@ -256,6 +258,7 @@ class Services:
         )
         notification_service = NotificationService(
             repository=repositories.notification.repository,
+            notification_center=args.notification_center,
         )
         object_storage_service = ObjectStorageService(
             artifact_repository=repositories.artifact.repository,

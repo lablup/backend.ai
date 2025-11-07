@@ -18,6 +18,7 @@ from .request import (
     StringFilter,
     UpdateNotificationChannelRequest,
     UpdateNotificationRuleRequest,
+    ValidateNotificationChannelRequest,
     ValidateNotificationRuleRequest,
 )
 from .response import (
@@ -64,6 +65,7 @@ __all__ = (
     "UpdateNotificationRuleRequest",
     "ListNotificationRulesRequest",
     "SearchNotificationRulesRequest",
+    "ValidateNotificationChannelRequest",
     "ValidateNotificationRuleRequest",
     "StringFilter",
     "NotificationChannelFilter",

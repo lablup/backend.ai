@@ -14,6 +14,7 @@ class ValidateChannelAction(NotificationAction):
     """Action to validate a notification channel (webhook sending test)."""
 
     channel_id: UUID
+    test_message: str
 
     @override
     @classmethod
@@ -28,9 +29,6 @@ class ValidateChannelAction(NotificationAction):
 @dataclass
 class ValidateChannelActionResult(BaseActionResult):
     """Result of validating a notification channel."""
-
-    success: bool
-    message: str
 
     @override
     def entity_id(self) -> Optional[str]:

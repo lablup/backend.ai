@@ -15,9 +15,11 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.notification import (
     NotificationChannelCreator,
     NotificationChannelData,
+    NotificationChannelListResult,
     NotificationChannelModifier,
     NotificationRuleCreator,
     NotificationRuleData,
+    NotificationRuleListResult,
     NotificationRuleModifier,
     NotificationRuleType,
 )
@@ -25,10 +27,7 @@ from ai.backend.manager.repositories.base import Querier
 
 from .db_source import NotificationDBSource
 
-__all__ = (
-    "NotificationRepository",
-    "notification_repository_resilience",
-)
+__all__ = ("NotificationRepository",)
 
 
 notification_repository_resilience = Resilience(
@@ -127,17 +126,17 @@ class NotificationRepository:
         return await self._db_source.get_rule_by_id(rule_id)
 
     @notification_repository_resilience.apply()
-    async def list_channels(
+    async def search_channels(
         self,
         querier: Optional[Querier] = None,
-    ) -> list[NotificationChannelData]:
-        """Lists all notification channels."""
-        return await self._db_source.list_channels(querier=querier)
+    ) -> NotificationChannelListResult:
+        """Searches notification channels with total count."""
+        return await self._db_source.search_channels(querier=querier)
 
     @notification_repository_resilience.apply()
-    async def list_rules(
+    async def search_rules(
         self,
         querier: Optional[Querier] = None,
-    ) -> list[NotificationRuleData]:
-        """Lists all notification rules."""
-        return await self._db_source.list_rules(querier=querier)
+    ) -> NotificationRuleListResult:
+        """Searches notification rules with total count."""
+        return await self._db_source.search_rules(querier=querier)

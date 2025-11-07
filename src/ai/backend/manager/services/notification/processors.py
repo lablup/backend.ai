@@ -17,12 +17,12 @@ from .actions import (
     GetChannelActionResult,
     GetRuleAction,
     GetRuleActionResult,
-    ListChannelsAction,
-    ListChannelsActionResult,
-    ListRulesAction,
-    ListRulesActionResult,
     ProcessNotificationAction,
     ProcessNotificationActionResult,
+    SearchChannelsAction,
+    SearchChannelsActionResult,
+    SearchRulesAction,
+    SearchRulesActionResult,
     UpdateChannelAction,
     UpdateChannelActionResult,
     UpdateRuleAction,
@@ -39,14 +39,14 @@ class NotificationProcessors(AbstractProcessorPackage):
     """Processor package for notification operations."""
 
     create_channel: ActionProcessor[CreateChannelAction, CreateChannelActionResult]
-    list_channels: ActionProcessor[ListChannelsAction, ListChannelsActionResult]
+    search_channels: ActionProcessor[SearchChannelsAction, SearchChannelsActionResult]
     get_channel: ActionProcessor[GetChannelAction, GetChannelActionResult]
     update_channel: ActionProcessor[UpdateChannelAction, UpdateChannelActionResult]
     delete_channel: ActionProcessor[DeleteChannelAction, DeleteChannelActionResult]
     validate_channel: ActionProcessor[ValidateChannelAction, ValidateChannelActionResult]
 
     create_rule: ActionProcessor[CreateRuleAction, CreateRuleActionResult]
-    list_rules: ActionProcessor[ListRulesAction, ListRulesActionResult]
+    search_rules: ActionProcessor[SearchRulesAction, SearchRulesActionResult]
     get_rule: ActionProcessor[GetRuleAction, GetRuleActionResult]
     update_rule: ActionProcessor[UpdateRuleAction, UpdateRuleActionResult]
     delete_rule: ActionProcessor[DeleteRuleAction, DeleteRuleActionResult]
@@ -58,14 +58,14 @@ class NotificationProcessors(AbstractProcessorPackage):
 
     def __init__(self, service: NotificationService, action_monitors: list[ActionMonitor]) -> None:
         self.create_channel = ActionProcessor(service.create_channel, action_monitors)
-        self.list_channels = ActionProcessor(service.list_channels, action_monitors)
+        self.search_channels = ActionProcessor(service.search_channels, action_monitors)
         self.get_channel = ActionProcessor(service.get_channel, action_monitors)
         self.update_channel = ActionProcessor(service.update_channel, action_monitors)
         self.delete_channel = ActionProcessor(service.delete_channel, action_monitors)
         self.validate_channel = ActionProcessor(service.validate_channel, action_monitors)
 
         self.create_rule = ActionProcessor(service.create_rule, action_monitors)
-        self.list_rules = ActionProcessor(service.list_rules, action_monitors)
+        self.search_rules = ActionProcessor(service.search_rules, action_monitors)
         self.get_rule = ActionProcessor(service.get_rule, action_monitors)
         self.update_rule = ActionProcessor(service.update_rule, action_monitors)
         self.delete_rule = ActionProcessor(service.delete_rule, action_monitors)
@@ -77,13 +77,13 @@ class NotificationProcessors(AbstractProcessorPackage):
     def supported_actions(self) -> list[ActionSpec]:
         return [
             CreateChannelAction.spec(),
-            ListChannelsAction.spec(),
+            SearchChannelsAction.spec(),
             GetChannelAction.spec(),
             UpdateChannelAction.spec(),
             DeleteChannelAction.spec(),
             ValidateChannelAction.spec(),
             CreateRuleAction.spec(),
-            ListRulesAction.spec(),
+            SearchRulesAction.spec(),
             GetRuleAction.spec(),
             UpdateRuleAction.spec(),
             DeleteRuleAction.spec(),

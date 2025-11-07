@@ -11,15 +11,15 @@ from .base import NotificationAction
 
 
 @dataclass
-class ListChannelsAction(NotificationAction):
-    """Action to list notification channels."""
+class SearchChannelsAction(NotificationAction):
+    """Action to search notification channels."""
 
     querier: Optional[Querier] = None
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "list_channels"
+        return "search_channels"
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -27,10 +27,11 @@ class ListChannelsAction(NotificationAction):
 
 
 @dataclass
-class ListChannelsActionResult(BaseActionResult):
-    """Result of listing notification channels."""
+class SearchChannelsActionResult(BaseActionResult):
+    """Result of searching notification channels."""
 
     channels: list[NotificationChannelData]
+    total_count: int
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Callable, Generic, Optional, TypeVar
 
 import sqlalchemy as sa
+from sqlalchemy.engine import Row
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 # QueryCondition now returns a ColumnElement (whereclause) instead of modifying stmt
 type QueryCondition = Callable[[], sa.sql.expression.ColumnElement[bool]]
@@ -168,7 +172,7 @@ def negate_conditions(conditions: list[QueryCondition]) -> QueryCondition:
     return inner
 
 
-def apply_querier(
+def _apply_querier(
     query: sa.sql.Select,
     querier: Querier,
 ) -> sa.sql.Select:
@@ -194,3 +198,54 @@ def apply_querier(
         query = querier.pagination.apply(query)
 
     return query
+
+
+TRow = TypeVar("TRow", bound=Row)
+
+
+@dataclass
+class QuerierResult(Generic[TRow]):
+    """Result of executing a query with querier."""
+
+    rows: list[TRow]
+    total_count: int
+
+
+async def execute_querier(
+    db_sess: SASession,
+    query: sa.sql.Select,
+    querier: Optional[Querier],
+    fallback_count_table: type[Row],
+) -> QuerierResult[Row]:
+    """Execute query with querier and return rows with total_count.
+
+    Uses count().over() window function for efficient counting in most cases.
+    Falls back to separate count query only when rows is empty (offset exceeds total).
+
+    Args:
+        db_sess: Database session
+        query: SELECT query with count().over().label("total_count") included
+        querier: Optional querier for filtering, ordering, and pagination
+        fallback_count_table: SQLAlchemy ORM model class used to count total records
+            when window function result is inaccessible (rows is empty because offset exceeds total)
+
+    Returns:
+        QuerierResult containing rows and total_count
+    """
+    if querier:
+        query = _apply_querier(query, querier)
+
+    result = await db_sess.execute(query)
+    rows = result.all()
+
+    if rows:
+        return QuerierResult(rows=rows, total_count=rows[0].total_count)
+
+    # Fallback: count with conditions only when rows is empty
+    count_query = sa.select(sa.func.count()).select_from(fallback_count_table)
+    if querier:
+        for condition in querier.conditions:
+            count_query = count_query.where(condition())
+    total_count = await db_sess.scalar(count_query) or 0
+
+    return QuerierResult(rows=rows, total_count=total_count)

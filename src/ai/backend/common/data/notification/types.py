@@ -24,6 +24,9 @@ class WebhookConfig(BaseModel):
 
     url: str = Field(description="Webhook endpoint URL")
     method: str = Field(default="POST", description="HTTP method (POST or GET)")
+    content_type: str = Field(
+        default="application/json", description="Content-Type header for the request body"
+    )
     headers: dict[str, str] = Field(
         default_factory=dict, description="Additional HTTP headers to send"
     )

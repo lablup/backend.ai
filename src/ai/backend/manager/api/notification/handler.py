@@ -31,6 +31,7 @@ from ai.backend.common.dto.manager.notification import (
     UpdateNotificationChannelResponse,
     UpdateNotificationRuleRequest,
     UpdateNotificationRuleResponse,
+    ValidateNotificationChannelRequest,
     ValidateNotificationChannelResponse,
     ValidateNotificationRuleRequest,
     ValidateNotificationRuleResponse,
@@ -53,8 +54,8 @@ from ai.backend.manager.services.notification.actions import (
     DeleteRuleAction,
     GetChannelAction,
     GetRuleAction,
-    ListChannelsAction,
-    ListRulesAction,
+    SearchChannelsAction,
+    SearchRulesAction,
     UpdateChannelAction,
     UpdateRuleAction,
     ValidateChannelAction,
@@ -129,15 +130,15 @@ class NotificationAPIHandler:
         querier = self.channel_adapter.build_querier(body.parsed)
 
         # Call service action
-        action_result = await processors.notification.list_channels.wait_for_complete(
-            ListChannelsAction(querier=querier)
+        action_result = await processors.notification.search_channels.wait_for_complete(
+            SearchChannelsAction(querier=querier)
         )
 
         # Build response
         resp = ListNotificationChannelsResponse(
             channels=[self.channel_adapter.convert_to_dto(ch) for ch in action_result.channels],
             pagination=PaginationInfo(
-                total=len(action_result.channels),
+                total=action_result.total_count,
                 offset=body.parsed.offset or 0,
                 limit=body.parsed.limit,
             ),
@@ -214,22 +215,23 @@ class NotificationAPIHandler:
     async def validate_channel(
         self,
         path: PathParam[ValidateNotificationChannelPathParam],
+        body: BodyParam[ValidateNotificationChannelRequest],
         processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """Validate a notification channel by sending a test webhook."""
         processors = processors_ctx.processors
 
         # Call service action
-        action_result = await processors.notification.validate_channel.wait_for_complete(
+        await processors.notification.validate_channel.wait_for_complete(
             ValidateChannelAction(
                 channel_id=path.parsed.channel_id,
+                test_message=body.parsed.test_message,
             )
         )
 
         # Build response
         resp = ValidateNotificationChannelResponse(
-            success=action_result.success,
-            message=action_result.message,
+            channel_id=path.parsed.channel_id,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -254,9 +256,7 @@ class NotificationAPIHandler:
 
         # Build response
         resp = ValidateNotificationRuleResponse(
-            success=action_result.success,
             message=action_result.message,
-            rendered_message=action_result.rendered_message,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -310,15 +310,15 @@ class NotificationAPIHandler:
         querier = self.rule_adapter.build_querier(body.parsed)
 
         # Call service action
-        action_result = await processors.notification.list_rules.wait_for_complete(
-            ListRulesAction(querier=querier)
+        action_result = await processors.notification.search_rules.wait_for_complete(
+            SearchRulesAction(querier=querier)
         )
 
         # Build response
         resp = ListNotificationRulesResponse(
             rules=[self.rule_adapter.convert_to_dto(rule) for rule in action_result.rules],
             pagination=PaginationInfo(
-                total=len(action_result.rules),
+                total=action_result.total_count,
                 offset=body.parsed.offset or 0,
                 limit=body.parsed.limit,
             ),

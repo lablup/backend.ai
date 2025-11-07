@@ -1,16 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
-from uuid import UUID
-
-import jinja2
 
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.data.notification import NotificationRuleType
+from ai.backend.manager.notification.types import ProcessRuleParams
 
 from .actions import (
     CreateChannelAction,
@@ -25,12 +24,13 @@ from .actions import (
     GetChannelActionResult,
     GetRuleAction,
     GetRuleActionResult,
-    ListChannelsAction,
-    ListChannelsActionResult,
-    ListRulesAction,
-    ListRulesActionResult,
+    ProcessedRuleSuccess,
     ProcessNotificationAction,
     ProcessNotificationActionResult,
+    SearchChannelsAction,
+    SearchChannelsActionResult,
+    SearchRulesAction,
+    SearchRulesActionResult,
     UpdateChannelAction,
     UpdateChannelActionResult,
     UpdateRuleAction,
@@ -43,6 +43,7 @@ from .actions import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.notification.types import NotificationRuleData
+    from ai.backend.manager.notification import NotificationCenter
 
     from ...repositories.notification import NotificationRepository
 
@@ -52,11 +53,20 @@ __all__ = ("NotificationService",)
 
 
 @dataclass
+class _ProcessedRulesResult:
+    """Internal result of processing notification rules."""
+
+    successes: list[ProcessedRuleSuccess]
+    errors: list[BaseException]
+
+
+@dataclass
 class _ProcessedNotificationResult:
     """Internal result of processing notification rules."""
 
     rules_matched: int
-    rules_processed: int
+    successes: list[ProcessedRuleSuccess]
+    errors: list[BaseException]
 
 
 class NotificationService:
@@ -66,15 +76,15 @@ class NotificationService:
     """
 
     _repository: NotificationRepository
-    _template_env: jinja2.Environment
+    _notification_center: NotificationCenter
 
-    def __init__(self, repository: NotificationRepository) -> None:
+    def __init__(
+        self,
+        repository: NotificationRepository,
+        notification_center: NotificationCenter,
+    ) -> None:
         self._repository = repository
-        # Initialize Jinja2 environment for template rendering
-        self._template_env = jinja2.Environment(
-            loader=jinja2.BaseLoader(),
-            autoescape=jinja2.select_autoescape(),
-        )
+        self._notification_center = notification_center
 
     async def process_notification(
         self, action: ProcessNotificationAction
@@ -92,7 +102,8 @@ class NotificationService:
         return ProcessNotificationActionResult(
             rule_type=action.rule_type,
             rules_matched=result.rules_matched,
-            rules_processed=result.rules_processed,
+            successes=result.successes,
+            errors=result.errors,
         )
 
     async def create_channel(
@@ -160,71 +171,48 @@ class NotificationService:
         self,
         action: ValidateChannelAction,
     ) -> ValidateChannelActionResult:
-        """Validates a notification channel by sending a test webhook."""
-        try:
-            # Verify the channel exists
-            channel_data = await self._repository.get_channel_by_id(action.channel_id)
+        """
+        Validates a notification channel by sending a test message.
 
-            # TODO: Implement ABC-based notification handler to actually send webhook
-            # For now, just verify the channel configuration is valid
-            log.info(
-                "Validating notification channel '{}' (ID: {})",
-                channel_data.name,
-                action.channel_id,
-            )
+        Raises:
+            NotificationChannelNotFound: If the channel does not exist
+            NotificationProcessingFailure: If sending the test message fails
+        """
+        channel_data = await self._repository.get_channel_by_id(action.channel_id)
+        await self._notification_center.validate_channel(channel_data, action.test_message)
+        log.debug(
+            "Test notification sent successfully for channel '{}' (ID: {})",
+            channel_data.name,
+            action.channel_id,
+        )
 
-            return ValidateChannelActionResult(
-                success=True,
-                message=f"Channel '{channel_data.name}' configuration is valid. "
-                f"(Actual webhook sending will be implemented with ABC-based handlers)",
-            )
-
-        except Exception as e:
-            log.error("Failed to validate notification channel: {}", e)
-            return ValidateChannelActionResult(
-                success=False,
-                message=f"Failed to validate notification channel: {str(e)}",
-            )
+        return ValidateChannelActionResult()
 
     async def validate_rule(
         self,
         action: ValidateRuleAction,
     ) -> ValidateRuleActionResult:
-        """Validates a notification rule by rendering its template with test data."""
-        try:
-            # Fetch the rule
-            rule_data = await self._repository.get_rule_by_id(action.rule_id)
+        """
+        Validates a notification rule by rendering its template with test data.
 
-            # Render the template with test data
-            try:
-                template = self._template_env.from_string(rule_data.message_template)
-                rendered_message = template.render(action.notification_data)
-
-                return ValidateRuleActionResult(
-                    success=True,
-                    message=f"Rule '{rule_data.name}' template rendered successfully",
-                    rendered_message=rendered_message,
-                )
-
-            except jinja2.TemplateError as template_error:
-                log.warning(
-                    "Failed to render template for rule '{}': {}",
-                    rule_data.name,
-                    template_error,
-                )
-                return ValidateRuleActionResult(
-                    success=False,
-                    message=f"Template rendering failed: {str(template_error)}",
-                    rendered_message="",
-                )
-
-        except Exception as e:
-            log.error("Failed to validate notification rule: {}", e)
-            return ValidateRuleActionResult(
-                success=False,
-                message=f"Failed to validate notification rule: {str(e)}",
-                rendered_message="",
+        Raises:
+            NotificationRuleNotFound: If the rule does not exist
+            NotificationTemplateRenderingFailure: If template rendering fails
+        """
+        # Fetch the rule
+        rule = await self._repository.get_rule_by_id(action.rule_id)
+        result = await self._notification_center.process_rule(
+            ProcessRuleParams(
+                message_template=rule.message_template,
+                rule_type=rule.rule_type,
+                channel=rule.channel,
+                timestamp=datetime.now(),
+                notification_data=action.notification_data,
             )
+        )
+        return ValidateRuleActionResult(
+            message=result.message,
+        )
 
     async def delete_rule(
         self,
@@ -259,30 +247,31 @@ class NotificationService:
             rule_data=rule_data,
         )
 
-    async def list_channels(
+    async def search_channels(
         self,
-        action: ListChannelsAction,
-    ) -> ListChannelsActionResult:
-        """Lists all notification channels."""
-        channels = await self._repository.list_channels(
+        action: SearchChannelsAction,
+    ) -> SearchChannelsActionResult:
+        """Searches notification channels."""
+        result = await self._repository.search_channels(
             querier=action.querier,
         )
 
-        return ListChannelsActionResult(
-            channels=channels,
+        return SearchChannelsActionResult(
+            channels=result.items,
+            total_count=result.total_count,
         )
 
-    async def list_rules(
+    async def search_rules(
         self,
-        action: ListRulesAction,
-    ) -> ListRulesActionResult:
-        """Lists all notification rules."""
-        rules = await self._repository.list_rules(
+        action: SearchRulesAction,
+    ) -> SearchRulesActionResult:
+        """Searches notification rules."""
+        result = await self._repository.search_rules(
             querier=action.querier,
         )
-
-        return ListRulesActionResult(
-            rules=rules,
+        return SearchRulesActionResult(
+            rules=result.items,
+            total_count=result.total_count,
         )
 
     async def _process_notification(
@@ -290,9 +279,6 @@ class NotificationService:
         rule_type: NotificationRuleType,
         timestamp: datetime,
         notification_data: Mapping[str, Any],
-        channel_id_filter: UUID | None = None,
-        is_test: bool = False,
-        channel_name: str | None = None,
     ) -> _ProcessedNotificationResult:
         """
         Query matching rules and process them.
@@ -309,126 +295,91 @@ class NotificationService:
             Processed notification result
         """
         # Query matching rules
-        all_rules = await self._repository.get_matching_rules(
+        rules = await self._repository.get_matching_rules(
             rule_type,
             enabled_only=True,
         )
-
-        # Filter by channel if specified
-        if channel_id_filter is not None:
-            rules = [rule for rule in all_rules if rule.channel.id == channel_id_filter]
-        else:
-            rules = all_rules
-
         if not rules:
-            if is_test:
-                log.warning(
-                    "No matching rules found for test notification",
-                    channel_id=channel_id_filter,
-                    rule_type=rule_type,
-                )
-            else:
-                log.debug("No matching rules found", rule_type=rule_type)
-            return _ProcessedNotificationResult(rules_matched=0, rules_processed=0)
-
+            return _ProcessedNotificationResult(
+                rules_matched=0,
+                successes=[],
+                errors=[],
+            )
         # Process rules
-        rules_processed = self._process_rules(
+        result = await self._process_rules(
             rules=rules,
-            rule_type=rule_type,
             timestamp=timestamp,
             notification_data=notification_data,
-            is_test=is_test,
-            channel_id=channel_id_filter,
-            channel_name=channel_name,
         )
-
         return _ProcessedNotificationResult(
             rules_matched=len(rules),
-            rules_processed=rules_processed,
+            successes=result.successes,
+            errors=result.errors,
         )
 
-    def _process_rules(
+    async def _process_rules(
         self,
         rules: Sequence[NotificationRuleData],
-        rule_type: NotificationRuleType,
         timestamp: datetime,
         notification_data: Mapping[str, Any],
-        is_test: bool = False,
-        channel_id: UUID | None = None,
-        channel_name: str | None = None,
-    ) -> int:
+    ) -> _ProcessedRulesResult:
         """
-        Process notification rules with template rendering.
+        Process notification rules concurrently.
 
         Args:
             rules: List of notification rules to process
             rule_type: Type of notification rule
             timestamp: Timestamp of the notification
             notification_data: Data for template rendering
-            is_test: Whether this is a test notification
-            channel_id: Channel ID (for test logging)
-            channel_name: Channel name (for test logging)
 
         Returns:
-            Number of successfully processed rules
+            ProcessedRulesResult containing successes and errors lists
         """
-        rules_processed = 0
-
-        for rule in rules:
-            try:
-                # Render message template
-                self._render_template(
-                    rule.message_template,
-                    rule_type,
-                    timestamp,
-                    notification_data,
-                )
-
-                # TODO Phase 3: Send via handler
-                # handler = self._handler_registry.get_handler(rule.channel.channel_type)
-                # result = await handler.send(action, rule.channel.config)
-                rules_processed += 1
-
-                if is_test:
-                    log.info(
-                        "Test notification processed for rule",
-                        rule_id=rule.id,
-                        rule_name=rule.name,
-                        channel_id=channel_id,
-                        channel_name=channel_name,
+        # Process all rules concurrently with return_exceptions=True for partial failure tolerance
+        results = await asyncio.gather(
+            *[
+                self._notification_center.process_rule(
+                    ProcessRuleParams(
+                        message_template=rule.message_template,
+                        rule_type=rule.rule_type,
+                        channel=rule.channel,
+                        timestamp=timestamp,
+                        notification_data=notification_data,
                     )
-
-            except Exception as e:
-                log.error(
-                    "Failed to process notification",
-                    rule_type=rule_type,
-                    rule_id=rule.id,
-                    exc_info=e,
                 )
+                for rule in rules
+            ],
+            return_exceptions=True,
+        )
 
-        return rules_processed
+        # Collect successes and failures
+        successes: list[ProcessedRuleSuccess] = []
+        errors: list[BaseException] = []
 
-    def _render_template(
-        self,
-        template_str: str,
-        rule_type: NotificationRuleType,
-        timestamp: datetime,
-        notification_data: Mapping[str, Any],
-    ) -> str:
-        """Renders a Jinja2 template with notification event data."""
-        try:
-            template = self._template_env.from_string(template_str)
-            return template.render(
-                rule_type=str(rule_type),
-                timestamp=timestamp,
-                data=notification_data,
-                **notification_data,  # Allow direct access to data fields
+        for rule, result in zip(rules, results):
+            if isinstance(result, BaseException):
+                errors.append(result)
+                log.error(
+                    "Failed to process notification for rule '{}': {}",
+                    rule.name,
+                    str(result),
+                )
+                continue
+            successes.append(
+                ProcessedRuleSuccess(
+                    rule_id=rule.id,
+                    rule_name=rule.name,
+                    channel_name=rule.channel.name,
+                )
             )
-        except jinja2.TemplateError as e:
-            log.error(
-                "Failed to render notification template",
-                template=template_str,
-                error=str(e),
+            log.debug(
+                "Notification sent successfully for rule '{}' (channel: '{}')",
+                rule.name,
+                rule.channel.name,
+                rule_id=rule.id,
             )
-            # Return a fallback message
-            return f"Notification for {str(rule_type)}"
+
+        return _ProcessedRulesResult(
+            successes=successes,
+            errors=errors,
+        )
