@@ -120,8 +120,6 @@ class TestValkeyArtifactDownloadTrackingClient:
         """Test that file progress updates are aggregated to artifact level"""
         model_id = f"test-model-{random.randint(1000, 9999)}"
         revision = "main"
-        total_files = 3
-        total_bytes = 3000
 
         # Initialize artifact
         await valkey_client_with_cleanup.init_artifact_download(
