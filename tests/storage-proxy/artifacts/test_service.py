@@ -639,6 +639,10 @@ class TestHuggingFaceDownloadStep:
                 chunk_size=_DEFAULT_CHUNK_SIZE,
                 max_retries=8,
                 content_type="application/json",  # mimetypes.guess_type('config.json')[0]
+                redis_client=mock_redis_client,
+                model_id=mock_import_step_context.model.model_id,
+                revision=mock_import_step_context.model.revision,
+                file_path=mock_file_info.path,
             )
 
             # Get the mock storage from the pool and check it was called
