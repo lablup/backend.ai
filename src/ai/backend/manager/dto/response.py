@@ -11,6 +11,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisionsResponse,
     ArtifactRevisionReadme,
     ArtifactRevisionResponseData,
+    ArtifactStatus,
 )
 
 
@@ -103,3 +104,7 @@ class GetVFSStorageResponse(BaseResponseModel):
 
 class ListVFSStorageResponse(BaseResponseModel):
     storages: list[VFSStorage]
+
+
+class GetArtifactRevisionStatusResponse(BaseResponseModel):
+    status: ArtifactStatus

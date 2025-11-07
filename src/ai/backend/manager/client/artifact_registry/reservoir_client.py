@@ -18,6 +18,7 @@ from ai.backend.manager.dto.response import (
     DelegateImportArtifactsResponse,
     DelegateScanArtifactsResponse,
     GetArtifactRevisionReadmeResponse,
+    GetArtifactRevisionStatusResponse,
     GetVFSStorageResponse,
     ListVFSStorageResponse,
     SearchArtifactsResponse,
@@ -112,3 +113,9 @@ class ReservoirRegistryClient:
     async def list_vfs_storages(self) -> ListVFSStorageResponse:
         resp = await self._request("GET", "/vfs-storages")
         return ListVFSStorageResponse.model_validate(resp)
+
+    async def get_artifact_revision_status(
+        self, artifact_revision_id: uuid.UUID
+    ) -> GetArtifactRevisionStatusResponse:
+        resp = await self._request("GET", f"/artifacts/revisions/{artifact_revision_id}/status")
+        return GetArtifactRevisionStatusResponse.model_validate(resp)

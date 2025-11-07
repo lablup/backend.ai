@@ -143,3 +143,7 @@ class UpdateArtifactReqBodyParam(BaseRequestModel):
         if self.description is not None:
             modifier.description = TriState.update(self.description)
         return modifier
+
+
+class GetArtifactRevisionStatusReq(BaseRequestModel):
+    artifact_revision_id: uuid.UUID = Field(description="The artifact revision ID to get status.")

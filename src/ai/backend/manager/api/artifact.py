@@ -16,6 +16,7 @@ from ai.backend.manager.dto.request import (
     CancelImportArtifactReq,
     CleanupArtifactsReq,
     GetArtifactRevisionReadmeReq,
+    GetArtifactRevisionStatusReq,
     ImportArtifactsReq,
     RejectArtifactRevisionReq,
     UpdateArtifactReqBodyParam,
@@ -27,6 +28,7 @@ from ai.backend.manager.dto.response import (
     CancelImportArtifactResponse,
     CleanupArtifactsResponse,
     GetArtifactRevisionReadmeResponse,
+    GetArtifactRevisionStatusResponse,
     ImportArtifactsResponse,
     RejectArtifactRevisionResponse,
     UpdateArtifactResponse,
@@ -40,6 +42,9 @@ from ai.backend.manager.services.artifact_revision.actions.cancel_import import 
 )
 from ai.backend.manager.services.artifact_revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.get import (
+    GetArtifactRevisionAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
@@ -263,6 +268,32 @@ class APIHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
+    @auth_required_for_method
+    @api_handler
+    async def get_artifact_revision_status(
+        self,
+        path: PathParam[GetArtifactRevisionStatusReq],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """
+        Retrieve the status information for a specific artifact revision.
+
+        Returns the current status of the specified artifact revision,
+        allowing users to track the state of the artifact version.
+        """
+        processors = processors_ctx.processors
+
+        revision_result = await processors.artifact_revision.get.wait_for_complete(
+            GetArtifactRevisionAction(
+                artifact_revision_id=path.parsed.artifact_revision_id,
+            )
+        )
+
+        resp = GetArtifactRevisionStatusResponse(
+            status=revision_result.revision.status,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
 
 def create_app(
     default_cors_options: CORSOptions,
@@ -296,6 +327,13 @@ def create_app(
             "GET",
             "/revisions/{artifact_revision_id}/readme",
             api_handler.get_artifact_revision_readme,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/revisions/{artifact_revision_id}/status",
+            api_handler.get_artifact_revision_status,
         )
     )
 
