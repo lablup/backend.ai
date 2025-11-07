@@ -229,23 +229,23 @@ class ArtifactRevisionService:
             status=revision.status.value,
         )
 
-        # 4. Check if we need to query remote progress
-        # Remote progress is only queried when:
-        # - Local status is not PULLING (not actively downloading locally)
-        # - Delegation is enabled
-        # - Local progress is empty
+        # 4. Query remote progress when delegation is enabled
         remote_download_progress: Optional[ArtifactRevisionDownloadProgress] = None
 
-        if revision.status != ArtifactStatus.PULLING:
-            # Check if delegation is enabled
-            reservoir_cfg = self._config_provider.config.reservoir
-            if (
-                reservoir_cfg
-                and reservoir_cfg.use_delegation
-                and local_progress.artifact_progress is None
-            ):
-                # Get artifact's registry to find remote reservoir
-                if artifact.registry_type == ArtifactRegistryType.RESERVOIR:
+        # Check if delegation is enabled
+        reservoir_cfg = self._config_provider.config.reservoir
+        if reservoir_cfg and reservoir_cfg.use_delegation:
+            # Get artifact's registry to find remote reservoir
+            if artifact.registry_type == ArtifactRegistryType.RESERVOIR:
+                # If local is PULLING, return remote status without making remote request
+                if revision.status == ArtifactStatus.PULLING:
+                    if revision.remote_status is not None:
+                        remote_download_progress = ArtifactRevisionDownloadProgress(
+                            progress=None,
+                            status=revision.remote_status.value,
+                        )
+                # Otherwise, query remote only if local has no progress
+                elif local_progress.artifact_progress is None:
                     try:
                         # Get reservoir registry data
                         registry_data = await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
@@ -275,7 +275,6 @@ class ArtifactRevisionService:
                         # If remote query fails, just skip it
                         # Don't fail the entire request
                         log.warning("Failed to get remote download progress {}", e)
-                        pass
 
         # 5. Build combined response
         combined_progress = CombinedDownloadProgress(
