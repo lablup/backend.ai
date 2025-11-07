@@ -87,8 +87,6 @@ from ..session import (
     get_permission_ctx,
 )
 from ..types import (
-    QueryCondition,
-    QueryOption,
     join_by_related_field,
     load_related_field,
 )
@@ -100,6 +98,8 @@ from .kernel import ComputeContainer, KernelConnection, KernelNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.types import QueryCondition, QueryOption
+
     from ..gql import GraphQueryContext
 
 __all__ = (
@@ -772,7 +772,7 @@ class TotalResourceSlot(graphene.ObjectType):
             status_list = [SessionStatus[s] for s in statuses]
         else:
             status_list = None
-        query_conditions: list[QueryCondition] = []
+        query_conditions: list["QueryCondition"] = []
         if raw_filter is not None:
             query_conditions.append(by_raw_filter(_queryfilter_fieldspec, raw_filter))
         if status_list is not None:
@@ -781,7 +781,7 @@ class TotalResourceSlot(graphene.ObjectType):
             query_conditions.append(by_domain_name(domain_name))
         if resource_group_name is not None:
             query_conditions.append(by_resource_group_name(resource_group_name))
-        query_options: list[QueryOption] = [
+        query_options: list["QueryOption"] = [
             load_related_field(SessionRow.kernel_load_option()),
             join_by_related_field(SessionRow.user),
             join_by_related_field(SessionRow.group),
