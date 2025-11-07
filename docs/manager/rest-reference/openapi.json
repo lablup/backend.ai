@@ -1873,6 +1873,26 @@
         "description": "\nRetrieve the README content for a specific artifact revision.\n\nReturns the README documentation associated with the artifact revision,\nwhich typically contains usage instructions and model information.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/artifacts/revisions/download-progress": {
+      "get": {
+        "operationId": "artifacts.get_download_progress",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "\nQuery the current download progress for an artifact.\n\nReturns the current state of the download including artifact-level progress\n(total bytes, completed files) and per-file progress information.\nThe data is retrieved from Redis where it's tracked during the download process.\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/artifact-registries/scan": {
       "post": {
         "operationId": "artifact-registries.scan_artifacts",
