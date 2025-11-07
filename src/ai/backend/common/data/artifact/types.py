@@ -35,11 +35,9 @@ class ArtifactDownloadTrackingData(BaseModel):
         description="Total bytes to download across all files",
     )
     completed_files: int = Field(
-        default=0,
         description="Number of files that have been successfully downloaded",
     )
     downloaded_bytes: int = Field(
-        default=0,
         description="Total bytes downloaded so far across all files",
     )
 

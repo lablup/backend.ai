@@ -117,7 +117,6 @@ class ReservoirRegistryClient:
     async def get_download_progress(
         self, artifact_revision_id: uuid.UUID
     ) -> GetDownloadProgressResponse:
-        """Get download progress for an artifact by artifact_revision_id from remote reservoir manager."""
         resp = await self._request(
             "GET",
             f"/artifacts/revisions/{artifact_revision_id}/download-progress",
