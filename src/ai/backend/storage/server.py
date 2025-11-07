@@ -25,6 +25,9 @@ from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.config import (
     ConfigurationError,
@@ -33,6 +36,7 @@ from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import (
     NOOP_STORAGE_VOLUME_NAME,
     REDIS_BGTASK_DB,
+    REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     RedisRole,
 )
@@ -594,6 +598,15 @@ async def server_main(
             watcher_ctx(local_config, pidx)
         )
 
+        # Create ValkeyArtifactDownloadTrackingClient
+        valkey_target = redis_config.to_valkey_target()
+        valkey_artifact_client = await ValkeyArtifactDownloadTrackingClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_STATISTICS_DB,
+            human_readable_name=f"storage-proxy-artifact-download-tracker-{pidx}",
+        )
+        storage_init_stack.push_async_callback(valkey_artifact_client.close)
+
         root_ctx = RootContext(
             pid=os.getpid(),
             pidx=pidx,
@@ -613,6 +626,7 @@ async def server_main(
                 ),
             },
             manager_http_clients={},
+            valkey_artifact_client=valkey_artifact_client,
             backends={**DEFAULT_BACKENDS},
             volumes={
                 NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)

@@ -443,6 +443,7 @@ class LayerType(enum.StrEnum):
     SCHEDULER_CACHE_SOURCE = "scheduler_cache_source"
 
     # Valkey client layers
+    VALKEY_ARTIFACT = "valkey_artifact"
     VALKEY_CONTAINER_LOG = "valkey_container_log"
     VALKEY_IMAGE = "valkey_image"
     VALKEY_LIVE = "valkey_live"
