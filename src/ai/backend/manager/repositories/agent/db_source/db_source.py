@@ -1,9 +1,9 @@
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, cast
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import insert as pg_insert
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import contains_eager, selectinload
 
 from ai.backend.common.exception import AgentNotFound
 from ai.backend.common.types import AgentId, ImageID
@@ -11,17 +11,22 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
     AgentData,
+    AgentDataExtended,
+    AgentDataExtendedRequirements,
     AgentHeartbeatUpsert,
     AgentStatus,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models import agents
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.agent.options import ListAgentQueryOptions
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -143,3 +148,58 @@ class AgentDBSource:
                 .where(AgentRow.id == agent_id)
             )
             await session.execute(query)
+
+    async def fetch_agent_data_list(self, options: ListAgentQueryOptions) -> list[AgentData]:
+        stmt: sa.sql.Select = (
+            sa.select(AgentRow)
+            .select_from(
+                sa.join(
+                    AgentRow,
+                    KernelRow,
+                    sa.and_(
+                        AgentRow.id == KernelRow.agent,
+                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
+                    ),
+                    isouter=True,
+                )
+            )
+            .options(
+                contains_eager(AgentRow.kernels),
+            )
+        )
+
+        final_stmt = options.apply(stmt)
+
+        async with self._db.begin_readonly_session() as db_session:
+            result = await db_session.scalars(final_stmt)
+            agent_rows = cast(list[AgentRow], result.unique().all())
+            return [agent_row.to_data() for agent_row in agent_rows]
+
+    async def fetch_agent_extended_data_list(
+        self,
+        options: ListAgentQueryOptions,
+        requirements: AgentDataExtendedRequirements,
+    ) -> list[AgentDataExtended]:
+        stmt: sa.sql.Select = (
+            sa.select(AgentRow)
+            .select_from(
+                sa.join(
+                    AgentRow,
+                    KernelRow,
+                    sa.and_(
+                        AgentRow.id == KernelRow.agent,
+                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
+                    ),
+                    isouter=True,
+                )
+            )
+            .options(
+                contains_eager(AgentRow.kernels),
+            )
+        )
+
+        final_stmt = options.apply(stmt)
+        async with self._db.begin_readonly_session() as db_session:
+            result = await db_session.scalars(final_stmt)
+            agent_rows = cast(list[AgentRow], result.unique().all())
+            return [agent_row.to_extended_data(requirements) for agent_row in agent_rows]

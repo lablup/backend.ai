@@ -60,13 +60,13 @@ from .rbac import (
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ProjectPermission
 from .types import (
-    QueryCondition,
-    QueryOption,
     load_related_field,
 )
 from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.types import QueryCondition, QueryOption
+
     from .rbac import ContainerRegistryScope
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -258,8 +258,8 @@ class GroupRow(Base):
     @classmethod
     async def query_by_condition(
         cls,
-        conditions: Sequence[QueryCondition],
-        options: Sequence[QueryOption] = tuple(),
+        conditions: Sequence["QueryCondition"],
+        options: Sequence["QueryOption"] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
@@ -317,7 +317,7 @@ class GroupRow(Base):
         return rows[0]
 
 
-def by_id(project_id: uuid.UUID) -> QueryCondition:
+def by_id(project_id: uuid.UUID) -> "QueryCondition":
     def _by_id(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:

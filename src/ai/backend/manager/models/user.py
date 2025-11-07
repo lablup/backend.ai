@@ -35,13 +35,13 @@ from .base import (
 from .exceptions import ObjectNotFound
 from .hasher import PasswordHasherFactory
 from .types import (
-    QueryCondition,
-    QueryOption,
     load_related_field,
 )
 from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.types import QueryCondition, QueryOption
+
     from .keypair import KeyPairRow
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -272,8 +272,8 @@ class UserRow(Base):
     @classmethod
     async def query_by_condition(
         cls,
-        conditions: Sequence[QueryCondition],
-        options: Sequence[QueryOption] = tuple(),
+        conditions: Sequence["QueryCondition"],
+        options: Sequence["QueryOption"] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
@@ -390,7 +390,7 @@ class UserRow(Base):
 
 def by_user_uuid(
     user_uuid: UUID,
-) -> QueryCondition:
+) -> "QueryCondition":
     def _by_user_uuid(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:
@@ -401,7 +401,7 @@ def by_user_uuid(
 
 def by_username(
     username: str,
-) -> QueryCondition:
+) -> "QueryCondition":
     def _by_username(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:
@@ -412,7 +412,7 @@ def by_username(
 
 def by_user_email(
     email: str,
-) -> QueryCondition:
+) -> "QueryCondition":
     def _by_email(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:

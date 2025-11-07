@@ -1,7 +1,7 @@
 import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, Optional, Protocol, TypeVar
+from typing import Any, Callable, Generic, Optional, Protocol, TypeVar
 
 import sqlalchemy as sa
 from sqlalchemy.sql import Select
@@ -30,6 +30,16 @@ class RepositoryArgs:
     valkey_schedule_client: "ValkeyScheduleClient"
     valkey_image_client: "ValkeyImageClient"
     valkey_live_client: "ValkeyLiveClient"
+
+
+type QueryConditionCallable = Callable[
+    [Optional[sa.sql.expression.BinaryExpression]], sa.sql.expression.BinaryExpression
+]
+type QueryCondition = Callable[[sa.sql.Select], QueryConditionCallable]
+
+type QueryOrder = sa.sql.ClauseElement
+type QueryOptionCallable = Callable[[sa.sql.Select], sa.sql.Select]
+type QueryOption = Callable[..., Callable[[sa.sql.Select], sa.sql.Select]]
 
 
 # Generic types for pagination

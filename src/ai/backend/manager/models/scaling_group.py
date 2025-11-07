@@ -5,6 +5,7 @@ from collections.abc import Container, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Optional,
@@ -52,9 +53,11 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ScalingGroupPermission
-from .types import QueryCondition
 from .user import UserRole
 from .utils import ExtendedAsyncSAEngine
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.types import QueryCondition
 
 __all__: Sequence[str] = (
     # table defs
@@ -282,7 +285,7 @@ class ScalingGroupRow(Base):
     @classmethod
     async def list_by_condition(
         cls,
-        conditions: Iterable[QueryCondition],
+        conditions: Iterable["QueryCondition"],
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:

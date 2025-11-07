@@ -222,3 +222,8 @@ class UpsertResult:
             was_revived=was_revived,
             need_resource_slot_update=need_resource_slot_update,
         )
+
+
+@dataclass
+class AgentDataExtendedRequirements:
+    known_slot_types: Mapping[SlotName, SlotTypes]

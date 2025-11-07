@@ -1,9 +1,5 @@
 import logging
-from collections.abc import Collection, Sequence
-from typing import Any, Mapping, cast
-
-import sqlalchemy as sa
-from sqlalchemy.orm import contains_eager
+from typing import Any, Mapping
 
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -21,13 +17,11 @@ from ai.backend.manager.data.agent.modifier import AgentStatusModifier
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentDataExtended,
+    AgentDataExtendedRequirements,
     AgentHeartbeatUpsert,
     UpsertResult,
 )
 from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
-from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
@@ -36,7 +30,7 @@ from ai.backend.manager.repositories.agent.stateful_source.stateful_source impor
 )
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 
-from .query import QueryCondition, QueryOrder
+from .options import ListAgentQueryOptions
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -163,72 +157,21 @@ class AgentRepository:
     @agent_repository_resilience.apply()
     async def list_data(
         self,
-        conditions: Sequence[QueryCondition],
-        order_by: Sequence[QueryOrder] = tuple(),
+        options: ListAgentQueryOptions,
     ) -> list[AgentData]:
-        stmt: sa.sql.Select = (
-            sa.select(AgentRow)
-            .select_from(
-                sa.join(
-                    AgentRow,
-                    KernelRow,
-                    sa.and_(
-                        AgentRow.id == KernelRow.agent,
-                        KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
-                    ),
-                    isouter=True,
-                )
-            )
-            .options(
-                contains_eager(AgentRow.kernels),
-            )
-        )
-        for cond in conditions:
-            stmt = stmt.where(cond())
-
-        if order_by:
-            stmt = stmt.order_by(*order_by)
-
-        async with self._db_source._db.begin_readonly_session() as db_session:
-            result = await db_session.scalars(stmt)
-            agent_rows = cast(list[AgentRow], result.unique().all())
-            return [agent_row.to_data() for agent_row in agent_rows]
+        return await self._db_source.fetch_agent_data_list(options)
 
     @agent_repository_resilience.apply()
     async def list_extended_data(
         self,
-        conditions: Sequence[QueryCondition],
-        order_by: Sequence[QueryOrder] = tuple(),
-        *,
-        kernel_statuses: Collection[KernelStatus] = KernelStatus.resource_occupied_statuses(),
+        options: ListAgentQueryOptions,
     ) -> list[AgentDataExtended]:
-        stmt: sa.sql.Select = (
-            sa.select(AgentRow)
-            .select_from(
-                sa.join(
-                    AgentRow,
-                    KernelRow,
-                    sa.and_(AgentRow.id == KernelRow.agent, KernelRow.status.in_(kernel_statuses)),
-                    isouter=True,
-                )
-            )
-            .options(
-                contains_eager(AgentRow.kernels),
+        requirements = AgentDataExtendedRequirements(
+            known_slot_types=(
+                await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
             )
         )
-        for cond in conditions:
-            stmt = stmt.where(cond())
-
-        if order_by:
-            stmt = stmt.order_by(*order_by)
-
-        known_slot_types = (
-            await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
-        )
-        async with self._db_source._db.begin_readonly_session() as db_session:
-            result = await db_session.scalars(stmt)
-            agent_rows = cast(list[AgentRow], result.unique().all())
-            return [agent_row.to_extended_data(known_slot_types) for agent_row in agent_rows]
+        return await self._db_source.fetch_agent_extended_data_list(options, requirements)
 
     @agent_repository_resilience.apply()
     async def update_gpu_alloc_map(self, agent_id: AgentId, alloc_map: Mapping[str, Any]) -> None:

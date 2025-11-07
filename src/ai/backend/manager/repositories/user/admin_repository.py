@@ -29,8 +29,6 @@ from ai.backend.manager.models.group import association_groups_users
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.session import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    QueryCondition,
-    QueryOption,
     SessionRow,
     by_status,
     by_user_id,
@@ -40,6 +38,7 @@ from ai.backend.manager.models.types import join_by_related_field
 from ai.backend.manager.models.user import UserRow, users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, SAConnection
 from ai.backend.manager.models.vfolder import vfolder_permissions, vfolders
+from ai.backend.manager.repositories.types import QueryCondition, QueryOption
 
 user_repository_resilience = Resilience(
     policies=[

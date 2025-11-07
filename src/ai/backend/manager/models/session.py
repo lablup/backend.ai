@@ -133,10 +133,6 @@ from .rbac import (
 from .rbac.context import ClientContext
 from .rbac.permission_defs import ComputeSessionPermission
 from .routing import RouteStatus, RoutingRow
-from .types import (
-    QueryCondition,
-    QueryOption,
-)
 from .utils import (
     ExtendedAsyncSAEngine,
     JSONCoalesceExpr,
@@ -146,6 +142,8 @@ from .utils import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.repositories.types import QueryCondition, QueryOption
+
     from ..registry import AgentRegistry
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
@@ -1192,8 +1190,8 @@ class SessionRow(Base):
     @classmethod
     async def list_session_by_condition(
         cls,
-        conditions: Iterable[QueryCondition],
-        options: Iterable[QueryOption] = tuple(),
+        conditions: Iterable["QueryCondition"],
+        options: Iterable["QueryOption"] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
@@ -1567,7 +1565,7 @@ class SessionRow(Base):
         return until - cls.status_history[status.name].astext.cast(sa.types.DateTime(timezone=True))
 
 
-def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
+def by_status(statuses: Iterable[SessionStatus]) -> "QueryCondition":
     def _by_status(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:
@@ -1576,7 +1574,7 @@ def by_status(statuses: Iterable[SessionStatus]) -> QueryCondition:
     return _by_status
 
 
-def by_user_id(user_id: UUID) -> QueryCondition:
+def by_user_id(user_id: UUID) -> "QueryCondition":
     def _by_user_id(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:
@@ -1585,7 +1583,7 @@ def by_user_id(user_id: UUID) -> QueryCondition:
     return _by_user_id
 
 
-def by_project_id(project_id: UUID) -> QueryCondition:
+def by_project_id(project_id: UUID) -> "QueryCondition":
     def _by_project_id(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:
@@ -1594,7 +1592,7 @@ def by_project_id(project_id: UUID) -> QueryCondition:
     return _by_project_id
 
 
-def by_domain_name(domain_name: str) -> QueryCondition:
+def by_domain_name(domain_name: str) -> "QueryCondition":
     def _by_domain_name(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:
@@ -1603,7 +1601,7 @@ def by_domain_name(domain_name: str) -> QueryCondition:
     return _by_domain_name
 
 
-def by_resource_group_name(resource_group_name: str) -> QueryCondition:
+def by_resource_group_name(resource_group_name: str) -> "QueryCondition":
     def _by_resource_group_name(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:
@@ -1612,7 +1610,7 @@ def by_resource_group_name(resource_group_name: str) -> QueryCondition:
     return _by_resource_group_name
 
 
-def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> QueryCondition:
+def by_raw_filter(filter_spec: FieldSpecType, raw_filter: str) -> "QueryCondition":
     def _by_raw_filter(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:
