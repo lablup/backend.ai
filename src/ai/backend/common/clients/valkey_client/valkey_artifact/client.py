@@ -12,7 +12,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
-from ai.backend.common.clients.valkey_client.valkey_artifact.types import (
+from ai.backend.common.data.artifact.types import (
     ArtifactDownloadTrackingData,
     DownloadProgressData,
     FileDownloadProgressData,
