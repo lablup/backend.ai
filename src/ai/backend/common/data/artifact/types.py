@@ -65,7 +65,11 @@ class FileDownloadProgressData(BaseModel):
     )
     error_message: Optional[str] = Field(
         default=None,
-        description="Error message if download failed",
+        description=(
+            "Error message if download failed. "
+            "Present when success is False and an error occurred during download. "
+            "None when success is True or no error information is available."
+        ),
     )
 
 
