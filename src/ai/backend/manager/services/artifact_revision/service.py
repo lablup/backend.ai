@@ -237,13 +237,17 @@ class ArtifactRevisionService:
         if reservoir_cfg and reservoir_cfg.use_delegation:
             # Get artifact's registry to find remote reservoir
             if artifact.registry_type == ArtifactRegistryType.RESERVOIR:
+                # Default: create remote progress object with None progress and remote_status
+                remote_status = (
+                    revision.remote_status.value if revision.remote_status else "UNSCANNED"
+                )
+
                 # If local is PULLING, return remote status without making remote request
                 if revision.status == ArtifactStatus.PULLING:
-                    if revision.remote_status is not None:
-                        remote_download_progress = ArtifactRevisionDownloadProgress(
-                            progress=None,
-                            status=revision.remote_status.value,
-                        )
+                    remote_download_progress = ArtifactRevisionDownloadProgress(
+                        progress=None,
+                        status=remote_status,
+                    )
                 # Otherwise, query remote only if local has no progress
                 elif local_progress.artifact_progress is None:
                     try:
@@ -271,10 +275,25 @@ class ArtifactRevisionService:
                                 progress=remote_local.progress,
                                 status=remote_local.status,
                             )
+                        else:
+                            # Remote response exists but no local data
+                            remote_download_progress = ArtifactRevisionDownloadProgress(
+                                progress=None,
+                                status=remote_status,
+                            )
                     except Exception as e:
-                        # If remote query fails, just skip it
-                        # Don't fail the entire request
+                        # If remote query fails, return remote status without progress
                         log.warning("Failed to get remote download progress {}", e)
+                        remote_download_progress = ArtifactRevisionDownloadProgress(
+                            progress=None,
+                            status=remote_status,
+                        )
+                else:
+                    # Local has progress, don't query remote
+                    remote_download_progress = ArtifactRevisionDownloadProgress(
+                        progress=None,
+                        status=remote_status,
+                    )
 
         # 5. Build combined response
         combined_progress = CombinedDownloadProgress(
