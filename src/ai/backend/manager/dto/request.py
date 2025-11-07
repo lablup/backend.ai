@@ -145,6 +145,7 @@ class UpdateArtifactReqBodyParam(BaseRequestModel):
         return modifier
 
 
-class GetArtifactDownloadProgressReq(BaseRequestModel):
-    model_id: str = Field(description="Model identifier to query download progress.")
-    revision: str = Field(description="Model revision to query download progress.")
+class GetDownloadProgressReqPathParam(BaseRequestModel):
+    artifact_revision_id: uuid.UUID = Field(
+        description="The artifact revision ID to get download progress for"
+    )

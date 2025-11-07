@@ -11,18 +11,17 @@ from ai.backend.common.api_handlers import (
     APIResponse,
     BodyParam,
     PathParam,
-    QueryParam,
     api_handler,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
-from ai.backend.manager.dto.context import ProcessorsCtx, ValkeyArtifactCtx
+from ai.backend.manager.dto.context import ProcessorsCtx
 from ai.backend.manager.dto.request import (
     ApproveArtifactRevisionReq,
     CancelImportArtifactReq,
     CleanupArtifactsReq,
-    GetArtifactDownloadProgressReq,
     GetArtifactRevisionReadmeReq,
+    GetDownloadProgressReqPathParam,
     ImportArtifactsReq,
     RejectArtifactRevisionReq,
     UpdateArtifactReqBodyParam,
@@ -33,8 +32,8 @@ from ai.backend.manager.dto.response import (
     ArtifactRevisionImportTask,
     CancelImportArtifactResponse,
     CleanupArtifactsResponse,
-    GetArtifactDownloadProgressResponse,
     GetArtifactRevisionReadmeResponse,
+    GetDownloadProgressResponse,
     ImportArtifactsResponse,
     RejectArtifactRevisionResponse,
     UpdateArtifactResponse,
@@ -48,6 +47,9 @@ from ai.backend.manager.services.artifact_revision.actions.cancel_import import 
 )
 from ai.backend.manager.services.artifact_revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.get_download_progress import (
+    GetDownloadProgressAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
@@ -275,29 +277,25 @@ class APIHandler:
     @api_handler
     async def get_download_progress(
         self,
-        query: QueryParam[GetArtifactDownloadProgressReq],
-        valkey_ctx: ValkeyArtifactCtx,
+        path: PathParam[GetDownloadProgressReqPathParam],
+        processors_ctx: ProcessorsCtx,
     ) -> APIResponse:
         """
-        Query the current download progress for an artifact.
+        Retrieve download progress for an artifact revision.
 
-        Returns the current state of the download including artifact-level progress
-        (total bytes, completed files) and per-file progress information.
-        The data is retrieved from Redis where it's tracked during the download process.
+        Returns detailed download progress information including artifact-level
+        and file-level progress data for the specified artifact revision.
+        Supports both local and remote download progress when delegation is enabled.
         """
-        valkey_artifact = valkey_ctx.valkey_artifact
-        artifact_progress = await valkey_artifact.get_artifact_progress(
-            model_id=query.parsed.model_id,
-            revision=query.parsed.revision,
-        )
-        file_progress = await valkey_artifact.get_all_file_progress(
-            model_id=query.parsed.model_id,
-            revision=query.parsed.revision,
+        processors = processors_ctx.processors
+        action_result = await processors.artifact_revision.get_download_progress.wait_for_complete(
+            GetDownloadProgressAction(
+                artifact_revision_id=path.parsed.artifact_revision_id,
+            )
         )
 
-        resp = GetArtifactDownloadProgressResponse(
-            artifact_progress=artifact_progress,
-            file_progress=file_progress if file_progress else None,
+        resp = GetDownloadProgressResponse(
+            download_progress=action_result.download_progress,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
@@ -339,7 +337,7 @@ def create_app(
     cors.add(
         app.router.add_route(
             "GET",
-            "/revisions/download-progress",
+            "/revisions/{artifact_revision_id}/download-progress",
             api_handler.get_download_progress,
         )
     )
