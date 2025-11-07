@@ -72,7 +72,7 @@ _DOWNLOAD_RETRIABLE_ERROR = (
 
 @dataclass
 class _ProbeHeadInfo:
-    total: Optional[int]
+    total: int
     etag: Optional[str]
     accept_ranges: bool
 
@@ -148,30 +148,22 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
     async def _probe_head(self) -> _ProbeHeadInfo:
         """
         Probe metadata via HEAD.
-        - May set total size, etag, and Accept-Ranges support.
-        - Any failure is swallowed (best effort).
+        - Sets total size, etag, and Accept-Ranges support.
+        - Raises error if Content-Length is not available.
         """
-        total: Optional[int] = None
-        etag: Optional[str] = None
-        accept_ranges: bool = False
-
         headers_base = _PROBE_HEAD_BASE_HEADER
-        try:
-            async with self._session.head(
-                self._url, headers=headers_base, allow_redirects=True
-            ) as resp:
-                content_length = resp.headers.get("Content-Length")
-                if content_length and content_length.isdigit():
-                    total = int(content_length)
+        async with self._session.head(
+            self._url, headers=headers_base, allow_redirects=True
+        ) as resp:
+            content_length = resp.headers.get("Content-Length")
+            if not content_length or not content_length.isdigit():
+                raise aiohttp.ClientPayloadError(
+                    f"Content-Length header missing or invalid in HEAD response for {self._url}"
+                )
+            total = int(content_length)
 
-                new_etag = resp.headers.get("ETag")
-                if etag and new_etag and new_etag != etag:
-                    raise aiohttp.ClientPayloadError("ETag changed on HEAD")
-                etag = etag or new_etag
-                accept_ranges = "bytes" in (resp.headers.get("Accept-Ranges", "")).lower()
-        except Exception:
-            # HEAD is best-effort; ignore failures.
-            pass
+            etag = resp.headers.get("ETag")
+            accept_ranges = "bytes" in (resp.headers.get("Accept-Ranges", "")).lower()
 
         return _ProbeHeadInfo(total=total, etag=etag, accept_ranges=accept_ranges)
 
@@ -191,26 +183,23 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
         backoff = 1.0
         retries = 0
 
-        total: Optional[int] = None
-        etag: Optional[str] = None
-        accept_ranges = False
         self._download_complete = False
         self._progress_task = None
 
-        try:
-            probe_info = await self._probe_head()
-            total = probe_info.total
-            etag = probe_info.etag
-            accept_ranges = probe_info.accept_ranges
+        # Probe head first - if this fails, we can't proceed
+        probe_info = await self._probe_head()
+        total = probe_info.total
+        etag = probe_info.etag
+        accept_ranges = probe_info.accept_ranges
 
-            # Start background progress task once we have total size
-            if total is not None:
-                self._progress_task = asyncio.create_task(
-                    self._periodic_progress_update(
-                        offset_getter=lambda: offset,
-                        total_bytes=total,
-                    )
+        try:
+            # Start background progress task
+            self._progress_task = asyncio.create_task(
+                self._periodic_progress_update(
+                    offset_getter=lambda: offset,
+                    total_bytes=total,
                 )
+            )
 
             while True:
                 headers = dict(headers_base)
@@ -230,33 +219,11 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
                         if etag and resp_etag and resp_etag != etag:
                             raise aiohttp.ClientPayloadError("ETag changed during resume")
 
-                        # Fill total size from response headers if still unknown
-                        if total is None:
-                            if resp.status == 200:
-                                content_length = resp.headers.get("Content-Length")
-                                if content_length and content_length.isdigit():
-                                    total = int(content_length)
-                            elif resp.status == 206:
-                                content_range = resp.headers.get(
-                                    "Content-Range"
-                                )  # e.g. "bytes 123-456/789"
-                                if content_range and "/" in content_range:
-                                    try:
-                                        total = int(content_range.split("/")[-1])
-                                    except ValueError:
-                                        pass
-                            # TODO: Handle else case
-
                         async for chunk in resp.content.iter_chunked(self._chunk_size):
                             if not chunk:
                                 continue
                             offset += len(chunk)
                             yield chunk
-
-                    # total unknown
-                    if total is None:
-                        log.warning("Skipped download of %s since total size is unknown", self._url)
-                        break
 
                     # Completed
                     if offset >= total:
@@ -291,19 +258,18 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
                     continue
         except Exception as e:
             # Update Redis with error status
-            if total is not None:
-                try:
-                    await self._redis_client.update_file_progress(
-                        model_id=self._model_id,
-                        revision=self._revision,
-                        file_path=self._file_path,
-                        current_bytes=offset,
-                        total_bytes=total,
-                        success=False,
-                        error_message=str(e),
-                    )
-                except Exception as redis_err:
-                    log.warning("Failed to update error status in Redis: {}", str(redis_err))
+            try:
+                await self._redis_client.update_file_progress(
+                    model_id=self._model_id,
+                    revision=self._revision,
+                    file_path=self._file_path,
+                    current_bytes=offset,
+                    total_bytes=total,
+                    success=False,
+                    error_message=str(e),
+                )
+            except Exception as redis_err:
+                log.warning("Failed to update error status in Redis: {}", str(redis_err))
             raise
         finally:
             self._download_complete = True
@@ -317,18 +283,17 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
                     pass
 
             # Final update to Redis
-            if total is not None:
-                try:
-                    await self._redis_client.update_file_progress(
-                        model_id=self._model_id,
-                        revision=self._revision,
-                        file_path=self._file_path,
-                        current_bytes=offset,
-                        total_bytes=total,
-                        success=(offset >= total),
-                    )
-                except Exception as redis_err:
-                    log.warning("Failed to update final status in Redis: {}", str(redis_err))
+            try:
+                await self._redis_client.update_file_progress(
+                    model_id=self._model_id,
+                    revision=self._revision,
+                    file_path=self._file_path,
+                    current_bytes=offset,
+                    total_bytes=total,
+                    success=(offset >= total),
+                )
+            except Exception as redis_err:
+                log.warning("Failed to update final status in Redis: {}", str(redis_err))
 
             await self._session.close()
 
