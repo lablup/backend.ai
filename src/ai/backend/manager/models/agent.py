@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Optional, Self, TypeAlias, cast, override
+from typing import TYPE_CHECKING, Optional, Self, TypeAlias, cast, override
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
@@ -15,6 +15,7 @@ from ai.backend.common.types import AccessKey, AgentId, ResourceSlot, SlotName, 
 from ai.backend.manager.data.agent.types import (
     AgentData,
     AgentDataExtended,
+    AgentDataExtendedRequirements,
     AgentDataForHeartbeatUpdate,
     AgentStatus,
 )
@@ -40,8 +41,10 @@ from .rbac import (
 )
 from .rbac.context import ClientContext
 from .rbac.permission_defs import AgentPermission, ScalingGroupPermission
-from .types import QueryCondition
 from .utils import ExtendedAsyncSAEngine, execute_with_txn_retry
+
+if TYPE_CHECKING:
+    from ai.backend.manager.repositories.types import QueryCondition
 
 __all__: Sequence[str] = (
     "agents",
@@ -130,7 +133,7 @@ class AgentRow(Base):
             auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
         )
 
-    def to_extended_data(self, known_slot_types: Mapping[SlotName, SlotTypes]) -> AgentDataExtended:
+    def to_extended_data(self, requirements: AgentDataExtendedRequirements) -> AgentDataExtended:
         kernel_rows = cast(list[KernelRow], self.kernels)
         return AgentDataExtended(
             id=self.id,
@@ -151,7 +154,7 @@ class AgentRow(Base):
             compute_plugins=self.compute_plugins,
             public_key=self.public_key,
             auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
-            known_slot_types=known_slot_types,
+            known_slot_types=requirements.known_slot_types,
             kernels=[k.to_kernel_info() for k in kernel_rows],
         )
 
@@ -172,7 +175,7 @@ class AgentRow(Base):
 
     @classmethod
     async def get_agents_by_condition(
-        cls, conditions: Sequence[QueryCondition], *, db: ExtendedAsyncSAEngine
+        cls, conditions: Sequence["QueryCondition"], *, db: ExtendedAsyncSAEngine
     ) -> list[Self]:
         query_stmt = sa.select(AgentRow)
         for cond in conditions:
@@ -220,7 +223,7 @@ class AgentRow(Base):
 
 def by_scaling_group(
     scaling_group: str,
-) -> QueryCondition:
+) -> "QueryCondition":
     def _by_scaling_group(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.expression.BinaryExpression:
@@ -231,7 +234,7 @@ def by_scaling_group(
 
 def by_status(
     status: AgentStatus,
-) -> QueryCondition:
+) -> "QueryCondition":
     def _by_status(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.expression.BinaryExpression:
@@ -242,7 +245,7 @@ def by_status(
 
 def by_schedulable(
     schedulable: bool,
-) -> QueryCondition:
+) -> "QueryCondition":
     def _by_schedulable(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.expression.BinaryExpression:
