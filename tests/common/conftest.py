@@ -170,7 +170,7 @@ async def test_valkey_artifact(
     client = await ValkeyArtifactDownloadTrackingClient.create(
         valkey_target,
         human_readable_name="test.artifact",
-        db_id=0,
+        db_id=REDIS_STATISTICS_DB,
     )
     try:
         yield client
