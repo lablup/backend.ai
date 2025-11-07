@@ -470,14 +470,19 @@ class TestValkeyArtifactDownloadTrackingClient:
         )
 
         assert len(all_progress) == 3
-        assert "file1.bin" in all_progress
-        assert "file2.bin" in all_progress
-        assert "file3.bin" in all_progress
+        file_paths = {fp.file_path for fp in all_progress}
+        assert "file1.bin" in file_paths
+        assert "file2.bin" in file_paths
+        assert "file3.bin" in file_paths
 
-        assert all_progress["file1.bin"].current_bytes == 100
-        assert all_progress["file2.bin"].current_bytes == 200
-        assert all_progress["file3.bin"].current_bytes == 300
-        assert all_progress["file3.bin"].success is True
+        file1 = next(fp for fp in all_progress if fp.file_path == "file1.bin")
+        file2 = next(fp for fp in all_progress if fp.file_path == "file2.bin")
+        file3 = next(fp for fp in all_progress if fp.file_path == "file3.bin")
+
+        assert file1.current_bytes == 100
+        assert file2.current_bytes == 200
+        assert file3.current_bytes == 300
+        assert file3.success is True
 
     async def test_get_download_progress(
         self,
@@ -528,13 +533,17 @@ class TestValkeyArtifactDownloadTrackingClient:
 
         # Verify file-level progress
         assert len(progress.file_progress) == 2
-        assert "file1.bin" in progress.file_progress
-        assert "file2.bin" in progress.file_progress
+        file_paths = {fp.file_path for fp in progress.file_progress}
+        assert "file1.bin" in file_paths
+        assert "file2.bin" in file_paths
 
-        assert progress.file_progress["file1.bin"].current_bytes == 500
-        assert progress.file_progress["file1.bin"].success is False
-        assert progress.file_progress["file2.bin"].current_bytes == 1000
-        assert progress.file_progress["file2.bin"].success is True
+        file1 = next(fp for fp in progress.file_progress if fp.file_path == "file1.bin")
+        file2 = next(fp for fp in progress.file_progress if fp.file_path == "file2.bin")
+
+        assert file1.current_bytes == 500
+        assert file1.success is False
+        assert file2.current_bytes == 1000
+        assert file2.success is True
 
     async def test_get_download_progress_nonexistent(
         self,

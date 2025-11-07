@@ -77,8 +77,8 @@ class DownloadProgressData(BaseModel):
     artifact_progress: Optional[ArtifactDownloadTrackingData] = Field(
         description="Artifact-level download progress, None if not found",
     )
-    file_progress: dict[str, FileDownloadProgressData] = Field(
-        description="Dictionary mapping file paths to their download progress",
+    file_progress: list[FileDownloadProgressData] = Field(
+        description="List of file-level download progress",
     )
 
 
@@ -89,10 +89,22 @@ class ArtifactRevisionDownloadProgress(BaseModel):
     """
 
     progress: Optional[DownloadProgressData] = Field(
-        description="Download progress data",
+        description=(
+            "Download progress data. "
+            "Present when status is PULLING (actively downloading). "
+            "None when status is SCANNED (not yet started), PULLED/AVAILABLE (completed and cleaned up), "
+            "or when tracking data is not available."
+        ),
     )
     status: str = Field(
-        description="Artifact revision status (SCANNED, PULLING, PULLED, etc.)",
+        description=(
+            "Artifact revision status. "
+            "SCANNED: Not yet downloaded. "
+            "PULLING: Currently downloading (progress should be present). "
+            "PULLED/AVAILABLE: Download completed (progress may be cleaned up). "
+            "FAILED: Download failed. "
+            "UNSCANNED: Remote status unknown"
+        ),
     )
 
 

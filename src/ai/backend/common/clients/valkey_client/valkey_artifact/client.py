@@ -360,16 +360,16 @@ class ValkeyArtifactDownloadTrackingClient:
         self,
         model_id: str,
         revision: str,
-    ) -> dict[str, FileDownloadProgressData]:
+    ) -> list[FileDownloadProgressData]:
         """
         Get all file download progress for an artifact.
 
         :param model_id: Model identifier
         :param revision: Model revision
-        :return: Dictionary mapping file paths to their progress data
+        :return: List of file progress data
         """
         file_pattern = self._get_file_pattern(model_id, revision)
-        file_progress_map: dict[str, FileDownloadProgressData] = {}
+        file_progress_list: list[FileDownloadProgressData] = []
 
         cursor = b"0"
         while cursor:
@@ -386,14 +386,14 @@ class ValkeyArtifactDownloadTrackingClient:
                             file_progress = FileDownloadProgressData.model_validate_json(
                                 value_bytes
                             )
-                            file_progress_map[file_progress.file_path] = file_progress
+                            file_progress_list.append(file_progress)
                         except (ValidationError, UnicodeDecodeError):
                             log.warning("Failed to parse file progress data for key: {}", key_bytes)
 
             if cursor == b"0":
                 break
 
-        return file_progress_map
+        return file_progress_list
 
     @valkey_artifact_resilience.apply()
     async def get_download_progress(
