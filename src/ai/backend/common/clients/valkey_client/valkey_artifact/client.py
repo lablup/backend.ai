@@ -1,0 +1,377 @@
+from __future__ import annotations
+
+import hashlib
+import logging
+import time
+from typing import Final, Optional, Self, cast
+
+from glide import Batch, ExpirySet, ExpiryType
+from pydantic import ValidationError
+
+from ai.backend.common.clients.valkey_client.client import (
+    AbstractValkeyClient,
+    create_valkey_client,
+)
+from ai.backend.common.clients.valkey_client.valkey_artifact.types import (
+    ArtifactDownloadTrackingData,
+    FileDownloadProgressData,
+)
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.metrics.metric import DomainType, LayerType
+from ai.backend.common.resilience import (
+    BackoffStrategy,
+    MetricArgs,
+    MetricPolicy,
+    Resilience,
+    RetryArgs,
+    RetryPolicy,
+)
+from ai.backend.common.types import ValkeyTarget
+from ai.backend.logging.utils import BraceStyleAdapter
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+
+# Resilience instance for valkey_artifact layer
+valkey_artifact_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_ARTIFACT)),
+        RetryPolicy(
+            RetryArgs(
+                max_retries=3,
+                retry_delay=0.1,
+                backoff_strategy=BackoffStrategy.FIXED,
+                non_retryable_exceptions=(BackendAIError,),
+            )
+        ),
+    ]
+)
+
+_ARTIFACT_DOWNLOAD_PREFIX: Final[str] = "artifact:download"
+_ARTIFACT_DOWNLOAD_EXPIRATION: Final[int] = 86400  # 24 hours
+_FILE_PROGRESS_UPDATE_INTERVAL: Final[int] = 30  # seconds
+
+
+class ValkeyArtifactDownloadTrackingClient:
+    """
+    Client for managing artifact download tracking using Valkey.
+    """
+
+    _client: AbstractValkeyClient
+    _closed: bool
+
+    def __init__(self, client: AbstractValkeyClient) -> None:
+        self._client = client
+        self._closed = False
+
+    @classmethod
+    async def create(
+        cls,
+        valkey_target: ValkeyTarget,
+        *,
+        db_id: int,
+        human_readable_name: str,
+    ) -> Self:
+        """
+        Create a ValkeyRateLimitClient instance.
+
+        :param redis_target: The target Redis server to connect to.
+        :param db_id: The database index to use.
+        :param human_readable_name: The human-readable name of the client.
+        :return: An instance of ValkeyRateLimitClient.
+        """
+        client = create_valkey_client(
+            valkey_target=valkey_target,
+            db_id=db_id,
+            human_readable_name=human_readable_name,
+        )
+        await client.connect()
+        return cls(client=client)
+
+    @valkey_artifact_resilience.apply()
+    async def close(self) -> None:
+        """
+        Close the ValkeyArtifactDownloadTrackingClient connection.
+        """
+        if self._closed:
+            log.debug("ValkeyArtifactDownloadTrackingClient is already closed.")
+            return
+        self._closed = True
+        await self._client.disconnect()
+
+    def _create_batch(self, is_atomic: bool = False) -> Batch:
+        """
+        Create a batch for transaction operations.
+
+        :param is_atomic: Whether the batch should be atomic.
+        :return: A Batch instance.
+        """
+        return Batch(is_atomic=is_atomic)
+
+    def _get_artifact_key(self, model_id: str, revision: str) -> str:
+        """
+        Generate Redis key for artifact-level tracking.
+
+        :param model_id: Model identifier
+        :param revision: Model revision
+        :return: Redis key string
+        """
+        # URL-encode model_id and revision to handle special characters
+        safe_model_id = model_id.replace("/", ":")
+        safe_revision = revision.replace("/", ":")
+        return f"{_ARTIFACT_DOWNLOAD_PREFIX}:{safe_model_id}:{safe_revision}"
+
+    def _get_file_key(self, model_id: str, revision: str, file_path: str) -> str:
+        """
+        Generate Redis key for file-level tracking.
+
+        :param model_id: Model identifier
+        :param revision: Model revision
+        :param file_path: File path within the model
+        :return: Redis key string
+        """
+        # Hash the file path to handle special characters and length
+        file_hash = hashlib.sha256(file_path.encode()).hexdigest()[:16]
+        artifact_key = self._get_artifact_key(model_id, revision)
+        return f"{artifact_key}:file:{file_hash}"
+
+    def _get_file_pattern(self, model_id: str, revision: str) -> str:
+        """
+        Generate Redis key pattern for all files in an artifact.
+
+        :param model_id: Model identifier
+        :param revision: Model revision
+        :return: Redis key pattern string
+        """
+        artifact_key = self._get_artifact_key(model_id, revision)
+        return f"{artifact_key}:file:*"
+
+    @valkey_artifact_resilience.apply()
+    async def init_artifact_download(
+        self,
+        model_id: str,
+        revision: str,
+        total_files: int,
+        total_bytes: int,
+    ) -> None:
+        """
+        Initialize artifact download tracking in Redis.
+
+        :param model_id: Model identifier
+        :param revision: Model revision
+        :param total_files: Total number of files in the artifact
+        :param total_bytes: Total bytes to download
+        """
+        artifact_key = self._get_artifact_key(model_id, revision)
+        artifact_data = ArtifactDownloadTrackingData(
+            model_id=model_id,
+            revision=revision,
+            start_time=time.time(),
+            total_files=total_files,
+            total_bytes=total_bytes,
+            completed_files=0,
+            downloaded_bytes=0,
+        )
+
+        batch = self._create_batch(is_atomic=False)
+        batch.set(
+            artifact_key,
+            artifact_data.model_dump_json(),
+            expiry=ExpirySet(
+                expiry_type=ExpiryType.SEC,
+                value=_ARTIFACT_DOWNLOAD_EXPIRATION,
+            ),
+        )
+        await self._client.client.exec(batch, raise_on_error=True)
+        log.debug(
+            "Initialized artifact download tracking: model_id={}, revision={}, total_files={}, total_bytes={}",
+            model_id,
+            revision,
+            total_files,
+            total_bytes,
+        )
+
+    @valkey_artifact_resilience.apply()
+    async def update_file_progress(
+        self,
+        model_id: str,
+        revision: str,
+        file_path: str,
+        current_bytes: int,
+        total_bytes: int,
+        success: bool = False,
+        error_message: Optional[str] = None,
+    ) -> None:
+        """
+        Update file download progress in Redis.
+
+        :param model_id: Model identifier
+        :param revision: Model revision
+        :param file_path: File path within the model
+        :param current_bytes: Current bytes downloaded for this file
+        :param total_bytes: Total bytes for this file
+        :param success: Whether the download completed successfully
+        :param error_message: Error message if download failed
+        """
+        file_key = self._get_file_key(model_id, revision, file_path)
+        artifact_key = self._get_artifact_key(model_id, revision)
+
+        # Get previous file data to calculate delta for artifact aggregation
+        previous_data_bytes = await self._client.client.get(file_key)
+        previous_current_bytes = 0
+        if previous_data_bytes:
+            try:
+                previous_data = FileDownloadProgressData.model_validate_json(previous_data_bytes)
+                previous_current_bytes = previous_data.current_bytes
+            except (ValidationError, UnicodeDecodeError):
+                pass
+
+        # Calculate bytes delta for artifact aggregation
+        bytes_delta = current_bytes - previous_current_bytes
+
+        file_data = FileDownloadProgressData(
+            file_path=file_path,
+            success=success,
+            current_bytes=current_bytes,
+            total_bytes=total_bytes,
+            last_updated=time.time(),
+            error_message=error_message,
+        )
+
+        # Update file progress
+        # If file key doesn't exist yet, set TTL; otherwise keep existing TTL
+        batch = self._create_batch(is_atomic=False)
+        if previous_data_bytes:
+            # File key exists, keep existing TTL
+            file_expiry = ExpirySet(expiry_type=ExpiryType.KEEP_TTL, value=None)
+        else:
+            # First time creating file key, set 24-hour TTL
+            file_expiry = ExpirySet(expiry_type=ExpiryType.SEC, value=_ARTIFACT_DOWNLOAD_EXPIRATION)
+        batch.set(file_key, file_data.model_dump_json(), expiry=file_expiry)
+
+        # Update artifact aggregates if there's a change
+        if bytes_delta != 0:
+            # Get current artifact data
+            artifact_data_bytes = await self._client.client.get(artifact_key)
+            if artifact_data_bytes:
+                try:
+                    artifact_data = ArtifactDownloadTrackingData.model_validate_json(
+                        artifact_data_bytes
+                    )
+                    artifact_data.downloaded_bytes += bytes_delta
+
+                    # Update completed files count if this file just completed
+                    if success and previous_current_bytes < total_bytes:
+                        artifact_data.completed_files += 1
+
+                    batch.set(
+                        artifact_key,
+                        artifact_data.model_dump_json(),
+                        expiry=ExpirySet(
+                            expiry_type=ExpiryType.KEEP_TTL,
+                            value=None,
+                        ),
+                    )
+                except (ValidationError, UnicodeDecodeError):
+                    log.warning("Failed to parse artifact data for aggregation update")
+
+        await self._client.client.exec(batch, raise_on_error=True)
+
+        log.trace(
+            "Updated file progress: file_path={}, current={}, total={}, success={}",
+            file_path,
+            current_bytes,
+            total_bytes,
+            success,
+        )
+
+    @valkey_artifact_resilience.apply()
+    async def get_artifact_progress(
+        self,
+        model_id: str,
+        revision: str,
+    ) -> Optional[ArtifactDownloadTrackingData]:
+        """
+        Get overall artifact download progress.
+
+        :param model_id: Model identifier
+        :param revision: Model revision
+        :return: Artifact progress data or None if not found
+        """
+        artifact_key = self._get_artifact_key(model_id, revision)
+        data_bytes = await self._client.client.get(artifact_key)
+
+        if not data_bytes:
+            return None
+
+        try:
+            return ArtifactDownloadTrackingData.model_validate_json(data_bytes)
+        except (ValidationError, UnicodeDecodeError):
+            log.warning("Failed to parse artifact progress data")
+            return None
+
+    @valkey_artifact_resilience.apply()
+    async def get_file_progress(
+        self,
+        model_id: str,
+        revision: str,
+        file_path: str,
+    ) -> Optional[FileDownloadProgressData]:
+        """
+        Get specific file download progress.
+
+        :param model_id: Model identifier
+        :param revision: Model revision
+        :param file_path: File path within the model
+        :return: File progress data or None if not found
+        """
+        file_key = self._get_file_key(model_id, revision, file_path)
+        data_bytes = await self._client.client.get(file_key)
+
+        if not data_bytes:
+            return None
+
+        try:
+            return FileDownloadProgressData.model_validate_json(data_bytes)
+        except (ValidationError, UnicodeDecodeError):
+            log.warning("Failed to parse file progress data")
+            return None
+
+    @valkey_artifact_resilience.apply()
+    async def cleanup_artifact_download(
+        self,
+        model_id: str,
+        revision: str,
+    ) -> None:
+        """
+        Clean up all Redis keys for an artifact download.
+
+        :param model_id: Model identifier
+        :param revision: Model revision
+        """
+        artifact_key = self._get_artifact_key(model_id, revision)
+        file_pattern = self._get_file_pattern(model_id, revision)
+
+        # Delete artifact key
+        await self._client.client.delete([artifact_key])
+
+        # Find and delete all file keys
+        # Note: SCAN is more efficient than KEYS for production use
+        cursor = b"0"
+        while True:
+            result = await self._client.client.scan(cursor, match=file_pattern, count=100)
+            if result is None or len(result) != 2:
+                break
+
+            cursor = cast(bytes, result[0])
+            keys = cast(list[bytes], result[1])
+            if keys:
+                await self._client.client.delete(cast(list[str | bytes], keys))
+
+            if cursor == b"0":
+                break
+
+        log.debug(
+            "Cleaned up artifact download tracking: model_id={}, revision={}",
+            model_id,
+            revision,
+        )

@@ -1,0 +1,62 @@
+from __future__ import annotations
+
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
+
+class ArtifactDownloadTrackingData(BaseModel):
+    """
+    Artifact-level download tracking data stored in Redis.
+    """
+
+    model_id: str = Field(
+        description="Model identifier",
+    )
+    revision: str = Field(
+        description="Model revision",
+    )
+    start_time: float = Field(
+        description="Download start timestamp (Unix time)",
+    )
+    total_files: int = Field(
+        description="Total number of files in the artifact",
+    )
+    total_bytes: int = Field(
+        description="Total bytes to download across all files",
+    )
+    completed_files: int = Field(
+        default=0,
+        description="Number of files that have been successfully downloaded",
+    )
+    downloaded_bytes: int = Field(
+        default=0,
+        description="Total bytes downloaded so far across all files",
+    )
+
+
+class FileDownloadProgressData(BaseModel):
+    """
+    File-level download progress data stored in Redis.
+    """
+
+    file_path: str = Field(
+        description="File path within the model",
+    )
+    success: bool = Field(
+        default=False,
+        description="Whether the file download completed successfully",
+    )
+    current_bytes: int = Field(
+        description="Current bytes downloaded for this file",
+    )
+    total_bytes: int = Field(
+        description="Total bytes for this file",
+    )
+    last_updated: float = Field(
+        description="Last update timestamp (Unix time)",
+    )
+    error_message: Optional[str] = Field(
+        default=None,
+        description="Error message if download failed",
+    )

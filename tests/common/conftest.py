@@ -6,6 +6,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -149,6 +152,25 @@ async def test_valkey_rate_limit(redis_container) -> AsyncIterator[ValkeyRateLim
         valkey_target,
         human_readable_name="test.rate_limit",
         db_id=REDIS_RATE_LIMIT_DB,
+    )
+    try:
+        yield client
+    finally:
+        await client.close()
+
+
+@pytest.fixture
+async def test_valkey_artifact(
+    redis_container,  # noqa: F811
+) -> AsyncIterator[ValkeyArtifactDownloadTrackingClient]:
+    hostport_pair: HostPortPairModel = redis_container[1]
+    valkey_target = ValkeyTarget(
+        addr=hostport_pair.address,
+    )
+    client = await ValkeyArtifactDownloadTrackingClient.create(
+        valkey_target,
+        human_readable_name="test.artifact",
+        db_id=0,
     )
     try:
         yield client

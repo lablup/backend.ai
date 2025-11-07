@@ -14,6 +14,9 @@ from typing import (
 import aiohttp_cors
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -98,6 +101,7 @@ class RootContext:
     background_task_manager: BackgroundTaskManager
     cors_options: Mapping[str, aiohttp_cors.ResourceOptions]
     manager_http_clients: MutableMapping[str, ManagerHTTPClient]
+    valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
 
     # volume backend states
     backends: MutableMapping[str, type[AbstractVolume]]
