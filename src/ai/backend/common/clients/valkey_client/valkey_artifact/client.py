@@ -14,6 +14,7 @@ from ai.backend.common.clients.valkey_client.client import (
 )
 from ai.backend.common.clients.valkey_client.valkey_artifact.types import (
     ArtifactDownloadTrackingData,
+    DownloadProgressData,
     FileDownloadProgressData,
 )
 from ai.backend.common.exception import BackendAIError
@@ -162,10 +163,12 @@ class ValkeyArtifactDownloadTrackingClient:
         :param total_bytes: Total bytes to download
         """
         artifact_key = self._get_artifact_key(model_id, revision)
+        current_time = time.time()
         artifact_data = ArtifactDownloadTrackingData(
             model_id=model_id,
             revision=revision,
-            start_time=time.time(),
+            start_time=current_time,
+            last_updated=current_time,
             total_files=total_files,
             total_bytes=total_bytes,
             completed_files=0,
@@ -258,6 +261,7 @@ class ValkeyArtifactDownloadTrackingClient:
                         artifact_data_bytes
                     )
                     artifact_data.downloaded_bytes += bytes_delta
+                    artifact_data.last_updated = time.time()
 
                     # Update completed files count if this file just completed
                     if success and previous_current_bytes < total_bytes:
@@ -335,6 +339,69 @@ class ValkeyArtifactDownloadTrackingClient:
         except (ValidationError, UnicodeDecodeError):
             log.warning("Failed to parse file progress data")
             return None
+
+    @valkey_artifact_resilience.apply()
+    async def get_all_file_progress(
+        self,
+        model_id: str,
+        revision: str,
+    ) -> dict[str, FileDownloadProgressData]:
+        """
+        Get all file download progress for an artifact.
+
+        :param model_id: Model identifier
+        :param revision: Model revision
+        :return: Dictionary mapping file paths to their progress data
+        """
+        file_pattern = self._get_file_pattern(model_id, revision)
+        file_progress_map: dict[str, FileDownloadProgressData] = {}
+
+        cursor = b"0"
+        while cursor:
+            result = await self._client.client.scan(cursor, match=file_pattern, count=100)
+            cursor = cast(bytes, result[0])
+            keys = cast(list[bytes], result[1])
+
+            if keys:
+                # Get all file progress data
+                values = await self._client.client.mget(cast(list[str | bytes], keys))
+                for key_bytes, value_bytes in zip(keys, values, strict=False):
+                    if value_bytes:
+                        try:
+                            file_progress = FileDownloadProgressData.model_validate_json(
+                                value_bytes
+                            )
+                            file_progress_map[file_progress.file_path] = file_progress
+                        except (ValidationError, UnicodeDecodeError):
+                            log.warning("Failed to parse file progress data for key: {}", key_bytes)
+
+            if cursor == b"0":
+                break
+
+        return file_progress_map
+
+    @valkey_artifact_resilience.apply()
+    async def get_download_progress(
+        self,
+        model_id: str,
+        revision: str,
+    ) -> DownloadProgressData:
+        """
+        Get download progress including artifact-level and all file-level data.
+
+        This is a convenience method that combines get_artifact_progress() and
+        get_all_file_progress() into a single call.
+
+        :param model_id: Model identifier
+        :param revision: Model revision
+        :return: Download progress data
+        """
+        artifact_progress = await self.get_artifact_progress(model_id, revision)
+        file_progress = await self.get_all_file_progress(model_id, revision)
+        return DownloadProgressData(
+            artifact_progress=artifact_progress,
+            file_progress=file_progress,
+        )
 
     @valkey_artifact_resilience.apply()
     async def cleanup_artifact_download(

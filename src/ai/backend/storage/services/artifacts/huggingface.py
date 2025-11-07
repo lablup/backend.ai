@@ -58,6 +58,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _MiB = 1024 * 1024
 
+_DOWNLOAD_PROGRESS_UPDATE_INTERVAL: Final[int] = 30
 _PROBE_HEAD_BASE_HEADER: Final[dict[str, str]] = {"Accept-Encoding": "identity"}
 
 _DOWNLOAD_RETRIABLE_ERROR = (
@@ -122,6 +123,8 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
         :param total_bytes: Total bytes for this file
         """
         while not self._download_complete:
+            await asyncio.sleep(_DOWNLOAD_PROGRESS_UPDATE_INTERVAL)
+
             try:
                 current = offset_getter()
                 await self._redis_client.update_file_progress(
@@ -132,7 +135,6 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
                     total_bytes=total_bytes,
                     success=False,
                 )
-                await asyncio.sleep(30)
             except asyncio.CancelledError:
                 # Task is being cancelled, exit cleanly
                 break
@@ -142,7 +144,6 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
                     "Failed to update download progress in Redis: {}",
                     str(e),
                 )
-                await asyncio.sleep(30)
 
     async def _probe_head(self) -> _ProbeHeadInfo:
         """

@@ -19,6 +19,9 @@ class ArtifactDownloadTrackingData(BaseModel):
     start_time: float = Field(
         description="Download start timestamp (Unix time)",
     )
+    last_updated: float = Field(
+        description="Last update timestamp (Unix time)",
+    )
     total_files: int = Field(
         description="Total number of files in the artifact",
     )
@@ -59,4 +62,17 @@ class FileDownloadProgressData(BaseModel):
     error_message: Optional[str] = Field(
         default=None,
         description="Error message if download failed",
+    )
+
+
+class DownloadProgressData(BaseModel):
+    """
+    Download progress data including artifact-level and all file-level information.
+    """
+
+    artifact_progress: Optional[ArtifactDownloadTrackingData] = Field(
+        description="Artifact-level download progress, None if not found",
+    )
+    file_progress: dict[str, FileDownloadProgressData] = Field(
+        description="Dictionary mapping file paths to their download progress",
     )
