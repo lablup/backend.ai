@@ -45,6 +45,9 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -553,6 +556,11 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     valkey_profile_target = root_ctx.config_provider.config.redis.to_valkey_profile_target()
     root_ctx.valkey_profile_target = valkey_profile_target
 
+    root_ctx.valkey_artifact = await ValkeyArtifactDownloadTrackingClient.create(
+        valkey_profile_target.profile_target(RedisRole.STATISTICS),
+        db_id=REDIS_STATISTICS_DB,
+        human_readable_name="artifact",  # tracking artifact download progress
+    )
     root_ctx.valkey_container_log = await ValkeyContainerLogClient.create(
         valkey_profile_target.profile_target(RedisRole.CONTAINER_LOG),
         db_id=REDIS_CONTAINER_LOG,
@@ -595,6 +603,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await root_ctx.valkey_artifact.close()
         await root_ctx.valkey_container_log.close()
         await root_ctx.valkey_image.close()
         await root_ctx.valkey_stat.close()
@@ -686,6 +695,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 storage_manager=root_ctx.storage_manager,
                 valkey_stat_client=root_ctx.valkey_stat,
                 valkey_live=root_ctx.valkey_live,
+                valkey_artifact_client=root_ctx.valkey_artifact,
                 event_fetcher=root_ctx.event_fetcher,
                 background_task_manager=root_ctx.background_task_manager,
                 event_hub=root_ctx.event_hub,

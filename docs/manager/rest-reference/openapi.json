@@ -1873,6 +1873,35 @@
         "description": "\nRetrieve the README content for a specific artifact revision.\n\nReturns the README documentation associated with the artifact revision,\nwhich typically contains usage instructions and model information.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/artifacts/revisions/{artifact_revision_id}/download-progress": {
+      "get": {
+        "operationId": "artifacts.get_download_progress",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nRetrieve download progress for an artifact revision.\n\nReturns detailed download progress information including artifact-level\nand file-level progress data for the specified artifact revision.\nSupports both local and remote download progress when delegation is enabled.\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/artifact-registries/scan": {
       "post": {
         "operationId": "artifact-registries.scan_artifacts",

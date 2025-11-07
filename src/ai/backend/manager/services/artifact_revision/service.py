@@ -1,8 +1,18 @@
+from __future__ import annotations
+
+import logging
 import uuid
 from typing import Optional, cast
 from uuid import UUID
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
+from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
+    ArtifactRevisionDownloadProgress,
+    CombinedDownloadProgress,
+)
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.dto.storage.request import (
@@ -12,6 +22,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
 )
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.client.artifact_registry.reservoir_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -76,6 +87,10 @@ from ai.backend.manager.services.artifact_revision.actions.get import (
     GetArtifactRevisionAction,
     GetArtifactRevisionActionResult,
 )
+from ai.backend.manager.services.artifact_revision.actions.get_download_progress import (
+    GetDownloadProgressAction,
+    GetDownloadProgressActionResult,
+)
 from ai.backend.manager.services.artifact_revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
     GetArtifactRevisionReadmeActionResult,
@@ -92,6 +107,8 @@ from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
     RejectArtifactRevisionActionResult,
 )
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class ArtifactRevisionService:
@@ -116,6 +133,7 @@ class ArtifactRevisionService:
         reservoir_registry_repository: ReservoirRegistryRepository,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
+        valkey_artifact_client: ValkeyArtifactDownloadTrackingClient,
     ) -> None:
         self._artifact_repository = artifact_repository
         self._artifact_registry_repository = artifact_registry_repository
@@ -126,6 +144,7 @@ class ArtifactRevisionService:
         self._reservoir_registry_repository = reservoir_registry_repository
         self._storage_manager = storage_manager
         self._config_provider = config_provider
+        self._valkey_artifact_client = valkey_artifact_client
 
     def _resolve_storage_namespace(self, reservoir_config: ReservoirConfig) -> str:
         """Resolve namespace based on storage type
@@ -184,6 +203,110 @@ class ArtifactRevisionService:
         )
         readme_data = ArtifactRevisionReadme(readme=readme)
         return GetArtifactRevisionReadmeActionResult(readme_data=readme_data)
+
+    async def get_download_progress(
+        self, action: GetDownloadProgressAction
+    ) -> GetDownloadProgressActionResult:
+        # 1. Get artifact_revision info
+        revision = await self._artifact_repository.get_artifact_revision_by_id(
+            action.artifact_revision_id
+        )
+
+        # 2. Get artifact info to extract model_id and revision
+        artifact = await self._artifact_repository.get_artifact_by_id(revision.artifact_id)
+        model_id = artifact.name  # artifact name is the model_id
+        revision_name = revision.version
+
+        # 3. Get local progress from valkey
+        local_progress = await self._valkey_artifact_client.get_download_progress(
+            model_id=model_id,
+            revision=revision_name,
+        )
+
+        # Build local progress with status
+        local_download_progress = ArtifactRevisionDownloadProgress(
+            progress=local_progress if local_progress.artifact_progress else None,
+            status=revision.status.value,
+        )
+
+        # 4. Query remote progress when delegation is enabled
+        remote_download_progress: Optional[ArtifactRevisionDownloadProgress] = None
+
+        # Only set remote for RESERVOIR type
+        if artifact.registry_type == ArtifactRegistryType.RESERVOIR:
+            reservoir_cfg = self._config_provider.config.reservoir
+            # Default: create remote progress object with None progress and remote_status
+            remote_status = revision.remote_status.value if revision.remote_status else "UNSCANNED"
+
+            # Check if delegation is enabled
+            if reservoir_cfg and reservoir_cfg.use_delegation:
+                # If local is PULLING, return remote status without making remote request
+                if revision.status == ArtifactStatus.PULLING:
+                    remote_download_progress = ArtifactRevisionDownloadProgress(
+                        progress=None,
+                        status=remote_status,
+                    )
+                # Otherwise, query remote only if local has no progress
+                elif local_progress.artifact_progress is None:
+                    try:
+                        # Get reservoir registry data
+                        registry_data = await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
+                            artifact.registry_id
+                        )
+
+                        # Create remote reservoir client
+                        remote_reservoir_client = ReservoirRegistryClient(
+                            registry_data=registry_data
+                        )
+
+                        # Query remote reservoir manager for download progress
+                        remote_resp = await remote_reservoir_client.get_download_progress(
+                            artifact_revision_id=action.artifact_revision_id,
+                        )
+
+                        # Parse response - expecting GetDownloadProgressResponse structure
+                        # We want the remote's "local" progress as our "remote" progress
+                        remote_local = remote_resp.download_progress.local
+
+                        if remote_local:
+                            remote_download_progress = ArtifactRevisionDownloadProgress(
+                                progress=remote_local.progress,
+                                status=remote_local.status,
+                            )
+                        else:
+                            # Remote response exists but no local data
+                            remote_download_progress = ArtifactRevisionDownloadProgress(
+                                progress=None,
+                                status=remote_status,
+                            )
+                    except Exception as e:
+                        # If remote query fails, return remote status without progress
+                        log.warning("Failed to get remote download progress {}", e)
+                        remote_download_progress = ArtifactRevisionDownloadProgress(
+                            progress=None,
+                            status=remote_status,
+                        )
+                else:
+                    # Local has progress, don't query remote
+                    remote_download_progress = ArtifactRevisionDownloadProgress(
+                        progress=None,
+                        status=remote_status,
+                    )
+            else:
+                # No delegation but still RESERVOIR type
+                remote_download_progress = ArtifactRevisionDownloadProgress(
+                    progress=None,
+                    status=remote_status,
+                )
+        # else: Not RESERVOIR type, remote_download_progress remains None
+
+        # 5. Build combined response
+        combined_progress = CombinedDownloadProgress(
+            local=local_download_progress,
+            remote=remote_download_progress,
+        )
+
+        return GetDownloadProgressActionResult(download_progress=combined_progress)
 
     async def list_revision(
         self, action: ListArtifactRevisionsAction
