@@ -84,30 +84,17 @@ class DownloadProgressData(BaseModel):
     )
 
 
-class LocalDownloadProgress(BaseModel):
+class ArtifactRevisionDownloadProgress(BaseModel):
     """
-    Local download progress with artifact revision status.
+    Download progress with artifact revision status.
+    Used for both local and remote download progress.
     """
 
     progress: Optional[DownloadProgressData] = Field(
-        description="Local download progress data from Valkey",
+        description="Download progress data",
     )
     status: str = Field(
         description="Artifact revision status (SCANNED, PULLING, PULLED, etc.)",
-    )
-
-
-class RemoteDownloadProgress(BaseModel):
-    """
-    Remote download progress with artifact revision status.
-    Only populated when local status is not PULLING.
-    """
-
-    progress: Optional[DownloadProgressData] = Field(
-        description="Remote download progress data from delegated reservoir",
-    )
-    status: str = Field(
-        description="Remote artifact revision status",
     )
 
 
@@ -116,10 +103,10 @@ class CombinedDownloadProgress(BaseModel):
     Combined local and remote download progress.
     """
 
-    local: LocalDownloadProgress = Field(
+    local: ArtifactRevisionDownloadProgress = Field(
         description="Local download progress and status",
     )
-    remote: Optional[RemoteDownloadProgress] = Field(
+    remote: Optional[ArtifactRevisionDownloadProgress] = Field(
         default=None,
         description="Remote download progress and status, None if local is PULLING",
     )

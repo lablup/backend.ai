@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Optional, cast
 from uuid import UUID
@@ -17,6 +18,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
 )
+from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.client.artifact_registry.reservoir_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -81,6 +83,10 @@ from ai.backend.manager.services.artifact_revision.actions.get import (
     GetArtifactRevisionAction,
     GetArtifactRevisionActionResult,
 )
+from ai.backend.manager.services.artifact_revision.actions.get_download_progress import (
+    GetDownloadProgressAction,
+    GetDownloadProgressActionResult,
+)
 from ai.backend.manager.services.artifact_revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
     GetArtifactRevisionReadmeActionResult,
@@ -97,6 +103,8 @@ from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
     RejectArtifactRevisionActionResult,
 )
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
 
 class ArtifactRevisionService:
@@ -191,6 +199,93 @@ class ArtifactRevisionService:
         )
         readme_data = ArtifactRevisionReadme(readme=readme)
         return GetArtifactRevisionReadmeActionResult(readme_data=readme_data)
+
+    async def get_download_progress(
+        self, action: GetDownloadProgressAction
+    ) -> GetDownloadProgressActionResult:
+        from ai.backend.common.data.artifact.types import (
+            ArtifactRevisionDownloadProgress,
+            CombinedDownloadProgress,
+        )
+        from ai.backend.manager.data.artifact.types import ArtifactStatus
+
+        # 1. Get artifact_revision info
+        revision = await self._artifact_repository.get_artifact_revision_by_id(
+            action.artifact_revision_id
+        )
+
+        # 2. Get artifact info to extract model_id and revision
+        artifact = await self._artifact_repository.get_artifact_by_id(revision.artifact_id)
+        model_id = artifact.name  # artifact name is the model_id
+        revision_name = revision.version
+
+        # 3. Get local progress from valkey
+        local_progress = await self._valkey_artifact_client.get_download_progress(
+            model_id=model_id,
+            revision=revision_name,
+        )
+
+        # Build local progress with status
+        local_download_progress = ArtifactRevisionDownloadProgress(
+            progress=local_progress if local_progress.artifact_progress else None,
+            status=revision.status.value,
+        )
+
+        # 4. Check if we need to query remote progress
+        # Remote progress is only queried when:
+        # - Local status is not PULLING (not actively downloading locally)
+        # - Delegation is enabled
+        # - Local progress is empty
+        remote_download_progress: Optional[ArtifactRevisionDownloadProgress] = None
+
+        if revision.status != ArtifactStatus.PULLING:
+            # Check if delegation is enabled
+            reservoir_cfg = self._config_provider.config.reservoir
+            if (
+                reservoir_cfg
+                and reservoir_cfg.use_delegation
+                and local_progress.artifact_progress is None
+            ):
+                # Get artifact's registry to find remote reservoir
+                if artifact.registry_type == ArtifactRegistryType.RESERVOIR:
+                    try:
+                        # Get reservoir registry data
+                        registry_data = await self._reservoir_registry_repository.get_reservoir_registry_data_by_id(
+                            artifact.registry_id
+                        )
+
+                        # Create remote reservoir client
+                        remote_reservoir_client = ReservoirRegistryClient(
+                            registry_data=registry_data
+                        )
+
+                        # Query remote reservoir manager for download progress
+                        remote_resp = await remote_reservoir_client.get_download_progress(
+                            artifact_revision_id=action.artifact_revision_id,
+                        )
+
+                        # Parse response - expecting GetDownloadProgressResponse structure
+                        # We want the remote's "local" progress as our "remote" progress
+                        remote_local = remote_resp.download_progress.local
+
+                        if remote_local:
+                            remote_download_progress = ArtifactRevisionDownloadProgress(
+                                progress=remote_local.progress,
+                                status=remote_local.status,
+                            )
+                    except Exception:
+                        # If remote query fails, just skip it
+                        # Don't fail the entire request
+                        log.warning("Failed to get remote download progress", exc_info=True)
+                        pass
+
+        # 5. Build combined response
+        combined_progress = CombinedDownloadProgress(
+            local=local_download_progress,
+            remote=remote_download_progress,
+        )
+
+        return GetDownloadProgressActionResult(download_progress=combined_progress)
 
     async def list_revision(
         self, action: ListArtifactRevisionsAction
