@@ -8,7 +8,11 @@ from uuid import UUID
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
+    ArtifactRevisionDownloadProgress,
+    CombinedDownloadProgress,
+)
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.dto.storage.request import (
@@ -203,12 +207,6 @@ class ArtifactRevisionService:
     async def get_download_progress(
         self, action: GetDownloadProgressAction
     ) -> GetDownloadProgressActionResult:
-        from ai.backend.common.data.artifact.types import (
-            ArtifactRevisionDownloadProgress,
-            CombinedDownloadProgress,
-        )
-        from ai.backend.manager.data.artifact.types import ArtifactStatus
-
         # 1. Get artifact_revision info
         revision = await self._artifact_repository.get_artifact_revision_by_id(
             action.artifact_revision_id
@@ -273,10 +271,10 @@ class ArtifactRevisionService:
                                 progress=remote_local.progress,
                                 status=remote_local.status,
                             )
-                    except Exception:
+                    except Exception as e:
                         # If remote query fails, just skip it
                         # Don't fail the entire request
-                        log.warning("Failed to get remote download progress", exc_info=True)
+                        log.warning("Failed to get remote download progress {}", e)
                         pass
 
         # 5. Build combined response
