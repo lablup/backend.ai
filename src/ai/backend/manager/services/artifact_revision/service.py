@@ -3,6 +3,7 @@ from typing import Optional, cast
 from uuid import UUID
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.error.types import ErrorData
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.dto.storage.request import (
@@ -12,6 +13,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceImportModelsReq,
     ReservoirImportModelsReq,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.client.artifact_registry.reservoir_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -31,8 +33,8 @@ from ai.backend.manager.dto.request import DelegateImportArtifactsReq
 from ai.backend.manager.errors.artifact import (
     ArtifactDeletionBadRequestError,
     ArtifactDeletionError,
+    ArtifactImportAlreadyAvailableError,
     ArtifactImportBadRequestError,
-    RemoteReservoirArtifactImportError,
 )
 from ai.backend.manager.errors.artifact_registry import (
     InvalidArtifactRegistryTypeError,
@@ -278,9 +280,8 @@ class ArtifactRevisionService:
                     # Skip import if artifact revision is already Available and commit hash matches
                     # If current_commit_hash is None, always proceed with import
                     if self._is_latest_commit_hash(revision_data, latest_commit_hash):
-                        # Return early without calling import API
-                        return ImportArtifactRevisionActionResult(
-                            result=revision_data, task_id=None
+                        raise ArtifactImportAlreadyAvailableError(
+                            f"Artifact revision {revision_data.id} is available, and up-to-date."
                         )
 
                     await self._artifact_repository.update_artifact_revision_status(
@@ -328,7 +329,8 @@ class ArtifactRevisionService:
                     revision_data.id, namespace_id, ArtifactStorageType(storage_type)
                 )
             )
-
+        except ArtifactImportAlreadyAvailableError as e:
+            raise e
         except Exception as e:
             await self._artifact_repository.update_artifact_revision_status(
                 action.artifact_revision_id, ArtifactStatus.FAILED
@@ -440,22 +442,24 @@ class ArtifactRevisionService:
                 action.artifact_type, registry_id
             )
 
-            try:
-                # TODO: Improve this
-                task_ids = []
-                result: list[ArtifactRevisionData] = []
-                for revision_id in action.artifact_revision_ids:
+            task_ids = []
+            result: list[ArtifactRevisionData] = []
+            errors: list[ErrorData] = []
+
+            for revision_id in action.artifact_revision_ids:
+                try:
                     import_result = await self.import_revision(
                         ImportArtifactRevisionAction(artifact_revision_id=revision_id)
                     )
                     task_ids.append(import_result.task_id)  # Keep None values for zip alignment
                     result.append(import_result.result)
-            except Exception as e:
-                raise RemoteReservoirArtifactImportError(
-                    f"Failed to import artifacts from remote reservoir: {e}"
-                ) from e
+                except BackendAIError as e:
+                    errors.append(e.to_dataclass())
+                    task_ids.append(None)  # Keep alignment for failed imports
 
-            return DelegateImportArtifactRevisionBatchActionResult(result=result, task_ids=task_ids)
+            return DelegateImportArtifactRevisionBatchActionResult(
+                result=result, task_ids=task_ids, errors=errors
+            )
 
         # If not a leaf node, perform delegation to remote reservoir
         registry_meta = await self._resolve_artifact_registry_meta(
@@ -496,8 +500,10 @@ class ArtifactRevisionService:
         # Extract task_ids from remote response
         task_ids = [uuid.UUID(task.task_id) if task.task_id else None for task in client_resp.tasks]
 
+        # Convert remote errors (DTO) to data layer type
+        remote_errors = client_resp.errors
         return DelegateImportArtifactRevisionBatchActionResult(
-            result=result_revisions, task_ids=task_ids
+            result=result_revisions, task_ids=task_ids, errors=remote_errors
         )
 
     async def _resolve_artifact_registry_meta(

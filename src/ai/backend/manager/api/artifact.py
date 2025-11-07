@@ -7,7 +7,14 @@ from typing import Iterable, Tuple
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
+from ai.backend.common.api_handlers import (
+    APIResponse,
+    BodyParam,
+    PathParam,
+    api_handler,
+    batch_api_handler,
+)
+from ai.backend.common.exception import BackendAIError as BackendAIErrorException
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
 from ai.backend.manager.dto.context import ProcessorsCtx
@@ -171,7 +178,7 @@ class APIHandler:
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     @auth_required_for_method
-    @api_handler
+    @batch_api_handler
     async def import_artifacts(
         self,
         body: BodyParam[ImportArtifactsReq],
@@ -189,27 +196,33 @@ class APIHandler:
         processors = processors_ctx.processors
         imported_revisions = []
         tasks = []
+        errors = []
 
         # Process each artifact revision sequentially
         # TODO: Optimize with asyncio.gather() for parallel processing
         for artifact_revision_id in body.parsed.artifact_revision_ids:
-            action_result = await processors.artifact_revision.import_revision.wait_for_complete(
-                ImportArtifactRevisionAction(
-                    artifact_revision_id=artifact_revision_id,
+            try:
+                action_result = (
+                    await processors.artifact_revision.import_revision.wait_for_complete(
+                        ImportArtifactRevisionAction(
+                            artifact_revision_id=artifact_revision_id,
+                        )
+                    )
                 )
-            )
-            imported_revisions.append(action_result.result)
-            tasks.append(
-                ArtifactRevisionImportTask(
-                    task_id=str(action_result.task_id),
-                    artifact_revision=ArtifactRevisionResponseData.from_revision_data(
-                        action_result.result
-                    ),
+                imported_revisions.append(action_result.result)
+                tasks.append(
+                    ArtifactRevisionImportTask(
+                        task_id=str(action_result.task_id),
+                        artifact_revision=ArtifactRevisionResponseData.from_revision_data(
+                            action_result.result
+                        ),
+                    )
                 )
-            )
+            except BackendAIErrorException as exc:
+                errors.append(exc.to_dataclass())
 
-        resp = ImportArtifactsResponse(tasks=tasks)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+        resp = ImportArtifactsResponse(tasks=tasks, errors=errors)
+        return APIResponse.build(response_model=resp)
 
     @auth_required_for_method
     @api_handler

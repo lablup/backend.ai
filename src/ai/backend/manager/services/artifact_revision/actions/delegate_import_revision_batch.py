@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import uuid
 from dataclasses import dataclass
 from typing import Optional, override
 
+from ai.backend.common.data.error.types import ErrorData
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.artifact.types import (
     ArtifactRevisionData,
@@ -33,6 +36,7 @@ class DelegateImportArtifactRevisionBatchAction(ArtifactRevisionAction):
 class DelegateImportArtifactRevisionBatchActionResult(BaseActionResult):
     result: list[ArtifactRevisionData]
     task_ids: list[Optional[uuid.UUID]]
+    errors: list[ErrorData]
 
     @override
     def entity_id(self) -> Optional[str]:

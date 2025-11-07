@@ -178,7 +178,7 @@ class ArtifactScanLimitExceededError(BackendAIError, web.HTTPBadRequest):
         )
 
 
-class ArtifactImportBadRequestError(BackendAIError, web.HTTPNotFound):
+class ArtifactImportBadRequestError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-bad-import-request"
     error_title = "Artifact Bad Import Request"
 
@@ -188,6 +188,19 @@ class ArtifactImportBadRequestError(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.BAD_REQUEST,
+        )
+
+
+class ArtifactImportAlreadyAvailableError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/artifact-already-available"
+    error_title = "Artifact Already Available"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ARTIFACT,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.CONFLICT,
         )
 
 

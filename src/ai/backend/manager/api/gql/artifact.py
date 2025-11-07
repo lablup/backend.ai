@@ -13,6 +13,7 @@ from strawberry.scalars import JSON
 
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.api.gql.base import (
     ByteSize,
     IntFilter,
@@ -21,6 +22,7 @@ from ai.backend.manager.api.gql.base import (
     build_pagination_options,
     to_global_id,
 )
+from ai.backend.manager.api.gql.error import BackendAIGQLError
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import dedent_strip
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
@@ -744,6 +746,9 @@ class ArtifactRevisionImportTask:
 class ImportArtifactsPayload:
     artifact_revisions: ArtifactRevisionConnection
     tasks: list[ArtifactRevisionImportTask]
+    errors: list[BackendAIGQLError] = strawberry.field(
+        default_factory=list, description="Errors that occurred during import artifacts"
+    )
 
 
 @strawberry.type(
@@ -761,6 +766,9 @@ class DelegateImportArtifactsPayload:
     )
     tasks: list[ArtifactRevisionImportTask] = strawberry.field(
         description="List of background tasks created for importing the artifact revisions"
+    )
+    errors: list[BackendAIGQLError] = strawberry.field(
+        default_factory=list, description="Errors that occurred during delegate import artifacts"
     )
 
 
@@ -1320,22 +1328,28 @@ async def import_artifacts(
 ) -> ImportArtifactsPayload:
     imported_artifacts = []
     tasks = []
+    errors = []
+
     for revision_id in input.artifact_revision_ids:
-        action_result = (
-            await info.context.processors.artifact_revision.import_revision.wait_for_complete(
-                ImportArtifactRevisionAction(
-                    artifact_revision_id=uuid.UUID(revision_id),
+        try:
+            action_result = (
+                await info.context.processors.artifact_revision.import_revision.wait_for_complete(
+                    ImportArtifactRevisionAction(
+                        artifact_revision_id=uuid.UUID(revision_id),
+                    )
                 )
             )
-        )
-        artifact_revision = ArtifactRevision.from_dataclass(action_result.result)
-        imported_artifacts.append(artifact_revision)
-        tasks.append(
-            ArtifactRevisionImportTask(
-                task_id=ID(str(action_result.task_id)),
-                artifact_revision=artifact_revision,
+            artifact_revision = ArtifactRevision.from_dataclass(action_result.result)
+            imported_artifacts.append(artifact_revision)
+            tasks.append(
+                ArtifactRevisionImportTask(
+                    task_id=ID(str(action_result.task_id)),
+                    artifact_revision=artifact_revision,
+                )
             )
-        )
+        except BackendAIError as exc:
+            error_data = exc.to_dataclass()
+            errors.append(BackendAIGQLError.from_dataclass(error_data))
 
     edges = [
         ArtifactRevisionEdge(node=artifact, cursor=to_global_id(ArtifactRevisionEdge, artifact.id))
@@ -1353,7 +1367,9 @@ async def import_artifacts(
         ),
     )
 
-    return ImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
+    return ImportArtifactsPayload(
+        artifact_revisions=artifacts_connection, tasks=tasks, errors=errors
+    )
 
 
 @strawberry.mutation(
@@ -1427,41 +1443,50 @@ async def delegate_import_artifacts(
 ) -> DelegateImportArtifactsPayload:
     imported_artifacts = []
     tasks = []
+    errors = []
 
-    action_result = await info.context.processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
-        DelegateImportArtifactRevisionBatchAction(
-            delegator_reservoir_id=uuid.UUID(input.delegator_reservoir_id)
-            if input.delegator_reservoir_id
-            else None,
-            delegatee_target=input.delegatee_target.to_dataclass()
-            if input.delegatee_target
-            else None,
-            artifact_type=input.artifact_type,
-            artifact_revision_ids=[
-                uuid.UUID(revision_id) for revision_id in input.artifact_revision_ids
-            ],
-        )
-    )
-    artifact_revisions = [
-        ArtifactRevision.from_dataclass(result) for result in action_result.result
-    ]
-    imported_artifacts.extend(artifact_revisions)
-
-    if len(artifact_revisions) != len(action_result.task_ids):
-        raise ArtifactImportDelegationError(
-            "Mismatch between artifact revisions and task IDs returned"
-        )
-
-    for task_uuid, artifact_revision in zip(
-        action_result.task_ids, artifact_revisions, strict=True
-    ):
-        task_id = ID(str(task_uuid)) if task_uuid is not None else None
-        tasks.append(
-            ArtifactRevisionImportTask(
-                task_id=task_id,
-                artifact_revision=artifact_revision,
+    try:
+        action_result = await info.context.processors.artifact_revision.delegate_import_revision_batch.wait_for_complete(
+            DelegateImportArtifactRevisionBatchAction(
+                delegator_reservoir_id=uuid.UUID(input.delegator_reservoir_id)
+                if input.delegator_reservoir_id
+                else None,
+                delegatee_target=input.delegatee_target.to_dataclass()
+                if input.delegatee_target
+                else None,
+                artifact_type=input.artifact_type,
+                artifact_revision_ids=[
+                    uuid.UUID(revision_id) for revision_id in input.artifact_revision_ids
+                ],
             )
         )
+        artifact_revisions = [
+            ArtifactRevision.from_dataclass(result) for result in action_result.result
+        ]
+        imported_artifacts.extend(artifact_revisions)
+
+        if len(artifact_revisions) != len(action_result.task_ids):
+            raise ArtifactImportDelegationError(
+                "Mismatch between artifact revisions and task IDs returned"
+            )
+
+        for task_uuid, artifact_revision in zip(
+            action_result.task_ids, artifact_revisions, strict=True
+        ):
+            task_id = ID(str(task_uuid)) if task_uuid is not None else None
+            tasks.append(
+                ArtifactRevisionImportTask(
+                    task_id=task_id,
+                    artifact_revision=artifact_revision,
+                )
+            )
+
+        # Convert errors from service layer to GQL
+        errors.extend([BackendAIGQLError.from_dataclass(error) for error in action_result.errors])
+
+    except BackendAIError as exc:
+        error_data = exc.to_dataclass()
+        errors.append(BackendAIGQLError.from_dataclass(error_data))
 
     edges = [
         ArtifactRevisionEdge(node=artifact, cursor=to_global_id(ArtifactRevisionEdge, artifact.id))
@@ -1479,7 +1504,9 @@ async def delegate_import_artifacts(
         ),
     )
 
-    return DelegateImportArtifactsPayload(artifact_revisions=artifacts_connection, tasks=tasks)
+    return DelegateImportArtifactsPayload(
+        artifact_revisions=artifacts_connection, tasks=tasks, errors=errors
+    )
 
 
 @strawberry.mutation(
