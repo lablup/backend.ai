@@ -521,9 +521,9 @@ class TestHuggingFaceDownloadStep:
             if key == "Content-Length":
                 return "12"  # Total size matches our chunks
             elif key == "ETag":
-                return None
+                return default
             elif key == "Accept-Ranges":
-                return None
+                return default
             else:
                 return default
 
@@ -566,7 +566,15 @@ class TestHuggingFaceDownloadStep:
         # Configure response with error status
         mock_response.status = 404
         mock_response.content.iter_chunked = mock_iter_chunked_error
-        mock_response.headers.get.return_value = None
+
+        # Mock headers.get to return valid Content-Length for HEAD probe, but defaults for others
+        def mock_headers_get(key, default=None):
+            if key == "Content-Length":
+                return "100"  # Valid content length for HEAD probe
+            else:
+                return default
+
+        mock_response.headers.get.side_effect = mock_headers_get
 
         with pytest.raises(RuntimeError):
             download_stream = HuggingFaceFileDownloadStreamReader(
