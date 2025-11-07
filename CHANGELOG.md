@@ -16,6 +16,26 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.2 (2025-11-07)
+
+### Features
+* Support project name filter when resolving user nodes ([#6298](https://github.com/lablup/backend.ai/issues/6298))
+
+### Fixes
+* Fix GQL agent_summary_list resolver ([#6389](https://github.com/lablup/backend.ai/issues/6389))
+* Add timestamp tracking for route health status to enable staleness detection.
+
+  Route health checks now store both status and check timestamp, automatically marking health data older than 5 minutes as unhealthy. This prevents routing traffic to routes with stale health information and improves overall system reliability. ([#6423](https://github.com/lablup/backend.ai/issues/6423))
+* Refresh VAST cluster info cache rather than keep the cache alive forever ([#6428](https://github.com/lablup/backend.ai/issues/6428))
+* Change keypair query to include keypairs of users with no group membership ([#6455](https://github.com/lablup/backend.ai/issues/6455))
+* Resolve deadlock occurring due to incorrect use of semaphore in specific image rescan scenarios ([#6469](https://github.com/lablup/backend.ai/issues/6469))
+* Artifact revision not found error caused by `get_artifact_revision_readme` ([#6485](https://github.com/lablup/backend.ai/issues/6485))
+* Add missing `PRE_ENQUEUE_HOOK` and `POST_ENQUEUE_HOOK` call in Sokovan scheduler ([#6584](https://github.com/lablup/backend.ai/issues/6584))
+
+### Miscellaneous
+* Expose `SESSION_PRIORITY_*` constants from the manager package to the common package for consistent priority handling across components ([#6459](https://github.com/lablup/backend.ai/issues/6459))
+
+
 ## 25.15.1 (2025-10-23)
 
 ### Features
