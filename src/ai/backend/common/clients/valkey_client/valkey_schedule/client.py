@@ -128,7 +128,7 @@ class ValkeyScheduleClient:
         except (ValueError, TypeError):
             return False
 
-    @valkey_schedule_resilience.apply()
+    @valkey_decorator()
     async def mark_schedule_needed(self, schedule_type: str) -> None:
         """
         Mark that scheduling is needed for the given schedule type.
