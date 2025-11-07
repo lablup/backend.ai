@@ -72,12 +72,12 @@ class ValkeyArtifactDownloadTrackingClient:
         human_readable_name: str,
     ) -> Self:
         """
-        Create a ValkeyRateLimitClient instance.
+        Create a ValkeyArtifactDownloadTrackingClient instance.
 
-        :param redis_target: The target Redis server to connect to.
+        :param valkey_target: The target Valkey server to connect to.
         :param db_id: The database index to use.
         :param human_readable_name: The human-readable name of the client.
-        :return: An instance of ValkeyRateLimitClient.
+        :return: An instance of ValkeyArtifactDownloadTrackingClient.
         """
         client = create_valkey_client(
             valkey_target=valkey_target,
@@ -166,28 +166,24 @@ class ValkeyArtifactDownloadTrackingClient:
         total_files = len(file_info_list)
         total_bytes = sum(size for _, size in file_info_list)
 
-        artifact_data = ArtifactDownloadTrackingData(
-            model_id=model_id,
-            revision=revision,
-            start_time=current_time,
-            last_updated=current_time,
-            total_files=total_files,
-            total_bytes=total_bytes,
-            completed_files=0,
-            downloaded_bytes=0,
-        )
-
         batch = self._create_batch(is_atomic=False)
 
-        # Set artifact-level data
-        batch.set(
+        # Set artifact-level data as Hash for atomic field updates
+        batch.hset(
             artifact_key,
-            artifact_data.model_dump_json(),
-            expiry=ExpirySet(
-                expiry_type=ExpiryType.SEC,
-                value=_ARTIFACT_DOWNLOAD_EXPIRATION,
-            ),
+            {
+                "model_id": model_id,
+                "revision": revision,
+                "start_time": str(current_time),
+                "last_updated": str(current_time),
+                "total_files": str(total_files),
+                "total_bytes": str(total_bytes),
+                "completed_files": "0",
+                "downloaded_bytes": "0",
+            },
         )
+        # Set TTL for artifact hash
+        batch.expire(artifact_key, _ARTIFACT_DOWNLOAD_EXPIRATION)
 
         # Pre-register all files with initial progress (0 bytes)
         for file_path, file_size in file_info_list:
@@ -273,34 +269,21 @@ class ValkeyArtifactDownloadTrackingClient:
             expiry=ExpirySet(expiry_type=ExpiryType.KEEP_TTL, value=None),
         )
 
-        # Update artifact aggregates if there's a change
-        if bytes_delta != 0:
-            # Get current artifact data
-            artifact_data_bytes = await self._client.client.get(artifact_key)
-            if artifact_data_bytes:
-                try:
-                    artifact_data = ArtifactDownloadTrackingData.model_validate_json(
-                        artifact_data_bytes
-                    )
-                    artifact_data.downloaded_bytes += bytes_delta
-                    artifact_data.last_updated = time.time()
-
-                    # Update completed files count if this file just completed
-                    if success and previous_current_bytes < total_bytes:
-                        artifact_data.completed_files += 1
-
-                    batch.set(
-                        artifact_key,
-                        artifact_data.model_dump_json(),
-                        expiry=ExpirySet(
-                            expiry_type=ExpiryType.KEEP_TTL,
-                            value=None,
-                        ),
-                    )
-                except (ValidationError, UnicodeDecodeError):
-                    log.warning("Failed to parse artifact data for aggregation update")
-
         await self._client.client.exec(batch, raise_on_error=True)
+
+        # Update artifact aggregates atomically using HINCRBY
+        if bytes_delta != 0 or (success and previous_current_bytes < total_bytes):
+            current_time_str = str(time.time())
+
+            # Use HINCRBY for atomic increments
+            if bytes_delta != 0:
+                await self._client.client.hincrby(artifact_key, "downloaded_bytes", bytes_delta)
+
+            if success and previous_current_bytes < total_bytes:
+                await self._client.client.hincrby(artifact_key, "completed_files", 1)
+
+            # Update last_updated timestamp
+            await self._client.client.hset(artifact_key, {"last_updated": current_time_str})
 
         log.trace(
             "Updated file progress: file_path={}, current={}, total={}, success={}",
@@ -324,15 +307,25 @@ class ValkeyArtifactDownloadTrackingClient:
         :return: Artifact progress data or None if not found
         """
         artifact_key = self._get_artifact_key(model_id, revision)
-        data_bytes = await self._client.client.get(artifact_key)
+        hash_data = await self._client.client.hgetall(artifact_key)
 
-        if not data_bytes:
+        if not hash_data:
             return None
 
         try:
-            return ArtifactDownloadTrackingData.model_validate_json(data_bytes)
-        except (ValidationError, UnicodeDecodeError):
-            log.warning("Failed to parse artifact progress data")
+            # Convert Hash data (bytes keys/values) to proper types
+            return ArtifactDownloadTrackingData(
+                model_id=hash_data[b"model_id"].decode(),
+                revision=hash_data[b"revision"].decode(),
+                start_time=float(hash_data[b"start_time"].decode()),
+                last_updated=float(hash_data[b"last_updated"].decode()),
+                total_files=int(hash_data[b"total_files"].decode()),
+                total_bytes=int(hash_data[b"total_bytes"].decode()),
+                completed_files=int(hash_data[b"completed_files"].decode()),
+                downloaded_bytes=int(hash_data[b"downloaded_bytes"].decode()),
+            )
+        except (KeyError, ValueError, UnicodeDecodeError) as e:
+            log.warning("Failed to parse artifact progress data from hash: {}", str(e))
             return None
 
     @valkey_artifact_resilience.apply()
