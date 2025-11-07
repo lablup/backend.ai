@@ -1,7 +1,12 @@
+from __future__ import annotations
+
 import uuid
 from typing import Optional, cast
 from uuid import UUID
 
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import ModelTarget
 from ai.backend.common.data.storage.types import ArtifactStorageType
@@ -116,6 +121,7 @@ class ArtifactRevisionService:
         reservoir_registry_repository: ReservoirRegistryRepository,
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
+        valkey_artifact_client: ValkeyArtifactDownloadTrackingClient,
     ) -> None:
         self._artifact_repository = artifact_repository
         self._artifact_registry_repository = artifact_registry_repository
@@ -126,6 +132,7 @@ class ArtifactRevisionService:
         self._reservoir_registry_repository = reservoir_registry_repository
         self._storage_manager = storage_manager
         self._config_provider = config_provider
+        self._valkey_artifact_client = valkey_artifact_client
 
     def _resolve_storage_namespace(self, reservoir_config: ReservoirConfig) -> str:
         """Resolve namespace based on storage type

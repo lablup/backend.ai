@@ -7,14 +7,21 @@ from typing import Iterable, Tuple
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
+from ai.backend.common.api_handlers import (
+    APIResponse,
+    BodyParam,
+    PathParam,
+    QueryParam,
+    api_handler,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
-from ai.backend.manager.dto.context import ProcessorsCtx
+from ai.backend.manager.dto.context import ProcessorsCtx, ValkeyArtifactCtx
 from ai.backend.manager.dto.request import (
     ApproveArtifactRevisionReq,
     CancelImportArtifactReq,
     CleanupArtifactsReq,
+    GetArtifactDownloadProgressReq,
     GetArtifactRevisionReadmeReq,
     ImportArtifactsReq,
     RejectArtifactRevisionReq,
@@ -26,6 +33,7 @@ from ai.backend.manager.dto.response import (
     ArtifactRevisionImportTask,
     CancelImportArtifactResponse,
     CleanupArtifactsResponse,
+    GetArtifactDownloadProgressResponse,
     GetArtifactRevisionReadmeResponse,
     ImportArtifactsResponse,
     RejectArtifactRevisionResponse,
@@ -263,6 +271,36 @@ class APIHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
+    @auth_required_for_method
+    @api_handler
+    async def get_download_progress(
+        self,
+        query: QueryParam[GetArtifactDownloadProgressReq],
+        valkey_ctx: ValkeyArtifactCtx,
+    ) -> APIResponse:
+        """
+        Query the current download progress for an artifact.
+
+        Returns the current state of the download including artifact-level progress
+        (total bytes, completed files) and per-file progress information.
+        The data is retrieved from Redis where it's tracked during the download process.
+        """
+        valkey_artifact = valkey_ctx.valkey_artifact
+        artifact_progress = await valkey_artifact.get_artifact_progress(
+            model_id=query.parsed.model_id,
+            revision=query.parsed.revision,
+        )
+        file_progress = await valkey_artifact.get_all_file_progress(
+            model_id=query.parsed.model_id,
+            revision=query.parsed.revision,
+        )
+
+        resp = GetArtifactDownloadProgressResponse(
+            artifact_progress=artifact_progress,
+            file_progress=file_progress if file_progress else None,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
 
 def create_app(
     default_cors_options: CORSOptions,
@@ -296,6 +334,13 @@ def create_app(
             "GET",
             "/revisions/{artifact_revision_id}/readme",
             api_handler.get_artifact_revision_readme,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/revisions/download-progress",
+            api_handler.get_download_progress,
         )
     )
 

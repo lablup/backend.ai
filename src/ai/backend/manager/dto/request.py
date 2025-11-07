@@ -143,3 +143,8 @@ class UpdateArtifactReqBodyParam(BaseRequestModel):
         if self.description is not None:
             modifier.description = TriState.update(self.description)
         return modifier
+
+
+class GetArtifactDownloadProgressReq(BaseRequestModel):
+    model_id: str = Field(description="Model identifier to query download progress.")
+    revision: str = Field(description="Model revision to query download progress.")

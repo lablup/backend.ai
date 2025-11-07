@@ -2,6 +2,9 @@ from dataclasses import dataclass
 from typing import Optional, Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.etcd import AsyncEtcd
@@ -101,6 +104,7 @@ class ServiceArgs:
     storage_manager: StorageSessionManager
     valkey_stat_client: ValkeyStatClient
     valkey_live: ValkeyLiveClient
+    valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
     event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
     event_hub: EventHub
@@ -287,6 +291,7 @@ class Services:
             huggingface_registry_repository=repositories.huggingface_registry.repository,
             reservoir_registry_repository=repositories.reservoir_registry.repository,
             config_provider=args.config_provider,
+            valkey_artifact_client=args.valkey_artifact_client,
         )
         artifact_registry_service = ArtifactRegistryService(
             repositories.huggingface_registry.repository,
