@@ -49,12 +49,12 @@ class TestValkeyArtifactDownloadTrackingClient:
         revision = "main"
         total_files = 10
         total_bytes = 1000000
+        file_info_list = [(f"file{i}.bin", 100000) for i in range(10)]
 
         await valkey_client_with_cleanup.init_artifact_download(
             model_id=model_id,
             revision=revision,
-            total_files=total_files,
-            total_bytes=total_bytes,
+            file_info_list=file_info_list,
         )
 
         # Verify artifact data was stored
@@ -87,8 +87,7 @@ class TestValkeyArtifactDownloadTrackingClient:
         await valkey_client_with_cleanup.init_artifact_download(
             model_id=model_id,
             revision=revision,
-            total_files=1,
-            total_bytes=1000,
+            file_info_list=[(file_path, 1000)],
         )
 
         # Update file progress
@@ -128,8 +127,7 @@ class TestValkeyArtifactDownloadTrackingClient:
         await valkey_client_with_cleanup.init_artifact_download(
             model_id=model_id,
             revision=revision,
-            total_files=total_files,
-            total_bytes=total_bytes,
+            file_info_list=[("file1.bin", 1000), ("file2.bin", 1000), ("file3.bin", 1000)],
         )
 
         # Update first file partially
@@ -204,8 +202,7 @@ class TestValkeyArtifactDownloadTrackingClient:
         await valkey_client_with_cleanup.init_artifact_download(
             model_id=model_id,
             revision=revision,
-            total_files=1,
-            total_bytes=1000,
+            file_info_list=[(file_path, 1000)],
         )
 
         # Update with error
@@ -244,8 +241,7 @@ class TestValkeyArtifactDownloadTrackingClient:
         await valkey_client_with_cleanup.init_artifact_download(
             model_id=model_id,
             revision=revision,
-            total_files=1,
-            total_bytes=1000,
+            file_info_list=[(file_path, 1000)],
         )
 
         # First update
@@ -293,8 +289,7 @@ class TestValkeyArtifactDownloadTrackingClient:
         await valkey_client_with_cleanup.init_artifact_download(
             model_id=model_id,
             revision=revision,
-            total_files=2,
-            total_bytes=2000,
+            file_info_list=[("file1.bin", 1000), ("file2.bin", 1000)],
         )
 
         await valkey_client_with_cleanup.update_file_progress(
@@ -374,8 +369,7 @@ class TestValkeyArtifactDownloadTrackingClient:
         await valkey_client_with_cleanup.init_artifact_download(
             model_id=model_id,
             revision=revision,
-            total_files=1,
-            total_bytes=1000,
+            file_info_list=[("model.bin", 1000)],
         )
 
         result = await valkey_client_with_cleanup.get_artifact_progress(
@@ -398,15 +392,12 @@ class TestValkeyArtifactDownloadTrackingClient:
         model_id = f"org/model-name_{random.randint(1000, 9999)}"
         revision = "v1.0.0"
         file_path = "subfolder/model.bin"
-        total_files = 1
-        total_bytes = 1000
 
         # Initialize with special characters
         await valkey_client_with_cleanup.init_artifact_download(
             model_id=model_id,
             revision=revision,
-            total_files=total_files,
-            total_bytes=total_bytes,
+            file_info_list=[(file_path, 1000)],
         )
 
         # Update file progress
@@ -447,8 +438,7 @@ class TestValkeyArtifactDownloadTrackingClient:
         await valkey_client_with_cleanup.init_artifact_download(
             model_id=model_id,
             revision=revision,
-            total_files=3,
-            total_bytes=3000,
+            file_info_list=[("file1.bin", 1000), ("file2.bin", 1000), ("file3.bin", 1000)],
         )
 
         # Add progress for multiple files
@@ -503,8 +493,7 @@ class TestValkeyArtifactDownloadTrackingClient:
         await valkey_client_with_cleanup.init_artifact_download(
             model_id=model_id,
             revision=revision,
-            total_files=2,
-            total_bytes=2000,
+            file_info_list=[("file1.bin", 1000), ("file2.bin", 1000)],
         )
 
         # Add progress for multiple files

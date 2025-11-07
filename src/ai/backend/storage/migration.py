@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
 from typing import AsyncIterator, Iterator, Optional, TypedDict
-from unittest.mock import MagicMock
 from uuid import UUID
 
 import aiofiles
@@ -274,7 +273,7 @@ async def check_and_upgrade(
         metric_registry=CommonMetricRegistry(),
         cors_options={},
         manager_http_clients={},
-        valkey_artifact_client=MagicMock(),  # type: ignore[arg-type]
+        valkey_artifact_client=None,  # type: ignore[arg-type]
         backends={**DEFAULT_BACKENDS},
         volumes={},
     )
