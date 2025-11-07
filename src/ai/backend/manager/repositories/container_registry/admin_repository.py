@@ -8,7 +8,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-from .repository import ContainerRegistryRepository
+from .db_source.db_source import ContainerRegistryDBSource
 
 container_registry_repository_resilience = Resilience(
     policies=[
@@ -28,10 +28,10 @@ container_registry_repository_resilience = Resilience(
 
 
 class AdminContainerRegistryRepository:
-    _repository: ContainerRegistryRepository
+    _db_source: ContainerRegistryDBSource
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
-        self._repository = ContainerRegistryRepository(db)
+        self._db_source = ContainerRegistryDBSource(db)
 
     @container_registry_repository_resilience.apply()
     async def clear_images_force(
@@ -43,7 +43,11 @@ class AdminContainerRegistryRepository:
         Forcefully clear images from a container registry without any validation.
         This is an admin-only operation that should be used with caution.
         """
-        return await self._repository.clear_images(registry_name, project)
+        # Clear images
+        await self._db_source.mark_images_as_deleted(registry_name, project)
+
+        # Return registry data
+        return await self._db_source.fetch_by_registry_and_project(registry_name, project)
 
     @container_registry_repository_resilience.apply()
     async def get_by_registry_and_project_force(
@@ -55,7 +59,7 @@ class AdminContainerRegistryRepository:
         Forcefully get container registry by name and project without any validation.
         This is an admin-only operation that should be used with caution.
         """
-        return await self._repository.get_by_registry_and_project(registry_name, project)
+        return await self._db_source.fetch_by_registry_and_project(registry_name, project)
 
     @container_registry_repository_resilience.apply()
     async def get_by_registry_name_force(self, registry_name: str) -> list[ContainerRegistryData]:
@@ -63,7 +67,7 @@ class AdminContainerRegistryRepository:
         Forcefully get container registries by name without any validation.
         This is an admin-only operation that should be used with caution.
         """
-        return await self._repository.get_by_registry_name(registry_name)
+        return await self._db_source.fetch_by_registry_name(registry_name)
 
     @container_registry_repository_resilience.apply()
     async def get_all_force(self) -> list[ContainerRegistryData]:
@@ -71,4 +75,4 @@ class AdminContainerRegistryRepository:
         Forcefully get all container registries without any validation.
         This is an admin-only operation that should be used with caution.
         """
-        return await self._repository.get_all()
+        return await self._db_source.fetch_all()
