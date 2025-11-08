@@ -29,7 +29,6 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.repositories.notification import NotificationRepository
-from ai.backend.manager.repositories.notification.db_source import NotificationDBSource
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
     NotificationChannelOrders,
@@ -154,21 +153,12 @@ class TestNotificationOptions:
                 await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
 
     @pytest.fixture
-    async def notification_db_source(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[NotificationDBSource, None]:
-        """Create NotificationDBSource instance with real database"""
-        db_source = NotificationDBSource(db=db_with_cleanup)
-        yield db_source
-
-    @pytest.fixture
     async def notification_repository(
         self,
-        notification_db_source: NotificationDBSource,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[NotificationRepository, None]:
-        """Create NotificationRepository instance with DB source"""
-        repo = NotificationRepository(db_source=notification_db_source)
+        """Create NotificationRepository instance with database"""
+        repo = NotificationRepository(db=db_with_cleanup)
         yield repo
 
     @pytest.fixture
