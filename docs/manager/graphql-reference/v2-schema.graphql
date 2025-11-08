@@ -1973,6 +1973,9 @@ type Query {
   """List notification rules"""
   notificationRules(filter: NotificationRuleFilter = null, orderBy: NotificationRuleOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection!
 
+  """List available notification rule types"""
+  notificationRuleTypes: [NotificationRuleType!]!
+
   """Added in 25.14.0"""
   objectStorage(id: ID!): ObjectStorage
 
@@ -2635,12 +2638,12 @@ type VFSStorageEdge {
 """Input for validate notification channel mutation"""
 input ValidateNotificationChannelInput {
   id: ID!
+  testMessage: String!
 }
 
 """Payload for validate notification channel mutation"""
 type ValidateNotificationChannelPayload {
-  success: Boolean!
-  message: String!
+  id: ID!
 }
 
 """Input for validate notification rule mutation"""
@@ -2651,9 +2654,7 @@ input ValidateNotificationRuleInput {
 
 """Payload for validate notification rule mutation"""
 type ValidateNotificationRulePayload {
-  success: Boolean!
   message: String!
-  renderedMessage: String
 }
 
 extend type VirtualFolderNode @key(fields: "id") {

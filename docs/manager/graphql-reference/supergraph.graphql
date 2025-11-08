@@ -5799,6 +5799,9 @@ type Query
   """List notification rules"""
   notificationRules(filter: NotificationRuleFilter = null, orderBy: NotificationRuleOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection! @join__field(graph: STRAWBERRY)
 
+  """List available notification rule types"""
+  notificationRuleTypes: [NotificationRuleType!]! @join__field(graph: STRAWBERRY)
+
   """Added in 25.14.0"""
   objectStorage(id: ID!): ObjectStorage @join__field(graph: STRAWBERRY)
 
@@ -7163,14 +7166,14 @@ input ValidateNotificationChannelInput
   @join__type(graph: STRAWBERRY)
 {
   id: ID!
+  testMessage: String!
 }
 
 """Payload for validate notification channel mutation"""
 type ValidateNotificationChannelPayload
   @join__type(graph: STRAWBERRY)
 {
-  success: Boolean!
-  message: String!
+  id: ID!
 }
 
 """Input for validate notification rule mutation"""
@@ -7185,9 +7188,7 @@ input ValidateNotificationRuleInput
 type ValidateNotificationRulePayload
   @join__type(graph: STRAWBERRY)
 {
-  success: Boolean!
   message: String!
-  renderedMessage: String
 }
 
 """
