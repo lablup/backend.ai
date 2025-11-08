@@ -270,11 +270,16 @@ def reservoir_download_step(
     """Create ReservoirDownloadStep instance for testing."""
     # Create a mock storage object that properly inherits from ObjectStorage
     mock_download_storage = MockObjectStorage()
+    # Create a mock redis client with AsyncMock methods
+    mock_redis_client = MagicMock()
+    mock_redis_client.init_artifact_download = AsyncMock()
+    mock_redis_client.update_file_progress = AsyncMock()
     return ReservoirDownloadStep(
         registry_configs=mock_reservoir_registry_configs,
         download_storage=mock_download_storage,
         manager_http_clients={},
         reservoir_client_config=ReservoirClientConfig(),
+        redis_client=mock_redis_client,
     )
 
 
@@ -911,6 +916,8 @@ class TestReservoirDownloadStep:
                 storage_name="test_storage",
                 storage_pool=mock_import_step_context.storage_pool,
                 options=BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0),
+                model_id="test_model",
+                revision="test_revision",
                 progress_reporter=None,
                 key_prefix="models/",
             )
@@ -940,6 +947,8 @@ class TestReservoirDownloadStep:
                     storage_name="test_storage",
                     storage_pool=mock_import_step_context.storage_pool,
                     options=BucketCopyOptions(concurrency=1, progress_log_interval_bytes=0),
+                    model_id="test_model",
+                    revision="test_revision",
                     progress_reporter=None,
                     key_prefix="models/",
                 )
@@ -984,11 +993,15 @@ class TestReservoirDownloadStep:
         # Create step without reservoir configs
         # Create a mock storage object
         mock_download_storage = MagicMock()
+        mock_redis_client = MagicMock()
+        mock_redis_client.init_artifact_download = AsyncMock()
+        mock_redis_client.update_file_progress = AsyncMock()
         step = ReservoirDownloadStep(
             registry_configs={},
             download_storage=mock_download_storage,
             manager_http_clients={},
             reservoir_client_config=ReservoirClientConfig(),
+            redis_client=mock_redis_client,
         )
 
         with pytest.raises(ReservoirStorageConfigInvalidError):
