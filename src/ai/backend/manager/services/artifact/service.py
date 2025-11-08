@@ -277,10 +277,14 @@ class ArtifactService:
                             try:
                                 # Try to get existing local revision to check current remote_status
                                 # If remote artifact is AVAILABLE and we were tracking it, update remote_status
-                                if response_revision.status == ArtifactStatus.AVAILABLE:
-                                    remote_status = ArtifactRemoteStatus.AVAILABLE
-                                if response_revision.status == ArtifactStatus.FAILED:
-                                    remote_status = ArtifactRemoteStatus.FAILED
+                                if response_revision.status in [
+                                    ArtifactStatus.AVAILABLE,
+                                    ArtifactStatus.SCANNED,
+                                    ArtifactStatus.FAILED,
+                                ]:
+                                    remote_status = ArtifactRemoteStatus(
+                                        response_revision.status.value
+                                    )
                             except ArtifactRevisionNotFoundError:
                                 # New artifact revision - no remote_status to track
                                 pass
