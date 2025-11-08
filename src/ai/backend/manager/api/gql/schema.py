@@ -75,6 +75,7 @@ from .notification import (
     notification_channel,
     notification_channels,
     notification_rule,
+    notification_rule_types,
     notification_rules,
     update_notification_channel,
     update_notification_rule,
@@ -132,6 +133,7 @@ class Query:
     notification_channels = notification_channels
     notification_rule = notification_rule
     notification_rules = notification_rules
+    notification_rule_types = notification_rule_types
     object_storage = object_storage
     object_storages = object_storages
     vfs_storage = vfs_storage

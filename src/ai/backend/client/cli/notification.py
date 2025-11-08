@@ -102,7 +102,7 @@ def info_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
 @pass_ctx_obj
 @click.argument("name", type=str)
 @click.argument("url", type=str)
-@click.option("--channel-type", default="WEBHOOK", help="Channel type (default: WEBHOOK)")
+@click.option("--channel-type", default="webhook", help="Channel type (default: WEBHOOK)")
 @click.option("--description", type=str, default=None, help="Channel description")
 @click.option("--disabled", is_flag=True, help="Create channel as disabled")
 def create_channel_cmd(
@@ -235,6 +235,27 @@ def validate_channel_cmd(ctx: CLIContext, channel_id: str) -> None:
 @notification.group()
 def rule():
     """Manage notification rules"""
+
+
+@rule.command("types")
+@pass_ctx_obj
+def list_rule_types_cmd(ctx: CLIContext) -> None:
+    """
+    List all available notification rule types.
+    """
+    with Session() as session:
+        try:
+            result = session.Notification.list_rule_types()
+            rule_types = result.rule_types
+            if not rule_types:
+                print("No rule types available")
+                return
+            print("Available notification rule types:")
+            for rule_type in rule_types:
+                print(f"  - {rule_type}")
+        except Exception as e:
+            ctx.output.print_error(e)
+            sys.exit(ExitCode.FAILURE)
 
 
 @rule.command("list")
@@ -438,16 +459,9 @@ def validate_rule_cmd(ctx: CLIContext, rule_id: str, data: Optional[str]) -> Non
             request = ValidateNotificationRuleRequest(notification_data=notification_data)
             result = session.Notification.validate_rule(UUID(rule_id), request)
 
-            if result.success:
-                print_done(f"Rule validation successful: {rule_id}")
-                print(f"Message: {result.message}")
-                if result.rendered_message:
-                    print("\nRendered message:")
-                    print(result.rendered_message)
-            else:
-                print_fail(f"Rule validation failed: {rule_id}")
-                print(result.message)
-                sys.exit(ExitCode.FAILURE)
+            print_done(f"Rule validation successful: {rule_id}")
+            print("\nMessage:")
+            print(result.message)
         except json.JSONDecodeError as e:
             print_fail(f"Invalid JSON data: {e}")
             sys.exit(ExitCode.FAILURE)

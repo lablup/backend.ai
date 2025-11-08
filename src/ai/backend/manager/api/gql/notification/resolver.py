@@ -42,6 +42,7 @@ from .types import (
     NotificationRule,
     NotificationRuleFilter,
     NotificationRuleOrderBy,
+    NotificationRuleTypeGQL,
     UpdateNotificationChannelInput,
     UpdateNotificationChannelPayload,
     UpdateNotificationRuleInput,
@@ -197,6 +198,14 @@ async def notification_rules(
         ),
         count=action_result.total_count,
     )
+
+
+@strawberry.field(description="List available notification rule types")
+async def notification_rule_types() -> list[NotificationRuleTypeGQL]:
+    """Return all available notification rule types."""
+    from ai.backend.common.data.notification import NotificationRuleType
+
+    return [NotificationRuleTypeGQL.from_internal(rt) for rt in NotificationRuleType]
 
 
 # Mutation fields

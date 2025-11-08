@@ -29,6 +29,7 @@ __all__ = (
     "DeleteNotificationRuleResponse",
     "GetNotificationRuleResponse",
     "ListNotificationRulesResponse",
+    "ListNotificationRuleTypesResponse",
     "ValidateNotificationChannelResponse",
     "ValidateNotificationRuleResponse",
     "PaginationInfo",
@@ -150,3 +151,11 @@ class ValidateNotificationRuleResponse(BaseResponseModel):
     """Response for validating a notification rule."""
 
     message: str = Field(description="The rendered message from the template")
+
+
+class ListNotificationRuleTypesResponse(BaseResponseModel):
+    """Response for listing available notification rule types."""
+
+    rule_types: list[NotificationRuleType] = Field(
+        description="List of available notification rule types"
+    )

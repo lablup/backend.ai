@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -27,6 +27,9 @@ from ai.backend.manager.repositories.base import Querier
 
 from .db_source import NotificationDBSource
 
+if TYPE_CHECKING:
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
 __all__ = ("NotificationRepository",)
 
 
@@ -51,8 +54,8 @@ class NotificationRepository:
 
     _db_source: NotificationDBSource
 
-    def __init__(self, db_source: NotificationDBSource) -> None:
-        self._db_source = db_source
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+        self._db_source = NotificationDBSource(db)
 
     @notification_repository_resilience.apply()
     async def get_matching_rules(

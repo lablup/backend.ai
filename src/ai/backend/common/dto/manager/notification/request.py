@@ -46,7 +46,7 @@ class CreateNotificationChannelRequest(BaseRequestModel):
     name: str = Field(description="Channel name")
     description: Optional[str] = Field(default=None, description="Channel description")
     channel_type: NotificationChannelType = Field(description="Channel type")
-    config: dict[str, Any] | WebhookConfig = Field(description="Channel configuration")
+    config: WebhookConfig = Field(description="Channel configuration")
     enabled: bool = Field(default=True, description="Whether the channel is enabled")
 
     @field_validator("config", mode="before")
