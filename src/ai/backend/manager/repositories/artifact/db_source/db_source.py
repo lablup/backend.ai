@@ -329,7 +329,6 @@ class ArtifactDBSource:
                         source_registry_type=artifact_data.source_registry_type,
                         readonly=True,  # always overwrite readonly to True
                         extra=artifact_data.extra,
-                        verification_result=artifact_data.verification_result,
                     )
                     db_sess.add(new_artifact)
                     await db_sess.flush()
@@ -463,7 +462,6 @@ class ArtifactDBSource:
                         source_registry_type=ArtifactRegistryType.HUGGINGFACE,
                         readonly=True,
                         extra=model.extra,
-                        verification_result=None,
                     )
                     db_sess.add(artifact_row)
                     await db_sess.flush()
