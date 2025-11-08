@@ -670,36 +670,6 @@ input ArtifactRevisionStatusFilter
   equals: ArtifactStatus = null
 }
 
-"""
-Added in 25.17.0.
-
-Result from a single malware verifier containing scan results and metadata.
-
-Each verifier scans the artifact for potential security issues and reports
-findings including infected file count, scan time, and any errors encountered.
-"""
-type ArtifactSingleVerifierResult
-  @join__type(graph: STRAWBERRY)
-{
-  """Whether the verification completed successfully"""
-  success: Boolean!
-
-  """Number of infected or suspicious files detected"""
-  infectedCount: Int!
-
-  """Timestamp when verification started"""
-  scannedAt: DateTime!
-
-  """Time taken to complete verification in seconds"""
-  scanTime: Float!
-
-  """Total number of files scanned"""
-  scannedCount: Int!
-
-  """Fatal error message if the verifier failed to complete"""
-  error: String
-}
-
 enum ArtifactStatus
   @join__type(graph: STRAWBERRY)
 {
@@ -767,6 +737,36 @@ type ArtifactVerificationResult
 """
 Added in 25.17.0.
 
+Result from a single malware verifier containing scan results and metadata.
+
+Each verifier scans the artifact for potential security issues and reports
+findings including infected file count, scan time, and any errors encountered.
+"""
+type ArtifactVerifierResult
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the verification completed successfully"""
+  success: Boolean!
+
+  """Number of infected or suspicious files detected"""
+  infectedCount: Int!
+
+  """Timestamp when verification started"""
+  scannedAt: DateTime!
+
+  """Time taken to complete verification in seconds"""
+  scanTime: Float!
+
+  """Total number of files scanned"""
+  scannedCount: Int!
+
+  """Fatal error message if the verifier failed to complete"""
+  error: String
+}
+
+"""
+Added in 25.17.0.
+
 Entry for a single verifier's result in the verification results.
 
 Associates a verifier name with its scan results.
@@ -778,7 +778,7 @@ type ArtifactVerifierResultEntry
   name: String!
 
   """Scan result from this verifier"""
-  result: ArtifactSingleVerifierResult!
+  result: ArtifactVerifierResult!
 }
 
 """Added in 24.03.9."""

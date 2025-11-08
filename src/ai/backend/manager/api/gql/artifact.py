@@ -86,6 +86,7 @@ from .artifact_registry_meta import ArtifactRegistryMeta
 
 
 @strawberry.type(
+    name="ArtifactVerifierResult",
     description=dedent_strip("""
     Added in 25.17.0.
 
@@ -93,9 +94,9 @@ from .artifact_registry_meta import ArtifactRegistryMeta
 
     Each verifier scans the artifact for potential security issues and reports
     findings including infected file count, scan time, and any errors encountered.
-    """)
+    """),
 )
-class ArtifactSingleVerifierResult:
+class ArtifactVerifierGQLResult:
     success: bool = strawberry.field(description="Whether the verification completed successfully")
     infected_count: int = strawberry.field(
         description="Number of infected or suspicious files detected"
@@ -122,17 +123,18 @@ class ArtifactSingleVerifierResult:
 
 
 @strawberry.type(
+    name="ArtifactVerifierResultEntry",
     description=dedent_strip("""
     Added in 25.17.0.
 
     Entry for a single verifier's result in the verification results.
 
     Associates a verifier name with its scan results.
-    """)
+    """),
 )
-class ArtifactVerifierResultEntry:
+class ArtifactVerifierGQLResultEntry:
     name: str = strawberry.field(description="Name of the verifier (e.g., 'clamav', 'custom')")
-    result: ArtifactSingleVerifierResult = strawberry.field(
+    result: ArtifactVerifierGQLResult = strawberry.field(
         description="Scan result from this verifier"
     )
 
@@ -140,11 +142,12 @@ class ArtifactVerifierResultEntry:
     def from_verifier_result(cls, name: str, result: VerifierResult) -> Self:
         return cls(
             name=name,
-            result=ArtifactSingleVerifierResult.from_dataclass(result),
+            result=ArtifactVerifierGQLResult.from_dataclass(result),
         )
 
 
 @strawberry.type(
+    name="ArtifactVerificationResult",
     description=dedent_strip("""
     Added in 25.17.0.
 
@@ -152,17 +155,17 @@ class ArtifactVerifierResultEntry:
 
     Artifacts undergo malware scanning through multiple verifiers after being imported.
     This type aggregates results from all verifiers that were run on the artifact.
-    """)
+    """),
 )
-class ArtifactVerificationResult:
-    verifiers: list[ArtifactVerifierResultEntry] = strawberry.field(
+class ArtifactVerificationGQLResult:
+    verifiers: list[ArtifactVerifierGQLResultEntry] = strawberry.field(
         description="Results from each verifier that scanned the artifact"
     )
 
     @classmethod
     def from_dataclass(cls, data: VerificationStepResult) -> Self:
         verifier_entries = [
-            ArtifactVerifierResultEntry.from_verifier_result(verifier_name, verifier_result)
+            ArtifactVerifierGQLResultEntry.from_verifier_result(verifier_name, verifier_result)
             for verifier_name, verifier_result in data.verifiers.items()
         ]
         return cls(verifiers=verifier_entries)
@@ -676,7 +679,7 @@ class ArtifactRevision(Node):
     digest: Optional[str] = strawberry.field(
         description="Digest at the time of import. None for models that have not been imported. Added in 25.17.0"
     )
-    verification_result: Optional[ArtifactVerificationResult] = strawberry.field(
+    verification_result: Optional[ArtifactVerificationGQLResult] = strawberry.field(
         description="Verification result containing malware scan results from all verifiers. None if not yet verified. Added in 25.17.0"
     )
 
@@ -692,7 +695,9 @@ class ArtifactRevision(Node):
             created_at=data.created_at,
             updated_at=data.updated_at,
             digest=data.digest,
-            verification_result=ArtifactVerificationResult.from_dataclass(data.verification_result)
+            verification_result=ArtifactVerificationGQLResult.from_dataclass(
+                data.verification_result
+            )
             if data.verification_result
             else None,
         )
