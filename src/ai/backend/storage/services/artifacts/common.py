@@ -7,8 +7,8 @@ from typing import cast, override
 
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
-    SingleVerifierResult,
-    VerificationResult,
+    VerificationStepResult,
+    VerifierResult,
 )
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.events.dispatcher import EventProducer
@@ -102,7 +102,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
         dst_storage = cast(VFSStorage, dst_storage)
 
         # Collect verification results from all verifiers
-        verifier_results: dict[str, SingleVerifierResult] = {}
+        verifier_results: dict[str, VerifierResult] = {}
         verification_success = True
 
         for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
@@ -117,7 +117,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
                 elapsed_time = (verifier_end_time - verifier_start_time).total_seconds()
 
                 # Create VerifierResult object
-                verifier_results[verifier_name] = SingleVerifierResult(
+                verifier_results[verifier_name] = VerifierResult(
                     success=result.infected_count == 0,
                     infected_count=result.infected_count,
                     scanned_at=verifier_start_time,
@@ -139,7 +139,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
                 verification_success = False
                 verifier_end_time = datetime.now(timezone.utc)
                 elapsed_time = (verifier_end_time - verifier_start_time).total_seconds()
-                verifier_results[verifier_name] = SingleVerifierResult(
+                verifier_results[verifier_name] = VerifierResult(
                     success=False,
                     infected_count=0,
                     scanned_at=verifier_start_time,
@@ -150,7 +150,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
                 log.error(f"Artifact verification using '{verifier_name}' failed: {e}")
 
         # Create complete verification result
-        verification_result = VerificationResult(
+        verification_result = VerificationStepResult(
             verifiers=verifier_results,
         )
 

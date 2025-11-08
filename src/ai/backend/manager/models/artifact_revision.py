@@ -6,7 +6,7 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship
 
-from ai.backend.common.data.artifact.types import VerificationResult
+from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
@@ -110,7 +110,9 @@ class ArtifactRevisionRow(Base):
         verification_result = None
         if self.verification_result is not None:
             try:
-                verification_result = VerificationResult.model_validate(self.verification_result)
+                verification_result = VerificationStepResult.model_validate(
+                    self.verification_result
+                )
             except Exception as e:
                 # If validation fails, keep as None
                 verification_result = None

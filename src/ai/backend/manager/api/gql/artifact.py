@@ -12,8 +12,8 @@ from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
 
 from ai.backend.common.data.artifact.types import (
-    SingleVerifierResult,
-    VerificationResult,
+    VerificationStepResult,
+    VerifierResult,
 )
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
@@ -110,7 +110,7 @@ class ArtifactSingleVerifierResult:
     )
 
     @classmethod
-    def from_dataclass(cls, data: SingleVerifierResult) -> Self:
+    def from_dataclass(cls, data: VerifierResult) -> Self:
         return cls(
             success=data.success,
             infected_count=data.infected_count,
@@ -137,7 +137,7 @@ class ArtifactVerifierResultEntry:
     )
 
     @classmethod
-    def from_verifier_result(cls, name: str, result: SingleVerifierResult) -> Self:
+    def from_verifier_result(cls, name: str, result: VerifierResult) -> Self:
         return cls(
             name=name,
             result=ArtifactSingleVerifierResult.from_dataclass(result),
@@ -160,7 +160,7 @@ class ArtifactVerificationResult:
     )
 
     @classmethod
-    def from_dataclass(cls, data: VerificationResult) -> Self:
+    def from_dataclass(cls, data: VerificationStepResult) -> Self:
         verifier_entries = [
             ArtifactVerifierResultEntry.from_verifier_result(verifier_name, verifier_result)
             for verifier_name, verifier_result in data.verifiers.items()

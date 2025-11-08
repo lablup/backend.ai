@@ -7,7 +7,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class SingleVerifierResult(BaseModel):
+class VerifierResult(BaseModel):
     """Result from a single verifier"""
 
     success: bool
@@ -18,10 +18,10 @@ class SingleVerifierResult(BaseModel):
     error: Optional[str] = None  # For when verifier fails with exception
 
 
-class VerificationResult(BaseModel):
-    """Complete verification result containing results from all verifiers"""
+class VerificationStepResult(BaseModel):
+    """Verification result containing results from all verifiers"""
 
-    verifiers: dict[str, SingleVerifierResult]
+    verifiers: dict[str, VerifierResult]
 
 
 class ArtifactRegistryType(enum.StrEnum):

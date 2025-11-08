@@ -1,7 +1,7 @@
 import logging
 from uuid import UUID
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationResult
+from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.events.event_types.artifact.anycast import (
     ModelImportDoneEvent,
     ModelMetadataFetchDoneEvent,
@@ -253,7 +253,7 @@ class ArtifactEventHandler:
             )
 
             # Convert dict back to VerificationResult for validation and type safety
-            verification_result = VerificationResult.model_validate(event.verification_result)
+            verification_result = VerificationStepResult.model_validate(event.verification_result)
 
             # Update verification_result column with the verification results
             await self._artifact_repository.update_artifact_revision_verification_result(

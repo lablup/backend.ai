@@ -1,7 +1,7 @@
 import uuid
 from typing import Optional
 
-from ai.backend.common.data.artifact.types import VerificationResult
+from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import BackendAIError
@@ -174,7 +174,7 @@ class ArtifactRepository:
 
     @artifact_repository_resilience.apply()
     async def update_artifact_revision_verification_result(
-        self, artifact_revision_id: uuid.UUID, verification_result: VerificationResult
+        self, artifact_revision_id: uuid.UUID, verification_result: VerificationStepResult
     ) -> uuid.UUID:
         return await self._db_source.update_artifact_revision_verification_result(
             artifact_revision_id, verification_result.model_dump()
