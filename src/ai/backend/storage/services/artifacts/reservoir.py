@@ -98,6 +98,9 @@ class ReservoirVFSFileDownloader:
     _redis_client: ValkeyArtifactDownloadTrackingClient
     _model_id: str
     _revision: str
+    _download_complete: bool
+    _progress_task: Optional[asyncio.Task[None]]
+    _bytes_downloaded: int
 
     def __init__(
         self,
@@ -112,32 +115,30 @@ class ReservoirVFSFileDownloader:
         self._redis_client = redis_client
         self._model_id = model_id
         self._revision = revision
+        self._download_complete = False
+        self._progress_task = None
+        self._bytes_downloaded = 0
 
     async def _periodic_progress_update(
         self,
-        offset_getter: Callable[[], int],
         total_bytes: int,
         file_path: str,
-        download_complete: Callable[[], bool],
     ) -> None:
         """
         Background task that periodically updates Redis with download progress.
 
-        :param offset_getter: Callable that returns current download offset
         :param total_bytes: Total bytes for this file
         :param file_path: Path of the file being downloaded
-        :param download_complete: Callable that returns whether download is complete
         """
-        while not download_complete():
+        while not self._download_complete:
             await asyncio.sleep(_DOWNLOAD_PROGRESS_UPDATE_INTERVAL)
 
             try:
-                current = offset_getter()
                 await self._redis_client.update_file_progress(
                     model_id=self._model_id,
                     revision=self._revision,
                     file_path=file_path,
-                    current_bytes=current,
+                    current_bytes=self._bytes_downloaded,
                     total_bytes=total_bytes,
                     success=False,
                 )
@@ -166,21 +167,21 @@ class ReservoirVFSFileDownloader:
         # Ensure parent directory exists
         local_path.parent.mkdir(parents=True, exist_ok=True)
 
-        bytes_downloaded = 0
-        download_complete = False
-        progress_task: Optional[asyncio.Task[None]] = None
+        # Initialize download state
+        self._bytes_downloaded = 0
+        self._download_complete = False
+        self._progress_task = None
+
         stream_reader = ReservoirVFSDownloadStreamReader(
             self._client, self._storage_name, remote_path
         )
 
         try:
             # Start background progress task
-            progress_task = asyncio.create_task(
+            self._progress_task = asyncio.create_task(
                 self._periodic_progress_update(
-                    offset_getter=lambda: bytes_downloaded,
                     total_bytes=total_bytes,
                     file_path=remote_path,
-                    download_complete=lambda: download_complete,
                 )
             )
 
@@ -188,14 +189,14 @@ class ReservoirVFSFileDownloader:
                 try:
                     async for chunk in stream_reader.read():
                         await f.write(chunk)
-                        bytes_downloaded += len(chunk)
+                        self._bytes_downloaded += len(chunk)
                 except aiohttp.ClientError as e:
                     log.error(
-                        f"Network error during download: {e}, Downloaded {bytes_downloaded} bytes before failure"
+                        f"Network error during download: {e}, Downloaded {self._bytes_downloaded} bytes before failure"
                     )
                     raise
                 except asyncio.TimeoutError:
-                    log.error(f"Timeout after downloading {bytes_downloaded} bytes")
+                    log.error(f"Timeout after downloading {self._bytes_downloaded} bytes")
                     raise
         except Exception as e:
             # Update Redis with error status for any unexpected errors
@@ -204,7 +205,7 @@ class ReservoirVFSFileDownloader:
                     model_id=self._model_id,
                     revision=self._revision,
                     file_path=remote_path,
-                    current_bytes=bytes_downloaded,
+                    current_bytes=self._bytes_downloaded,
                     total_bytes=total_bytes,
                     success=False,
                     error_message=str(e),
@@ -213,13 +214,13 @@ class ReservoirVFSFileDownloader:
                 log.warning(f"Failed to update error status in Redis: {redis_err}")
             raise
         finally:
-            download_complete = True
+            self._download_complete = True
 
             # Cancel and wait for progress task
-            if progress_task:
-                progress_task.cancel()
+            if self._progress_task:
+                self._progress_task.cancel()
                 try:
-                    await progress_task
+                    await self._progress_task
                 except asyncio.CancelledError:
                     pass
 
@@ -229,91 +230,20 @@ class ReservoirVFSFileDownloader:
                     model_id=self._model_id,
                     revision=self._revision,
                     file_path=remote_path,
-                    current_bytes=bytes_downloaded,
+                    current_bytes=self._bytes_downloaded,
                     total_bytes=total_bytes,
-                    success=(bytes_downloaded >= total_bytes),
+                    success=(self._bytes_downloaded >= total_bytes),
                 )
             except Exception as redis_err:
                 log.warning(f"Failed to update final status in Redis: {redis_err}")
 
-        log.debug(f"Downloaded file: {remote_path} -> {local_path} ({bytes_downloaded} bytes)")
-        return bytes_downloaded
+        log.debug(
+            f"Downloaded file: {remote_path} -> {local_path} ({self._bytes_downloaded} bytes)"
+        )
+        return self._bytes_downloaded
 
 
-class TarExtractor:
-    """Simple tar extractor that downloads and extracts VFS tar files."""
-
-    _stream_reader: StreamReader
-
-    def __init__(self, stream_reader: StreamReader):
-        self._stream_reader = stream_reader
-
-    async def extract_to(self, target_dir: Path) -> int:
-        """
-        Download tar file to temp location and extract to target directory.
-
-        Args:
-            target_dir: Directory where to extract the tar contents
-
-        Returns:
-            int: Total size of downloaded file in bytes
-        """
-        temp_file = None
-        bytes_downloaded = 0
-
-        try:
-            # Create temporary file for tar
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".tar") as tf:
-                temp_file = Path(tf.name)
-                log.debug(f"Downloading artifact tar to temp directory: {temp_file}")
-
-                # Download to temp file
-                async with aiofiles.open(temp_file, "wb") as f:
-                    async for chunk in self._stream_reader.read():
-                        await f.write(chunk)
-                        bytes_downloaded += len(chunk)
-
-                log.debug(f"Downloaded {bytes_downloaded} bytes to {temp_file}")
-
-            # Ensure target directory exists
-            target_dir.mkdir(parents=True, exist_ok=True)
-
-            # Extract tar file in executor to avoid blocking
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(None, self._extract_tar, temp_file, target_dir)
-
-            log.info(f"Successfully extracted artifact tar to: {target_dir}")
-            return bytes_downloaded
-
-        finally:
-            # Clean up temp file
-            if temp_file and temp_file.exists():
-                try:
-                    temp_file.unlink()
-                    log.debug(f"Cleaned up temp file: {temp_file}")
-                except Exception as e:
-                    log.warning(f"Failed to remove temp file {temp_file}: {e}")
-
-    def _extract_tar(self, tar_path: Path, target_dir: Path) -> None:
-        """Extract tar archive to target directory."""
-        with tarfile.open(tar_path, "r") as tar:
-            tar.extractall(path=target_dir)
-        log.debug(f"Tar extraction completed: {tar_path} -> {target_dir}")
-
-
-@dataclass
-class ReservoirServiceArgs:
-    background_task_manager: BackgroundTaskManager
-    event_producer: EventProducer
-    storage_pool: StoragePool
-    reservoir_registry_configs: dict[str, ReservoirConfig]
-    artifact_verifier_ctx: ArtifactVerifierContext
-    manager_http_clients: MutableMapping[str, ManagerHTTPClient]
-    reservoir_client_config: ReservoirClientConfig  # Passed to ImportStepContext
-    redis_client: ValkeyArtifactDownloadTrackingClient
-
-
-class ReservoirFileDownloadStreamReader(StreamReader):
+class ReservoirS3FileDownloadStreamReader(StreamReader):
     _src_s3_client: S3Client
     _key: str
     _size: int
@@ -458,6 +388,18 @@ class ReservoirFileDownloadStreamReader(StreamReader):
     @override
     def content_type(self) -> Optional[str]:
         return self._content_type
+
+
+@dataclass
+class ReservoirServiceArgs:
+    background_task_manager: BackgroundTaskManager
+    event_producer: EventProducer
+    storage_pool: StoragePool
+    reservoir_registry_configs: dict[str, ReservoirConfig]
+    artifact_verifier_ctx: ArtifactVerifierContext
+    manager_http_clients: MutableMapping[str, ManagerHTTPClient]
+    reservoir_client_config: ReservoirClientConfig  # Passed to ImportStepContext
+    redis_client: ValkeyArtifactDownloadTrackingClient
 
 
 class ReservoirService:
@@ -962,7 +904,7 @@ class ReservoirDownloadStep(ImportStep[None]):
                     or "application/octet-stream"
                 )
 
-                data_stream = ReservoirFileDownloadStreamReader(
+                data_stream = ReservoirS3FileDownloadStreamReader(
                     src_s3_client=src_s3_client,
                     key=key,
                     size=size,
@@ -1089,6 +1031,9 @@ class ReservoirArchiveStep(ModelArchiveStep):
         return ArtifactRegistryType.RESERVOIR
 
 
+# Utilities
+
+
 def create_reservoir_import_pipeline(
     storage_pool: StoragePool,
     registry_configs: dict[str, Any],
@@ -1128,3 +1073,64 @@ def create_reservoir_import_pipeline(
         steps.append(ReservoirArchiveStep(transfer_manager))
 
     return ImportPipeline(steps)
+
+
+class TarExtractor:
+    """Simple tar extractor that downloads and extracts VFS tar files."""
+
+    _stream_reader: StreamReader
+
+    def __init__(self, stream_reader: StreamReader):
+        self._stream_reader = stream_reader
+
+    async def extract_to(self, target_dir: Path) -> int:
+        """
+        Download tar file to temp location and extract to target directory.
+
+        Args:
+            target_dir: Directory where to extract the tar contents
+
+        Returns:
+            int: Total size of downloaded file in bytes
+        """
+        temp_file = None
+        bytes_downloaded = 0
+
+        try:
+            # Create temporary file for tar
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".tar") as tf:
+                temp_file = Path(tf.name)
+                log.debug(f"Downloading artifact tar to temp directory: {temp_file}")
+
+                # Download to temp file
+                async with aiofiles.open(temp_file, "wb") as f:
+                    async for chunk in self._stream_reader.read():
+                        await f.write(chunk)
+                        bytes_downloaded += len(chunk)
+
+                log.debug(f"Downloaded {bytes_downloaded} bytes to {temp_file}")
+
+            # Ensure target directory exists
+            target_dir.mkdir(parents=True, exist_ok=True)
+
+            # Extract tar file in executor to avoid blocking
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, self._extract_tar, temp_file, target_dir)
+
+            log.info(f"Successfully extracted artifact tar to: {target_dir}")
+            return bytes_downloaded
+
+        finally:
+            # Clean up temp file
+            if temp_file and temp_file.exists():
+                try:
+                    temp_file.unlink()
+                    log.debug(f"Cleaned up temp file: {temp_file}")
+                except Exception as e:
+                    log.warning(f"Failed to remove temp file {temp_file}: {e}")
+
+    def _extract_tar(self, tar_path: Path, target_dir: Path) -> None:
+        """Extract tar archive to target directory."""
+        with tarfile.open(tar_path, "r") as tar:
+            tar.extractall(path=target_dir)
+        log.debug(f"Tar extraction completed: {tar_path} -> {target_dir}")
