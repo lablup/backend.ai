@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
-from typing import Optional, cast
+from typing import Final, Optional, cast
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
@@ -107,6 +108,9 @@ from ai.backend.manager.services.artifact_revision.actions.reject import (
     RejectArtifactRevisionAction,
     RejectArtifactRevisionActionResult,
 )
+
+_REMOTE_ARTIFACT_STATUS_POLL_INTERVAL: Final[int] = 5  # seconds
+_REMOTE_ARTIFACT_MAX_WAIT_TIME: Final[int] = 3600  # 1 hour
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -426,6 +430,78 @@ class ArtifactRevisionService:
                             artifact.id
                         )
                     )
+
+                    # When use_delegation is True, if remote status is not AVAILABLE, delegate import
+                    if reservoir_config.use_delegation:
+                        remote_reservoir_client = ReservoirRegistryClient(
+                            registry_data=registry_data
+                        )
+
+                        remote_progress_status_resp = (
+                            await remote_reservoir_client.get_download_progress(revision_data.id)
+                        )
+                        remote_progress = remote_progress_status_resp.download_progress.local
+
+                        # Wait for remote to start pulling if not yet AVAILABLE
+                        if remote_progress.status != ArtifactStatus.AVAILABLE.value:
+                            delegate_import_req = DelegateImportArtifactsReq(
+                                artifact_revision_ids=[revision_data.id],
+                                artifact_type=artifact.type,
+                                # We can't pass delegatee_reservoir_id here since we don't have it.
+                                # So we depends on default.
+                                delegator_reservoir_id=None,
+                                delegatee_target=None,
+                            )
+
+                            await remote_reservoir_client.delegate_import_artifacts(
+                                delegate_import_req
+                            )
+
+                            # Poll until remote status is AVAILABLE
+                            elapsed_time = 0
+
+                            log.info(
+                                "Waiting for remote artifact to become AVAILABLE. "
+                                "artifact_revision_id: {}",
+                                revision_data.id,
+                            )
+
+                            while elapsed_time < _REMOTE_ARTIFACT_MAX_WAIT_TIME:
+                                await asyncio.sleep(_REMOTE_ARTIFACT_STATUS_POLL_INTERVAL)
+                                elapsed_time += _REMOTE_ARTIFACT_STATUS_POLL_INTERVAL
+
+                                remote_progress_status_resp = (
+                                    await remote_reservoir_client.get_download_progress(
+                                        revision_data.id
+                                    )
+                                )
+                                remote_progress = (
+                                    remote_progress_status_resp.download_progress.local
+                                )
+
+                                if remote_progress.status == ArtifactStatus.AVAILABLE.value:
+                                    log.info(
+                                        "Remote artifact is now AVAILABLE. "
+                                        "artifact_revision_id: {}, elapsed_time: {}s",
+                                        revision_data.id,
+                                        elapsed_time,
+                                    )
+                                    break
+
+                                log.info(
+                                    "Waiting for remote artifact. Status: {}, Elapsed: {}s, "
+                                    "artifact_revision_id: {}",
+                                    remote_progress.status,
+                                    elapsed_time,
+                                    revision_data.id,
+                                )
+                            else:
+                                # Timeout reached
+                                raise RemoteReservoirArtifactImportError(
+                                    f"Timeout waiting for remote artifact to become AVAILABLE. "
+                                    f"artifact_revision_id: {revision_data.id}, "
+                                    f"Last status: {remote_progress.status}"
+                                )
 
                     await self._artifact_repository.update_artifact_revision_status(
                         action.artifact_revision_id, ArtifactStatus.PULLING
