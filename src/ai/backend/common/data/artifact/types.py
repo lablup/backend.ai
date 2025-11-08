@@ -1,9 +1,28 @@
 from __future__ import annotations
 
 import enum
+from dataclasses import dataclass
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+
+@dataclass
+class VerifierResult:
+    """Result from a single verifier"""
+
+    success: bool
+    infected_count: int
+    scan_time: Optional[float]
+    scanned_files: Optional[int]
+    errors: list[str]
+    error: Optional[str] = None  # For when verifier fails with exception
+
+
+class ArtifactVerifiersResult(BaseModel):
+    """Complete verification result containing results from all verifiers"""
+
+    verifiers: dict[str, VerifierResult]
 
 
 class ArtifactRegistryType(enum.StrEnum):

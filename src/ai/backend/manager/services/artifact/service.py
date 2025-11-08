@@ -297,6 +297,7 @@ class ArtifactService:
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
                                 digest=response_revision.digest,
+                                verification_result=response_revision.verification_result,
                             )
                             full_revisions.append(full_revision)
 
@@ -487,6 +488,7 @@ class ArtifactService:
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
                                 digest=response_revision.digest,
+                                verification_result=response_revision.verification_result,
                             )
                             full_revisions.append(full_revision)
 
@@ -811,6 +813,7 @@ class ArtifactService:
                     created_at=response_revision.created_at,
                     updated_at=response_revision.updated_at,
                     digest=response_revision.digest,
+                    verification_result=response_revision.verification_result,
                 )
                 full_revisions.append(full_revision)
 

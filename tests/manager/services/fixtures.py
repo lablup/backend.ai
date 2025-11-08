@@ -124,6 +124,7 @@ ARTIFACT_ROW_FIXTURE = ArtifactRow(
     description="A conversational AI model by Microsoft",
     readonly=True,
     availability=ArtifactAvailability.ALIVE.value,
+    verification_result=None,
 )
 ARTIFACT_ROW_FIXTURE.id = uuid.uuid4()
 ARTIFACT_ROW_FIXTURE.scanned_at = datetime.now(timezone.utc)

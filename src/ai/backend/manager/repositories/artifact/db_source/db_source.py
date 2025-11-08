@@ -329,6 +329,7 @@ class ArtifactDBSource:
                         source_registry_type=artifact_data.source_registry_type,
                         readonly=True,  # always overwrite readonly to True
                         extra=artifact_data.extra,
+                        verification_result=artifact_data.verification_result,
                     )
                     db_sess.add(new_artifact)
                     await db_sess.flush()
@@ -462,6 +463,7 @@ class ArtifactDBSource:
                         source_registry_type=ArtifactRegistryType.HUGGINGFACE,
                         readonly=True,
                         extra=model.extra,
+                        verification_result=None,
                     )
                     db_sess.add(artifact_row)
                     await db_sess.flush()
@@ -779,6 +781,18 @@ class ArtifactDBSource:
                 sa.update(ArtifactRevisionRow)
                 .where(ArtifactRevisionRow.id == artifact_revision_id)
                 .values(readme=readme)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
+    async def update_artifact_revision_verification_result(
+        self, artifact_revision_id: uuid.UUID, verification_result: dict[str, Any]
+    ) -> uuid.UUID:
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(verification_result=verification_result)
             )
             await db_sess.execute(stmt)
             return artifact_revision_id
