@@ -783,6 +783,18 @@ class ArtifactDBSource:
             await db_sess.execute(stmt)
             return artifact_revision_id
 
+    async def update_artifact_revision_verification_result(
+        self, artifact_revision_id: uuid.UUID, verification_result: dict[str, Any]
+    ) -> uuid.UUID:
+        async with self._begin_session_read_committed() as db_sess:
+            stmt = (
+                sa.update(ArtifactRevisionRow)
+                .where(ArtifactRevisionRow.id == artifact_revision_id)
+                .values(verification_result=verification_result)
+            )
+            await db_sess.execute(stmt)
+            return artifact_revision_id
+
     async def update_artifact_revision_digest(
         self, artifact_revision_id: uuid.UUID, digest: str
     ) -> uuid.UUID:

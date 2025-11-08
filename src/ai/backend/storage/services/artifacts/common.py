@@ -2,12 +2,20 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from typing import cast, override
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
+    VerificationStepResult,
+    VerifierResult,
+)
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.artifact.anycast import ModelVerifyingEvent
+from ai.backend.common.events.event_types.artifact.anycast import (
+    ModelVerifyDoneEvent,
+    ModelVerifyingEvent,
+)
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.context_types import ArtifactVerifierContext
 from ai.backend.storage.exception import (
@@ -93,19 +101,76 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
             raise ArtifactVerifyStorageTypeInvalid("Verify step requires VFS storage type")
         dst_storage = cast(VFSStorage, dst_storage)
 
+        # Collect verification results from all verifiers
+        verifier_results: dict[str, VerifierResult] = {}
+        verification_success = True
+
         for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
             dst_path = dst_storage.resolve_path(model_prefix)
+            verifier_start_time = datetime.now(timezone.utc)
             log.info(
                 f"Starting artifact verification using '{verifier_name}', dst_path: {dst_path}"
             )
-            result = await verifier.verify(dst_path, context)
-            if result.infected_count > 0:
-                raise ArtifactVerificationFailedError(
-                    f"Artifact '{model_prefix}' verification failed using '{verifier_name}': "
-                    f"infected_count={result.infected_count}"
+            try:
+                result = await verifier.verify(dst_path, context)
+                verifier_end_time = datetime.now(timezone.utc)
+                elapsed_time = (verifier_end_time - verifier_start_time).total_seconds()
+
+                # Create VerifierResult object
+                verifier_results[verifier_name] = VerifierResult(
+                    success=result.infected_count == 0,
+                    infected_count=result.infected_count,
+                    scanned_at=verifier_start_time,
+                    scan_time=elapsed_time,
+                    scanned_count=result.scanned_count,
                 )
 
-            log.info(f"Artifact verification using '{verifier_name}' completed successfully")
+                if result.infected_count > 0:
+                    verification_success = False
+                    log.warning(
+                        f"Artifact verification using '{verifier_name}' found {result.infected_count} infected files"
+                    )
+                else:
+                    log.info(
+                        f"Artifact verification using '{verifier_name}' completed successfully"
+                    )
+
+            except Exception as e:
+                verification_success = False
+                verifier_end_time = datetime.now(timezone.utc)
+                elapsed_time = (verifier_end_time - verifier_start_time).total_seconds()
+                verifier_results[verifier_name] = VerifierResult(
+                    success=False,
+                    infected_count=0,
+                    scanned_at=verifier_start_time,
+                    scan_time=elapsed_time,
+                    scanned_count=0,
+                    error=str(e),
+                )
+                log.error(f"Artifact verification using '{verifier_name}' failed: {e}")
+
+        # Create complete verification result
+        verification_result = VerificationStepResult(
+            verifiers=verifier_results,
+        )
+
+        # Send ModelVerifyDoneEvent with collected results
+        await self._event_producer.anycast_event(
+            ModelVerifyDoneEvent(
+                model_id=context.model.model_id,
+                revision=revision,
+                registry_type=self.registry_type,
+                registry_name=context.registry_name,
+                success=verification_success,
+                verification_result=verification_result.model_dump(),
+            )
+        )
+
+        # Raise error if any verification failed
+        if not verification_success:
+            raise ArtifactVerificationFailedError(
+                f"Artifact '{model_prefix}' verification failed. See verification_result for details."
+            )
 
         return VerifyStepResult(
             verified_files=input_data.downloaded_files,

@@ -633,6 +633,7 @@ async def server_main(
             },
             artifact_verifier_ctx=ArtifactVerifierContext(),
         )
+        await root_ctx.init_storage_artifact_verifier_plugin()
         if pidx == 0:
             await check_latest(root_ctx)
 

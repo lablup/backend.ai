@@ -316,6 +316,11 @@ type ArtifactRevision implements Node {
   Digest at the time of import. None for models that have not been imported. Added in 25.17.0
   """
   digest: String
+
+  """
+  Verification result containing malware scan results from all verifiers. None if not yet verified. Added in 25.17.0
+  """
+  verificationResult: ArtifactVerificationResult
   artifact: Artifact!
 }
 
@@ -450,6 +455,62 @@ enum ArtifactType {
   MODEL
   PACKAGE
   IMAGE
+}
+
+"""
+Added in 25.17.0.
+
+Complete verification result containing results from all configured verifiers.
+
+Artifacts undergo malware scanning through multiple verifiers after being imported.
+This type aggregates results from all verifiers that were run on the artifact.
+"""
+type ArtifactVerificationResult {
+  """Results from each verifier that scanned the artifact"""
+  verifiers: [ArtifactVerifierResultEntry!]!
+}
+
+"""
+Added in 25.17.0.
+
+Result from a single malware verifier containing scan results and metadata.
+
+Each verifier scans the artifact for potential security issues and reports
+findings including infected file count, scan time, and any errors encountered.
+"""
+type ArtifactVerifierResult {
+  """Whether the verification completed successfully"""
+  success: Boolean!
+
+  """Number of infected or suspicious files detected"""
+  infectedCount: Int!
+
+  """Timestamp when verification started"""
+  scannedAt: DateTime!
+
+  """Time taken to complete verification in seconds"""
+  scanTime: Float!
+
+  """Total number of files scanned"""
+  scannedCount: Int!
+
+  """Fatal error message if the verifier failed to complete"""
+  error: String
+}
+
+"""
+Added in 25.17.0.
+
+Entry for a single verifier's result in the verification results.
+
+Associates a verifier name with its scan results.
+"""
+type ArtifactVerifierResultEntry {
+  """Name of the verifier (e.g., 'clamav', 'custom')"""
+  name: String!
+
+  """Scan result from this verifier"""
+  result: ArtifactVerifierResult!
 }
 
 """Added in 25.1.0"""

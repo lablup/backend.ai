@@ -1,9 +1,27 @@
 from __future__ import annotations
 
 import enum
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
+
+class VerifierResult(BaseModel):
+    """Result from a single verifier"""
+
+    success: bool
+    infected_count: int
+    scanned_at: datetime  # Timestamp when verification started
+    scan_time: float  # Time taken to complete verification in seconds
+    scanned_count: int
+    error: Optional[str] = None  # For when verifier fails with exception
+
+
+class VerificationStepResult(BaseModel):
+    """Verification result containing results from all verifiers"""
+
+    verifiers: dict[str, VerifierResult]
 
 
 class ArtifactRegistryType(enum.StrEnum):
