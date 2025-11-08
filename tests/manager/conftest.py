@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import enum
 import hashlib
@@ -11,6 +13,7 @@ import tempfile
 import textwrap
 import uuid
 from datetime import datetime
+from decimal import Decimal
 from functools import partial, update_wrapper
 from pathlib import Path
 from typing import (
@@ -47,6 +50,7 @@ from ai.backend.common.events.dispatcher import EventDispatcher
 from ai.backend.common.lock import FileLock
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
+from ai.backend.common.types import ResourceSlot
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
@@ -566,8 +570,10 @@ async def database_fixture(
     extra_fixture_file_path = Path(extra_fixture_file.name)
 
     def fixture_json_encoder(obj: Any):
-        if isinstance(obj, Mapping):
-            return dict(obj)
+        if isinstance(obj, ResourceSlot):
+            return obj.to_json()
+        if isinstance(obj, Decimal):
+            return str(obj)
         if isinstance(obj, uuid.UUID):
             return str(obj)
         if isinstance(obj, datetime):
@@ -576,6 +582,8 @@ async def database_fixture(
             return obj.value
         if isinstance(obj, yarl.URL):
             return str(obj)
+        if isinstance(obj, Mapping):
+            return dict(obj)
 
         raise TypeError(f'Fixture type "{type(obj)}" not serializable')
 

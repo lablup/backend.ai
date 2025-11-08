@@ -88,7 +88,7 @@ class KernelResourceSpec:
     while kernel containers are running.
     """
 
-    slots: Mapping[SlotName, str]
+    slots: ResourceSlot
     """Stores the original user-requested resource slots."""
 
     allocations: MutableMapping[DeviceName, Mapping[SlotName, Mapping[DeviceId, Decimal]]]
@@ -186,7 +186,7 @@ class KernelResourceSpec:
         return cls(
             scratch_disk_size=BinarySize.finite_from_str(kvpairs["SCRATCH_SIZE"]),
             allocations=dict(allocations),
-            slots=ResourceSlot(load_json(kvpairs["SLOTS"])),
+            slots=ResourceSlot.from_json(load_json(kvpairs["SLOTS"])),
             mounts=mounts,
         )
 
@@ -520,7 +520,8 @@ async def scan_resource_usage_per_slot(
             return
         if resource_spec is None:
             return
-        for slot_name in resource_spec.slots.keys():
+        for raw_slot_name in resource_spec.slots.keys():
+            slot_name = SlotName(raw_slot_name)
             slot_allocs[slot_name] += Decimal(resource_spec.slots[slot_name])
 
     async def _wrap_future(fut: asyncio.Future) -> None:
@@ -615,8 +616,8 @@ def allocate(
 
     # Sort out the device names in the resource spec based on the configured allocation order
     dev_names: set[DeviceName] = set()
-    for slot_name in slots.keys():
-        dev_name = slot_name.split(".", maxsplit=1)[0]
+    for raw_slot_name in slots.keys():
+        dev_name = raw_slot_name.split(".", maxsplit=1)[0]
         dev_names.add(DeviceName(dev_name))
     ordered_dev_names = sorted(dev_names, key=lambda item: alloc_order.index(item))
 
@@ -635,9 +636,9 @@ def allocate(
             computer_ctx = computers[dev_name]
             device_id_map = {device.device_id: device for device in computer_ctx.devices}
             device_specific_slots = {
-                SlotName(slot_name): Decimal(alloc)
-                for slot_name, alloc in slots.items()
-                if slot_name == dev_name or slot_name.startswith(f"{dev_name}.")
+                SlotName(raw_slot_name): Decimal(alloc)
+                for raw_slot_name, alloc in slots.items()
+                if raw_slot_name == dev_name or raw_slot_name.startswith(f"{dev_name}.")
             }
             try:
                 if isinstance(computer_ctx.alloc_map, FractionAllocMap):

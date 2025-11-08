@@ -90,7 +90,7 @@ async def get_resource_slots(request: web.Request) -> web.Response:
     log.info("ETCD.GET_RESOURCE_SLOTS ()")
     root_ctx: RootContext = request.app["_root.context"]
     known_slots = await root_ctx.config_provider.legacy_etcd_config_loader.get_resource_slots()
-    return web.json_response(known_slots, status=HTTPStatus.OK)
+    return web.json_response({str(k): v for k, v in known_slots.items()}, status=HTTPStatus.OK)
 
 
 @check_api_params(
@@ -132,7 +132,7 @@ async def get_resource_metadata(request: web.Request, params: Any) -> web.Respon
             for agent in result.scalars().all():
                 available_slot_keys.update(agent.available_slots.keys())
         accelerator_metadata = {
-            k: v
+            str(k): v
             for k, v in accelerator_metadata.items()
             if k in {"cpu", "mem", *available_slot_keys}
         }
