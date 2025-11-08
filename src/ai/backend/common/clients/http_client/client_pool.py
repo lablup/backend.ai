@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Optional, Protocol
 
 import aiohttp
+from aiotools import cancel_and_wait
 
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -89,12 +90,7 @@ class ClientPool:
 
     async def close(self) -> None:
         if not (self._cleanup_task.cancelled() or self._cleanup_task.done()):
-            self._cleanup_task.cancel()
-            try:
-                await self._cleanup_task
-            except asyncio.CancelledError:
-                # FIXME: use safer cancel-and-wait approach
-                pass
+            await cancel_and_wait(self._cleanup_task)
         for client in self._clients.values():
             await client.session.close()
         self._clients.clear()

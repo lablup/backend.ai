@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from enum import StrEnum
-
 from pydantic import BaseModel, Field
 
+from ai.backend.common.types import CIStrEnum
 
-class NotificationChannelType(StrEnum):
+
+class NotificationChannelType(CIStrEnum):
     """Notification channel types."""
 
     WEBHOOK = "webhook"
 
 
-class NotificationRuleType(StrEnum):
+class NotificationRuleType(CIStrEnum):
     """Types of notification rules that can be created."""
 
     SESSION_STARTED = "session.started"
@@ -24,6 +24,9 @@ class WebhookConfig(BaseModel):
 
     url: str = Field(description="Webhook endpoint URL")
     method: str = Field(default="POST", description="HTTP method (POST or GET)")
+    content_type: str = Field(
+        default="application/json", description="Content-Type header for the request body"
+    )
     headers: dict[str, str] = Field(
         default_factory=dict, description="Additional HTTP headers to send"
     )

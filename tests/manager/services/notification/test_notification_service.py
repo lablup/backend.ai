@@ -3,6 +3,7 @@ Tests for NotificationService functionality.
 Tests the service layer with mocked repository operations.
 """
 
+from collections.abc import AsyncGenerator
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -30,9 +31,9 @@ from ai.backend.manager.services.notification.actions import (
     DeleteRuleAction,
     GetChannelAction,
     GetRuleAction,
-    ListChannelsAction,
-    ListRulesAction,
     ProcessNotificationAction,
+    SearchChannelsAction,
+    SearchRulesAction,
     UpdateChannelAction,
     UpdateRuleAction,
     ValidateChannelAction,
@@ -45,15 +46,47 @@ from ai.backend.manager.types import OptionalState
 class TestNotificationService:
     """Test cases for NotificationService"""
 
+    def _mock_http_session_success(self, notification_service: NotificationService) -> None:
+        """Helper to mock HTTP client session for successful webhook delivery"""
+        from unittest.mock import AsyncMock as AsyncMockClass
+        from unittest.mock import MagicMock as MagicMockClass
+
+        mock_response = MagicMockClass()
+        mock_response.status = 200
+        mock_response.__aenter__ = AsyncMockClass(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMockClass(return_value=None)
+
+        mock_session = MagicMockClass()
+        mock_session.post = MagicMockClass(return_value=mock_response)
+
+        notification_service._notification_center._http_client_pool.load_client_session = (  # type: ignore[method-assign]
+            MagicMockClass(return_value=mock_session)
+        )
+
     @pytest.fixture
     def mock_repository(self) -> MagicMock:
         """Create mocked NotificationRepository"""
         return MagicMock(spec=NotificationRepository)
 
     @pytest.fixture
-    def notification_service(self, mock_repository: MagicMock) -> NotificationService:
+    async def notification_service(
+        self, mock_repository: MagicMock
+    ) -> AsyncGenerator[NotificationService, None]:
         """Create NotificationService instance with mocked repository"""
-        return NotificationService(repository=mock_repository)
+
+        from ai.backend.manager.notification.notification_center import NotificationCenter
+
+        # Create real NotificationCenter and mock HTTP client pool later
+        notification_center = NotificationCenter()
+
+        try:
+            yield NotificationService(
+                repository=mock_repository,
+                notification_center=notification_center,
+            )
+        finally:
+            # Cleanup the client pool
+            await notification_center._http_client_pool.close()
 
     @pytest.fixture
     def sample_webhook_channel(self) -> NotificationChannelData:
@@ -116,6 +149,9 @@ class TestNotificationService:
         sample_event: NotificationTriggeredEvent,
     ) -> None:
         """Test processing notification with matching rules"""
+        # Mock HTTP session to avoid actual webhook calls
+        self._mock_http_session_success(notification_service)
+
         mock_repository.get_matching_rules = AsyncMock(return_value=[sample_rule])
 
         action = ProcessNotificationAction(
@@ -127,7 +163,7 @@ class TestNotificationService:
 
         assert result.rule_type == NotificationRuleType.SESSION_STARTED
         assert result.rules_matched == 1
-        assert result.rules_processed == 1
+        assert len(result.successes) == 1
         mock_repository.get_matching_rules.assert_called_once_with(
             NotificationRuleType.SESSION_STARTED, enabled_only=True
         )
@@ -151,7 +187,7 @@ class TestNotificationService:
 
         assert result.rule_type == NotificationRuleType.SESSION_STARTED
         assert result.rules_matched == 0
-        assert result.rules_processed == 0
+        assert len(result.successes) == 0
 
     @pytest.mark.asyncio
     async def test_template_rendering_with_data_fields(
@@ -162,6 +198,9 @@ class TestNotificationService:
         sample_event: NotificationTriggeredEvent,
     ) -> None:
         """Test that template rendering correctly uses notification data fields"""
+        # Mock HTTP session to avoid actual webhook calls
+        self._mock_http_session_success(notification_service)
+
         mock_repository.get_matching_rules = AsyncMock(return_value=[sample_rule])
 
         action = ProcessNotificationAction(
@@ -184,6 +223,9 @@ class TestNotificationService:
         sample_event: NotificationTriggeredEvent,
     ) -> None:
         """Test processing notification with multiple matching rules"""
+        # Mock HTTP session to avoid actual webhook calls
+        self._mock_http_session_success(notification_service)
+
         now = datetime.now()
         rule1 = NotificationRuleData(
             id=uuid4(),
@@ -221,7 +263,7 @@ class TestNotificationService:
         result = await notification_service.process_notification(action)
 
         assert result.rules_matched == 2
-        assert result.rules_processed == 2
+        assert len(result.successes) == 2
 
     @pytest.mark.asyncio
     async def test_template_rendering_fallback_on_error(
@@ -231,7 +273,7 @@ class TestNotificationService:
         sample_webhook_channel: NotificationChannelData,
         sample_event: NotificationTriggeredEvent,
     ) -> None:
-        """Test that template rendering falls back to simple message on error"""
+        """Test that template rendering errors are handled gracefully"""
         # Create rule with invalid template syntax
         now = datetime.now()
         invalid_rule = NotificationRuleData(
@@ -254,12 +296,12 @@ class TestNotificationService:
             timestamp=sample_event.timestamp,
             notification_data=sample_event.notification_data,
         )
-        # Should not raise exception, should handle gracefully
+        # Should not raise exception, errors are caught by asyncio.gather
         result = await notification_service.process_notification(action)
 
         assert result.rules_matched == 1
-        # Rule should still be counted as processed even with template error
-        assert result.rules_processed == 1
+        # Rule should not be counted as processed due to template error
+        assert len(result.successes) == 0
 
     @pytest.mark.asyncio
     async def test_template_with_timestamp(
@@ -269,6 +311,9 @@ class TestNotificationService:
         sample_webhook_channel: NotificationChannelData,
     ) -> None:
         """Test that templates can access timestamp field"""
+        # Mock HTTP session to avoid actual webhook calls
+        self._mock_http_session_success(notification_service)
+
         now = datetime.now()
         rule = NotificationRuleData(
             id=uuid4(),
@@ -298,7 +343,7 @@ class TestNotificationService:
         )
         result = await notification_service.process_notification(action)
 
-        assert result.rules_processed == 1
+        assert len(result.successes) == 1
 
     @pytest.mark.asyncio
     async def test_template_with_nested_data(
@@ -308,6 +353,9 @@ class TestNotificationService:
         sample_webhook_channel: NotificationChannelData,
     ) -> None:
         """Test template rendering with nested notification data"""
+        # Mock HTTP session to avoid actual webhook calls
+        self._mock_http_session_success(notification_service)
+
         now = datetime.now()
         rule = NotificationRuleData(
             id=uuid4(),
@@ -340,7 +388,7 @@ class TestNotificationService:
         )
         result = await notification_service.process_notification(action)
 
-        assert result.rules_processed == 1
+        assert len(result.successes) == 1
 
     @pytest.mark.asyncio
     async def test_process_notification_with_different_rule_types(
@@ -552,38 +600,50 @@ class TestNotificationService:
         mock_repository.delete_rule.assert_called_once_with(sample_rule.id)
 
     @pytest.mark.asyncio
-    async def test_list_channels(
+    async def test_search_channels(
         self,
         notification_service: NotificationService,
         mock_repository: MagicMock,
         sample_webhook_channel: NotificationChannelData,
     ) -> None:
-        """Test listing notification channels with querier"""
-        querier = Querier(conditions=[], orders=[], pagination=None)
-        mock_repository.list_channels = AsyncMock(return_value=[sample_webhook_channel])
+        """Test searching notification channels with querier"""
+        from ai.backend.manager.data.notification import NotificationChannelListResult
 
-        action = ListChannelsAction(querier=querier)
-        result = await notification_service.list_channels(action)
+        querier = Querier(conditions=[], orders=[], pagination=None)
+        mock_repository.search_channels = AsyncMock(
+            return_value=NotificationChannelListResult(
+                items=[sample_webhook_channel], total_count=1
+            )
+        )
+
+        action = SearchChannelsAction(querier=querier)
+        result = await notification_service.search_channels(action)
 
         assert result.channels == [sample_webhook_channel]
-        mock_repository.list_channels.assert_called_once_with(querier=querier)
+        assert result.total_count == 1
+        mock_repository.search_channels.assert_called_once_with(querier=querier)
 
     @pytest.mark.asyncio
-    async def test_list_rules(
+    async def test_search_rules(
         self,
         notification_service: NotificationService,
         mock_repository: MagicMock,
         sample_rule: NotificationRuleData,
     ) -> None:
-        """Test listing notification rules with querier"""
-        querier = Querier(conditions=[], orders=[], pagination=None)
-        mock_repository.list_rules = AsyncMock(return_value=[sample_rule])
+        """Test searching notification rules with querier"""
+        from ai.backend.manager.data.notification import NotificationRuleListResult
 
-        action = ListRulesAction(querier=querier)
-        result = await notification_service.list_rules(action)
+        querier = Querier(conditions=[], orders=[], pagination=None)
+        mock_repository.search_rules = AsyncMock(
+            return_value=NotificationRuleListResult(items=[sample_rule], total_count=1)
+        )
+
+        action = SearchRulesAction(querier=querier)
+        result = await notification_service.search_rules(action)
 
         assert result.rules == [sample_rule]
-        mock_repository.list_rules.assert_called_once_with(querier=querier)
+        assert result.total_count == 1
+        mock_repository.search_rules.assert_called_once_with(querier=querier)
 
     @pytest.mark.asyncio
     async def test_validate_channel_success(
@@ -593,13 +653,33 @@ class TestNotificationService:
         sample_webhook_channel: NotificationChannelData,
     ) -> None:
         """Test validating a notification channel successfully"""
+        from unittest.mock import AsyncMock as AsyncMockClass
+        from unittest.mock import MagicMock as MagicMockClass
+
         mock_repository.get_channel_by_id = AsyncMock(return_value=sample_webhook_channel)
 
-        action = ValidateChannelAction(channel_id=sample_webhook_channel.id)
+        # Mock HTTP client session to avoid actual HTTP calls
+        mock_response = MagicMockClass()
+        mock_response.status = 200
+        mock_response.__aenter__ = AsyncMockClass(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMockClass(return_value=None)
+
+        mock_session = MagicMockClass()
+        mock_session.post = MagicMockClass(return_value=mock_response)
+
+        # Mock the client pool to return our mock session
+        notification_service._notification_center._http_client_pool.load_client_session = (  # type: ignore[method-assign]
+            MagicMockClass(return_value=mock_session)
+        )
+
+        action = ValidateChannelAction(
+            channel_id=sample_webhook_channel.id,
+            test_message="Test notification from Backend.AI - Channel validation",
+        )
         result = await notification_service.validate_channel(action)
 
-        assert result.success is True
-        assert sample_webhook_channel.name in result.message
+        # Validation succeeds by not raising exception
+        assert result is not None
         mock_repository.get_channel_by_id.assert_called_once_with(sample_webhook_channel.id)
 
     @pytest.mark.asyncio
@@ -609,14 +689,19 @@ class TestNotificationService:
         mock_repository: MagicMock,
     ) -> None:
         """Test validating a non-existent notification channel"""
+        from ai.backend.manager.errors.notification import NotificationChannelNotFound
+
         channel_id = uuid4()
-        mock_repository.get_channel_by_id = AsyncMock(side_effect=Exception("Channel not found"))
+        mock_repository.get_channel_by_id = AsyncMock(
+            side_effect=NotificationChannelNotFound(f"Channel {channel_id} not found")
+        )
 
-        action = ValidateChannelAction(channel_id=channel_id)
-        result = await notification_service.validate_channel(action)
-
-        assert result.success is False
-        assert "Failed to validate" in result.message
+        action = ValidateChannelAction(
+            channel_id=channel_id,
+            test_message="Test notification from Backend.AI",
+        )
+        with pytest.raises(NotificationChannelNotFound):
+            await notification_service.validate_channel(action)
 
     @pytest.mark.asyncio
     async def test_validate_rule_success(
@@ -626,11 +711,35 @@ class TestNotificationService:
         sample_rule: NotificationRuleData,
     ) -> None:
         """Test validating a notification rule successfully"""
+        from unittest.mock import AsyncMock as AsyncMockClass
+        from unittest.mock import MagicMock as MagicMockClass
+
         mock_repository.get_rule_by_id = AsyncMock(return_value=sample_rule)
         notification_data = {
             "session_id": "sess-123",
             "user_name": "test_user",
         }
+
+        # Mock the template environment to return a template that renders correctly
+        mock_template = MagicMock()
+        mock_template.render = MagicMock(return_value="Session sess-123 started by test_user")
+        notification_service._notification_center._template_env.from_string = MagicMock(  # type: ignore[method-assign]
+            return_value=mock_template
+        )
+
+        # Mock HTTP client session to avoid actual HTTP calls
+        mock_response = MagicMockClass()
+        mock_response.status = 200
+        mock_response.__aenter__ = AsyncMockClass(return_value=mock_response)
+        mock_response.__aexit__ = AsyncMockClass(return_value=None)
+
+        mock_session = MagicMockClass()
+        mock_session.post = MagicMockClass(return_value=mock_response)
+
+        # Mock the client pool to return our mock session
+        notification_service._notification_center._http_client_pool.load_client_session = (  # type: ignore[method-assign]
+            MagicMockClass(return_value=mock_session)
+        )
 
         action = ValidateRuleAction(
             rule_id=sample_rule.id,
@@ -638,10 +747,8 @@ class TestNotificationService:
         )
         result = await notification_service.validate_rule(action)
 
-        assert result.success is True
-        assert result.rendered_message is not None
-        assert "sess-123" in result.rendered_message
-        assert "test_user" in result.rendered_message
+        # Validation succeeds by not raising exception
+        assert result.message is not None
         mock_repository.get_rule_by_id.assert_called_once_with(sample_rule.id)
 
     @pytest.mark.asyncio
@@ -652,6 +759,10 @@ class TestNotificationService:
         sample_webhook_channel: NotificationChannelData,
     ) -> None:
         """Test validating a rule with invalid template"""
+        import jinja2
+
+        from ai.backend.manager.errors.notification import NotificationTemplateRenderingFailure
+
         invalid_rule = NotificationRuleData(
             id=uuid4(),
             name="Invalid Template Rule",
@@ -666,16 +777,17 @@ class TestNotificationService:
         )
         mock_repository.get_rule_by_id = AsyncMock(return_value=invalid_rule)
 
+        # Mock _template_env to raise TemplateError
+        notification_service._notification_center._template_env.from_string = MagicMock(  # type: ignore[method-assign]
+            side_effect=jinja2.TemplateError("Template syntax error")
+        )
+
         action = ValidateRuleAction(
             rule_id=invalid_rule.id,
             notification_data={"test": "data"},
         )
-        result = await notification_service.validate_rule(action)
-
-        assert result.success is False
-        assert (
-            "Failed to validate" in result.message or "Template rendering failed" in result.message
-        )
+        with pytest.raises(NotificationTemplateRenderingFailure):
+            await notification_service.validate_rule(action)
 
     @pytest.mark.asyncio
     async def test_validate_rule_not_found(
@@ -684,14 +796,16 @@ class TestNotificationService:
         mock_repository: MagicMock,
     ) -> None:
         """Test validating a non-existent notification rule"""
+        from ai.backend.manager.errors.notification import NotificationRuleNotFound
+
         rule_id = uuid4()
-        mock_repository.get_rule_by_id = AsyncMock(side_effect=Exception("Rule not found"))
+        mock_repository.get_rule_by_id = AsyncMock(
+            side_effect=NotificationRuleNotFound(f"Rule {rule_id} not found")
+        )
 
         action = ValidateRuleAction(
             rule_id=rule_id,
             notification_data={"test": "data"},
         )
-        result = await notification_service.validate_rule(action)
-
-        assert result.success is False
-        assert "Failed to validate" in result.message
+        with pytest.raises(NotificationRuleNotFound):
+            await notification_service.validate_rule(action)

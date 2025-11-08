@@ -29,7 +29,6 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.repositories.notification import NotificationRepository
-from ai.backend.manager.repositories.notification.db_source import NotificationDBSource
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
     NotificationChannelOrders,
@@ -154,21 +153,12 @@ class TestNotificationOptions:
                 await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_uuid))
 
     @pytest.fixture
-    async def notification_db_source(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[NotificationDBSource, None]:
-        """Create NotificationDBSource instance with real database"""
-        db_source = NotificationDBSource(db=db_with_cleanup)
-        yield db_source
-
-    @pytest.fixture
     async def notification_repository(
         self,
-        notification_db_source: NotificationDBSource,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[NotificationRepository, None]:
-        """Create NotificationRepository instance with DB source"""
-        repo = NotificationRepository(db_source=notification_db_source)
+        """Create NotificationRepository instance with database"""
+        repo = NotificationRepository(db=db_with_cleanup)
         yield repo
 
     @pytest.fixture
@@ -363,11 +353,11 @@ class TestNotificationOptions:
             ],
             orders=[],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
         # Should match "Test Channel" only, not "test channel"
-        assert len(channels) == 1
-        assert channels[0].name == "Test Channel"
+        assert len(channels.items) == 1
+        assert channels.items[0].name == "Test Channel"
 
     @pytest.mark.asyncio
     async def test_channel_by_name_contains_case_insensitive(
@@ -383,11 +373,11 @@ class TestNotificationOptions:
             ],
             orders=[],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
         # Should match both "Test Channel" and "test channel"
-        assert len(channels) == 2
-        names = {ch.name for ch in channels}
+        assert len(channels.items) == 2
+        names = {ch.name for ch in channels.items}
         assert names == {"Test Channel", "test channel"}
 
     @pytest.mark.asyncio
@@ -404,11 +394,11 @@ class TestNotificationOptions:
             ],
             orders=[],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
         # Should match exactly "Test Channel"
-        assert len(channels) == 1
-        assert channels[0].name == "Test Channel"
+        assert len(channels.items) == 1
+        assert channels.items[0].name == "Test Channel"
 
     @pytest.mark.asyncio
     async def test_channel_by_name_equals_case_insensitive(
@@ -424,11 +414,11 @@ class TestNotificationOptions:
             ],
             orders=[],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
         # Should match both "Test Channel" and "test channel"
-        assert len(channels) == 2
-        names = {ch.name for ch in channels}
+        assert len(channels.items) == 2
+        names = {ch.name for ch in channels.items}
         assert names == {"Test Channel", "test channel"}
 
     @pytest.mark.asyncio
@@ -445,11 +435,11 @@ class TestNotificationOptions:
             ],
             orders=[],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
         # Should match all 5 channels
-        assert len(channels) == 5
-        assert all(ch.channel_type == NotificationChannelType.WEBHOOK for ch in channels)
+        assert len(channels.items) == 5
+        assert all(ch.channel_type == NotificationChannelType.WEBHOOK for ch in channels.items)
 
     @pytest.mark.asyncio
     async def test_channel_by_enabled_true(
@@ -463,10 +453,10 @@ class TestNotificationOptions:
             conditions=[NotificationChannelConditions.by_enabled(True)],
             orders=[],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
-        assert len(channels) == 4
-        assert all(ch.enabled for ch in channels)
+        assert len(channels.items) == 4
+        assert all(ch.enabled for ch in channels.items)
 
     @pytest.mark.asyncio
     async def test_channel_by_enabled_false(
@@ -480,11 +470,11 @@ class TestNotificationOptions:
             conditions=[NotificationChannelConditions.by_enabled(False)],
             orders=[],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
-        assert len(channels) == 1
-        assert not channels[0].enabled
-        assert channels[0].name == "Dev Notification"
+        assert len(channels.items) == 1
+        assert not channels.items[0].enabled
+        assert channels.items[0].name == "Dev Notification"
 
     # NotificationChannelOrders Tests
 
@@ -500,12 +490,12 @@ class TestNotificationOptions:
             conditions=[],
             orders=[NotificationChannelOrders.name(ascending=True)],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
-        assert len(channels) == 3
-        assert channels[0].name == "Alpha Channel"
-        assert channels[1].name == "Beta Channel"
-        assert channels[2].name == "Zebra Channel"
+        assert len(channels.items) == 3
+        assert channels.items[0].name == "Alpha Channel"
+        assert channels.items[1].name == "Beta Channel"
+        assert channels.items[2].name == "Zebra Channel"
 
     @pytest.mark.asyncio
     async def test_channel_order_by_name_descending(
@@ -519,12 +509,12 @@ class TestNotificationOptions:
             conditions=[],
             orders=[NotificationChannelOrders.name(ascending=False)],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
-        assert len(channels) == 3
-        assert channels[0].name == "Zebra Channel"
-        assert channels[1].name == "Beta Channel"
-        assert channels[2].name == "Alpha Channel"
+        assert len(channels.items) == 3
+        assert channels.items[0].name == "Zebra Channel"
+        assert channels.items[1].name == "Beta Channel"
+        assert channels.items[2].name == "Alpha Channel"
 
     @pytest.mark.asyncio
     async def test_channel_order_by_created_at_ascending(
@@ -538,13 +528,13 @@ class TestNotificationOptions:
             conditions=[],
             orders=[NotificationChannelOrders.created_at(ascending=True)],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
-        assert len(channels) == 3
+        assert len(channels.items) == 3
         # Oldest to newest
-        assert channels[0].name == "Zebra Channel"
-        assert channels[1].name == "Alpha Channel"
-        assert channels[2].name == "Beta Channel"
+        assert channels.items[0].name == "Zebra Channel"
+        assert channels.items[1].name == "Alpha Channel"
+        assert channels.items[2].name == "Beta Channel"
 
     @pytest.mark.asyncio
     async def test_channel_order_by_created_at_descending(
@@ -558,13 +548,13 @@ class TestNotificationOptions:
             conditions=[],
             orders=[NotificationChannelOrders.created_at(ascending=False)],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
-        assert len(channels) == 3
+        assert len(channels.items) == 3
         # Newest to oldest
-        assert channels[0].name == "Beta Channel"
-        assert channels[1].name == "Alpha Channel"
-        assert channels[2].name == "Zebra Channel"
+        assert channels.items[0].name == "Beta Channel"
+        assert channels.items[1].name == "Alpha Channel"
+        assert channels.items[2].name == "Zebra Channel"
 
     @pytest.mark.asyncio
     async def test_channel_order_by_updated_at_ascending(
@@ -578,13 +568,13 @@ class TestNotificationOptions:
             conditions=[],
             orders=[NotificationChannelOrders.updated_at(ascending=True)],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
-        assert len(channels) == 3
+        assert len(channels.items) == 3
         # Oldest update to newest update
-        assert channels[0].name == "Beta Channel"
-        assert channels[1].name == "Alpha Channel"
-        assert channels[2].name == "Zebra Channel"
+        assert channels.items[0].name == "Beta Channel"
+        assert channels.items[1].name == "Alpha Channel"
+        assert channels.items[2].name == "Zebra Channel"
 
     @pytest.mark.asyncio
     async def test_channel_order_by_updated_at_descending(
@@ -598,13 +588,13 @@ class TestNotificationOptions:
             conditions=[],
             orders=[NotificationChannelOrders.updated_at(ascending=False)],
         )
-        channels = await notification_repository.list_channels(querier=querier)
+        channels = await notification_repository.search_channels(querier=querier)
 
-        assert len(channels) == 3
+        assert len(channels.items) == 3
         # Newest update to oldest update
-        assert channels[0].name == "Zebra Channel"
-        assert channels[1].name == "Alpha Channel"
-        assert channels[2].name == "Beta Channel"
+        assert channels.items[0].name == "Zebra Channel"
+        assert channels.items[1].name == "Alpha Channel"
+        assert channels.items[2].name == "Beta Channel"
 
     # NotificationRuleConditions Tests
 
@@ -622,11 +612,11 @@ class TestNotificationOptions:
             ],
             orders=[],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
         # Should match "Test Rule" only, not "test rule"
-        assert len(rules) == 1
-        assert rules[0].name == "Test Rule"
+        assert len(rules.items) == 1
+        assert rules.items[0].name == "Test Rule"
 
     @pytest.mark.asyncio
     async def test_rule_by_name_contains_case_insensitive(
@@ -640,11 +630,11 @@ class TestNotificationOptions:
             conditions=[NotificationRuleConditions.by_name_contains("test", case_insensitive=True)],
             orders=[],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
         # Should match both "Test Rule" and "test rule"
-        assert len(rules) == 2
-        names = {rule.name for rule in rules}
+        assert len(rules.items) == 2
+        names = {rule.name for rule in rules.items}
         assert names == {"Test Rule", "test rule"}
 
     @pytest.mark.asyncio
@@ -661,11 +651,11 @@ class TestNotificationOptions:
             ],
             orders=[],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
         # Should match exactly "Test Rule"
-        assert len(rules) == 1
-        assert rules[0].name == "Test Rule"
+        assert len(rules.items) == 1
+        assert rules.items[0].name == "Test Rule"
 
     @pytest.mark.asyncio
     async def test_rule_by_name_equals_case_insensitive(
@@ -681,11 +671,11 @@ class TestNotificationOptions:
             ],
             orders=[],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
         # Should match both "Test Rule" and "test rule"
-        assert len(rules) == 2
-        names = {rule.name for rule in rules}
+        assert len(rules.items) == 2
+        names = {rule.name for rule in rules.items}
         assert names == {"Test Rule", "test rule"}
 
     @pytest.mark.asyncio
@@ -702,11 +692,11 @@ class TestNotificationOptions:
             ],
             orders=[],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
         # Should match 3 SESSION_STARTED rules
-        assert len(rules) == 3
-        assert all(rule.rule_type == NotificationRuleType.SESSION_STARTED for rule in rules)
+        assert len(rules.items) == 3
+        assert all(rule.rule_type == NotificationRuleType.SESSION_STARTED for rule in rules.items)
 
     @pytest.mark.asyncio
     async def test_rule_by_enabled_true(
@@ -720,10 +710,10 @@ class TestNotificationOptions:
             conditions=[NotificationRuleConditions.by_enabled(True)],
             orders=[],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
-        assert len(rules) == 4
-        assert all(rule.enabled for rule in rules)
+        assert len(rules.items) == 4
+        assert all(rule.enabled for rule in rules.items)
 
     @pytest.mark.asyncio
     async def test_rule_by_enabled_false(
@@ -737,11 +727,11 @@ class TestNotificationOptions:
             conditions=[NotificationRuleConditions.by_enabled(False)],
             orders=[],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
-        assert len(rules) == 1
-        assert not rules[0].enabled
-        assert rules[0].name == "Dev Notification"
+        assert len(rules.items) == 1
+        assert not rules.items[0].enabled
+        assert rules.items[0].name == "Dev Notification"
 
     # NotificationRuleOrders Tests
 
@@ -757,12 +747,12 @@ class TestNotificationOptions:
             conditions=[],
             orders=[NotificationRuleOrders.name(ascending=True)],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
-        assert len(rules) == 3
-        assert rules[0].name == "Alpha Rule"
-        assert rules[1].name == "Beta Rule"
-        assert rules[2].name == "Zebra Rule"
+        assert len(rules.items) == 3
+        assert rules.items[0].name == "Alpha Rule"
+        assert rules.items[1].name == "Beta Rule"
+        assert rules.items[2].name == "Zebra Rule"
 
     @pytest.mark.asyncio
     async def test_rule_order_by_name_descending(
@@ -776,12 +766,12 @@ class TestNotificationOptions:
             conditions=[],
             orders=[NotificationRuleOrders.name(ascending=False)],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
-        assert len(rules) == 3
-        assert rules[0].name == "Zebra Rule"
-        assert rules[1].name == "Beta Rule"
-        assert rules[2].name == "Alpha Rule"
+        assert len(rules.items) == 3
+        assert rules.items[0].name == "Zebra Rule"
+        assert rules.items[1].name == "Beta Rule"
+        assert rules.items[2].name == "Alpha Rule"
 
     @pytest.mark.asyncio
     async def test_rule_order_by_created_at_ascending(
@@ -795,13 +785,13 @@ class TestNotificationOptions:
             conditions=[],
             orders=[NotificationRuleOrders.created_at(ascending=True)],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
-        assert len(rules) == 3
+        assert len(rules.items) == 3
         # Oldest to newest
-        assert rules[0].name == "Zebra Rule"
-        assert rules[1].name == "Alpha Rule"
-        assert rules[2].name == "Beta Rule"
+        assert rules.items[0].name == "Zebra Rule"
+        assert rules.items[1].name == "Alpha Rule"
+        assert rules.items[2].name == "Beta Rule"
 
     @pytest.mark.asyncio
     async def test_rule_order_by_created_at_descending(
@@ -815,13 +805,13 @@ class TestNotificationOptions:
             conditions=[],
             orders=[NotificationRuleOrders.created_at(ascending=False)],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
-        assert len(rules) == 3
+        assert len(rules.items) == 3
         # Newest to oldest
-        assert rules[0].name == "Beta Rule"
-        assert rules[1].name == "Alpha Rule"
-        assert rules[2].name == "Zebra Rule"
+        assert rules.items[0].name == "Beta Rule"
+        assert rules.items[1].name == "Alpha Rule"
+        assert rules.items[2].name == "Zebra Rule"
 
     @pytest.mark.asyncio
     async def test_rule_order_by_updated_at_ascending(
@@ -835,13 +825,13 @@ class TestNotificationOptions:
             conditions=[],
             orders=[NotificationRuleOrders.updated_at(ascending=True)],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
-        assert len(rules) == 3
+        assert len(rules.items) == 3
         # Oldest update to newest update
-        assert rules[0].name == "Beta Rule"
-        assert rules[1].name == "Alpha Rule"
-        assert rules[2].name == "Zebra Rule"
+        assert rules.items[0].name == "Beta Rule"
+        assert rules.items[1].name == "Alpha Rule"
+        assert rules.items[2].name == "Zebra Rule"
 
     @pytest.mark.asyncio
     async def test_rule_order_by_updated_at_descending(
@@ -855,10 +845,44 @@ class TestNotificationOptions:
             conditions=[],
             orders=[NotificationRuleOrders.updated_at(ascending=False)],
         )
-        rules = await notification_repository.list_rules(querier=querier)
+        rules = await notification_repository.search_rules(querier=querier)
 
-        assert len(rules) == 3
+        assert len(rules.items) == 3
         # Newest update to oldest update
-        assert rules[0].name == "Zebra Rule"
-        assert rules[1].name == "Alpha Rule"
-        assert rules[2].name == "Beta Rule"
+        assert rules.items[0].name == "Zebra Rule"
+        assert rules.items[1].name == "Alpha Rule"
+        assert rules.items[2].name == "Beta Rule"
+
+    @pytest.mark.asyncio
+    async def test_channel_no_match_returns_empty(
+        self,
+        notification_repository: NotificationRepository,
+        sample_channels_for_filter: list[uuid.UUID],
+    ) -> None:
+        """Test that searching for non-existent channel returns empty with total_count=0"""
+        querier = Querier(
+            conditions=[NotificationChannelConditions.by_name_equals("NonexistentChannelName")],
+            orders=[],
+        )
+        channels = await notification_repository.search_channels(querier=querier)
+
+        # WHERE condition matches nothing
+        assert len(channels.items) == 0
+        assert channels.total_count == 0
+
+    @pytest.mark.asyncio
+    async def test_rule_no_match_returns_empty(
+        self,
+        notification_repository: NotificationRepository,
+        sample_rules_for_filter: list[uuid.UUID],
+    ) -> None:
+        """Test that searching for non-existent rule returns empty with total_count=0"""
+        querier = Querier(
+            conditions=[NotificationRuleConditions.by_name_equals("NonexistentRuleName")],
+            orders=[],
+        )
+        rules = await notification_repository.search_rules(querier=querier)
+
+        # WHERE condition matches nothing
+        assert len(rules.items) == 0
+        assert rules.total_count == 0

@@ -134,3 +134,19 @@ class NotificationRuleModifier(PartialModifier):
         self.message_template.update_dict(to_update, "message_template")
         self.enabled.update_dict(to_update, "enabled")
         return to_update
+
+
+@dataclass
+class NotificationChannelListResult:
+    """Search result with total count for notification channels."""
+
+    items: list[NotificationChannelData]
+    total_count: int
+
+
+@dataclass
+class NotificationRuleListResult:
+    """Search result with total count for notification rules."""
+
+    items: list[NotificationRuleData]
+    total_count: int

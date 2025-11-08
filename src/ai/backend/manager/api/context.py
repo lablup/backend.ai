@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from ..idle import IdleCheckerHost
     from ..models.storage import StorageSessionManager
     from ..models.utils import ExtendedAsyncSAEngine
+    from ..notification import NotificationCenter
     from ..plugin.network import NetworkPluginContext
     from ..plugin.webapp import WebappPluginContext
     from ..registry import AgentRegistry
@@ -108,6 +109,7 @@ class RootContext(BaseContext):
     metrics: CommonMetricRegistry
     repositories: Repositories
     processors: Processors
+    notification_center: NotificationCenter
     event_hub: EventHub
     message_queue: AbstractMessageQueue
     service_discovery: ServiceDiscovery

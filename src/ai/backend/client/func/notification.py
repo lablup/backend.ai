@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.notification import (
     GetNotificationRuleResponse,
     ListNotificationChannelsResponse,
     ListNotificationRulesResponse,
+    ListNotificationRuleTypesResponse,
     SearchNotificationChannelsRequest,
     SearchNotificationRulesRequest,
     UpdateNotificationChannelRequest,
@@ -258,3 +259,16 @@ class Notification(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             return ValidateNotificationRuleResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def list_rule_types(cls) -> ListNotificationRuleTypesResponse:
+        """
+        List all available notification rule types.
+
+        :returns: List of available rule types
+        """
+        rqst = Request("GET", "/notifications/rule-types")
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return ListNotificationRuleTypesResponse.model_validate(data)

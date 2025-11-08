@@ -2,11 +2,21 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Optional, override
+from uuid import UUID
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.notification import NotificationRuleType
 
 from .base import NotificationAction
+
+
+@dataclass
+class ProcessedRuleSuccess:
+    """Information about a successfully processed notification rule."""
+
+    rule_id: UUID
+    rule_name: str
+    channel_name: str
 
 
 @dataclass
@@ -33,7 +43,8 @@ class ProcessNotificationActionResult(BaseActionResult):
 
     rule_type: NotificationRuleType
     rules_matched: int
-    rules_processed: int
+    successes: list[ProcessedRuleSuccess]
+    errors: list[BaseException]
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -31,9 +31,7 @@ class ValidateRuleAction(NotificationAction):
 class ValidateRuleActionResult(BaseActionResult):
     """Result of validating a notification rule."""
 
-    success: bool
     message: str
-    rendered_message: str
 
     @override
     def entity_id(self) -> Optional[str]:

@@ -30,6 +30,7 @@ __all__ = (
     "UpdateNotificationRuleRequest",
     "ListNotificationRulesRequest",
     "SearchNotificationRulesRequest",
+    "ValidateNotificationChannelRequest",
     "ValidateNotificationRuleRequest",
     "StringFilter",
     "NotificationChannelFilter",
@@ -45,7 +46,7 @@ class CreateNotificationChannelRequest(BaseRequestModel):
     name: str = Field(description="Channel name")
     description: Optional[str] = Field(default=None, description="Channel description")
     channel_type: NotificationChannelType = Field(description="Channel type")
-    config: dict[str, Any] | WebhookConfig = Field(description="Channel configuration")
+    config: WebhookConfig = Field(description="Channel configuration")
     enabled: bool = Field(default=True, description="Whether the channel is enabled")
 
     @field_validator("config", mode="before")
@@ -185,6 +186,14 @@ class SearchNotificationRulesRequest(BaseRequestModel):
     order: Optional[NotificationRuleOrder] = Field(default=None, description="Order specification")
     limit: int = Field(default=50, ge=1, le=1000, description="Maximum items to return")
     offset: Optional[int] = Field(default=None, ge=0, description="Number of items to skip")
+
+
+class ValidateNotificationChannelRequest(BaseRequestModel):
+    """Request body for validating a notification channel."""
+
+    test_message: str = Field(
+        description="Test message to send through the channel",
+    )
 
 
 class ValidateNotificationRuleRequest(BaseRequestModel):

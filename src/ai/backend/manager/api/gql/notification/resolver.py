@@ -18,8 +18,8 @@ from ai.backend.manager.services.notification.actions import (
     DeleteRuleAction,
     GetChannelAction,
     GetRuleAction,
-    ListChannelsAction,
-    ListRulesAction,
+    SearchChannelsAction,
+    SearchRulesAction,
     UpdateChannelAction,
     UpdateRuleAction,
     ValidateChannelAction,
@@ -42,6 +42,7 @@ from .types import (
     NotificationRule,
     NotificationRuleFilter,
     NotificationRuleOrderBy,
+    NotificationRuleTypeGQL,
     UpdateNotificationChannelInput,
     UpdateNotificationChannelPayload,
     UpdateNotificationRuleInput,
@@ -59,9 +60,11 @@ NotificationChannelEdge = Edge[NotificationChannel]
 
 @strawberry.type(description="Notification channel connection")
 class NotificationChannelConnection(Connection[NotificationChannel]):
-    @strawberry.field
-    def count(self) -> int:
-        return len(self.edges)
+    count: int
+
+    def __init__(self, *args, count: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.count = count
 
 
 NotificationRuleEdge = Edge[NotificationRule]
@@ -69,9 +72,11 @@ NotificationRuleEdge = Edge[NotificationRule]
 
 @strawberry.type(description="Notification rule connection")
 class NotificationRuleConnection(Connection[NotificationRule]):
-    @strawberry.field
-    def count(self) -> int:
-        return len(self.edges)
+    count: int
+
+    def __init__(self, *args, count: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.count = count
 
 
 # Query fields
@@ -114,8 +119,8 @@ async def notification_channels(
         offset=offset,
     )
 
-    action_result = await processors.notification.list_channels.wait_for_complete(
-        ListChannelsAction(querier=querier)
+    action_result = await processors.notification.search_channels.wait_for_complete(
+        SearchChannelsAction(querier=querier)
     )
 
     nodes = [NotificationChannel.from_dataclass(data) for data in action_result.channels]
@@ -133,6 +138,7 @@ async def notification_channels(
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
+        count=action_result.total_count,
     )
 
 
@@ -171,8 +177,8 @@ async def notification_rules(
         offset=offset,
     )
 
-    action_result = await processors.notification.list_rules.wait_for_complete(
-        ListRulesAction(querier=querier)
+    action_result = await processors.notification.search_rules.wait_for_complete(
+        SearchRulesAction(querier=querier)
     )
 
     nodes = [NotificationRule.from_dataclass(data) for data in action_result.rules]
@@ -190,7 +196,16 @@ async def notification_rules(
             start_cursor=edges[0].cursor if edges else None,
             end_cursor=edges[-1].cursor if edges else None,
         ),
+        count=action_result.total_count,
     )
+
+
+@strawberry.field(description="List available notification rule types")
+async def notification_rule_types() -> list[NotificationRuleTypeGQL]:
+    """Return all available notification rule types."""
+    from ai.backend.common.data.notification import NotificationRuleType
+
+    return [NotificationRuleTypeGQL.from_internal(rt) for rt in NotificationRuleType]
 
 
 # Mutation fields
@@ -298,13 +313,15 @@ async def validate_notification_channel(
 ) -> ValidateNotificationChannelPayload:
     processors = info.context.processors
 
-    action_result = await processors.notification.validate_channel.wait_for_complete(
-        ValidateChannelAction(channel_id=uuid.UUID(input.id))
+    await processors.notification.validate_channel.wait_for_complete(
+        ValidateChannelAction(
+            channel_id=uuid.UUID(input.id),
+            test_message=input.test_message,
+        )
     )
 
     return ValidateNotificationChannelPayload(
-        success=action_result.success,
-        message=action_result.message,
+        id=input.id,
     )
 
 
@@ -326,7 +343,5 @@ async def validate_notification_rule(
     )
 
     return ValidateNotificationRulePayload(
-        success=action_result.success,
         message=action_result.message,
-        rendered_message=action_result.rendered_message,
     )

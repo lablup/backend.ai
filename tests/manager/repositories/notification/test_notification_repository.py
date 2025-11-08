@@ -40,7 +40,6 @@ from ai.backend.manager.models.user import (
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base import OffsetPagination, Querier
 from ai.backend.manager.repositories.notification import NotificationRepository
-from ai.backend.manager.repositories.notification.db_source import NotificationDBSource
 from ai.backend.manager.repositories.notification.options import (
     NotificationChannelConditions,
     NotificationChannelOrders,
@@ -336,21 +335,12 @@ class TestNotificationRepository:
         yield channel_ids
 
     @pytest.fixture
-    async def notification_db_source(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[NotificationDBSource, None]:
-        """Create NotificationDBSource instance with real database"""
-        db_source = NotificationDBSource(db=db_with_cleanup)
-        yield db_source
-
-    @pytest.fixture
     async def notification_repository(
         self,
-        notification_db_source: NotificationDBSource,
+        db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[NotificationRepository, None]:
-        """Create NotificationRepository instance with DB source"""
-        repo = NotificationRepository(db_source=notification_db_source)
+        """Create NotificationRepository instance with database"""
+        repo = NotificationRepository(db=db_with_cleanup)
         yield repo
 
     @pytest.mark.asyncio
@@ -484,15 +474,16 @@ class TestNotificationRepository:
             db_sess.add(disabled_channel)
             await db_sess.flush()
 
-        all_channels = await notification_repository.list_channels()
-        assert len(all_channels) >= 2
+        result = await notification_repository.search_channels()
+        assert len(result.items) >= 2
+        assert result.total_count >= 2
 
         enabled_querier = Querier(
             conditions=[NotificationChannelConditions.by_enabled(True)],
             orders=[],
         )
-        enabled_channels = await notification_repository.list_channels(querier=enabled_querier)
-        assert all(ch.enabled for ch in enabled_channels)
+        enabled_result = await notification_repository.search_channels(querier=enabled_querier)
+        assert all(ch.enabled for ch in enabled_result.items)
 
     @pytest.mark.asyncio
     async def test_create_rule(
@@ -696,16 +687,17 @@ class TestNotificationRepository:
         from ai.backend.manager.repositories.notification.options import NotificationRuleConditions
 
         # List all rules
-        all_rules = await notification_repository.list_rules()
-        assert len(all_rules) >= 3
+        all_result = await notification_repository.search_rules()
+        assert len(all_result.items) >= 3
+        assert all_result.total_count >= 3
 
         # List enabled rules only
         enabled_querier = Querier(
             conditions=[NotificationRuleConditions.by_enabled(True)],
             orders=[],
         )
-        enabled_rules = await notification_repository.list_rules(querier=enabled_querier)
-        assert all(r.enabled for r in enabled_rules)
+        enabled_result = await notification_repository.search_rules(querier=enabled_querier)
+        assert all(r.enabled for r in enabled_result.items)
 
         # List rules by rule_type
         started_querier = Querier(
@@ -714,9 +706,11 @@ class TestNotificationRepository:
             ],
             orders=[],
         )
-        started_rules = await notification_repository.list_rules(querier=started_querier)
-        assert len(started_rules) >= 2
-        assert all(r.rule_type == NotificationRuleType.SESSION_STARTED for r in started_rules)
+        started_result = await notification_repository.search_rules(querier=started_querier)
+        assert len(started_result.items) >= 2
+        assert all(
+            r.rule_type == NotificationRuleType.SESSION_STARTED for r in started_result.items
+        )
 
     @pytest.mark.asyncio
     async def test_delete_channel_with_rules(
@@ -784,8 +778,9 @@ class TestNotificationRepository:
             orders=[],
             pagination=OffsetPagination(limit=10, offset=0),
         )
-        channels = await notification_repository.list_channels(querier=querier)
-        assert len(channels) == 10
+        result = await notification_repository.search_channels(querier=querier)
+        assert len(result.items) == 10
+        assert result.total_count == 25
 
     @pytest.mark.asyncio
     async def test_list_channels_offset_pagination_second_page(
@@ -800,8 +795,9 @@ class TestNotificationRepository:
             orders=[],
             pagination=OffsetPagination(limit=10, offset=10),
         )
-        channels = await notification_repository.list_channels(querier=querier)
-        assert len(channels) == 10
+        result = await notification_repository.search_channels(querier=querier)
+        assert len(result.items) == 10
+        assert result.total_count == 25
 
     @pytest.mark.asyncio
     async def test_list_channels_offset_pagination_last_page(
@@ -816,8 +812,9 @@ class TestNotificationRepository:
             orders=[],
             pagination=OffsetPagination(limit=10, offset=20),
         )
-        channels = await notification_repository.list_channels(querier=querier)
-        assert len(channels) == 5
+        result = await notification_repository.search_channels(querier=querier)
+        assert len(result.items) == 5
+        assert result.total_count == 25
 
     @pytest.mark.asyncio
     async def test_list_channels_pagination_limit_exceeds_total(
@@ -832,8 +829,9 @@ class TestNotificationRepository:
             orders=[],
             pagination=OffsetPagination(limit=100, offset=0),
         )
-        channels = await notification_repository.list_channels(querier=querier)
-        assert len(channels) == 5
+        result = await notification_repository.search_channels(querier=querier)
+        assert len(result.items) == 5
+        assert result.total_count == 5
 
     @pytest.mark.asyncio
     async def test_list_channels_pagination_offset_exceeds_total(
@@ -848,8 +846,9 @@ class TestNotificationRepository:
             orders=[],
             pagination=OffsetPagination(limit=10, offset=100),
         )
-        channels = await notification_repository.list_channels(querier=querier)
-        assert len(channels) == 0
+        result = await notification_repository.search_channels(querier=querier)
+        assert len(result.items) == 0
+        assert result.total_count == 5
 
     @pytest.mark.asyncio
     async def test_list_channels_pagination_with_filter_and_order(
@@ -864,12 +863,13 @@ class TestNotificationRepository:
             orders=[NotificationChannelOrders.name(ascending=True)],
             pagination=OffsetPagination(limit=5, offset=0),
         )
-        channels = await notification_repository.list_channels(querier=querier)
-        assert len(channels) == 5
-        assert all(c.enabled for c in channels)
+        result = await notification_repository.search_channels(querier=querier)
+        assert len(result.items) == 5
+        assert result.total_count == 10  # Only enabled channels
+        assert all(c.enabled for c in result.items)
         # Verify ordering (Channel 00, 02, 04, 06, 08)
-        assert channels[0].name == "Channel 00"
-        assert channels[1].name == "Channel 02"
+        assert result.items[0].name == "Channel 00"
+        assert result.items[1].name == "Channel 02"
 
     @pytest.mark.asyncio
     async def test_list_channels_no_pagination(
@@ -884,5 +884,6 @@ class TestNotificationRepository:
             orders=[],
             pagination=None,
         )
-        channels = await notification_repository.list_channels(querier=querier)
-        assert len(channels) == 15
+        result = await notification_repository.search_channels(querier=querier)
+        assert len(result.items) == 15
+        assert result.total_count == 15

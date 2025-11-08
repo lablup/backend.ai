@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -15,9 +15,11 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy
 from ai.backend.manager.data.notification import (
     NotificationChannelCreator,
     NotificationChannelData,
+    NotificationChannelListResult,
     NotificationChannelModifier,
     NotificationRuleCreator,
     NotificationRuleData,
+    NotificationRuleListResult,
     NotificationRuleModifier,
     NotificationRuleType,
 )
@@ -25,10 +27,10 @@ from ai.backend.manager.repositories.base import Querier
 
 from .db_source import NotificationDBSource
 
-__all__ = (
-    "NotificationRepository",
-    "notification_repository_resilience",
-)
+if TYPE_CHECKING:
+    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+__all__ = ("NotificationRepository",)
 
 
 notification_repository_resilience = Resilience(
@@ -52,8 +54,8 @@ class NotificationRepository:
 
     _db_source: NotificationDBSource
 
-    def __init__(self, db_source: NotificationDBSource) -> None:
-        self._db_source = db_source
+    def __init__(self, db: ExtendedAsyncSAEngine) -> None:
+        self._db_source = NotificationDBSource(db)
 
     @notification_repository_resilience.apply()
     async def get_matching_rules(
@@ -127,17 +129,17 @@ class NotificationRepository:
         return await self._db_source.get_rule_by_id(rule_id)
 
     @notification_repository_resilience.apply()
-    async def list_channels(
+    async def search_channels(
         self,
         querier: Optional[Querier] = None,
-    ) -> list[NotificationChannelData]:
-        """Lists all notification channels."""
-        return await self._db_source.list_channels(querier=querier)
+    ) -> NotificationChannelListResult:
+        """Searches notification channels with total count."""
+        return await self._db_source.search_channels(querier=querier)
 
     @notification_repository_resilience.apply()
-    async def list_rules(
+    async def search_rules(
         self,
         querier: Optional[Querier] = None,
-    ) -> list[NotificationRuleData]:
-        """Lists all notification rules."""
-        return await self._db_source.list_rules(querier=querier)
+    ) -> NotificationRuleListResult:
+        """Searches notification rules with total count."""
+        return await self._db_source.search_rules(querier=querier)

@@ -11,15 +11,15 @@ from .base import NotificationAction
 
 
 @dataclass
-class ListRulesAction(NotificationAction):
-    """Action to list notification rules."""
+class SearchRulesAction(NotificationAction):
+    """Action to search notification rules."""
 
     querier: Optional[Querier] = None
 
     @override
     @classmethod
     def operation_type(cls) -> str:
-        return "list_rules"
+        return "search_rules"
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -27,10 +27,11 @@ class ListRulesAction(NotificationAction):
 
 
 @dataclass
-class ListRulesActionResult(BaseActionResult):
-    """Result of listing notification rules."""
+class SearchRulesActionResult(BaseActionResult):
+    """Result of searching notification rules."""
 
     rules: list[NotificationRuleData]
+    total_count: int
 
     @override
     def entity_id(self) -> Optional[str]:

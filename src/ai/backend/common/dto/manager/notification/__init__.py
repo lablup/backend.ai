@@ -18,6 +18,7 @@ from .request import (
     StringFilter,
     UpdateNotificationChannelRequest,
     UpdateNotificationRuleRequest,
+    ValidateNotificationChannelRequest,
     ValidateNotificationRuleRequest,
 )
 from .response import (
@@ -29,6 +30,7 @@ from .response import (
     GetNotificationRuleResponse,
     ListNotificationChannelsResponse,
     ListNotificationRulesResponse,
+    ListNotificationRuleTypesResponse,
     NotificationChannelDTO,
     NotificationRuleDTO,
     PaginationInfo,
@@ -64,6 +66,7 @@ __all__ = (
     "UpdateNotificationRuleRequest",
     "ListNotificationRulesRequest",
     "SearchNotificationRulesRequest",
+    "ValidateNotificationChannelRequest",
     "ValidateNotificationRuleRequest",
     "StringFilter",
     "NotificationChannelFilter",
@@ -84,6 +87,7 @@ __all__ = (
     "DeleteNotificationRuleResponse",
     "GetNotificationRuleResponse",
     "ListNotificationRulesResponse",
+    "ListNotificationRuleTypesResponse",
     "ValidateNotificationChannelResponse",
     "ValidateNotificationRuleResponse",
     "PaginationInfo",

@@ -29,6 +29,7 @@ __all__ = (
     "DeleteNotificationRuleResponse",
     "GetNotificationRuleResponse",
     "ListNotificationRulesResponse",
+    "ListNotificationRuleTypesResponse",
     "ValidateNotificationChannelResponse",
     "ValidateNotificationRuleResponse",
     "PaginationInfo",
@@ -143,13 +144,18 @@ class ListNotificationRulesResponse(BaseResponseModel):
 class ValidateNotificationChannelResponse(BaseResponseModel):
     """Response for validating a notification channel."""
 
-    success: bool = Field(description="Whether the channel validation was successful")
-    message: str = Field(description="Result message describing the validation outcome")
+    channel_id: UUID = Field(description="ID of the validated channel")
 
 
 class ValidateNotificationRuleResponse(BaseResponseModel):
     """Response for validating a notification rule."""
 
-    success: bool = Field(description="Whether the rule validation was successful")
-    message: str = Field(description="Result message describing the validation outcome")
-    rendered_message: str = Field(description="The rendered message from the template")
+    message: str = Field(description="The rendered message from the template")
+
+
+class ListNotificationRuleTypesResponse(BaseResponseModel):
+    """Response for listing available notification rule types."""
+
+    rule_types: list[NotificationRuleType] = Field(
+        description="List of available notification rule types"
+    )
