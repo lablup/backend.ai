@@ -66,6 +66,7 @@ class ReservoirRegistryAPIHandler:
             event_producer=self._reservoir_service._event_producer,
             manager_http_clients=self._reservoir_service._manager_http_clients,
             reservoir_client_config=self._reservoir_service._reservoir_client_config,
+            redis_client=self._reservoir_service._redis_client,
         )
 
         task_id = await self._reservoir_service.import_models_batch(
@@ -107,6 +108,7 @@ def create_app(ctx: RootContext) -> web.Application:
             artifact_verifier_ctx=ctx.artifact_verifier_ctx,
             manager_http_clients=ctx.manager_http_clients,
             reservoir_client_config=ctx.local_config.reservoir_client,
+            redis_client=ctx.valkey_artifact_client,
         )
     )
     reservoir_api_handler = ReservoirRegistryAPIHandler(
