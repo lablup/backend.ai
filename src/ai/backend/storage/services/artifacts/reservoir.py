@@ -98,7 +98,6 @@ class ReservoirVFSFileDownloader:
     _redis_client: ValkeyArtifactDownloadTrackingClient
     _model_id: str
     _revision: str
-    _download_progress_update_interval: int
 
     def __init__(
         self,
@@ -107,14 +106,12 @@ class ReservoirVFSFileDownloader:
         redis_client: ValkeyArtifactDownloadTrackingClient,
         model_id: str,
         revision: str,
-        download_progress_update_interval: int = _DOWNLOAD_PROGRESS_UPDATE_INTERVAL,
     ):
         self._client = client
         self._storage_name = storage_name
         self._redis_client = redis_client
         self._model_id = model_id
         self._revision = revision
-        self._download_progress_update_interval = download_progress_update_interval
 
     async def _periodic_progress_update(
         self,
@@ -132,7 +129,7 @@ class ReservoirVFSFileDownloader:
         :param download_complete: Callable that returns whether download is complete
         """
         while not download_complete():
-            await asyncio.sleep(self._download_progress_update_interval)
+            await asyncio.sleep(_DOWNLOAD_PROGRESS_UPDATE_INTERVAL)
 
             try:
                 current = offset_getter()
@@ -328,7 +325,6 @@ class ReservoirFileDownloadStreamReader(StreamReader):
     _revision: str
     _download_complete: bool
     _progress_task: Optional[asyncio.Task[None]]
-    _download_progress_update_interval: int
 
     def __init__(
         self,
@@ -341,7 +337,6 @@ class ReservoirFileDownloadStreamReader(StreamReader):
         redis_client: ValkeyArtifactDownloadTrackingClient,
         model_id: str,
         revision: str,
-        download_progress_update_interval: int = _DOWNLOAD_PROGRESS_UPDATE_INTERVAL,
     ):
         self._src_s3_client = src_s3_client
         self._key = key
@@ -354,7 +349,6 @@ class ReservoirFileDownloadStreamReader(StreamReader):
         self._revision = revision
         self._download_complete = False
         self._progress_task = None
-        self._download_progress_update_interval = download_progress_update_interval
 
     async def _periodic_progress_update(
         self,
@@ -368,7 +362,7 @@ class ReservoirFileDownloadStreamReader(StreamReader):
         :param total_bytes: Total bytes for this file
         """
         while not self._download_complete:
-            await asyncio.sleep(self._download_progress_update_interval)
+            await asyncio.sleep(_DOWNLOAD_PROGRESS_UPDATE_INTERVAL)
 
             try:
                 current = offset_getter()
