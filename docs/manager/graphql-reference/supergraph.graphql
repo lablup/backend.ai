@@ -554,6 +554,11 @@ type ArtifactRevision implements Node
   Digest at the time of import. None for models that have not been imported. Added in 25.17.0
   """
   digest: String
+
+  """
+  Verification result containing malware scan results from all verifiers. None if not yet verified. Added in 25.17.0
+  """
+  verificationResult: ArtifactVerificationResult
   artifact: Artifact!
 }
 
@@ -665,6 +670,36 @@ input ArtifactRevisionStatusFilter
   equals: ArtifactStatus = null
 }
 
+"""
+Added in 25.17.0.
+
+Result from a single malware verifier containing scan results and metadata.
+
+Each verifier scans the artifact for potential security issues and reports
+findings including infected file count, scan time, and any errors encountered.
+"""
+type ArtifactSingleVerifierResult
+  @join__type(graph: STRAWBERRY)
+{
+  """Whether the verification completed successfully"""
+  success: Boolean!
+
+  """Number of infected or suspicious files detected"""
+  infectedCount: Int!
+
+  """Time taken to complete the scan in seconds"""
+  scanTime: Float
+
+  """Total number of files scanned"""
+  scannedFiles: Int
+
+  """List of non-fatal errors encountered during scanning"""
+  errors: [String!]!
+
+  """Fatal error message if the verifier failed to complete"""
+  error: String
+}
+
 enum ArtifactStatus
   @join__type(graph: STRAWBERRY)
 {
@@ -712,6 +747,38 @@ enum ArtifactType
   MODEL @join__enumValue(graph: STRAWBERRY)
   PACKAGE @join__enumValue(graph: STRAWBERRY)
   IMAGE @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 25.17.0.
+
+Complete verification result containing results from all configured verifiers.
+
+Artifacts undergo malware scanning through multiple verifiers after being imported.
+This type aggregates results from all verifiers that were run on the artifact.
+"""
+type ArtifactVerificationResult
+  @join__type(graph: STRAWBERRY)
+{
+  """Results from each verifier that scanned the artifact"""
+  verifiers: [ArtifactVerifierResultEntry!]!
+}
+
+"""
+Added in 25.17.0.
+
+Entry for a single verifier's result in the verification results.
+
+Associates a verifier name with its scan results.
+"""
+type ArtifactVerifierResultEntry
+  @join__type(graph: STRAWBERRY)
+{
+  """Name of the verifier (e.g., 'clamav', 'custom')"""
+  name: String!
+
+  """Scan result from this verifier"""
+  result: ArtifactSingleVerifierResult!
 }
 
 """Added in 24.03.9."""

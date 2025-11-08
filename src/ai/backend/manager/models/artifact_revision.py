@@ -6,6 +6,7 @@ import uuid
 import sqlalchemy as sa
 from sqlalchemy.orm import foreign, relationship
 
+from ai.backend.common.data.artifact.types import VerificationResult
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import (
@@ -105,18 +106,17 @@ class ArtifactRevisionRow(Base):
         )
 
     def to_dataclass(self) -> ArtifactRevisionData:
-        from ai.backend.common.data.artifact.types import ArtifactVerifiersResult
-
         # Convert JSON dict back to Pydantic model if present
         verification_result = None
         if self.verification_result is not None:
             try:
-                verification_result = ArtifactVerifiersResult.model_validate(
-                    self.verification_result
-                )
+                verification_result = VerificationResult.model_validate(self.verification_result)
             except Exception:
                 # If validation fails, keep as None
                 verification_result = None
+                log.warning(
+                    "Failed to validate verification_result for ArtifactRevisionRow id=%s", self.id
+                )
 
         return ArtifactRevisionData(
             id=self.id,

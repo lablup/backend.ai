@@ -11,6 +11,10 @@ from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.data.artifact.types import (
+    SingleVerifierResult,
+    VerificationResult,
+)
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
 from ai.backend.manager.api.gql.base import (
@@ -79,6 +83,91 @@ from ai.backend.manager.services.artifact_revision.actions.reject import (
 from ai.backend.manager.types import PaginationOptions, TriState
 
 from .artifact_registry_meta import ArtifactRegistryMeta
+
+
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.17.0.
+
+    Result from a single malware verifier containing scan results and metadata.
+
+    Each verifier scans the artifact for potential security issues and reports
+    findings including infected file count, scan time, and any errors encountered.
+    """)
+)
+class ArtifactSingleVerifierResult:
+    success: bool = strawberry.field(description="Whether the verification completed successfully")
+    infected_count: int = strawberry.field(
+        description="Number of infected or suspicious files detected"
+    )
+    scan_time: Optional[float] = strawberry.field(
+        description="Time taken to complete the scan in seconds"
+    )
+    scanned_files: Optional[int] = strawberry.field(description="Total number of files scanned")
+    errors: list[str] = strawberry.field(
+        description="List of non-fatal errors encountered during scanning"
+    )
+    error: Optional[str] = strawberry.field(
+        description="Fatal error message if the verifier failed to complete"
+    )
+
+    @classmethod
+    def from_dataclass(cls, data: SingleVerifierResult) -> Self:
+        return cls(
+            success=data.success,
+            infected_count=data.infected_count,
+            scan_time=data.scan_time,
+            scanned_files=data.scanned_files,
+            errors=data.errors,
+            error=data.error,
+        )
+
+
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.17.0.
+
+    Entry for a single verifier's result in the verification results.
+
+    Associates a verifier name with its scan results.
+    """)
+)
+class ArtifactVerifierResultEntry:
+    name: str = strawberry.field(description="Name of the verifier (e.g., 'clamav', 'custom')")
+    result: ArtifactSingleVerifierResult = strawberry.field(
+        description="Scan result from this verifier"
+    )
+
+    @classmethod
+    def from_verifier_result(cls, name: str, result: SingleVerifierResult) -> Self:
+        return cls(
+            name=name,
+            result=ArtifactSingleVerifierResult.from_dataclass(result),
+        )
+
+
+@strawberry.type(
+    description=dedent_strip("""
+    Added in 25.17.0.
+
+    Complete verification result containing results from all configured verifiers.
+
+    Artifacts undergo malware scanning through multiple verifiers after being imported.
+    This type aggregates results from all verifiers that were run on the artifact.
+    """)
+)
+class ArtifactVerificationResult:
+    verifiers: list[ArtifactVerifierResultEntry] = strawberry.field(
+        description="Results from each verifier that scanned the artifact"
+    )
+
+    @classmethod
+    def from_dataclass(cls, data: VerificationResult) -> Self:
+        verifier_entries = [
+            ArtifactVerifierResultEntry.from_verifier_result(verifier_name, verifier_result)
+            for verifier_name, verifier_result in data.verifiers.items()
+        ]
+        return cls(verifiers=verifier_entries)
 
 
 @strawberry.input(
@@ -589,6 +678,9 @@ class ArtifactRevision(Node):
     digest: Optional[str] = strawberry.field(
         description="Digest at the time of import. None for models that have not been imported. Added in 25.17.0"
     )
+    verification_result: Optional[ArtifactVerificationResult] = strawberry.field(
+        description="Verification result containing malware scan results from all verifiers. None if not yet verified. Added in 25.17.0"
+    )
 
     @classmethod
     def from_dataclass(cls, data: ArtifactRevisionData) -> Self:
@@ -602,6 +694,9 @@ class ArtifactRevision(Node):
             created_at=data.created_at,
             updated_at=data.updated_at,
             digest=data.digest,
+            verification_result=ArtifactVerificationResult.from_dataclass(data.verification_result)
+            if data.verification_result
+            else None,
         )
 
     @strawberry.field
