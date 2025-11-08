@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 @dataclass
-class VerifierResult:
+class SingleVerifierResult:
     """Result from a single verifier"""
 
     success: bool
@@ -19,10 +19,10 @@ class VerifierResult:
     error: Optional[str] = None  # For when verifier fails with exception
 
 
-class ArtifactVerifiersResult(BaseModel):
+class VerificationResult(BaseModel):
     """Complete verification result containing results from all verifiers"""
 
-    verifiers: dict[str, VerifierResult]
+    verifiers: dict[str, SingleVerifierResult]
 
 
 class ArtifactRegistryType(enum.StrEnum):

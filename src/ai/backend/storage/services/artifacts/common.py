@@ -6,8 +6,8 @@ from typing import cast, override
 
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
-    ArtifactVerifiersResult,
-    VerifierResult,
+    SingleVerifierResult,
+    VerificationResult,
 )
 from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 from ai.backend.common.events.dispatcher import EventProducer
@@ -101,7 +101,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
         dst_storage = cast(VFSStorage, dst_storage)
 
         # Collect verification results from all verifiers
-        verifier_results: dict[str, VerifierResult] = {}
+        verifier_results: dict[str, SingleVerifierResult] = {}
         verification_success = True
 
         for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
@@ -113,7 +113,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
                 result = await verifier.verify(dst_path, context)
 
                 # Create VerifierResult object
-                verifier_results[verifier_name] = VerifierResult(
+                verifier_results[verifier_name] = SingleVerifierResult(
                     success=result.infected_count == 0,
                     infected_count=result.infected_count,
                     scan_time=None,
@@ -133,7 +133,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
             except Exception as e:
                 verification_success = False
-                verifier_results[verifier_name] = VerifierResult(
+                verifier_results[verifier_name] = SingleVerifierResult(
                     success=False,
                     infected_count=0,
                     scan_time=None,
@@ -144,7 +144,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
                 log.error(f"Artifact verification using '{verifier_name}' failed: {e}")
 
         # Create complete verification result
-        verification_result = ArtifactVerifiersResult(
+        verification_result = VerificationResult(
             verifiers=verifier_results,
         )
 

@@ -6,7 +6,7 @@ from typing import Any, Optional, Self
 
 from ai.backend.common.data.artifact.types import (
     ArtifactRegistryType,
-    ArtifactVerifiersResult,
+    VerificationResult,
 )
 from ai.backend.manager.data.common.types import StringFilterData
 
@@ -82,7 +82,7 @@ class ArtifactRevisionData:
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     digest: Optional[str]
-    verification_result: Optional[ArtifactVerifiersResult]
+    verification_result: Optional[VerificationResult]
 
 
 @dataclass
@@ -98,7 +98,7 @@ class ArtifactRevisionResponseData:
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     digest: Optional[str]
-    verification_result: Optional[ArtifactVerifiersResult]
+    verification_result: Optional[VerificationResult]
 
     @classmethod
     def from_revision_data(cls, data: ArtifactRevisionData) -> Self:
