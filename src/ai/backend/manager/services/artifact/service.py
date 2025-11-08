@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import uuid
-from typing import Optional, cast
+from typing import Optional
 
 from aiohttp.client_exceptions import ClientConnectorError
 from pydantic import TypeAdapter
@@ -282,8 +282,8 @@ class ArtifactService:
                                     ArtifactStatus.SCANNED,
                                     ArtifactStatus.FAILED,
                                 ]:
-                                    remote_status = cast(
-                                        ArtifactRemoteStatus, response_revision.status
+                                    remote_status = ArtifactRemoteStatus(
+                                        response_revision.status.value
                                     )
                             except ArtifactRevisionNotFoundError:
                                 # New artifact revision - no remote_status to track

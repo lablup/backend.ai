@@ -448,7 +448,7 @@ class ArtifactRevisionService:
                                 artifact_revision_ids=[revision_data.id],
                                 artifact_type=artifact.type,
                                 # We can't pass delegatee_reservoir_id here since we don't have it.
-                                # So we depends on default.
+                                # So we depend on default.
                                 delegator_reservoir_id=None,
                                 delegatee_target=None,
                             )
