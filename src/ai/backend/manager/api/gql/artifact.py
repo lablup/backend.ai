@@ -100,13 +100,11 @@ class ArtifactSingleVerifierResult:
     infected_count: int = strawberry.field(
         description="Number of infected or suspicious files detected"
     )
-    scan_time: Optional[float] = strawberry.field(
-        description="Time taken to complete the scan in seconds"
+    scanned_at: datetime = strawberry.field(description="Timestamp when verification started")
+    scan_time: float = strawberry.field(
+        description="Time taken to complete verification in seconds"
     )
-    scanned_files: Optional[int] = strawberry.field(description="Total number of files scanned")
-    errors: list[str] = strawberry.field(
-        description="List of non-fatal errors encountered during scanning"
-    )
+    scanned_count: int = strawberry.field(description="Total number of files scanned")
     error: Optional[str] = strawberry.field(
         description="Fatal error message if the verifier failed to complete"
     )
@@ -116,9 +114,9 @@ class ArtifactSingleVerifierResult:
         return cls(
             success=data.success,
             infected_count=data.infected_count,
+            scanned_at=data.scanned_at,
             scan_time=data.scan_time,
-            scanned_files=data.scanned_files,
-            errors=data.errors,
+            scanned_count=data.scanned_count,
             error=data.error,
         )
 

@@ -111,11 +111,13 @@ class ArtifactRevisionRow(Base):
         if self.verification_result is not None:
             try:
                 verification_result = VerificationResult.model_validate(self.verification_result)
-            except Exception:
+            except Exception as e:
                 # If validation fails, keep as None
                 verification_result = None
                 log.warning(
-                    "Failed to validate verification_result for ArtifactRevisionRow id=%s", self.id
+                    "Failed to validate verification_result for ArtifactRevisionRow id={}: {}",
+                    self.id,
+                    e,
                 )
 
         return ArtifactRevisionData(

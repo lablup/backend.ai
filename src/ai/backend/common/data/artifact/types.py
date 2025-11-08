@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -13,9 +14,9 @@ class SingleVerifierResult:
 
     success: bool
     infected_count: int
-    scan_time: Optional[float]
-    scanned_files: Optional[int]
-    errors: list[str]
+    scanned_at: datetime  # Timestamp when verification started
+    scan_time: float  # Time taken to complete verification in seconds
+    scanned_count: int
     error: Optional[str] = None  # For when verifier fails with exception
 
 

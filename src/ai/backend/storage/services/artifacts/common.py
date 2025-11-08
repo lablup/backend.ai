@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from datetime import datetime, timezone
 from typing import cast, override
 
 from ai.backend.common.data.artifact.types import (
@@ -106,19 +107,22 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
         for verifier_name, verifier in self._artifact_verifier_ctx._verifiers.items():
             dst_path = dst_storage.resolve_path(model_prefix)
+            verifier_start_time = datetime.now(timezone.utc)
             log.info(
                 f"Starting artifact verification using '{verifier_name}', dst_path: {dst_path}"
             )
             try:
                 result = await verifier.verify(dst_path, context)
+                verifier_end_time = datetime.now(timezone.utc)
+                elapsed_time = (verifier_end_time - verifier_start_time).total_seconds()
 
                 # Create VerifierResult object
                 verifier_results[verifier_name] = SingleVerifierResult(
                     success=result.infected_count == 0,
                     infected_count=result.infected_count,
-                    scan_time=None,
-                    scanned_files=result.scanned_count,
-                    errors=[],
+                    scanned_at=verifier_start_time,
+                    scan_time=elapsed_time,
+                    scanned_count=result.scanned_count,
                 )
 
                 if result.infected_count > 0:
@@ -133,12 +137,14 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
 
             except Exception as e:
                 verification_success = False
+                verifier_end_time = datetime.now(timezone.utc)
+                elapsed_time = (verifier_end_time - verifier_start_time).total_seconds()
                 verifier_results[verifier_name] = SingleVerifierResult(
                     success=False,
                     infected_count=0,
-                    scan_time=None,
-                    scanned_files=None,
-                    errors=[],
+                    scanned_at=verifier_start_time,
+                    scan_time=elapsed_time,
+                    scanned_count=0,
                     error=str(e),
                 )
                 log.error(f"Artifact verification using '{verifier_name}' failed: {e}")

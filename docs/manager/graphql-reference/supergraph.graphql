@@ -687,14 +687,14 @@ type ArtifactSingleVerifierResult
   """Number of infected or suspicious files detected"""
   infectedCount: Int!
 
-  """Time taken to complete the scan in seconds"""
-  scanTime: Float
+  """Timestamp when verification started"""
+  scannedAt: DateTime!
+
+  """Time taken to complete verification in seconds"""
+  scanTime: Float!
 
   """Total number of files scanned"""
-  scannedFiles: Int
-
-  """List of non-fatal errors encountered during scanning"""
-  errors: [String!]!
+  scannedCount: Int!
 
   """Fatal error message if the verifier failed to complete"""
   error: String
