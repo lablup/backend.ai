@@ -33,6 +33,7 @@ def processors(extra_fixtures, database_fixture, database_engine, registry_ctx):
     storage_manager = MagicMock()
     config_provider = MagicMock()
     valkey_artifact_client = MagicMock(spec=ValkeyArtifactDownloadTrackingClient)
+    background_task_manager = MagicMock()
 
     artifact_revision_service = ArtifactRevisionService(
         artifact_repository=artifact_repository,
@@ -45,5 +46,6 @@ def processors(extra_fixtures, database_fixture, database_engine, registry_ctx):
         storage_manager=storage_manager,
         config_provider=config_provider,
         valkey_artifact_client=valkey_artifact_client,
+        background_task_manager=background_task_manager,
     )
     return ArtifactRevisionProcessors(artifact_revision_service, [])
