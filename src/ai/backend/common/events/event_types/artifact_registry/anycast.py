@@ -36,37 +36,3 @@ class DoScanReservoirRegistryEvent(AbstractAnycastEvent):
     @override
     def user_event(self) -> Optional[UserEvent]:
         return None
-
-
-class DoPullReservoirRegistryEvent(AbstractAnycastEvent):
-    """Event to trigger reservoir registry artifact pulling from remote storage."""
-
-    def __init__(self) -> None:
-        pass
-
-    @override
-    def serialize(self) -> tuple:
-        return ()
-
-    @classmethod
-    @override
-    def deserialize(cls, value: tuple) -> Self:
-        return cls()
-
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "do_pull_reservoir_registry"
-
-    @classmethod
-    @override
-    def event_domain(cls) -> EventDomain:
-        return EventDomain.ARTIFACT
-
-    @override
-    def domain_id(self) -> Optional[str]:
-        return None
-
-    @override
-    def user_event(self) -> Optional[UserEvent]:
-        return None
