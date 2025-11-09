@@ -9941,6 +9941,35 @@
         "description": "List all available notification rule types.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/notifications/rule-types/{rule_type}/schema": {
+      "get": {
+        "operationId": "notifications.get_rule_type_schema",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get JSON schema for a notification rule type's message format.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/notifications/rules": {
       "post": {
         "operationId": "notifications.create_rule",
