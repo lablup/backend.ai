@@ -106,6 +106,7 @@ class ArtifactVerifierGQLResult:
         description="Time taken to complete verification in seconds"
     )
     scanned_count: int = strawberry.field(description="Total number of files scanned")
+    metadata: JSON = strawberry.field(description="Additional metadata from the verifier")
     error: Optional[str] = strawberry.field(
         description="Fatal error message if the verifier failed to complete"
     )
@@ -118,6 +119,7 @@ class ArtifactVerifierGQLResult:
             scanned_at=data.scanned_at,
             scan_time=data.scan_time,
             scanned_count=data.scanned_count,
+            metadata=data.metadata,
             error=data.error,
         )
 

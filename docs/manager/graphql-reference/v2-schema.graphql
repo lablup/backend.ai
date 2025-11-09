@@ -494,6 +494,9 @@ type ArtifactVerifierResult {
   """Total number of files scanned"""
   scannedCount: Int!
 
+  """Additional metadata from the verifier"""
+  metadata: JSON!
+
   """Fatal error message if the verifier failed to complete"""
   error: String
 }

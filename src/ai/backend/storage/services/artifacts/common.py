@@ -123,6 +123,7 @@ class ModelVerifyStep(ImportStep[DownloadStepResult], ABC):
                     scanned_at=verifier_start_time,
                     scan_time=elapsed_time,
                     scanned_count=result.scanned_count,
+                    metadata=result.metadata,
                 )
 
                 if result.infected_count > 0:
