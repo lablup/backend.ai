@@ -73,19 +73,21 @@ class SessionHook(AbstractSessionHook):
         from datetime import datetime, timezone
 
         from ai.backend.common.data.notification import NotificationRuleType
+        from ai.backend.common.data.notification.messages import SessionStartedMessage
         from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 
         try:
+            message = SessionStartedMessage(
+                session_id=str(session.session_id),
+                session_name=session.session_name,
+                session_type=session.session_type.value,
+                cluster_mode=session.cluster_mode.value,
+                status="RUNNING",
+            )
             event = NotificationTriggeredEvent(
                 rule_type=NotificationRuleType.SESSION_STARTED.value,
                 timestamp=datetime.now(timezone.utc),
-                notification_data={
-                    "session_id": str(session.session_id),
-                    "session_name": session.session_name or None,
-                    "session_type": session.session_type.value,
-                    "cluster_mode": session.cluster_mode.value,
-                    "status": "RUNNING",
-                },
+                notification_data=message.model_dump(),
             )
             await self._event_producer.anycast_event(event)
             log.debug("Produced session started notification for {}", session.session_id)
@@ -103,20 +105,22 @@ class SessionHook(AbstractSessionHook):
         from datetime import datetime, timezone
 
         from ai.backend.common.data.notification import NotificationRuleType
+        from ai.backend.common.data.notification.messages import SessionTerminatedMessage
         from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 
         try:
+            message = SessionTerminatedMessage(
+                session_id=str(session.session_id),
+                session_name=session.session_name,
+                session_type=session.session_type.value,
+                cluster_mode=session.cluster_mode.value,
+                status="TERMINATED",
+                termination_reason=session.status_info,
+            )
             event = NotificationTriggeredEvent(
                 rule_type=NotificationRuleType.SESSION_TERMINATED.value,
                 timestamp=datetime.now(timezone.utc),
-                notification_data={
-                    "session_id": str(session.session_id),
-                    "session_name": session.session_name or None,
-                    "session_type": session.session_type.value,
-                    "cluster_mode": session.cluster_mode.value,
-                    "status": "TERMINATED",
-                    "termination_reason": session.status_info or None,
-                },
+                notification_data=message.model_dump(),
             )
             await self._event_producer.anycast_event(event)
             log.debug("Produced session terminated notification for {}", session.session_id)
