@@ -16,6 +16,45 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.17.0rc1 (2025-11-09)
+
+### Features
+* Implement `artifact_verifier` type plugin in storage-proxy ([#6258](https://github.com/lablup/backend.ai/issues/6258))
+* Fix `limit`, `search` parameters not working in reservoir registry's `scan_artifact` API ([#6488](https://github.com/lablup/backend.ai/issues/6488))
+* Implement pickle based Kernel registry recovery which can replace existing kernel registry load and save functions ([#6489](https://github.com/lablup/backend.ai/issues/6489))
+* Separate DB source from artifact repository layers ([#6490](https://github.com/lablup/backend.ai/issues/6490))
+* Re-import available artifacts only when necessary based on digest ([#6501](https://github.com/lablup/backend.ai/issues/6501))
+* Add image purge/rescan background tasks and modernize task system ([#6597](https://github.com/lablup/backend.ai/issues/6597))
+* Improve bgtask infrastructure with repository pattern and type adapters ([#6606](https://github.com/lablup/backend.ai/issues/6606))
+* Add `extra` column to Artifact model to store gated information for `huggingface` models ([#6620](https://github.com/lablup/backend.ai/issues/6620))
+* Migrate commit session to retriable background task pattern ([#6625](https://github.com/lablup/backend.ai/issues/6625))
+* Support bind, advertised address configuration options for app-proxy coordinator and worker components ([#6631](https://github.com/lablup/backend.ai/issues/6631))
+* Implement notification system with channels, rules, and event processing ([#6635](https://github.com/lablup/backend.ai/issues/6635))
+* Implement notification center with REST/GraphQL APIs for managing channels and rules ([#6653](https://github.com/lablup/backend.ai/issues/6653))
+* Add notification validation API and notification CLI ([#6657](https://github.com/lablup/backend.ai/issues/6657))
+* Collect artifact verification results to `artifact_revisions` table ([#6662](https://github.com/lablup/backend.ai/issues/6662))
+* Track Artifact download progress through redis ([#6663](https://github.com/lablup/backend.ai/issues/6663))
+* Create artifact download progress query REST API ([#6666](https://github.com/lablup/backend.ai/issues/6666))
+* Add notification center with webhook channel support ([#6668](https://github.com/lablup/backend.ai/issues/6668))
+* Extend reservoir registry artifact import API to perform import delegation when the artifact is not available in the remote reservoir ([#6672](https://github.com/lablup/backend.ai/issues/6672))
+* Track Reservoir registry artifact download progress ([#6673](https://github.com/lablup/backend.ai/issues/6673))
+* Add `metadata` field to artifact verifier interface ([#6676](https://github.com/lablup/backend.ai/issues/6676))
+* Implement notification message type system and validation APIs ([#6677](https://github.com/lablup/backend.ai/issues/6677))
+
+### Improvements
+* Change Action Processor arguments to immutable types and made them contravariant to prevent memory leaks and improve type safety ([#6596](https://github.com/lablup/backend.ai/issues/6596))
+
+### Fixes
+* Update `gpu_allocated` legacy metric fields to consider all accelerator devices, including both `cuda.devices` and `cuda.shares`, but also MIG variants and other NPUs as well (Known issue: all resources visible to each user and group MUST use a consistent fraction mode) ([#2404](https://github.com/lablup/backend.ai/issues/2404))
+* Refresh VAST cluster info cache rather than keep the cache alive forever ([#6428](https://github.com/lablup/backend.ai/issues/6428))
+* Adjust reservoir download API client timeout and add proper connection termination handling ([#6627](https://github.com/lablup/backend.ai/issues/6627))
+* Remove `DoPullReservoirRegistryEvent`, and the event handler ([#6680](https://github.com/lablup/backend.ai/issues/6680))
+
+### Documentation Updates
+* Add Entry Point, Event, and Background Task architecture documentation ([#6594](https://github.com/lablup/backend.ai/issues/6594))
+* Document adapter and Querier patterns in API/GraphQL/Repository READMEs ([#6656](https://github.com/lablup/backend.ai/issues/6656))
+
+
 ## 25.16.0 (2025-11-01)
 
 ### Features

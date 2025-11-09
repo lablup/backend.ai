@@ -228,3 +228,17 @@ registries = []
 # Each configuration defines how to connect to and use an artifact registry
 # service.
 [artifact-registries]
+
+[reservoir-client]
+  # Total timeout for the entire request (in seconds).
+  # None means no timeout.
+  ## timeout-total = 300.0
+  # Timeout for acquiring a connection from the pool (in seconds).
+  # None means no timeout.
+  ## timeout-connect = 60.0
+  # Timeout for connecting to a peer for a new connection (in seconds).
+  # None means no timeout.
+  ## timeout-sock-connect = 30.0
+  # Timeout for reading a portion of data from a peer (in seconds).
+  # None means no timeout.
+  ## timeout-sock-read = 300.0
