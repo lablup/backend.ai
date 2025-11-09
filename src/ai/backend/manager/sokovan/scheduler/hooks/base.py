@@ -4,6 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
+from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import ClusterMode
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.clients.agent.pool import AgentPool
@@ -50,6 +51,7 @@ class SessionHookArgs:
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
     agent_pool: AgentPool
+    event_producer: EventProducer
 
 
 class SessionHook(AbstractSessionHook):
@@ -57,16 +59,79 @@ class SessionHook(AbstractSessionHook):
     _network_plugin_ctx: NetworkPluginContext
     _config_provider: ManagerConfigProvider
     _agent_pool: AgentPool
+    _event_producer: EventProducer
 
     def __init__(self, session_hook: AbstractSessionHook, args: SessionHookArgs) -> None:
         self._session_hook = session_hook
         self._network_plugin_ctx = args.network_plugin_ctx
         self._config_provider = args.config_provider
         self._agent_pool = args.agent_pool
+        self._event_producer = args.event_producer
+
+    async def _produce_session_started_notification(self, session: SessionTransitionData) -> None:
+        """Produce notification event for session start."""
+        from datetime import datetime, timezone
+
+        from ai.backend.common.data.notification import NotificationRuleType
+        from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
+
+        try:
+            event = NotificationTriggeredEvent(
+                rule_type=NotificationRuleType.SESSION_STARTED.value,
+                timestamp=datetime.now(timezone.utc),
+                notification_data={
+                    "session_id": str(session.session_id),
+                    "session_name": session.session_name or None,
+                    "session_type": session.session_type.value,
+                    "cluster_mode": session.cluster_mode.value,
+                    "status": "RUNNING",
+                },
+            )
+            await self._event_producer.anycast_event(event)
+            log.debug("Produced session started notification for {}", session.session_id)
+        except Exception as e:
+            log.error(
+                "Failed to produce session started notification for {}: {}",
+                session.session_id,
+                e,
+            )
+
+    async def _produce_session_terminated_notification(
+        self, session: SessionTransitionData
+    ) -> None:
+        """Produce notification event for session termination."""
+        from datetime import datetime, timezone
+
+        from ai.backend.common.data.notification import NotificationRuleType
+        from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
+
+        try:
+            event = NotificationTriggeredEvent(
+                rule_type=NotificationRuleType.SESSION_TERMINATED.value,
+                timestamp=datetime.now(timezone.utc),
+                notification_data={
+                    "session_id": str(session.session_id),
+                    "session_name": session.session_name or None,
+                    "session_type": session.session_type.value,
+                    "cluster_mode": session.cluster_mode.value,
+                    "status": "TERMINATED",
+                    "termination_reason": session.status_info or None,
+                },
+            )
+            await self._event_producer.anycast_event(event)
+            log.debug("Produced session terminated notification for {}", session.session_id)
+        except Exception as e:
+            log.error(
+                "Failed to produce session terminated notification for {}: {}",
+                session.session_id,
+                e,
+            )
 
     async def on_transition_to_running(self, session: SessionTransitionData) -> None:
-        # Bypass to the actual hook implementation
+        # Execute session-type specific hook first
         await self._session_hook.on_transition_to_running(session)
+        # Produce notification event AFTER successful hook execution
+        await self._produce_session_started_notification(session)
 
     async def on_transition_to_terminated(self, session: SessionTransitionData) -> None:
         try:
@@ -78,6 +143,9 @@ class SessionHook(AbstractSessionHook):
                 str(e),
             )
         finally:
+            # Produce notification BEFORE network cleanup
+            await self._produce_session_terminated_notification(session)
+
             log.info(
                 "Running default cleanup for session transition data {}",
                 session,
