@@ -5,15 +5,21 @@ from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.notification import NotificationChannelData
+from ai.backend.manager.repositories.base import Querier
 
 from .base import NotificationAction
 
 
 @dataclass
-class ListChannelsAction(NotificationAction):
-    """Action to list notification channels."""
+class SearchChannelsAction(NotificationAction):
+    """Action to search notification channels."""
 
-    enabled_only: bool = False
+    querier: Optional[Querier] = None
+
+    @override
+    @classmethod
+    def operation_type(cls) -> str:
+        return "search_channels"
 
     @override
     def entity_id(self) -> Optional[str]:
@@ -21,10 +27,11 @@ class ListChannelsAction(NotificationAction):
 
 
 @dataclass
-class ListChannelsActionResult(BaseActionResult):
-    """Result of listing notification channels."""
+class SearchChannelsActionResult(BaseActionResult):
+    """Result of searching notification channels."""
 
     channels: list[NotificationChannelData]
+    total_count: int
 
     @override
     def entity_id(self) -> Optional[str]:

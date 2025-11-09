@@ -16,6 +16,7 @@ __all__ = (
     "NotificationChannelConflict",
     "NotificationRuleConflict",
     "NotificationProcessingFailure",
+    "NotificationTemplateRenderingFailure",
     "InvalidNotificationChannelType",
 )
 
@@ -82,6 +83,19 @@ class NotificationProcessingFailure(BackendAIError, web.HTTPInternalServerError)
             domain=ErrorDomain.NOTIFICATION,
             operation=ErrorOperation.GENERIC,
             error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class NotificationTemplateRenderingFailure(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/notification-template-rendering-failure"
+    error_title = "Failed to render notification template."
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.NOTIFICATION,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
         )
 
 

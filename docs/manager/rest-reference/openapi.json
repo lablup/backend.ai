@@ -1873,6 +1873,35 @@
         "description": "\nRetrieve the README content for a specific artifact revision.\n\nReturns the README documentation associated with the artifact revision,\nwhich typically contains usage instructions and model information.\n\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/artifacts/revisions/{artifact_revision_id}/download-progress": {
+      "get": {
+        "operationId": "artifacts.get_download_progress",
+        "tags": [
+          "artifacts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "artifact_revision_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "\nRetrieve download progress for an artifact revision.\n\nReturns detailed download progress information including artifact-level\nand file-level progress data for the specified artifact revision.\nSupports both local and remote download progress when delegation is enabled.\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/artifact-registries/scan": {
       "post": {
         "operationId": "artifact-registries.scan_artifacts",
@@ -9738,6 +9767,330 @@
         ],
         "parameters": [],
         "description": "\nList all VFS storages.\n\nReturns:\n    APIResponse with storage information\n\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/channels": {
+      "post": {
+        "operationId": "notifications.create_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Create a new notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/channels/search": {
+      "post": {
+        "operationId": "notifications.search_channels",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search notification channels with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/channels/{channel_id}": {
+      "get": {
+        "operationId": "notifications.get_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "notifications.update_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "notifications.delete_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Delete a notification channel.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/channels/{channel_id}/validate": {
+      "post": {
+        "operationId": "notifications.validate_channel",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "channel_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Validate a notification channel by sending a test webhook.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rule-types": {
+      "get": {
+        "operationId": "notifications.list_rule_types",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "List all available notification rule types.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rules": {
+      "post": {
+        "operationId": "notifications.create_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Create a new notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rules/search": {
+      "post": {
+        "operationId": "notifications.search_rules",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Search notification rules with filters, orders, and pagination.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rules/{rule_id}": {
+      "get": {
+        "operationId": "notifications.get_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Get a specific notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "notifications.update_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Update an existing notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "delete": {
+        "operationId": "notifications.delete_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Delete a notification rule.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/notifications/rules/{rule_id}/validate": {
+      "post": {
+        "operationId": "notifications.validate_rule",
+        "tags": [
+          "notifications"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "rule_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Validate a notification rule by rendering its template with test data.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     }
   }

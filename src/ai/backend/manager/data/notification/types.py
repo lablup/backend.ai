@@ -5,37 +5,12 @@ from datetime import datetime
 from typing import Any, Optional, override
 from uuid import UUID
 
-from pydantic import BaseModel, Field
-
-from ai.backend.common.types import CIStrEnum
+from ai.backend.common.data.notification import (
+    NotificationChannelType,
+    NotificationRuleType,
+    WebhookConfig,
+)
 from ai.backend.manager.types import Creator, OptionalState, PartialModifier
-
-
-class NotificationChannelType(CIStrEnum):
-    WEBHOOK = "webhook"
-
-
-class WebhookConfig(BaseModel):
-    """Configuration for webhook notification channel."""
-
-    url: str = Field(description="Webhook endpoint URL")
-    method: str = Field(default="POST", description="HTTP method (POST or GET)")
-    headers: dict[str, str] = Field(
-        default_factory=dict, description="Additional HTTP headers to send"
-    )
-    timeout: int = Field(default=30, description="Request timeout in seconds")
-    success_status_codes: list[int] = Field(
-        default=[200, 201, 202, 204],
-        description="HTTP status codes considered as successful delivery",
-    )
-
-
-class NotificationRuleType(CIStrEnum):
-    """Types of notification rules that can be created."""
-
-    SESSION_STARTED = "session.started"
-    SESSION_TERMINATED = "session.terminated"
-    ARTIFACT_DOWNLOAD_COMPLETED = "artifact.download.completed"
 
 
 @dataclass
@@ -159,3 +134,19 @@ class NotificationRuleModifier(PartialModifier):
         self.message_template.update_dict(to_update, "message_template")
         self.enabled.update_dict(to_update, "enabled")
         return to_update
+
+
+@dataclass
+class NotificationChannelListResult:
+    """Search result with total count for notification channels."""
+
+    items: list[NotificationChannelData]
+    total_count: int
+
+
+@dataclass
+class NotificationRuleListResult:
+    """Search result with total count for notification rules."""
+
+    items: list[NotificationRuleData]
+    total_count: int

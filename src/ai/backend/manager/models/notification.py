@@ -9,12 +9,12 @@ from ..data.notification import (
     NotificationChannelData,
     NotificationChannelType,
     NotificationRuleData,
+    NotificationRuleType,
     WebhookConfig,
 )
 from .base import (
     GUID,
     Base,
-    EnumType,
     IDColumn,
 )
 
@@ -41,7 +41,7 @@ class NotificationChannelRow(Base):
     description = sa.Column("description", sa.Text, nullable=True)
     channel_type = sa.Column(
         "channel_type",
-        EnumType(NotificationChannelType),
+        sa.String(length=64),
         nullable=False,
     )
     config = sa.Column(
@@ -81,8 +81,11 @@ class NotificationChannelRow(Base):
 
     def to_data(self) -> NotificationChannelData:
         """Convert Row to domain model data."""
+        # Parse channel_type string to enum
+        channel_type_enum = NotificationChannelType(self.channel_type)
+
         # Parse config based on channel_type
-        match self.channel_type:
+        match channel_type_enum:
             case NotificationChannelType.WEBHOOK:
                 parsed_config = WebhookConfig(**self.config)
             case _:
@@ -92,7 +95,7 @@ class NotificationChannelRow(Base):
             id=self.id,
             name=self.name,
             description=self.description,
-            channel_type=self.channel_type,
+            channel_type=channel_type_enum,
             config=parsed_config,
             enabled=self.enabled,
             created_by=self.created_by,
@@ -142,11 +145,14 @@ class NotificationRuleRow(Base):
 
     def to_data(self) -> NotificationRuleData:
         """Convert Row to domain model data."""
+        # Parse rule_type string to enum
+        rule_type_enum = NotificationRuleType(self.rule_type)
+
         return NotificationRuleData(
             id=self.id,
             name=self.name,
             description=self.description,
-            rule_type=self.rule_type,
+            rule_type=rule_type_enum,
             channel=self.channel.to_data(),
             message_template=self.message_template,
             enabled=self.enabled,

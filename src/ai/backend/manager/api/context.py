@@ -9,6 +9,9 @@ from ai.backend.manager.sokovan.deployment.route.route_controller import RouteCo
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
     from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
+    from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+        ValkeyArtifactDownloadTrackingClient,
+    )
     from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
     from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
         ValkeyContainerLogClient,
@@ -43,6 +46,7 @@ if TYPE_CHECKING:
     from ..idle import IdleCheckerHost
     from ..models.storage import StorageSessionManager
     from ..models.utils import ExtendedAsyncSAEngine
+    from ..notification import NotificationCenter
     from ..plugin.network import NetworkPluginContext
     from ..plugin.webapp import WebappPluginContext
     from ..registry import AgentRegistry
@@ -51,6 +55,7 @@ if TYPE_CHECKING:
     from ..service.base import ServicesContext
     from ..services.processors import Processors
     from ..types import DistributedLockFactory
+    from .gql.adapters import GQLAdapters
     from .types import CORSOptions
 
 
@@ -67,6 +72,7 @@ class RootContext(BaseContext):
     event_fetcher: EventFetcher
     event_producer: EventProducer
     etcd: AsyncEtcd
+    valkey_artifact: ValkeyArtifactDownloadTrackingClient
     valkey_container_log: ValkeyContainerLogClient
     valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
@@ -103,7 +109,9 @@ class RootContext(BaseContext):
     metrics: CommonMetricRegistry
     repositories: Repositories
     processors: Processors
+    notification_center: NotificationCenter
     event_hub: EventHub
     message_queue: AbstractMessageQueue
     service_discovery: ServiceDiscovery
     sd_loop: ServiceDiscoveryLoop
+    gql_adapters: GQLAdapters

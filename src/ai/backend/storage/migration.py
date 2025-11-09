@@ -273,6 +273,7 @@ async def check_and_upgrade(
         metric_registry=CommonMetricRegistry(),
         cors_options={},
         manager_http_clients={},
+        valkey_artifact_client=None,  # type: ignore[arg-type]
         backends={**DEFAULT_BACKENDS},
         volumes={},
     )

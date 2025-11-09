@@ -316,6 +316,11 @@ type ArtifactRevision implements Node {
   Digest at the time of import. None for models that have not been imported. Added in 25.17.0
   """
   digest: String
+
+  """
+  Verification result containing malware scan results from all verifiers. None if not yet verified. Added in 25.17.0
+  """
+  verificationResult: ArtifactVerificationResult
   artifact: Artifact!
 }
 
@@ -450,6 +455,65 @@ enum ArtifactType {
   MODEL
   PACKAGE
   IMAGE
+}
+
+"""
+Added in 25.17.0.
+
+Complete verification result containing results from all configured verifiers.
+
+Artifacts undergo malware scanning through multiple verifiers after being imported.
+This type aggregates results from all verifiers that were run on the artifact.
+"""
+type ArtifactVerificationResult {
+  """Results from each verifier that scanned the artifact"""
+  verifiers: [ArtifactVerifierResultEntry!]!
+}
+
+"""
+Added in 25.17.0.
+
+Result from a single malware verifier containing scan results and metadata.
+
+Each verifier scans the artifact for potential security issues and reports
+findings including infected file count, scan time, and any errors encountered.
+"""
+type ArtifactVerifierResult {
+  """Whether the verification completed successfully"""
+  success: Boolean!
+
+  """Number of infected or suspicious files detected"""
+  infectedCount: Int!
+
+  """Timestamp when verification started"""
+  scannedAt: DateTime!
+
+  """Time taken to complete verification in seconds"""
+  scanTime: Float!
+
+  """Total number of files scanned"""
+  scannedCount: Int!
+
+  """Additional metadata from the verifier"""
+  metadata: JSON!
+
+  """Fatal error message if the verifier failed to complete"""
+  error: String
+}
+
+"""
+Added in 25.17.0.
+
+Entry for a single verifier's result in the verification results.
+
+Associates a verifier name with its scan results.
+"""
+type ArtifactVerifierResultEntry {
+  """Name of the verifier (e.g., 'clamav', 'custom')"""
+  name: String!
+
+  """Scan result from this verifier"""
+  result: ArtifactVerifierResult!
 }
 
 """Added in 25.1.0"""
@@ -647,6 +711,35 @@ type CreateModelRevisionPayload {
   revision: ModelRevision!
 }
 
+"""Input for creating a notification channel"""
+input CreateNotificationChannelInput {
+  name: String!
+  description: String = null
+  channelType: NotificationChannelType! = WEBHOOK
+  config: WebhookConfigInput!
+  enabled: Boolean! = true
+}
+
+"""Payload for create notification channel mutation"""
+type CreateNotificationChannelPayload {
+  channel: NotificationChannel!
+}
+
+"""Input for creating a notification rule"""
+input CreateNotificationRuleInput {
+  name: String!
+  description: String = null
+  ruleType: NotificationRuleType!
+  channelId: ID!
+  messageTemplate: String!
+  enabled: Boolean! = true
+}
+
+"""Payload for create notification rule mutation"""
+type CreateNotificationRulePayload {
+  rule: NotificationRule!
+}
+
 """Added in 25.14.0"""
 input CreateObjectStorageInput {
   name: String!
@@ -832,6 +925,26 @@ input DeleteModelDeploymentInput {
 
 """Added in 25.16.0"""
 type DeleteModelDeploymentPayload {
+  id: ID!
+}
+
+"""Input for deleting a notification channel"""
+input DeleteNotificationChannelInput {
+  id: ID!
+}
+
+"""Payload for delete notification channel mutation"""
+type DeleteNotificationChannelPayload {
+  id: ID!
+}
+
+"""Input for deleting a notification rule"""
+input DeleteNotificationRuleInput {
+  id: ID!
+}
+
+"""Payload for delete notification rule mutation"""
+type DeleteNotificationRulePayload {
   id: ID!
 }
 
@@ -1522,6 +1635,30 @@ type Mutation {
   """
   createModelRevision(input: CreateModelRevisionInput!): CreateModelRevisionPayload!
 
+  """Create a new notification channel"""
+  createNotificationChannel(input: CreateNotificationChannelInput!): CreateNotificationChannelPayload!
+
+  """Update a notification channel"""
+  updateNotificationChannel(input: UpdateNotificationChannelInput!): UpdateNotificationChannelPayload!
+
+  """Delete a notification channel"""
+  deleteNotificationChannel(input: DeleteNotificationChannelInput!): DeleteNotificationChannelPayload!
+
+  """Validate a notification channel"""
+  validateNotificationChannel(input: ValidateNotificationChannelInput!): ValidateNotificationChannelPayload!
+
+  """Create a new notification rule"""
+  createNotificationRule(input: CreateNotificationRuleInput!): CreateNotificationRulePayload!
+
+  """Update a notification rule"""
+  updateNotificationRule(input: UpdateNotificationRuleInput!): UpdateNotificationRulePayload!
+
+  """Delete a notification rule"""
+  deleteNotificationRule(input: DeleteNotificationRuleInput!): DeleteNotificationRulePayload!
+
+  """Validate a notification rule"""
+  validateNotificationRule(input: ValidateNotificationRuleInput!): ValidateNotificationRulePayload!
+
   """Added in 25.14.0"""
   createObjectStorage(input: CreateObjectStorageInput!): CreateObjectStoragePayload!
 
@@ -1615,6 +1752,123 @@ type Mutation {
 interface Node {
   """The Globally Unique ID of this object"""
   id: ID!
+}
+
+"""Notification channel"""
+type NotificationChannel implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String
+  channelType: NotificationChannelType!
+  config: WebhookConfigGQL!
+  enabled: Boolean!
+}
+
+"""Notification channel connection"""
+type NotificationChannelConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [NotificationChannelEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type NotificationChannelEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: NotificationChannel!
+}
+
+"""Filter for notification channels"""
+input NotificationChannelFilter {
+  name: StringFilter = null
+  channelType: [NotificationChannelType!] = null
+  enabled: Boolean = null
+  AND: [NotificationChannelFilter!] = null
+  OR: [NotificationChannelFilter!] = null
+  NOT: [NotificationChannelFilter!] = null
+}
+
+"""Order by specification for notification channels"""
+input NotificationChannelOrderBy {
+  field: NotificationChannelOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum NotificationChannelOrderField {
+  NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Notification channel types"""
+enum NotificationChannelType {
+  WEBHOOK
+}
+
+"""Notification rule"""
+type NotificationRule implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+  name: String!
+  description: String
+  ruleType: NotificationRuleType!
+  channel: NotificationChannel!
+  messageTemplate: String!
+  enabled: Boolean!
+}
+
+"""Notification rule connection"""
+type NotificationRuleConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [NotificationRuleEdge!]!
+  count: Int!
+}
+
+"""An edge in a connection."""
+type NotificationRuleEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: NotificationRule!
+}
+
+"""Filter for notification rules"""
+input NotificationRuleFilter {
+  name: StringFilter = null
+  ruleType: [NotificationRuleType!] = null
+  enabled: Boolean = null
+  AND: [NotificationRuleFilter!] = null
+  OR: [NotificationRuleFilter!] = null
+  NOT: [NotificationRuleFilter!] = null
+}
+
+"""Order by specification for notification rules"""
+input NotificationRuleOrderBy {
+  field: NotificationRuleOrderField!
+  direction: OrderDirection! = ASC
+}
+
+enum NotificationRuleOrderField {
+  NAME
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Notification rule types"""
+enum NotificationRuleType {
+  SESSION_STARTED
+  SESSION_TERMINATED
+  ARTIFACT_DOWNLOAD_COMPLETED
 }
 
 """Added in 25.14.0"""
@@ -1770,6 +2024,21 @@ type Query {
 
   """Added in 25.16.0"""
   replica(id: ID!): ModelReplica
+
+  """Get a notification channel by ID"""
+  notificationChannel(id: ID!): NotificationChannel
+
+  """List notification channels"""
+  notificationChannels(filter: NotificationChannelFilter = null, orderBy: NotificationChannelOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationChannelConnection!
+
+  """Get a notification rule by ID"""
+  notificationRule(id: ID!): NotificationRule
+
+  """List notification rules"""
+  notificationRules(filter: NotificationRuleFilter = null, orderBy: NotificationRuleOrderBy = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): NotificationRuleConnection!
+
+  """List available notification rule types"""
+  notificationRuleTypes: [NotificationRuleType!]!
 
   """Added in 25.14.0"""
   objectStorage(id: ID!): ObjectStorage
@@ -2283,6 +2552,34 @@ type UpdateModelDeploymentPayload {
   deployment: ModelDeployment!
 }
 
+"""Input for updating a notification channel"""
+input UpdateNotificationChannelInput {
+  id: ID!
+  name: String
+  description: String
+  config: WebhookConfigInput
+  enabled: Boolean
+}
+
+"""Payload for update notification channel mutation"""
+type UpdateNotificationChannelPayload {
+  channel: NotificationChannel!
+}
+
+"""Input for updating a notification rule"""
+input UpdateNotificationRuleInput {
+  id: ID!
+  name: String
+  description: String
+  messageTemplate: String
+  enabled: Boolean
+}
+
+"""Payload for update notification rule mutation"""
+type UpdateNotificationRulePayload {
+  rule: NotificationRule!
+}
+
 """Added in 25.14.0"""
 input UpdateObjectStorageInput {
   id: ID!
@@ -2402,8 +2699,39 @@ type VFSStorageEdge {
   node: VFSStorage!
 }
 
+"""Input for validate notification channel mutation"""
+input ValidateNotificationChannelInput {
+  id: ID!
+  testMessage: String!
+}
+
+"""Payload for validate notification channel mutation"""
+type ValidateNotificationChannelPayload {
+  id: ID!
+}
+
+"""Input for validate notification rule mutation"""
+input ValidateNotificationRuleInput {
+  id: ID!
+  notificationData: JSON
+}
+
+"""Payload for validate notification rule mutation"""
+type ValidateNotificationRulePayload {
+  message: String!
+}
+
 extend type VirtualFolderNode @key(fields: "id") {
   id: ID! @external
+}
+
+type WebhookConfigGQL {
+  url: String!
+}
+
+"""Input for webhook configuration"""
+input WebhookConfigInput {
+  url: String!
 }
 
 scalar _Any

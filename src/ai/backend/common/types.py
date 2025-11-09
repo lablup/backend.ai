@@ -10,7 +10,7 @@ import numbers
 import textwrap
 import uuid
 from abc import ABC, ABCMeta, abstractmethod
-from collections import UserDict, defaultdict, namedtuple
+from collections import UserDict, UserString, defaultdict, namedtuple
 from collections.abc import AsyncIterator, Iterable
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -319,7 +319,52 @@ AGENTID_MANAGER = AgentId("manager")
 AGENTID_STORAGE = AgentId("storage")
 DeviceName = NewType("DeviceName", str)
 DeviceId = NewType("DeviceId", str)
-SlotName = NewType("SlotName", str)
+
+
+class SlotName(UserString):
+    __slots__ = ("_parsed", "_device_name", "_major_type", "_minor_type")
+
+    def __init__(self, value: str | SlotName) -> None:
+        self._parsed = False
+        self._device_name = ""
+        self._major_type = ""
+        self._minor_type = ""
+        super().__init__(value)
+
+    def _parse(self) -> None:
+        # Do lazy-parsing for when required only because SlotName is used
+        # very frequently in certain code paths to represent subtypes,
+        # without actually needing to access parsed attributes.
+        if self._parsed:
+            return
+        name, _, type_ = self.data.partition(".")
+        major_type, _, minor_type = type_.partition(":")
+        self._device_name = name
+        self._major_type = major_type
+        self._minor_type = minor_type
+        self._parsed = True
+
+    @property
+    def device_name(self) -> str:
+        self._parse()
+        return self._device_name
+
+    @property
+    def major_type(self) -> str:
+        self._parse()
+        return self._major_type
+
+    @property
+    def minor_type(self) -> str:
+        self._parse()
+        return self._minor_type
+
+    def is_accelerator(self) -> bool:
+        if self.major_type in ("device", "devices", "share", "shares"):
+            return True
+        return False
+
+
 MetricKey = NewType("MetricKey", str)
 
 AccessKey = NewType("AccessKey", str)
@@ -814,21 +859,63 @@ def _validate_binary_size(v: Any) -> BinarySize:
 # Create a custom type annotation for BinarySize fields
 BinarySizeField = Annotated[BinarySize, PlainValidator(_validate_binary_size)]
 
+type RawResourceValue = int | float | str | Decimal | BinarySize
 
-class ResourceSlot(UserDict):
+
+class ResourceSlot(UserDict[str, Decimal]):
     """
     key: `str` type slot name.
-    value: `str` or `Decimal` type value. Do not convert this to `float` or `int`.
+    value: `Decimal` type value. Do not convert this to `float` or `int` for calculation accuracy.
     """
 
     __slots__ = ("data",)
 
-    def __init__(self, *args, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
+    def __init__(
+        self,
+        data: Mapping[SlotName, RawResourceValue | None]
+        | Mapping[str, RawResourceValue | None]
+        | None = None,
+        **kwargs: RawResourceValue | None,  # for legacy codes (TODO: update all kwarg-based init)
+    ) -> None:
+        if data is None:
+            data = {}
+        normalized: dict[str, Decimal] = {}
+        for kwargs_key, v in kwargs.items():
+            if v is None:
+                continue
+            normalized[kwargs_key] = self._process_raw_value(kwargs_key, v)
+        for raw_data_key, v in data.items():
+            if v is None:
+                continue
+            data_key = str(raw_data_key)
+            normalized[data_key] = self._process_raw_value(data_key, v)
+        super().__init__(normalized)
 
     @classmethod
     def from_known_slots(cls, known_slots: Mapping[SlotName, SlotTypes]) -> ResourceSlot:
         return cls({k: Decimal(0) for k in known_slots.keys()})
+
+    @classmethod
+    def _process_raw_value(cls, key: str, value: RawResourceValue) -> Decimal:
+        if cls._guess_slot_type(str(key)) == SlotTypes.BYTES and isinstance(value, str):
+            v = Decimal(BinarySize.from_str(value))
+        else:
+            v = Decimal(value)
+        return v
+
+    def __setitem__(self, key: str | SlotName, value: RawResourceValue | None) -> None:
+        normalized_key = str(key)
+        if value is None:
+            self.data.pop(normalized_key, None)
+            return
+        self.data[normalized_key] = self._process_raw_value(normalized_key, value)
+
+    def __getitem__(self, key: str | SlotName) -> Decimal:
+        normalized_key = str(key)
+        return self.data[normalized_key]
+
+    def copy(self) -> Self:
+        return type(self)(self.data.copy())
 
     def sync_keys(self, other: ResourceSlot) -> None:
         self_only_keys = self.data.keys() - other.data.keys()
@@ -922,16 +1009,16 @@ class ResourceSlot(UserDict):
             raise ValueError(f"Unknown slots: {', '.join(map(repr, unknown_slots))}")
         data = {k: v for k, v in self.data.items() if k in known_slots}
         for k in unset_slots:
-            data[k] = Decimal(0)
+            data[str(k)] = Decimal(0)
         return type(self)(data)
 
     @classmethod
-    def _normalize_value(cls, key: str, value: Any, unit: SlotTypes) -> Decimal:
+    def _normalize_value(cls, key: str, value: RawResourceValue, unit: SlotTypes) -> Decimal:
         try:
             if unit == SlotTypes.BYTES:
                 if isinstance(value, Decimal):
-                    return Decimal(value) if value.is_finite() else value
-                if isinstance(value, int):
+                    return value
+                if isinstance(value, (int, float)):
                     return Decimal(value)
                 value = Decimal(BinarySize.from_str(value))
             else:
@@ -1005,7 +1092,7 @@ class ResourceSlot(UserDict):
                 # fill missing
                 for k in slot_types.keys():
                     if k not in data:
-                        data[k] = Decimal(0)
+                        data[str(k)] = Decimal(0)
         except KeyError as e:
             extra_guide = ""
             if e.args[0] == "shmem":
@@ -1016,7 +1103,7 @@ class ResourceSlot(UserDict):
     def to_humanized(self, slot_types: Mapping) -> Mapping[str, str]:
         try:
             return {
-                k: type(self)._humanize_value(v, slot_types[k])
+                k: type(self)._humanize_value(Decimal(v), slot_types[k])
                 for k, v in self.data.items()
                 if v is not None
             }

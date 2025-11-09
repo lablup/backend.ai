@@ -11,9 +11,11 @@ from sqlalchemy.orm import selectinload
 from ai.backend.manager.data.notification import (
     NotificationChannelCreator,
     NotificationChannelData,
+    NotificationChannelListResult,
     NotificationChannelModifier,
     NotificationRuleCreator,
     NotificationRuleData,
+    NotificationRuleListResult,
     NotificationRuleModifier,
     NotificationRuleType,
 )
@@ -25,13 +27,19 @@ from ai.backend.manager.models.notification import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
+from ai.backend.manager.repositories.base import Querier, execute_querier
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-__all__ = ("NotificationDBSource",)
+
+__all__ = (
+    "NotificationDBSource",
+    "NotificationChannelListResult",
+    "NotificationRuleListResult",
+)
 
 
 class NotificationDBSource:
@@ -206,36 +214,52 @@ class NotificationDBSource:
                 raise NotificationRuleNotFound(f"Notification rule {rule_id} not found")
             return row.to_data()
 
-    async def list_channels(
+    async def search_channels(
         self,
-        enabled_only: bool = False,
-    ) -> list[NotificationChannelData]:
-        """Lists all notification channels."""
+        querier: Optional[Querier] = None,
+    ) -> NotificationChannelListResult:
+        """Searches notification channels with total count."""
         async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(NotificationChannelRow)
-            if enabled_only:
-                query = query.where(NotificationChannelRow.enabled == sa.true())
-
-            result = await db_sess.execute(query)
-            rows = result.scalars().all()
-            return [row.to_data() for row in rows]
-
-    async def list_rules(
-        self,
-        enabled_only: bool = False,
-        rule_type: Optional[NotificationRuleType] = None,
-    ) -> list[NotificationRuleData]:
-        """Lists all notification rules, optionally filtered by rule type."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(NotificationRuleRow).options(
-                selectinload(NotificationRuleRow.channel)
+            query = sa.select(
+                NotificationChannelRow,
+                sa.func.count().over().label("total_count"),
             )
 
-            if enabled_only:
-                query = query.where(NotificationRuleRow.enabled == sa.true())
-            if rule_type:
-                query = query.where(NotificationRuleRow.rule_type == str(rule_type))
+            result = await execute_querier(
+                db_sess,
+                query,
+                querier,
+                fallback_count_table=NotificationChannelRow,
+            )
 
-            result = await db_sess.execute(query)
-            rows = result.scalars().all()
-            return [row.to_data() for row in rows]
+            items = [row.NotificationChannelRow.to_data() for row in result.rows]
+
+            return NotificationChannelListResult(
+                items=items,
+                total_count=result.total_count,
+            )
+
+    async def search_rules(
+        self,
+        querier: Optional[Querier] = None,
+    ) -> NotificationRuleListResult:
+        """Searches notification rules with total count."""
+        async with self._db.begin_readonly_session() as db_sess:
+            query = sa.select(
+                NotificationRuleRow,
+                sa.func.count().over().label("total_count"),
+            ).options(selectinload(NotificationRuleRow.channel))
+
+            result = await execute_querier(
+                db_sess,
+                query,
+                querier,
+                fallback_count_table=NotificationRuleRow,
+            )
+
+            items = [row.NotificationRuleRow.to_data() for row in result.rows]
+
+            return NotificationRuleListResult(
+                items=items,
+                total_count=result.total_count,
+            )

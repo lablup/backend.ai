@@ -178,7 +178,7 @@ class AgentRepository:
             )
         )
         for cond in conditions:
-            stmt = cond(stmt)
+            stmt = stmt.where(cond())
 
         if order_by:
             stmt = stmt.order_by(*order_by)
@@ -211,7 +211,7 @@ class AgentRepository:
             )
         )
         for cond in conditions:
-            stmt = cond(stmt)
+            stmt = stmt.where(cond())
 
         if order_by:
             stmt = stmt.order_by(*order_by)

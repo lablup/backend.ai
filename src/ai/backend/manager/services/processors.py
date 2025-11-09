@@ -2,6 +2,9 @@ from dataclasses import dataclass
 from typing import Optional, Self, override
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.etcd import AsyncEtcd
@@ -17,6 +20,7 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.notification import NotificationCenter
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.repositories import Repositories
 from ai.backend.manager.services.agent.processors import AgentProcessors
@@ -60,6 +64,8 @@ from ai.backend.manager.services.model_serving.services.auto_scaling import Auto
 from ai.backend.manager.services.model_serving.services.model_serving import (
     ModelServingService,
 )
+from ai.backend.manager.services.notification.processors import NotificationProcessors
+from ai.backend.manager.services.notification.service import NotificationService
 from ai.backend.manager.services.object_storage.processors import ObjectStorageProcessors
 from ai.backend.manager.services.object_storage.service import ObjectStorageService
 from ai.backend.manager.services.project_resource_policy.processors import (
@@ -99,6 +105,7 @@ class ServiceArgs:
     storage_manager: StorageSessionManager
     valkey_stat_client: ValkeyStatClient
     valkey_live: ValkeyLiveClient
+    valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
     event_fetcher: EventFetcher
     background_task_manager: BackgroundTaskManager
     event_hub: EventHub
@@ -111,6 +118,7 @@ class ServiceArgs:
     deployment_controller: DeploymentController
     event_producer: EventProducer
     agent_cache: AgentRPCCache
+    notification_center: NotificationCenter
 
 
 @dataclass
@@ -134,6 +142,7 @@ class Services:
     model_serving: ModelServingServiceProtocol
     model_serving_auto_scaling: AutoScalingService
     auth: AuthService
+    notification: NotificationService
     object_storage: ObjectStorageService
     vfs_storage: VFSStorageService
     artifact: ArtifactService
@@ -251,6 +260,10 @@ class Services:
             auth_repository=repositories.auth.repository,
             config_provider=args.config_provider,
         )
+        notification_service = NotificationService(
+            repository=repositories.notification.repository,
+            notification_center=args.notification_center,
+        )
         object_storage_service = ObjectStorageService(
             artifact_repository=repositories.artifact.repository,
             object_storage_repository=repositories.object_storage.repository,
@@ -281,6 +294,7 @@ class Services:
             huggingface_registry_repository=repositories.huggingface_registry.repository,
             reservoir_registry_repository=repositories.reservoir_registry.repository,
             config_provider=args.config_provider,
+            valkey_artifact_client=args.valkey_artifact_client,
         )
         artifact_registry_service = ArtifactRegistryService(
             repositories.huggingface_registry.repository,
@@ -312,6 +326,7 @@ class Services:
             model_serving=model_serving_service,
             model_serving_auto_scaling=model_serving_auto_scaling,
             auth=auth,
+            notification=notification_service,
             object_storage=object_storage_service,
             vfs_storage=vfs_storage_service,
             artifact=artifact_service,
@@ -348,6 +363,7 @@ class Processors(AbstractProcessorPackage):
     model_serving: ModelServingProcessors
     model_serving_auto_scaling: ModelServingAutoScalingProcessors
     auth: AuthProcessors
+    notification: NotificationProcessors
     object_storage: ObjectStorageProcessors
     vfs_storage: VFSStorageProcessors
     artifact: ArtifactProcessors
@@ -394,6 +410,7 @@ class Processors(AbstractProcessorPackage):
             services.utilization_metric, action_monitors
         )
         auth = AuthProcessors(services.auth, action_monitors)
+        notification_processors = NotificationProcessors(services.notification, action_monitors)
         object_storage_processors = ObjectStorageProcessors(
             services.object_storage, action_monitors
         )
@@ -435,6 +452,7 @@ class Processors(AbstractProcessorPackage):
             model_serving=model_serving_processors,
             model_serving_auto_scaling=model_serving_auto_scaling_processors,
             auth=auth,
+            notification=notification_processors,
             object_storage=object_storage_processors,
             vfs_storage=vfs_storage_processors,
             artifact=artifact_processors,
@@ -466,6 +484,7 @@ class Processors(AbstractProcessorPackage):
             *self.model_serving.supported_actions(),
             *self.model_serving_auto_scaling.supported_actions(),
             *self.auth.supported_actions(),
+            *self.notification.supported_actions(),
             *self.object_storage.supported_actions(),
             *self.vfs_storage.supported_actions(),
             *self.artifact_registry.supported_actions(),

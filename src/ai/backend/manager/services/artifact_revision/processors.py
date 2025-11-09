@@ -31,6 +31,10 @@ from ai.backend.manager.services.artifact_revision.actions.get import (
     GetArtifactRevisionAction,
     GetArtifactRevisionActionResult,
 )
+from ai.backend.manager.services.artifact_revision.actions.get_download_progress import (
+    GetDownloadProgressAction,
+    GetDownloadProgressActionResult,
+)
 from ai.backend.manager.services.artifact_revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
     GetArtifactRevisionReadmeActionResult,
@@ -55,6 +59,9 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
     get_readme: ActionProcessor[
         GetArtifactRevisionReadmeAction, GetArtifactRevisionReadmeActionResult
     ]
+    get_download_progress: ActionProcessor[
+        GetDownloadProgressAction, GetDownloadProgressActionResult
+    ]
     list_revision: ActionProcessor[ListArtifactRevisionsAction, ListArtifactRevisionsActionResult]
     approve: ActionProcessor[ApproveArtifactRevisionAction, ApproveArtifactRevisionActionResult]
     reject: ActionProcessor[RejectArtifactRevisionAction, RejectArtifactRevisionActionResult]
@@ -78,6 +85,7 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
     ) -> None:
         self.get = ActionProcessor(service.get, action_monitors)
         self.get_readme = ActionProcessor(service.get_readme, action_monitors)
+        self.get_download_progress = ActionProcessor(service.get_download_progress, action_monitors)
         self.list_revision = ActionProcessor(service.list_revision, action_monitors)
         self.approve = ActionProcessor(service.approve, action_monitors)
         self.reject = ActionProcessor(service.reject, action_monitors)
@@ -99,6 +107,7 @@ class ArtifactRevisionProcessors(AbstractProcessorPackage):
         return [
             GetArtifactRevisionAction.spec(),
             GetArtifactRevisionReadmeAction.spec(),
+            GetDownloadProgressAction.spec(),
             ListArtifactRevisionsAction.spec(),
             ApproveArtifactRevisionAction.spec(),
             RejectArtifactRevisionAction.spec(),

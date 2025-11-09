@@ -4,7 +4,10 @@ from typing import Optional
 from pydantic import BaseModel
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
+    CombinedDownloadProgress,
+)
 from ai.backend.manager.data.artifact.types import (
     ArtifactData,
     ArtifactDataWithRevisions,
@@ -103,3 +106,7 @@ class GetVFSStorageResponse(BaseResponseModel):
 
 class ListVFSStorageResponse(BaseResponseModel):
     storages: list[VFSStorage]
+
+
+class GetDownloadProgressResponse(BaseResponseModel):
+    download_progress: CombinedDownloadProgress

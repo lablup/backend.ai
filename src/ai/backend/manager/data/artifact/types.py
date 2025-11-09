@@ -4,7 +4,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional, Self
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
+    VerificationStepResult,
+)
 from ai.backend.manager.data.common.types import StringFilterData
 
 
@@ -79,6 +82,7 @@ class ArtifactRevisionData:
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     digest: Optional[str]
+    verification_result: Optional[VerificationStepResult]
 
 
 @dataclass
@@ -94,6 +98,7 @@ class ArtifactRevisionResponseData:
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
     digest: Optional[str]
+    verification_result: Optional[VerificationStepResult]
 
     @classmethod
     def from_revision_data(cls, data: ArtifactRevisionData) -> Self:
@@ -107,6 +112,7 @@ class ArtifactRevisionResponseData:
             created_at=data.created_at,
             updated_at=data.updated_at,
             digest=data.digest,
+            verification_result=data.verification_result,
         )
 
 
