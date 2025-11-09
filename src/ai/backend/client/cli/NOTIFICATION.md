@@ -27,10 +27,10 @@ This displays all available rule types with their message schemas, showing requi
 
 ### 2. Create a Notification Channel
 
-Create a webhook channel (e.g., Slack, Discord, or custom webhook):
+Create a webhook channel:
 
 ```bash
-backend.ai notification channel create "My Webhook" "https://hooks.slack.com/services/YOUR/WEBHOOK/URL" \
+backend.ai notification channel create "My Webhook" "https://your-webhook-url.example.com" \
   --description "Production alerts"
 ```
 
@@ -90,9 +90,9 @@ Options:
 
 Example:
 ```bash
-backend.ai notification channel create "Slack Alerts" \
-  "https://hooks.slack.com/services/T00/B00/XXX" \
-  --description "Main Slack webhook for production alerts"
+backend.ai notification channel create "Production Alerts" \
+  "https://your-webhook-url.example.com" \
+  --description "Main webhook for production alerts"
 ```
 
 #### Update Channel
@@ -258,8 +258,8 @@ backend.ai notification rule validate 660e8400-e29b-41d4-a716-446655440000 \
 
 **1. Create a webhook channel:**
 ```bash
-backend.ai notification channel create "Slack Production" \
-  "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+backend.ai notification channel create "Production Notifications" \
+  "https://your-webhook-url.example.com"
 ```
 
 **2. Create session started rule:**
@@ -267,16 +267,12 @@ backend.ai notification channel create "Slack Production" \
 # Save this as session_started.json
 cat > session_started.json << 'EOF'
 {
-  "text": "🚀 Session Started",
-  "blocks": [
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "*Session ID:* `{{ session_id }}`\n*Name:* {{ session_name or 'N/A' }}\n*Type:* {{ session_type }}\n*Mode:* {{ cluster_mode }}\n*Status:* {{ status }}"
-      }
-    }
-  ]
+  "title": "Session Started",
+  "session_id": "{{ session_id }}",
+  "session_name": "{{ session_name or 'N/A' }}",
+  "session_type": "{{ session_type }}",
+  "cluster_mode": "{{ cluster_mode }}",
+  "status": "{{ status }}"
 }
 EOF
 
@@ -291,16 +287,11 @@ backend.ai notification rule create "Production Session Started" \
 # Save this as session_terminated.json
 cat > session_terminated.json << 'EOF'
 {
-  "text": "🛑 Session Terminated",
-  "blocks": [
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "*Session ID:* `{{ session_id }}`\n*Name:* {{ session_name or 'N/A' }}\n*Type:* {{ session_type }}\n*Reason:* {{ termination_reason or 'N/A' }}"
-      }
-    }
-  ]
+  "title": "Session Terminated",
+  "session_id": "{{ session_id }}",
+  "session_name": "{{ session_name or 'N/A' }}",
+  "session_type": "{{ session_type }}",
+  "termination_reason": "{{ termination_reason or 'N/A' }}"
 }
 EOF
 
@@ -433,7 +424,7 @@ Templates use Jinja2 syntax for variable interpolation and logic.
 
 **Channel validation fails:**
 - Verify the webhook URL is correct and accessible
-- Check if the webhook service (e.g., Slack) is operational
+- Check if the webhook service is operational
 - Ensure the message format matches what the webhook expects
 
 **Rule validation fails:**
