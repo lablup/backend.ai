@@ -80,8 +80,8 @@ class SessionHook(AbstractSessionHook):
             message = SessionStartedMessage(
                 session_id=str(session.session_id),
                 session_name=session.session_name,
-                session_type=session.session_type.value,
-                cluster_mode=session.cluster_mode.value,
+                session_type=str(session.session_type),
+                cluster_mode=str(session.cluster_mode),
                 status="RUNNING",
             )
             event = NotificationTriggeredEvent(
@@ -112,8 +112,8 @@ class SessionHook(AbstractSessionHook):
             message = SessionTerminatedMessage(
                 session_id=str(session.session_id),
                 session_name=session.session_name,
-                session_type=session.session_type.value,
-                cluster_mode=session.cluster_mode.value,
+                session_type=str(session.session_type),
+                cluster_mode=str(session.cluster_mode),
                 status="TERMINATED",
                 termination_reason=session.status_info,
             )
