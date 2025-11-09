@@ -295,6 +295,7 @@ class Services:
             reservoir_registry_repository=repositories.reservoir_registry.repository,
             config_provider=args.config_provider,
             valkey_artifact_client=args.valkey_artifact_client,
+            background_task_manager=args.background_task_manager,
         )
         artifact_registry_service = ArtifactRegistryService(
             repositories.huggingface_registry.repository,

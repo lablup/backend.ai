@@ -6,6 +6,8 @@ import uuid
 from typing import Final, Optional, cast
 from uuid import UUID
 
+from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -125,6 +127,7 @@ class ArtifactRevisionService:
     _reservoir_registry_repository: ReservoirRegistryRepository
     _storage_manager: StorageSessionManager
     _config_provider: ManagerConfigProvider
+    _background_task_manager: BackgroundTaskManager
 
     def __init__(
         self,
@@ -138,6 +141,7 @@ class ArtifactRevisionService:
         storage_manager: StorageSessionManager,
         config_provider: ManagerConfigProvider,
         valkey_artifact_client: ValkeyArtifactDownloadTrackingClient,
+        background_task_manager: BackgroundTaskManager,
     ) -> None:
         self._artifact_repository = artifact_repository
         self._artifact_registry_repository = artifact_registry_repository
@@ -149,6 +153,7 @@ class ArtifactRevisionService:
         self._storage_manager = storage_manager
         self._config_provider = config_provider
         self._valkey_artifact_client = valkey_artifact_client
+        self._background_task_manager = background_task_manager
 
     def _resolve_storage_namespace(self, reservoir_config: ReservoirConfig) -> str:
         """Resolve namespace based on storage type
@@ -431,92 +436,99 @@ class ArtifactRevisionService:
                         )
                     )
 
-                    # When use_delegation is True, if remote status is not AVAILABLE, delegate import
-                    if reservoir_config.use_delegation:
-                        remote_reservoir_client = ReservoirRegistryClient(
-                            registry_data=registry_data
-                        )
-
-                        remote_progress_status_resp = (
-                            await remote_reservoir_client.get_download_progress(revision_data.id)
-                        )
-                        remote_progress = remote_progress_status_resp.download_progress.local
-
-                        # Wait for remote to start pulling if not yet AVAILABLE
-                        if remote_progress.status != ArtifactStatus.AVAILABLE.value:
-                            delegate_import_req = DelegateImportArtifactsReq(
-                                artifact_revision_ids=[revision_data.id],
-                                artifact_type=artifact.type,
-                                # We can't pass delegatee_reservoir_id here since we don't have it.
-                                # So we depend on default.
-                                delegator_reservoir_id=None,
-                                delegatee_target=None,
+                    async def _task(reporter: ProgressReporter) -> None:
+                        # When use_delegation is True, if remote status is not AVAILABLE, delegate import
+                        if reservoir_config.use_delegation:
+                            remote_reservoir_client = ReservoirRegistryClient(
+                                registry_data=registry_data
                             )
 
-                            await remote_reservoir_client.delegate_import_artifacts(
-                                delegate_import_req
-                            )
-
-                            # Poll until remote status is AVAILABLE
-                            elapsed_time = 0
-
-                            log.info(
-                                "Waiting for remote artifact to become AVAILABLE. "
-                                "artifact_revision_id: {}",
-                                revision_data.id,
-                            )
-
-                            while elapsed_time < _REMOTE_ARTIFACT_MAX_WAIT_TIME:
-                                await asyncio.sleep(_REMOTE_ARTIFACT_STATUS_POLL_INTERVAL)
-                                elapsed_time += _REMOTE_ARTIFACT_STATUS_POLL_INTERVAL
-
-                                remote_progress_status_resp = (
-                                    await remote_reservoir_client.get_download_progress(
-                                        revision_data.id
-                                    )
+                            remote_progress_status_resp = (
+                                await remote_reservoir_client.get_download_progress(
+                                    revision_data.id
                                 )
-                                remote_progress = (
-                                    remote_progress_status_resp.download_progress.local
+                            )
+                            remote_progress = remote_progress_status_resp.download_progress.local
+
+                            # Wait for remote to start pulling if not yet AVAILABLE
+                            if remote_progress.status != ArtifactStatus.AVAILABLE.value:
+                                delegate_import_req = DelegateImportArtifactsReq(
+                                    artifact_revision_ids=[revision_data.id],
+                                    artifact_type=artifact.type,
+                                    # We can't pass delegatee_reservoir_id here since we don't have it.
+                                    # So we depend on default.
+                                    delegator_reservoir_id=None,
+                                    delegatee_target=None,
                                 )
 
-                                if remote_progress.status == ArtifactStatus.AVAILABLE.value:
-                                    log.info(
-                                        "Remote artifact is now AVAILABLE. "
-                                        "artifact_revision_id: {}, elapsed_time: {}s",
-                                        revision_data.id,
-                                        elapsed_time,
-                                    )
-                                    break
+                                await remote_reservoir_client.delegate_import_artifacts(
+                                    delegate_import_req
+                                )
+
+                                # Poll until remote status is AVAILABLE
+                                elapsed_time = 0
 
                                 log.info(
-                                    "Waiting for remote artifact. Status: {}, Elapsed: {}s, "
+                                    "Waiting for remote artifact to become AVAILABLE. "
                                     "artifact_revision_id: {}",
-                                    remote_progress.status,
-                                    elapsed_time,
                                     revision_data.id,
                                 )
-                            else:
-                                # Timeout reached
-                                raise RemoteReservoirArtifactImportError(
-                                    f"Timeout waiting for remote artifact to become AVAILABLE. "
-                                    f"artifact_revision_id: {revision_data.id}, "
-                                    f"Last status: {remote_progress.status}"
-                                )
 
-                    await self._artifact_repository.update_artifact_revision_status(
-                        action.artifact_revision_id, ArtifactStatus.PULLING
-                    )
+                                while elapsed_time < _REMOTE_ARTIFACT_MAX_WAIT_TIME:
+                                    await asyncio.sleep(_REMOTE_ARTIFACT_STATUS_POLL_INTERVAL)
+                                    elapsed_time += _REMOTE_ARTIFACT_STATUS_POLL_INTERVAL
 
-                    result = await storage_proxy_client.import_reservoir_models(
-                        ReservoirImportModelsReq(
-                            models=[
-                                ModelTarget(model_id=artifact.name, revision=revision_data.version)
-                            ],
-                            registry_name=registry_data.name,
-                            storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                                    remote_progress_status_resp = (
+                                        await remote_reservoir_client.get_download_progress(
+                                            revision_data.id
+                                        )
+                                    )
+                                    remote_progress = (
+                                        remote_progress_status_resp.download_progress.local
+                                    )
+
+                                    if remote_progress.status == ArtifactStatus.AVAILABLE.value:
+                                        log.info(
+                                            "Remote artifact is now AVAILABLE. "
+                                            "artifact_revision_id: {}, elapsed_time: {}s",
+                                            revision_data.id,
+                                            elapsed_time,
+                                        )
+                                        break
+
+                                    log.info(
+                                        "Waiting for remote artifact. Status: {}, Elapsed: {}s, "
+                                        "artifact_revision_id: {}",
+                                        remote_progress.status,
+                                        elapsed_time,
+                                        revision_data.id,
+                                    )
+                                else:
+                                    # Timeout reached
+                                    raise RemoteReservoirArtifactImportError(
+                                        f"Timeout waiting for remote artifact to become AVAILABLE. "
+                                        f"artifact_revision_id: {revision_data.id}, "
+                                        f"Last status: {remote_progress.status}"
+                                    )
+
+                        await self._artifact_repository.update_artifact_revision_status(
+                            action.artifact_revision_id, ArtifactStatus.PULLING
                         )
-                    )
-                    task_id = result.task_id
+
+                        # TODO: Utilize this internal import task_id
+                        _result = await storage_proxy_client.import_reservoir_models(
+                            ReservoirImportModelsReq(
+                                models=[
+                                    ModelTarget(
+                                        model_id=artifact.name, revision=revision_data.version
+                                    )
+                                ],
+                                registry_name=registry_data.name,
+                                storage_step_mappings=reservoir_config.resolve_storage_step_selection(),
+                            )
+                        )
+
+                    task_id = await self._background_task_manager.start(_task)
                 case _:
                     raise InvalidArtifactRegistryTypeError(
                         f"Unsupported artifact registry type: {artifact.registry_type}"
