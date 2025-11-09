@@ -140,7 +140,9 @@ class CreateNotificationRuleRequest(BaseRequestModel):
     description: Optional[str] = Field(default=None, description="Rule description")
     rule_type: NotificationRuleType = Field(description="Rule type")
     channel_id: UUID = Field(description="ID of the channel to use")
-    message_template: str = Field(description="Jinja2 template for notification message")
+    message_template: str = Field(
+        max_length=65536, description="Jinja2 template for notification message (max 64KB)"
+    )
     enabled: bool = Field(default=True, description="Whether the rule is enabled")
 
 
@@ -149,7 +151,9 @@ class UpdateNotificationRuleRequest(BaseRequestModel):
 
     name: Optional[str] = Field(default=None, description="Updated rule name")
     description: Optional[str] = Field(default=None, description="Updated rule description")
-    message_template: Optional[str] = Field(default=None, description="Updated message template")
+    message_template: Optional[str] = Field(
+        default=None, max_length=65536, description="Updated message template (max 64KB)"
+    )
     enabled: Optional[bool] = Field(default=None, description="Updated enabled status")
 
 
@@ -192,7 +196,8 @@ class ValidateNotificationChannelRequest(BaseRequestModel):
     """Request body for validating a notification channel."""
 
     test_message: str = Field(
-        description="Test message to send through the channel",
+        max_length=5000,
+        description="Test message to send through the channel (max 5KB)",
     )
 
 

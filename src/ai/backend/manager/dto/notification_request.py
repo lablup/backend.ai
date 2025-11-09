@@ -3,6 +3,7 @@ import uuid
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.notification import NotificationRuleType
 
 
 class UpdateNotificationChannelPathParam(BaseRequestModel):
@@ -35,3 +36,9 @@ class ValidateNotificationChannelPathParam(BaseRequestModel):
 
 class ValidateNotificationRulePathParam(BaseRequestModel):
     rule_id: uuid.UUID = Field(description="The notification rule ID to validate")
+
+
+class RuleTypePathParam(BaseRequestModel):
+    rule_type: NotificationRuleType = Field(
+        description="The notification rule type to get schema for"
+    )

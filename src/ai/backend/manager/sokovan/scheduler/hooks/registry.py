@@ -55,6 +55,7 @@ class HookRegistry:
             network_plugin_ctx=self._network_plugin_ctx,
             config_provider=self._config_provider,
             agent_pool=self._agent_pool,
+            event_producer=self._event_producer,
         )
         self._hooks[SessionTypes.INTERACTIVE] = SessionHook(InteractiveSessionHook(), args)
         self._hooks[SessionTypes.BATCH] = SessionHook(BatchSessionHook(self._agent_pool), args)

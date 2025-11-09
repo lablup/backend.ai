@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
 from datetime import datetime
-from typing import Any
 
 import jinja2
 
 from ai.backend.common.clients.http_client import ClientPool
-from ai.backend.common.data.notification import NotificationChannelType
+from ai.backend.common.data.notification import NotifiableMessage, NotificationChannelType
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.data.notification import NotificationChannelData
 from ai.backend.manager.errors.notification import (
@@ -147,16 +145,18 @@ class NotificationCenter:
         template_str: str,
         rule_type: str,
         timestamp: datetime,
-        notification_data: Mapping[str, Any],
+        notification_data: NotifiableMessage,
     ) -> str:
         """Render Jinja2 template with notification event data."""
         try:
+            # Convert Pydantic model to dict for template context
+            data_dict = notification_data.model_dump()
             template = self._template_env.from_string(template_str)
             return template.render(
                 rule_type=str(rule_type),
                 timestamp=timestamp,
-                data=notification_data,
-                **notification_data,  # Allow direct access to data fields
+                data=data_dict,
+                **data_dict,  # Allow direct access to data fields
             )
         except jinja2.TemplateError as e:
             log.error(

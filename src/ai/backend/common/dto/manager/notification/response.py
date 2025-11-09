@@ -6,7 +6,7 @@ Shared between Client SDK and Manager API.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -30,6 +30,7 @@ __all__ = (
     "GetNotificationRuleResponse",
     "ListNotificationRulesResponse",
     "ListNotificationRuleTypesResponse",
+    "NotificationRuleTypeSchemaResponse",
     "ValidateNotificationChannelResponse",
     "ValidateNotificationRuleResponse",
     "PaginationInfo",
@@ -158,4 +159,15 @@ class ListNotificationRuleTypesResponse(BaseResponseModel):
 
     rule_types: list[NotificationRuleType] = Field(
         description="List of available notification rule types"
+    )
+
+
+class NotificationRuleTypeSchemaResponse(BaseResponseModel):
+    """Response for getting notification rule type schema."""
+
+    rule_type: NotificationRuleType = Field(
+        description="The notification rule type for which the schema is provided"
+    )
+    json_schema: dict[str, Any] = Field(
+        description="JSON schema describing the required notification_data structure for this rule type"
     )
