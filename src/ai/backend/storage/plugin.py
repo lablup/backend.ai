@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterator, Optional
+from typing import TYPE_CHECKING, Any, Iterator, Optional
 
 from aiohttp import web
 
@@ -27,7 +27,7 @@ class AbstractStoragePlugin(AbstractPlugin, metaclass=ABCMeta):
 class VerifierPluginResult:
     scanned_count: int
     infected_count: int
-    metadata: dict[str, str]
+    metadata: dict[str, Any]
 
 
 class AbstractArtifactVerifierPlugin(AbstractPlugin, metaclass=ABCMeta):
