@@ -214,9 +214,7 @@ class Dispatchers:
         )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)
-        self._notification_event_handler = NotificationEventHandler(
-            args.processors_factory().notification
-        )
+        self._notification_event_handler = NotificationEventHandler(args.processors_factory)
         self._artifact_event_handler = ArtifactEventHandler(
             args.repositories.artifact.repository,
             args.repositories.huggingface_registry.repository,

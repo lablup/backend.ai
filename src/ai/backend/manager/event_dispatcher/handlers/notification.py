@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from ai.backend.common.data.notification import NotifiableMessage
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
@@ -11,7 +11,7 @@ from ...data.notification import NotificationRuleType
 from ...services.notification.actions import ProcessNotificationAction
 
 if TYPE_CHECKING:
-    from ...services.notification.processors import NotificationProcessors
+    from ...services.processors import Processors
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore[name-defined]
 
@@ -26,13 +26,13 @@ class NotificationEventHandler:
     processing to NotificationProcessors.
     """
 
-    _processors: NotificationProcessors
+    _processors_factory: Callable[[], Processors]
 
     def __init__(
         self,
-        processors: NotificationProcessors,
+        processors_factory: Callable[[], Processors],
     ) -> None:
-        self._processors = processors
+        self._processors_factory = processors_factory
 
     async def handle_notification_triggered(
         self,
@@ -71,7 +71,8 @@ class NotificationEventHandler:
             raise
 
         # Delegate to processor for business logic
-        await self._processors.process_notification.wait_for_complete(
+        processors = self._processors_factory()
+        await processors.notification.process_notification.wait_for_complete(
             ProcessNotificationAction(
                 rule_type=rule_type,
                 timestamp=event.timestamp,
