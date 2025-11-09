@@ -15,6 +15,7 @@ class VerifierResult(BaseModel):
     scanned_at: datetime  # Timestamp when verification started
     scan_time: float  # Time taken to complete verification in seconds
     scanned_count: int
+    metadata: dict[str, str]  # Additional metadata from verifier
     error: Optional[str] = None  # For when verifier fails with exception
 
 
