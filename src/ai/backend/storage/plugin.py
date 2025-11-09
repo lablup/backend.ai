@@ -24,14 +24,15 @@ class AbstractStoragePlugin(AbstractPlugin, metaclass=ABCMeta):
 
 
 @dataclass
-class VerificationResult:
+class VerifierPluginResult:
     scanned_count: int
     infected_count: int
+    metadata: dict[str, str]
 
 
 class AbstractArtifactVerifierPlugin(AbstractPlugin, metaclass=ABCMeta):
     @abstractmethod
-    async def verify(self, artifact_path: Path, context: ImportStepContext) -> VerificationResult:
+    async def verify(self, artifact_path: Path, context: ImportStepContext) -> VerifierPluginResult:
         raise NotImplementedError
 
 
