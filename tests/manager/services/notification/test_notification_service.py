@@ -124,7 +124,7 @@ class TestNotificationService:
             description="Notify when session starts",
             rule_type=NotificationRuleType.SESSION_STARTED,
             channel=sample_webhook_channel,
-            message_template="Session {{ session_id }} started for user {{ user_name }}",
+            message_template="Session {{ session_id }} ({{ session_type }}) is now {{ status }}",
             enabled=True,
             created_by=uuid4(),
             created_at=now,
@@ -139,8 +139,10 @@ class TestNotificationService:
             timestamp=datetime.now(),
             notification_data=SessionStartedMessage(
                 session_id="sess-12345",
-                user_name="john_doe",
-                kernel_image="python:3.11",
+                session_name="test-session",
+                session_type="interactive",
+                cluster_mode="single-node",
+                status="RUNNING",
             ).model_dump(),
         )
 
@@ -337,8 +339,10 @@ class TestNotificationService:
             timestamp=datetime.now(),
             notification_data=SessionStartedMessage(
                 session_id="test-session",
-                user_name="test-user",
-                kernel_image="python:3.11",
+                session_name="test-session",
+                session_type="interactive",
+                cluster_mode="single-node",
+                status="RUNNING",
             ).model_dump(),
         )
 
@@ -360,18 +364,18 @@ class TestNotificationService:
         mock_repository: MagicMock,
         sample_webhook_channel: NotificationChannelData,
     ) -> None:
-        """Test template rendering with nested notification data"""
+        """Test template rendering with session termination data"""
         # Mock HTTP session to avoid actual webhook calls
         self._mock_http_session_success(notification_service)
 
         now = datetime.now()
         rule = NotificationRuleData(
             id=uuid4(),
-            name="Nested Data Rule",
+            name="Session Terminated Rule",
             description=None,
             rule_type=NotificationRuleType.SESSION_TERMINATED,
             channel=sample_webhook_channel,
-            message_template="User {{ user.name }} exceeded {{ resource.type }} quota",
+            message_template="Session {{ session_id }} ({{ session_type }}) {{ status }}: {{ termination_reason }}",
             enabled=True,
             created_by=uuid4(),
             created_at=now,
@@ -383,9 +387,11 @@ class TestNotificationService:
             timestamp=datetime.now(),
             notification_data=SessionTerminatedMessage(
                 session_id="test-session",
-                user=SessionTerminatedMessage.UserInfo(name="john_doe", id="user-123"),
-                resource=SessionTerminatedMessage.ResourceInfo(type="cpu", limit=100),
+                session_name="test-session",
+                session_type="batch",
+                cluster_mode="single-node",
                 status="terminated",
+                termination_reason="user-requested",
             ).model_dump(),
         )
 
@@ -414,9 +420,11 @@ class TestNotificationService:
             timestamp=datetime.now(),
             notification_data=SessionTerminatedMessage(
                 session_id="test-session",
-                user=SessionTerminatedMessage.UserInfo(name="test-user", id="user-001"),
-                resource=SessionTerminatedMessage.ResourceInfo(type="cpu", limit=100),
+                session_name="test-session",
+                session_type="batch",
+                cluster_mode="single-node",
                 status="terminated",
+                termination_reason="user-requested",
             ),
         )
         await notification_service.process_notification(action)
@@ -732,8 +740,10 @@ class TestNotificationService:
         mock_repository.get_rule_by_id = AsyncMock(return_value=sample_rule)
         notification_data = {
             "session_id": "sess-123",
-            "user_name": "test_user",
-            "kernel_image": "python:3.11-ubuntu20.04",
+            "session_name": "test-session",
+            "session_type": "interactive",
+            "cluster_mode": "single-node",
+            "status": "RUNNING",
         }
 
         # Mock the template environment to return a template that renders correctly
@@ -802,8 +812,10 @@ class TestNotificationService:
             rule_id=invalid_rule.id,
             notification_data={
                 "session_id": "sess-123",
-                "user_name": "test_user",
-                "kernel_image": "python:3.11-ubuntu20.04",
+                "session_name": "test-session",
+                "session_type": "interactive",
+                "cluster_mode": "single-node",
+                "status": "RUNNING",
             },
         )
         with pytest.raises(NotificationTemplateRenderingFailure):

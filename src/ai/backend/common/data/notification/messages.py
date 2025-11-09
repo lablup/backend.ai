@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import abstractmethod
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -97,21 +97,17 @@ class SessionStartedMessage(NotifiableMessage):
         """Return the notification rule type for this message class."""
         return NotificationRuleType.SESSION_STARTED
 
-    session_id: str = Field(description="Unique identifier of the compute session that was started")
-    user_name: str = Field(description="Name of the user who started the session")
-    kernel_image: str = Field(
-        description="Container image used for the session (e.g., 'python:3.11-ubuntu20.04')"
-    )
-    session_name: str | None = Field(
+    session_id: str = Field(description="Unique identifier of the compute session")
+    session_name: Optional[str] = Field(
         default=None, description="User-defined name for the session, if provided"
     )
-    access_key: str | None = Field(
-        default=None, description="Access key used to create the session"
+    session_type: str = Field(
+        description="Type of session (e.g., 'interactive', 'batch', 'inference', 'system')"
     )
-    cluster_size: int = Field(
-        default=1,
-        description="Number of containers in the session cluster (1 for single-container sessions)",
+    cluster_mode: str = Field(
+        description="Cluster mode of the session (e.g., 'single-node', 'multi-node')"
     )
+    status: str = Field(description="Current status of the session")
 
 
 class SessionTerminatedMessage(NotifiableMessage):
@@ -126,31 +122,22 @@ class SessionTerminatedMessage(NotifiableMessage):
         """Return the notification rule type for this message class."""
         return NotificationRuleType.SESSION_TERMINATED
 
-    class UserInfo(BaseModel):
-        """User information nested in termination message."""
-
-        name: str = Field(description="Name of the user who owned the session")
-        id: str = Field(description="Unique identifier of the user")
-
-    class ResourceInfo(BaseModel):
-        """Resource information nested in termination message."""
-
-        type: str = Field(description="Type of resource (e.g., 'cpu', 'memory', 'gpu')")
-        limit: int = Field(description="Resource limit value that was allocated to the session")
-
-    session_id: str = Field(
-        description="Unique identifier of the compute session that was terminated"
+    session_id: str = Field(description="Unique identifier of the compute session")
+    session_name: Optional[str] = Field(
+        default=None, description="User-defined name for the session, if provided"
     )
-    user: UserInfo = Field(description="Information about the user who owned the session")
-    resource: ResourceInfo = Field(
-        description="Information about resources that were allocated to the session"
+    session_type: str = Field(
+        description="Type of session (e.g., 'interactive', 'batch', 'inference', 'system')"
     )
-    termination_reason: str | None = Field(
-        default=None,
-        description="Reason for termination (e.g., 'user-requested', 'timeout', 'error')",
+    cluster_mode: str = Field(
+        description="Cluster mode of the session (e.g., 'single-node', 'multi-node')"
     )
     status: str = Field(
         description="Final status of the session (e.g., 'terminated', 'cancelled', 'error')"
+    )
+    termination_reason: Optional[str] = Field(
+        default=None,
+        description="Reason for termination (e.g., 'user-requested', 'timeout', 'error')",
     )
 
 
@@ -165,13 +152,12 @@ class ArtifactDownloadCompletedMessage(NotifiableMessage):
         """Return the notification rule type for this message class."""
         return NotificationRuleType.ARTIFACT_DOWNLOAD_COMPLETED
 
-    artifact_id: str = Field(description="Unique identifier of the downloaded artifact")
-    download_url: str | None = Field(
-        default=None, description="URL where the artifact was downloaded from, if available"
+    artifact_id: str = Field(description="Unique identifier of the artifact")
+    artifact_name: str = Field(description="Name of the artifact")
+    artifact_type: str = Field(description="Type of artifact (e.g., 'MODEL', 'PACKAGE', 'IMAGE')")
+    registry_type: str = Field(
+        description="Type of registry where the artifact is stored (e.g., 'HARBOR', 'HUGGINGFACE')"
     )
-    file_name: str = Field(description="Name of the downloaded artifact file")
-    file_size: int = Field(description="Size of the downloaded artifact in bytes")
-    download_status: str = Field(
-        description="Status of the download operation (e.g., 'completed', 'failed')"
+    version: Optional[str] = Field(
+        default=None, description="Version of the artifact revision, if available"
     )
-    user_name: str = Field(description="Name of the user who initiated the download")
