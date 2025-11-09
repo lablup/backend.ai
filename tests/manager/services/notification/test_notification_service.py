@@ -10,6 +10,10 @@ from uuid import uuid4
 
 import pytest
 
+from ai.backend.common.data.notification import (
+    SessionStartedMessage,
+    SessionTerminatedMessage,
+)
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.manager.data.notification import (
     NotificationChannelCreator,
@@ -133,11 +137,11 @@ class TestNotificationService:
         return NotificationTriggeredEvent(
             rule_type=NotificationRuleType.SESSION_STARTED,
             timestamp=datetime.now(),
-            notification_data={
-                "session_id": "sess-12345",
-                "user_name": "john_doe",
-                "kernel_image": "python:3.11",
-            },
+            notification_data=SessionStartedMessage(
+                session_id="sess-12345",
+                user_name="john_doe",
+                kernel_image="python:3.11",
+            ).model_dump(),
         )
 
     @pytest.mark.asyncio
@@ -157,7 +161,7 @@ class TestNotificationService:
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_STARTED,
             timestamp=sample_event.timestamp,
-            notification_data=sample_event.notification_data,
+            notification_data=SessionStartedMessage.model_validate(sample_event.notification_data),
         )
         result = await notification_service.process_notification(action)
 
@@ -181,7 +185,7 @@ class TestNotificationService:
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_STARTED,
             timestamp=sample_event.timestamp,
-            notification_data=sample_event.notification_data,
+            notification_data=SessionStartedMessage.model_validate(sample_event.notification_data),
         )
         result = await notification_service.process_notification(action)
 
@@ -206,7 +210,7 @@ class TestNotificationService:
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_STARTED,
             timestamp=sample_event.timestamp,
-            notification_data=sample_event.notification_data,
+            notification_data=SessionStartedMessage.model_validate(sample_event.notification_data),
         )
         await notification_service.process_notification(action)
 
@@ -258,7 +262,7 @@ class TestNotificationService:
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_STARTED,
             timestamp=sample_event.timestamp,
-            notification_data=sample_event.notification_data,
+            notification_data=SessionStartedMessage.model_validate(sample_event.notification_data),
         )
         result = await notification_service.process_notification(action)
 
@@ -294,7 +298,7 @@ class TestNotificationService:
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_STARTED,
             timestamp=sample_event.timestamp,
-            notification_data=sample_event.notification_data,
+            notification_data=SessionStartedMessage.model_validate(sample_event.notification_data),
         )
         # Should not raise exception, errors are caught by asyncio.gather
         result = await notification_service.process_notification(action)
@@ -331,7 +335,11 @@ class TestNotificationService:
         event = NotificationTriggeredEvent(
             rule_type=NotificationRuleType.SESSION_STARTED,
             timestamp=datetime.now(),
-            notification_data={},
+            notification_data=SessionStartedMessage(
+                session_id="test-session",
+                user_name="test-user",
+                kernel_image="python:3.11",
+            ).model_dump(),
         )
 
         mock_repository.get_matching_rules = AsyncMock(return_value=[rule])
@@ -339,7 +347,7 @@ class TestNotificationService:
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_STARTED,
             timestamp=event.timestamp,
-            notification_data=event.notification_data,
+            notification_data=SessionStartedMessage.model_validate(event.notification_data),
         )
         result = await notification_service.process_notification(action)
 
@@ -373,18 +381,20 @@ class TestNotificationService:
         event = NotificationTriggeredEvent(
             rule_type=NotificationRuleType.SESSION_TERMINATED,
             timestamp=datetime.now(),
-            notification_data={
-                "user": {"name": "john_doe", "id": "user-123"},
-                "resource": {"type": "cpu", "limit": 100},
-            },
+            notification_data=SessionTerminatedMessage(
+                session_id="test-session",
+                user=SessionTerminatedMessage.UserInfo(name="john_doe", id="user-123"),
+                resource=SessionTerminatedMessage.ResourceInfo(type="cpu", limit=100),
+                status="terminated",
+            ).model_dump(),
         )
 
         mock_repository.get_matching_rules = AsyncMock(return_value=[rule])
 
         action = ProcessNotificationAction(
-            rule_type=NotificationRuleType.SESSION_STARTED,
+            rule_type=NotificationRuleType.SESSION_TERMINATED,
             timestamp=event.timestamp,
-            notification_data=event.notification_data,
+            notification_data=SessionTerminatedMessage.model_validate(event.notification_data),
         )
         result = await notification_service.process_notification(action)
 
@@ -402,7 +412,12 @@ class TestNotificationService:
         action = ProcessNotificationAction(
             rule_type=NotificationRuleType.SESSION_TERMINATED,
             timestamp=datetime.now(),
-            notification_data={"agent_id": "agent-001"},
+            notification_data=SessionTerminatedMessage(
+                session_id="test-session",
+                user=SessionTerminatedMessage.UserInfo(name="test-user", id="user-001"),
+                resource=SessionTerminatedMessage.ResourceInfo(type="cpu", limit=100),
+                status="terminated",
+            ),
         )
         await notification_service.process_notification(action)
 

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
+from ai.backend.common.data.notification import NotifiableMessage
 from ai.backend.common.logging import BraceStyleAdapter
 from ai.backend.manager.data.notification import NotificationRuleType
 from ai.backend.manager.notification.types import ProcessRuleParams
@@ -122,6 +123,10 @@ class NotificationService:
         action: CreateRuleAction,
     ) -> CreateRuleActionResult:
         """Creates a new notification rule."""
+        # Validate message_template length
+        if len(action.creator.message_template) > 65536:
+            raise ValueError("message_template must not exceed 65536 characters (64KB)")
+
         rule_data = await self._repository.create_rule(action.creator)
 
         return CreateRuleActionResult(
@@ -147,6 +152,13 @@ class NotificationService:
         action: UpdateRuleAction,
     ) -> UpdateRuleActionResult:
         """Updates an existing notification rule."""
+        # Validate message_template length if being updated
+        fields_to_update = action.modifier.fields_to_update()
+        if "message_template" in fields_to_update:
+            message_template = fields_to_update["message_template"]
+            if message_template is not None and len(message_template) > 65536:
+                raise ValueError("message_template must not exceed 65536 characters (64KB)")
+
         rule_data = await self._repository.update_rule(
             rule_id=action.rule_id,
             modifier=action.modifier,
@@ -198,16 +210,27 @@ class NotificationService:
         Raises:
             NotificationRuleNotFound: If the rule does not exist
             NotificationTemplateRenderingFailure: If template rendering fails
+            ValidationError: If notification_data doesn't match the rule type's schema
         """
-        # Fetch the rule
+        from ai.backend.common.data.notification import NotifiableMessage
+
+        # Fetch the rule to know its rule_type
         rule = await self._repository.get_rule_by_id(action.rule_id)
+
+        # Validate notification_data against the rule type's schema
+        validated_data = NotifiableMessage.validate_notification_data(
+            rule_type=rule.rule_type,
+            data=action.notification_data,
+        )
+
+        # Process the rule with validated data
         result = await self._notification_center.process_rule(
             ProcessRuleParams(
                 message_template=rule.message_template,
                 rule_type=rule.rule_type,
                 channel=rule.channel,
                 timestamp=datetime.now(),
-                notification_data=action.notification_data,
+                notification_data=validated_data,
             )
         )
         return ValidateRuleActionResult(
@@ -278,7 +301,7 @@ class NotificationService:
         self,
         rule_type: NotificationRuleType,
         timestamp: datetime,
-        notification_data: Mapping[str, Any],
+        notification_data: NotifiableMessage,
     ) -> _ProcessedNotificationResult:
         """
         Query matching rules and process them.
@@ -321,7 +344,7 @@ class NotificationService:
         self,
         rules: Sequence[NotificationRuleData],
         timestamp: datetime,
-        notification_data: Mapping[str, Any],
+        notification_data: NotifiableMessage,
     ) -> _ProcessedRulesResult:
         """
         Process notification rules concurrently.

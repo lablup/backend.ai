@@ -1,11 +1,10 @@
-from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional, override
+from typing import Optional, override
 from uuid import UUID
 
+from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.manager.actions.action import BaseActionResult
-from ai.backend.manager.data.notification import NotificationRuleType
 
 from .base import NotificationAction
 
@@ -25,7 +24,7 @@ class ProcessNotificationAction(NotificationAction):
 
     rule_type: NotificationRuleType
     timestamp: datetime
-    notification_data: Mapping[str, Any]
+    notification_data: NotifiableMessage
 
     @override
     def entity_id(self) -> Optional[str]:

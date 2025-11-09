@@ -16,12 +16,15 @@ from ai.backend.common.dto.manager.notification import (
     ListNotificationChannelsResponse,
     ListNotificationRulesResponse,
     ListNotificationRuleTypesResponse,
+    NotificationRuleType,
+    NotificationRuleTypeSchemaResponse,
     SearchNotificationChannelsRequest,
     SearchNotificationRulesRequest,
     UpdateNotificationChannelRequest,
     UpdateNotificationChannelResponse,
     UpdateNotificationRuleRequest,
     UpdateNotificationRuleResponse,
+    ValidateNotificationChannelRequest,
     ValidateNotificationChannelResponse,
     ValidateNotificationRuleRequest,
     ValidateNotificationRuleResponse,
@@ -136,14 +139,17 @@ class Notification(BaseFunction):
     async def validate_channel(
         cls,
         channel_id: UUID,
+        request: ValidateNotificationChannelRequest,
     ) -> ValidateNotificationChannelResponse:
         """
         Validate a notification channel by sending a test webhook.
 
         :param channel_id: Channel ID to validate
+        :param request: Validation request with test message
         :returns: Validation result
         """
         rqst = Request("POST", f"/notifications/channels/{channel_id}/validate")
+        rqst.set_json(request.model_dump(mode="json"))
         async with rqst.fetch() as resp:
             data = await resp.json()
             return ValidateNotificationChannelResponse.model_validate(data)
@@ -272,3 +278,19 @@ class Notification(BaseFunction):
         async with rqst.fetch() as resp:
             data = await resp.json()
             return ListNotificationRuleTypesResponse.model_validate(data)
+
+    @api_function
+    @classmethod
+    async def get_rule_type_schema(
+        cls, rule_type: NotificationRuleType
+    ) -> NotificationRuleTypeSchemaResponse:
+        """
+        Get JSON schema for a notification rule type's message format.
+
+        :param rule_type: The notification rule type
+        :returns: Schema information for the rule type
+        """
+        rqst = Request("GET", f"/notifications/rule-types/{rule_type.value}/schema")
+        async with rqst.fetch() as resp:
+            data = await resp.json()
+            return NotificationRuleTypeSchemaResponse.model_validate(data)

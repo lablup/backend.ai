@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from ai.backend.common.data.notification import NotifiableMessage
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.common.logging import BraceStyleAdapter
 
@@ -52,11 +53,28 @@ class NotificationEventHandler:
             event.rule_type,
             source,
         )
+
+        # Validate notification_data against the rule type's schema
+        rule_type = NotificationRuleType(event.rule_type)
+        try:
+            validated_data = NotifiableMessage.validate_notification_data(
+                rule_type=rule_type,
+                data=event.notification_data,
+            )
+        except Exception as e:
+            log.error(
+                "Failed to validate notification data for rule type {0}: {1}",
+                event.rule_type,
+                str(e),
+            )
+            # Re-raise to let the caller know validation failed
+            raise
+
         # Delegate to processor for business logic
         await self._processors.process_notification.wait_for_complete(
             ProcessNotificationAction(
-                rule_type=NotificationRuleType(event.rule_type),
+                rule_type=rule_type,
                 timestamp=event.timestamp,
-                notification_data=event.notification_data,
+                notification_data=validated_data,
             )
         )

@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.notification import (
     ListNotificationRulesResponse,
     ListNotificationRuleTypesResponse,
     NotificationRuleType,
+    NotificationRuleTypeSchemaResponse,
     PaginationInfo,
     SearchNotificationChannelsRequest,
     SearchNotificationRulesRequest,
@@ -44,6 +45,7 @@ from ai.backend.manager.dto.notification_request import (
     DeleteNotificationRulePathParam,
     GetNotificationChannelPathParam,
     GetNotificationRulePathParam,
+    RuleTypePathParam,
     UpdateNotificationChannelPathParam,
     UpdateNotificationRulePathParam,
     ValidateNotificationChannelPathParam,
@@ -265,7 +267,7 @@ class NotificationAPIHandler:
         if me is None or not me.is_superadmin:
             raise web.HTTPForbidden(reason="Only superadmin can validate notification rules.")
 
-        # Call service action
+        # Service layer handles rule fetching and data validation
         action_result = await processors.notification.validate_rule.wait_for_complete(
             ValidateRuleAction(
                 rule_id=path.parsed.rule_id,
@@ -291,6 +293,30 @@ class NotificationAPIHandler:
 
         # Return all available rule types from the enum
         resp = ListNotificationRuleTypesResponse(rule_types=list(NotificationRuleType))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    @auth_required_for_method
+    @api_handler
+    async def get_rule_type_schema(
+        self,
+        path: PathParam[RuleTypePathParam],
+    ) -> APIResponse:
+        """Get JSON schema for a notification rule type's message format."""
+        from ai.backend.common.data.notification import NotifiableMessage
+
+        me = current_user()
+        if me is None or not me.is_superadmin:
+            raise web.HTTPForbidden(
+                reason="Only superadmin can view notification rule type schemas."
+            )
+
+        # Get schema for the requested rule type
+        schema = NotifiableMessage.get_message_schema(path.parsed.rule_type)
+
+        resp = NotificationRuleTypeSchemaResponse(
+            rule_type=path.parsed.rule_type,
+            json_schema=schema,
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # Notification Rule Endpoints
@@ -462,6 +488,11 @@ def create_app(
 
     # Rule routes
     cors.add(app.router.add_route("GET", "/rule-types", api_handler.list_rule_types))
+    cors.add(
+        app.router.add_route(
+            "GET", "/rule-types/{rule_type}/schema", api_handler.get_rule_type_schema
+        )
+    )
     cors.add(app.router.add_route("POST", "/rules", api_handler.create_rule))
     cors.add(app.router.add_route("POST", "/rules/search", api_handler.search_rules))
     cors.add(app.router.add_route("GET", "/rules/{rule_id}", api_handler.get_rule))

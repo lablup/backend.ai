@@ -208,6 +208,19 @@ async def notification_rule_types() -> list[NotificationRuleTypeGQL]:
     return [NotificationRuleTypeGQL.from_internal(rt) for rt in NotificationRuleType]
 
 
+@strawberry.field(description="Get JSON schema for a notification rule type's message format")
+async def notification_rule_type_schema(
+    rule_type: NotificationRuleTypeGQL,
+) -> strawberry.scalars.JSON:
+    """Return the JSON schema for a given notification rule type."""
+    from ai.backend.common.data.notification import NotifiableMessage
+
+    # Convert GraphQL enum to internal enum and get schema
+    internal_type = rule_type.to_internal()
+    schema = NotifiableMessage.get_message_schema(internal_type)
+    return schema
+
+
 # Mutation fields
 
 

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING
 
-from ai.backend.common.data.notification import NotificationRuleType
+from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 
 if TYPE_CHECKING:
     from ai.backend.manager.data.notification import NotificationChannelData
@@ -33,7 +33,7 @@ class ProcessRuleParams:
     rule_type: NotificationRuleType
     channel: NotificationChannelData
     timestamp: datetime
-    notification_data: Mapping[str, Any]
+    notification_data: NotifiableMessage
 
 
 @dataclass(frozen=True)
