@@ -16,6 +16,12 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.17.0rc2 (2025-11-10)
+
+### Fixes
+* Reservoir artifact import API response is blocking when using delegation ([#6683](https://github.com/lablup/backend.ai/issues/6683))
+
+
 ## 25.17.0rc1 (2025-11-09)
 
 ### Features
