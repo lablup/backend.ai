@@ -58,6 +58,9 @@ from ai.backend.common.events.event_types.model_serving.anycast import (
     ModelServiceStatusAnycastEvent,
     RouteCreatedAnycastEvent,
 )
+from ai.backend.common.events.event_types.notification.anycast import (
+    NotificationTriggeredEvent,
+)
 from ai.backend.common.events.event_types.schedule.anycast import (
     DoCheckPrecondEvent,
     DoDeploymentLifecycleEvent,
@@ -124,6 +127,7 @@ from .handlers.idle_check import IdleCheckEventHandler
 from .handlers.image import ImageEventHandler
 from .handlers.kernel import KernelEventHandler
 from .handlers.model_serving import ModelServingEventHandler
+from .handlers.notification import NotificationEventHandler
 from .handlers.session import SessionEventHandler
 from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
@@ -163,6 +167,7 @@ class Dispatchers:
     _session_event_handler: SessionEventHandler
     _vfolder_event_handler: VFolderEventHandler
     _idle_check_event_handler: IdleCheckEventHandler
+    _notification_event_handler: NotificationEventHandler
     _artifact_event_handler: ArtifactEventHandler
     _artifact_registry_event_handler: ArtifactRegistryEventHandler
 
@@ -209,6 +214,9 @@ class Dispatchers:
         )
         self._vfolder_event_handler = VFolderEventHandler(args.db)
         self._idle_check_event_handler = IdleCheckEventHandler(args.idle_checker_host)
+        self._notification_event_handler = NotificationEventHandler(
+            args.processors_factory().notification
+        )
         self._artifact_event_handler = ArtifactEventHandler(
             args.repositories.artifact.repository,
             args.repositories.huggingface_registry.repository,
@@ -239,6 +247,7 @@ class Dispatchers:
         self._dispatch_session_events(event_dispatcher)
         self._dispatch_vfolder_events(event_dispatcher)
         self._dispatch_idle_check_events(event_dispatcher)
+        self._dispatch_notification_events(event_dispatcher)
         self._dispatch_artifact_events(event_dispatcher)
         self._dispatch_artifact_registry_events(event_dispatcher)
 
@@ -625,4 +634,15 @@ class Dispatchers:
             None,
             self._idle_check_event_handler.handle_do_idle_check,
             name="idle_check",
+        )
+
+    def _dispatch_notification_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        event_dispatcher.consume(
+            NotificationTriggeredEvent,
+            None,
+            self._notification_event_handler.handle_notification_triggered,
+            name="notification.triggered",
         )
