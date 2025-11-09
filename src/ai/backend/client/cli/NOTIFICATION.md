@@ -20,7 +20,7 @@ The system consists of two main components:
 Check what event types can trigger notifications:
 
 ```bash
-backend.ai notification rule types
+./backend.ai notification rule types
 ```
 
 This displays all available rule types with their message schemas, showing required and optional fields.
@@ -30,7 +30,7 @@ This displays all available rule types with their message schemas, showing requi
 Create a webhook channel:
 
 ```bash
-backend.ai notification channel create "My Webhook" "https://your-webhook-url.example.com" \
+./backend.ai notification channel create "My Webhook" "https://your-webhook-url.example.com" \
   --description "Production alerts"
 ```
 
@@ -41,7 +41,7 @@ Save the channel ID from the output.
 Link an event type to your channel with a message template:
 
 ```bash
-backend.ai notification rule create "Session Started Alert" \
+./backend.ai notification rule create "Session Started Alert" \
   session.started \
   <CHANNEL_ID> \
   --template '{"text": "Session {{ session_id }} started"}' \
@@ -53,7 +53,7 @@ backend.ai notification rule create "Session Started Alert" \
 Test your rule with sample data:
 
 ```bash
-backend.ai notification rule validate <RULE_ID> \
+./backend.ai notification rule validate <RULE_ID> \
   --data '{"session_id": "test-123", "session_type": "interactive", "cluster_mode": "single-node", "status": "RUNNING"}'
 ```
 
@@ -65,22 +65,22 @@ backend.ai notification rule validate <RULE_ID> \
 
 ```bash
 # List all channels
-backend.ai notification channel list
+./backend.ai notification channel list
 
 # List only enabled channels
-backend.ai notification channel list --enabled-only
+./backend.ai notification channel list --enabled-only
 ```
 
 #### Get Channel Details
 
 ```bash
-backend.ai notification channel info <CHANNEL_ID>
+./backend.ai notification channel info <CHANNEL_ID>
 ```
 
 #### Create Channel
 
 ```bash
-backend.ai notification channel create <NAME> <WEBHOOK_URL> [OPTIONS]
+./backend.ai notification channel create <NAME> <WEBHOOK_URL> [OPTIONS]
 
 Options:
   --channel-type TEXT     Channel type (default: webhook)
@@ -90,7 +90,7 @@ Options:
 
 Example:
 ```bash
-backend.ai notification channel create "Production Alerts" \
+./backend.ai notification channel create "Production Alerts" \
   "https://your-webhook-url.example.com" \
   --description "Main webhook for production alerts"
 ```
@@ -98,7 +98,7 @@ backend.ai notification channel create "Production Alerts" \
 #### Update Channel
 
 ```bash
-backend.ai notification channel update <CHANNEL_ID> [OPTIONS]
+./backend.ai notification channel update <CHANNEL_ID> [OPTIONS]
 
 Options:
   --name TEXT            Update channel name
@@ -110,7 +110,7 @@ Options:
 
 Example:
 ```bash
-backend.ai notification channel update 550e8400-e29b-41d4-a716-446655440000 \
+./backend.ai notification channel update 550e8400-e29b-41d4-a716-446655440000 \
   --url "https://new.webhook.url" \
   --enable
 ```
@@ -118,7 +118,7 @@ backend.ai notification channel update 550e8400-e29b-41d4-a716-446655440000 \
 #### Delete Channel
 
 ```bash
-backend.ai notification channel delete <CHANNEL_ID>
+./backend.ai notification channel delete <CHANNEL_ID>
 ```
 
 #### Validate Channel
@@ -126,13 +126,13 @@ backend.ai notification channel delete <CHANNEL_ID>
 Test a channel by sending a test message:
 
 ```bash
-backend.ai notification channel validate <CHANNEL_ID> --data <MESSAGE>
-backend.ai notification channel validate <CHANNEL_ID> --data-file <FILE_PATH>
+./backend.ai notification channel validate <CHANNEL_ID> --data <MESSAGE>
+./backend.ai notification channel validate <CHANNEL_ID> --data-file <FILE_PATH>
 ```
 
 Example:
 ```bash
-backend.ai notification channel validate 550e8400-e29b-41d4-a716-446655440000 \
+./backend.ai notification channel validate 550e8400-e29b-41d4-a716-446655440000 \
   --data '{"text": "Test notification"}'
 ```
 
@@ -143,7 +143,7 @@ backend.ai notification channel validate 550e8400-e29b-41d4-a716-446655440000 \
 Display all available event types with their schemas:
 
 ```bash
-backend.ai notification rule types
+./backend.ai notification rule types
 ```
 
 #### Get Rule Type Schema
@@ -151,37 +151,37 @@ backend.ai notification rule types
 Display the message schema for a specific rule type:
 
 ```bash
-backend.ai notification rule schema <RULE_TYPE>
+./backend.ai notification rule schema <RULE_TYPE>
 ```
 
 Example:
 ```bash
-backend.ai notification rule schema session.started
+./backend.ai notification rule schema session.started
 ```
 
 #### List Rules
 
 ```bash
 # List all rules
-backend.ai notification rule list
+./backend.ai notification rule list
 
 # List only enabled rules
-backend.ai notification rule list --enabled-only
+./backend.ai notification rule list --enabled-only
 
 # Filter by rule types
-backend.ai notification rule list --rule-types session.started --rule-types session.terminated
+./backend.ai notification rule list --rule-types session.started --rule-types session.terminated
 ```
 
 #### Get Rule Details
 
 ```bash
-backend.ai notification rule info <RULE_ID>
+./backend.ai notification rule info <RULE_ID>
 ```
 
 #### Create Rule
 
 ```bash
-backend.ai notification rule create <NAME> <RULE_TYPE> <CHANNEL_ID> [OPTIONS]
+./backend.ai notification rule create <NAME> <RULE_TYPE> <CHANNEL_ID> [OPTIONS]
 
 Options:
   --template TEXT        Jinja2 template string
@@ -196,7 +196,7 @@ Examples:
 
 **Inline template:**
 ```bash
-backend.ai notification rule create "Session Started" \
+./backend.ai notification rule create "Session Started" \
   session.started \
   550e8400-e29b-41d4-a716-446655440000 \
   --template '{"text": "Session {{ session_id }} ({{ session_type }}) started"}'
@@ -204,7 +204,7 @@ backend.ai notification rule create "Session Started" \
 
 **Template file:**
 ```bash
-backend.ai notification rule create "Session Started" \
+./backend.ai notification rule create "Session Started" \
   session.started \
   550e8400-e29b-41d4-a716-446655440000 \
   --template-file templates/session_started.json
@@ -213,7 +213,7 @@ backend.ai notification rule create "Session Started" \
 #### Update Rule
 
 ```bash
-backend.ai notification rule update <RULE_ID> [OPTIONS]
+./backend.ai notification rule update <RULE_ID> [OPTIONS]
 
 Options:
   --name TEXT                Update rule name
@@ -226,7 +226,7 @@ Options:
 
 Example:
 ```bash
-backend.ai notification rule update 660e8400-e29b-41d4-a716-446655440000 \
+./backend.ai notification rule update 660e8400-e29b-41d4-a716-446655440000 \
   --message-template '{"text": "Updated: Session {{ session_id }} started"}' \
   --enable
 ```
@@ -234,7 +234,7 @@ backend.ai notification rule update 660e8400-e29b-41d4-a716-446655440000 \
 #### Delete Rule
 
 ```bash
-backend.ai notification rule delete <RULE_ID>
+./backend.ai notification rule delete <RULE_ID>
 ```
 
 #### Validate Rule
@@ -242,13 +242,13 @@ backend.ai notification rule delete <RULE_ID>
 Test a rule by rendering its template with sample data:
 
 ```bash
-backend.ai notification rule validate <RULE_ID> --data <JSON_DATA>
-backend.ai notification rule validate <RULE_ID> --data-file <JSON_FILE>
+./backend.ai notification rule validate <RULE_ID> --data <JSON_DATA>
+./backend.ai notification rule validate <RULE_ID> --data-file <JSON_FILE>
 ```
 
 Example:
 ```bash
-backend.ai notification rule validate 660e8400-e29b-41d4-a716-446655440000 \
+./backend.ai notification rule validate 660e8400-e29b-41d4-a716-446655440000 \
   --data '{"session_id": "sess-123", "session_type": "interactive", "cluster_mode": "single-node", "status": "RUNNING"}'
 ```
 
@@ -258,7 +258,7 @@ backend.ai notification rule validate 660e8400-e29b-41d4-a716-446655440000 \
 
 **1. Create a webhook channel:**
 ```bash
-backend.ai notification channel create "Production Notifications" \
+./backend.ai notification channel create "Production Notifications" \
   "https://your-webhook-url.example.com"
 ```
 
@@ -276,7 +276,7 @@ cat > session_started.json << 'EOF'
 }
 EOF
 
-backend.ai notification rule create "Production Session Started" \
+./backend.ai notification rule create "Production Session Started" \
   session.started \
   <CHANNEL_ID> \
   --template-file session_started.json
@@ -295,7 +295,7 @@ cat > session_terminated.json << 'EOF'
 }
 EOF
 
-backend.ai notification rule create "Production Session Terminated" \
+./backend.ai notification rule create "Production Session Terminated" \
   session.terminated \
   <CHANNEL_ID> \
   --template-file session_terminated.json
@@ -305,7 +305,7 @@ backend.ai notification rule create "Production Session Terminated" \
 
 ```bash
 # Create artifact download completion rule
-backend.ai notification rule create "Artifact Downloaded" \
+./backend.ai notification rule create "Artifact Downloaded" \
   artifact.download.completed \
   <CHANNEL_ID> \
   --template '{"text": "Artifact {{ artifact_name }} ({{ artifact_type }}) downloaded from {{ registry_type }}"}'
@@ -315,17 +315,17 @@ backend.ai notification rule create "Artifact Downloaded" \
 
 ```bash
 # Disable a specific rule
-backend.ai notification rule update <RULE_ID> --disable
+./backend.ai notification rule update <RULE_ID> --disable
 
 # Later, re-enable it
-backend.ai notification rule update <RULE_ID> --enable
+./backend.ai notification rule update <RULE_ID> --enable
 ```
 
 ### Update Webhook URL
 
 ```bash
 # Update the channel's webhook URL
-backend.ai notification channel update <CHANNEL_ID> \
+./backend.ai notification channel update <CHANNEL_ID> \
   --url "https://new.webhook.url"
 ```
 
@@ -418,7 +418,7 @@ Templates use Jinja2 syntax for variable interpolation and logic.
 2. **Use meaningful names**: Give channels and rules descriptive names for easy management
 3. **Template files for complex messages**: Use `--template-file` for multi-line or complex JSON structures
 4. **Disable instead of delete**: Temporarily disable rules instead of deleting them if you might need them later
-5. **Check schemas**: Use `backend.ai notification rule types` to see exactly what fields are available for each event type
+5. **Check schemas**: Use `./backend.ai notification rule types` to see exactly what fields are available for each event type
 
 ## Troubleshooting
 
@@ -435,10 +435,10 @@ Templates use Jinja2 syntax for variable interpolation and logic.
 **Notifications not received:**
 - Verify both channel and rule are enabled
 - Check channel URL is correct
-- Test the channel with `backend.ai notification channel validate`
+- Test the channel with `./backend.ai notification channel validate`
 - Check Backend.AI manager logs for errors
 
 **Template rendering errors:**
 - Validate your Jinja2 syntax
 - Ensure all referenced variables exist in the rule type schema
-- Test with `backend.ai notification rule validate` before deploying
+- Test with `./backend.ai notification rule validate` before deploying
