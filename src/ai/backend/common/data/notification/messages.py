@@ -17,6 +17,9 @@ __all__ = (
     "ArtifactDownloadCompletedMessage",
 )
 
+# Module-level registry for notification message types
+_MESSAGE_TYPE_REGISTRY: dict[NotificationRuleType, type["NotifiableMessage"]] = {}
+
 
 class NotifiableMessage(BaseModel):
     """Base class for all notification messages.
@@ -27,15 +30,13 @@ class NotifiableMessage(BaseModel):
 
     model_config = {"extra": "forbid"}  # Strict validation - reject unknown fields
 
-    _register_dict: dict[NotificationRuleType, type["NotifiableMessage"]] = {}
-
     def __init_subclass__(cls):
         """Automatically register subclasses by their rule type."""
         try:
             rule_type = cls.rule_type()
-            if rule_type in cls._register_dict:
+            if rule_type in _MESSAGE_TYPE_REGISTRY:
                 raise RuntimeError(f"Notification message type {rule_type} is already registered")
-            cls._register_dict[rule_type] = cls
+            _MESSAGE_TYPE_REGISTRY[rule_type] = cls
         except NotImplementedError:
             # If rule_type is not implemented, we cannot register it
             return
@@ -65,7 +66,7 @@ class NotifiableMessage(BaseModel):
             KeyError: If the rule_type has no associated message class
             ValidationError: If the data doesn't match the message schema
         """
-        model_class = cls._register_dict[rule_type]
+        model_class = _MESSAGE_TYPE_REGISTRY[rule_type]
         return model_class.model_validate(data)
 
     @classmethod
@@ -81,7 +82,7 @@ class NotifiableMessage(BaseModel):
         Raises:
             KeyError: If the rule_type has no associated message class
         """
-        model_class = cls._register_dict[rule_type]
+        model_class = _MESSAGE_TYPE_REGISTRY[rule_type]
         return model_class.model_json_schema()
 
 

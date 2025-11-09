@@ -733,6 +733,7 @@ class TestNotificationService:
         notification_data = {
             "session_id": "sess-123",
             "user_name": "test_user",
+            "kernel_image": "python:3.11-ubuntu20.04",
         }
 
         # Mock the template environment to return a template that renders correctly
@@ -799,7 +800,11 @@ class TestNotificationService:
 
         action = ValidateRuleAction(
             rule_id=invalid_rule.id,
-            notification_data={"test": "data"},
+            notification_data={
+                "session_id": "sess-123",
+                "user_name": "test_user",
+                "kernel_image": "python:3.11-ubuntu20.04",
+            },
         )
         with pytest.raises(NotificationTemplateRenderingFailure):
             await notification_service.validate_rule(action)
