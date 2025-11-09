@@ -158,6 +158,13 @@ class ArtifactDownloadCompletedMessage(NotifiableMessage):
     registry_type: str = Field(
         description="Type of registry where the artifact is stored (e.g., 'HARBOR', 'HUGGINGFACE')"
     )
+    registry_id: str = Field(description="Unique identifier of the registry")
     version: Optional[str] = Field(
         default=None, description="Version of the artifact revision, if available"
+    )
+    status: str = Field(description="Status of the artifact revision")
+    success: bool = Field(description="Whether the download operation succeeded")
+    digest: Optional[str] = Field(default=None, description="Digest of the artifact revision")
+    verification_result: Optional[dict[str, Any]] = Field(
+        default=None, description="Verification result of the artifact revision, if available"
     )

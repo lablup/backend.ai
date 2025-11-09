@@ -308,7 +308,7 @@ EOF
 ./backend.ai notification rule create "Artifact Downloaded" \
   artifact.download.completed \
   <CHANNEL_ID> \
-  --template '{"text": "Artifact {{ artifact_name }} ({{ artifact_type }}) downloaded from {{ registry_type }}"}'
+  --template '{"text": "Artifact {{ artifact_name }} ({{ artifact_type }}) {{ 'successfully' if success else 'failed to be' }} downloaded from {{ registry_type }}, status: {{ status }}"}'
 ```
 
 ### Temporarily Disable Notifications
@@ -376,13 +376,22 @@ Triggered when an artifact download operation completes.
 - `artifact_id` (required): Artifact UUID
 - `artifact_name` (required): Artifact name
 - `artifact_type` (required): Artifact type (MODEL, PACKAGE, IMAGE)
-- `registry_type` (required): Registry type (HARBOR, HUGGINGFACE)
+- `registry_type` (required): Registry type (HARBOR, HUGGINGFACE, RESERVOIR)
+- `registry_id` (required): Registry UUID
 - `version` (optional): Artifact version
+- `status` (required): Artifact revision status (AVAILABLE, NEEDS_APPROVAL, FAILED)
+- `success` (required): Whether the download operation succeeded (true/false)
+- `digest` (optional): Artifact revision digest
+- `verification_result` (optional): Verification result object
 
 **Example template:**
 ```json
 {
-  "text": "Artifact {{ artifact_name }} (v{{ version or 'latest' }}) downloaded successfully"
+  "title": "Artifact Download {{ 'Completed' if success else 'Failed' }}",
+  "artifact": "{{ artifact_name }} (v{{ version or 'latest' }})",
+  "registry": "{{ registry_type }}",
+  "status": "{{ status }}",
+  "digest": "{{ digest or 'N/A' }}"
 }
 ```
 

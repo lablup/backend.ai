@@ -9,6 +9,7 @@ from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyS
 from ai.backend.common.events.dispatcher import (
     CoalescingOptions,
     EventDispatcher,
+    EventProducer,
 )
 from ai.backend.common.events.event_types.agent.anycast import (
     AgentErrorEvent,
@@ -153,6 +154,7 @@ class DispatcherArgs:
     processors_factory: Callable[[], Processors]
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
+    event_producer: EventProducer
     use_sokovan: bool = True
 
 
@@ -220,6 +222,7 @@ class Dispatchers:
             args.repositories.huggingface_registry.repository,
             args.repositories.reservoir_registry.repository,
             args.config_provider,
+            args.event_producer,
         )
         self._artifact_registry_event_handler = ArtifactRegistryEventHandler(
             args.processors_factory,
