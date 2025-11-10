@@ -100,7 +100,7 @@ class ContainerRegistryDBSource:
     ) -> ContainerRegistryRow:
         """
         Fetch the raw ContainerRegistryRow object.
-        Returns None if registry is not found.
+        Raise ContainerRegistryNotFound if registry is not found.
         """
         async with self._db.begin_readonly_session() as session:
             stmt = sa.select(ContainerRegistryRow).where(
