@@ -10,6 +10,7 @@ from uuid import UUID
 
 import yarl
 
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
     ActivenessStatus,
     DeploymentStrategy,
@@ -27,30 +28,6 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.image.types import ImageIdentifier
-
-
-class EndpointLifecycle(enum.Enum):
-    PENDING = "pending"
-    CREATED = "created"  # Deprecated, use READY instead
-    SCALING = "scaling"
-    READY = "ready"
-    DESTROYING = "destroying"
-    DESTROYED = "destroyed"
-
-    @classmethod
-    @lru_cache(maxsize=1)
-    def active_states(cls) -> set["EndpointLifecycle"]:
-        return {cls.PENDING, cls.CREATED, cls.SCALING, cls.READY}
-
-    @classmethod
-    @lru_cache(maxsize=1)
-    def need_scaling_states(cls) -> set["EndpointLifecycle"]:
-        return {cls.CREATED, cls.READY}
-
-    @classmethod
-    @lru_cache(maxsize=1)
-    def inactive_states(cls) -> set["EndpointLifecycle"]:
-        return {cls.DESTROYING, cls.DESTROYED}
 
 
 class RouteStatus(enum.Enum):
