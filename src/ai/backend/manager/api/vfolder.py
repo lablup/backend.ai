@@ -596,7 +596,6 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
     )
     domain_name = request["user"]["domain_name"]
     group_id = params["group_id"]
-    domain_admin = request["user"]["role"] == UserRole.ADMIN
     resource_policy = request["keypair"]["resource_policy"]
     allowed_vfolder_types = (
         await root_ctx.config_provider.legacy_etcd_config_loader.get_vfolder_types()
@@ -610,7 +609,10 @@ async def list_hosts(request: web.Request, params: Any) -> web.Response:
             allowed_hosts = allowed_hosts | allowed_hosts_by_user
         if "group" in allowed_vfolder_types:
             allowed_hosts_by_group = await get_allowed_vfolder_hosts_by_group(
-                conn, resource_policy, domain_name, group_id, domain_admin=domain_admin
+                conn,
+                resource_policy,
+                domain_name,
+                group_id,
             )
             allowed_hosts = allowed_hosts | allowed_hosts_by_group
     all_volumes = await root_ctx.storage_manager.get_all_volumes()
