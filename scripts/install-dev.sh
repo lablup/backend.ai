@@ -867,6 +867,7 @@ setup_environment() {
     SOURCE_APOLLO_ROUTER_CONFIG_PATH="configs/graphql/gateway.config.ts"
     SOURCE_SUPERGRAPH_PATH="docs/manager/graphql-reference/supergraph.graphql"
 
+    ./scripts/generate-graphql-schema.sh
     cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
     cp "${SOURCE_PROMETHEUS_PATH}" "prometheus.yaml"
     cp -r "${SOURCE_GRAFANA_DASHBOARDS_PATH}" "grafana-dashboards"
@@ -926,6 +927,8 @@ setup_environment() {
     SOURCE_TEMPO_CONFIG_PATH="configs/tempo/tempo-config.yaml"
     SOURCE_APOLLO_ROUTER_CONFIG_PATH="configs/graphql/gateway.config.ts"
     SOURCE_SUPERGRAPH_PATH="docs/manager/graphql-reference/supergraph.graphql"
+
+    ./scripts/generate-graphql-schema.sh
     cp "${SOURCE_COMPOSE_PATH}" "docker-compose.halfstack.current.yml"
     cp "${SOURCE_PROMETHEUS_PATH}" "prometheus.yaml"
     cp -r "${SOURCE_GRAFANA_DASHBOARDS_PATH}" "grafana-dashboards"
