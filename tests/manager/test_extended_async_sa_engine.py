@@ -6,7 +6,6 @@ from dataclasses import dataclass
 import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncConnection
-from sqlalchemy.orm import declarative_base
 
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -19,23 +18,6 @@ class IsolationTestRowData:
 
     value: str
     version: int
-
-
-Base = declarative_base()
-
-
-class IsolationDataModel(Base):  # type: ignore
-    """ORM model for test_isolation_data table."""
-
-    __tablename__ = "test_isolation_data"
-
-    id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
-    value = sa.Column(sa.String(255), nullable=False)
-    version = sa.Column(sa.Integer, nullable=False, default=1)
-
-    def __init__(self, value: str, version: int = 1) -> None:
-        self.value = value
-        self.version = version
 
 
 class TestExtendedAsyncSAEngineReadCommitted:
@@ -52,12 +34,15 @@ class TestExtendedAsyncSAEngineReadCommitted:
     @pytest.fixture
     def test_table_metadata(self) -> sa.MetaData:
         """Create test table metadata for isolation level testing."""
-        return IsolationDataModel.metadata
-
-    @pytest.fixture
-    def orm_model(self) -> type[IsolationDataModel]:
-        """Provide ORM model class for session-based tests."""
-        return IsolationDataModel
+        metadata = sa.MetaData()
+        sa.Table(
+            "test_isolation_data",
+            metadata,
+            sa.Column("id", sa.Integer, primary_key=True, autoincrement=True),
+            sa.Column("value", sa.String(255), nullable=False),
+            sa.Column("version", sa.Integer, nullable=False, default=1),
+        )
+        return metadata
 
     @pytest.fixture(autouse=True)
     async def test_table_in_db(
@@ -217,33 +202,31 @@ class TestExtendedAsyncSAEngineReadCommitted:
         self,
         database_engine: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
-        orm_model: type[IsolationDataModel],
     ) -> None:
-        """Test basic functionality of begin_session_read_committed using ORM."""
-        session_value_1 = "session_value_1"
-        session_value_2 = "session_value_2"
-        row_ids: list[int] = []
+        """Test basic functionality of begin_session_read_committed."""
+        test_value = "session_test"
+        expected_version = 1
 
-        # Insert data using READ COMMITTED session with ORM
+        # Insert and read data using READ COMMITTED session
         async with database_engine.begin_session_read_committed() as session:
-            model1 = orm_model(value=session_value_1, version=1)
-            model2 = orm_model(value=session_value_2, version=1)
+            result = await session.execute(
+                sa.insert(test_table_in_db)
+                .values(value=test_value, version=expected_version)
+                .returning(test_table_in_db.c.id)
+            )
+            row_id = result.scalar_one()
 
-            session.add(model1)
-            session.add(model2)
-            await session.flush()
+            # Verify data within session
+            result = await session.execute(
+                sa.select(test_table_in_db.c.value, test_table_in_db.c.version).where(
+                    test_table_in_db.c.id == row_id
+                )
+            )
+            row = result.fetchone()
 
-            row_ids.append(model1.id)
-            row_ids.append(model2.id)
-
-            # Verify data within session using ORM query
-            result = await session.execute(sa.select(orm_model).where(orm_model.id.in_(row_ids)))
-            objs = result.scalars().all()
-            values = [obj.value for obj in objs]
-
-        # Session should auto-commit
-        assert session_value_1 in values
-        assert session_value_2 in values
+        assert row is not None
+        assert row[0] == test_value
+        assert row[1] == expected_version
 
     @pytest.mark.asyncio
     async def test_begin_session_read_committed_isolation_level(
@@ -265,17 +248,18 @@ class TestExtendedAsyncSAEngineReadCommitted:
         self,
         database_engine: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
-        orm_model: type[IsolationDataModel],
     ) -> None:
-        """Verify that session auto-commits on exit using ORM."""
+        """Verify that session auto-commits on exit."""
         test_value = "auto_commit_test"
 
-        # Insert in session using ORM
+        # Insert in session
         async with database_engine.begin_session_read_committed() as session:
-            model = orm_model(value=test_value, version=1)
-            session.add(model)
-            await session.flush()
-            row_id = model.id
+            result = await session.execute(
+                sa.insert(test_table_in_db)
+                .values(value=test_value, version=1)
+                .returning(test_table_in_db.c.id)
+            )
+            row_id = result.scalar_one()
 
         # Verify data persisted after session exit
         async with database_engine.begin_readonly() as conn:
@@ -289,9 +273,8 @@ class TestExtendedAsyncSAEngineReadCommitted:
         self,
         database_engine: ExtendedAsyncSAEngine,
         test_table_in_db: sa.Table,
-        orm_model: type[IsolationDataModel],
     ) -> None:
-        """Test basic functionality of begin_readonly_session_read_committed using ORM."""
+        """Test basic functionality of begin_readonly_session_read_committed."""
         test_value = "readonly_session_test"
         expected_version = 1
 
@@ -299,14 +282,18 @@ class TestExtendedAsyncSAEngineReadCommitted:
         async with database_engine.begin() as conn:
             row_id = await self._insert_test_data_returning_id(conn, test_table_in_db, test_value)
 
-        # Read using READ COMMITTED read-only session with ORM
+        # Read using READ COMMITTED read-only session
         async with database_engine.begin_readonly_session_read_committed() as session:
-            result = await session.execute(sa.select(orm_model).where(orm_model.id == row_id))
-            model = result.scalar_one_or_none()
+            result = await session.execute(
+                sa.select(test_table_in_db.c.value, test_table_in_db.c.version).where(
+                    test_table_in_db.c.id == row_id
+                )
+            )
+            row = result.fetchone()
 
-        assert model is not None
-        assert model.value == test_value
-        assert model.version == expected_version
+        assert row is not None
+        assert row[0] == test_value
+        assert row[1] == expected_version
 
     @pytest.mark.asyncio
     async def test_begin_readonly_session_read_committed_isolation_level(
@@ -327,16 +314,16 @@ class TestExtendedAsyncSAEngineReadCommitted:
     async def test_begin_readonly_session_read_committed_cannot_write(
         self,
         database_engine: ExtendedAsyncSAEngine,
-        orm_model: type[IsolationDataModel],
+        test_table_in_db: sa.Table,
     ) -> None:
-        """Verify that read-only session cannot perform writes using ORM."""
+        """Verify that read-only session cannot perform writes."""
         test_value = "should_fail"
 
         with pytest.raises(sa.exc.DBAPIError) as exc_info:
             async with database_engine.begin_readonly_session_read_committed() as session:
-                model = orm_model(value=test_value, version=1)
-                session.add(model)
-                await session.flush()
+                await session.execute(
+                    sa.insert(test_table_in_db).values(value=test_value, version=1)
+                )
 
         # PostgreSQL raises "cannot execute INSERT in a read-only transaction"
         assert "read-only" in str(exc_info.value).lower()
