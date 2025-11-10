@@ -74,13 +74,13 @@ class TestContainerRegistryRepository:
                 await session.execute(
                     sa.delete(ImageRow).where(
                         (ImageRow.registry == registry_name)
-                        & (ImageRow.project == project if project else True)
+                        & (ImageRow.project == project if project else sa.true())
                     )
                 )
                 await session.execute(
                     sa.delete(ContainerRegistryRow).where(
                         (ContainerRegistryRow.registry_name == registry_name)
-                        & (ContainerRegistryRow.project == project if project else True)
+                        & (ContainerRegistryRow.project == project if project else sa.true())
                     )
                 )
 
