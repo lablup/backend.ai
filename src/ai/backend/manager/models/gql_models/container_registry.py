@@ -12,6 +12,7 @@ from graphql import Undefined, UndefinedType
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import (
     ContainerRegistryGroupsAssociationNotFound,
 )
@@ -169,6 +170,22 @@ class ContainerRegistryNode(graphene.ObjectType):
             total_cnt = await db_session.scalar(cnt_query)
         result = [cls.from_row(graph_ctx, cast(ContainerRegistryRow, row)) for row in reg_rows]
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
+
+    @classmethod
+    def from_dataclass(cls, ctx: GraphQueryContext, data: ContainerRegistryData) -> Self:
+        return cls(
+            id=data.id,  # auto-converted to Relay global ID
+            row_id=data.id,
+            url=data.url,
+            type=data.type,
+            registry_name=data.registry_name,
+            project=data.project,
+            username=data.username,
+            password=PASSWORD_PLACEHOLDER if data.password is not None else None,
+            ssl_verify=data.ssl_verify,
+            is_global=data.is_global,
+            extra=data.extra,
+        )
 
     @classmethod
     def from_row(cls, ctx: GraphQueryContext, row: ContainerRegistryRow) -> ContainerRegistryNode:
