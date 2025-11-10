@@ -140,9 +140,9 @@ class ValkeyScheduleClient:
         seconds_bytes, _ = result
         return int(seconds_bytes)
 
-    async def _is_health_status_valid(self, status: str, timestamp_str: str) -> bool:
+    async def _validate_health_status(self, status: str, timestamp_str: str) -> bool:
         """
-        Check if health status is healthy and timestamp is not stale.
+        Validate health status by checking if it's healthy and timestamp is not stale.
 
         :param status: The status string ("1" for healthy, "0" for unhealthy)
         :param timestamp_str: The timestamp string value from Redis
@@ -333,10 +333,10 @@ class ValkeyScheduleClient:
         data = {k.decode(): v.decode() for k, v in result.items()}
 
         # Parse boolean values using validation helper (checks both status and staleness)
-        readiness = await self._is_health_status_valid(
+        readiness = await self._validate_health_status(
             data.get("readiness", "0"), data.get("last_readiness", "0")
         )
-        liveness = await self._is_health_status_valid(
+        liveness = await self._validate_health_status(
             data.get("liveness", "0"), data.get("last_liveness", "0")
         )
         last_check = int(data["last_check"]) if "last_check" in data else 0
@@ -457,10 +457,10 @@ class ValkeyScheduleClient:
             # Parse existing data
             data = {k.decode(): v.decode() for k, v in result.items()}
             # Parse boolean values using validation helper (checks both status and staleness)
-            readiness = await self._is_health_status_valid(
+            readiness = await self._validate_health_status(
                 data.get("readiness", "0"), data.get("last_readiness", "0")
             )
-            liveness = await self._is_health_status_valid(
+            liveness = await self._validate_health_status(
                 data.get("liveness", "0"), data.get("last_liveness", "0")
             )
             health_statuses[route_id] = HealthStatus(
