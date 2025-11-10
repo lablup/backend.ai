@@ -148,9 +148,16 @@ async def setup(
     match circuit.protocol:
         case ProxyProtocol.HTTP:
             protocol = "https" if use_tls else "http"
-            response = web.HTTPPermanentRedirect(
-                generate_proxy_url(port_config, protocol, circuit), headers=cors_headers
-            )
+            base_url = generate_proxy_url(port_config, protocol, circuit)
+
+            # Handle redirect parameter from JWT body
+            redirect_path = jwt_body.get("redirect", "")
+            if redirect_path and not redirect_path.startswith("/"):
+                redirect_path = f"/{redirect_path}"
+
+            full_url = f"{base_url}{redirect_path}" if redirect_path else base_url
+
+            response = web.HTTPPermanentRedirect(full_url, headers=cors_headers)
             cookie_domain = None
             if circuit.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
                 wildcard_info = config.wildcard_domain
