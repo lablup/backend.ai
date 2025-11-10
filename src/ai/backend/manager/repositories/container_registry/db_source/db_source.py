@@ -2,14 +2,24 @@ from __future__ import annotations
 
 import logging
 from typing import Optional
+from uuid import UUID
 
 import sqlalchemy as sa
 
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryCreator,
+    ContainerRegistryData,
+    ContainerRegistryModifier,
+)
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.container_registry import (
+    ContainerRegistryRow,
+    ContainerRegistryValidator,
+    ContainerRegistryValidatorArgs,
+)
+from ai.backend.manager.models.gql_models.container_registry import handle_allowed_groups_update
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -23,6 +33,69 @@ class ContainerRegistryDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
+
+    async def insert_registry(
+        self,
+        creator: ContainerRegistryCreator,
+    ) -> ContainerRegistryData:
+        async with self._db.begin_session() as db_session:
+            reg_row = ContainerRegistryRow.from_creator(creator)
+            db_session.add(reg_row)
+            await db_session.flush()
+            await db_session.refresh(reg_row)
+
+        if creator.allowed_groups:
+            await handle_allowed_groups_update(self._db, reg_row.id, creator.allowed_groups)
+
+        return reg_row.to_dataclass()
+
+    async def update_registry(
+        self,
+        registry_id: UUID,
+        modifier: ContainerRegistryModifier,
+    ) -> ContainerRegistryData:
+        async with self._db.begin_session() as session:
+            reg_row: Optional[ContainerRegistryRow] = await session.scalar(
+                sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
+            )
+            if reg_row is None:
+                raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
+            reg_row.apply_modifier(modifier)
+            session.add(reg_row)
+            await session.flush()
+            await session.refresh(reg_row)
+
+            validator = ContainerRegistryValidator(
+                ContainerRegistryValidatorArgs(
+                    type=reg_row.type,
+                    project=reg_row.project,
+                    url=reg_row.url,
+                )
+            )
+            validator.validate()
+
+        if modifier.allowed_groups.optional_value is not None:
+            await handle_allowed_groups_update(
+                self._db, reg_row.id, modifier.allowed_groups.value()
+            )
+
+        return reg_row.to_dataclass()
+
+    async def delete_registry(
+        self,
+        registry_id: UUID,
+    ) -> ContainerRegistryData:
+        async with self._db.begin_session() as db_session:
+            reg_row: Optional[ContainerRegistryRow] = await db_session.scalar(
+                sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
+            )
+            if reg_row is None:
+                raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
+            registry_data = reg_row.to_dataclass()
+            await db_session.execute(
+                sa.delete(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
+            )
+        return registry_data
 
     async def fetch_by_registry_and_project(
         self,
