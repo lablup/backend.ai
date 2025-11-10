@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Mapping
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
@@ -9,6 +10,7 @@ import yarl
 
 from ai.backend.common.exception import ErrorCode, ErrorDomain, InvalidErrorCode
 from ai.backend.common.json import load_json
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.storage import (
     QuotaScopeNotFoundError,
     StorageProxyConnectionError,
@@ -20,6 +22,8 @@ from ai.backend.manager.errors.storage import (
 )
 
 AUTH_TOKEN_HDR: Final = "X-BackendAI-Storage-Auth-Token"
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -75,7 +79,25 @@ class StorageProxyHTTPClient:
                 )
 
     async def _handle_exceptional_response(self, resp: aiohttp.ClientResponse) -> None:
-        data = await resp.json()
+        data = None
+        try:
+            data = await resp.json()
+        except (aiohttp.ContentTypeError, ValueError) as e:
+            resp_text = await resp.text()
+            log.warning(
+                "Failed to parse JSON from storage proxy error response: "
+                "status={}, content_type={}, error={}, response_text={}",
+                resp.status,
+                resp.content_type,
+                e,
+                resp_text if resp_text else "",
+            )
+            raise UnexpectedStorageProxyResponseError(
+                extra_msg=(
+                    f"Unexpected non-JSON error response from storage proxy: "
+                    f"status={resp.status}, content_type={resp.content_type}"
+                ),
+            ) from e
         try:
             err_code = ErrorCode.from_str(data.get("error_code", ""))
             err_domain = err_code.domain
