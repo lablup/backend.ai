@@ -573,7 +573,7 @@ class ModelCard(graphene.ObjectType):
             if isinstance(e, ModelCardProcessError):
                 error_msg = e.msg
             else:
-                error_msg = "Unknown error"
+                error_msg = repr(e)
             if (
                 graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
                 or vfolder_row.creator == graph_ctx.user["email"]
