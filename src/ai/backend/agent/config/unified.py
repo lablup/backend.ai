@@ -355,17 +355,17 @@ class CommonAgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("rpc-listen-addr", "rpc_listen_addr"),
         serialization_alias="rpc-listen-addr",
     )
-    service_addr: HostPortPair = Field(
+    internal_addr: HostPortPair = Field(
         default=HostPortPair(host="0.0.0.0", port=6003),
         description="Service address and port",
         validation_alias=AliasChoices("service-addr", "internal-addr", "service_addr"),
-        serialization_alias="service-addr",
+        serialization_alias="internal-addr",
     )
-    announce_addr: HostPortPair = Field(
+    announce_internal_addr: HostPortPair = Field(
         default=HostPortPair(host="host.docker.internal", port=6003),
         description="Announce address and port",
         validation_alias=AliasChoices("announce-addr", "announce-internal-addr", "announce_addr"),
-        serialization_alias="announce-addr",
+        serialization_alias="announce-internal-addr",
     )
     ssl_enabled: bool = Field(
         default=False,

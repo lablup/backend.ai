@@ -1444,7 +1444,7 @@ async def agent_server_ctx(
     app = build_root_server()
     runner = web.AppRunner(app)
     await runner.setup()
-    service_addr = local_config.agent_common.service_addr.to_legacy()
+    service_addr = local_config.agent_common.internal_addr.to_legacy()
     ssl_ctx = None
 
     if local_config.agent_common.ssl_enabled:
@@ -1472,8 +1472,15 @@ async def service_discovery_ctx(
     etcd: AsyncEtcd,
     agent_server: AgentRPCServer,
 ) -> AsyncGenerator[None]:
+<<<<<<< HEAD
     local_config = agent_server.local_config
     announce_addr = local_config.agent_common.announce_addr.to_legacy()
+=======
+    announce_addr = HostPortPair(
+        local_config.agent.announce_internal_addr.host,
+        local_config.agent.announce_internal_addr.port,
+    )
+>>>>>>> 6e39667e2 (feat(BA-3001): Change agent config field names and serialization aliases to use internal-addr naming)
     sd_type = ServiceDiscoveryType(local_config.service_discovery.type)
     service_discovery: ServiceDiscovery
     match sd_type:
