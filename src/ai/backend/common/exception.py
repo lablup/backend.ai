@@ -253,6 +253,9 @@ class ErrorDetail(enum.StrEnum):
     # TIMEOUT
     TIMEOUT = "timeout"
 
+    # Error occured in external proxy/service. Check the extra message for details.
+    PROXY_ERROR = "proxy-error"
+
 
 @dataclass
 class ErrorCode:

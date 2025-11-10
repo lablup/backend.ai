@@ -12,6 +12,7 @@ from ai.backend.common.exception import ErrorCode, ErrorDomain, InvalidErrorCode
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.storage import (
+    ProxyPassthroughError,
     QuotaScopeNotFoundError,
     StorageProxyConnectionError,
     UnexpectedStorageProxyResponseError,
@@ -92,12 +93,10 @@ class StorageProxyHTTPClient:
                 e,
                 resp_text if resp_text else "",
             )
-            raise UnexpectedStorageProxyResponseError(
-                extra_msg=(
-                    f"Unexpected non-JSON error response from storage proxy: "
-                    f"status={resp.status}, content_type={resp.content_type}"
-                ),
-            ) from e
+            raise ProxyPassthroughError(
+                status_code=resp.status,
+                error_message=f"Failed to parse error response from storage proxy. Original response: {resp_text if resp_text else ''}",
+            )
         try:
             err_code = ErrorCode.from_str(data.get("error_code", ""))
             err_domain = err_code.domain

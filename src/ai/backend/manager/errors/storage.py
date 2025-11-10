@@ -5,7 +5,7 @@ Storage and virtual folder-related exceptions.
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from aiohttp import web
 
@@ -307,6 +307,33 @@ class UnexpectedStorageProxyResponseError(BackendAIError, web.HTTPInternalServer
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.UNREACHABLE,
+        )
+
+
+class ProxyPassthroughError(BackendAIError):
+    """
+    Wraps and forwards errors from storage proxy with original status code and message.
+    This allows transparent error propagation from storage proxy to API clients.
+    """
+
+    error_type = "https://api.backend.ai/probs/storage-proxy-error"
+    error_title = "Error from storage proxy"
+
+    def __init__(
+        self,
+        status_code: int,
+        error_message: Optional[str] = None,
+    ) -> None:
+        extra_msg = error_message or f"Storage proxy returned status {status_code}"
+        super().__init__(extra_msg=extra_msg)
+        self.status_code = status_code
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.STORAGE_PROXY,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.PROXY_ERROR,
         )
 
 
