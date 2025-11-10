@@ -308,7 +308,7 @@ async def web_handler(
 async def web_handler_with_jwt(
     frontend_rqst: web.Request,
     *,
-    api_endpoint: Optional[str] = None,
+    api_endpoints: list[str] | None = None,
     http_headers_to_forward_extra: Iterable[str] | None = None,
 ) -> web.StreamResponse:
     """
@@ -321,12 +321,17 @@ async def web_handler_with_jwt(
 
     Args:
         frontend_rqst: The incoming frontend request
-        api_endpoint: Optional override for the API endpoint (Apollo Router endpoint)
+        api_endpoints: List of API endpoints (Apollo Router endpoints) for load balancing
         http_headers_to_forward_extra: Additional HTTP headers to forward
 
     Returns:
         Streamed response from the backend API
     """
+    # Select random endpoint if multiple endpoints are provided
+    api_endpoint: Optional[str] = None
+    if api_endpoints:
+        api_endpoint = random.choice(api_endpoints)
+
     # Generate JWT token from session (needed for both HTTP and WebSocket)
     jwt_token = await generate_jwt_token_for_session(frontend_rqst)
     log.debug(
