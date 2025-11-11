@@ -6,7 +6,12 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
 from ai.backend.manager.data.artifact.modifier import ArtifactModifier
-from ai.backend.manager.data.artifact.types import ArtifactType, DelegateeTarget
+from ai.backend.manager.data.artifact.types import (
+    ArtifactFilterOptions,
+    ArtifactOrderingOptions,
+    ArtifactType,
+    DelegateeTarget,
+)
 from ai.backend.manager.defs import ARTIFACT_MAX_SCAN_LIMIT
 from ai.backend.manager.types import PaginationOptions, TriState
 
@@ -56,9 +61,8 @@ class ScanArtifactsSyncReq(BaseRequestModel):
 
 class SearchArtifactsReq(BaseRequestModel):
     pagination: PaginationOptions
-    # TODO: Support this. (we need to make strawberry independent types)
-    # ordering: Optional[ArtifactOrderingOptions] = None
-    # filters: Optional[ArtifactFilterOptions] = None
+    ordering: Optional[ArtifactOrderingOptions] = None
+    filters: Optional[ArtifactFilterOptions] = None
 
 
 class ScanArtifactModelsReq(BaseRequestModel):
@@ -139,3 +143,9 @@ class UpdateArtifactReqBodyParam(BaseRequestModel):
         if self.description is not None:
             modifier.description = TriState.update(self.description)
         return modifier
+
+
+class GetDownloadProgressReqPathParam(BaseRequestModel):
+    artifact_revision_id: uuid.UUID = Field(
+        description="The artifact revision ID to get download progress for"
+    )

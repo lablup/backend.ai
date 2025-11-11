@@ -371,6 +371,7 @@
       "DownloadingModel": "Downloading Model...",
       "Edit": "Edit",
       "EditDelete": "Edit+Delete",
+      "ExcludedFolders": "The following folder(s) without delete permission will be excluded.",
       "FileDeleted": "File deleted",
       "FileRenamed": "File renamed",
       "FolderCloneFailed": "Failed to clone the folder.",

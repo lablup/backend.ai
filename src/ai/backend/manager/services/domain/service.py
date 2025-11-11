@@ -116,24 +116,13 @@ class DomainService:
     async def purge_domain(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
         name = action.name
 
-        try:
-            if action.user_info.role == UserRole.SUPERADMIN:
-                success = await self._admin_repository.purge_domain_force(name)
-            else:
-                success = await self._repository.purge_domain_validated(name)
-            if success:
-                return PurgeDomainActionResult(
-                    success=True, description=f"domain {name} purged successfully"
-                )
-            else:
-                return PurgeDomainActionResult(
-                    success=False,
-                    description=f"no matching {name} domain to purge",
-                )
-        except Exception as e:
-            return PurgeDomainActionResult(
-                success=False, description=f"domain purge failed: {str(e)}"
-            )
+        if action.user_info.role == UserRole.SUPERADMIN:
+            await self._admin_repository.purge_domain_force(name)
+        else:
+            await self._repository.purge_domain_validated(name)
+        return PurgeDomainActionResult(
+            success=True, description=f"domain {name} purged successfully"
+        )
 
     async def create_domain_node(
         self, action: CreateDomainNodeAction

@@ -6,7 +6,6 @@ from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Final,
     Optional,
     Self,
 )
@@ -18,14 +17,14 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.orm import contains_eager
 
-from ai.backend.common.bgtask.bgtask import ProgressReporter
-from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     HardwareMetadata,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.manager.bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAllocMapsManifest
+from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
@@ -107,9 +106,6 @@ _queryorder_colmap: Mapping[str, OrderSpecItem] = {
     "available_slots": ("available_slots", None),
     "occupied_slots": ("occupied_slots", None),
 }
-
-
-GPU_ALLOC_MAP_CACHE_PERIOD: Final[int] = 3600 * 24
 
 
 async def _resolve_gpu_alloc_map(ctx: GraphQueryContext, agent_id: AgentId) -> dict[str, float]:
@@ -926,35 +922,12 @@ class RescanGPUAllocMaps(graphene.Mutation):
         info: graphene.ResolveInfo,
         agent_id: str,
     ) -> RescanGPUAllocMaps:
-        log.info("rescanning GPU alloc maps")
+        log.info("rescanning GPU alloc maps for agent {}", agent_id)
         graph_ctx: GraphQueryContext = info.context
 
-        async def _rescan_alloc_map_task(reporter: ProgressReporter) -> None:
-            await reporter.update(message=f"Agent {agent_id} GPU alloc map scanning...")
-
-            reporter_msg = ""
-            try:
-                alloc_map: Mapping[str, Any] = await graph_ctx.registry.scan_gpu_alloc_map(
-                    AgentId(agent_id)
-                )
-                key = f"gpu_alloc_map.{agent_id}"
-                await graph_ctx.registry.valkey_stat.setex(
-                    name=key,
-                    value=dump_json_str(alloc_map),
-                    time=GPU_ALLOC_MAP_CACHE_PERIOD,
-                )
-            except Exception as e:
-                reporter_msg = f"Failed to scan GPU alloc map for agent {agent_id}: {str(e)}"
-                log.error(reporter_msg)
-            else:
-                reporter_msg = f"Agent {agent_id} GPU alloc map scanned."
-
-            await reporter.update(
-                increment=1,
-                message=reporter_msg,
-            )
-
-            await reporter.update(message="GPU alloc map scanning completed")
-
-        task_id = await graph_ctx.background_task_manager.start(_rescan_alloc_map_task)
+        manifest = RescanGPUAllocMapsManifest(agent_id=AgentId(agent_id))
+        task_id = await graph_ctx.background_task_manager.start_retriable(
+            ManagerBgtaskName.RESCAN_GPU_ALLOC_MAPS,
+            manifest,
+        )
         return RescanGPUAllocMaps(task_id=task_id)

@@ -828,7 +828,7 @@ async def webapp_ctx(
     if config.apollo_router.enabled:
         # Use JWT authentication for Apollo Router if enabled, otherwise use HMAC
         supergraph_handler = partial(
-            web_handler_with_jwt, api_endpoint=str(config.apollo_router.endpoint)
+            web_handler_with_jwt, api_endpoints=list(config.apollo_router.endpoints)
         )
         cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))

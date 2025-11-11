@@ -45,6 +45,9 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -68,7 +71,6 @@ from ai.backend.common.defs import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
-    DoPullReservoirRegistryEvent,
     DoScanReservoirRegistryEvent,
 )
 from ai.backend.common.events.fetcher import EventFetcher
@@ -112,6 +114,7 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.manager.server_gql_ctx import gql_adapters_ctx
 
 from . import __version__
 from .api.context import RootContext
@@ -132,6 +135,7 @@ from .config.loader.types import AbstractConfigLoader
 from .config.provider import ManagerConfigProvider
 from .config.unified import EventLoopType
 from .config.watchers.etcd import EtcdConfigWatcher
+from .server_bgtask_ctx import manager_bgtask_registry_ctx
 from .sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
@@ -267,6 +271,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".logs",
     ".object_storage",
     ".vfs_storage",
+    ".notification",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -551,6 +556,11 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     valkey_profile_target = root_ctx.config_provider.config.redis.to_valkey_profile_target()
     root_ctx.valkey_profile_target = valkey_profile_target
 
+    root_ctx.valkey_artifact = await ValkeyArtifactDownloadTrackingClient.create(
+        valkey_profile_target.profile_target(RedisRole.STATISTICS),
+        db_id=REDIS_STATISTICS_DB,
+        human_readable_name="artifact",  # tracking artifact download progress
+    )
     root_ctx.valkey_container_log = await ValkeyContainerLogClient.create(
         valkey_profile_target.profile_target(RedisRole.CONTAINER_LOG),
         db_id=REDIS_CONTAINER_LOG,
@@ -593,6 +603,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await root_ctx.valkey_artifact.close()
         await root_ctx.valkey_container_log.close()
         await root_ctx.valkey_image.close()
         await root_ctx.valkey_stat.close()
@@ -657,6 +668,17 @@ def _make_action_reporters(
 
 
 @asynccontextmanager
+async def notification_center_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .notification import NotificationCenter
+
+    root_ctx.notification_center = NotificationCenter()
+    try:
+        yield
+    finally:
+        await root_ctx.notification_center.close()
+
+
+@asynccontextmanager
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .actions.monitors.audit_log import AuditLogMonitor
     from .actions.monitors.prometheus import PrometheusMonitor
@@ -684,6 +706,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 storage_manager=root_ctx.storage_manager,
                 valkey_stat_client=root_ctx.valkey_stat,
                 valkey_live=root_ctx.valkey_live,
+                valkey_artifact_client=root_ctx.valkey_artifact,
                 event_fetcher=root_ctx.event_fetcher,
                 background_task_manager=root_ctx.background_task_manager,
                 event_hub=root_ctx.event_hub,
@@ -696,6 +719,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 deployment_controller=root_ctx.deployment_controller,
                 event_producer=root_ctx.event_producer,
                 agent_cache=root_ctx.agent_cache,
+                notification_center=root_ctx.notification_center,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -817,6 +841,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             lambda: root_ctx.processors,
             root_ctx.storage_manager,
             root_ctx.config_provider,
+            root_ctx.event_producer,
             use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )
@@ -991,6 +1016,7 @@ async def agent_registry_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             event_producer=root_ctx.event_producer,
             valkey_schedule=root_ctx.valkey_schedule,
             network_plugin_ctx=root_ctx.network_plugin_ctx,
+            hook_plugin_ctx=root_ctx.hook_plugin_ctx,
         )
     )
     # Create deployment controller
@@ -1104,14 +1130,6 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             EventTaskSpec(
                 name="reservoir_registry_scan",
                 event_factory=lambda: DoScanReservoirRegistryEvent(),
-                interval=600,  # 10 minutes
-                initial_delay=0,
-            )
-        )
-        task_specs.append(
-            EventTaskSpec(
-                name="reservoir_registry_pull",
-                event_factory=lambda: DoPullReservoirRegistryEvent(),
                 interval=600,  # 10 minutes
                 initial_delay=0,
             )
@@ -1461,6 +1479,7 @@ def build_root_app(
             event_producer_ctx,
             storage_manager_ctx,
             repositories_ctx,
+            notification_center_ctx,
             hook_plugin_ctx,
             monitoring_ctx,
             network_plugin_ctx,
@@ -1475,7 +1494,9 @@ def build_root_app(
             stale_session_sweeper_ctx,
             stale_kernel_sweeper_ctx,
             processors_ctx,
+            manager_bgtask_registry_ctx,
             service_discovery_ctx,
+            gql_adapters_ctx,
         ]
     shutdown_context_instances = []
 

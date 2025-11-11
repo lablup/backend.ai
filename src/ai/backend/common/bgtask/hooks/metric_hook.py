@@ -38,7 +38,7 @@ class MetricObserverHook(AbstractTaskHook):
     @asynccontextmanager
     async def apply(self, context: TaskContext) -> AsyncIterator[TaskContext]:
         # Pre-execution: start metric observation
-        self._observer.observe_bgtask_started(task_name=context.task_name)
+        self._observer.observe_bgtask_started(task_name=context.task_name.value)
         start_time = time.perf_counter()
 
         try:
@@ -57,7 +57,7 @@ class MetricObserverHook(AbstractTaskHook):
                 error_code = None
 
             self._observer.observe_bgtask_done(
-                task_name=context.task_name,
+                task_name=context.task_name.value,
                 status=status,
                 duration=duration,
                 error_code=error_code,

@@ -17,6 +17,7 @@ from ai.backend.manager.data.domain.types import (
 )
 from ai.backend.manager.errors.resource import (
     DomainDataProcessingError,
+    DomainDeletionFailed,
     DomainHasActiveKernels,
     DomainHasGroups,
     DomainHasUsers,
@@ -121,7 +122,7 @@ class DomainRepository:
             return result.rowcount > 0
 
     @domain_repository_resilience.apply()
-    async def purge_domain_validated(self, domain_name: str) -> bool:
+    async def purge_domain_validated(self, domain_name: str) -> None:
         """
         Permanently deletes a domain after validation checks.
         Validates domain purge permissions and prerequisites.
@@ -147,7 +148,8 @@ class DomainRepository:
             # Delete domain
             delete_query = sa.delete(domains).where(domains.c.name == domain_name)
             result = await conn.execute(delete_query)
-            return result.rowcount > 0
+            if result.rowcount == 0:
+                raise DomainDeletionFailed(f"Failed to delete domain: {domain_name}")
 
     @domain_repository_resilience.apply()
     async def create_domain_node_validated(

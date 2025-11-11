@@ -193,7 +193,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
             slots = slots.normalize_slots(ignore_unknown=True)
             resource_spec = KernelResourceSpec(
                 allocations={},
-                slots={**slots},  # copy
+                slots=slots.copy(),
                 mounts=[],
                 scratch_disk_size=0,  # TODO: implement (#70)
             )

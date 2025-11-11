@@ -1,13 +1,14 @@
 import logging
 import zlib
 from collections.abc import Collection, Sequence
-from typing import Mapping, cast
+from typing import Any, Mapping, cast
 
 import sqlalchemy as sa
 from sqlalchemy.orm import contains_eager
 
 from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -64,10 +65,11 @@ class AgentRepository:
         db: ExtendedAsyncSAEngine,
         valkey_image: ValkeyImageClient,
         valkey_live: ValkeyLiveClient,
+        valkey_stat: ValkeyStatClient,
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._db_source = AgentDBSource(db)
-        self._cache_source = AgentCacheSource(valkey_image, valkey_live)
+        self._cache_source = AgentCacheSource(valkey_image, valkey_live, valkey_stat)
         self._config_provider = config_provider
 
     @agent_repository_resilience.apply()
@@ -176,7 +178,7 @@ class AgentRepository:
             )
         )
         for cond in conditions:
-            stmt = cond(stmt)
+            stmt = stmt.where(cond())
 
         if order_by:
             stmt = stmt.order_by(*order_by)
@@ -209,7 +211,7 @@ class AgentRepository:
             )
         )
         for cond in conditions:
-            stmt = cond(stmt)
+            stmt = stmt.where(cond())
 
         if order_by:
             stmt = stmt.order_by(*order_by)
@@ -221,3 +223,11 @@ class AgentRepository:
             result = await db_session.scalars(stmt)
             agent_rows = cast(list[AgentRow], result.unique().all())
             return [agent_row.to_extended_data(known_slot_types) for agent_row in agent_rows]
+
+    @agent_repository_resilience.apply()
+    async def update_gpu_alloc_map(self, agent_id: AgentId, alloc_map: Mapping[str, Any]) -> None:
+        """Update GPU allocation map in cache."""
+        with suppress_with_log(
+            [Exception], message=f"Failed to update GPU alloc map for agent: {agent_id}"
+        ):
+            await self._cache_source.update_gpu_alloc_map(agent_id, alloc_map)

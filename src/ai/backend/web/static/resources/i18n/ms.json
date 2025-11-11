@@ -367,6 +367,7 @@
       "DownloadingModel": "Muat turun Model ...",
       "Edit": "Edit",
       "EditDelete": "Edit + Padam",
+      "ExcludedFolders": "Folder berikut yang tidak mempunyai kebenaran untuk memadam akan dikecualikan.",
       "FileDeleted": "Fail Dipadamkan",
       "FileRenamed": "Fail Dinamakan Semula",
       "FolderCloneFailed": "Gagal mengklon folder.",

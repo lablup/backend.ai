@@ -4,6 +4,7 @@ from . import dotfile  # noqa  # type: ignore
 from . import extensions  # noqa  # type: ignore
 from . import image  # noqa  # type: ignore
 from . import model  # noqa  # type: ignore
+from . import notification  # noqa  # type: ignore
 from . import server_log  # noqa  # type: ignore
 from . import service  # noqa  # type: ignore
 from . import service_auto_scaling_rule  # noqa  # type: ignore

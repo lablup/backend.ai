@@ -368,6 +368,7 @@
       "DownloadingModel": "下載型號...",
       "Edit": "編輯",
       "EditDelete": "編輯+刪除",
+      "ExcludedFolders": "下列無刪除權限的資料夾將被排除在外。",
       "FileDeleted": "文件已刪除",
       "FileRenamed": "文件重命名",
       "FolderCloneFailed": "克隆文件夹失败。",

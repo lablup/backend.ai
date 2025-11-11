@@ -368,6 +368,7 @@
       "DownloadingModel": "Modell herunterladen ...",
       "Edit": "Bearbeiten",
       "EditDelete": "Bearbeiten+Löschen",
+      "ExcludedFolders": "Die folgenden Ordner ohne Löschberechtigung werden ausgeschlossen.",
       "FileDeleted": "Datei gelöscht",
       "FileRenamed": "Datei umbenannt",
       "FolderCloneFailed": "Der Ordner konnte nicht geklont werden.",

@@ -32,6 +32,16 @@ All port numbers specified in this document are **based on the development envir
 - **App Proxy Coordinator**: 10200 (HTTP)
 - **App Proxy Worker**: 10205-10300 (Traffic Proxy)
 
+#### Internal Ports
+
+Internal ports are used for internal service requests such as Prometheus metrics collection and service discovery. Currently, only Prometheus integration is implemented.
+
+- **Manager**: 18080 (Prometheus metrics and service discovery)
+- **Agent**: 6003 (Prometheus metrics, HTTP service API)
+- **Storage Proxy**: 16023 (Prometheus metrics)
+
+**Note**: The internal port is separate from the main API port to isolate internal monitoring traffic from user-facing API traffic.
+
 #### Infrastructure Ports
 - **PostgreSQL**: 8101 (host) → 5432 (container)
 - **Redis**: 8111 (host) → 6379 (container)
@@ -143,11 +153,11 @@ Shows connections between all Backend.AI components and infrastructure services.
        ┌──────┴─────────────────┬──────────────────────┐
        │                        │                      │
        │ ZeroMQ RPC             │ HTTP                 │ HTTP
-       │ (6011)                 │ (6021/6022)          │ (10200)
+       │ (6011)                 │ (6022)               │ (10200)
        ↓                        ↓                      ↓
       ┌───────────┐       ┌──────────────┐   ┌─────────────────────┐
       │   Agent   │       │Storage Proxy │   │App Proxy Coordinator│
-      │  (6011)   │       │   (6021)     │   │      (10200)        │
+      │  (6011)   │       │   (6022)     │   │      (10200)        │
       │           │       │              │   │                     │
       │ - Kernel  │       │ - VFolder    │   │ - Circuit mgmt      │
       │   create/ │       │   management │   │ - Health Check      │
@@ -259,6 +269,111 @@ End-user flow accessing container services (Jupyter, VSCode, etc.).
 └─────────────────────────────────────────────────────────────┘
 ```
 
+## Development Setup
+
+### Python Version Compatibility
+
+Backend.AI requires specific Python and Pantsbuild versions for each release:
+
+| Backend.AI Version | Python Version | Pantsbuild Version |
+|:------------------|:--------------|:-------------------|
+| 25.06.x ~ (main)  | 3.13.x        | 2.27.x             |
+| 24.03.x ~ 25.05.x | 3.12.x        | 2.21.x             |
+| 23.03.x / 23.09.x | 3.11.x        | 2.19.x             |
+| 22.03.x / 22.09.x | 3.10.x        | -                  |
+| 21.03.x / 21.09.x | 3.8.x         | -                  |
+
+**Current main branch**:
+- Python: CPython 3.13.7
+- Pantsbuild: 2.27.0
+- Versions defined in `pants.toml`
+
+### Build System
+
+Backend.AI uses **Pantsbuild** (version 2) as its build system and dependency manager.
+
+**Key Commands**:
+```bash
+# Export virtual environment for development
+pants export --resolve=python-default
+
+# Update dependencies after modifying requirements.txt
+pants generate-lockfiles --resolve=python-default
+
+# Run linting
+pants lint ::
+
+# Run type checking
+pants check ::
+
+# Run tests
+pants test ::
+
+# Build packages
+./scripts/build-wheels.sh  # Python wheels
+./scripts/build-scies.sh   # SCIE executables
+```
+
+**Lock Files**:
+- `python.lock` - Main source tree dependencies (python-default)
+- `tools/*.lock` - Tool-specific dependencies (mypy, ruff, black, pytest, etc.)
+
+### Database Schema Management
+
+Backend.AI uses Alembic for database migrations:
+
+```bash
+# Manager database
+./py -m alembic upgrade head
+./py -m alembic revision --autogenerate -m "Description"
+
+# App Proxy database
+./py -m alembic -c alembic-appproxy.ini upgrade head
+
+# Account Manager database
+./py -m alembic -c alembic-accountmgr.ini upgrade head
+
+# Check for migration conflicts
+python scripts/check-multiple-alembic-heads.py
+./py -m scripts/alembic-rebase.py {base_head} {top_head}
+```
+
+### Development Environment
+
+**Single-node Development Setup**:
+```bash
+./scripts/install-dev.sh  # Automated setup script
+```
+
+This script:
+- Checks Docker availability
+- Sets up PostgreSQL, Redis, etcd containers
+- Configures development environment
+
+**Manual Component Startup**:
+```bash
+./backend.ai mgr start-server       # Manager
+./backend.ai ag start-server        # Agent
+./backend.ai storage start-server   # Storage Proxy
+./backend.ai web start-server       # Webserver
+```
+
+**Development Ports** (from halfstack configuration):
+- Webserver: 8090
+- Manager: 8091 (API), 18080 (metrics)
+- Agent: 6011 (RPC), 6003 (metrics)
+- Storage Proxy: 6021 (client), 6022 (manager), 16023 (metrics)
+- PostgreSQL: 8101 → 5432
+- Redis: 8111 → 6379
+- etcd: 8121 → 2379
+
+### Contribution Guidelines
+
+For contributing to Backend.AI:
+- [CONTRIBUTING.md](../.github/CONTRIBUTING.md) - Development workflow and code standards
+- [CLAUDE.md](../CLAUDE.md) - Guidelines for AI-assisted development
+- [MIGRATION.md](../MIGRATION.md) - Major version migration guide
+
 ## Core Components
 
 ### [Manager](./manager/)
@@ -280,6 +395,19 @@ Manager receives REST/GraphQL requests, performs business logic, and acts as a c
 - `services/`: Business logic implementation
 - `repositories/`: Data access layer
 - `sokovan/`: Session scheduling engine
+
+**Detailed Documentation**:
+
+For in-depth understanding of Manager's architecture and implementation:
+
+- **[Manager Overview](./manager/README.md)**: Component overview, key responsibilities, and architectural layers
+- **[Sokovan Orchestration](./manager/sokovan/README.md)**: Session scheduling orchestrator with 3-tier architecture
+  - [Scheduler](./manager/sokovan/scheduler/README.md): Core scheduling engine for session placement
+  - [Scheduling Controller](./manager/sokovan/scheduling_controller/README.md): Validation and preparation logic
+  - [Deployment Controller](./manager/sokovan/deployment/README.md): Deployment management
+- **[Services Layer](./manager/services/README.md)**: Business logic patterns and design principles
+- **[Repositories Layer](./manager/repositories/README.md)**: Data access patterns and query optimization
+- **[Actions Layer](./manager/actions/README.md)**: Permission validation and monitoring
 
 ### [Agent](./agent/)
 
@@ -456,13 +584,14 @@ Backend.AI uses various infrastructure components, with each component having re
 
 #### Hive Router (GraphQL Gateway)
 - **Purpose**: GraphQL Federation Gateway (GraphQL routing between Webserver and Manager)
-- **Image**: `ghcr.io/graphql-hive/gateway:latest`
+- **Image**: `ghcr.io/graphql-hive/gateway:2.1.12`
 - **Halfstack Port**: 4000
 - **Configuration**: `configs/graphql/gateway.config.ts`
 - **Supergraph**: `docs/manager/graphql-reference/supergraph.graphql`
 - **Features**:
   - Convert GraphQL Subscription from HTTP SSE → WebSocket
   - REST requests also support HTTP SSE
+  - Requires Node.js v20+
 
 ### Observability Infrastructure (Observability Stack)
 
@@ -533,7 +662,6 @@ Halfstack includes exporters for infrastructure metrics collection.
 - **Halfstack Port**: 9000 (API), 9001 (Console)
 - **Default Auth**: minioadmin / minioadmin
 - **Data Volume**: `half-minio`
-- **Storage Modes**: Provides both MinIO Storage mode and VFS Storage mode
 - **Note**: Not required when using only VFS Storage. Optional for typical Backend.AI use cases
 
 ### Infrastructure Dependency Matrix
@@ -541,13 +669,13 @@ Halfstack includes exporters for infrastructure metrics collection.
 | Infrastructure | Manager | Agent | Storage | Webserver | App Proxy | Note |
 |----------------|---------|-------|---------|-----------|-----------|------|
 | PostgreSQL | **Required** | - | - | - | **Required** (Coordinator) | Main database |
-| Redis | **Required** | - | Optional | **Required** | - | Cache/sessions/locks |
-| etcd | **Required** | - | - | - | **Required** (Coordinator) | Global config store (easy configuration sharing across all components) |
-| Prometheus | **Required** | Recommended | Recommended | Recommended | Recommended | Metrics collection and queries (required for Manager) |
-| Grafana | Recommended | - | - | - | - | Visualization |
-| Loki | Recommended | Recommended | Recommended | Recommended | Recommended | Log aggregation |
-| Tempo | Recommended | - | - | - | Recommended | Tracing |
-| OTEL Collector | Recommended | - | - | - | Recommended | Log and trace collection |
+| Redis | **Required** | **Required** | **Required** | **Required** | **Required** | State storage (App Proxy, Manager, future Agent) & events (all components) |
+| etcd | **Required** | **Required** | **Required** | **Required** | **Required** | Global config store (easy configuration sharing across all components) |
+| Prometheus | **Required** | **Required** | Recommended | Recommended | Recommended | Metrics collection and queries (required for Manager and Agent) |
+| Grafana | Recommended | Recommended | Recommended | Recommended | Recommended | Visualization (component-independent) |
+| Loki | Recommended | Recommended | Recommended | Recommended | Recommended | Log aggregation (component-independent) |
+| Tempo | Recommended | Recommended | Recommended | Recommended | Recommended | Tracing (component-independent) |
+| OTEL Collector | Recommended | Recommended | Recommended | Recommended | Recommended | Log and trace collection (required when using Loki/Tempo) |
 
 ### Starting Halfstack Infrastructure
 
@@ -653,12 +781,12 @@ See [Port Number Guide](#port-number-guide) for detailed port information.
 | Webserver → Manager | HTTP | 8091 | REST API proxy |
 | Manager → Agent | ZeroMQ RPC | 6011 | Session management commands (create, destroy, execute) |
 | Agent → Manager | ZeroMQ Event Push | 5002 | Status reports (kernel_created, stats) |
-| Manager → Storage Proxy | HTTP/gRPC | 6022 | VFolder management tasks |
+| Manager → Storage Proxy | HTTP | 6022 | VFolder management tasks |
 | Client → Storage Proxy | HTTP | 6021 | File upload/download (direct access) |
 | Manager → App Proxy Coordinator | HTTP | 10200 | Circuit registration and management |
 | Client → App Proxy Worker | HTTP/WebSocket | 10205-10300 | Container app access |
 | App Proxy Worker → Agent | HTTP/WebSocket | 30000-31000 | Container port forwarding |
-| Agent → Storage Proxy | HTTP/gRPC | 6021/6022 | VFolder mount info queries |
+| Agent → Storage Proxy | HTTP | 6021/6022 | VFolder mount info queries |
 
 ### Infrastructure Communication
 

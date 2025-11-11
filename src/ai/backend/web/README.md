@@ -31,6 +31,72 @@ The Webserver provides a web-based user interface, maintains user sessions, and 
 - User input sanitization
 - Rate limiting
 
+## Entry Points
+
+Webserver has 1 entry point to receive and process user requests.
+
+### 1. REST API (Web UI + Proxy)
+
+**Framework**: aiohttp (async HTTP server)
+
+**Port**: 8080 (default)
+
+**Key Features**:
+- Session-based authentication (Redis)
+- Request signing and proxying to Manager API (JWT/HMAC)
+
+**Processing Flow**:
+
+#### Login Flow
+```
+Browser → POST /auth/login → Webserver → Manager API (authenticate)
+                                    ↓
+                              Session created in Redis
+                                    ↓
+                          Session cookie sent to Browser
+```
+
+#### API Request Proxy Flow
+```
+Browser → API Request + Session Cookie → Webserver
+                                            ↓
+                                 Retrieve access/secret key from Redis session
+                                            ↓
+                                 Sign request (GraphQL: JWT, REST: HMAC)
+                                            ↓
+                                 Proxy to Manager API
+                                            ↓
+                                 Manager processes request
+                                            ↓
+                                 Response returned to Browser
+```
+
+**Integrated Architecture**:
+
+```
+┌─────────────┐
+│   Browser   │
+│  (Web UI)   │
+└──────┬──────┘
+       │
+       ▼ Session Cookie + API Request
+┌─────────────────────────────────┐
+│      Webserver (Port 8080)      │
+│  - Serve static assets          │
+│  - Session management (Redis)   │
+│  - Request signing (JWT/HMAC)   │
+│  - Proxy to Manager             │
+└──────┬──────────────────────────┘
+       │
+       ▼ Signed API Request (JWT/HMAC)
+┌─────────────────────────────────┐
+│    Manager API (Port 8081)      │
+│  - Verify signature             │
+│  - Process request              │
+│  - Return response              │
+└─────────────────────────────────┘
+```
+
 ## Architecture
 
 ```
@@ -56,8 +122,6 @@ web/
 │   ├── js/             # JavaScript files
 │   └── images/         # Images and icons
 ├── templates/           # Jinja2 templates
-│   ├── login.html      # Login page
-│   └── index.html      # Main page
 ├── config/              # Configuration
 ├── cli/                 # CLI commands
 ├── auth.py              # Session management and request signing
@@ -133,7 +197,6 @@ Proxied Request Headers:
 - `X-BackendAI-Token`: JWT token (GraphQL requests)
 - `Authorization`: HMAC signature (REST API requests, based on access key/secret key)
 - `X-BackendAI-Version`: API version
-- `X-Real-IP`: Original client IP
 - `X-Forwarded-For`: Proxy chain
 
 ### Session Storage (Redis)
@@ -167,9 +230,9 @@ Example session data:
 
 ### Rate Limiting
 Request limiting to prevent brute force attacks:
-- **Limit**: Limited number of requests per 5 minutes per IP
+- **Limit**: Limited number of requests per access key
 - **Response**: HTTP 429 Too Many Requests
-- **Tracking**: Redis-based counter per IP
+- **Tracking**: Redis-based counter per access key
 
 ### Input Sanitization
 - HTML escape user input
@@ -236,7 +299,7 @@ See `configs/webserver/halfstack.conf` for configuration file examples.
 
 #### Loki (Log Aggregation)
 - **Purpose**:
-  - Session creation/expiration events
+  - Session creation/termination events
   - Request signing and proxy events
   - Security violation events
   - Proxied request tracking
@@ -253,7 +316,7 @@ See `configs/webserver/halfstack.conf` for configuration file examples.
 ### Security Configuration
 
 **Session Management**: Session timeout and Redis-based session storage configuration
-**Rate Limiting**: API request limiting (default: limited number per 5 minutes per IP)
+**Rate Limiting**: API request limiting
 **CORS Configuration**: Allowed origins, methods, and credentials
 
 ### Halfstack Configuration
@@ -281,16 +344,177 @@ Webserver uses Jinja2 for server-side rendering to serve login pages and more.
 
 ### Prometheus Metrics
 
+The Webserver component exposes Prometheus metrics at the `/metrics` endpoint for monitoring web UI and API proxy performance.
+
 #### API Metrics
+
 Metrics related to web UI and authentication HTTP request processing.
 
-- `backendai_api_request_count`: Total API requests
-  - Labels: method, endpoint, domain, operation, error_detail, status_code
-  - Track session-based request signing (JWT/HMAC) and Manager proxy requests
+**`backendai_api_request_count`** (Counter)
+- **Description**: Total number of HTTP requests received by the Webserver
+- **Labels**:
+  - `method`: HTTP method (GET, POST, PUT, DELETE, PATCH)
+  - `endpoint`: Request endpoint path (e.g., "/", "/api/auth/login")
+  - `domain`: Error domain (empty if successful)
+  - `operation`: Error operation (empty if successful)
+  - `error_detail`: Error details (empty if successful)
+  - `status_code`: HTTP response status code (200, 400, 500, etc.)
+- Track session-based request signing (JWT/HMAC) and Manager proxy requests
 
-- `backendai_api_request_duration_sec`: API request processing time (seconds)
-  - Labels: method, endpoint, domain, operation, error_detail, status_code
-  - Measure web UI response time and proxy performance
+**`backendai_api_request_duration_sec`** (Histogram)
+- **Description**: HTTP request processing time in seconds
+- **Labels**: Same as `backendai_api_request_count`
+- **Buckets**: [0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30] seconds
+- Measure web UI response time and proxy performance
+
+### Prometheus Query Examples
+
+The following examples demonstrate common Prometheus queries for Webserver metrics. Note that Counter metrics use the `_total` suffix and Histogram metrics use `_bucket`, `_sum`, `_count` suffixes in actual queries.
+
+**Important Notes:**
+- When using `increase()` or `rate()` functions, the time range must be at least 2-4x longer than your Prometheus scrape interval to get reliable data. If the time range is too short, metrics may not appear or show incomplete data.
+- Default Prometheus scrape interval is typically 15s-30s
+- **Time range selection trade-offs**:
+  - Shorter ranges (e.g., `[1m]`): Detect changes faster with more granular data, but more sensitive to noise and short-term fluctuations
+  - Longer ranges (e.g., `[5m]`): Smoother graphs with reduced noise, better for identifying trends, but slower to detect sudden changes
+  - For real-time alerting: Use shorter ranges like `[1m]` or `[2m]`
+  - For dashboards and trend analysis: Use longer ranges like `[5m]` or `[10m]`
+
+#### Web Request Monitoring
+
+**Web Request Rate by Endpoint**
+
+Monitor web request rate by endpoint. This shows how frequently users access different web pages and APIs. Use this to understand web traffic patterns and popular features.
+
+```promql
+sum(rate(backendai_api_request_count_total{service_group="$service_groups"}[1m])) by (method, endpoint, status_code)
+```
+
+**Failed Web Requests (4xx and 5xx)**
+
+Track failed web requests (4xx and 5xx errors). This helps identify user errors and server issues.
+
+```promql
+sum(rate(backendai_api_request_count_total{service_group="$service_groups", status_code=~"[45].."}[5m])) by (endpoint, status_code)
+```
+
+**Authentication Failures**
+
+Monitor authentication failures (login errors). This can indicate brute force attempts or user issues.
+
+```promql
+sum(rate(backendai_api_request_count_total{service_group="$service_groups", endpoint="/api/auth/login", status_code!="200"}[5m]))
+```
+
+#### Web Request Latency
+
+**P95 Web Request Latency**
+
+Calculate P95 web request latency by endpoint. This shows response times experienced by users. Use this to identify slow pages and optimize user experience.
+
+```promql
+histogram_quantile(0.95,
+  sum(rate(backendai_api_request_duration_sec_bucket{service_group="$service_groups"}[5m])) by (le, endpoint)
+)
+```
+
+**Average Request Duration**
+
+Calculate average request duration per endpoint. This provides a simple overview of page load times.
+
+```promql
+sum(rate(backendai_api_request_duration_sec_sum{service_group="$service_groups"}[5m])) by (endpoint)
+/
+sum(rate(backendai_api_request_duration_sec_count{service_group="$service_groups"}[5m])) by (endpoint)
+```
+
+**Slow Requests (> 1 second)**
+
+Monitor slow requests (> 1 second). This identifies performance issues affecting user experience.
+
+```promql
+sum(rate(backendai_api_request_duration_sec_bucket{service_group="$service_groups", le="1.0"}[5m])) by (endpoint)
+```
+
+#### Session Management
+
+**Login Request Rate**
+
+Monitor login request rate. This shows how frequently users are logging in.
+
+```promql
+sum(rate(backendai_api_request_count_total{service_group="$service_groups", endpoint="/api/auth/login"}[5m]))
+```
+
+**Successful Logins**
+
+Track successful logins. This helps monitor authentication success rate and detect issues.
+
+```promql
+sum(rate(backendai_api_request_count_total{service_group="$service_groups", endpoint="/api/auth/login", status_code="200"}[5m])) by (status_code)
+```
+
+**Failed Logins**
+
+Track failed logins. This helps identify authentication problems.
+
+```promql
+sum(rate(backendai_api_request_count_total{service_group="$service_groups", endpoint="/api/auth/login", status_code!="200"}[5m])) by (status_code)
+```
+
+**Logout Request Rate**
+
+Monitor logout request rate. This shows active session management patterns.
+
+```promql
+sum(rate(backendai_api_request_count_total{service_group="$service_groups", endpoint="/api/auth/logout"}[5m]))
+```
+
+#### Proxy Performance
+
+**Manager API Proxy Request Rate**
+
+Monitor Manager API proxy request rate. This shows how much traffic is being proxied to the Manager.
+
+```promql
+sum(rate(backendai_api_request_count_total{service_group="$service_groups", endpoint=~"/api/.*"}[5m])) by (endpoint)
+```
+
+**P95 Proxy Request Duration**
+
+Track proxy request duration. This measures the overhead of request signing and proxying.
+
+```promql
+histogram_quantile(0.95,
+  sum(rate(backendai_api_request_duration_sec_bucket{service_group="$service_groups", endpoint=~"/api/.*"}[5m])) by (le, endpoint)
+)
+```
+
+**Proxy Errors**
+
+Monitor proxy errors. This identifies issues with request signing or Manager communication.
+
+```promql
+sum(rate(backendai_api_request_count_total{service_group="$service_groups", endpoint=~"/api/.*", status_code=~"5.."}[5m])) by (endpoint, error_detail)
+```
+
+#### Static Assets
+
+**Static Asset Request Rate**
+
+Monitor static asset request rate. This shows how frequently UI assets (CSS, JS, images) are being served.
+
+```promql
+sum(rate(backendai_api_request_count_total{service_group="$service_groups", endpoint=~"/static/.*"}[5m])) by (endpoint)
+```
+
+**Static Asset 404 Errors**
+
+Track static asset 404 errors. This identifies missing or broken asset references.
+
+```promql
+sum(rate(backendai_api_request_count_total{service_group="$service_groups", endpoint=~"/static/.*", status_code="404"}[5m])) by (endpoint)
+```
 
 ### Logs
 - Session creation/expiration events

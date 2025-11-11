@@ -22,6 +22,7 @@ from ai.backend.storage.client.huggingface import HuggingFaceClient
 from ai.backend.storage.config.unified import (
     HuggingfaceConfig,
     ObjectStorageConfig,
+    ReservoirClientConfig,
     ReservoirConfig,
 )
 from ai.backend.storage.exception import (
@@ -134,12 +135,24 @@ def mock_storage_transfer_manager(mock_storage_pool: MagicMock) -> StorageTransf
 
 
 @pytest.fixture
+def mock_redis_client() -> MagicMock:
+    """Mock ValkeyArtifactDownloadTrackingClient."""
+    mock_client = MagicMock()
+    mock_client.init_artifact_download = AsyncMock()
+    mock_client.update_file_progress = AsyncMock()
+    mock_client.cleanup_artifact_download = AsyncMock()
+    return mock_client
+
+
+@pytest.fixture
 def hf_download_step(
     mock_registry_configs: dict[str, HuggingfaceConfig],
+    mock_redis_client: MagicMock,
 ) -> HuggingFaceDownloadStep:
     """Create HuggingFaceDownloadStep instance for testing."""
     return HuggingFaceDownloadStep(
         registry_configs=mock_registry_configs,
+        redis_client=mock_redis_client,
     )
 
 
@@ -212,11 +225,11 @@ def mock_import_step_context(
         ArtifactStorageImportStep.DOWNLOAD: "test_storage",
         ArtifactStorageImportStep.ARCHIVE: "test_storage",
     }
+
     return ImportStepContext(
         model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
         registry_name="test_registry",
         storage_pool=mock_storage_pool,
-        progress_reporter=mock_progress_reporter,
         storage_step_mappings=storage_step_mappings,
         step_metadata={},
     )
@@ -257,9 +270,16 @@ def reservoir_download_step(
     """Create ReservoirDownloadStep instance for testing."""
     # Create a mock storage object that properly inherits from ObjectStorage
     mock_download_storage = MockObjectStorage()
+    # Create a mock redis client with AsyncMock methods
+    mock_redis_client = MagicMock()
+    mock_redis_client.init_artifact_download = AsyncMock()
+    mock_redis_client.update_file_progress = AsyncMock()
     return ReservoirDownloadStep(
         registry_configs=mock_reservoir_registry_configs,
         download_storage=mock_download_storage,
+        manager_http_clients={},
+        reservoir_client_config=ReservoirClientConfig(),
+        redis_client=mock_redis_client,
     )
 
 
@@ -306,6 +326,7 @@ class TestHuggingFaceDownloadStep:
             direction=-1,
             limit=5,
             token="test_token",
+            expand=["gated"],
         )
 
     @pytest.mark.asyncio
@@ -481,7 +502,10 @@ class TestHuggingFaceDownloadStep:
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
     async def test_make_download_file_stream_success(
-        self, mock_client_session: MagicMock, hf_download_step: HuggingFaceDownloadStep
+        self,
+        mock_client_session: MagicMock,
+        hf_download_step: HuggingFaceDownloadStep,
+        mock_redis_client: MagicMock,
     ) -> None:
         """Test successful file download stream."""
 
@@ -502,9 +526,9 @@ class TestHuggingFaceDownloadStep:
             if key == "Content-Length":
                 return "12"  # Total size matches our chunks
             elif key == "ETag":
-                return None
+                return default
             elif key == "Accept-Ranges":
-                return None
+                return default
             else:
                 return default
 
@@ -516,6 +540,10 @@ class TestHuggingFaceDownloadStep:
             _DEFAULT_CHUNK_SIZE,
             max_retries=8,
             content_type="application/octet-stream",
+            redis_client=mock_redis_client,
+            model_id="test-model",
+            revision="main",
+            file_path="test.bin",
         )
         async for chunk in download_stream.read():
             chunks.append(chunk)
@@ -526,7 +554,10 @@ class TestHuggingFaceDownloadStep:
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
     async def test_make_download_file_stream_http_error(
-        self, mock_client_session: MagicMock, hf_download_step: HuggingFaceDownloadStep
+        self,
+        mock_client_session: MagicMock,
+        hf_download_step: HuggingFaceDownloadStep,
+        mock_redis_client: MagicMock,
     ) -> None:
         """Test file download stream with HTTP error."""
         mock_session, mock_response = create_mock_aiohttp_session()
@@ -540,7 +571,15 @@ class TestHuggingFaceDownloadStep:
         # Configure response with error status
         mock_response.status = 404
         mock_response.content.iter_chunked = mock_iter_chunked_error
-        mock_response.headers.get.return_value = None
+
+        # Mock headers.get to return valid Content-Length for HEAD probe, but defaults for others
+        def mock_headers_get(key, default=None):
+            if key == "Content-Length":
+                return "100"  # Valid content length for HEAD probe
+            else:
+                return default
+
+        mock_response.headers.get.side_effect = mock_headers_get
 
         with pytest.raises(RuntimeError):
             download_stream = HuggingFaceFileDownloadStreamReader(
@@ -548,6 +587,10 @@ class TestHuggingFaceDownloadStep:
                 _DEFAULT_CHUNK_SIZE,
                 max_retries=8,
                 content_type="application/octet-stream",
+                redis_client=mock_redis_client,
+                model_id="test-model",
+                revision="main",
+                file_path="test.bin",
             )
             async for chunk in download_stream.read():
                 pass
@@ -555,7 +598,10 @@ class TestHuggingFaceDownloadStep:
     @pytest.mark.asyncio
     @patch("aiohttp.ClientSession")
     async def test_make_download_file_stream_client_error(
-        self, mock_client_session: MagicMock, hf_download_step: HuggingFaceDownloadStep
+        self,
+        mock_client_session: MagicMock,
+        hf_download_step: HuggingFaceDownloadStep,
+        mock_redis_client: MagicMock,
     ) -> None:
         """Test file download stream with client error."""
         mock_client_session.side_effect = ClientError("Connection error")
@@ -566,6 +612,10 @@ class TestHuggingFaceDownloadStep:
                 _DEFAULT_CHUNK_SIZE,
                 max_retries=8,
                 content_type="application/octet-stream",
+                redis_client=mock_redis_client,
+                model_id="test-model",
+                revision="main",
+                file_path="test.bin",
             )
             async for chunk in download_stream.read():
                 pass
@@ -577,6 +627,7 @@ class TestHuggingFaceDownloadStep:
         mock_file_info: FileObjectData,
         mock_storage_pool: MagicMock,
         mock_import_step_context: ImportStepContext,
+        mock_redis_client: MagicMock,
     ) -> None:
         """Test successful model file upload."""
         # Mock the HuggingFaceFileDownloadStreamReader class
@@ -592,6 +643,7 @@ class TestHuggingFaceDownloadStep:
                 storage_name="test_storage",
                 storage_pool=mock_import_step_context.storage_pool,
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
+                redis_client=mock_redis_client,
             )
 
             # Verify the stream reader was created with correct parameters
@@ -600,6 +652,10 @@ class TestHuggingFaceDownloadStep:
                 chunk_size=_DEFAULT_CHUNK_SIZE,
                 max_retries=8,
                 content_type="application/json",  # mimetypes.guess_type('config.json')[0]
+                redis_client=mock_redis_client,
+                model_id=mock_import_step_context.model.model_id,
+                revision=mock_import_step_context.model.revision,
+                file_path=mock_file_info.path,
             )
 
             # Get the mock storage from the pool and check it was called
@@ -613,6 +669,7 @@ class TestHuggingFaceDownloadStep:
         mock_file_info: FileObjectData,
         mock_storage_pool: MagicMock,
         mock_import_step_context: ImportStepContext,
+        mock_redis_client: MagicMock,
     ) -> None:
         """Test model file upload with upload failure."""
         # Mock failed upload result - setup the mock storage from the pool
@@ -633,6 +690,7 @@ class TestHuggingFaceDownloadStep:
                     storage_name="test_storage",
                     storage_pool=mock_import_step_context.storage_pool,
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
+                    redis_client=mock_redis_client,
                 )
 
     @pytest.mark.asyncio
@@ -641,6 +699,7 @@ class TestHuggingFaceDownloadStep:
         mock_registry_configs: dict[str, HuggingfaceConfig],
         mock_storage_transfer_manager: StorageTransferManager,
         mock_file_info: FileObjectData,
+        mock_redis_client: MagicMock,
     ) -> None:
         """Test model file upload with no storage pool configured."""
         # Create context without storage pool
@@ -648,7 +707,6 @@ class TestHuggingFaceDownloadStep:
             model=ModelTarget(model_id="microsoft/DialoGPT-medium", revision="main"),
             registry_name="test_registry",
             storage_pool=None,  # type: ignore
-            progress_reporter=None,
             storage_step_mappings={
                 ArtifactStorageImportStep.DOWNLOAD: "test_storage",
                 ArtifactStorageImportStep.ARCHIVE: "test_storage",
@@ -659,6 +717,7 @@ class TestHuggingFaceDownloadStep:
         # Create step instance
         step = HuggingFaceDownloadStep(
             registry_configs=mock_registry_configs,
+            redis_client=mock_redis_client,
         )
 
         with pytest.raises(AttributeError):
@@ -668,6 +727,7 @@ class TestHuggingFaceDownloadStep:
                 storage_name="test_storage",
                 storage_pool=context.storage_pool,
                 download_chunk_size=_DEFAULT_CHUNK_SIZE,
+                redis_client=mock_redis_client,
             )
 
     @pytest.mark.asyncio
@@ -677,6 +737,7 @@ class TestHuggingFaceDownloadStep:
         mock_file_info: FileObjectData,
         mock_storage_pool: MagicMock,
         mock_import_step_context: ImportStepContext,
+        mock_redis_client: MagicMock,
     ) -> None:
         """Test model file upload with exception."""
         mock_storage = mock_storage_pool.get_storage.return_value
@@ -696,6 +757,7 @@ class TestHuggingFaceDownloadStep:
                     storage_name="test_storage",
                     storage_pool=mock_import_step_context.storage_pool,
                     download_chunk_size=_DEFAULT_CHUNK_SIZE,
+                    redis_client=mock_redis_client,
                 )
 
 
@@ -854,7 +916,9 @@ class TestReservoirDownloadStep:
                 storage_name="test_storage",
                 storage_pool=mock_import_step_context.storage_pool,
                 options=BucketCopyOptions(concurrency=2, progress_log_interval_bytes=0),
-                progress_reporter=mock_import_step_context.progress_reporter,
+                model_id="test_model",
+                revision="test_revision",
+                progress_reporter=None,
                 key_prefix="models/",
             )
 
@@ -883,7 +947,9 @@ class TestReservoirDownloadStep:
                     storage_name="test_storage",
                     storage_pool=mock_import_step_context.storage_pool,
                     options=BucketCopyOptions(concurrency=1, progress_log_interval_bytes=0),
-                    progress_reporter=mock_import_step_context.progress_reporter,
+                    model_id="test_model",
+                    revision="test_revision",
+                    progress_reporter=None,
                     key_prefix="models/",
                 )
 
@@ -927,9 +993,15 @@ class TestReservoirDownloadStep:
         # Create step without reservoir configs
         # Create a mock storage object
         mock_download_storage = MagicMock()
+        mock_redis_client = MagicMock()
+        mock_redis_client.init_artifact_download = AsyncMock()
+        mock_redis_client.update_file_progress = AsyncMock()
         step = ReservoirDownloadStep(
             registry_configs={},
             download_storage=mock_download_storage,
+            manager_http_clients={},
+            reservoir_client_config=ReservoirClientConfig(),
+            redis_client=mock_redis_client,
         )
 
         with pytest.raises(ReservoirStorageConfigInvalidError):

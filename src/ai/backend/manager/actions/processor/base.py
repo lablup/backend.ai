@@ -1,5 +1,6 @@
 import logging
 import uuid
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Awaitable, Callable, Generic, Optional
 
@@ -22,12 +23,12 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class ActionRunner(Generic[TAction, TActionResult]):
     _func: Callable[[TAction], Awaitable[TActionResult]]
-    _monitors: list[ActionMonitor]
+    _monitors: Sequence[ActionMonitor]
 
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[TActionResult]],
-        monitors: Optional[list[ActionMonitor]],
+        monitors: Optional[Sequence[ActionMonitor]],
     ) -> None:
         self._func = func
         self._monitors = monitors or []
@@ -105,15 +106,15 @@ class ActionRunner(Generic[TAction, TActionResult]):
 
 
 class ActionProcessor(Generic[TAction, TActionResult]):
-    _validators: list[ActionValidator]
+    _validators: Sequence[ActionValidator]
 
     _runner: ActionRunner[TAction, TActionResult]
 
     def __init__(
         self,
         func: Callable[[TAction], Awaitable[TActionResult]],
-        monitors: Optional[list[ActionMonitor]] = None,
-        validators: Optional[list[ActionValidator]] = None,
+        monitors: Optional[Sequence[ActionMonitor]] = None,
+        validators: Optional[Sequence[ActionValidator]] = None,
     ) -> None:
         self._runner = ActionRunner(func, monitors)
 

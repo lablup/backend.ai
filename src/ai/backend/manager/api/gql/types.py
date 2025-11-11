@@ -11,6 +11,7 @@ from ai.backend.manager.services.processors import Processors
 if TYPE_CHECKING:
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.manager.api.gql.adapters import GQLAdapters
 
 
 @dataclass
@@ -20,3 +21,4 @@ class StrawberryGQLContext:
     event_hub: EventHub
     event_fetcher: EventFetcher
     dataloader_registry: DataLoaderRegistry
+    gql_adapters: GQLAdapters

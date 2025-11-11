@@ -1,5 +1,7 @@
 # Services Layer
 
+← [Back to Manager](../README.md#manager-architecture-documentation) | [Architecture Overview](../../README.md#manager)
+
 ## Overview
 
 The Services layer encapsulates the business logic of Backend.AI Manager. This layer performs domain-specific operations and provides clear input/output interfaces through Actions and ActionResults.
@@ -36,6 +38,7 @@ Database Models (models/)
 - Apply policy-based constraints
 
 **Note**: Authorization is handled by the Action Processor layer, and transaction management is the responsibility of the Repository layer.
+
 
 ## Directory Structure
 
@@ -571,9 +574,51 @@ async def handle(self, id: str) -> None:
     ...
 ```
 
+## Service-Specific Documentation
+
+Detailed documentation for individual service implementations:
+
+### Core Services
+- **[Session Service](./session/README.md)**: Session lifecycle management and execution
+  - Session creation and validation
+  - Session state management
+  - Resource allocation and cleanup
+
+- **[User Service](./user/README.md)**: User account and authentication management
+  - User creation and profile management
+  - Authentication and credential handling
+
+- **[Domain Service](./domain/README.md)**: Multi-tenant domain management
+  - Domain creation and configuration
+  - Domain-level settings and policies
+
+### Resource Policy Services
+- **[Resource Preset Service](./resource_preset/README.md)**: Resource template management
+  - Predefined resource configurations
+  - Resource allocation templates
+
+- **[Keypair Resource Policy Service](./keypair_resource_policy/README.md)**: Access key-level resource policies
+  - Per-keypair resource limits
+  - Access key quota management
+
+- **[Project Resource Policy Service](./project_resource_policy/README.md)**: Project-level resource policies
+  - Project resource quotas
+  - Multi-user resource sharing policies
+
+- **[User Resource Policy Service](./user_resource_policy/README.md)**: User-level resource policies
+  - Per-user resource limits
+  - User quota management
+
+### Monitoring Services
+- **[Metric Service](./metric/README.md)**: Container metrics collection and querying
+  - Prometheus integration
+  - Resource utilization metrics
+  - Time-series data queries
+
 ## References
 
 ### Related Documentation
-- [Action Processor Layer](../actions/README.md)
-- [Repositories Layer](../repositories/README.md)
-- [API Layer](../api/README.md)
+- [Action Processor Layer](../actions/README.md): Permission validation and request handling
+- [Repositories Layer](../repositories/README.md): Data access and query patterns
+- [Sokovan Orchestration](../sokovan/README.md): Session scheduling and orchestration
+- [Manager Overview](../README.md): Manager component architecture

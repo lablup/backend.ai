@@ -74,7 +74,7 @@ services:
 
   # Initial master is redis-node01.
   backendai-half-redis-node01:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.11-alpine
     hostname: node01
     networks:
     - half
@@ -94,7 +94,7 @@ services:
     # network partitioning.
 
   backendai-half-redis-node02:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.11-alpine
     hostname: node02
     networks:
     - half
@@ -112,7 +112,7 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-node03:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.11-alpine
     hostname: node03
     ports:
     - 0.0.0.0:${REDIS_SLAVE2_PORT}:${REDIS_SLAVE2_PORT}
@@ -130,7 +130,7 @@ services:
       --min-slaves-max-lag 10
 
   backendai-half-redis-sentinel01:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.11-alpine
     hostname: sentinel01
     networks:
     - half
@@ -150,7 +150,7 @@ services:
       - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel02:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.11-alpine
     hostname: sentinel02
     networks:
     - half
@@ -170,7 +170,7 @@ services:
     - REDIS_PASSWORD=${REDIS_PASSWORD:-develove}
 
   backendai-half-redis-sentinel03:
-    image: redis:7.0.5-alpine
+    image: redis:7.2.11-alpine
     hostname: sentinel03
     networks:
     - half
@@ -351,6 +351,23 @@ services:
     ports:
       - "3200" # tempo
       - "4317" # otlp grpc
+
+  backendai-half-apollo-router:
+    image: ghcr.io/graphql-hive/gateway:2.1.12
+    restart: unless-stopped
+    networks:
+      - half
+    ports:
+      - "4000:4000"
+    command: ["supergraph"]
+    environment:
+      - HOST=0.0.0.0
+      - PORT=4000
+    volumes:
+      - ./docs/manager/graphql-reference/supergraph.graphql:/gateway/supergraph.graphql:ro
+      - ./configs/graphql/gateway.config.ts:/gateway/gateway.config.ts:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   backendai-half-minio:
     image: minio/minio:latest

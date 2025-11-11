@@ -32,7 +32,7 @@ services:
       - "9187:9187"
 
   backendai-half-redis:
-    image: redis:7.2.4-alpine
+    image: redis:7.2.11-alpine
     restart: unless-stopped
     networks:
       - half
@@ -103,9 +103,9 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=develove
     volumes:
       - half-grafana:/var/lib/grafana:rw
-      - "./configs/grafana/dashboards:/var/lib/grafana/dashboards:ro"
-      - "./configs/grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro"
-      - "./configs/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro"
+      - "./grafana-dashboards:/var/lib/grafana/dashboards:ro"
+      - "./grafana-provisioning/dashboards:/etc/grafana/provisioning/dashboards:ro"
+      - "./grafana-provisioning/datasources:/etc/grafana/provisioning/datasources:ro"
 
   backendai-half-pyroscope:
     image: grafana/pyroscope:1.9.2
@@ -138,7 +138,7 @@ services:
       - half
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
-      - ./configs/otel/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
       - "4317:4317"
       - "4318:4318"
@@ -152,7 +152,7 @@ services:
     ports:
       - "3100:3100"
     volumes:
-      - ./configs/loki/loki-config.yaml:/etc/loki/local-config.yaml
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
 
   backendai-half-tempo:
     image: grafana/tempo:2.7.2
@@ -161,14 +161,14 @@ services:
       - half
     command: [ "-config.file=/etc/tempo.yaml" ]
     volumes:
-      - ./configs/tempo/tempo-config.yaml:/etc/tempo.yaml
+      - ./tempo-config.yaml:/etc/tempo.yaml
       - half-tempo:/var/tempo
     ports:
       - "3200" # tempo
       - "4317" # otlp grpc
 
   backendai-half-apollo-router:
-    image: ghcr.io/graphql-hive/gateway:latest
+    image: ghcr.io/graphql-hive/gateway:2.1.12
     restart: unless-stopped
     networks:
       - half
@@ -179,8 +179,8 @@ services:
       - HOST=0.0.0.0
       - PORT=4000
     volumes:
-      - ./docs/manager/graphql-reference/supergraph.graphql:/gateway/supergraph.graphql:ro
-      - ./configs/graphql/gateway.config.ts:/gateway/gateway.config.ts:ro
+      - ./supergraph.graphql:/gateway/supergraph.graphql:ro
+      - ./gateway.config.ts:/gateway/gateway.config.ts:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

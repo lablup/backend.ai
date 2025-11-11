@@ -368,6 +368,7 @@
       "DownloadingModel": "ดาวน์โหลดรุ่น ...",
       "Edit": "แก้ไข",
       "EditDelete": "แก้ไข+ลบ",
+      "ExcludedFolders": "โฟลเดอร์ต่อไปนี้ที่ไม่มีสิทธิ์ลบจะถูกยกเว้น",
       "FileDeleted": "ลบไฟล์แล้ว",
       "FileRenamed": "เปลี่ยนชื่อไฟล์แล้ว",
       "FolderCloneFailed": "การโคลนโฟลเดอร์ล้มเหลว",

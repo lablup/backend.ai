@@ -1,5 +1,7 @@
 # Repositories Layer
 
+← [Back to Manager](../README.md#manager-architecture-documentation) | [Architecture Overview](../../README.md#manager)
+
 ## Overview
 
 The Repositories layer encapsulates and abstracts database access. This layer separates data access logic from business logic and is responsible for transaction management and query optimization.
@@ -13,7 +15,42 @@ Repositories Layer (repositories/)  ← Current document
     ↓
 Database Models (models/)
     ↓
-PostgreSQL Database
+Database
+```
+
+## Service Integration
+
+Repositories are called from the Services Layer to perform data access operations.
+
+**Key Principles**:
+- Services do not create transactions (delegate to Repository)
+- Repository instances are dependency-injected when Services are created
+- Public method naming: `get_*()`, `find_*()`, `list_*()`, `create_*()`, `update_*()`, `delete_*()`, `count_*()`
+
+## Architecture Diagram
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Services Layer                                     │
+│  - Execute business logic                           │
+│  - Call Repository                                  │
+└────────────────────┬────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│  Repositories Layer                   ← Current doc │
+│  - Data access abstraction                          │
+│  - Transaction creation and management              │
+│  - Query optimization                               │
+│  - Cache management                                 │
+└────────────────────┬────────────────────────────────┘
+                     │
+                     ▼
+┌─────────────────────────────────────────────────────┐
+│  Database Models & PostgreSQL                       │
+│  - ORM model definitions                            │
+│  - Database schema                                  │
+└─────────────────────────────────────────────────────┘
 ```
 
 ## Key Responsibilities
@@ -90,7 +127,46 @@ class SessionRepository:
     ) -> None:
         self._db_source = db_source
         self._cache_source = cache_source
+
+    async def get_session(
+        self,
+        session_id: SessionId,
+    ) -> Optional[SessionInfo]:
+        """Read: cache first, fallback to DB"""
+        # Check cache first
+        if self._cache_source:
+            cached = await self._cache_source.get_session(session_id)
+            if cached:
+                return cached
+
+        # Cache miss - query from DB
+        session_info = await self._db_source.get_session(session_id)
+
+        # Update cache
+        if session_info and self._cache_source:
+            await self._cache_source.set_session(session_id, session_info)
+
+        return session_info
+
+    async def create_session(
+        self,
+        session_data: SessionData,
+    ) -> SessionId:
+        """Write: DB source handles transaction"""
+        # DB source creates session
+        session_id = await self._db_source.create_session(session_data)
+
+        # Repository decides cache strategy
+        # (cache invalidation or no-op)
+
+        return session_id
 ```
+
+**Pattern explanation:**
+
+- **DBSource**: Only handles database operations. Public methods create their own sessions, private methods receive sessions as parameters.
+- **CacheSource**: Only handles cache operations (no database dependency). Provides get/set methods for cached data.
+- **Repository**: Orchestrates both sources. Read operations check cache first and fall back to DB on cache miss. Write operations delegate to DB source and handle cache invalidation.
 
 **Type hint recommendation**: Using `Optional[T]` is recommended over `| None`.
 
@@ -188,7 +264,7 @@ When the `@*_resilience.apply()` decorator is applied to Repository methods, Pro
   - Cache Source: `"agent_cache_source"`, `"schedule_cache_source"`, etc.
 - `operation`: Method name (e.g., `"get_session_by_id"`, `"create_session"`)
 - `success`: `"true"` or `"false"`
-- `error_code`: Exception class name (e.g., `"SessionNotFound"`, `"IntegrityError"`)
+- `error_code`: Error code in the format `{domain}_{operation}_{error-detail}` (e.g., `"api_parsing_invalid-parameters"`, `"user_read_not-found"`, `"session_generic_mismatch"`)
 
 ### 4. Explicit Return Types
 
@@ -271,6 +347,260 @@ class MixedRepository:
     """Manages Sessions, Kernels, and Agents - Unclear responsibility"""
     async def get_session_with_kernels_and_agents(self, ...): ...
 ```
+
+## Querier Pattern
+
+The Querier pattern provides a unified way to build database queries from API requests, supporting filtering, ordering, and pagination.
+
+### Architecture
+
+```
+API Layer (adapters)
+    ↓ build
+Querier (conditions, orders, pagination)
+    ↓ pass through
+Service Layer
+    ↓ delegate
+Repository
+    ↓ apply
+SQLAlchemy Query
+    ↓
+Database
+```
+
+### Querier Structure
+
+```python
+from dataclasses import dataclass
+from typing import Optional
+
+@dataclass(frozen=True)
+class Querier:
+    """Unified query specification."""
+    conditions: list[QueryCondition]  # WHERE clauses
+    orders: list[QueryOrder]          # ORDER BY clauses
+    pagination: Optional[QueryPagination]  # LIMIT/OFFSET or cursor
+
+
+# Type aliases
+QueryCondition = Callable[[], ColumnElement[bool]]
+QueryOrder = Callable[[SAColumn], ColumnElement]
+
+# Pagination strategies
+@dataclass(frozen=True)
+class OffsetPagination:
+    limit: int
+    offset: int
+
+@dataclass(frozen=True)
+class CursorForwardPagination:
+    first: int
+    after: str  # base64 encoded cursor
+
+@dataclass(frozen=True)
+class CursorBackwardPagination:
+    last: int
+    before: str  # base64 encoded cursor
+```
+
+### Condition Builders
+
+Repository `options.py` modules provide condition builders:
+
+```python
+# repositories/notification/options.py
+class NotificationChannelConditions:
+    """Condition builders for notification channels."""
+
+    @staticmethod
+    def name_equals(value: str, case_insensitive: bool = False) -> QueryCondition:
+        """Build name equals condition."""
+        def condition() -> ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(NotificationChannelRow.name) == value.lower()
+            return NotificationChannelRow.name == value
+        return condition
+
+    @staticmethod
+    def name_contains(value: str, case_insensitive: bool = False) -> QueryCondition:
+        """Build name contains condition."""
+        def condition() -> ColumnElement[bool]:
+            if case_insensitive:
+                return sa.func.lower(NotificationChannelRow.name).contains(value.lower())
+            return NotificationChannelRow.name.contains(value)
+        return condition
+
+    @staticmethod
+    def enabled_equals(value: bool) -> QueryCondition:
+        """Build enabled equals condition."""
+        def condition() -> ColumnElement[bool]:
+            return NotificationChannelRow.enabled == value
+        return condition
+```
+
+### Order Builders
+
+```python
+class NotificationChannelOrders:
+    """Order builders for notification channels."""
+
+    @staticmethod
+    def name(ascending: bool = True) -> QueryOrder:
+        """Order by name."""
+        def order(column: SAColumn) -> ColumnElement:
+            return column.asc() if ascending else column.desc()
+        return lambda: order(NotificationChannelRow.name)
+
+    @staticmethod
+    def created_at(ascending: bool = True) -> QueryOrder:
+        """Order by creation time."""
+        def order(column: SAColumn) -> ColumnElement:
+            return column.asc() if ascending else column.desc()
+        return lambda: order(NotificationChannelRow.created_at)
+```
+
+### Repository Integration
+
+Repositories accept `Querier` objects and apply them to SQLAlchemy queries:
+
+```python
+class NotificationChannelRepository:
+    """Repository using Querier pattern."""
+
+    async def search_channels(
+        self,
+        querier: Querier,
+    ) -> list[NotificationChannelData]:
+        """Search channels using Querier."""
+        async with self._db.begin_readonly_session() as db_sess:
+            # Build base query
+            stmt = sa.select(NotificationChannelRow)
+
+            # Apply conditions (WHERE)
+            for condition in querier.conditions:
+                stmt = stmt.where(condition())
+
+            # Apply ordering (ORDER BY)
+            for order in querier.orders:
+                stmt = stmt.order_by(order())
+
+            # Apply pagination (LIMIT/OFFSET or cursor)
+            if querier.pagination:
+                stmt = self._apply_pagination(stmt, querier.pagination)
+
+            # Execute query
+            result = await db_sess.execute(stmt)
+            rows = result.scalars().all()
+
+            # Convert to domain objects
+            return [self._to_data(row) for row in rows]
+
+    def _apply_pagination(
+        self,
+        stmt: Select,
+        pagination: QueryPagination,
+    ) -> Select:
+        """Apply pagination to query."""
+        if isinstance(pagination, OffsetPagination):
+            return stmt.limit(pagination.limit).offset(pagination.offset)
+        elif isinstance(pagination, CursorForwardPagination):
+            # Decode cursor and apply
+            decoded = decode_cursor(pagination.after)
+            return stmt.where(row_id > decoded).limit(pagination.first)
+        elif isinstance(pagination, CursorBackwardPagination):
+            # Decode cursor and apply
+            decoded = decode_cursor(pagination.before)
+            return stmt.where(row_id < decoded).limit(pagination.last)
+        return stmt
+```
+
+### Example Usage Flow
+
+```python
+# 1. API Layer: Build Querier from request
+@api_handler
+async def search_channels(
+    body: BodyParam[SearchNotificationChannelsReq],
+    processors_ctx: ProcessorsCtx,
+) -> APIResponse:
+    # Adapter converts DTO to Querier
+    querier = adapter.build_querier(body.parsed)
+
+    # Service layer executes query (service delegates to repository)
+    results = await processors.notification.search_channels(querier)
+
+    return APIResponse(data=results)
+
+# 2. Adapter: Convert DTO to Querier
+class NotificationChannelAdapter:
+    def build_querier(self, request: SearchNotificationChannelsReq) -> Querier:
+        conditions = []
+
+        # Build conditions
+        if request.filter:
+            if request.filter.name:
+                conditions.append(
+                    NotificationChannelConditions.name_contains(
+                        request.filter.name.contains
+                    )
+                )
+            if request.filter.enabled is not None:
+                conditions.append(
+                    NotificationChannelConditions.enabled_equals(
+                        request.filter.enabled
+                    )
+                )
+
+        # Build orders
+        orders = []
+        if request.order:
+            orders.append(request.order.to_query_order())
+
+        # Build pagination
+        pagination = None
+        if request.limit:
+            pagination = OffsetPagination(
+                limit=request.limit,
+                offset=request.offset or 0
+            )
+
+        return Querier(
+            conditions=conditions,
+            orders=orders,
+            pagination=pagination
+        )
+
+# 3. Service Layer: Pass through to repository
+class NotificationService:
+    async def search_channels(self, querier: Querier) -> list[ChannelData]:
+        """Service delegates to repository."""
+        return await self._repository.search_channels(querier)
+
+# 4. Repository: Execute query
+class NotificationChannelRepository:
+    async def search_channels(self, querier: Querier) -> list[ChannelData]:
+        async with self._db.begin_readonly_session() as db_sess:
+            stmt = sa.select(NotificationChannelRow)
+
+            # Apply querier
+            for condition in querier.conditions:
+                stmt = stmt.where(condition())
+            for order in querier.orders:
+                stmt = stmt.order_by(order())
+            if querier.pagination:
+                stmt = self._apply_pagination(stmt, querier.pagination)
+
+            result = await db_sess.execute(stmt)
+            return [self._to_data(row) for row in result.scalars()]
+```
+
+### Benefits
+
+1. **Type Safety**: Strong typing throughout the pipeline
+2. **Reusability**: Condition/order builders reused across API layers
+3. **Testability**: Each component can be tested independently
+4. **Flexibility**: Easy to add new filters/orders without changing repository
+5. **Consistency**: Uniform query building across REST and GraphQL APIs
 
 ## Data Access Patterns
 
@@ -422,51 +752,57 @@ class SessionDBSource:
 
 
 class SessionCacheSource:
-    """Cache data access"""
+    """Cache data access - only handles cache operations"""
     _redis: RedisConnectionInfo
+
+    def __init__(self, redis: RedisConnectionInfo) -> None:
+        self._redis = redis
+
+    async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
+        """Get session from cache"""
+        return await self._get_from_cache(session_id)
+
+    async def set_session(self, session_id: SessionId, session_info: SessionInfo) -> None:
+        """Store session to cache"""
+        await self._set_to_cache(session_id, session_info)
+
+
+class SessionRepository:
+    """Repository: orchestrates db_source and cache_source"""
     _db_source: SessionDBSource
+    _cache_source: SessionCacheSource
 
     def __init__(
         self,
+        db: ExtendedAsyncSAEngine,
         redis: RedisConnectionInfo,
-        db_source: SessionDBSource,
     ) -> None:
-        self._redis = redis
-        self._db_source = db_source
+        self._db_source = SessionDBSource(db)
+        self._cache_source = SessionCacheSource(redis)
 
     async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
         """Cache-first query, fall back to DB on cache miss"""
-        # Check cache
-        cached = await self._get_from_cache(session_id)
+        # Check cache first
+        cached = await self._cache_source.get_session(session_id)
         if cached:
             return cached
 
         # Cache miss - query from DB
         session_info = await self._db_source.get_session(session_id)
         if session_info:
-            await self._set_to_cache(session_id, session_info)
+            await self._cache_source.set_session(session_id, session_info)
 
         return session_info
 
+    async def create_session(self, session_data: SessionData) -> SessionId:
+        """Repository handles transaction and cache invalidation"""
+        # DB source handles transaction internally
+        session_id = await self._db_source.create_session(session_data)
 
-class SessionRepository:
-    """Repository: orchestrates db_source and cache_source"""
-    _db_source: SessionDBSource
-    _cache_source: Optional[SessionCacheSource]
+        # Repository decides cache invalidation strategy
+        # (no need to cache newly created session immediately)
 
-    def __init__(
-        self,
-        db_source: SessionDBSource,
-        cache_source: Optional[SessionCacheSource] = None,
-    ) -> None:
-        self._db_source = db_source
-        self._cache_source = cache_source
-
-    async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
-        """Use cache if available, otherwise use DB directly"""
-        if self._cache_source:
-            return await self._cache_source.get_session(session_id)
-        return await self._db_source.get_session(session_id)
+        return session_id
 ```
 
 ## Error Handling
@@ -713,11 +1049,20 @@ async def fetch(self, params: dict) -> list:
     ...
 ```
 
+## Repository-Specific Documentation
+
+### Specialized Repositories
+- **[Metric Repository](./metric/README.md)**: Container metrics data access
+  - Prometheus metric querying
+  - Time-series data retrieval
+  - Metric aggregation patterns
+
 ## References
 
 ### Related Documentation
-- [Services Layer](../services/README.md)
-- [Database Models](../models/README.md)
+- [Services Layer](../services/README.md): Business logic patterns and service implementation
+- [Sokovan Orchestration](../sokovan/README.md): Session scheduling and orchestration
+- [Manager Overview](../README.md): Manager component architecture
 
 ### Query Optimization Guide
 - N+1 problem resolution: Use JOIN or separate queries

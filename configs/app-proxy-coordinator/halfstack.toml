@@ -18,6 +18,11 @@ aiomonitor_webui_port = 49510
 allow_unauthorized_configure_request = true
 
 [proxy_coordinator.bind_addr]
+host = "0.0.0.0"
+port = 10200
+
+[proxy_coordinator.advertised_addr]
+# Change `host` and `port` to the actual host and port for user access
 host = "127.0.0.1"
 port = 10200
 

@@ -1,5 +1,7 @@
 # Sokovan
 
+← [Back to Manager](../README.md#manager-architecture-documentation) | [Architecture Overview](../../README.md#manager)
+
 ## Overview
 
 Sokovan is the orchestration layer that comprehensively coordinates session scheduling, deployment management, and route management in Backend.AI.
@@ -202,19 +204,28 @@ sequenceDiagram
     Sched->>Sched: Allocators: Resource allocation
 
     Sched->>DB: Session state → SCHEDULED
-    Sched->>DB: Create kernel (PREPARING state)
+
+    Note over Coord: Precondition check
+    Coord->>Sched: check_preconditions()
+    Sched->>DB: Session state → PREPARING
+    Sched->>Agent: Trigger image check/pull (RPC)
+    Agent->>Agent: Check if image exists
+    Agent->>Agent: Pull image if needed
+
+    Note over Coord: Check pulling progress
+    Coord->>Sched: check_pulling_progress()
+    Sched->>DB: Query PULLING/PREPARING sessions
+    Sched->>DB: Session state → PREPARED (when image ready)
 
     Note over Coord: Session start
     Coord->>Coord: handle_kernel_creating()
     Coord->>Sched: start_sessions()
+    Sched->>DB: Session/Kernel state → CREATING
 
     Sched->>Agent: Kernel creation request (RPC)
     Agent-->>Sched: Creation start confirmation
 
-    Sched->>DB: Kernel state → PULLING (image pulling)
-
-    Note over Agent: Image pulling and container creation
-    Agent->>Agent: Image download
+    Note over Agent: Container creation
     Agent->>Agent: Container creation and start
 
     Agent-->>Coord: kernel_started event
@@ -230,9 +241,13 @@ If validation passes, a session record is created in PENDING state and a session
 
 ScheduleCoordinator executes scheduling periodically. It queries sessions in PENDING state and verifies resource constraints with Validators (user/group quotas, etc.). It determines priority with Sequencers (FIFO, DRF, etc.), selects optimal agents with Selectors, and allocates and reserves resources with Allocators. On success, it transitions the session and kernel states to SCHEDULED.
 
-It performs image preparation and other tasks to transition kernel state to PREPARED. When image preparation is complete, it transitions kernel state to CREATING and requests kernel creation from the selected agent, passing image name, resource slots, environment variables, etc.
+After scheduling, check_preconditions() transitions sessions to PREPARING state and triggers image check/pull on the selected agents. The agent checks if the required container image exists locally, and pulls it if needed.
 
-The agent downloads the container image, creates and starts the container, then publishes a kernel_started event.
+check_pulling_progress() periodically checks if all images are ready. Once image pulling is complete for all kernels in a session, it transitions the session to PREPARED state.
+
+When preconditions are satisfied, start_sessions() transitions sessions to CREATING state and requests kernel creation from the agents, passing image name, resource slots, environment variables, etc.
+
+The agent creates and starts the container using the already-pulled image, then publishes a kernel_started event.
 
 When ScheduleCoordinator receives kernel_started events from all kernels, it transitions kernel states to RUNNING, and when all kernels are in RUNNING state, it transitions the session state to RUNNING as well.
 
@@ -544,10 +559,27 @@ PENDING → PROVISIONING → RUNNING → TERMINATING → TERMINATED
 2. Free up agent disk space
 3. Wait for automatic retry on timeout
 
-## Sub-documents
+## Sokovan Component Documentation
 
-Refer to subdirectories for detailed documentation on each layer:
+Detailed documentation for each Sokovan component:
 
-- [Scheduler Architecture](scheduler/README.md): Session scheduling details
-- [Deployment Architecture](deployment/README.md): Deployment management details
-- [SchedulingController Architecture](scheduling_controller/README.md): Session validation and preparation details
+### Core Components
+- **[Scheduler](./scheduler/README.md)**: Core scheduling engine for session placement and resource allocation
+  - Session scheduling algorithm implementation
+  - Resource matching and agent selection
+  - Session state transitions and lifecycle management
+
+- **[Scheduling Controller](./scheduling_controller/README.md)**: Validation and preparation logic for scheduling
+  - Session creation validation rules
+  - Resource requirement preparation
+  - Image and environment preparation
+
+- **[Deployment Controller](./deployment/README.md)**: Deployment lifecycle management
+  - Deployment creation and scaling
+  - Service endpoint management
+  - Deployment health monitoring
+
+### Related Documentation
+- [Manager Overview](../README.md): Manager component architecture and responsibilities
+- [Services Layer](../services/README.md): Business logic patterns and implementation
+- [Repositories Layer](../repositories/README.md): Data access patterns and query optimization
