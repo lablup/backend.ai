@@ -764,8 +764,8 @@ class ModelRevisionNotFound(BackendAIError, web.HTTPNotFound):
 
 class PassthroughError(BackendAIError):
     """
-    Wraps and forwards errors from request with original status code and message.
-    This allows transparent error propagation from request to API clients.
+    Wraps and forwards errors from requests with original status code and message.
+    This allows transparent error propagation from requests to API clients.
     """
 
     error_type = "https://api.backend.ai/probs/forwarded-error"
