@@ -24,8 +24,7 @@ class SchedulingError(BackendAIError, ABC):
     error_type = "https://api.backend.ai/probs/scheduling-failed"
     error_title = "Scheduling failed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.SCHEDULE,

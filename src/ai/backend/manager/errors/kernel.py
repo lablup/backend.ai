@@ -29,8 +29,7 @@ class KernelNotReady(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/kernel-not-ready"
     error_title = "Kernel not ready."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.READ,
@@ -42,8 +41,7 @@ class InvalidSessionId(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-session-id"
     error_title = "Invalid session ID format."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.READ,
@@ -54,8 +52,7 @@ class InvalidSessionId(BackendAIError, web.HTTPBadRequest):
 class SessionNotFound(ObjectNotFound):
     object_name = "session"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.READ,
@@ -66,8 +63,7 @@ class SessionNotFound(ObjectNotFound):
 class MainKernelNotFound(ObjectNotFound):
     object_name = "main kernel"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.READ,
@@ -78,8 +74,7 @@ class MainKernelNotFound(ObjectNotFound):
 class KernelNotFound(ObjectNotFound):
     object_name = "kernel"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.READ,
@@ -91,8 +86,7 @@ class TooManySessionsMatched(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-sessions-matched"
     error_title = "Too many sessions matched."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.READ,
@@ -123,8 +117,7 @@ class TooManyKernelsFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/too-many-kernels"
     error_title = "There are two or more matching kernels."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.READ,
@@ -136,8 +129,7 @@ class SessionAlreadyExists(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/session-already-exists"
     error_title = "The session already exists but you requested not to reuse existing one."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.CREATE,
@@ -149,8 +141,7 @@ class QuotaExceeded(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/quota-exceeded"
     error_title = "You have reached your resource limit."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.CREATE,
@@ -169,8 +160,7 @@ class BackendAgentError(BackendAIError):
         "FAILURE": "https://api.backend.ai/probs/agent-failure",
     }
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.ACCESS,
@@ -245,8 +235,7 @@ class KernelCreationFailed(BackendAgentError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/kernel-creation-failed"
     error_title = "Kernel creation has failed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.CREATE,
@@ -258,8 +247,7 @@ class KernelDestructionFailed(BackendAgentError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/kernel-destruction-failed"
     error_title = "Kernel destruction has failed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.SOFT_DELETE,
@@ -271,8 +259,7 @@ class KernelRestartFailed(BackendAgentError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/kernel-restart-failed"
     error_title = "Kernel restart has failed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.START,
@@ -284,8 +271,7 @@ class KernelExecutionFailed(BackendAgentError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/kernel-execution-failed"
     error_title = "Executing user code in the kernel has failed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.EXECUTE,

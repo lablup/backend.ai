@@ -22,8 +22,7 @@ class URLNotFound(BackendAIError, web.HTTPNotFound):  # TODO: Misused now.
     error_type = "https://api.backend.ai/probs/url-not-found"
     error_title = "Unknown URL path."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.READ,
@@ -48,8 +47,7 @@ class ObjectNotFound(BackendAIError, web.HTTPNotFound):
         self.error_title = f"No such {self.object_name}."
         super().__init__(extra_msg, extra_data, **kwargs)
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.READ,
@@ -61,8 +59,7 @@ class GenericBadRequest(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Bad request."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
@@ -74,8 +71,7 @@ class GenericForbidden(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/generic-forbidden"
     error_title = "Forbidden operation."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
@@ -87,8 +83,7 @@ class RejectedByHook(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/rejected-by-hook"
     error_title = "Operation rejected by a hook plugin."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.PLUGIN,
             operation=ErrorOperation.HOOK,
@@ -109,8 +104,7 @@ class MethodNotAllowed(BackendAIError, web.HTTPMethodNotAllowed):
     error_type = "https://api.backend.ai/probs/method-not-allowed"
     error_title = "HTTP Method Not Allowed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.ACCESS,
@@ -122,8 +116,7 @@ class InternalServerError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Internal server error."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
@@ -135,8 +128,7 @@ class ServerMisconfiguredError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/server-misconfigured"
     error_title = "Service misconfigured."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.SETUP,
@@ -148,8 +140,7 @@ class ServiceUnavailable(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/service-unavailable"
     error_title = "Serivce unavailable."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
@@ -161,8 +152,7 @@ class ServerFrozen(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/server-frozen"
     error_title = "The server is frozen due to maintenance. Please try again later."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.ACCESS,
@@ -174,8 +164,7 @@ class Forbidden(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/forbidden"
     error_title = "Forbidden operation."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.ACCESS,

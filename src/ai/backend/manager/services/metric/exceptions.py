@@ -13,8 +13,7 @@ class FailedToGetMetric(BackendAIError):
     error_type = "https://api.backend.ai/probs/failed-to-get-metric"
     error_title = "Failed to get metric."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.METRIC,
             operation=ErrorOperation.READ,

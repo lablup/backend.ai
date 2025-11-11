@@ -13,8 +13,7 @@ from ai.backend.manager.errors.common import ObjectNotFound
 class DefinitionFileNotFound(ObjectNotFound):
     object_name = "definition-file"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
             operation=ErrorOperation.READ,
@@ -25,8 +24,7 @@ class DefinitionFileNotFound(ObjectNotFound):
 class EndpointNotFound(ObjectNotFound):
     object_name = "endpoint"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
             operation=ErrorOperation.READ,
@@ -37,8 +35,7 @@ class EndpointNotFound(ObjectNotFound):
 class UserNotFoundInDeployment(ObjectNotFound):
     object_name = "user in deployment"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
             operation=ErrorOperation.READ,
@@ -50,8 +47,7 @@ class DeploymentHasNoTargetRevision(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/deployment-has-no-target-revision"
     error_title = "Deployment has no target revision."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_SERVICE,
             operation=ErrorOperation.READ,

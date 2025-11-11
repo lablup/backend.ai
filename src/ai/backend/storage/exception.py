@@ -16,8 +16,7 @@ class StorageProxyError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/generic"
     error_title = "Storage Proxy Error"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.GENERIC,
@@ -29,8 +28,7 @@ class ProcessExecutionError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/execution/failed"
     error_title = "Storage Operation Execution Failed"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.GENERIC,
@@ -42,8 +40,7 @@ class ExternalStorageServiceError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/external/failed"
     error_title = "External Operation Failed"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.GENERIC,
@@ -55,8 +52,7 @@ class NetAppClientError(ExternalStorageServiceError, web.HTTPServiceUnavailable)
     error_type = "https://api.backend.ai/probs/storage/netapp/api-error"
     error_title = "NetApp API Error"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.ACCESS,
@@ -68,8 +64,7 @@ class VFolderNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/vfolder/not-found"
     error_title = "VFolder Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.READ,
@@ -81,8 +76,7 @@ class QuotaDirectoryNotEmptyError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/storage/quota-directory-not-empty"
     error_title = "Quota Directory Not Empty"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.SOFT_DELETE,
@@ -94,8 +88,7 @@ class QuotaScopeNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/quota/scope/not-found"
     error_title = "Quota Scope Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.QUOTA_SCOPE,
             operation=ErrorOperation.READ,
@@ -107,8 +100,7 @@ class QuotaScopeAlreadyExists(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/storage/quota/scope/already-exists"
     error_title = "Quota Scope Already Exists"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.CREATE,
@@ -120,8 +112,7 @@ class InvalidQuotaConfig(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/quota/config/invalid"
     error_title = "Invalid Quota Config"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.UPDATE,
@@ -137,8 +128,7 @@ class InvalidSubpathError(BackendAIError, web.HTTPBadRequest):
         msg_str = f"Invalid Subpath (vfid={vfid}, relpath={relpath})"
         super().__init__(extra_msg=msg_str, extra_data=msg_str)
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.ACCESS,
@@ -150,8 +140,7 @@ class InvalidQuotaScopeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/quota/scope/invalid"
     error_title = "Invalid Quota Scope"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.ACCESS,
@@ -163,8 +152,7 @@ class InvalidVolumeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/volume/invalid"
     error_title = "Invalid Volume"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.ACCESS,
@@ -176,8 +164,7 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/invalid-api-params"
     error_title = "Invalid API parameters"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.GENERIC,
@@ -189,8 +176,7 @@ class FileStreamUploadError(ProcessExecutionError):
     error_type = "https://api.backend.ai/probs/storage/file-stream-upload-failed"
     error_title = "Failed to upload file stream"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.CREATE,
@@ -202,8 +188,7 @@ class FileStreamDownloadError(ProcessExecutionError):
     error_type = "https://api.backend.ai/probs/storage/file-stream-download-failed"
     error_title = "Failed to download file stream"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.ACCESS,
@@ -215,8 +200,7 @@ class PresignedUploadURLGenerationError(ProcessExecutionError):
     error_type = "https://api.backend.ai/probs/storage/presigned-upload-url-generation-failed"
     error_title = "Failed to generate presigned upload URL"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.CREATE,
@@ -228,8 +212,7 @@ class PresignedDownloadURLGenerationError(ProcessExecutionError):
     error_type = "https://api.backend.ai/probs/storage/presigned-download-url-generation-failed"
     error_title = "Failed to generate presigned download URL"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.CREATE,
@@ -241,8 +224,7 @@ class ObjectInfoFetchError(ProcessExecutionError):
     error_type = "https://api.backend.ai/probs/storage/object-info-fetch-failed"
     error_title = "Failed to fetch object info"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.READ,
@@ -254,8 +236,7 @@ class StorageNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/object-not-found"
     error_title = "Storage Config Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.READ,
@@ -267,8 +248,7 @@ class StorageTypeInvalidError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/object-type-invalid"
     error_title = "Storage Config Invalid Type"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.READ,
@@ -280,8 +260,7 @@ class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/bucket/object-not-found"
     error_title = "Storage Bucket Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.READ,
@@ -293,8 +272,7 @@ class StorageBucketFileNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/bucket/file/object-not-found"
     error_title = "Storage Bucket File Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.READ,
@@ -306,8 +284,7 @@ class RegistryNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/registries/registry-not-found"
     error_title = "Registry Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_REGISTRY,
             operation=ErrorOperation.READ,
@@ -319,8 +296,7 @@ class HuggingFaceAPIError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/registries/huggingface/api-error"
     error_title = "HuggingFace API Error"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_REGISTRY,
             operation=ErrorOperation.ACCESS,
@@ -332,8 +308,7 @@ class HuggingFaceModelNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/registries/huggingface/model-not-found"
     error_title = "HuggingFace Model Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.READ,
@@ -345,8 +320,7 @@ class ObjectStorageConfigInvalidError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/object/config/invalid"
     error_title = "Object Storage Config Invalid"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.UPDATE,
@@ -358,8 +332,7 @@ class ReservoirStorageConfigInvalidError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/reservoir/config/invalid"
     error_title = "Reservoir Storage Config Invalid"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.UPDATE,
@@ -371,8 +344,7 @@ class ArtifactStorageEmptyError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage/artifact/config/invalid"
     error_title = "Artifact Storage Empty"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.READ,
@@ -384,8 +356,7 @@ class ArtifactRevisionEmptyError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/artifact/revision/empty"
     error_title = "Artifact Revision Empty"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.READ,
@@ -397,8 +368,7 @@ class ArtifactImportError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/artifact/import/failed"
     error_title = "Artifact Import Failed"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.CREATE,
@@ -410,8 +380,7 @@ class NotImplementedAPI(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/api/not-implemented"
     error_title = "API Not Implemented"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.GENERIC,
@@ -423,8 +392,7 @@ class ObjectStorageObjectDeletionError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/object/deletion/failed"
     error_title = "Object Deletion Failed"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
             operation=ErrorOperation.HARD_DELETE,
@@ -436,8 +404,7 @@ class StorageTransferError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/storage/transfer/failed"
     error_title = "Storage Transfer Failed"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.CREATE,
@@ -449,8 +416,7 @@ class StorageStepRequiredStepNotProvided(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/step-mapping-not-provided"
     error_title = "Storage Step Mapping Not Provided"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.GENERIC,
@@ -462,8 +428,7 @@ class ArtifactVerifyStorageTypeInvalid(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/artifact/verify/storage-type/invalid"
     error_title = "Artifact Verify Storage Type Invalid"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.GENERIC,
@@ -475,8 +440,7 @@ class ArtifactVerificationFailedError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/storage/artifact/verification/failed"
     error_title = "Artifact Verification Failed"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_PROXY,
             operation=ErrorOperation.GENERIC,
