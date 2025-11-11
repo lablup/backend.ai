@@ -29,6 +29,11 @@ from typing import (
 import aiodocker
 import attrs
 
+from ai.backend.agent.config.unified import (
+    CommonResourceConfig,
+    ResourceAllocationMode,
+    ResourceConfig,
+)
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
@@ -69,6 +74,17 @@ DeviceAllocation: TypeAlias = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
+
+
+def _combine_mappings(mappings: list[Mapping[SlotName, Decimal]]) -> dict[SlotName, Decimal]:
+    combined: dict[SlotName, Decimal] = {}
+    for mapping in mappings:
+        if set(combined.keys()) & set(mapping.keys()):
+            raise ValueError(
+                f"Duplicate keys found in devices: {combined.keys()} and {mapping.keys()}"
+            )
+        combined = {**combined, **mapping}
+    return combined
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -442,6 +458,160 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         e.g., ["io_uring_enter", "io_uring_setup", "io_uring_register"] for enabling io_uring in the container.
         """
         return []
+
+
+class ResourcePartitioner:
+    def __init__(
+        self,
+        resource_config: ResourceConfig,
+        num_agents: int,
+        agent_idx: int,
+    ) -> None:
+        self.resource_config = resource_config
+        self.num_agents = num_agents
+        self.agent_idx = agent_idx
+        self.resource_scaling_factor: Mapping[SlotName, Decimal] = {}
+
+    @staticmethod
+    def calculate_total_slots(
+        computers: Mapping[DeviceName, ComputerContext],
+        resource_config: CommonResourceConfig,
+        deduct_reserved: bool = False,
+    ) -> dict[SlotName, Decimal]:
+        total_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))
+        for device in computers.values():
+            for slot_info in device.alloc_map.device_slots.values():
+                total_slots[slot_info.slot_name] += slot_info.amount
+        if deduct_reserved:
+            return ResourcePartitioner.deduct_reserved_resources(total_slots, resource_config)
+        else:
+            return total_slots
+
+    @staticmethod
+    def deduct_reserved_resources(
+        total_slots: Mapping[SlotName, Decimal],
+        resource_config: CommonResourceConfig,
+    ) -> dict[SlotName, Decimal]:
+        reserved_resources = {
+            SlotName("cpu"): Decimal(resource_config.reserved_cpu),
+            SlotName("mem"): Decimal(resource_config.reserved_mem),
+        }
+
+        slots: dict[SlotName, Decimal] = {}
+        for slot_name, slot in total_slots.items():
+            slots[slot_name] = slot - reserved_resources.get(slot_name, Decimal("0"))
+        return slots
+
+    def restrict_computer_resources(
+        self,
+        computers: MutableMapping[DeviceName, ComputerContext],
+        total_slots: Mapping[SlotName, Decimal],
+    ) -> dict[SlotName, Decimal]:
+        devices_allocated_slots: list[Mapping[SlotName, Decimal]] = []
+        devices_reserved_slots: list[Mapping[SlotName, Decimal]] = []
+        for device in computers.values():
+            device_allocated_slots = self._calculate_device_slots(device.alloc_map, total_slots)
+            device.alloc_map.update_device_slot_amounts(device_allocated_slots)
+            devices_allocated_slots.append(device_allocated_slots)
+
+            device_reserved_slots = self._calculate_reserved_slots(
+                device_allocated_slots, total_slots
+            )
+            devices_reserved_slots.append(device_reserved_slots)
+
+        allocated_slots = _combine_mappings(devices_allocated_slots)
+        self.resource_scaling_factor = self._calculate_resource_scaling_factor(
+            allocated_slots, total_slots
+        )
+
+        reserved_slots = _combine_mappings(devices_reserved_slots)
+        return reserved_slots
+
+    def get_resource_scaling_factor(self, slot_name: SlotName) -> Decimal:
+        return self.resource_scaling_factor[slot_name]
+
+    def _calculate_device_slots(
+        self,
+        alloc_map: AbstractAllocMap,
+        total_slots: Mapping[SlotName, Decimal],
+    ) -> dict[SlotName, Decimal]:
+        total_slots_no_reserved = ResourcePartitioner.deduct_reserved_resources(
+            total_slots, self.resource_config
+        )
+        return {
+            device_slot.slot_name: self._calculate_device_slot(
+                device_slot.slot_name,
+                total_slots_no_reserved[device_slot.slot_name],
+                type(alloc_map),
+            )
+            for device_slot in alloc_map.device_slots.values()
+        }
+
+    def _calculate_device_slot(
+        self,
+        slot_name: SlotName,
+        total_slot: Decimal,
+        alloc_map_type: Type[AbstractAllocMap],
+    ) -> Decimal:
+        match self.resource_config.allocation_mode:
+            case ResourceAllocationMode.SHARED:
+                return total_slot
+            case ResourceAllocationMode.AUTO_SPLIT:
+                if alloc_map_type is DiscretePropertyAllocMap:
+                    slot, slot_extra = divmod(total_slot, self.num_agents)
+                    remainder_value = 1 if self.agent_idx < slot_extra else 0
+                    return slot + remainder_value
+                elif alloc_map_type is FractionAllocMap:
+                    return total_slot / self.num_agents
+                else:
+                    raise NotImplementedError(
+                        f"Unrecognized AbstractAllocMap type {alloc_map_type}"
+                    )
+            case ResourceAllocationMode.MANUAL:
+                match slot_name:
+                    case "cpu":
+                        assert self.resource_config.allocated_cpu is not None
+                        return Decimal(self.resource_config.allocated_cpu)
+                    case "mem":
+                        assert self.resource_config.allocated_mem is not None
+                        return Decimal(self.resource_config.allocated_mem)
+                    case slot_name:
+                        if slot_name not in self.resource_config.allocated_devices:
+                            raise ValueError(
+                                f"{slot_name=} not found in config {self.resource_config.allocated_devices!r}"
+                            )
+                        return self.resource_config.allocated_devices[slot_name]
+
+    def _calculate_reserved_slots(
+        self,
+        device_slots: Mapping[SlotName, Decimal],
+        total_slots: Mapping[SlotName, Decimal],
+    ) -> dict[SlotName, Decimal]:
+        reserved_slots: dict[SlotName, Decimal] = {}
+        for slot_name, slot in device_slots.items():
+            reserved_slots[slot_name] = max(total_slots[slot_name] - slot, Decimal(0))
+        return reserved_slots
+
+    def _calculate_resource_scaling_factor(
+        self,
+        allocated_slots: Mapping[SlotName, Decimal],
+        total_slots: Mapping[SlotName, Decimal],
+    ) -> dict[SlotName, Decimal]:
+        match self.resource_config.allocation_mode:
+            case ResourceAllocationMode.SHARED:
+                return defaultdict(lambda: Decimal(1.0))
+            case ResourceAllocationMode.AUTO_SPLIT:
+                return defaultdict(lambda: Decimal(1.0) / Decimal(self.num_agents))
+            case ResourceAllocationMode.MANUAL:
+                if SlotName("cpu") not in allocated_slots or SlotName("cpu") not in total_slots:
+                    raise ValueError("CPU not in allocated or total slots seen")
+                if SlotName("mem") not in allocated_slots or SlotName("mem") not in total_slots:
+                    raise ValueError("Memory not in allocated or total slots seen")
+                scaling_factor = {
+                    slot_name: slot / total_slots[slot_name]
+                    for slot_name, slot in allocated_slots.items()
+                }
+                return scaling_factor
 
 
 class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):

@@ -117,6 +117,7 @@ from ..resources import (
     ComputerContext,
     KernelResourceSpec,
     Mount,
+    ResourcePartitioner,
     known_slot_types,
 )
 from ..scratch import create_loop_filesystem, destroy_loop_filesystem
@@ -1356,6 +1357,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
         kernel_registry: KernelRegistry,
+        resource_partitioner: ResourcePartitioner,
     ) -> None:
         super().__init__(
             etcd,
@@ -1365,6 +1367,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
             kernel_registry=kernel_registry,
+            resource_partitioner=resource_partitioner,
         )
         self.checked_invalid_images = set()
 

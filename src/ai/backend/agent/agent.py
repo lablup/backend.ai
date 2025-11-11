@@ -240,6 +240,7 @@ from .resources import (
     ComputerContext,
     KernelResourceSpec,
     Mount,
+    ResourcePartitioner,
     align_memory,
     allocate,
     known_slot_types,
@@ -766,7 +767,10 @@ class AbstractAgent(
     etcd: AgentEtcdClientView
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
+    resource_partitioner: ResourcePartitioner
     computers: MutableMapping[DeviceName, ComputerContext]
+    total_slots: Mapping[SlotName, Decimal]
+    reserved_slots: Mapping[SlotName, Decimal]
     images: Mapping[ImageCanonical, ScannedImage]
     port_pool: set[int]
 
@@ -838,6 +842,7 @@ class AbstractAgent(
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
         kernel_registry: KernelRegistry,
+        resource_partitioner: ResourcePartitioner,
     ) -> None:
         self._skip_initial_scan = skip_initial_scan
         self.loop = current_loop()
@@ -847,7 +852,10 @@ class AbstractAgent(
         self.local_instance_id = generate_local_instance_id(__file__)
         self.agent_public_key = agent_public_key
         self.kernel_registry = kernel_registry.agent_mapping(self.id)
+        self.resource_partitioner = resource_partitioner
         self.computers = {}
+        self.total_slots = {}
+        self.reserved_slots = {}
         self.images = {}
         self.restarting_kernels = {}
         self.stat_ctx = StatContext(
@@ -943,6 +951,12 @@ class AbstractAgent(
             self.computers[name] = ComputerContext(computer, devices, alloc_map)
             metadatas.append(computer.get_metadata())
 
+        self.total_slots = self.resource_partitioner.calculate_total_slots(
+            self.computers, self.local_config.resource_common
+        )
+        self.reserved_slots = self.resource_partitioner.restrict_computer_resources(
+            self.computers, self.total_slots
+        )
         self.slots = await self.update_slots()
         log.info("Resource slots: {!r}", self.slots)
         log.info("Slot types: {!r}", known_slot_types)
@@ -1965,14 +1979,9 @@ class AbstractAgent(
         """
         scanned_slots = await self.scan_available_resources()
         usable_slots: dict[SlotName, Decimal] = {}
-        reserved_slots = {
-            SlotName("cpu"): Decimal(self.local_config.resource.reserved_cpu),
-            SlotName("mem"): Decimal(self.local_config.resource.reserved_mem),
-            SlotName("disk"): Decimal(self.local_config.resource.reserved_disk),
-        }
         for slot_name, slot_capacity in scanned_slots.items():
             if slot_name == SlotName("mem"):
-                mem_reserved = int(reserved_slots.get(slot_name, 0))
+                mem_reserved = int(self.reserved_slots.get(slot_name, 0))
                 mem_align = int(self.local_config.resource.memory_align_size)
                 mem_usable, mem_reserved = align_memory(
                     int(slot_capacity), mem_reserved, align=mem_align
@@ -1986,7 +1995,7 @@ class AbstractAgent(
                 )
             else:
                 usable_capacity = max(
-                    Decimal(0), slot_capacity - reserved_slots.get(slot_name, Decimal(0))
+                    Decimal(0), slot_capacity - self.reserved_slots.get(slot_name, Decimal(0))
                 )
             usable_slots[slot_name] = usable_capacity
         return usable_slots
