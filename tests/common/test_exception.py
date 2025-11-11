@@ -1,5 +1,3 @@
-"""Tests for BackendAIError and error_code() instance method."""
-
 import pytest
 from aiohttp import web
 
