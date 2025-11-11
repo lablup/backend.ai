@@ -1276,8 +1276,8 @@ class PackageContext(Context):
                         tg.create_task(self._fetch_package("agent", vpane))
                         tg.create_task(self._fetch_package("agent-watcher", vpane))
                         tg.create_task(self._fetch_package("webserver", vpane))
-                        tg.create_task(self._fetch_package("app-proxy-coordinator", vpane))
-                        tg.create_task(self._fetch_package("app-proxy-worker", vpane))
+                        tg.create_task(self._fetch_package("appproxy-coordinator", vpane))
+                        tg.create_task(self._fetch_package("appproxy-worker", vpane))
                         tg.create_task(self._fetch_package("storage-proxy", vpane))
                         tg.create_task(self._fetch_package("client", vpane))
                         tg.create_task(self._fetch_checksums(vpane))
@@ -1286,8 +1286,8 @@ class PackageContext(Context):
                     await self._verify_package("agent", fat=False)
                     await self._verify_package("agent-watcher", fat=False)
                     await self._verify_package("webserver", fat=False)
-                    await self._verify_package("app-proxy-coordinator", fat=False)
-                    await self._verify_package("app-proxy-worker", fat=False)
+                    await self._verify_package("appproxy-coordinator", fat=False)
+                    await self._verify_package("appproxy-worker", fat=False)
                     await self._verify_package("storage-proxy", fat=False)
                     await self._verify_package("client", fat=False)
                 case PackageSource.LOCAL_DIR:
@@ -1303,10 +1303,10 @@ class PackageContext(Context):
                         "webserver", vpane, fat=self.dist_info.use_fat_binary
                     )
                     await self._install_package(
-                        "app-proxy-coordinator", vpane, fat=self.dist_info.use_fat_binary
+                        "appproxy-coordinator", vpane, fat=self.dist_info.use_fat_binary
                     )
                     await self._install_package(
-                        "app-proxy-worker", vpane, fat=self.dist_info.use_fat_binary
+                        "appproxy-worker", vpane, fat=self.dist_info.use_fat_binary
                     )
                     await self._install_package(
                         "storage-proxy", vpane, fat=self.dist_info.use_fat_binary
@@ -1318,11 +1318,9 @@ class PackageContext(Context):
                     await self._verify_package("agent-watcher", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("webserver", fat=self.dist_info.use_fat_binary)
                     await self._verify_package(
-                        "app-proxy-coordinator", fat=self.dist_info.use_fat_binary
+                        "appproxy-coordinator", fat=self.dist_info.use_fat_binary
                     )
-                    await self._verify_package(
-                        "app-proxy-worker", fat=self.dist_info.use_fat_binary
-                    )
+                    await self._verify_package("appproxy-worker", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("storage-proxy", fat=self.dist_info.use_fat_binary)
                     await self._verify_package("client", fat=self.dist_info.use_fat_binary)
         finally:
