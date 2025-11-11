@@ -41,6 +41,12 @@ async def arpcs_no_ainit(test_id, redis_container):
     )
 
     ars = AgentRPCServer(etcd=etcd, local_config=config, skip_detect_manager=True)
+
+    # Mock the runtime object to return the etcd client
+    runtime = Dummy()
+    runtime.get_etcd = lambda: etcd
+    ars.runtime = runtime
+
     yield ars
 
 

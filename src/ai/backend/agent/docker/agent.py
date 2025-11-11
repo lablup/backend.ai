@@ -119,7 +119,6 @@ from ..resources import (
     known_slot_types,
 )
 from ..scratch import create_loop_filesystem, destroy_loop_filesystem
-from ..server import get_extra_volumes
 from ..types import (
     AgentEventData,
     Container,
@@ -127,6 +126,7 @@ from ..types import (
     LifecycleEvent,
     MountInfo,
     Port,
+    VolumeInfo,
 )
 from ..utils import (
     closing_async,
@@ -160,6 +160,49 @@ known_glibc_distros: Final[dict[float, str]] = {
     2.35: "ubuntu22.04",
     2.39: "ubuntu24.04",
 }
+
+deeplearning_image_keys = {
+    "tensorflow",
+    "caffe",
+    "keras",
+    "torch",
+    "mxnet",
+    "theano",
+}
+
+deeplearning_sample_volume = VolumeInfo(
+    "deeplearning-samples",
+    "/home/work/samples",
+    "ro",
+)
+
+
+async def get_extra_volumes(docker, lang):
+    avail_volumes = (await docker.volumes.list())["Volumes"]
+    if not avail_volumes:
+        return []
+    avail_volume_names = set(v["Name"] for v in avail_volumes)
+
+    # deeplearning specialization
+    # TODO: extract as config
+    volume_list = []
+    for k in deeplearning_image_keys:
+        if k in lang:
+            volume_list.append(deeplearning_sample_volume)
+            break
+
+    # Mount only actually existing volumes
+    mount_list = []
+    for vol in volume_list:
+        if vol.name in avail_volume_names:
+            mount_list.append(vol)
+        else:
+            log.info(
+                "skipped attaching extra volume {0} to a kernel based on image {1}",
+                vol.name,
+                lang,
+            )
+    return mount_list
 
 
 def container_from_docker_container(src: DockerContainer) -> Container:
