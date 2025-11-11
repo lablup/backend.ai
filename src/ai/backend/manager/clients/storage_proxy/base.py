@@ -8,11 +8,17 @@ from typing import Any, AsyncIterator, Final, Optional
 import aiohttp
 import yarl
 
-from ai.backend.common.exception import ErrorCode, ErrorDomain, InvalidErrorCode
+from ai.backend.common.exception import (
+    ErrorCode,
+    ErrorDetail,
+    ErrorDomain,
+    ErrorOperation,
+    InvalidErrorCode,
+    PassthroughError,
+)
 from ai.backend.common.json import load_json
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.errors.storage import (
-    ProxyPassthroughError,
     QuotaScopeNotFoundError,
     StorageProxyConnectionError,
     UnexpectedStorageProxyResponseError,
@@ -93,8 +99,13 @@ class StorageProxyHTTPClient:
                 e,
                 resp_text if resp_text else "",
             )
-            raise ProxyPassthroughError(
+            raise PassthroughError(
                 status_code=resp.status,
+                error_code=ErrorCode(
+                    domain=ErrorDomain.STORAGE_PROXY,
+                    operation=ErrorOperation.REQUEST,
+                    error_detail=ErrorDetail.CONTENT_TYPE_MISMATCH,
+                ),
                 error_message=f"Failed to parse error response from storage proxy. Original response: {resp_text if resp_text else ''}",
             )
         try:
