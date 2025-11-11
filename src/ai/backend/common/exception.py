@@ -777,10 +777,10 @@ class PassthroughError(BackendAIError):
         error_code: ErrorCode,
         error_message: Optional[str] = None,
     ) -> None:
+        self.status_code = status_code
         self._error_code = error_code
         extra_msg = error_message or f"An error occurred with status code {status_code}"
         super().__init__(extra_msg=extra_msg)
-        self.status_code = status_code
 
     def error_code(self) -> ErrorCode:
         return self._error_code
