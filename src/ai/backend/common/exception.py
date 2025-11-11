@@ -171,6 +171,8 @@ class ErrorDomain(enum.StrEnum):
     MESSAGE_QUEUE = "message-queue"
     NOTIFICATION = "notification"
 
+    EXTERNAL_SYSTEM = "external-system"  # Errors from external systems
+
 
 class ErrorOperation(enum.StrEnum):
     """
@@ -758,4 +760,73 @@ class ModelRevisionNotFound(BackendAIError, web.HTTPNotFound):
             domain=ErrorDomain.MODEL_DEPLOYMENT,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class BaseNFSMountCheckFailed(BackendAIError):
+    pass
+
+
+class ShowmountFailed(BaseNFSMountCheckFailed, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/showmount-failed"
+    error_title = "showmount command failed"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
+class ShowmountNotFound(BaseNFSMountCheckFailed, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/showmount-not-found"
+    error_title = "showmount command not found"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ExportPathNotFound(BaseNFSMountCheckFailed, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/nfs-export-path-not-found"
+    error_title = "NFS export path not found on the server"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class NFSTimeoutError(BaseNFSMountCheckFailed, web.HTTPRequestTimeout):
+    error_type = "https://api.backend.ai/probs/nfs-timeout"
+    error_title = "NFS server is not reachable (timeout)"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.TIMEOUT,
+        )
+
+
+class NFSUnexpectedError(BaseNFSMountCheckFailed, web.HTTPInternalServerError):
+    error_type = "https://api.backend.ai/probs/nfs-unexpected-error"
+    error_title = "Unexpected NFS error"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.EXTERNAL_SYSTEM,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

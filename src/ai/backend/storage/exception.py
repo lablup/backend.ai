@@ -96,6 +96,19 @@ class QuotaScopeNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class QuotaScopeRequiredError(BackendAIError, web.HTTPPreconditionRequired):
+    error_type = "https://api.backend.ai/probs/storage/quota/scope/required"
+    error_title = "Quota Scope Required"
+
+    @classmethod
+    def error_code(cls) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.QUOTA_SCOPE,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.NOT_READY,
+        )
+
+
 class QuotaScopeAlreadyExists(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/storage/quota/scope/already-exists"
     error_title = "Quota Scope Already Exists"
