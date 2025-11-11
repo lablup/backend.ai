@@ -1241,7 +1241,7 @@ async def prepare_krunner_volumes(local_config: AgentUnifiedConfig) -> None:
     )
     krunner_volumes: Mapping[str, str] = await kernel_mod.prepare_krunner_env(
         local_config.model_dump(by_alias=True)
-    )  # type: ignore
+    )
     # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']
     log.info("Kernel runner environments: {}", [*krunner_volumes.keys()])
     local_config.update(container_update={"krunner_volumes": krunner_volumes})

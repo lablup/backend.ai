@@ -48,6 +48,7 @@ from aiomonitor.task import preserve_termination_log
 from aiotools import TaskGroup
 from async_timeout import timeout
 
+from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.docker import (
@@ -143,7 +144,6 @@ from .utils import PersistentServiceContainer
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
-    from ai.backend.common.etcd import AsyncEtcd
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 eof_sentinel = Sentinel.TOKEN
@@ -1350,7 +1350,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     def __init__(
         self,
-        etcd: AsyncEtcd,
+        etcd: AgentEtcdClientView,
         local_config: AgentUnifiedConfig,
         *,
         stats_monitor: StatsPluginContext,

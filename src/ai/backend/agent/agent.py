@@ -64,6 +64,7 @@ from tenacity import (
 )
 from trafaret import DataError
 
+from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.metrics.metric import (
     StatScope,
     StatTaskObserver,
@@ -256,7 +257,6 @@ from .utils import generate_local_instance_id, get_arch_name
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
-    from ai.backend.common.etcd import AsyncEtcd
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -762,7 +762,7 @@ class AbstractAgent(
     id: AgentId
     loop: asyncio.AbstractEventLoop
     local_config: AgentUnifiedConfig
-    etcd: AsyncEtcd
+    etcd: AgentEtcdClientView
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
     computers: MutableMapping[DeviceName, ComputerContext]
@@ -829,7 +829,7 @@ class AbstractAgent(
 
     def __init__(
         self,
-        etcd: AsyncEtcd,
+        etcd: AgentEtcdClientView,
         local_config: AgentUnifiedConfig,
         *,
         stats_monitor: StatsPluginContext,

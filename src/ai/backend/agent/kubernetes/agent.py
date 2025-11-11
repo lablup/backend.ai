@@ -32,11 +32,11 @@ from kubernetes.client.models import V1Service, V1ServicePort
 from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
 
+from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
@@ -822,7 +822,7 @@ class KubernetesAgent(
 
     def __init__(
         self,
-        etcd: AsyncEtcd,
+        etcd: AgentEtcdClientView,
         local_config: AgentUnifiedConfig,
         *,
         stats_monitor: StatsPluginContext,

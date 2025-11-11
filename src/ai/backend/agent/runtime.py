@@ -4,6 +4,7 @@ from typing import Optional, Type
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -14,6 +15,7 @@ class AgentRuntime(aobject):
     local_config: AgentUnifiedConfig
     agent: AbstractAgent
     etcd: AsyncEtcd
+    etcd_view: AgentEtcdClientView
 
     _stop_signal: signal.Signals
 
@@ -27,6 +29,7 @@ class AgentRuntime(aobject):
     ) -> None:
         self.local_config = local_config
         self.etcd = etcd
+        self.etcd_view = AgentEtcdClientView(etcd, self.local_config)
 
         self._stop_signal = signal.SIGTERM
 
@@ -35,7 +38,7 @@ class AgentRuntime(aobject):
         self.agent_public_key = agent_public_key
 
     async def __ainit__(self) -> None:
-        self.agent = await self._create_agent(self.etcd, self.local_config)
+        self.agent = await self._create_agent(self.etcd_view, self.local_config)
 
     async def __aexit__(self, *exc_info) -> None:
         await self.agent.shutdown(self._stop_signal)
@@ -43,8 +46,8 @@ class AgentRuntime(aobject):
     def get_agent(self) -> AbstractAgent:
         return self.agent
 
-    def get_etcd(self) -> AsyncEtcd:
-        return self.etcd
+    def get_etcd(self) -> AgentEtcdClientView:
+        return self.etcd_view
 
     def mark_stop_signal(self, stop_signal: signal.Signals) -> None:
         self._stop_signal = stop_signal
@@ -55,7 +58,7 @@ class AgentRuntime(aobject):
 
     async def _create_agent(
         self,
-        etcd: AsyncEtcd,
+        etcd_view: AgentEtcdClientView,
         agent_config: AgentUnifiedConfig,
     ) -> AbstractAgent:
         agent_kwargs = {
@@ -68,4 +71,4 @@ class AgentRuntime(aobject):
         agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
         agent_cls: Type[AbstractAgent] = agent_mod.get_agent_cls()
 
-        return await agent_cls.new(etcd, agent_config, **agent_kwargs)
+        return await agent_cls.new(etcd_view, agent_config, **agent_kwargs)
