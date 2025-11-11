@@ -22,8 +22,7 @@ from .common import ObjectNotFound
 class DomainNotFound(ObjectNotFound):
     object_name = "domain"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.READ,
@@ -34,8 +33,7 @@ class DomainNotFound(ObjectNotFound):
 class GroupNotFound(ObjectNotFound):
     object_name = "user group (or project)"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.READ,
@@ -47,8 +45,7 @@ class GroupHasActiveKernelsError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/group-has-active-kernels"
     error_title = "Group has active kernels."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.HARD_DELETE,
@@ -60,8 +57,7 @@ class GroupHasVFoldersMountedError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/group-has-vfolders-mounted"
     error_title = "Group has vfolders mounted to active kernels."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.HARD_DELETE,
@@ -73,8 +69,7 @@ class GroupHasActiveEndpointsError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/group-has-active-endpoints"
     error_title = "Group has active endpoints."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.HARD_DELETE,
@@ -85,8 +80,7 @@ class GroupHasActiveEndpointsError(BackendAIError, web.HTTPConflict):
 class ScalingGroupNotFound(ObjectNotFound):
     object_name = "scaling group"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SCALING_GROUP,
             operation=ErrorOperation.READ,
@@ -98,8 +92,7 @@ class ScalingGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/scaling-group-deletion-failure"
     error_title = "Failed to delete scaling group."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SCALING_GROUP,
             operation=ErrorOperation.HARD_DELETE,
@@ -110,8 +103,7 @@ class ScalingGroupDeletionFailure(BackendAIError, web.HTTPInternalServerError):
 class InstanceNotFound(ObjectNotFound):
     object_name = "agent instance"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.INSTANCE,
             operation=ErrorOperation.READ,
@@ -123,8 +115,7 @@ class InstanceNotAvailable(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/instance-not-available"
     error_title = "There is no available instance."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.INSTANCE,
             operation=ErrorOperation.ACCESS,
@@ -139,8 +130,7 @@ class ProjectNotFound(BackendAIError, web.HTTPNotFound):
     def __init__(self, project_id: Optional[Union[str, Any]] = None) -> None:
         super().__init__(f"Project not found: {project_id}")
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.READ,
@@ -151,8 +141,7 @@ class ProjectNotFound(BackendAIError, web.HTTPNotFound):
 class TaskTemplateNotFound(ObjectNotFound):
     object_name = "task template"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.TEMPLATE,
             operation=ErrorOperation.READ,
@@ -163,8 +152,7 @@ class TaskTemplateNotFound(ObjectNotFound):
 class AppNotFound(ObjectNotFound):
     object_name = "app service"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.READ,
@@ -181,8 +169,7 @@ class DomainDataProcessingError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/domain-data-processing-error"
     error_title = "Failed to process domain data."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.GENERIC,
@@ -193,8 +180,7 @@ class DomainDataProcessingError(BackendAIError, web.HTTPInternalServerError):
 class ScalingGroupProxyTargetNotFound(ObjectNotFound):
     object_name = "scaling group proxy target"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SCALING_GROUP,
             operation=ErrorOperation.READ,
@@ -205,8 +191,7 @@ class ScalingGroupProxyTargetNotFound(ObjectNotFound):
 class ResourcePresetNotFound(ObjectNotFound):
     object_name = "resource preset"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.RESOURCE_PRESET,
             operation=ErrorOperation.READ,
@@ -217,8 +202,7 @@ class ResourcePresetNotFound(ObjectNotFound):
 class AgentNotFound(ObjectNotFound):
     object_name = "agent"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.READ,
@@ -230,8 +214,7 @@ class DomainCreationFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/domain-creation-failed"
     error_title = "Failed to create domain."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.CREATE,
@@ -243,8 +226,7 @@ class DomainNodeCreationFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/domain-node-creation-failed"
     error_title = "Failed to create domain node."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.CREATE,
@@ -256,8 +238,7 @@ class DomainHasActiveKernels(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/domain-has-active-kernels"
     error_title = "Domain has active kernels."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.HARD_DELETE,
@@ -269,8 +250,7 @@ class DomainHasUsers(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/domain-has-users"
     error_title = "Domain has associated users."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.HARD_DELETE,
@@ -282,8 +262,7 @@ class DomainHasGroups(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/domain-has-groups"
     error_title = "Domain has associated groups."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.HARD_DELETE,
@@ -295,8 +274,7 @@ class DomainDeletionFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/domain-deletion-failed"
     error_title = "Failed to delete domain."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.HARD_DELETE,
@@ -308,8 +286,7 @@ class DomainUpdateNotAllowed(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/domain-update-not-allowed"
     error_title = "Domain update not allowed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.UPDATE,
@@ -321,8 +298,7 @@ class InvalidDomainConfiguration(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-domain-configuration"
     error_title = "Invalid domain configuration."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.UPDATE,
@@ -334,8 +310,7 @@ class AllocationFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/allocation-failed"
     error_title = "Failed to allocate resources."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.CREATE,
@@ -347,8 +322,7 @@ class InvalidUserUpdateMode(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-user-update-mode"
     error_title = "Invalid user update mode."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.UPDATE,
@@ -360,8 +334,7 @@ class InvalidPresetQuery(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-preset-query"
     error_title = "Invalid resource preset query parameters."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.RESOURCE_PRESET,
             operation=ErrorOperation.READ,
@@ -373,8 +346,7 @@ class NoAvailableScalingGroup(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/no-available-scaling-group"
     error_title = "No scaling groups available for this session."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SCALING_GROUP,
             operation=ErrorOperation.ACCESS,

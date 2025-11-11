@@ -29,8 +29,7 @@ class ResilienceTimeoutError(BackendAIError):
     error_type = "https://api.backend.ai/probs/resilience-timeout"
     error_title = "Resilience timeout exceeded."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,

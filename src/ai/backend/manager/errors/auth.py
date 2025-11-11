@@ -21,8 +21,7 @@ class InvalidCredentials(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-credentials"
     error_title = "Invalid credentials for authentication."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.AUTH,
@@ -34,8 +33,7 @@ class InsufficientPrivilege(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/insufficient-privilege"
     error_title = "Insufficient privilege."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.AUTH,
@@ -47,8 +45,7 @@ class InvalidAuthParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-auth-params"
     error_title = "Missing or invalid authorization parameters."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.AUTH,
@@ -60,8 +57,7 @@ class AuthorizationFailed(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/auth-failed"
     error_title = "Credential/signature mismatch."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.AUTH,
@@ -73,8 +69,7 @@ class PasswordExpired(BackendAIError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/password-expired"
     error_title = "Password has expired."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.AUTH,
@@ -86,8 +81,7 @@ class EmailAlreadyExistsError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/email-already-exists"
     error_title = "Email already exists."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.CREATE,
@@ -99,8 +93,7 @@ class UserCreationError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/user-creation-failed"
     error_title = "Failed to create user account."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.CREATE,
@@ -111,8 +104,7 @@ class UserCreationError(BackendAIError, web.HTTPInternalServerError):
 class UserNotFound(ObjectNotFound):
     object_name = "user"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.READ,
@@ -124,8 +116,7 @@ class GroupMembershipNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/group-membership-not-found"
     error_title = "User is not a member of the specified group."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.READ,

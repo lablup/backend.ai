@@ -10,8 +10,7 @@ from ai.backend.common.exception import (
 
 
 class InvalidContainerRegistryProject(BackendAIError, web.HTTPBadRequest):
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.CONTAINER_REGISTRY,
             operation=ErrorOperation.CREATE,
@@ -20,8 +19,7 @@ class InvalidContainerRegistryProject(BackendAIError, web.HTTPBadRequest):
 
 
 class InvalidContainerRegistryURL(BackendAIError, web.HTTPBadRequest):
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.CONTAINER_REGISTRY,
             operation=ErrorOperation.CREATE,
