@@ -252,6 +252,7 @@ class ErrorDetail(enum.StrEnum):
     MISMATCH = "mismatch"
     # TIMEOUT
     TIMEOUT = "timeout"
+    CONTENT_TYPE_MISMATCH = "content-type-mismatch"
 
 
 @dataclass
@@ -759,3 +760,27 @@ class ModelRevisionNotFound(BackendAIError, web.HTTPNotFound):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class PassthroughError(BackendAIError):
+    """
+    Wraps and forwards errors from requests with original status code and message.
+    This allows transparent error propagation from requests to API clients.
+    """
+
+    error_type = "https://api.backend.ai/probs/forwarded-error"
+    error_title = "Forwarded Error from Downstream Service"
+
+    def __init__(
+        self,
+        status_code: int,
+        error_code: ErrorCode,
+        error_message: Optional[str] = None,
+    ) -> None:
+        self.status_code = status_code
+        self._error_code = error_code
+        extra_msg = error_message or f"An error occurred with status code {status_code}"
+        super().__init__(extra_msg=extra_msg)
+
+    def error_code(self) -> ErrorCode:
+        return self._error_code

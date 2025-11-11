@@ -94,10 +94,26 @@ async def token_auth_middleware(
     if not skip_token_auth:
         token = request.headers.get("X-BackendAI-Storage-Auth-Token", None)
         if not token:
-            raise web.HTTPForbidden()
+            raise web.HTTPForbidden(
+                text=dump_json_str(
+                    {
+                        "type": "https://api.backend.ai/probs/storage/forbidden",
+                        "title": "Forbidden (missing auth token)",
+                    },
+                ),
+                content_type="application/problem+json",
+            )
         ctx: RootContext = request.app["ctx"]
         if token != ctx.local_config.api.manager.secret:
-            raise web.HTTPForbidden()
+            raise web.HTTPForbidden(
+                text=dump_json_str(
+                    {
+                        "type": "https://api.backend.ai/probs/storage/forbidden",
+                        "title": "Forbidden (invalid auth token)",
+                    },
+                ),
+                content_type="application/problem+json",
+            )
     return await handler(request)
 
 
