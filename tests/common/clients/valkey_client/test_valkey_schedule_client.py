@@ -61,36 +61,36 @@ class TestValkeyScheduleClient:
         )
 
     @pytest.mark.asyncio
-    async def test_is_health_status_valid_with_valid_timestamp(
+    async def test_validate_health_status_with_valid_timestamp(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
         """Test validation with healthy status and fresh timestamp"""
         fresh_timestamp = str(int(time()))
-        assert valkey_schedule_client._is_health_status_valid("1", fresh_timestamp) is True
+        assert await valkey_schedule_client._validate_health_status("1", fresh_timestamp) is True
 
     @pytest.mark.asyncio
-    async def test_is_health_status_valid_with_stale_timestamp(
+    async def test_validate_health_status_with_stale_timestamp(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
         """Test validation with healthy status but stale timestamp"""
         stale_timestamp = str(int(time()) - MAX_HEALTH_STALENESS_SEC - 10)
-        assert valkey_schedule_client._is_health_status_valid("1", stale_timestamp) is False
+        assert await valkey_schedule_client._validate_health_status("1", stale_timestamp) is False
 
     @pytest.mark.asyncio
-    async def test_is_health_status_valid_with_unhealthy_status(
+    async def test_validate_health_status_with_unhealthy_status(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
         """Test validation with unhealthy status regardless of timestamp"""
         fresh_timestamp = str(int(time()))
-        assert valkey_schedule_client._is_health_status_valid("0", fresh_timestamp) is False
+        assert await valkey_schedule_client._validate_health_status("0", fresh_timestamp) is False
 
     @pytest.mark.asyncio
-    async def test_is_health_status_valid_with_invalid_timestamp(
+    async def test_validate_health_status_with_invalid_timestamp(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
         """Test validation with invalid timestamp formats"""
-        assert valkey_schedule_client._is_health_status_valid("1", "invalid") is False
-        assert valkey_schedule_client._is_health_status_valid("1", "") is False
+        assert await valkey_schedule_client._validate_health_status("1", "invalid") is False
+        assert await valkey_schedule_client._validate_health_status("1", "") is False
 
     @pytest.mark.asyncio
     async def test_initialize_routes_health_status_batch(

@@ -711,7 +711,6 @@ async def get_allowed_vfolder_hosts_by_group(
     resource_policy,
     domain_name: str,
     group_id: Optional[uuid.UUID] = None,
-    domain_admin: bool = False,
 ) -> VFolderHostPermissionMap:
     """
     Union `allowed_vfolder_hosts` from domain, group, and keypair_resource_policy.
@@ -737,13 +736,6 @@ async def get_allowed_vfolder_hosts_by_group(
         )
         if values := await conn.scalar(query):
             allowed_hosts = allowed_hosts | values
-    elif domain_admin:
-        query = sa.select([groups.c.allowed_vfolder_hosts]).where(
-            (groups.c.domain_name == domain_name) & (groups.c.is_active),
-        )
-        if rows := (await conn.execute(query)).fetchall():
-            for row in rows:
-                allowed_hosts = allowed_hosts | row.allowed_vfolder_hosts
     # Keypair Resource Policy's allowed_vfolder_hosts
     allowed_hosts = allowed_hosts | resource_policy["allowed_vfolder_hosts"]
     return allowed_hosts
