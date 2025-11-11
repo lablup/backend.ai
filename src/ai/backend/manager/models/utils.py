@@ -228,7 +228,7 @@ class ExtendedAsyncSAEngine(SAEngine):
             conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
             async with conn_with_isolation.begin():
                 # Configure session factory with the connection
-                self._sess_factory.configure(bind=conn_with_isolation)
+                self._sess_factory.configure(bind=conn_with_isolation, expire_on_commit=False)
                 session = self._sess_factory()
                 session = cast(SASession, session)
                 yield session
