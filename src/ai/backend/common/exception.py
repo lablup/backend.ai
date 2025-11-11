@@ -374,9 +374,8 @@ class BackendAIError(web.HTTPError, ABC):
             self.__dict__,
         )
 
-    @classmethod
     @abstractmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         """
         Returns the error code for this error.
         This is used in the API response to indicate the type of error.
@@ -391,8 +390,7 @@ class InvalidErrorCode(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/invalid-error-code"
     error_title = "Invalid error code in the raised exception."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
@@ -404,8 +402,7 @@ class MalformedRequestBody(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Malformed request body."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
@@ -417,8 +414,7 @@ class InvalidAPIParameters(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/generic-bad-request"
     error_title = "Invalid or Missing API Parameters."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
@@ -430,8 +426,7 @@ class ResourcePresetConflict(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/duplicate-resource"
     error_title = "Duplicate Resource Preset"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.RESOURCE_PRESET,
             operation=ErrorOperation.GENERIC,
@@ -443,8 +438,7 @@ class MiddlewareParamParsingFailed(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Middleware parameter parsing failed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
@@ -456,8 +450,7 @@ class ParameterNotParsedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/internal-server-error"
     error_title = "Parameter Not Parsed Error"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.PARSING,
@@ -469,8 +462,7 @@ class BgtaskNotRegisteredError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/bgtask-not-registered"
     error_title = "Background Task Not Registered"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BGTASK,
             operation=ErrorOperation.EXECUTE,
@@ -482,8 +474,7 @@ class BgtaskNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/bgtask-not-found"
     error_title = "Background Task Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BGTASK,
             operation=ErrorOperation.READ,
@@ -495,8 +486,7 @@ class BgtaskFailedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/bgtask-failed"
     error_title = "Background Task Failed"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BGTASK,
             operation=ErrorOperation.EXECUTE,
@@ -508,8 +498,7 @@ class BgtaskCancelledError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/bgtask-cancelled"
     error_title = "Background Task Cancelled"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BGTASK,
             operation=ErrorOperation.EXECUTE,
@@ -521,8 +510,7 @@ class UnreachableError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/unreachable"
     error_title = "Unreachable"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
@@ -534,8 +522,7 @@ class PermissionDeniedError(BackendAIError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/permission-denied"
     error_title = "Permission Denied."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.API,
             operation=ErrorOperation.AUTH,
@@ -547,8 +534,7 @@ class SessionWithInvalidStateError(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/session-invalid-state"
     error_title = "Session with Invalid State"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.GENERIC,
@@ -560,8 +546,7 @@ class StorageNamespaceNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/storage-namespace-not-found"
     error_title = "Storage Namespace Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE_NAMESPACE,
             operation=ErrorOperation.READ,
@@ -573,8 +558,7 @@ class InvalidCursorTypeError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-cursor-type"
     error_title = "Invalid Cursor Type"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.REQUEST,
@@ -586,8 +570,7 @@ class RelationNotLoadedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/relation-not-loaded"
     error_title = "Relation Not Loaded"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
@@ -599,8 +582,7 @@ class ArtifactDefaultRevisionResolveError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/artifact-revision-resolve-failed"
     error_title = "Cannot Resolve Artifact Default Revision"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT,
             operation=ErrorOperation.REQUEST,
@@ -615,8 +597,7 @@ class RuntimeVariantNotSupportedError(BackendAIError, web.HTTPBadRequest):
     def __init__(self, runtime_variant: str) -> None:
         super().__init__(extra_msg=f"Runtime variant '{runtime_variant}' is not supported.")
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_DEPLOYMENT,
             operation=ErrorOperation.REQUEST,
@@ -628,8 +609,7 @@ class GenericNotImplementedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/not-implemented"
     error_title = "Not Implemented"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
@@ -641,8 +621,7 @@ class ObjectStorageBucketNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/object-storage-bucket-not-found"
     error_title = "Object Storage Bucket Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.OBJECT_STORAGE,
             operation=ErrorOperation.READ,
@@ -654,8 +633,7 @@ class InvalidConfigError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/invalid-configuration"
     error_title = "Invalid Configuration"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
@@ -667,8 +645,7 @@ class ProcessorNotReadyError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/processor-not-ready"
     error_title = "Processor Not Ready"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.GENERIC,
@@ -680,8 +657,7 @@ class AgentNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/agent-not-found"
     error_title = "Agent Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.READ,
@@ -693,8 +669,7 @@ class ScalingGroupNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/scaling-group-not-found"
     error_title = "Scaling Group Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SCALING_GROUP,
             operation=ErrorOperation.READ,
@@ -706,8 +681,7 @@ class VFolderNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/vfolder-not-found"
     error_title = "Virtual Folder Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.VFOLDER,
             operation=ErrorOperation.READ,
@@ -719,8 +693,7 @@ class UserNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/user-not-found"
     error_title = "User Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.READ,
@@ -732,8 +705,7 @@ class GroupNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/group-not-found"
     error_title = "Project Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.READ,
@@ -745,8 +717,7 @@ class DomainNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/domain-not-found"
     error_title = "Domain Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.DOMAIN,
             operation=ErrorOperation.READ,
@@ -758,8 +729,7 @@ class ModelDeploymentNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/model-deployment-not-found"
     error_title = "Model Deployment Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_DEPLOYMENT,
             operation=ErrorOperation.READ,
@@ -771,8 +741,7 @@ class ModelDeploymentUnavailable(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/model-deployment-unavailable"
     error_title = "Model Deployment Unavailable"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_DEPLOYMENT,
             operation=ErrorOperation.EXECUTE,
@@ -784,8 +753,7 @@ class ModelRevisionNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/model-revision-not-found"
     error_title = "Model Revision Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_DEPLOYMENT,
             operation=ErrorOperation.READ,

@@ -42,8 +42,7 @@ class PurgeGroupActionActiveKernelsError(BackendAIError):
     error_type = "https://api.backend.ai/probs/group-active-kernels"
     error_title = "Group has active kernels."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.HARD_DELETE,
@@ -55,8 +54,7 @@ class PurgeGroupActionVFoldersMountedToActiveKernelsError(BackendAIError):
     error_type = "https://api.backend.ai/probs/group-vfolders-mounted-to-active-kernels"
     error_title = "Group has vfolders mounted to active kernels."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.HARD_DELETE,
@@ -68,8 +66,7 @@ class PurgeGroupActionActiveEndpointsError(BackendAIError):
     error_type = "https://api.backend.ai/probs/group-active-endpoints"
     error_title = "Group has active endpoints."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.GROUP,
             operation=ErrorOperation.HARD_DELETE,

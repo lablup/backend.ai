@@ -17,8 +17,7 @@ class DeploymentError(BackendAIError):
     error_type = "https://api.backend.ai/probs/deployment-failed"
     error_title = "Deployment operation failed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.SCHEDULE,
@@ -32,8 +31,7 @@ class InvalidEndpointState(DeploymentError):
     error_type = "https://api.backend.ai/probs/invalid-endpoint-state"
     error_title = "Invalid endpoint state."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.UPDATE,
@@ -47,8 +45,7 @@ class RouteCreationFailed(DeploymentError):
     error_type = "https://api.backend.ai/probs/route-creation-failed"
     error_title = "Failed to create route."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.CREATE,
@@ -62,8 +59,7 @@ class ScalingOperationFailed(DeploymentError):
     error_type = "https://api.backend.ai/probs/scaling-failed"
     error_title = "Scaling operation failed."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.UPDATE,
@@ -77,8 +73,7 @@ class ServiceInfoRetrievalFailed(DeploymentError):
     error_type = "https://api.backend.ai/probs/service-info-retrieval-failed"
     error_title = "Failed to retrieve service information."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.SESSION,
             operation=ErrorOperation.READ,
