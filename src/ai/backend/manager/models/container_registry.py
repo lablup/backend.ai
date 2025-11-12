@@ -21,6 +21,7 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryCreator,
     ContainerRegistryData,
+    ContainerRegistryModifier,
 )
 from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryProject,
@@ -268,6 +269,24 @@ class ContainerRegistryRow(Base):
         )
         instance.id = data.id
         return instance
+
+    def apply_modifier(self, modifier: ContainerRegistryModifier) -> None:
+        if modifier.url.optional_value is not None:
+            self.url = modifier.url.value()
+        if modifier.type.optional_value is not None:
+            self.type = modifier.type.value()
+        if modifier.project.optional_value is not None:
+            self.project = modifier.project.value()
+        if modifier.username.optional_value is not None:
+            self.username = modifier.username.value()
+        if modifier.password.optional_value is not None:
+            self.password = modifier.password.value()
+        if modifier.ssl_verify.optional_value is not None:
+            self.ssl_verify = modifier.ssl_verify.value()
+        if modifier.is_global.optional_value is not None:
+            self.is_global = modifier.is_global.value()
+        if modifier.extra.optional_value is not None:
+            self.extra = modifier.extra.value()
 
     def to_dataclass(self) -> ContainerRegistryData:
         return ContainerRegistryData(

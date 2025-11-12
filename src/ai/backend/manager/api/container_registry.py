@@ -26,7 +26,7 @@ from ai.backend.manager.errors.image import (
 from ai.backend.manager.models.container_registry import (
     ContainerRegistryRow,
 )
-from ai.backend.manager.models.gql_models.container_registry_v2 import handle_allowed_groups_update
+from ai.backend.manager.models.gql_models.container_registry import handle_allowed_groups_update
 
 from ..errors.common import (
     GenericBadRequest,
