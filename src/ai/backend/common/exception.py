@@ -170,6 +170,7 @@ class ErrorDomain(enum.StrEnum):
     STORAGE_PROXY = "storage-proxy"
     MESSAGE_QUEUE = "message-queue"
     NOTIFICATION = "notification"
+    HEALTH_CHECK = "health-check"
 
 
 class ErrorOperation(enum.StrEnum):
