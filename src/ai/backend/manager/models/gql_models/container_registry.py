@@ -341,7 +341,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
             ContainerRegistryValidatorArgs(
                 url=url,
                 type=type,
-                project=cast(Optional[str], project if project is not Undefined else None),
+                project=project,
             )
         )
 
