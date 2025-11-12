@@ -31,6 +31,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.manager.data.user.types import UserRole
 
 from ...errors.storage import (
     ModelCardParseError,
@@ -564,16 +565,30 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    async def from_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self:
+    async def from_row(
+        cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow
+    ) -> Optional[Self]:
         try:
             return await cls.parse_row(graph_ctx, vfolder_row)
-        except Exception as e:
+        except ModelCardParseError as e:
             log.exception(
                 "Failed to parse model card from vfolder (id: {}, error: {})",
                 vfolder_row.id,
                 repr(e),
             )
-            raise ModelCardParseError from e
+            if (
+                graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
+                or vfolder_row.creator == graph_ctx.user["email"]
+            ):
+                return cls(
+                    id=vfolder_row.id,
+                    row_id=vfolder_row.id,
+                    name=vfolder_row.name,
+                    author=vfolder_row.creator or "",
+                    error_msg=e.extra_msg,
+                )
+            else:
+                return None
 
     @classmethod
     async def parse_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self:
