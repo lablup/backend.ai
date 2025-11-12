@@ -513,6 +513,34 @@ class CommonAgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("metadata-server-port", "metadata_server_port"),
         serialization_alias="metadata-server-port",
     )
+    allow_compute_plugins: Optional[set[str]] = Field(
+        default=None,
+        description="Allowed compute plugins",
+        examples=[{"ai.backend.activator.agent", "ai.backend.accelerator.cuda_open"}],
+        validation_alias=AliasChoices("allow-compute-plugins", "allow_compute_plugins"),
+        serialization_alias="allow-compute-plugins",
+    )
+    block_compute_plugins: Optional[set[str]] = Field(
+        default=None,
+        description="Blocked compute plugins",
+        examples=[{"ai.backend.accelerator.mock"}],
+        validation_alias=AliasChoices("block-compute-plugins", "block_compute_plugins"),
+        serialization_alias="block-compute-plugins",
+    )
+    allow_network_plugins: Optional[set[str]] = Field(
+        default=None,
+        description="Allowed network plugins",
+        examples=[{"ai.backend.manager.network.overlay"}],
+        validation_alias=AliasChoices("allow-network-plugins", "allow_network_plugins"),
+        serialization_alias="allow-network-plugins",
+    )
+    block_network_plugins: Optional[set[str]] = Field(
+        default=None,
+        description="Blocked network plugins",
+        examples=[{"ai.backend.manager.network.overlay"}],
+        validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
+        serialization_alias="block-network-plugins",
+    )
     image_commit_path: AutoDirectoryPath = Field(
         default=AutoDirectoryPath("./tmp/backend.ai/commit"),
         description="Path for image commit",
@@ -604,34 +632,6 @@ class OverridableAgentConfig(BaseConfigSchema):
         examples=[item.value for item in ResourceGroupType],
         validation_alias=AliasChoices("scaling-group-type", "scaling_group_type"),
         serialization_alias="scaling-group-type",
-    )
-    allow_compute_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Allowed compute plugins",
-        examples=[{"ai.backend.activator.agent", "ai.backend.accelerator.cuda_open"}],
-        validation_alias=AliasChoices("allow-compute-plugins", "allow_compute_plugins"),
-        serialization_alias="allow-compute-plugins",
-    )
-    block_compute_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Blocked compute plugins",
-        examples=[{"ai.backend.accelerator.mock"}],
-        validation_alias=AliasChoices("block-compute-plugins", "block_compute_plugins"),
-        serialization_alias="block-compute-plugins",
-    )
-    allow_network_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Allowed network plugins",
-        examples=[{"ai.backend.manager.network.overlay"}],
-        validation_alias=AliasChoices("allow-network-plugins", "allow_network_plugins"),
-        serialization_alias="allow-network-plugins",
-    )
-    block_network_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Blocked network plugins",
-        examples=[{"ai.backend.manager.network.overlay"}],
-        validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
-        serialization_alias="block-network-plugins",
     )
     force_terminate_abusing_containers: bool = Field(
         default=False,

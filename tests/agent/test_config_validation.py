@@ -811,33 +811,6 @@ class TestMultipleAgentsConfigValidation:
         assert agent_configs[0].agent.kernel_creation_concurrency == 8
         assert agent_configs[0].agent.allow_compute_plugins == {"plugin1", "plugin2"}
 
-    def test_agent_with_different_plugins(
-        self,
-        default_raw_config: RawConfigT,
-    ) -> None:
-        raw_config = {
-            **default_raw_config,
-            "agents": [
-                {
-                    "agent": {
-                        "id": "agent-1",
-                        "allow-compute-plugins": {"plugin1"},
-                    }
-                },
-                {
-                    "agent": {
-                        "id": "agent-2",
-                        "allow-compute-plugins": {"plugin2"},
-                    }
-                },
-            ],
-        }
-        config = AgentUnifiedConfig.model_validate(raw_config)
-
-        agent_configs = config.get_agent_configs()
-        assert agent_configs[0].agent.allow_compute_plugins == {"plugin1"}
-        assert agent_configs[1].agent.allow_compute_plugins == {"plugin2"}
-
     def test_multiple_agents_validate_backend_specific_config(
         self,
         default_raw_config: RawConfigT,
@@ -1021,7 +994,7 @@ class TestMultipleAgentsConfigValidation:
                 {
                     "agent": {
                         "id": "agent-2",
-                        "allow-compute-plugins": {"plugin1"},
+                        "force-terminate-abusing-containers": True,
                     },
                 },
             ],
@@ -1032,10 +1005,8 @@ class TestMultipleAgentsConfigValidation:
         assert agent_configs[0].agent.agent_sock_port == 6007
         assert agent_configs[0].agent.force_terminate_abusing_containers is False
         assert agent_configs[0].agent.use_experimental_redis_event_dispatcher is False
-        assert agent_configs[0].agent.allow_compute_plugins is None
-        assert agent_configs[0].agent.block_compute_plugins is None
 
-        assert agent_configs[1].agent.allow_compute_plugins == {"plugin1"}
+        assert agent_configs[1].agent.force_terminate_abusing_containers is True
         assert agent_configs[1].agent.agent_sock_port == 6007
 
     def test_overridable_container_config_defaults_when_not_in_global(
