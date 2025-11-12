@@ -2276,7 +2276,7 @@ class AbstractAgent(
         """
         ipc_base_path = self.local_config.agent.ipc_base_path
         var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.local_instance_id}.dat"
+        last_registry_file = f"last_registry.{self.id}.dat"
         if os.path.isfile(ipc_base_path / last_registry_file):
             shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
         try:
@@ -3745,7 +3745,7 @@ class AbstractAgent(
         if (not force) and (now <= self.last_registry_written_time + 60):
             return  # don't save too frequently
         var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.local_instance_id}.dat"
+        last_registry_file = f"last_registry.{self.id}.dat"
         try:
             with open(var_base_path / last_registry_file, "wb") as f:
                 pickle.dump(self.kernel_registry, f)

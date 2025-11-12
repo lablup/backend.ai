@@ -5,7 +5,7 @@ import signal
 from http import HTTPStatus
 from pickle import PickleError
 from typing import Any, Mapping
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
 
 import pytest
 from aiodocker.exceptions import DockerError
@@ -37,6 +37,7 @@ async def agent(local_config, test_id, mocker, socket_relay_image):
         error_monitor=None,
         skip_initial_scan=True,
         agent_public_key=None,
+        metadata_server=Mock(),
         kernel_registry=kernel_registry,
     )  # for faster test iteration
     agent.local_instance_id = test_case_id  # use per-test private registry file

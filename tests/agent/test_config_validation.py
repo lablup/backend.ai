@@ -1009,3 +1009,65 @@ class TestMultipleAgentsConfigValidation:
 
         assert agent_configs[1].container.port_range == (32000, 33000)
         assert agent_configs[1].container.scratch_type == ScratchType.HOSTDIR
+
+    def test_agent_ids_must_be_unique(self, default_raw_config: RawConfigT) -> None:
+        raw_config = {
+            **default_raw_config,
+            "agents": [
+                {"agent": {"id": "agent-1"}},
+                {"agent": {"id": "agent-1"}},
+            ],
+        }
+
+        with pytest.raises(ValidationError) as exc_info:
+            AgentUnifiedConfig.model_validate(raw_config)
+
+        assert "duplicate" in str(exc_info.value).lower()
+
+    def test_different_scaling_groups_per_agent(self, default_raw_config: RawConfigT) -> None:
+        raw_config = {
+            **default_raw_config,
+            "agents": [
+                {
+                    "agent": {
+                        "id": "agent-1",
+                        "scaling-group": "default",
+                    }
+                },
+                {
+                    "agent": {
+                        "id": "agent-2",
+                        "scaling-group": "gpu",
+                    }
+                },
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        agent_configs = config.get_agent_configs()
+        assert agent_configs[0].agent.scaling_group == "default"
+        assert agent_configs[1].agent.scaling_group == "gpu"
+
+    def test_agent_specific_resource_limits(self, default_raw_config: RawConfigT) -> None:
+        raw_config = {
+            **default_raw_config,
+            "resource": {
+                "reserved-cpu": 1,
+                "reserved-mem": "1G",
+            },
+            "agents": [
+                {"agent": {"id": "agent-1"}},
+                {
+                    "agent": {"id": "agent-2"},
+                    "resource": {
+                        "reserved-cpu": 4,
+                        "reserved-mem": "8G",
+                    },
+                },
+            ],
+        }
+        config = AgentUnifiedConfig.model_validate(raw_config)
+
+        agent_configs = config.get_agent_configs()
+        assert agent_configs[0].resource.reserved_cpu == 1
+        assert agent_configs[1].resource.reserved_cpu == 4
