@@ -729,18 +729,6 @@ class DomainNotFound(BackendAIError, web.HTTPNotFound):
         )
 
 
-class ModelCardParseError(BackendAIError, web.HTTPBadRequest):
-    error_type = "https://api.backend.ai/probs/model-card-parse-error"
-    error_title = "Model Card Parse Error"
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.MODEL_CARD,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
-        )
-
-
 class ModelDeploymentNotFound(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/model-deployment-not-found"
     error_title = "Model Deployment Not Found"

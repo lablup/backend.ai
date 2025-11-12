@@ -71,6 +71,18 @@ class QuotaScopeNotFoundError(ObjectNotFound):
         )
 
 
+class ModelCardParseError(BackendAIError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/model-card-parse-error"
+    error_title = "Model Card Parse Error"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.MODEL_CARD,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
+        )
+
+
 class VFolderAlreadyExists(BackendAIError, web.HTTPConflict):
     error_type = "https://api.backend.ai/probs/vfolder-already-exists"
     error_title = "The virtual folder already exists with the same name."
