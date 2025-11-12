@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime
@@ -24,11 +25,12 @@ from ruamel.yaml.error import YAMLError
 from sqlalchemy.orm import joinedload
 
 from ai.backend.common.config import model_definition_iv
-from ai.backend.common.exception import VFolderNotFound
+from ai.backend.common.exception import ModelCardParseError, VFolderNotFound
 from ai.backend.common.types import (
     VFolderID,
     VFolderUsageMode,
 )
+from ai.backend.logging import BraceStyleAdapter
 
 from ...errors.storage import (
     VFolderOperationFailed,
@@ -50,7 +52,6 @@ from ..rbac import (
 )
 from ..rbac.context import ClientContext
 from ..rbac.permission_defs import VFolderPermission as VFolderRBACPermission
-from ..user import UserRole
 from ..vfolder import (
     DEAD_VFOLDER_STATUSES,
     VFolderOperationStatus,
@@ -64,6 +65,8 @@ from ..vfolder import (
 
 if TYPE_CHECKING:
     from ..gql import GraphQueryContext
+
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class VFolderPermissionValueField(graphene.Scalar):
@@ -566,30 +569,19 @@ class ModelCard(graphene.ObjectType):
         )
 
     @classmethod
-    async def from_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self | None:
+    async def from_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self:
         try:
             return await cls.parse_row(graph_ctx, vfolder_row)
         except Exception as e:
-            if isinstance(e, ModelCardProcessError):
-                error_msg = e.msg
-            else:
-                error_msg = repr(e)
-            if (
-                graph_ctx.user["role"] in (UserRole.SUPERADMIN, UserRole.ADMIN)
-                or vfolder_row.creator == graph_ctx.user["email"]
-            ):
-                return cls(
-                    id=vfolder_row.id,
-                    row_id=vfolder_row.id,
-                    name=vfolder_row.name,
-                    author=vfolder_row.creator or "",
-                    error_msg=error_msg,
-                )
-            else:
-                return None
+            log.exception(
+                "Failed to parse model card from vfolder (id: {}, error: {})",
+                vfolder_row.id,
+                repr(e),
+            )
+            raise ModelCardParseError from e
 
     @classmethod
-    async def parse_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self | None:
+    async def parse_row(cls, graph_ctx: GraphQueryContext, vfolder_row: VFolderRow) -> Self:
         vfolder_row_id = vfolder_row.id
         quota_scope_id = vfolder_row.quota_scope_id
         host = vfolder_row.host
