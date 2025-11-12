@@ -2,13 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from ai.backend.common.dto.internal.health import ComponentHealthStatus, HealthCheckResponse
+from ai.backend.common.dto.internal.health import (
+    ComponentConnectivityStatus,
+    HealthCheckResponse,
+)
 
 
 def test_component_health_status_creation() -> None:
-    """Test ComponentHealthStatus Pydantic model creation."""
+    """Test ComponentConnectivityStatus Pydantic model creation."""
     now = datetime.now(timezone.utc)
-    status = ComponentHealthStatus(
+    status = ComponentConnectivityStatus(
         service_group="manager",
         component_id="postgres",
         is_healthy=True,
@@ -24,11 +27,11 @@ def test_component_health_status_creation() -> None:
 
 
 def test_component_health_status_with_error() -> None:
-    """Test ComponentHealthStatus with error message."""
+    """Test ComponentConnectivityStatus with error message."""
     now = datetime.now(timezone.utc)
     error_msg = "Connection failed"
 
-    status = ComponentHealthStatus(
+    status = ComponentConnectivityStatus(
         service_group="database",
         component_id="redis",
         is_healthy=False,
@@ -41,9 +44,9 @@ def test_component_health_status_with_error() -> None:
 
 
 def test_component_health_status_serialization() -> None:
-    """Test ComponentHealthStatus JSON serialization and deserialization."""
+    """Test ComponentConnectivityStatus JSON serialization and deserialization."""
     now = datetime.now(timezone.utc)
-    status = ComponentHealthStatus(
+    status = ComponentConnectivityStatus(
         service_group="manager",
         component_id="postgres",
         is_healthy=True,
@@ -56,7 +59,7 @@ def test_component_health_status_serialization() -> None:
     assert isinstance(json_data, str)
 
     # Deserialize from JSON
-    restored = ComponentHealthStatus.model_validate_json(json_data)
+    restored = ComponentConnectivityStatus.model_validate_json(json_data)
 
     assert restored.service_group == status.service_group
     assert restored.component_id == status.component_id
@@ -65,8 +68,8 @@ def test_component_health_status_serialization() -> None:
 
 
 def test_component_health_status_has_field_descriptions() -> None:
-    """Test that ComponentHealthStatus has Field descriptions."""
-    schema = ComponentHealthStatus.model_json_schema()
+    """Test that ComponentConnectivityStatus has Field descriptions."""
+    schema = ComponentConnectivityStatus.model_json_schema()
 
     assert "properties" in schema
     properties = schema["properties"]
@@ -83,7 +86,7 @@ def test_health_check_response_creation() -> None:
     """Test HealthCheckResponse Pydantic model creation."""
     now = datetime.now(timezone.utc)
 
-    component1 = ComponentHealthStatus(
+    component1 = ComponentConnectivityStatus(
         service_group="manager",
         component_id="postgres",
         is_healthy=True,
@@ -91,7 +94,7 @@ def test_health_check_response_creation() -> None:
         error_message=None,
     )
 
-    component2 = ComponentHealthStatus(
+    component2 = ComponentConnectivityStatus(
         service_group="database",
         component_id="redis",
         is_healthy=True,
@@ -101,12 +104,12 @@ def test_health_check_response_creation() -> None:
 
     response = HealthCheckResponse(
         overall_healthy=True,
-        components=[component1, component2],
+        connectivity_checks=[component1, component2],
         timestamp=now,
     )
 
     assert response.overall_healthy is True
-    assert len(response.components) == 2
+    assert len(response.connectivity_checks) == 2
     assert response.timestamp == now
 
 
@@ -114,7 +117,7 @@ def test_health_check_response_with_unhealthy_components() -> None:
     """Test HealthCheckResponse with unhealthy components."""
     now = datetime.now(timezone.utc)
 
-    component1 = ComponentHealthStatus(
+    component1 = ComponentConnectivityStatus(
         service_group="manager",
         component_id="postgres",
         is_healthy=True,
@@ -122,7 +125,7 @@ def test_health_check_response_with_unhealthy_components() -> None:
         error_message=None,
     )
 
-    component2 = ComponentHealthStatus(
+    component2 = ComponentConnectivityStatus(
         service_group="database",
         component_id="redis",
         is_healthy=False,
@@ -132,19 +135,19 @@ def test_health_check_response_with_unhealthy_components() -> None:
 
     response = HealthCheckResponse(
         overall_healthy=False,
-        components=[component1, component2],
+        connectivity_checks=[component1, component2],
         timestamp=now,
     )
 
     assert response.overall_healthy is False
-    assert len(response.components) == 2
+    assert len(response.connectivity_checks) == 2
 
 
 def test_health_check_response_serialization() -> None:
     """Test HealthCheckResponse JSON serialization and deserialization."""
     now = datetime.now(timezone.utc)
 
-    component = ComponentHealthStatus(
+    component = ComponentConnectivityStatus(
         service_group="manager",
         component_id="postgres",
         is_healthy=True,
@@ -154,7 +157,7 @@ def test_health_check_response_serialization() -> None:
 
     response = HealthCheckResponse(
         overall_healthy=True,
-        components=[component],
+        connectivity_checks=[component],
         timestamp=now,
     )
 
@@ -166,8 +169,8 @@ def test_health_check_response_serialization() -> None:
     restored = HealthCheckResponse.model_validate_json(json_data)
 
     assert restored.overall_healthy == response.overall_healthy
-    assert len(restored.components) == len(response.components)
-    assert restored.components[0].service_group == component.service_group
+    assert len(restored.connectivity_checks) == len(response.connectivity_checks)
+    assert restored.connectivity_checks[0].service_group == component.service_group
 
 
 def test_health_check_response_has_field_descriptions() -> None:
@@ -179,7 +182,7 @@ def test_health_check_response_has_field_descriptions() -> None:
 
     # Check that each field has a description
     assert "description" in properties["overall_healthy"]
-    assert "description" in properties["components"]
+    assert "description" in properties["connectivity_checks"]
     assert "description" in properties["timestamp"]
 
 
@@ -189,10 +192,10 @@ def test_health_check_response_empty_components() -> None:
 
     response = HealthCheckResponse(
         overall_healthy=True,
-        components=[],
+        connectivity_checks=[],
         timestamp=now,
     )
 
     assert response.overall_healthy is True
-    assert len(response.components) == 0
+    assert len(response.connectivity_checks) == 0
     assert response.timestamp == now
