@@ -68,7 +68,7 @@ from ..agent import (
 )
 from ..config.unified import AgentUnifiedConfig, ScratchType
 from ..exception import K8sError, UnsupportedResource
-from ..kernel import AbstractKernel
+from ..kernel import AbstractKernel, KernelRegistry
 from ..resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -829,6 +829,7 @@ class KubernetesAgent(
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
+        kernel_registry: KernelRegistry,
     ) -> None:
         super().__init__(
             etcd,
@@ -837,6 +838,7 @@ class KubernetesAgent(
             error_monitor=error_monitor,
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
+            kernel_registry=kernel_registry,
         )
 
     async def __ainit__(self) -> None:

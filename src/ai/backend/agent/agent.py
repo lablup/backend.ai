@@ -229,6 +229,7 @@ from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import (
     RUN_ID_FOR_BATCH_JOB,
     AbstractKernel,
+    KernelRegistry,
     match_distro_data,
 )
 from .observer.heartbeat import HeartbeatObserver
@@ -836,6 +837,7 @@ class AbstractAgent(
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
+        kernel_registry: KernelRegistry,
     ) -> None:
         self._skip_initial_scan = skip_initial_scan
         self.loop = current_loop()
@@ -844,7 +846,7 @@ class AbstractAgent(
         self.id = AgentId(local_config.agent.id or f"agent-{uuid4()}")
         self.local_instance_id = generate_local_instance_id(__file__)
         self.agent_public_key = agent_public_key
-        self.kernel_registry = {}
+        self.kernel_registry = kernel_registry.agent_mapping(self.id)
         self.computers = {}
         self.images = {}
         self.restarting_kernels = {}

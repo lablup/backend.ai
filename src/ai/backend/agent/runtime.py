@@ -5,6 +5,7 @@ from typing import Optional, Type
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.etcd import AgentEtcdClientView
+from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -14,6 +15,7 @@ from ai.backend.common.types import aobject
 class AgentRuntime(aobject):
     local_config: AgentUnifiedConfig
     agent: AbstractAgent
+    kernel_registry: KernelRegistry
     etcd: AsyncEtcd
     etcd_view: AgentEtcdClientView
 
@@ -28,6 +30,7 @@ class AgentRuntime(aobject):
         agent_public_key: Optional[PublicKey],
     ) -> None:
         self.local_config = local_config
+        self.kernel_registry = KernelRegistry()
         self.etcd = etcd
         self.etcd_view = AgentEtcdClientView(etcd, self.local_config)
 

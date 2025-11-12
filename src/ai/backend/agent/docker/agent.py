@@ -109,7 +109,7 @@ from ..agent import (
 from ..config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
 from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
-from ..kernel import AbstractKernel
+from ..kernel import AbstractKernel, KernelRegistry
 from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, NetworkPluginContext
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import (
@@ -1357,6 +1357,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
+        kernel_registry: KernelRegistry,
     ) -> None:
         super().__init__(
             etcd,
@@ -1365,6 +1366,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             error_monitor=error_monitor,
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
+            kernel_registry=kernel_registry,
         )
         self.checked_invalid_images = set()
 
