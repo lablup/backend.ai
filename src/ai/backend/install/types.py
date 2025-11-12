@@ -161,9 +161,15 @@ class ServiceConfig:
     storage_agent_var_base_path: str
     storage_watcher_addr: ServerAddr
     vfolder_relpath: str
-    wsproxy_hash_key: str
-    wsproxy_jwt_key: str
-    wsproxy_api_token: str
+    appproxy_api_secret: str | None = None
+    appproxy_jwt_secret: str | None = None
+    appproxy_permit_hash_secret: str | None = None
+    appproxy_coordinator_addr: ServerAddr = dataclasses.field(
+        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 10200))
+    )
+    appproxy_worker_addr: ServerAddr = dataclasses.field(
+        default_factory=lambda: ServerAddr(HostPortPair("127.0.0.1", 10201))
+    )
 
 
 @dataclasses.dataclass
