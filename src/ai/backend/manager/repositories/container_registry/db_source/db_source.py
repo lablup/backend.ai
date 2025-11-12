@@ -55,15 +55,18 @@ class ContainerRegistryDBSource:
         modifier: ContainerRegistryModifier,
     ) -> ContainerRegistryData:
         async with self._db.begin_session() as session:
-            reg_row: Optional[ContainerRegistryRow] = await session.scalar(
+            result = await session.execute(
+                sa.update(ContainerRegistryRow)
+                .where(ContainerRegistryRow.id == registry_id)
+                .values(modifier.fields_to_update())
+            )
+
+            if result.rowcount == 0:
+                raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
+
+            reg_row = await session.scalar(
                 sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
             )
-            if reg_row is None:
-                raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
-            reg_row.apply_modifier(modifier)
-            session.add(reg_row)
-            await session.flush()
-            await session.refresh(reg_row)
 
             validator = ContainerRegistryValidator(
                 ContainerRegistryValidatorArgs(
