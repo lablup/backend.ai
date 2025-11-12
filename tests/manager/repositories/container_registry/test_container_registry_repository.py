@@ -12,12 +12,28 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.manager.data.container_registry.types import ContainerRegistryData
+from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryCreator,
+    ContainerRegistryData,
+    ContainerRegistryModifier,
+)
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
-from ai.backend.manager.errors.image import ContainerRegistryNotFound
+from ai.backend.manager.errors.image import (
+    ContainerRegistryGroupsAssociationNotFound,
+    ContainerRegistryNotFound,
+)
+from ai.backend.manager.models.association_container_registries_groups import (
+    AssociationContainerRegistriesGroupsRow,
+)
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
+from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.group import GroupRow
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.resource_policy import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.admin_repository import (
     AdminContainerRegistryRepository,
@@ -25,6 +41,7 @@ from ai.backend.manager.repositories.container_registry.admin_repository import 
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
+from ai.backend.manager.types import OptionalState, TriState
 
 
 class TestContainerRegistryRepository:
@@ -47,7 +64,12 @@ class TestContainerRegistryRepository:
         self,
         database_engine: ExtendedAsyncSAEngine,
         registry_name: str = "test-registry.example.com",
-        project: str | None = "test-project",
+        project: str = "test-project",
+        username: Optional[str] = None,
+        password: Optional[str] = None,
+        ssl_verify: bool = True,
+        is_global: bool = True,
+        extra: Optional[dict[str, str]] = None,
     ) -> AsyncGenerator[ContainerRegistryData, None]:
         """Create a test container registry and ensure cleanup"""
         async with database_engine.begin_session() as session:
@@ -56,11 +78,11 @@ class TestContainerRegistryRepository:
                 registry_name=registry_name,
                 type=ContainerRegistryType.HARBOR2,
                 project=project,
-                username=None,
-                password=None,
-                ssl_verify=True,
-                is_global=True,
-                extra=None,
+                username=username,
+                password=password,
+                ssl_verify=ssl_verify,
+                is_global=is_global,
+                extra=extra,
             )
             session.add(registry)
             await session.flush()
@@ -109,6 +131,70 @@ class TestContainerRegistryRepository:
         finally:
             # Cleanup is handled by create_test_registry
             pass
+
+    @asynccontextmanager
+    async def create_test_groups(
+        self,
+        database_engine: ExtendedAsyncSAEngine,
+        domain_name: str = "test-domain",
+        group_count: int = 2,
+    ) -> AsyncGenerator[list[UUID], None]:
+        """Create test groups for allowed_groups testing"""
+        resource_policy_name = f"test-policy-{domain_name}"
+        group_ids: list[UUID] = []
+
+        async with database_engine.begin_session() as session:
+            # Create domain
+            domain = DomainRow(name=domain_name, total_resource_slots={})
+            session.add(domain)
+
+            # Create resource policies
+            user_policy = UserResourcePolicyRow(
+                name=resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_session_count_per_model_session=10,
+                max_customized_image_count=10,
+            )
+            session.add(user_policy)
+
+            project_policy = ProjectResourcePolicyRow(
+                name=resource_policy_name,
+                max_vfolder_count=0,
+                max_quota_scope_size=-1,
+                max_network_count=3,
+            )
+            session.add(project_policy)
+
+            # Create groups
+            for i in range(group_count):
+                group = GroupRow(
+                    name=f"test-group-{i}-{domain_name}",
+                    domain_name=domain_name,
+                    total_resource_slots={},
+                    resource_policy=resource_policy_name,
+                )
+                session.add(group)
+                await session.flush()
+                group_ids.append(group.id)
+
+        try:
+            yield group_ids
+        finally:
+            # Cleanup
+            async with database_engine.begin_session() as session:
+                await session.execute(sa.delete(GroupRow).where(GroupRow.id.in_(group_ids)))
+                await session.execute(
+                    sa.delete(ProjectResourcePolicyRow).where(
+                        ProjectResourcePolicyRow.name == resource_policy_name
+                    )
+                )
+                await session.execute(
+                    sa.delete(UserResourcePolicyRow).where(
+                        UserResourcePolicyRow.name == resource_policy_name
+                    )
+                )
+                await session.execute(sa.delete(DomainRow).where(DomainRow.name == domain_name))
 
     async def create_test_image(
         self,
@@ -341,3 +427,495 @@ class TestContainerRegistryRepository:
         """Test getting registry row when not found"""
         with pytest.raises(ContainerRegistryNotFound):
             await repository.get_registry_row_for_scanner("non-existent", "project")
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "creator",
+        [
+            ContainerRegistryCreator(
+                url="https://new-registry.example.com",
+                type=ContainerRegistryType.HARBOR2,
+                registry_name="new-registry.example.com",
+                project="new-project",
+                username="test-user",
+                password="test-password",
+                ssl_verify=True,
+                is_global=False,
+                extra={"key": "value"},
+                allowed_groups=None,
+            )
+        ],
+    )
+    async def test_create_registry_success(
+        self,
+        repository: ContainerRegistryRepository,
+        creator: ContainerRegistryCreator,
+        database_engine: ExtendedAsyncSAEngine,
+    ) -> None:
+        """Test successful registry creation"""
+        # When
+        try:
+            result = await repository.create_registry(creator)
+
+            # Then
+            assert result is not None
+            assert result.url == creator.url
+            assert result.registry_name == creator.registry_name
+            assert result.project == creator.project
+            assert result.type == creator.type
+            assert result.username == creator.username
+            assert result.password == creator.password
+            assert result.ssl_verify == creator.ssl_verify
+            assert result.is_global == creator.is_global
+            assert result.extra == creator.extra
+
+            # Verify it was actually created in the database
+            verify_result = await repository.get_by_registry_and_project(
+                creator.registry_name, creator.project
+            )
+            assert verify_result.id == result.id
+        finally:
+            # Cleanup
+            async with database_engine.begin_session() as session:
+                await session.execute(
+                    sa.delete(ContainerRegistryRow).where(
+                        (ContainerRegistryRow.registry_name == creator.registry_name)
+                        & (ContainerRegistryRow.project == creator.project)
+                    )
+                )
+
+    @pytest.mark.asyncio
+    async def test_modify_registry_success(
+        self, repository: ContainerRegistryRepository, database_engine: ExtendedAsyncSAEngine
+    ) -> None:
+        """Test successful registry modification"""
+        registry_name = "modify-registry.example.com"
+        project_name = "modify-project"
+        username = "initial-user"
+        password = "initial-password"
+        ssl_verify = False
+        extra = {"initial_key": "initial_value"}
+
+        changed_username = "modified-user"
+        changed_password = "modified-password"
+        changed_extra = {"modified_key": "modified_value"}
+
+        async with self.create_test_registry(
+            database_engine,
+            registry_name=registry_name,
+            project=project_name,
+            username=username,
+            password=password,
+            ssl_verify=ssl_verify,
+            extra=extra,
+        ) as registry_data:
+            # When - Modify only username and password, extra
+            result = await repository.modify_registry(
+                registry_data.id,
+                ContainerRegistryModifier(
+                    url=OptionalState.nop(),
+                    type=OptionalState.nop(),
+                    registry_name=OptionalState.nop(),
+                    project=OptionalState.nop(),
+                    username=TriState.update(changed_username),
+                    password=TriState.update(changed_password),
+                    ssl_verify=TriState.nop(),
+                    is_global=TriState.nop(),
+                    extra=TriState.update(changed_extra),
+                    allowed_groups=TriState.nop(),
+                ),
+            )
+
+            # Then
+            assert result is not None
+
+            # Then - Verify unchanged fields remain the same
+            assert result.id == registry_data.id
+            assert result.registry_name == registry_name
+            assert result.project == project_name
+            assert result.ssl_verify == ssl_verify
+
+            # Then - Verify only username and password, extra are changed
+            assert result.username == changed_username
+            assert result.password == changed_password
+            assert result.extra == changed_extra
+
+    @pytest.mark.asyncio
+    async def test_modify_registry_not_found(self, repository: ContainerRegistryRepository) -> None:
+        """Test modifying a non-existent registry"""
+        non_existent_id = UUID("00000000-0000-0000-0000-000000000000")
+
+        # Then
+        with pytest.raises(ContainerRegistryNotFound):
+            await repository.modify_registry(
+                non_existent_id,
+                modifier=ContainerRegistryModifier(
+                    url=OptionalState.nop(),
+                    type=OptionalState.nop(),
+                    registry_name=OptionalState.nop(),
+                    project=OptionalState.nop(),
+                    username=TriState.update("new-user"),
+                    password=TriState.nop(),
+                    ssl_verify=TriState.nop(),
+                    is_global=TriState.nop(),
+                    extra=TriState.nop(),
+                    allowed_groups=TriState.nop(),
+                ),
+            )
+
+    @pytest.mark.asyncio
+    async def test_delete_registry_success(
+        self, repository: ContainerRegistryRepository, database_engine: ExtendedAsyncSAEngine
+    ) -> None:
+        """Test successful registry deletion"""
+        registry_name = "delete-registry.example.com"
+        project_name = "delete-project"
+
+        async with self.create_test_registry(
+            database_engine, registry_name, project_name
+        ) as registry_data:
+            # When
+            result = await repository.delete_registry(registry_data.id)
+
+            # Then
+            assert result is not None
+            assert result.id == registry_data.id
+            assert result.registry_name == registry_name
+            assert result.project == project_name
+
+            # Verify it was actually deleted
+            with pytest.raises(ContainerRegistryNotFound):
+                await repository.get_by_registry_and_project(registry_name, project_name)
+
+    @pytest.mark.asyncio
+    async def test_delete_registry_not_found(self, repository: ContainerRegistryRepository) -> None:
+        """Test deleting a non-existent registry"""
+        non_existent_id = UUID("00000000-0000-0000-0000-000000000000")
+
+        # Then
+        with pytest.raises(ContainerRegistryNotFound):
+            await repository.delete_registry(non_existent_id)
+
+    @pytest.mark.asyncio
+    async def test_delete_registry_with_images(
+        self, repository: ContainerRegistryRepository, database_engine: ExtendedAsyncSAEngine
+    ) -> None:
+        """Test deleting a registry that has associated images"""
+        registry_name = "delete-with-images-registry.example.com"
+        project_name = "delete-with-images-project"
+
+        async with self.create_test_registry(
+            database_engine, registry_name, project_name
+        ) as registry_data:
+            # Create test images
+            await self.create_test_image(
+                database_engine,
+                registry_data.id,
+                registry_name,
+                project_name,
+                "image1",
+            )
+            await self.create_test_image(
+                database_engine,
+                registry_data.id,
+                registry_name,
+                project_name,
+                "image2",
+            )
+
+            # When - Delete the registry
+            result = await repository.delete_registry(registry_data.id)
+
+            # Then - Registry should be deleted
+            assert result is not None
+            assert result.id == registry_data.id
+
+            # Verify registry is deleted
+            with pytest.raises(ContainerRegistryNotFound):
+                await repository.get_by_registry_and_project(registry_name, project_name)
+
+    @pytest.mark.asyncio
+    async def test_create_registry_with_allowed_groups(
+        self, repository: ContainerRegistryRepository, database_engine: ExtendedAsyncSAEngine
+    ) -> None:
+        """Test creating a registry with allowed_groups"""
+        registry_name = "test-ag-create.example.com"
+        project_name = "test-project"
+
+        async with self.create_test_groups(
+            database_engine=database_engine, domain_name="test-domain-create", group_count=2
+        ) as group_ids:
+            try:
+                result = await repository.create_registry(
+                    ContainerRegistryCreator(
+                        url=f"https://{registry_name}",
+                        type=ContainerRegistryType.HARBOR2,
+                        registry_name=registry_name,
+                        project=project_name,
+                        username="test-user",
+                        password="test-password",
+                        ssl_verify=True,
+                        is_global=False,
+                        extra=None,
+                        allowed_groups=AllowedGroupsModel(
+                            add=[str(group_ids[0]), str(group_ids[1])], remove=[]
+                        ),
+                    )
+                )
+
+                assert result is not None
+                assert result.registry_name == registry_name
+
+                # Verify associations were created
+                async with database_engine.begin_readonly_session() as session:
+                    associations = (
+                        (
+                            await session.execute(
+                                sa.select(AssociationContainerRegistriesGroupsRow).where(
+                                    AssociationContainerRegistriesGroupsRow.registry_id == result.id
+                                )
+                            )
+                        )
+                        .scalars()
+                        .all()
+                    )
+
+                    assert len(associations) == 2
+                    assert {a.group_id for a in associations} == set(group_ids)
+            finally:
+                # Cleanup
+                async with database_engine.begin_session() as session:
+                    await session.execute(
+                        sa.delete(AssociationContainerRegistriesGroupsRow).where(
+                            AssociationContainerRegistriesGroupsRow.group_id.in_(group_ids)
+                        )
+                    )
+                    await session.execute(
+                        sa.delete(ContainerRegistryRow).where(
+                            (ContainerRegistryRow.registry_name == registry_name)
+                            & (ContainerRegistryRow.project == project_name)
+                        )
+                    )
+
+    @pytest.mark.asyncio
+    async def test_modify_registry_add_allowed_groups(
+        self, repository: ContainerRegistryRepository, database_engine: ExtendedAsyncSAEngine
+    ) -> None:
+        """Test adding allowed_groups to an existing registry"""
+        registry_name = "test-ag-add.example.com"
+        project_name = "test-project"
+
+        async with (
+            self.create_test_registry(
+                database_engine, registry_name, project_name
+            ) as registry_data,
+            self.create_test_groups(
+                database_engine=database_engine, domain_name="test-domain-add", group_count=2
+            ) as group_ids,
+        ):
+            result = await repository.modify_registry(
+                registry_data.id,
+                ContainerRegistryModifier(
+                    url=OptionalState.nop(),
+                    type=OptionalState.nop(),
+                    registry_name=OptionalState.nop(),
+                    project=OptionalState.nop(),
+                    username=TriState.nop(),
+                    password=TriState.nop(),
+                    ssl_verify=TriState.update(True),
+                    is_global=TriState.nop(),
+                    extra=TriState.nop(),
+                    allowed_groups=TriState.update(
+                        AllowedGroupsModel(add=[str(g) for g in group_ids], remove=[])
+                    ),
+                ),
+            )
+
+            assert result is not None
+
+            async with database_engine.begin_readonly_session() as session:
+                associations = (
+                    (
+                        await session.execute(
+                            sa.select(AssociationContainerRegistriesGroupsRow).where(
+                                AssociationContainerRegistriesGroupsRow.registry_id
+                                == registry_data.id
+                            )
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+
+                assert len(associations) == 2
+                assert {a.group_id for a in associations} == set(group_ids)
+
+            # Cleanup
+            async with database_engine.begin_session() as session:
+                await session.execute(
+                    sa.delete(AssociationContainerRegistriesGroupsRow).where(
+                        AssociationContainerRegistriesGroupsRow.group_id.in_(group_ids)
+                    )
+                )
+
+    @pytest.mark.asyncio
+    async def test_modify_registry_remove_allowed_groups(
+        self, repository: ContainerRegistryRepository, database_engine: ExtendedAsyncSAEngine
+    ) -> None:
+        """Test removing allowed_groups from an existing registry"""
+        registry_name = "test-ag-remove.example.com"
+        project_name = "test-project"
+        group_count = 3
+
+        async with (
+            self.create_test_registry(
+                database_engine, registry_name, project_name
+            ) as registry_data,
+            self.create_test_groups(
+                database_engine=database_engine,
+                domain_name="test-domain-remove",
+                group_count=group_count,
+            ) as group_ids,
+        ):
+            # Given - Add groups first
+            async with database_engine.begin_session() as session:
+                for gid in group_ids:
+                    assoc = AssociationContainerRegistriesGroupsRow()
+                    assoc.registry_id = registry_data.id
+                    assoc.group_id = gid
+                    session.add(assoc)
+
+            # When - Request to remove one group
+            result = await repository.modify_registry(
+                registry_data.id,
+                ContainerRegistryModifier(
+                    url=OptionalState.nop(),
+                    type=OptionalState.nop(),
+                    registry_name=OptionalState.nop(),
+                    project=OptionalState.nop(),
+                    username=TriState.nop(),
+                    password=TriState.nop(),
+                    ssl_verify=TriState.update(True),
+                    is_global=TriState.nop(),
+                    extra=TriState.nop(),
+                    allowed_groups=TriState.update(
+                        AllowedGroupsModel(add=[], remove=[str(group_ids[0])])
+                    ),
+                ),
+            )
+
+            assert result is not None
+
+            async with database_engine.begin_readonly_session() as session:
+                associations = (
+                    (
+                        await session.execute(
+                            sa.select(AssociationContainerRegistriesGroupsRow).where(
+                                AssociationContainerRegistriesGroupsRow.registry_id
+                                == registry_data.id
+                            )
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+
+                assert len(associations) == group_count - 1
+                assert {a.group_id for a in associations} == {group_ids[1], group_ids[2]}
+
+    @pytest.mark.asyncio
+    async def test_modify_registry_add_and_remove_allowed_groups(
+        self, repository: ContainerRegistryRepository, database_engine: ExtendedAsyncSAEngine
+    ) -> None:
+        """Test adding and removing allowed_groups simultaneously"""
+        registry_name = "test-ag-both.example.com"
+        project_name = "test-project"
+
+        async with (
+            self.create_test_registry(
+                database_engine, registry_name, project_name
+            ) as registry_data,
+            self.create_test_groups(
+                database_engine=database_engine, domain_name="test-domain-both", group_count=4
+            ) as group_ids,
+        ):
+            # Add group 0, 1 initially
+            async with database_engine.begin_session() as session:
+                for gid in group_ids[:2]:
+                    assoc = AssociationContainerRegistriesGroupsRow()
+                    assoc.registry_id = registry_data.id
+                    assoc.group_id = gid
+                    session.add(assoc)
+
+            # When - Remove group 0, add group 2, 3
+            result = await repository.modify_registry(
+                registry_data.id,
+                ContainerRegistryModifier(
+                    url=OptionalState.nop(),
+                    type=OptionalState.nop(),
+                    registry_name=OptionalState.nop(),
+                    project=OptionalState.nop(),
+                    username=TriState.nop(),
+                    password=TriState.nop(),
+                    ssl_verify=TriState.update(True),
+                    is_global=TriState.nop(),
+                    extra=TriState.nop(),
+                    allowed_groups=TriState.update(
+                        AllowedGroupsModel(
+                            add=[str(group_ids[2]), str(group_ids[3])],
+                            remove=[str(group_ids[0])],
+                        )
+                    ),
+                ),
+            )
+
+            assert result is not None
+
+            async with database_engine.begin_readonly_session() as session:
+                associations = (
+                    (
+                        await session.execute(
+                            sa.select(AssociationContainerRegistriesGroupsRow).where(
+                                AssociationContainerRegistriesGroupsRow.registry_id
+                                == registry_data.id
+                            )
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+
+                assert len(associations) == 3
+                assert {a.group_id for a in associations} == {
+                    group_ids[1],
+                    group_ids[2],
+                    group_ids[3],
+                }
+
+    @pytest.mark.asyncio
+    async def test_modify_registry_remove_nonexistent_allowed_groups(
+        self, repository: ContainerRegistryRepository, database_engine: ExtendedAsyncSAEngine
+    ) -> None:
+        """Test removing non-existent allowed_groups raises error"""
+        async with (
+            self.create_test_registry(
+                database_engine, "test-ag-error.example.com", "test-project"
+            ) as registry_data,
+        ):
+            modifier = ContainerRegistryModifier(
+                url=OptionalState.nop(),
+                type=OptionalState.nop(),
+                registry_name=OptionalState.nop(),
+                project=OptionalState.nop(),
+                username=TriState.update("user"),
+                password=TriState.nop(),
+                ssl_verify=TriState.nop(),
+                is_global=TriState.nop(),
+                extra=TriState.nop(),
+                allowed_groups=TriState.update(
+                    AllowedGroupsModel(add=[], remove=["00000000-0000-0000-0000-000000000000"])
+                ),
+            )
+
+            with pytest.raises(ContainerRegistryGroupsAssociationNotFound):
+                await repository.modify_registry(registry_data.id, modifier)
