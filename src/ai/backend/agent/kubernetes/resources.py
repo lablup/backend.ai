@@ -72,7 +72,6 @@ async def load_resources(
 
 
 async def scan_available_resources(
-    local_config: Mapping[str, Any],
     compute_device_types: Mapping[DeviceName, AbstractComputePlugin],
 ) -> Mapping[SlotName, Decimal]:
     """

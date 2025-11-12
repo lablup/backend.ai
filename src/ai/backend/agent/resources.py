@@ -29,15 +29,23 @@ from typing import (
 import aiodocker
 import attrs
 
+import ai.backend.agent.alloc_map as alloc_map_mod
 from ai.backend.agent.config.unified import (
-    CommonResourceConfig,
+    AgentUnifiedConfig,
     ResourceAllocationMode,
-    ResourceConfig,
 )
+from ai.backend.agent.errors.resources import (
+    AgentIdNotFoundError,
+    InvalidResourceConfigError,
+    ResourceOverAllocatedError,
+)
+from ai.backend.common.config import read_from_file
+from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
     AcceleratorMetadata,
+    AgentId,
     BinarySize,
     DeviceId,
     DeviceModelInfo,
@@ -49,6 +57,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SlotName,
     SlotTypes,
+    aobject,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -61,8 +70,8 @@ from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # n
 from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
 from .exception import ResourceError
 from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
+from .types import AgentBackend, MountInfo
 from .types import Container as SessionContainer
-from .types import MountInfo
 
 if TYPE_CHECKING:
     from io import TextIOWrapper
@@ -74,6 +83,8 @@ DeviceAllocation: TypeAlias = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
+
+# FIXME: Move the errors to separate files
 
 
 def _combine_mappings(mappings: list[Mapping[SlotName, Decimal]]) -> dict[SlotName, Decimal]:
@@ -460,88 +471,176 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         return []
 
 
-class ResourcePartitioner:
+ComputersMap: TypeAlias = Mapping[DeviceName, ComputerContext]
+SlotsMap: TypeAlias = Mapping[SlotName, Decimal]
+
+
+class ResourcePartitioner(aobject):
+    local_config: AgentUnifiedConfig
+    etcd: AsyncEtcd
+    agent_configs: Sequence[AgentUnifiedConfig]
+
+    computers: ComputersMap
+    total_slots: SlotsMap
+
+    agent_computers: Mapping[AgentId, ComputersMap]
+    agent_reserved_slots: Mapping[AgentId, SlotsMap]
+    agent_resource_scaling_factor: Mapping[AgentId, SlotsMap]
+
+    @property
+    def num_agents(self) -> int:
+        return len(self.agent_configs)
+
     def __init__(
         self,
-        resource_config: ResourceConfig,
-        num_agents: int,
-        agent_idx: int,
+        local_config: AgentUnifiedConfig,
+        etcd: AsyncEtcd,
     ) -> None:
-        self.resource_config = resource_config
-        self.num_agents = num_agents
-        self.agent_idx = agent_idx
-        self.resource_scaling_factor: Mapping[SlotName, Decimal] = {}
+        self.local_config = local_config
+        self.etcd = etcd
+        self.agent_configs = local_config.get_agent_configs()
 
-    @staticmethod
-    def calculate_total_slots(
-        computers: Mapping[DeviceName, ComputerContext],
-        resource_config: CommonResourceConfig,
-        deduct_reserved: bool = False,
-    ) -> dict[SlotName, Decimal]:
+    async def __ainit__(self) -> None:
+        alloc_map_mod.log_alloc_map = self.local_config.debug.log_alloc_map
+        computers = await self._load_resources()
+
+        computer_contexts: dict[DeviceName, ComputerContext] = {}
+        for name, computer in computers.items():
+            devices = await computer.list_devices()
+            alloc_map = await computer.create_alloc_map()
+            computer_contexts[name] = ComputerContext(computer, devices, alloc_map)
+        self.computers = computer_contexts
+        self.total_slots = self._calculate_total_slots()
+
+        agent_computers = {}
+        agent_reserved_slots = {}
+        agent_resource_scaling_factor = {}
+        for agent_idx, agent_config in enumerate(self.agent_configs):
+            res = await self._calculate_agent_partition(agent_idx, agent_config)
+            agent_computer, reserved_slots, resource_scaling_factor = res
+
+            agent_id = AgentId(agent_config.agent.id)
+            agent_computers[agent_id] = agent_computer
+            agent_reserved_slots[agent_id] = reserved_slots
+            agent_resource_scaling_factor[agent_id] = resource_scaling_factor
+
+        self.agent_computers = agent_computers
+        self.agent_reserved_slots = agent_reserved_slots
+        self.agent_resource_scaling_factor = agent_resource_scaling_factor
+
+        self._ensure_slots_are_not_overallocated()
+
+    async def __aexit__(self, *exc_info) -> None:
+        for _, computer in self.computers.items():
+            try:
+                await computer.instance.cleanup()
+            except Exception:
+                log.exception("Failed to clean up computer instance:")
+
+    def get_computers(self, agent_id: AgentId) -> ComputersMap:
+        if agent_id not in self.agent_computers:
+            raise AgentIdNotFoundError(f"Agent ID {agent_id} not in computers")
+        return self.agent_computers[agent_id]
+
+    async def get_updated_slots(self, agent_id: AgentId) -> SlotsMap:
+        scanned_slots = await self._scan_available_resources()
+        if agent_id not in self.agent_reserved_slots:
+            raise AgentIdNotFoundError(f"Agent ID {agent_id} not in reserved slots")
+        reserved_slots = self.agent_reserved_slots[agent_id]
+
+        usable_slots: dict[SlotName, Decimal] = {}
+        for slot_name, slot_capacity in scanned_slots.items():
+            if slot_name == SlotName("mem"):
+                mem_reserved = int(reserved_slots.get(slot_name, 0))
+                mem_align = int(self.local_config.resource.memory_align_size)
+                mem_usable, mem_reserved = align_memory(
+                    int(slot_capacity), mem_reserved, align=mem_align
+                )
+                usable_capacity = Decimal(mem_usable)
+                log.debug(
+                    "usable-mem: {:m}, reserved-mem: {:m} after {:m} alignment",
+                    BinarySize(mem_usable),
+                    BinarySize(mem_reserved),
+                    BinarySize(mem_align),
+                )
+            else:
+                usable_capacity = max(
+                    Decimal(0), slot_capacity - reserved_slots.get(slot_name, Decimal(0))
+                )
+            usable_slots[slot_name] = usable_capacity
+        return usable_slots
+
+    def get_resource_scaling_factor(self, agent_id: AgentId) -> SlotsMap:
+        if agent_id not in self.agent_resource_scaling_factor:
+            raise AgentIdNotFoundError(f"Agent ID {agent_id} not in computers")
+        return self.agent_resource_scaling_factor[agent_id]
+
+    def _calculate_total_slots(self) -> SlotsMap:
         total_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))
-        for device in computers.values():
+        for device in self.computers.values():
             for slot_info in device.alloc_map.device_slots.values():
                 total_slots[slot_info.slot_name] += slot_info.amount
-        if deduct_reserved:
-            return ResourcePartitioner.deduct_reserved_resources(total_slots, resource_config)
-        else:
-            return total_slots
+        return self._deduct_reserved_resources(total_slots)
 
-    @staticmethod
-    def deduct_reserved_resources(
-        total_slots: Mapping[SlotName, Decimal],
-        resource_config: CommonResourceConfig,
-    ) -> dict[SlotName, Decimal]:
+    def _deduct_reserved_resources(self, total_slots: SlotsMap) -> SlotsMap:
         reserved_resources = {
-            SlotName("cpu"): Decimal(resource_config.reserved_cpu),
-            SlotName("mem"): Decimal(resource_config.reserved_mem),
+            SlotName("cpu"): Decimal(self.local_config.resource_common.reserved_cpu),
+            SlotName("mem"): Decimal(self.local_config.resource_common.reserved_mem),
+            SlotName("disk"): Decimal(self.local_config.resource_common.reserved_disk),
         }
 
         slots: dict[SlotName, Decimal] = {}
-        for slot_name, slot in total_slots.items():
-            slots[slot_name] = slot - reserved_resources.get(slot_name, Decimal("0"))
+        for slot_name, total_slot in total_slots.items():
+            reserved_slot = reserved_resources.get(slot_name, Decimal("0"))
+            if total_slot < reserved_slot:
+                raise InvalidResourceConfigError(
+                    f"Slot {slot_name} reserved for {reserved_slot}, "
+                    f"which is larger than total slot available {total_slot}"
+                )
+            slots[slot_name] = total_slot - reserved_slot
         return slots
 
-    def restrict_computer_resources(
+    async def _calculate_agent_partition(
         self,
-        computers: MutableMapping[DeviceName, ComputerContext],
-        total_slots: Mapping[SlotName, Decimal],
-    ) -> dict[SlotName, Decimal]:
+        agent_idx: int,
+        agent_config: AgentUnifiedConfig,
+    ) -> tuple[ComputersMap, SlotsMap, SlotsMap]:
+        agent_computers: dict[DeviceName, ComputerContext] = {}
         devices_allocated_slots: list[Mapping[SlotName, Decimal]] = []
         devices_reserved_slots: list[Mapping[SlotName, Decimal]] = []
-        for device in computers.values():
-            device_allocated_slots = self._calculate_device_slots(device.alloc_map, total_slots)
-            device.alloc_map.update_device_slot_amounts(device_allocated_slots)
+        for device_name, ctx in self.computers.items():
+            device_allocated_slots = self._calculate_device_slots(
+                ctx.alloc_map, agent_idx, agent_config
+            )
             devices_allocated_slots.append(device_allocated_slots)
 
-            device_reserved_slots = self._calculate_reserved_slots(
-                device_allocated_slots, total_slots
+            agent_alloc_map = await ctx.instance.create_alloc_map()
+            agent_alloc_map.update_device_slot_amounts(device_allocated_slots)
+            agent_computers[device_name] = ComputerContext(
+                ctx.instance, ctx.devices, agent_alloc_map
             )
+
+            device_reserved_slots = self._calculate_reserved_slots(device_allocated_slots)
             devices_reserved_slots.append(device_reserved_slots)
 
-        allocated_slots = _combine_mappings(devices_allocated_slots)
-        self.resource_scaling_factor = self._calculate_resource_scaling_factor(
-            allocated_slots, total_slots
+        reserved_slots = _combine_mappings(devices_reserved_slots)
+        resource_scaling_factor = self._calculate_resource_scaling_factor(
+            allocated_slots=_combine_mappings(devices_allocated_slots)
         )
 
-        reserved_slots = _combine_mappings(devices_reserved_slots)
-        return reserved_slots
-
-    def get_resource_scaling_factor(self, slot_name: SlotName) -> Decimal:
-        return self.resource_scaling_factor[slot_name]
+        return agent_computers, reserved_slots, resource_scaling_factor
 
     def _calculate_device_slots(
         self,
         alloc_map: AbstractAllocMap,
-        total_slots: Mapping[SlotName, Decimal],
-    ) -> dict[SlotName, Decimal]:
-        total_slots_no_reserved = ResourcePartitioner.deduct_reserved_resources(
-            total_slots, self.resource_config
-        )
+        agent_idx: int,
+        agent_config: AgentUnifiedConfig,
+    ) -> SlotsMap:
         return {
             device_slot.slot_name: self._calculate_device_slot(
                 device_slot.slot_name,
-                total_slots_no_reserved[device_slot.slot_name],
+                agent_idx,
+                agent_config,
                 type(alloc_map),
             )
             for device_slot in alloc_map.device_slots.values()
@@ -550,16 +649,20 @@ class ResourcePartitioner:
     def _calculate_device_slot(
         self,
         slot_name: SlotName,
-        total_slot: Decimal,
+        agent_idx: int,
+        agent_config: AgentUnifiedConfig,
         alloc_map_type: Type[AbstractAllocMap],
     ) -> Decimal:
-        match self.resource_config.allocation_mode:
+        resource_config = agent_config.resource
+        total_slot = self.total_slots[slot_name]
+
+        match resource_config.allocation_mode:
             case ResourceAllocationMode.SHARED:
                 return total_slot
             case ResourceAllocationMode.AUTO_SPLIT:
                 if alloc_map_type is DiscretePropertyAllocMap:
                     slot, slot_extra = divmod(total_slot, self.num_agents)
-                    remainder_value = 1 if self.agent_idx < slot_extra else 0
+                    remainder_value = 1 if agent_idx < slot_extra else 0
                     return slot + remainder_value
                 elif alloc_map_type is FractionAllocMap:
                     return total_slot / self.num_agents
@@ -569,35 +672,28 @@ class ResourcePartitioner:
                     )
             case ResourceAllocationMode.MANUAL:
                 match slot_name:
-                    case "cpu":
-                        assert self.resource_config.allocated_cpu is not None
-                        return Decimal(self.resource_config.allocated_cpu)
-                    case "mem":
-                        assert self.resource_config.allocated_mem is not None
-                        return Decimal(self.resource_config.allocated_mem)
+                    case SlotName(device_name="cpu"):
+                        assert resource_config.allocated_cpu is not None
+                        return Decimal(resource_config.allocated_cpu)
+                    case SlotName(device_name="mem"):
+                        assert resource_config.allocated_mem is not None
+                        return Decimal(resource_config.allocated_mem)
                     case slot_name:
-                        if slot_name not in self.resource_config.allocated_devices:
+                        if slot_name not in resource_config.allocated_devices:
                             raise ValueError(
-                                f"{slot_name=} not found in config {self.resource_config.allocated_devices!r}"
+                                f"{slot_name=} not found in config {resource_config.allocated_devices!r}"
                             )
-                        return self.resource_config.allocated_devices[slot_name]
+                        return resource_config.allocated_devices[slot_name]
 
-    def _calculate_reserved_slots(
-        self,
-        device_slots: Mapping[SlotName, Decimal],
-        total_slots: Mapping[SlotName, Decimal],
-    ) -> dict[SlotName, Decimal]:
+    def _calculate_reserved_slots(self, device_slots: SlotsMap) -> SlotsMap:
         reserved_slots: dict[SlotName, Decimal] = {}
         for slot_name, slot in device_slots.items():
-            reserved_slots[slot_name] = max(total_slots[slot_name] - slot, Decimal(0))
+            reserved_slots[slot_name] = max(self.total_slots[slot_name] - slot, Decimal(0))
         return reserved_slots
 
-    def _calculate_resource_scaling_factor(
-        self,
-        allocated_slots: Mapping[SlotName, Decimal],
-        total_slots: Mapping[SlotName, Decimal],
-    ) -> dict[SlotName, Decimal]:
-        match self.resource_config.allocation_mode:
+    def _calculate_resource_scaling_factor(self, allocated_slots: SlotsMap) -> SlotsMap:
+        total_slots = self.total_slots
+        match self.local_config.resource_common.allocation_mode:
             case ResourceAllocationMode.SHARED:
                 return defaultdict(lambda: Decimal(1.0))
             case ResourceAllocationMode.AUTO_SPLIT:
@@ -612,6 +708,60 @@ class ResourcePartitioner:
                     for slot_name, slot in allocated_slots.items()
                 }
                 return scaling_factor
+
+    async def _load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
+        local_config_dump = self.local_config.model_dump(by_alias=True)
+
+        match self.local_config.agent_common.backend:
+            case AgentBackend.DOCKER:
+                from .docker.resources import load_resources as docker_load
+
+                return await docker_load(self.etcd, local_config_dump)
+            case AgentBackend.KUBERNETES:
+                from .kubernetes.resources import load_resources as kubernetes_load
+
+                return await kubernetes_load(self.etcd, local_config_dump)
+            case AgentBackend.DUMMY:
+                from .dummy.config import DEFAULT_CONFIG_PATH, dummy_local_config
+                from .dummy.resources import load_resources as dummy_load
+
+                raw_config, _ = read_from_file(DEFAULT_CONFIG_PATH, "dummy")
+                dummy_config = dummy_local_config.check(raw_config)
+                return await dummy_load(self.etcd, local_config_dump, dummy_config)
+
+    async def _scan_available_resources(self) -> Mapping[SlotName, Decimal]:
+        compute_device_types = {name: cctx.instance for name, cctx in self.computers.items()}
+
+        match self.local_config.agent_common.backend:
+            case AgentBackend.DOCKER:
+                from .docker.resources import scan_available_resources as docker_scan
+
+                return await docker_scan(compute_device_types)
+            case AgentBackend.KUBERNETES:
+                from .kubernetes.resources import scan_available_resources as kubernetes_scan
+
+                return await kubernetes_scan(compute_device_types)
+            case AgentBackend.DUMMY:
+                from .dummy.resources import scan_available_resources as dummy_scan
+
+                return await dummy_scan(compute_device_types)
+
+    def _ensure_slots_are_not_overallocated(self) -> None:
+        if self.local_config.resource_common.allocation_mode != ResourceAllocationMode.MANUAL:
+            return
+
+        allocated_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))
+        for agent_reserved_slots in self.agent_reserved_slots.values():
+            for slot_name, total_slot in self.total_slots.items():
+                allocated_slot = total_slot - agent_reserved_slots[slot_name]
+                allocated_slots[slot_name] += allocated_slot
+
+        for slot_name, allocated_slot in allocated_slots.items():
+            if self.total_slots[slot_name] < allocated_slot:
+                raise ResourceOverAllocatedError(
+                    f"Resource slot {slot_name} was manually allocated {allocated_slot} across "
+                    f"all agents when total capacity is {self.total_slots[slot_name]}."
+                )
 
 
 class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):

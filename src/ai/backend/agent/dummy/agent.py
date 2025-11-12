@@ -59,7 +59,6 @@ from ..resources import (
 from ..types import Container, KernelOwnershipData, MountInfo
 from .config import DEFAULT_CONFIG_PATH, dummy_local_config
 from .kernel import DummyKernel
-from .resources import load_resources, scan_available_resources
 
 
 class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
@@ -73,7 +72,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: AgentUnifiedConfig,
-        computers: MutableMapping[DeviceName, ComputerContext],
+        computers: Mapping[DeviceName, ComputerContext],
         restarting: bool = False,
         *,
         dummy_config: Mapping[str, Any],
@@ -283,17 +282,6 @@ class DummyAgent(
     def get_cgroup_version(self) -> str:
         # Dummy agent does not use cgroups, so we return an empty string.
         return ""
-
-    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(
-            self.etcd, self.local_config.model_dump(by_alias=True), self.dummy_config
-        )
-
-    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
-        return await scan_available_resources(
-            self.local_config.model_dump(by_alias=True),
-            {name: cctx.instance for name, cctx in self.computers.items()},
-        )
 
     async def extract_image_command(self, image: str) -> str | None:
         delay = self.dummy_agent_cfg["delay"]["scan-image"]

@@ -324,6 +324,7 @@ DeviceId = NewType("DeviceId", str)
 
 class SlotName(UserString):
     __slots__ = ("_parsed", "_device_name", "_major_type", "_minor_type")
+    __match_args__ = ("device_name", "major_type", "minor_type")
 
     def __init__(self, value: str | SlotName) -> None:
         self._parsed = False

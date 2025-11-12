@@ -74,7 +74,6 @@ from ..resources import (
     ComputerContext,
     KernelResourceSpec,
     Mount,
-    ResourcePartitioner,
     known_slot_types,
 )
 from ..types import Container, KernelOwnershipData, MountInfo, Port
@@ -91,7 +90,6 @@ from .kube_object import (
     PersistentVolumeClaim,
     Service,
 )
-from .resources import load_resources, scan_available_resources
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
@@ -122,7 +120,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         distro: str,
         local_config: AgentUnifiedConfig,
         agent_sockpath: Path,
-        computers: MutableMapping[DeviceName, ComputerContext],
+        computers: Mapping[DeviceName, ComputerContext],
         workers: Mapping[str, Mapping[str, str]],
         static_pvc_name: str,
         restarting: bool = False,
@@ -831,7 +829,8 @@ class KubernetesAgent(
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
         kernel_registry: KernelRegistry,
-        resource_partitioner: ResourcePartitioner,
+        computers: Mapping[DeviceName, ComputerContext],
+        slots: Mapping[SlotName, Decimal],
     ) -> None:
         super().__init__(
             etcd,
@@ -841,7 +840,8 @@ class KubernetesAgent(
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
             kernel_registry=kernel_registry,
-            resource_partitioner=resource_partitioner,
+            computers=computers,
+            slots=slots,
         )
 
     async def __ainit__(self) -> None:
@@ -969,15 +969,6 @@ class KubernetesAgent(
     def get_cgroup_version(self) -> str:
         # Not implemented yet for K8s Agent
         return ""
-
-    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(self.etcd, self.local_config.model_dump(by_alias=True))
-
-    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
-        return await scan_available_resources(
-            self.local_config.model_dump(by_alias=True),
-            {name: cctx.instance for name, cctx in self.computers.items()},
-        )
 
     async def extract_command(self, image_ref: str) -> str | None:
         return None

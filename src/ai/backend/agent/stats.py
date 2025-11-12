@@ -431,7 +431,7 @@ class StatContext:
             keys=metric_keys,
         )
 
-    async def collect_node_stat(self) -> None:
+    async def collect_node_stat(self, resource_scaling_factors: Mapping[SlotName, Decimal]) -> None:
         """
         Collect the per-node, per-device, and per-container statistics.
 
@@ -471,7 +471,7 @@ class StatContext:
                     metric_key = node_measure.key
                     # update node metric
                     slot_scale_factor = self._extract_slot_measurement_scale_factor(
-                        slot_names, metric_key
+                        resource_scaling_factors, slot_names, metric_key
                     )
                     per_node = node_measure.per_node.apply_scale_factor(slot_scale_factor)
                     if metric_key not in self.node_metrics:
@@ -576,6 +576,7 @@ class StatContext:
 
     def _extract_slot_measurement_scale_factor(
         self,
+        resource_scaling_factors: Mapping[SlotName, Decimal],
         slot_names: Sequence[SlotName],
         metric_key: MetricKey,
     ) -> Decimal:
@@ -583,7 +584,7 @@ class StatContext:
             case []:
                 return Decimal(1)
             case [slot_name]:
-                return self.agent.resource_partitioner.get_resource_scaling_factor(slot_name)
+                return resource_scaling_factors[slot_name]
             case _:
                 log.warning(
                     "Plugin defines more than 1 device slot info. Attempting best-effort match with metric key..."
@@ -591,12 +592,12 @@ class StatContext:
                 slot_names_with_same_prefix_as_metric_key = [
                     slot_name
                     for slot_name in slot_names
-                    if metric_key.startswith(slot_name.split(".")[0])
+                    if metric_key.startswith(slot_name.device_name)
                 ]
                 if len(slot_names_with_same_prefix_as_metric_key) == 1:
                     slot_name = slot_names_with_same_prefix_as_metric_key[0]
                     log.info(f"Found slot name {slot_name} with same prefix as {metric_key}")
-                    return self.agent.resource_partitioner.get_resource_scaling_factor(slot_name)
+                    return resource_scaling_factors[slot_name]
                 else:
                     raise ValueError(
                         f"Plugin defines more than 1 device slots {slot_names}, "

@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 import importlib
 import signal
-from typing import TYPE_CHECKING, Mapping, Optional, Type
+from decimal import Decimal
+from typing import TYPE_CHECKING, Mapping, MutableSequence, Optional, Type
+
+import aiotools
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig
@@ -11,10 +14,14 @@ from ai.backend.agent.errors.runtime import AgentIdNotFoundError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
+from ai.backend.agent.resources import ComputerContext, ResourcePartitioner
 from ai.backend.agent.types import AgentBackend
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.types import AgentId
+from ai.backend.common.metrics.types import (
+    UTILIZATION_METRIC_INTERVAL,
+)
+from ai.backend.common.types import AgentId, DeviceName, SlotName
 
 if TYPE_CHECKING:
     from .docker.metadata.server import MetadataServer
@@ -26,9 +33,11 @@ class AgentRuntime:
     _agents: Mapping[AgentId, AbstractAgent]
     _default_agent: AbstractAgent
     _kernel_registry: KernelRegistry
+    _resource_partitioner: ResourcePartitioner
     _metadata_server: Optional[MetadataServer]
 
     _stop_signal: signal.Signals
+    _timer_tasks: MutableSequence[asyncio.Task[None]]
 
     @classmethod
     async def create_runtime(
@@ -40,6 +49,7 @@ class AgentRuntime:
         agent_public_key: Optional[PublicKey],
     ) -> AgentRuntime:
         kernel_registry = KernelRegistry()
+        resource_partitioner = await ResourcePartitioner.new(local_config, etcd)
 
         if local_config.agent_common.backend == AgentBackend.DOCKER:
             metadata_server = await cls._create_metadata_server(local_config, etcd, kernel_registry)
@@ -56,6 +66,9 @@ class AgentRuntime:
                 etcd_view = AgentEtcdClientView(etcd, agent_config)
                 etcd_views[agent_id] = etcd_view
 
+                computers = resource_partitioner.get_computers(agent_id)
+                slots = await resource_partitioner.get_updated_slots(agent_id)
+
                 create_agent_task = tg.create_task(
                     cls._create_agent(
                         local_config,
@@ -65,6 +78,8 @@ class AgentRuntime:
                         stats_monitor,
                         error_monitor,
                         agent_public_key,
+                        computers,
+                        slots,
                     )
                 )
                 create_agent_tasks.append(create_agent_task)
@@ -78,6 +93,7 @@ class AgentRuntime:
             agents=agents,
             default_agent=default_agent,
             kernel_registry=kernel_registry,
+            resource_partitioner=resource_partitioner,
             metadata_server=metadata_server,
         )
 
@@ -108,12 +124,16 @@ class AgentRuntime:
         stats_monitor: AgentStatsPluginContext,
         error_monitor: AgentErrorPluginContext,
         agent_public_key: Optional[PublicKey],
+        computers: Mapping[DeviceName, ComputerContext],
+        slots: Mapping[SlotName, Decimal],
     ) -> AbstractAgent:
         agent_kwargs = {
             "kernel_registry": kernel_registry,
             "stats_monitor": stats_monitor,
             "error_monitor": error_monitor,
             "agent_public_key": agent_public_key,
+            "computers": computers,
+            "slots": slots,
         }
 
         backend = local_config.agent_common.backend
@@ -129,6 +149,7 @@ class AgentRuntime:
         agents: dict[AgentId, AbstractAgent],
         default_agent: AbstractAgent,
         kernel_registry: KernelRegistry,
+        resource_partitioner: ResourcePartitioner,
         metadata_server: Optional[MetadataServer] = None,
     ) -> None:
         self._local_config = local_config
@@ -136,15 +157,24 @@ class AgentRuntime:
         self._agents = agents
         self._default_agent = default_agent
         self._kernel_registry = kernel_registry
+        self._resource_partitioner = resource_partitioner
         self._metadata_server = metadata_server
 
         self._stop_signal = signal.SIGTERM
+        self._timer_tasks = []
+
+        self._timer_tasks.append(aiotools.create_timer(self._update_slots, 30.0))
+        self._timer_tasks.append(
+            aiotools.create_timer(self._collect_node_stat, UTILIZATION_METRIC_INTERVAL)
+        )
 
     async def __aexit__(self, *exc_info) -> None:
+        await aiotools.cancel_and_wait(self._timer_tasks)
         for agent in self._agents.values():
             await agent.shutdown(self._stop_signal)
         if self._metadata_server is not None:
             await self._metadata_server.cleanup()
+        await self._resource_partitioner.__aexit__(*exc_info)
 
     def get_agents(self) -> list[AbstractAgent]:
         return list(self._agents.values())
@@ -173,3 +203,14 @@ class AgentRuntime:
     async def update_status(self, status: str, agent_id: AgentId) -> None:
         etcd = self.get_etcd(agent_id)
         await etcd.put("", status, scope=ConfigScopes.NODE)
+
+    async def _update_slots(self, interval: float) -> None:
+        for agent_id, agent in self._agents.items():
+            updated_slots = await self._resource_partitioner.get_updated_slots(agent_id)
+            agent.update_slots(updated_slots)
+
+    async def _collect_node_stat(self, interval: float) -> None:
+        for agent_id, agent in self._agents.items():
+            await agent.collect_node_stat(
+                self._resource_partitioner.get_resource_scaling_factor(agent_id)
+            )

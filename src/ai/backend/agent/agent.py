@@ -30,15 +30,18 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
 from io import SEEK_END, BytesIO
+from itertools import chain
 from pathlib import Path
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
+    Concatenate,
     Final,
     Generic,
     Literal,
     Optional,
+    ParamSpec,
     TypeVar,
     cast,
 )
@@ -175,7 +178,6 @@ from ai.backend.common.service_ports import parse_service_ports
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReportValue,
-    AcceleratorMetadata,
     AgentId,
     AutoPullBehavior,
     BinarySize,
@@ -222,7 +224,6 @@ from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.formatter import pretty
 
 from . import __version__ as VERSION
-from . import alloc_map as alloc_map_mod
 from .affinity_map import AffinityMap
 from .config.unified import AgentUnifiedConfig, ContainerSandboxType
 from .exception import AgentError, ContainerCreationError, ResourceError
@@ -235,13 +236,10 @@ from .kernel import (
 from .observer.heartbeat import HeartbeatObserver
 from .observer.host_port import HostPortObserver
 from .resources import (
-    AbstractComputeDevice,
     AbstractComputePlugin,
     ComputerContext,
     KernelResourceSpec,
     Mount,
-    ResourcePartitioner,
-    align_memory,
     allocate,
     known_slot_types,
 )
@@ -280,6 +278,7 @@ COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 STAT_COLLECTION_TIMEOUT: Final[float] = 10 * 60  # 10 minutes
 
+P = ParamSpec("P")
 KernelObjectType = TypeVar("KernelObjectType", bound=AbstractKernel)
 KernelIdContainerPair = tuple[KernelId, Container]
 
@@ -342,7 +341,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: AgentUnifiedConfig,
-        computers: MutableMapping[DeviceName, ComputerContext],
+        computers: Mapping[DeviceName, ComputerContext],
         restarting: bool = False,
     ) -> None:
         self.image_labels = kernel_config["image"]["labels"]
@@ -730,18 +729,18 @@ class RestartTracker:
 def _observe_stat_task(
     stat_scope: StatScope,
 ) -> Callable[
-    [Callable[[AbstractAgent, float], Coroutine[Any, Any, None]]],
-    Callable[[AbstractAgent, float], Coroutine[Any, Any, None]],
+    [Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]]],
+    Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]],
 ]:
     stat_task_observer = StatTaskObserver.instance()
 
     def decorator(
-        func: Callable[[AbstractAgent, float], Coroutine[Any, Any, None]],
-    ) -> Callable[[AbstractAgent, float], Coroutine[Any, Any, None]]:
-        async def wrapper(self: AbstractAgent, interval: float) -> None:
+        func: Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]],
+    ) -> Callable[Concatenate[AbstractAgent, P], Coroutine[Any, Any, None]]:
+        async def wrapper(self: AbstractAgent, *args: P.args, **kwargs: P.kwargs) -> None:
             stat_task_observer.observe_stat_task_triggered(agent_id=self.id, stat_scope=stat_scope)
             try:
-                await func(self, interval)
+                await func(self, *args, **kwargs)
             except asyncio.CancelledError:
                 pass
             except Exception as e:
@@ -767,10 +766,8 @@ class AbstractAgent(
     etcd: AgentEtcdClientView
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
-    resource_partitioner: ResourcePartitioner
-    computers: MutableMapping[DeviceName, ComputerContext]
-    total_slots: Mapping[SlotName, Decimal]
-    reserved_slots: Mapping[SlotName, Decimal]
+    computers: Mapping[DeviceName, ComputerContext]
+    slots: Mapping[SlotName, Decimal]
     images: Mapping[ImageCanonical, ScannedImage]
     port_pool: set[int]
 
@@ -842,7 +839,8 @@ class AbstractAgent(
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
         kernel_registry: KernelRegistry,
-        resource_partitioner: ResourcePartitioner,
+        computers: Mapping[DeviceName, ComputerContext],
+        slots: Mapping[SlotName, Decimal],
     ) -> None:
         self._skip_initial_scan = skip_initial_scan
         self.loop = current_loop()
@@ -852,10 +850,8 @@ class AbstractAgent(
         self.local_instance_id = generate_local_instance_id(__file__)
         self.agent_public_key = agent_public_key
         self.kernel_registry = kernel_registry.agent_mapping(self.id)
-        self.resource_partitioner = resource_partitioner
-        self.computers = {}
-        self.total_slots = {}
-        self.reserved_slots = {}
+        self.computers = computers
+        self.slots = slots
         self.images = {}
         self.restarting_kernels = {}
         self.stat_ctx = StatContext(
@@ -939,30 +935,11 @@ class AbstractAgent(
             bgtask_observer=self._metric_registry.bgtask,
         )
 
-        alloc_map_mod.log_alloc_map = self.local_config.debug.log_alloc_map
-        computers = await self.load_resources()
-
-        all_devices: list[AbstractComputeDevice] = []
-        metadatas: list[AcceleratorMetadata] = []
-        for name, computer in computers.items():
-            devices = await computer.list_devices()
-            all_devices.extend(devices)
-            alloc_map = await computer.create_alloc_map()
-            self.computers[name] = ComputerContext(computer, devices, alloc_map)
-            metadatas.append(computer.get_metadata())
-
-        self.total_slots = self.resource_partitioner.calculate_total_slots(
-            self.computers, self.local_config.resource_common
-        )
-        self.reserved_slots = self.resource_partitioner.restrict_computer_resources(
-            self.computers, self.total_slots
-        )
-        self.slots = await self.update_slots()
         log.info("Resource slots: {!r}", self.slots)
         log.info("Slot types: {!r}", known_slot_types)
-        self.timer_tasks.append(aiotools.create_timer(self.update_slots_periodically, 30.0))
 
         # Use ValkeyStatClient batch operations for better performance
+        metadatas = [computer.instance.get_metadata() for computer in self.computers.values()]
         field_value_map = {}
         for metadata in metadatas:
             field_value_map[metadata["slot_name"]] = dump_json_str(metadata).encode()
@@ -970,6 +947,9 @@ class AbstractAgent(
         if field_value_map:
             await self.valkey_stat_client.store_computer_metadata(field_value_map)
 
+        all_devices = list(
+            chain.from_iterable((computer.devices for computer in self.computers.values()))
+        )
         self.affinity_map = AffinityMap.build(all_devices)
 
         if not self._skip_initial_scan:
@@ -979,9 +959,6 @@ class AbstractAgent(
             await self.scan_running_kernels()
 
         # Prepare stat collector tasks.
-        self.timer_tasks.append(
-            aiotools.create_timer(self.collect_node_stat, UTILIZATION_METRIC_INTERVAL)
-        )
         self.timer_tasks.append(
             aiotools.create_timer(self.collect_container_stat, UTILIZATION_METRIC_INTERVAL)
         )
@@ -1066,12 +1043,6 @@ class AbstractAgent(
         It must call this super method in an appropriate order, only once.
         """
         await cancel_tasks(self._ongoing_exec_batch_tasks)
-
-        for _, computer in self.computers.items():
-            try:
-                await computer.instance.cleanup()
-            except Exception:
-                log.exception("Failed to clean up computer instance:")
 
         async with self.registry_lock:
             # Close all pending kernel runners.
@@ -1278,12 +1249,12 @@ class AbstractAgent(
             chunk_buffer.close()
 
     @_observe_stat_task(stat_scope=StatScope.NODE)
-    async def collect_node_stat(self, interval: float):
+    async def collect_node_stat(self, resource_scaling_factors: Mapping[SlotName, Decimal]):
         if self.local_config.debug.log_stats:
             log.debug("collecting node statistics")
         try:
             async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
-                await self.stat_ctx.collect_node_stat()
+                await self.stat_ctx.collect_node_stat(resource_scaling_factors)
         except Exception:
             log.exception("unhandled exception while syncing node stats")
             await self.produce_error_event()
@@ -1954,60 +1925,8 @@ class AbstractAgent(
     def get_cgroup_version(self) -> str:
         raise NotImplementedError
 
-    @abstractmethod
-    async def load_resources(
-        self,
-    ) -> Mapping[DeviceName, AbstractComputePlugin]:
-        """
-        Detect available resources attached on the system and load corresponding device plugin.
-        """
-
-    @abstractmethod
-    async def scan_available_resources(
-        self,
-    ) -> Mapping[SlotName, Decimal]:
-        """
-        Scan and define the amount of available resource slots in this node.
-        """
-
-    async def update_slots(
-        self,
-    ) -> Mapping[SlotName, Decimal]:
-        """
-        Finalize the resource slots from the resource slots scanned by each device plugin,
-        excluding reserved capacities for the system and agent itself.
-        """
-        scanned_slots = await self.scan_available_resources()
-        usable_slots: dict[SlotName, Decimal] = {}
-        for slot_name, slot_capacity in scanned_slots.items():
-            if slot_name == SlotName("mem"):
-                mem_reserved = int(self.reserved_slots.get(slot_name, 0))
-                mem_align = int(self.local_config.resource.memory_align_size)
-                mem_usable, mem_reserved = align_memory(
-                    int(slot_capacity), mem_reserved, align=mem_align
-                )
-                usable_capacity = Decimal(mem_usable)
-                log.debug(
-                    "usable-mem: {:m}, reserved-mem: {:m} after {:m} alignment",
-                    BinarySize(mem_usable),
-                    BinarySize(mem_reserved),
-                    BinarySize(mem_align),
-                )
-            else:
-                usable_capacity = max(
-                    Decimal(0), slot_capacity - self.reserved_slots.get(slot_name, Decimal(0))
-                )
-            usable_slots[slot_name] = usable_capacity
-        return usable_slots
-
-    async def update_slots_periodically(
-        self,
-        interval: float,
-    ) -> None:
-        """
-        A timer function to periodically scan and update the resource slots.
-        """
-        self.slots = await self.update_slots()
+    def update_slots(self, updated_slots: Mapping[SlotName, Decimal]) -> None:
+        self.slots = updated_slots
         log.debug("slots: {!r}", self.slots)
 
     async def gather_hwinfo(self) -> Mapping[str, HardwareMetadata]:
