@@ -320,7 +320,7 @@ class HealthProbe:
 
         components = [
             ComponentHealthStatus(
-                service_group=key.service_group.value,
+                service_group=key.service_group,
                 component_id=key.component_id,
                 is_healthy=reg.status.is_healthy,
                 last_checked_at=reg.status.last_checked_at,

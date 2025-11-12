@@ -8,6 +8,13 @@ from .exceptions import (
 )
 from .probe import HealthProbe, HealthProbeOptions, RegisteredChecker
 from .types import (
+    AGENT,
+    APPPROXY,
+    DATABASE,
+    ETCD,
+    MANAGER,
+    REDIS,
+    STORAGE_PROXY,
     ComponentId,
     HealthCheckKey,
     HealthCheckStatus,
@@ -26,6 +33,14 @@ __all__ = [
     "ComponentId",
     "HealthCheckKey",
     "HealthCheckStatus",
+    # Built-in ServiceGroups
+    "MANAGER",
+    "AGENT",
+    "STORAGE_PROXY",
+    "APPPROXY",
+    "DATABASE",
+    "ETCD",
+    "REDIS",
     # Probe
     "HealthProbe",
     "HealthProbeOptions",

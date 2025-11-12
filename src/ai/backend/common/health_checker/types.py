@@ -1,26 +1,21 @@
 from __future__ import annotations
 
-import enum
 from dataclasses import dataclass
 from datetime import datetime
 from typing import NewType, Optional
 
+# Service group is a string identifier with type safety
+# Allows components to define their own service groups while maintaining type safety
+ServiceGroup = NewType("ServiceGroup", str)
 
-class ServiceGroup(enum.StrEnum):
-    """
-    Represents the service group category for health checks.
-
-    Each Backend.AI component can check health of various services
-    it depends on (database, Redis, etcd, etc.).
-    """
-
-    MANAGER = "manager"
-    AGENT = "agent"
-    DATABASE = "database"
-    REDIS = "redis"
-    ETCD = "etcd"
-    HTTP = "http"
-
+# Built-in service groups
+MANAGER: ServiceGroup = ServiceGroup("manager")
+AGENT: ServiceGroup = ServiceGroup("agent")
+STORAGE_PROXY: ServiceGroup = ServiceGroup("storage-proxy")
+APPPROXY: ServiceGroup = ServiceGroup("appproxy")
+DATABASE: ServiceGroup = ServiceGroup("database")
+ETCD: ServiceGroup = ServiceGroup("etcd")
+REDIS: ServiceGroup = ServiceGroup("redis")
 
 # Component ID is a string identifier with type safety
 # For services like database, redis, etcd: use service name (e.g., "postgres", "redis")
