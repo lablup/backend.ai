@@ -45,7 +45,6 @@ class ContainerRegistryCreator(Creator):
             "password": self.password,
             "ssl_verify": self.ssl_verify,
             "extra": self.extra,
-            "allowed_groups": self.allowed_groups,
         }
 
 
