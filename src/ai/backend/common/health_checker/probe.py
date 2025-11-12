@@ -238,17 +238,19 @@ class HealthProbe:
         """
         log.debug(f"Health probe loop started (check interval: {self._options.check_interval}s)")
 
-        while self._running:
-            try:
-                await asyncio.sleep(self._options.check_interval)
-                await self.check_all()
-            except asyncio.CancelledError:
-                log.debug("Health probe loop cancelled")
-                break
-            except Exception as e:
-                log.exception("Error in health probe loop: {}", e)
-                # Continue running despite errors
-        log.debug("Health probe loop stopped")
+        try:
+            while self._running:
+                try:
+                    await asyncio.sleep(self._options.check_interval)
+                    await self.check_all()
+                except Exception as e:
+                    log.error(f"Error in health probe loop: {e}", exc_info=True)
+                    # Continue running despite errors
+        except asyncio.CancelledError:
+            log.debug("Health probe loop cancelled")
+            raise
+        finally:
+            log.debug("Health probe loop stopped")
 
     async def _check_single(
         self,
