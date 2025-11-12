@@ -78,7 +78,7 @@ async def test_update_password_no_auth_successful(
     }
 
     new_timestamp = datetime(2024, 1, 1, 12, 0, 0)  # Fixed timestamp for comparison
-    mock_auth_repository.update_user_password_by_uuid_validated.return_value = new_timestamp
+    mock_auth_repository.update_user_password_by_uuid.return_value = new_timestamp
 
     mocker.patch(
         "ai.backend.manager.services.auth.service.compare_to_hashed_password", return_value=False
@@ -211,7 +211,7 @@ async def test_update_password_no_auth_with_retry(
     }
 
     changed_at = datetime.now()
-    mock_auth_repository.update_user_password_by_uuid_validated.return_value = changed_at
+    mock_auth_repository.update_user_password_by_uuid.return_value = changed_at
 
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED,
