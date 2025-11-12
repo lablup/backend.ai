@@ -80,6 +80,12 @@ class AgentClient:
 
     # Hardware information methods
     @agent_client_resilience.apply()
+    async def health(self) -> Mapping[str, Any]:
+        """Get lightweight health information from the agent."""
+        async with self._with_connection() as rpc:
+            return await rpc.call.health()
+
+    @agent_client_resilience.apply()
     async def gather_hwinfo(self) -> Mapping[str, Any]:
         """Gather hardware information from the agent."""
         async with self._with_connection() as rpc:

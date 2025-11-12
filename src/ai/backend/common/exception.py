@@ -785,3 +785,19 @@ class PassthroughError(BackendAIError):
 
     def error_code(self) -> ErrorCode:
         return self._error_code
+
+
+class ClientNotConnectedError(BackendAIError, web.HTTPServiceUnavailable):
+    """
+    Raised when attempting to use a client that is not connected.
+    """
+
+    error_type = "https://api.backend.ai/probs/client-not-connected"
+    error_title = "Client Not Connected"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )

@@ -9,7 +9,10 @@ from typing import Optional
 
 from aiotools import cancel_and_wait
 
-from ai.backend.common.dto.internal.health import ComponentHealthStatus, HealthCheckResponse
+from ai.backend.common.dto.internal.health import (
+    ComponentConnectivityStatus,
+    HealthCheckResponse,
+)
 
 from .abc import HealthChecker
 from .exceptions import HealthCheckerAlreadyRegistered, HealthCheckerNotFound
@@ -321,7 +324,7 @@ class HealthProbe:
         registered = await self._get_all_registered()
 
         components = [
-            ComponentHealthStatus(
+            ComponentConnectivityStatus(
                 service_group=key.service_group,
                 component_id=key.component_id,
                 is_healthy=reg.status.is_healthy,
@@ -334,6 +337,6 @@ class HealthProbe:
         overall_healthy = all(c.is_healthy for c in components) if components else True
         return HealthCheckResponse(
             overall_healthy=overall_healthy,
-            components=components,
+            connectivity_checks=components,
             timestamp=datetime.now(timezone.utc),
         )

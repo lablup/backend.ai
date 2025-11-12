@@ -354,7 +354,7 @@ async def test_probe_get_health_response_all_healthy(
     response = await health_probe.get_health_response()
 
     assert response.overall_healthy is True
-    assert len(response.components) == 2
+    assert len(response.connectivity_checks) == 2
     assert isinstance(response.timestamp, datetime)
 
 
@@ -377,7 +377,7 @@ async def test_probe_get_health_response_some_unhealthy(
     response = await health_probe.get_health_response()
 
     assert response.overall_healthy is False
-    assert len(response.components) == 2
+    assert len(response.connectivity_checks) == 2
 
 
 @pytest.mark.asyncio
@@ -388,7 +388,7 @@ async def test_probe_get_health_response_empty_registry(
     response = await health_probe.get_health_response()
 
     assert response.overall_healthy is True  # Default to True when empty
-    assert len(response.components) == 0
+    assert len(response.connectivity_checks) == 0
     assert isinstance(response.timestamp, datetime)
 
 
@@ -406,7 +406,7 @@ async def test_probe_get_health_response_excludes_unchecked(
     response = await health_probe.get_health_response()
 
     # Should not include the unchecked component
-    assert len(response.components) == 0
+    assert len(response.connectivity_checks) == 0
     assert response.overall_healthy is True  # Default when no checked components
 
 
@@ -415,15 +415,15 @@ async def test_probe_get_health_response_component_fields(
     health_probe: HealthProbe,
     mock_unhealthy_checker: HealthChecker,
 ) -> None:
-    """Test that ComponentHealthStatus in response has correct fields."""
+    """Test that ComponentConnectivityStatus in response has correct fields."""
     key = HealthCheckKey(MANAGER, ComponentId("postgres"))
     await health_probe.register(key, mock_unhealthy_checker)
 
     await health_probe.check_all()
     response = await health_probe.get_health_response()
 
-    assert len(response.components) == 1
-    component = response.components[0]
+    assert len(response.connectivity_checks) == 1
+    component = response.connectivity_checks[0]
 
     assert component.service_group == "manager"
     assert component.component_id == "postgres"

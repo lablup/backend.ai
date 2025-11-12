@@ -14,6 +14,7 @@ import traceback
 from collections import OrderedDict, defaultdict
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
+from datetime import datetime, timezone
 from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
@@ -64,6 +65,7 @@ from ai.backend.common.dto.agent.response import (
     PurgeContainersResp,
     PurgeImagesResp,
 )
+from ai.backend.common.dto.internal.health import HealthCheckResponse
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.event_types.kernel.anycast import (
@@ -615,6 +617,23 @@ class AgentRPCServer(aobject):
     async def ping(self, msg: str) -> str:
         log.debug("rpc::ping()")
         return msg
+
+    @rpc_function
+    @collect_error
+    async def health(self) -> Mapping[str, Any]:
+        """
+        Lightweight health check that returns agent health status.
+
+        Returns HealthCheckResponse without performing heavy operations.
+        Agent itself doesn't check connectivity to other components.
+        """
+        log.debug("rpc::health()")
+        response = HealthCheckResponse(
+            overall_healthy=True,
+            connectivity_checks=[],
+            timestamp=datetime.now(timezone.utc),
+        )
+        return response.model_dump()
 
     @rpc_function
     @collect_error

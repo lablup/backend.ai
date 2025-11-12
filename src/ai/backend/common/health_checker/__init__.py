@@ -1,6 +1,11 @@
 from __future__ import annotations
 
 from .abc import HealthChecker
+from .checkers import (
+    EtcdHealthChecker,
+    HttpHealthChecker,
+    ValkeyHealthChecker,
+)
 from .exceptions import (
     HealthCheckerAlreadyRegistered,
     HealthCheckerNotFound,
@@ -24,6 +29,10 @@ from .types import (
 __all__ = [
     # ABC
     "HealthChecker",
+    # Checkers
+    "EtcdHealthChecker",
+    "HttpHealthChecker",
+    "ValkeyHealthChecker",
     # Exceptions
     "HealthCheckError",
     "HealthCheckerAlreadyRegistered",
