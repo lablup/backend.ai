@@ -173,9 +173,10 @@ async def test_disassociate_container_registry_with_group(
 
 
 class TestContainerRegistryValidator:
-    def test_valid_urls(self) -> None:
-        """Test that valid URLs pass validation."""
-        valid_urls = [
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "valid_url",
+        [
             # Standard HTTP/HTTPS URLs
             "http://example.com",
             "https://example.com",
@@ -200,71 +201,79 @@ class TestContainerRegistryValidator:
             # URLs with paths
             "https://example.com/registry",
             "http://localhost:5000/v2",
-        ]
+        ],
+    )
+    async def test_valid_urls(self, valid_url: str) -> None:
+        """Test that valid URLs pass validation."""
+        args = ContainerRegistryValidatorArgs(
+            url=valid_url, type=ContainerRegistryType.DOCKER, project=None
+        )
+        validator = ContainerRegistryValidator(args)
+        # Should not raise any exception
+        validator.validate()
 
-        for url in valid_urls:
-            args = ContainerRegistryValidatorArgs(
-                url=url, type=ContainerRegistryType.DOCKER, project=None
-            )
-            validator = ContainerRegistryValidator(args)
-            # Should not raise any exception
-            validator.validate()
-
-    def test_invalid_urls(self) -> None:
-        """Test that invalid URLs fail validation."""
-        invalid_urls = [
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "invalid_url",
+        [
             # Empty or whitespace-only URLs
             "",
             "   ",
             # Malformed URLs that fail urlparse
             "http://",
             "https://",
-        ]
+        ],
+    )
+    async def test_invalid_urls(self, invalid_url: str) -> None:
+        """Test that invalid URLs fail validation."""
+        args = ContainerRegistryValidatorArgs(
+            url=invalid_url, type=ContainerRegistryType.DOCKER, project=None
+        )
+        validator = ContainerRegistryValidator(args)
+        with pytest.raises(InvalidContainerRegistryURL, match=f"Invalid URL format: {invalid_url}"):
+            validator.validate()
 
-        for url in invalid_urls:
-            args = ContainerRegistryValidatorArgs(
-                url=url, type=ContainerRegistryType.DOCKER, project=None
-            )
-            validator = ContainerRegistryValidator(args)
-            with pytest.raises(InvalidContainerRegistryURL, match=f"Invalid URL format: {url}"):
-                validator.validate()
-
-    def test_harbor_project_validation_required(self) -> None:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "regsitry_type, registry_url",
+        [
+            (ContainerRegistryType.HARBOR, "https://harbor.example.com"),
+            (ContainerRegistryType.HARBOR2, "https://harbor2.example.com"),
+        ],
+    )
+    async def test_harbor_project_validation_required(self, registry_type, registry_url) -> None:
         """Test that Harbor registries require project names."""
-        for registry_type in [ContainerRegistryType.HARBOR, ContainerRegistryType.HARBOR2]:
-            args = ContainerRegistryValidatorArgs(
-                url="https://harbor.example.com", type=registry_type, project=None
-            )
-            validator = ContainerRegistryValidator(args)
-            with pytest.raises(
-                InvalidContainerRegistryProject, match="Project name is required for Harbor."
-            ):
-                validator.validate()
+        args = ContainerRegistryValidatorArgs(url=registry_url, type=registry_type, project=None)
+        validator = ContainerRegistryValidator(args)
+        with pytest.raises(
+            InvalidContainerRegistryProject, match="Project name is required for Harbor."
+        ):
+            validator.validate()
 
-    def test_harbor_project_validation_length(self) -> None:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "project_name",
+        [
+            "",  # Empty string
+            "a" * 256,  # Too long (256 characters)
+        ],
+    )
+    async def test_harbor_project_validation_length(self, project_name) -> None:
         """Test Harbor project name length validation."""
         # Empty string (length 0)
         args = ContainerRegistryValidatorArgs(
-            url="https://harbor.example.com", type=ContainerRegistryType.HARBOR, project=""
-        )
-        validator = ContainerRegistryValidator(args)
-        with pytest.raises(InvalidContainerRegistryProject, match="Invalid project name length."):
-            validator.validate()
-
-        # Too long (256 characters)
-        long_project = "a" * 256
-        args = ContainerRegistryValidatorArgs(
             url="https://harbor.example.com",
             type=ContainerRegistryType.HARBOR,
-            project=long_project,
+            project=project_name,
         )
         validator = ContainerRegistryValidator(args)
         with pytest.raises(InvalidContainerRegistryProject, match="Invalid project name length."):
             validator.validate()
 
-    def test_harbor_project_validation_format(self) -> None:
-        """Test Harbor project name format validation."""
-        invalid_projects = [
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "invalid_project_name",
+        [
             # Starting with special characters
             "-project",
             "_project",
@@ -288,21 +297,24 @@ class TestContainerRegistryValidator:
             "project..name",
             "project.-name",
             "project_.name",
-        ]
+        ],
+    )
+    async def test_harbor_project_validation_format(self, invalid_project_name) -> None:
+        """Test Harbor project name format validation."""
 
-        for project in invalid_projects:
-            args = ContainerRegistryValidatorArgs(
-                url="https://harbor.example.com", type=ContainerRegistryType.HARBOR, project=project
-            )
-            validator = ContainerRegistryValidator(args)
-            with pytest.raises(
-                InvalidContainerRegistryProject, match="Invalid project name format."
-            ):
-                validator.validate()
+        args = ContainerRegistryValidatorArgs(
+            url="https://harbor.example.com",
+            type=ContainerRegistryType.HARBOR,
+            project=invalid_project_name,
+        )
+        validator = ContainerRegistryValidator(args)
+        with pytest.raises(InvalidContainerRegistryProject, match="Invalid project name format."):
+            validator.validate()
 
-    def test_harbor_project_validation_valid_names(self) -> None:
-        """Test that valid Harbor project names pass validation."""
-        valid_projects = [
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "valid_project_name",
+        [
             # Simple names
             "project",
             "myproject",
@@ -327,12 +339,15 @@ class TestContainerRegistryValidator:
             # Edge cases for length (1 and 255 characters)
             "a",
             "a" * 255,
-        ]
-
-        for project in valid_projects:
-            args = ContainerRegistryValidatorArgs(
-                url="https://harbor.example.com", type=ContainerRegistryType.HARBOR, project=project
-            )
-            validator = ContainerRegistryValidator(args)
-            # Should not raise any exception
-            validator.validate()
+        ],
+    )
+    async def test_harbor_project_validation_valid_names(self, valid_project_name) -> None:
+        """Test that valid Harbor project names pass validation."""
+        args = ContainerRegistryValidatorArgs(
+            url="https://harbor.example.com",
+            type=ContainerRegistryType.HARBOR,
+            project=valid_project_name,
+        )
+        validator = ContainerRegistryValidator(args)
+        # Should not raise any exception
+        validator.validate()
