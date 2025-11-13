@@ -584,9 +584,9 @@ class ResourcePartitioner(aobject):
 
     def _calculate_available_total_slots(self) -> SlotsMap:
         reserved_resources = {
-            SlotName("cpu"): Decimal(self.local_config.resource_common.reserved_cpu),
-            SlotName("mem"): Decimal(self.local_config.resource_common.reserved_mem),
-            SlotName("disk"): Decimal(self.local_config.resource_common.reserved_disk),
+            SlotName("cpu"): Decimal(self.local_config.resource.reserved_cpu),
+            SlotName("mem"): Decimal(self.local_config.resource.reserved_mem),
+            SlotName("disk"): Decimal(self.local_config.resource.reserved_disk),
         }
 
         available_slots: dict[SlotName, Decimal] = {}
@@ -671,19 +671,18 @@ class ResourcePartitioner(aobject):
                         f"Unrecognized AbstractAllocMap type {alloc_map_type}"
                     )
             case ResourceAllocationMode.MANUAL:
+                assert resource_config.allocations is not None
                 match slot_name:
                     case SlotName(device_name="cpu"):
-                        assert resource_config.allocated_cpu is not None
-                        return Decimal(resource_config.allocated_cpu)
+                        return Decimal(resource_config.allocations.cpu)
                     case SlotName(device_name="mem"):
-                        assert resource_config.allocated_mem is not None
-                        return Decimal(resource_config.allocated_mem)
+                        return Decimal(resource_config.allocations.mem)
                     case slot_name:
-                        if slot_name not in resource_config.allocated_devices:
+                        if slot_name not in resource_config.allocations.devices:
                             raise ValueError(
-                                f"{slot_name=} not found in config {resource_config.allocated_devices!r}"
+                                f"{slot_name=} not found in config {resource_config.allocations.devices!r}"
                             )
-                        return resource_config.allocated_devices[slot_name]
+                        return resource_config.allocations.devices[slot_name]
 
     def _calculate_reserved_slots(self, device_slots: SlotsMap) -> SlotsMap:
         reserved_slots: dict[SlotName, Decimal] = {}
@@ -693,7 +692,7 @@ class ResourcePartitioner(aobject):
         return reserved_slots
 
     def _calculate_resource_scaling_factor(self, allocated_slots: SlotsMap) -> SlotsMap:
-        match self.local_config.resource_common.allocation_mode:
+        match self.local_config.resource.allocation_mode:
             case ResourceAllocationMode.SHARED:
                 return defaultdict(lambda: Decimal(1.0))
             case ResourceAllocationMode.AUTO_SPLIT:
@@ -748,7 +747,7 @@ class ResourcePartitioner(aobject):
                 return await dummy_scan(compute_device_types)
 
     def _ensure_slots_are_not_overallocated(self) -> None:
-        if self.local_config.resource_common.allocation_mode != ResourceAllocationMode.MANUAL:
+        if self.local_config.resource.allocation_mode != ResourceAllocationMode.MANUAL:
             return
 
         allocated_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))

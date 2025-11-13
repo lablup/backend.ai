@@ -76,12 +76,16 @@ def create_test_config(
     }
 
     # Add manual allocation fields if provided
-    if allocated_cpu is not None:
-        base_config["resource"]["allocated_cpu"] = allocated_cpu
-    if allocated_mem is not None:
-        base_config["resource"]["allocated_mem"] = BinarySize.finite_from_str(allocated_mem)
-    if allocated_devices is not None:
-        base_config["resource"]["allocated_devices"] = allocated_devices
+    if allocated_cpu is not None or allocated_mem is not None or allocated_devices is not None:
+        base_config["resource"]["allocations"] = {}
+        if allocated_cpu is not None:
+            base_config["resource"]["allocations"]["cpu"] = allocated_cpu
+        if allocated_mem is not None:
+            base_config["resource"]["allocations"]["mem"] = BinarySize.finite_from_str(
+                allocated_mem
+            )
+        if allocated_devices is not None:
+            base_config["resource"]["allocations"]["devices"] = allocated_devices
 
     # Add multiple agents if requested
     if num_agents > 1:
@@ -93,13 +97,11 @@ def create_test_config(
             # In MANUAL mode, each agent needs allocation config
             if allocation_mode == ResourceAllocationMode.MANUAL:
                 agent_override["resource"] = {
-                    "allocated_cpu": allocated_cpu,
-                    "allocated_mem": BinarySize.finite_from_str(allocated_mem)
-                    if allocated_mem
-                    else None,
+                    "cpu": allocated_cpu,
+                    "mem": BinarySize.finite_from_str(allocated_mem) if allocated_mem else None,
                 }
                 if allocated_devices:
-                    agent_override["resource"]["allocated_devices"] = allocated_devices
+                    agent_override["resource"]["devices"] = allocated_devices
             agents_list.append(agent_override)
         base_config["agents"] = agents_list
 
