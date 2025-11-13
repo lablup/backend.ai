@@ -5,11 +5,13 @@ import shutil
 import subprocess
 from collections import defaultdict
 from pathlib import Path
+from typing import AsyncIterator
 
 import aiodocker
 import pytest
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
@@ -271,3 +273,33 @@ async def create_container(test_id, docker):
     finally:
         if container is not None:
             await container.delete(force=True)
+
+
+@pytest.fixture
+async def agent_runtime(
+    local_config: AgentUnifiedConfig,
+    etcd,
+    mocker,
+) -> AsyncIterator[AgentRuntime]:
+    """
+    Create a real AgentRuntime instance for integration testing.
+
+    This fixture provides a fully initialized AgentRuntime with:
+    - Real etcd client
+    - Real agent configuration
+    - Mocked stats and error monitors (external dependencies)
+    - Proper cleanup after tests
+    """
+    from unittest.mock import Mock
+
+    mock_stats_monitor = Mock()
+    mock_error_monitor = Mock()
+
+    runtime = AgentRuntime(local_config, etcd)
+
+    await runtime.create_agents(mock_stats_monitor, mock_error_monitor, None)
+
+    try:
+        yield runtime
+    finally:
+        await runtime.__aexit__(None, None, None)
