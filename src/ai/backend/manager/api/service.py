@@ -426,6 +426,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         description="String reference of the image which will be used to create session",
         examples=["cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"],
         alias="lang",
+        default=None,
     )
     runtime_variant: RuntimeVariant = Field(
         description="Type of the inference runtime the image will try to load.",
@@ -434,6 +435,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
     architecture: Optional[str] = Field(
         description="Image architecture",
         alias="arch",
+        default=None,
     )
     group_name: str = Field(
         description="Name of project to spawn session",
