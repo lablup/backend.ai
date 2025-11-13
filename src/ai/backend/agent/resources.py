@@ -482,6 +482,7 @@ class ResourcePartitioner(aobject):
 
     computers: ComputersMap
     total_slots: SlotsMap
+    available_total_slots: SlotsMap
 
     agent_computers: Mapping[AgentId, ComputersMap]
     agent_reserved_slots: Mapping[AgentId, SlotsMap]
@@ -511,6 +512,7 @@ class ResourcePartitioner(aobject):
             computer_contexts[name] = ComputerContext(computer, devices, alloc_map)
         self.computers = computer_contexts
         self.total_slots = self._calculate_total_slots()
+        self.available_total_slots = self._calculate_available_total_slots()
 
         agent_computers = {}
         agent_reserved_slots = {}
@@ -580,25 +582,25 @@ class ResourcePartitioner(aobject):
         for device in self.computers.values():
             for slot_info in device.alloc_map.device_slots.values():
                 total_slots[slot_info.slot_name] += slot_info.amount
-        return self._deduct_reserved_resources(total_slots)
+        return total_slots
 
-    def _deduct_reserved_resources(self, total_slots: SlotsMap) -> SlotsMap:
+    def _calculate_available_total_slots(self) -> SlotsMap:
         reserved_resources = {
             SlotName("cpu"): Decimal(self.local_config.resource_common.reserved_cpu),
             SlotName("mem"): Decimal(self.local_config.resource_common.reserved_mem),
             SlotName("disk"): Decimal(self.local_config.resource_common.reserved_disk),
         }
 
-        slots: dict[SlotName, Decimal] = {}
-        for slot_name, total_slot in total_slots.items():
+        available_slots: dict[SlotName, Decimal] = {}
+        for slot_name, total_slot in self.total_slots.items():
             reserved_slot = reserved_resources.get(slot_name, Decimal("0"))
             if total_slot < reserved_slot:
                 raise InvalidResourceConfigError(
                     f"Slot {slot_name} reserved for {reserved_slot}, "
                     f"which is larger than total slot available {total_slot}"
                 )
-            slots[slot_name] = total_slot - reserved_slot
-        return slots
+            available_slots[slot_name] = total_slot - reserved_slot
+        return available_slots
 
     async def _calculate_agent_partition(
         self,
@@ -654,18 +656,18 @@ class ResourcePartitioner(aobject):
         alloc_map_type: Type[AbstractAllocMap],
     ) -> Decimal:
         resource_config = agent_config.resource
-        total_slot = self.total_slots[slot_name]
+        available_total_slot = self.available_total_slots[slot_name]
 
         match resource_config.allocation_mode:
             case ResourceAllocationMode.SHARED:
-                return total_slot
+                return available_total_slot
             case ResourceAllocationMode.AUTO_SPLIT:
                 if alloc_map_type is DiscretePropertyAllocMap:
-                    slot, slot_extra = divmod(total_slot, self.num_agents)
+                    slot, slot_extra = divmod(available_total_slot, self.num_agents)
                     remainder_value = 1 if agent_idx < slot_extra else 0
                     return slot + remainder_value
                 elif alloc_map_type is FractionAllocMap:
-                    return total_slot / self.num_agents
+                    return available_total_slot / self.num_agents
                 else:
                     raise NotImplementedError(
                         f"Unrecognized AbstractAllocMap type {alloc_map_type}"
@@ -688,23 +690,24 @@ class ResourcePartitioner(aobject):
     def _calculate_reserved_slots(self, device_slots: SlotsMap) -> SlotsMap:
         reserved_slots: dict[SlotName, Decimal] = {}
         for slot_name, slot in device_slots.items():
-            reserved_slots[slot_name] = max(self.total_slots[slot_name] - slot, Decimal(0))
+            available_total_slot = self.available_total_slots[slot_name]
+            reserved_slots[slot_name] = max(available_total_slot - slot, Decimal(0))
         return reserved_slots
 
     def _calculate_resource_scaling_factor(self, allocated_slots: SlotsMap) -> SlotsMap:
-        total_slots = self.total_slots
         match self.local_config.resource_common.allocation_mode:
             case ResourceAllocationMode.SHARED:
                 return defaultdict(lambda: Decimal(1.0))
             case ResourceAllocationMode.AUTO_SPLIT:
                 return defaultdict(lambda: Decimal(1.0) / Decimal(self.num_agents))
             case ResourceAllocationMode.MANUAL:
+                total_slots = self.total_slots
                 if SlotName("cpu") not in allocated_slots or SlotName("cpu") not in total_slots:
                     raise ValueError("CPU not in allocated or total slots seen")
                 if SlotName("mem") not in allocated_slots or SlotName("mem") not in total_slots:
                     raise ValueError("Memory not in allocated or total slots seen")
                 scaling_factor = {
-                    slot_name: slot / total_slots[slot_name]
+                    slot_name: slot / self.available_total_slots[slot_name]
                     for slot_name, slot in allocated_slots.items()
                 }
                 return scaling_factor
@@ -752,15 +755,17 @@ class ResourcePartitioner(aobject):
 
         allocated_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))
         for agent_reserved_slots in self.agent_reserved_slots.values():
-            for slot_name, total_slot in self.total_slots.items():
-                allocated_slot = total_slot - agent_reserved_slots[slot_name]
+            for slot_name in self.total_slots.keys():
+                available_total_slot = self.available_total_slots[slot_name]
+                allocated_slot = available_total_slot - agent_reserved_slots[slot_name]
                 allocated_slots[slot_name] += allocated_slot
 
         for slot_name, allocated_slot in allocated_slots.items():
-            if self.total_slots[slot_name] < allocated_slot:
+            available_total_slot = self.available_total_slots[slot_name]
+            if available_total_slot < allocated_slot:
                 raise ResourceOverAllocatedError(
                     f"Resource slot {slot_name} was manually allocated {allocated_slot} across "
-                    f"all agents when total capacity is {self.total_slots[slot_name]}."
+                    f"all agents when total capacity is {available_total_slot}."
                 )
 
 
