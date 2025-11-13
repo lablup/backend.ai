@@ -1,14 +1,5 @@
 """
 Service layer tests for service definition merge behavior during deployment creation.
-
-These tests verify the acceptance criteria from BA-3030:
-1. Service creation with only service-definition.toml
-2. Service creation with only API request
-3. Service creation with both (override behavior)
-4. Validation errors for missing required fields in final config
-
-The tests use the definition generator pattern which is the actual code path
-that merges service definition with API request.
 """
 
 from dataclasses import dataclass
@@ -74,15 +65,6 @@ class ErrorTestCase:
 
 
 class TestServiceDefinitionMerge:
-    """
-    Test service definition merge behavior matching acceptance criteria.
-
-    1. API requests can omit image and architecture when defined in service-definition.toml
-    2. service-definition.toml values are used as base configuration
-    3. API request values properly override service-definition.toml values
-    4. Final merged configuration is validated before service creation
-    """
-
     @pytest.fixture
     def mock_deployment_repository(self) -> MagicMock:
         """Mock deployment repository."""
