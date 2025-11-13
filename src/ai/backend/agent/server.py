@@ -285,6 +285,7 @@ class AgentRPCServer(aobject):
         self.loop = current_loop()
         self.etcd = etcd
         self.local_config = local_config
+        self.runtime = AgentRuntime(self.local_config, self.etcd)
         self.skip_detect_manager = skip_detect_manager
 
     async def __ainit__(self) -> None:
@@ -337,9 +338,7 @@ class AgentRPCServer(aobject):
             self.rpc_auth_agent_secret_key = None
             auth_handler = None
 
-        self.runtime = await AgentRuntime.new(
-            self.local_config,
-            self.etcd,
+        await self.runtime.create_agents(
             self.stats_monitor,
             self.error_monitor,
             self.rpc_auth_agent_public_key,
