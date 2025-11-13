@@ -70,9 +70,12 @@ def test_node_id() -> str:
 
 
 @pytest.fixture
-async def etcd(etcd_container, test_ns: str) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
+async def etcd(
+    etcd_container_info: tuple[str, HostPortPairModel],
+    test_ns: str,
+) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
     etcd = AsyncEtcd(
-        addrs=[etcd_container[1]],
+        addrs=[etcd_container_info[1].to_legacy()],
         namespace=test_ns,
         scope_prefix_map={
             ConfigScopes.GLOBAL: "global",
