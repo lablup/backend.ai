@@ -40,7 +40,6 @@ class AgentRuntime(aobject):
     kernel_registry: KernelRegistry
     etcd: AsyncEtcd
     etcd_views: dict[AgentId, AgentEtcdClientView]
-    metadata_server: MetadataServer | None
 
     _default_agent_id: AgentId
     _stop_signal: signal.Signals
@@ -58,7 +57,7 @@ class AgentRuntime(aobject):
         self.kernel_registry = KernelRegistry()
         self.etcd = etcd
         self.etcd_views = {}
-        self.metadata_server = None
+        self.metadata_server: MetadataServer | None = None
 
         agent_configs = self.local_config.get_agent_configs()
         self._default_agent_id = AgentId(agent_configs[0].agent.id)
