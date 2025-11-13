@@ -65,6 +65,7 @@ class AgentRuntime(aobject):
         agent_config: AgentUnifiedConfig,
     ) -> AbstractAgent:
         agent_kwargs = {
+            "kernel_registry": self.kernel_registry,
             "stats_monitor": self.stats_monitor,
             "error_monitor": self.error_monitor,
             "agent_public_key": self.agent_public_key,
