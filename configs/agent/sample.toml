@@ -143,14 +143,6 @@
 # If agents field is populated, this field indicates the default values for all
 # agents.
 [resource]
-  # Hard CPU allocation for this agent (e.g., 8 cores).
-  # Only used in MANUAL allocation mode.
-  # All agents must specify this value when allocation-mode is MANUAL.
-  ## allocated-cpu = 8
-  # Hard memory allocation for this agent (e.g., "32G").
-  # Only used in MANUAL allocation mode.
-  # All agents must specify this value when allocation-mode is MANUAL.
-  ## allocated-mem = "32G"
   # The number of CPU cores reserved for the operating system and the agent
   # service.
   reserved-cpu = 1
@@ -179,9 +171,21 @@
   # Affinity policy
   affinity-policy = "INTERLEAVED"
 
-  # Device-specific per-slot resource allocations.
+  # Resource allocations.
   # Only used in MANUAL allocation mode.
-  [resource.allocated-devices]
+  [resource.allocations]
+    # Hard CPU allocation for this agent (e.g., 8 cores).
+    # Only used in MANUAL allocation mode.
+    # All agents must specify this value when allocation-mode is MANUAL.
+    cpu = 8
+    # Hard memory allocation for this agent (e.g., "32G").
+    # Only used in MANUAL allocation mode.
+    # All agents must specify this value when allocation-mode is MANUAL.
+    mem = "32G"
+
+    # Device-specific per-slot resource allocations.
+    # Only used in MANUAL allocation mode.
+    [resource.allocations.devices]
 
 # Pyroscope configuration
 [pyroscope]
@@ -401,7 +405,7 @@
     # late into the agent's runtime.
     port-range = [ 30000, 31000,]
     # Statistics type
-    ## stats-type = "cgroup"
+    ## stats-type = "docker"
     # Sandbox type
     sandbox-type = "docker"
     # Jail arguments
@@ -411,7 +415,7 @@
     # Scratch root directory
     scratch-root = "scratches"
     # Scratch size
-    scratch-size = 0
+    scratch-size = "0"
     # Scratch NFS address
     ## scratch-nfs-address = "192.168.1.100:/export"
     # Scratch NFS options
@@ -430,12 +434,12 @@
     # Hard CPU allocation for this agent (e.g., 8 cores).
     # Only used in MANUAL allocation mode.
     # All agents must specify this value when allocation-mode is MANUAL.
-    ## allocated-cpu = 8
+    cpu = 8
     # Hard memory allocation for this agent (e.g., "32G").
     # Only used in MANUAL allocation mode.
     # All agents must specify this value when allocation-mode is MANUAL.
-    ## allocated-mem = "32G"
+    mem = "32G"
 
     # Device-specific per-slot resource allocations.
     # Only used in MANUAL allocation mode.
-    [agents.resource.allocated-devices]
+    [agents.resource.devices]

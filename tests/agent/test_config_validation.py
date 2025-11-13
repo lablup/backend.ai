@@ -762,15 +762,15 @@ class TestMultipleAgentsConfigValidation:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "allocated-cpu": 2,
-                        "allocated-mem": "8G",
+                        "cpu": 2,
+                        "mem": "8G",
                     },
                 },
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "allocated-cpu": 1,
-                        "allocated-mem": "8G",
+                        "cpu": 1,
+                        "mem": "8G",
                     },
                 },
             ],
@@ -778,8 +778,10 @@ class TestMultipleAgentsConfigValidation:
         config = AgentUnifiedConfig.model_validate(raw_config)
 
         agent_configs = config.get_agent_configs()
-        assert agent_configs[0].resource.allocated_cpu == 2
-        assert agent_configs[1].resource.allocated_cpu == 1
+        assert agent_configs[0].resource.allocations is not None
+        assert agent_configs[0].resource.allocations.cpu == 2
+        assert agent_configs[1].resource.allocations is not None
+        assert agent_configs[1].resource.allocations.cpu == 1
 
     def test_agent_partial_override_preserves_other_fields(
         self,
@@ -871,8 +873,10 @@ class TestMultipleAgentsConfigValidation:
             "resource": {
                 **default_raw_config["resource"],
                 "allocation-mode": "manual",
-                "allocated-cpu": 1,
-                "allocated-mem": "8G",
+                "allocations": {
+                    "cpu": 1,
+                    "mem": "8G",
+                },
             },
             "agents": [
                 {
@@ -882,7 +886,8 @@ class TestMultipleAgentsConfigValidation:
                     },
                     "container": {"port-range": [31000, 32000]},
                     "resource": {
-                        "allocated-cpu": 2,
+                        "cpu": 2,
+                        "mem": "8G",
                     },
                 },
                 {
@@ -901,9 +906,11 @@ class TestMultipleAgentsConfigValidation:
         agent_configs = config.get_agent_configs()
         assert len(agent_configs) == 3
         assert agent_configs[0].agent.kernel_creation_concurrency == 8
-        assert agent_configs[0].resource.allocated_cpu == 2
+        assert agent_configs[0].resource.allocations is not None
+        assert agent_configs[0].resource.allocations.cpu == 2
         assert agent_configs[1].agent.kernel_creation_concurrency == 4
-        assert agent_configs[1].resource.allocated_cpu == 1
+        assert agent_configs[1].resource.allocations is not None
+        assert agent_configs[1].resource.allocations.cpu == 1
         assert agent_configs[2].agent.kernel_creation_concurrency == 4
 
     def test_agent_with_only_id_inherits_all_fields(
@@ -968,7 +975,6 @@ class TestMultipleAgentsConfigValidation:
             "agents": [
                 {
                     "agent": {"id": "agent-1"},
-                    "resource": {},
                 },
                 {"agent": {"id": "agent-2"}},
             ],
@@ -978,6 +984,31 @@ class TestMultipleAgentsConfigValidation:
         agent_configs = config.get_agent_configs()
         assert agent_configs[0].resource.reserved_cpu == 2
         assert agent_configs[1].resource.reserved_cpu == 2
+
+    def test_agent_with_empty_resource_dict_is_rejected(
+        self,
+        default_raw_config: RawConfigT,
+    ) -> None:
+        """Empty resource dict should be rejected - omit the field instead."""
+        raw_config = {
+            **default_raw_config,
+            "resource": {
+                "reserved-cpu": 2,
+                "reserved-mem": "2G",
+                "reserved-disk": "10G",
+            },
+            "agents": [
+                {
+                    "agent": {"id": "agent-1"},
+                    "resource": {},  # Empty dict should be invalid
+                },
+                {"agent": {"id": "agent-2"}},
+            ],
+        }
+        with pytest.raises(ValidationError) as exc_info:
+            AgentUnifiedConfig.model_validate(raw_config)
+
+        assert "Field required" in str(exc_info.value)
 
     def test_overridable_agent_config_defaults_when_not_in_global(
         self,
@@ -1151,7 +1182,10 @@ class TestResourceAllocationModes:
             "agents": [
                 {
                     "agent": {"id": "agent-1"},
-                    "resource": {"allocated-cpu": 8},
+                    "resource": {
+                        "cpu": 8,
+                        "mem": "8G",
+                    },
                 },
                 {"agent": {"id": "agent-2"}},
             ],
@@ -1175,9 +1209,11 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "allocated-devices": {
+                        "cpu": 8,
+                        "mem": "8G",
+                        "devices": {
                             SlotName("cuda.mem"): 0.5,
-                        }
+                        },
                     },
                 },
                 {"agent": {"id": "agent-2"}},
@@ -1219,7 +1255,10 @@ class TestResourceAllocationModes:
             "agents": [
                 {
                     "agent": {"id": "agent-1"},
-                    "resource": {"allocated-cpu": 8},
+                    "resource": {
+                        "cpu": 8,
+                        "mem": "8G",
+                    },
                 },
                 {"agent": {"id": "agent-2"}},
             ],
@@ -1243,8 +1282,8 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        # Missing allocated-mem
+                        "cpu": 8,
+                        # Missing mem - this should fail because mem is required
                     },
                 },
                 {"agent": {"id": "agent-2"}},
@@ -1253,8 +1292,7 @@ class TestResourceAllocationModes:
         with pytest.raises(ValidationError) as exc_info:
             AgentUnifiedConfig.model_validate(raw_config)
 
-        assert "must specify" in str(exc_info.value)
-        assert "resource allocations" in str(exc_info.value)
+        assert "Field required" in str(exc_info.value)
 
     def test_manual_mode_valid_configuration(
         self,
@@ -1270,15 +1308,15 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
+                        "cpu": 8,
+                        "mem": "32G",
                     },
                 },
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "allocated-cpu": 4,
-                        "allocated-mem": "32G",
+                        "cpu": 4,
+                        "mem": "32G",
                     },
                 },
             ],
@@ -1286,8 +1324,10 @@ class TestResourceAllocationModes:
         config = AgentUnifiedConfig.model_validate(raw_config)
         assert config.resource.allocation_mode == ResourceAllocationMode.MANUAL
         agent_configs = config.get_agent_configs()
-        assert agent_configs[0].resource.allocated_cpu == 8
-        assert agent_configs[1].resource.allocated_cpu == 4
+        assert agent_configs[0].resource.allocations is not None
+        assert agent_configs[0].resource.allocations.cpu == 8
+        assert agent_configs[1].resource.allocations is not None
+        assert agent_configs[1].resource.allocations.cpu == 4
 
     def test_manual_mode_with_allocated_devices(
         self,
@@ -1303,9 +1343,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        "allocated-devices": {
+                        "cpu": 8,
+                        "mem": "32G",
+                        "devices": {
                             SlotName("cuda.mem"): 0.3,
                         },
                     },
@@ -1313,9 +1353,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        "allocated-devices": {
+                        "cpu": 8,
+                        "mem": "32G",
+                        "devices": {
                             SlotName("cuda.mem"): 0.7,
                         },
                     },
@@ -1324,8 +1364,10 @@ class TestResourceAllocationModes:
         }
         config = AgentUnifiedConfig.model_validate(raw_config)
         agent_configs = config.get_agent_configs()
-        assert agent_configs[0].resource.allocated_devices[SlotName("cuda.mem")] == Decimal("0.3")
-        assert agent_configs[1].resource.allocated_devices[SlotName("cuda.mem")] == Decimal("0.7")
+        assert agent_configs[0].resource.allocations is not None
+        assert agent_configs[0].resource.allocations.devices[SlotName("cuda.mem")] == Decimal("0.3")
+        assert agent_configs[1].resource.allocations is not None
+        assert agent_configs[1].resource.allocations.devices[SlotName("cuda.mem")] == Decimal("0.7")
 
     def test_manual_mode_agents_with_same_slots_allowed(
         self,
@@ -1342,9 +1384,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        "allocated-devices": {
+                        "cpu": 8,
+                        "mem": "32G",
+                        "devices": {
                             SlotName("cuda.mem"): 0.3,
                             SlotName("cuda.shares"): 1.0,
                         },
@@ -1353,9 +1395,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "allocated-cpu": 4,
-                        "allocated-mem": "16G",
-                        "allocated-devices": {
+                        "cpu": 4,
+                        "mem": "16G",
+                        "devices": {
                             SlotName("cuda.mem"): 0.7,
                             SlotName("cuda.shares"): 2.0,
                         },
@@ -1367,18 +1409,20 @@ class TestResourceAllocationModes:
         agent_configs = config.get_agent_configs()
 
         # Check that both agents have the same slot names
-        assert set(agent_configs[0].resource.allocated_devices.keys()) == {
+        assert agent_configs[0].resource.allocations is not None
+        assert set(agent_configs[0].resource.allocations.devices.keys()) == {
             SlotName("cuda.mem"),
             SlotName("cuda.shares"),
         }
-        assert set(agent_configs[1].resource.allocated_devices.keys()) == {
+        assert agent_configs[1].resource.allocations is not None
+        assert set(agent_configs[1].resource.allocations.devices.keys()) == {
             SlotName("cuda.mem"),
             SlotName("cuda.shares"),
         }
 
         # Check that values can differ
-        assert agent_configs[0].resource.allocated_devices[SlotName("cuda.mem")] == Decimal("0.3")
-        assert agent_configs[1].resource.allocated_devices[SlotName("cuda.mem")] == Decimal("0.7")
+        assert agent_configs[0].resource.allocations.devices[SlotName("cuda.mem")] == Decimal("0.3")
+        assert agent_configs[1].resource.allocations.devices[SlotName("cuda.mem")] == Decimal("0.7")
 
     def test_manual_mode_agents_with_different_slots_rejected(
         self,
@@ -1395,9 +1439,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        "allocated-devices": {
+                        "cpu": 8,
+                        "mem": "32G",
+                        "devices": {
                             SlotName("cuda.mem"): 0.7,
                         },
                     },
@@ -1405,9 +1449,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        "allocated-devices": {
+                        "cpu": 8,
+                        "mem": "32G",
+                        "devices": {
                             SlotName("cuda.shares"): 0.6,
                         },
                     },
@@ -1434,9 +1478,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        "allocated-devices": {
+                        "cpu": 8,
+                        "mem": "32G",
+                        "devices": {
                             SlotName("cuda.mem"): 0.5,
                             SlotName("cuda.shares"): 1.0,
                         },
@@ -1445,9 +1489,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        "allocated-devices": {
+                        "cpu": 8,
+                        "mem": "32G",
+                        "devices": {
                             SlotName("cuda.mem"): 0.5,
                         },
                     },
@@ -1474,9 +1518,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        "allocated-devices": {
+                        "cpu": 8,
+                        "mem": "32G",
+                        "devices": {
                             SlotName("cuda.mem"): 0.5,
                         },
                     },
@@ -1484,9 +1528,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        # No allocated-devices specified
+                        "cpu": 8,
+                        "mem": "32G",
+                        # No devices specified
                     },
                 },
             ],
@@ -1511,17 +1555,17 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        # No allocated-devices specified
+                        "cpu": 8,
+                        "mem": "32G",
+                        # No devices specified
                     },
                 },
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "allocated-cpu": 4,
-                        "allocated-mem": "16G",
-                        # No allocated-devices specified
+                        "cpu": 4,
+                        "mem": "16G",
+                        # No devices specified
                     },
                 },
             ],
@@ -1530,8 +1574,10 @@ class TestResourceAllocationModes:
         agent_configs = config.get_agent_configs()
 
         # Both should have empty allocated_devices
-        assert agent_configs[0].resource.allocated_devices == {}
-        assert agent_configs[1].resource.allocated_devices == {}
+        assert agent_configs[0].resource.allocations is not None
+        assert agent_configs[0].resource.allocations.devices == {}
+        assert agent_configs[1].resource.allocations is not None
+        assert agent_configs[1].resource.allocations.devices == {}
 
     def test_allocated_devices_parses_decimal_strings(
         self,
@@ -1547,9 +1593,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        "allocated-devices": {
+                        "cpu": 8,
+                        "mem": "32G",
+                        "devices": {
                             SlotName("foo"): "0.25",  # String value
                         },
                     },
@@ -1557,9 +1603,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        "allocated-devices": {
+                        "cpu": 8,
+                        "mem": "32G",
+                        "devices": {
                             SlotName("foo"): 0.75,  # Numeric value
                         },
                     },
@@ -1568,8 +1614,10 @@ class TestResourceAllocationModes:
         }
         config = AgentUnifiedConfig.model_validate(raw_config)
         agent_configs = config.get_agent_configs()
-        assert float(agent_configs[0].resource.allocated_devices[SlotName("foo")]) == 0.25
-        assert float(agent_configs[1].resource.allocated_devices[SlotName("foo")]) == 0.75
+        assert agent_configs[0].resource.allocations is not None
+        assert float(agent_configs[0].resource.allocations.devices[SlotName("foo")]) == 0.25
+        assert agent_configs[1].resource.allocations is not None
+        assert float(agent_configs[1].resource.allocations.devices[SlotName("foo")]) == 0.75
 
     def test_allocated_devices_rejects_negative_values(
         self,
@@ -1585,9 +1633,9 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-1"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
-                        "allocated-devices": {
+                        "cpu": 8,
+                        "mem": "32G",
+                        "devices": {
                             SlotName("foo"): "-1",
                         },
                     },
@@ -1595,8 +1643,8 @@ class TestResourceAllocationModes:
                 {
                     "agent": {"id": "agent-2"},
                     "resource": {
-                        "allocated-cpu": 8,
-                        "allocated-mem": "32G",
+                        "cpu": 8,
+                        "mem": "32G",
                     },
                 },
             ],

@@ -51,6 +51,7 @@ from ai.backend.common.types import (
     ResourceGroupType,
     ServiceDiscoveryType,
     SlotName,
+    SlotNameField,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
@@ -875,7 +876,49 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
     pass
 
 
-class CommonResourceConfig(BaseConfigSchema):
+class ResourceAllocationConfig(BaseConfigSchema):
+    cpu: int = Field(
+        description=textwrap.dedent("""
+        Hard CPU allocation for this agent (e.g., 8 cores).
+        Only used in MANUAL allocation mode.
+        All agents must specify this value when allocation-mode is MANUAL.
+        """),
+        examples=[8, 16],
+    )
+    mem: BinarySizeField = Field(
+        description=textwrap.dedent("""
+        Hard memory allocation for this agent (e.g., "32G").
+        Only used in MANUAL allocation mode.
+        All agents must specify this value when allocation-mode is MANUAL.
+        """),
+        examples=["32G", "64G"],
+    )
+    devices: Mapping[SlotNameField, Decimal] = Field(
+        default_factory=dict,
+        description=textwrap.dedent("""
+        Device-specific per-slot resource allocations.
+        Only used in MANUAL allocation mode.
+        """),
+        examples=[{"cuda.mem": "0.3", "cuda.shares": "0.5"}],
+    )
+
+    model_config = ConfigDict(
+        extra="allow",
+        arbitrary_types_allowed=True,
+    )
+
+    @model_validator(mode="after")
+    def validate_values_are_positive(self) -> Self:
+        if self.cpu is not None and self.cpu < 0:
+            raise ValueError(f"Allocated cpu must not be a negative value, but given {self.cpu}")
+        if self.mem is not None and self.mem < 0:
+            raise ValueError(f"Allocated mem must not be a negative value, but given {self.mem}")
+        if any(value < 0 for value in self.devices.values()):
+            raise ValueError("All allocated device resource values must not be a negative value")
+        return self
+
+
+class ResourceConfig(BaseConfigSchema):
     reserved_cpu: int = Field(
         default=1,
         description="The number of CPU cores reserved for the operating system and the agent service.",
@@ -919,6 +962,13 @@ class CommonResourceConfig(BaseConfigSchema):
         validation_alias=AliasChoices("allocation-mode", "allocation_mode"),
         serialization_alias="allocation-mode",
     )
+    allocations: Optional[ResourceAllocationConfig] = Field(
+        default=None,
+        description=textwrap.dedent("""
+        Resource allocations.
+        Only used in MANUAL allocation mode.
+        """),
+    )
     memory_align_size: BinarySizeField = Field(
         default=BinarySize.finite_from_str("16M"),
         description=(
@@ -959,64 +1009,6 @@ class CommonResourceConfig(BaseConfigSchema):
             except KeyError:
                 raise ValueError(f"Invalid affinity policy: {v}")
         return v
-
-
-class OverridableResourceConfig(BaseConfigSchema):
-    allocated_cpu: Optional[int] = Field(
-        default=None,
-        description=textwrap.dedent("""
-        Hard CPU allocation for this agent (e.g., 8 cores).
-        Only used in MANUAL allocation mode.
-        All agents must specify this value when allocation-mode is MANUAL.
-        """),
-        examples=[8, 16],
-        validation_alias=AliasChoices("allocated-cpu", "allocated_cpu"),
-        serialization_alias="allocated-cpu",
-    )
-    allocated_mem: Optional[BinarySizeField] = Field(
-        default=None,
-        description=textwrap.dedent("""
-        Hard memory allocation for this agent (e.g., "32G").
-        Only used in MANUAL allocation mode.
-        All agents must specify this value when allocation-mode is MANUAL.
-        """),
-        examples=["32G", "64G"],
-        validation_alias=AliasChoices("allocated-mem", "allocated_mem"),
-        serialization_alias="allocated-mem",
-    )
-    allocated_devices: Mapping[SlotName, Decimal] = Field(
-        default_factory=dict,
-        description=textwrap.dedent("""
-        Device-specific per-slot resource allocations.
-        Only used in MANUAL allocation mode.
-        """),
-        examples=[{"cuda.mem": "0.3", "cuda.shares": "0.5"}],
-        validation_alias=AliasChoices("allocated-devices", "allocated_devices"),
-        serialization_alias="allocated-devices",
-    )
-
-    model_config = ConfigDict(
-        extra="allow",
-        arbitrary_types_allowed=True,
-    )
-
-    @model_validator(mode="after")
-    def validate_values_are_positive(self) -> Self:
-        if self.allocated_cpu is not None and self.allocated_cpu < 0:
-            raise ValueError(
-                f"Allocated cpu must not be a negative value, but given {self.allocated_cpu}"
-            )
-        if self.allocated_mem is not None and self.allocated_mem < 0:
-            raise ValueError(
-                f"Allocated mem must not be a negative value, but given {self.allocated_mem}"
-            )
-        if any(value < 0 for value in self.allocated_devices.values()):
-            raise ValueError("All allocated device resource values must not be a negative value")
-        return self
-
-
-class ResourceConfig(CommonResourceConfig, OverridableResourceConfig):
-    pass
 
 
 class EtcdConfig(BaseConfigSchema):
@@ -1261,11 +1253,11 @@ class AgentOverrideConfig(BaseConfigSchema):
         Only override fields if necessary.
         """),
     )
-    container: OverridableContainerConfig | None = Field(
+    container: Optional[OverridableContainerConfig] = Field(
         default=None,
         description="Container config overrides for the individual agent",
     )
-    resource: OverridableResourceConfig | None = Field(
+    resource: Optional[ResourceAllocationConfig] = Field(
         default=None,
         description="Resource config overrides for the individual agent",
     )
@@ -1287,10 +1279,19 @@ class AgentOverrideConfig(BaseConfigSchema):
                 update=container_override_fields
             )
         if self.resource is not None:
-            resource_override_fields = self.resource.model_dump(
-                include=self.resource.model_fields_set
+            default_allocations = default.resource.allocations
+            override_allocations = self.resource
+            if default_allocations is None:
+                merged_allocations = override_allocations
+            else:
+                merged_allocations = default_allocations.model_copy(
+                    update=override_allocations.model_dump(
+                        include=override_allocations.model_fields_set
+                    )
+                )
+            agent_updates["resource"] = default.resource.model_copy(
+                update={"allocations": merged_allocations}
             )
-            agent_updates["resource"] = default.resource.model_copy(update=resource_override_fields)
         return default.model_copy(update=agent_updates)
 
 
@@ -1325,10 +1326,6 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
     @property
     def agent_ids(self) -> Sequence[AgentId]:
         return [AgentId(agent_config.agent.id) for agent_config in self.get_agent_configs()]
-
-    @property
-    def resource_common(self) -> CommonResourceConfig:
-        return self.resource
 
     def get_agent_configs(self) -> Sequence[AgentUnifiedConfig]:
         agent_configs = [agent.construct_unified_config(default=self) for agent in self.agents]
@@ -1404,27 +1401,21 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
         match self.resource.allocation_mode:
             case ResourceAllocationMode.SHARED | ResourceAllocationMode.AUTO_SPLIT:
                 for config in agent_configs:
-                    resource = config.resource
-                    if any([
-                        resource.allocated_cpu is not None,
-                        resource.allocated_mem is not None,
-                        resource.allocated_devices,
-                    ]):
+                    if config.resource.allocations is not None:
                         raise ValueError(
                             "On non-MANUAL mode, config must not specify manual resource allocations"
                         )
 
             case ResourceAllocationMode.MANUAL:
+                slot_names: list[set[SlotName]] = []
                 for config in agent_configs:
-                    resource = config.resource
-                    if any([resource.allocated_cpu is None, resource.allocated_mem is None]):
+                    if config.resource.allocations is None:
                         raise ValueError(
                             "On MANUAL mode, config must specify cpu and mem resource allocations"
                         )
 
-                slot_names = [
-                    set(config.resource.allocated_devices.keys()) for config in agent_configs
-                ]
+                    slot_names.append(set(config.resource.allocations.devices.keys()))
+
                 if not all(slot_name == slot_names[0] for slot_name in slot_names):
                     raise ValueError("All agents must have the same slots defined in the devices!")
 
