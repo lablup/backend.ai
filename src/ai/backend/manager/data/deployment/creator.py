@@ -10,6 +10,8 @@ from ai.backend.manager.data.deployment.types import (
     MountInfo,
     MountMetadata,
     ReplicaSpec,
+    RequestedImageIdentifier,
+    RequestedModelRevisionSpec,
     ResourceSpec,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -40,7 +42,7 @@ class ModelRevisionCreator:
 
 
 @dataclass
-class DeploymentCreator:
+class FinalDeploymentCreator:
     metadata: DeploymentMetadata
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
@@ -66,6 +68,46 @@ class DeploymentCreator:
     def name(self) -> str:
         """Get the deployment name from metadata."""
         return self.metadata.name
+
+
+@dataclass
+class DeploymentCreator:
+    metadata: DeploymentMetadata
+    replica_spec: ReplicaSpec
+    network: DeploymentNetworkSpec
+    requested_model_revision: RequestedModelRevisionSpec
+
+    # Accessor properties for backward compatibility
+    @property
+    def image_identifier(self) -> RequestedImageIdentifier:
+        """Get the requested image identifier from model revision spec."""
+        return self.requested_model_revision.image_identifier
+
+    @property
+    def domain(self) -> str:
+        """Get the domain name from metadata."""
+        return self.metadata.domain
+
+    @property
+    def project(self) -> UUID:
+        """Get the project ID from metadata."""
+        return self.metadata.project
+
+    @property
+    def name(self) -> str:
+        """Get the deployment name from metadata."""
+        return self.metadata.name
+
+    def to_final_deployment_creator(
+        self,
+        model_revision: ModelRevisionSpec,
+    ) -> FinalDeploymentCreator:
+        return FinalDeploymentCreator(
+            metadata=self.metadata,
+            replica_spec=self.replica_spec,
+            network=self.network,
+            model_revision=model_revision,
+        )
 
 
 @dataclass

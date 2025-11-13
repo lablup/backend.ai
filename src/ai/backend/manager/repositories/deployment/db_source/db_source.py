@@ -21,7 +21,7 @@ from ai.backend.common.types import (
     RuntimeVariant,
     SessionId,
 )
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.creator import FinalDeploymentCreator
 from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.scale_modifier import AutoScalingRuleModifier
@@ -156,7 +156,7 @@ class DeploymentDBSource:
 
     async def create_endpoint(
         self,
-        creator: DeploymentCreator,
+        creator: FinalDeploymentCreator,
     ) -> DeploymentInfo:
         """Create a new endpoint in the database and return DeploymentInfo."""
         async with self._begin_session_read_committed() as db_sess:

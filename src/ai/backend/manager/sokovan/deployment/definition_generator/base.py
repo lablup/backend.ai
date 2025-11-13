@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from ai.backend.common.config import ModelDefinition
 from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpec,
+    RequestedModelRevisionSpec,
 )
 
 
@@ -15,5 +16,7 @@ class ModelDefinitionGenerator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def generate_model_revision(self, model_revision: ModelRevisionSpec) -> ModelRevisionSpec:
+    async def generate_model_revision(
+        self, requested_model_revision: RequestedModelRevisionSpec
+    ) -> ModelRevisionSpec:
         raise NotImplementedError

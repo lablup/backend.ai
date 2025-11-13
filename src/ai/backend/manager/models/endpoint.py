@@ -44,7 +44,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.creator import FinalDeploymentCreator
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
     AutoScalingCondition,
@@ -621,7 +621,7 @@ class EndpointRow(Base):
     async def from_deployment_creator(
         cls,
         db_session: AsyncSession,
-        creator: DeploymentCreator,
+        creator: FinalDeploymentCreator,
     ) -> Self:
         """
         Create an EndpointRow instance from a DeploymentCreator instance.
