@@ -276,10 +276,38 @@ async def create_container(test_id, docker):
 
 
 @pytest.fixture
+def mock_resource_partitioner(mocker):
+    """
+    Mock ResourcePartitioner to avoid real resource scanning in tests.
+
+    This fixture patches ResourcePartitioner.new() to return a mock that provides
+    empty computers and slots, suitable for testing agent initialization without
+    actual hardware resource detection.
+    """
+    from decimal import Decimal
+    from unittest.mock import AsyncMock
+
+    from ai.backend.agent.resources import ResourcePartitioner
+
+    mock_partitioner = AsyncMock(spec=ResourcePartitioner)
+    mock_partitioner.get_computers.return_value = {}
+    mock_partitioner.get_updated_slots.return_value = {}
+    mock_partitioner.get_resource_scaling_factor.return_value = Decimal(1.0)
+    mock_partitioner.__aexit__ = AsyncMock()
+
+    mocker.patch(
+        "ai.backend.agent.runtime.ResourcePartitioner.new",
+        return_value=mock_partitioner,
+    )
+    return mock_partitioner
+
+
+@pytest.fixture
 async def agent_runtime(
     local_config: AgentUnifiedConfig,
     etcd,
     mocker,
+    mock_resource_partitioner,
 ) -> AsyncIterator[AgentRuntime]:
     """
     Create a real AgentRuntime instance for integration testing.
@@ -288,6 +316,7 @@ async def agent_runtime(
     - Real etcd client
     - Real agent configuration
     - Mocked stats and error monitors (external dependencies)
+    - Mocked ResourcePartitioner (to avoid real resource scanning)
     - Proper cleanup after tests
     """
     from unittest.mock import Mock
