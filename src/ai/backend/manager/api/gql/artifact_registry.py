@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 import strawberry
-from strawberry import Info
+from strawberry import ID, Info
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -19,6 +19,10 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_meta impor
 
 @strawberry.type(description="Added in 25.14.0")
 class ArtifactRegistry:
+    id: ID = strawberry.field(description="Added in 25.17.0, ID of the artifact registry metadata row.")
+    registry_id: ID = strawberry.field(
+        description="Added in 25.17.0, Registry ID of the artifact registry database row."
+    )
     name: str = strawberry.field(description="Name of the default artifact registry.")
     type: ArtifactRegistryType = strawberry.field(
         description="Type of the default artifact registry."
@@ -48,9 +52,11 @@ async def default_artifact_registry(
         )
     )
 
-    registry_type = artifact_registry_meta.result.type
+    registry_data = artifact_registry_meta.result
 
     return ArtifactRegistry(
+        id=ID(str(registry_data.id)),
+        registry_id=ID(str(registry_data.registry_id)),
         name=registry_name,
-        type=registry_type,
+        type=registry_data.type,
     )
