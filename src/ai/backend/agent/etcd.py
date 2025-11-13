@@ -1,5 +1,5 @@
 from collections.abc import AsyncGenerator, Iterable, Mapping
-from typing import Optional, override
+from typing import ChainMap, MutableMapping, Optional, cast, override
 
 from etcd_client import CondVar
 
@@ -32,12 +32,7 @@ class AgentEtcdError(BackendAIError):
         )
 
 
-# AgentEtcdClientView inherits from AsyncEtcd, but really it's just composing an AsyncEtcd instance
-# and acting as an adaptor. Inheritance is made only to make the type checker happy, and the places
-# that use AsyncEtcd really should not take the concrete implementation type AsyncEtcd, but rather
-# the interface type AbstractKVStore. In the current codebase, manually modifying places that
-# currently take in an AsyncEtcd instance to instead take in AbstractKVStore would be too invasive.
-class AgentEtcdClientView(AsyncEtcd, AbstractKVStore):
+class AgentEtcdClientView(AbstractKVStore):
     _etcd: AsyncEtcd
     _config: AgentUnifiedConfig
 
@@ -49,19 +44,30 @@ class AgentEtcdClientView(AsyncEtcd, AbstractKVStore):
         self._etcd = etcd
         self._config = config
 
+    @property
+    def _agent_scope_prefix_map(self) -> Mapping[ConfigScopes, str]:
+        """
+        This is kept as a @property method instead of a simple variable, because this way any
+        updates that are made to the config object (e.g. scaling group) is correctly applied as the
+        scope prefix mapping is recalculated every time.
+        """
+        return {
+            ConfigScopes.SGROUP: f"sgroup/{self._config.agent.scaling_group}",
+            ConfigScopes.NODE: f"nodes/agents/{self._config.agent.id}",
+        }
+
     def _augment_scope_prefix_map(
         self,
-        scope_prefix_map: Optional[Mapping[ConfigScopes, str]],
+        override: Optional[Mapping[ConfigScopes, str]],
     ) -> Mapping[ConfigScopes, str]:
-        if scope_prefix_map is None:
-            scope_prefix_map = {}
-
-        agent_config = self._config.agent
-        return {
-            **scope_prefix_map,
-            ConfigScopes.SGROUP: f"sgroup/{agent_config.scaling_group}",
-            ConfigScopes.NODE: f"nodes/agents/{agent_config.id}",
-        }
+        """
+        This stub ensures immutable usage of the ChainMap because ChainMap does *not*
+        have the immutable version in typeshed.
+        (ref: https://github.com/python/typeshed/issues/6042)
+        """
+        return ChainMap(
+            cast(MutableMapping, override) or {}, cast(MutableMapping, self._agent_scope_prefix_map)
+        )
 
     @override
     async def put(
