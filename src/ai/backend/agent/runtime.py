@@ -5,33 +5,17 @@ from typing import TYPE_CHECKING, Mapping, Optional, Type
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.errors.runtime import AgentIdNotFoundError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.types import AgentBackend
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.exception import (
-    BackendAIError,
-    ErrorCode,
-    ErrorDetail,
-    ErrorDomain,
-    ErrorOperation,
-)
 from ai.backend.common.types import AgentId
 
 if TYPE_CHECKING:
     from .docker.metadata.server import MetadataServer
-
-
-class AgentIdNotFoundError(BackendAIError):
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
 
 
 class AgentRuntime:
