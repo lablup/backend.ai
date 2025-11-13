@@ -31,21 +31,21 @@ def mock_agent_server(single_agent_config: AgentUnifiedConfig) -> AgentRPCServer
 
     # Create a mock runtime
     runtime = Mock()
-    runtime.agents = {}
+    runtime._agents = {}
     runtime._default_agent_id = AgentId("test-agent")
 
     def get_agent_impl(agent_id: AgentId | None = None) -> Mock:
         if agent_id is None:
             agent_id = runtime._default_agent_id
-        if agent_id not in runtime.agents:
+        if agent_id not in runtime._agents:
             raise ValueError(f"Agent '{agent_id}' not found")
-        return runtime.agents[agent_id]
+        return runtime._agents[agent_id]
 
-    def get_agents_impl() -> list[Mock]:
-        return list(runtime.agents.values())
+    def get__agents_impl() -> list[Mock]:
+        return list(runtime._agents.values())
 
     runtime.get_agent = get_agent_impl
-    runtime.get_agents = get_agents_impl
+    runtime.get__agents = get__agents_impl
 
     server.runtime = runtime
     return server
@@ -94,7 +94,7 @@ def multi_agent_config() -> AgentUnifiedConfig:
             "namespace": "test",
             "addr": {"host": "127.0.0.1", "port": 2379},
         },
-        "sub-agents": [
+        "sub-_agents": [
             {
                 "agent": {
                     "id": "agent-1",
@@ -130,7 +130,7 @@ class TestAgentRPCServerSingleAgentMode:
     def test_get_agent_without_id_returns_default(self, mock_agent_server: AgentRPCServer) -> None:
         mock_agent = Mock()
         mock_agent.id = AgentId("test-agent")
-        mock_agent_server.runtime.agents = {AgentId("test-agent"): mock_agent}
+        mock_agent_server.runtime._agents = {AgentId("test-agent"): mock_agent}
 
         result = mock_agent_server.runtime.get_agent(None)
 
@@ -139,7 +139,7 @@ class TestAgentRPCServerSingleAgentMode:
     def test_get_agent_with_valid_id_returns_agent(self, mock_agent_server: AgentRPCServer) -> None:
         mock_agent = Mock()
         mock_agent.id = AgentId("test-agent")
-        mock_agent_server.runtime.agents = {AgentId("test-agent"): mock_agent}
+        mock_agent_server.runtime._agents = {AgentId("test-agent"): mock_agent}
 
         result = mock_agent_server.runtime.get_agent(AgentId("test-agent"))
 
@@ -150,27 +150,27 @@ class TestAgentRPCServerSingleAgentMode:
     ) -> None:
         mock_agent = Mock()
         mock_agent.id = AgentId("test-agent")
-        mock_agent_server.runtime.agents = {AgentId("test-agent"): mock_agent}
+        mock_agent_server.runtime._agents = {AgentId("test-agent"): mock_agent}
 
         with pytest.raises(ValueError, match="not found"):
             mock_agent_server.runtime.get_agent(AgentId("nonexistent"))
 
 
 class TestAgentRPCServerMultiAgentMode:
-    def test_agents_property_returns_all_agents(self, mock_agent_server: AgentRPCServer) -> None:
+    def test__agents_property_returns_all__agents(self, mock_agent_server: AgentRPCServer) -> None:
         mock_agent1 = Mock()
         mock_agent1.id = AgentId("agent-1")
         mock_agent2 = Mock()
         mock_agent2.id = AgentId("agent-2")
 
-        mock_agent_server.runtime.agents = {
+        mock_agent_server.runtime._agents = {
             AgentId("agent-1"): mock_agent1,
             AgentId("agent-2"): mock_agent2,
         }
 
-        assert len(mock_agent_server.runtime.agents) == 2
-        assert mock_agent_server.runtime.agents[AgentId("agent-1")] is mock_agent1
-        assert mock_agent_server.runtime.agents[AgentId("agent-2")] is mock_agent2
+        assert len(mock_agent_server.runtime._agents) == 2
+        assert mock_agent_server.runtime._agents[AgentId("agent-1")] is mock_agent1
+        assert mock_agent_server.runtime._agents[AgentId("agent-2")] is mock_agent2
 
     def test_get_agent_by_specific_id_agent1(self, mock_agent_server: AgentRPCServer) -> None:
         mock_agent1 = create_mock_agent()
@@ -178,7 +178,7 @@ class TestAgentRPCServerMultiAgentMode:
         mock_agent2 = create_mock_agent()
         mock_agent2.id = AgentId("agent-2")
 
-        mock_agent_server.runtime.agents = {
+        mock_agent_server.runtime._agents = {
             AgentId("agent-1"): mock_agent1,
             AgentId("agent-2"): mock_agent2,
         }
@@ -193,7 +193,7 @@ class TestAgentRPCServerMultiAgentMode:
         mock_agent2 = create_mock_agent()
         mock_agent2.id = AgentId("agent-2")
 
-        mock_agent_server.runtime.agents = {
+        mock_agent_server.runtime._agents = {
             AgentId("agent-1"): mock_agent1,
             AgentId("agent-2"): mock_agent2,
         }
@@ -208,8 +208,8 @@ class TestAgentRPCServerMultiAgentMode:
         mock_agent2 = create_mock_agent()
         mock_agent2.id = AgentId("agent-2")
 
-        mock_agent_server.runtime._default_agent_id = AgentId("agent-1")
-        mock_agent_server.runtime.agents = {
+        mock_agent_server.runtime._default_agent = mock_agent1
+        mock_agent_server.runtime._agents = {
             AgentId("agent-1"): mock_agent1,
             AgentId("agent-2"): mock_agent2,
         }
@@ -230,7 +230,7 @@ class TestAgentRPCServerConfigInheritance:
         assert config.agent.backend == AgentBackend.DOCKER
         assert config.container.port_range == (30000, 31000)
 
-    @pytest.mark.skip(reason="Config parsing for sub-agents not yet implemented")
+    @pytest.mark.skip(reason="Config parsing for sub-_agents not yet implemented")
     def test_multi_agent_configs_use_overrides(
         self,
         multi_agent_config: AgentUnifiedConfig,

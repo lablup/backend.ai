@@ -35,11 +35,11 @@ class AgentIdNotFoundError(BackendAIError):
 
 
 class AgentRuntime(aobject):
-    local_config: AgentUnifiedConfig
-    agents: dict[AgentId, AbstractAgent]
-    kernel_registry: KernelRegistry
-    etcd: AsyncEtcd
-    etcd_views: dict[AgentId, AgentEtcdClientView]
+    _local_config: AgentUnifiedConfig
+    _agents: dict[AgentId, AbstractAgent]
+    _kernel_registry: KernelRegistry
+    _etcd: AsyncEtcd
+    _etcd_views: dict[AgentId, AgentEtcdClientView]
 
     _default_agent_id: AgentId
     _stop_signal: signal.Signals
@@ -52,14 +52,14 @@ class AgentRuntime(aobject):
         error_monitor: AgentErrorPluginContext,
         agent_public_key: Optional[PublicKey],
     ) -> None:
-        self.local_config = local_config
-        self.agents = {}
-        self.kernel_registry = KernelRegistry()
-        self.etcd = etcd
-        self.etcd_views = {}
-        self.metadata_server: MetadataServer | None = None
+        self._local_config = local_config
+        self._agents = {}
+        self._kernel_registry = KernelRegistry()
+        self._etcd = etcd
+        self._etcd_views = {}
+        self._metadata_server: MetadataServer | None = None
 
-        agent_configs = self.local_config.get_agent_configs()
+        agent_configs = self._local_config.get_agent_configs()
         self._default_agent_id = AgentId(agent_configs[0].agent.id)
         self._stop_signal = signal.SIGTERM
 
@@ -68,47 +68,47 @@ class AgentRuntime(aobject):
         self.agent_public_key = agent_public_key
 
     async def __ainit__(self) -> None:
-        if self.local_config.agent_common.backend == AgentBackend.DOCKER:
+        if self._local_config.agent_common.backend == AgentBackend.DOCKER:
             await self._initialize_metadata_server()
 
         tasks = []
         async with asyncio.TaskGroup() as tg:
-            for agent_config in self.local_config.get_agent_configs():
+            for agent_config in self._local_config.get_agent_configs():
                 agent_id = AgentId(agent_config.agent.id)
-                etcd_view = AgentEtcdClientView(self.etcd, agent_config)
+                etcd_view = AgentEtcdClientView(self._etcd, agent_config)
 
-                self.etcd_views[agent_id] = etcd_view
+                self._etcd_views[agent_id] = etcd_view
                 tasks.append(tg.create_task(self._create_agent(etcd_view, agent_config)))
-        self.agents = {(agent := task.result()).id: agent for task in tasks}
+        self._agents = {(agent := task.result()).id: agent for task in tasks}
 
     async def __aexit__(self, *exc_info) -> None:
-        for agent in self.agents.values():
+        for agent in self._agents.values():
             await agent.shutdown(self._stop_signal)
-        if self.metadata_server is not None:
-            await self.metadata_server.cleanup()
+        if self._metadata_server is not None:
+            await self._metadata_server.cleanup()
 
     def get_agents(self) -> list[AbstractAgent]:
-        return list(self.agents.values())
+        return list(self._agents.values())
 
     def get_agent(self, agent_id: Optional[AgentId]) -> AbstractAgent:
         if agent_id is None:
             agent_id = self._default_agent_id
-        if agent_id not in self.agents:
+        if agent_id not in self._agents:
             raise AgentIdNotFoundError(
                 f"Agent '{agent_id}' not found in this runtime. "
-                f"Available agents: {', '.join(self.agents.keys())}"
+                f"Available agents: {', '.join(self._agents.keys())}"
             )
-        return self.agents[agent_id]
+        return self._agents[agent_id]
 
     def get_etcd(self, agent_id: Optional[AgentId]) -> AgentEtcdClientView:
         if agent_id is None:
             agent_id = self._default_agent_id
-        if agent_id not in self.agents:
+        if agent_id not in self._agents:
             raise AgentIdNotFoundError(
                 f"Agent '{agent_id}' not found in this runtime. "
-                f"Available agents: {', '.join(self.agents.keys())}"
+                f"Available agents: {', '.join(self._agents.keys())}"
             )
-        return self.etcd_views[agent_id]
+        return self._etcd_views[agent_id]
 
     def mark_stop_signal(self, stop_signal: signal.Signals) -> None:
         self._stop_signal = stop_signal
@@ -129,7 +129,7 @@ class AgentRuntime(aobject):
             "agent_public_key": self.agent_public_key,
         }
 
-        backend = self.local_config.agent_common.backend
+        backend = self._local_config.agent_common.backend
         agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
         agent_cls: Type[AbstractAgent] = agent_mod.get_agent_cls()
 
@@ -138,9 +138,9 @@ class AgentRuntime(aobject):
     async def _initialize_metadata_server(self) -> None:
         from .docker.metadata.server import MetadataServer
 
-        self.metadata_server = await MetadataServer.new(
-            self.local_config,
-            self.etcd,
-            kernel_registry=self.kernel_registry.global_view(),
+        self._metadata_server = await MetadataServer.new(
+            self._local_config,
+            self._etcd,
+            kernel_registry=self._kernel_registry.global_view(),
         )
-        await self.metadata_server.start_server()
+        await self._metadata_server.start_server()
