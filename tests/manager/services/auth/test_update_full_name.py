@@ -36,10 +36,10 @@ async def test_update_full_name_successful(
         full_name="New Full Name",
     )
 
-    mock_auth_repository.update_user_full_name_validated.return_value = True
+    mock_auth_repository.update_user_full_name.return_value = True
 
     result = await auth_service.update_full_name(action)
-    mock_auth_repository.update_user_full_name_validated.assert_called_once_with(
+    mock_auth_repository.update_user_full_name.assert_called_once_with(
         action.email,
         action.domain_name,
         action.full_name,
@@ -60,11 +60,11 @@ async def test_update_full_name_fails_for_nonexistent_user(
         full_name="Some Name",
     )
 
-    mock_auth_repository.update_user_full_name_validated.return_value = False
+    mock_auth_repository.update_user_full_name.return_value = False
 
     result = await auth_service.update_full_name(action)
 
-    mock_auth_repository.update_user_full_name_validated.assert_called_once_with(
+    mock_auth_repository.update_user_full_name.assert_called_once_with(
         action.email,
         action.domain_name,
         action.full_name,
@@ -85,12 +85,12 @@ async def test_update_full_name_repository_call(
         full_name="Test User Full Name",
     )
 
-    mock_auth_repository.update_user_full_name_validated.return_value = True
+    mock_auth_repository.update_user_full_name.return_value = True
 
     result = await auth_service.update_full_name(action)
 
     # Verify repository was called correctly
-    mock_auth_repository.update_user_full_name_validated.assert_called_once_with(
+    mock_auth_repository.update_user_full_name.assert_called_once_with(
         "test@example.com",
         "test-domain",
         "Test User Full Name",

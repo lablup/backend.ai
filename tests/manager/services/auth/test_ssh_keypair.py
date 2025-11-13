@@ -43,14 +43,14 @@ async def test_get_ssh_keypair_existing_key(
         access_key="AKIA1234567890ABCDEF",
     )
 
-    mock_auth_repository.get_ssh_public_key_validated.return_value = (
+    mock_auth_repository.get_ssh_public_key.return_value = (
         "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC..."
     )
 
     result = await auth_service.get_ssh_keypair(action)
 
     assert result.public_key == "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQC..."
-    mock_auth_repository.get_ssh_public_key_validated.assert_called_once_with(action.access_key)
+    mock_auth_repository.get_ssh_public_key.assert_called_once_with(action.access_key)
 
 
 @pytest.mark.asyncio
@@ -64,12 +64,12 @@ async def test_get_ssh_keypair_nonexistent_key(
         access_key="AKIANONEXISTENT",
     )
 
-    mock_auth_repository.get_ssh_public_key_validated.return_value = None
+    mock_auth_repository.get_ssh_public_key.return_value = None
 
     result = await auth_service.get_ssh_keypair(action)
 
     assert result.public_key == ""
-    mock_auth_repository.get_ssh_public_key_validated.assert_called_once_with(action.access_key)
+    mock_auth_repository.get_ssh_public_key.assert_called_once_with(action.access_key)
 
 
 # Test Generate SSH Keypair
@@ -95,7 +95,7 @@ async def test_generate_ssh_keypair(
         result = await auth_service.generate_ssh_keypair(action)
 
     # Verify repository was called with generated keys
-    mock_auth_repository.update_ssh_keypair_validated.assert_called_once_with(
+    mock_auth_repository.update_ssh_keypair.assert_called_once_with(
         "AKIA1234567890ABCDEF",
         mock_pubkey,
         mock_privkey,
@@ -127,7 +127,7 @@ async def test_upload_ssh_keypair_valid_keys(
         result = await auth_service.upload_ssh_keypair(action)
 
     # Verify repository was called
-    mock_auth_repository.update_ssh_keypair_validated.assert_called_once_with(
+    mock_auth_repository.update_ssh_keypair.assert_called_once_with(
         action.access_key,
         action.public_key,
         action.private_key,
@@ -159,7 +159,7 @@ async def test_upload_ssh_keypair_invalid_keys(
             await auth_service.upload_ssh_keypair(action)
 
     # Verify repository was NOT called for invalid keys
-    mock_auth_repository.update_ssh_keypair_validated.assert_not_called()
+    mock_auth_repository.update_ssh_keypair.assert_not_called()
 
 
 @pytest.mark.asyncio

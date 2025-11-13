@@ -70,7 +70,7 @@ def setup_successful_auth(mock_auth_repository, mock_hook_plugin_ctx):
         secret_key="test_secret_key",
         mapping={"access_key": "test_access_key"},
     )
-    mock_auth_repository.get_user_row_by_uuid_validated.return_value = mock_user_row
+    mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
 
 
 @pytest.mark.asyncio
@@ -168,7 +168,7 @@ async def test_authorize_with_hook_authorization(
         secret_key="hook_secret_key",
         mapping={"access_key": "hook_access_key"},
     )
-    mock_auth_repository.get_user_row_by_uuid_validated.return_value = mock_user_row
+    mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
 
     result = await auth_service.authorize(action)
 
@@ -207,7 +207,7 @@ async def test_authorize_with_password_expiry(
         "status": UserStatus.ACTIVE,
         "password_changed_at": password_changed_at,
     }
-    mock_auth_repository.get_current_time_validated.return_value = datetime.now()
+    mock_auth_repository.get_current_time.return_value = datetime.now()
 
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED,
@@ -251,7 +251,7 @@ async def test_authorize_with_post_hook_response(
         secret_key="test_secret_key",
         mapping={"access_key": "test_access_key"},
     )
-    mock_auth_repository.get_user_row_by_uuid_validated.return_value = mock_user_row
+    mock_auth_repository.get_user_row_by_uuid.return_value = mock_user_row
 
     # First hook (AUTHORIZE) passes normally
     # Second hook (POST_AUTHORIZE) returns a stream response

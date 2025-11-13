@@ -61,14 +61,14 @@ async def test_update_password_successful(
     }
 
     # Password update succeeds
-    mock_auth_repository.update_user_password_validated.return_value = None
+    mock_auth_repository.update_user_password.return_value = None
 
     result = await auth_service.update_password(action)
 
     assert result.success is True
     assert result.message == "Password updated successfully"
     mock_auth_repository.check_credential_without_migration.assert_called_once()
-    mock_auth_repository.update_user_password_validated.assert_called_once()
+    mock_auth_repository.update_user_password.assert_called_once()
 
 
 @pytest.mark.asyncio
@@ -110,7 +110,7 @@ async def test_update_password_fails_when_new_passwords_dont_match(
     # When passwords don't match, we return early without checking old password
     mock_auth_repository.check_credential_without_migration.assert_not_called()
     # Password update should not be called when passwords don't match
-    mock_auth_repository.update_user_password_validated.assert_not_called()
+    mock_auth_repository.update_user_password.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -145,7 +145,7 @@ async def test_update_password_fails_with_incorrect_old_password(
 
     mock_auth_repository.check_credential_without_migration.assert_called_once()
     # Password update should not be called when credential check fails
-    mock_auth_repository.update_user_password_validated.assert_not_called()
+    mock_auth_repository.update_user_password.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -225,7 +225,7 @@ async def test_update_password_repository_call(
         "old_pass",
     )
     # Verify password was updated with PasswordInfo
-    call_args = mock_auth_repository.update_user_password_validated.call_args
+    call_args = mock_auth_repository.update_user_password.call_args
     assert call_args[0][0] == "update@example.com"
     password_info = call_args[0][1]
     assert password_info.password == "new_pass123"

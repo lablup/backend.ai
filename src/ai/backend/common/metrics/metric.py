@@ -396,6 +396,8 @@ class DomainType(enum.StrEnum):
     VALKEY = "valkey"
     REPOSITORY = "repository"
     CLIENT = "client"
+    DB_SOURCE = "db_source"
+    CACHE_SOURCE = "cache_source"
 
 
 class LayerType(enum.StrEnum):
@@ -429,6 +431,7 @@ class LayerType(enum.StrEnum):
     VFS_STORAGE_REPOSITORY = "vfs_storage_repository"
 
     # DB Source layers
+    AUTH_DB_SOURCE = "auth_db_source"
     AGENT_DB_SOURCE = "agent_db_source"
     DEPLOYMENT_DB_SOURCE = "deployment_db_source"
     PERMISSION_CONTROLLER_DB_SOURCE = "permission_controller_db_source"
