@@ -1,6 +1,6 @@
 import importlib
 import signal
-from typing import Optional
+from typing import Optional, Type
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig
@@ -66,6 +66,6 @@ class AgentRuntime(aobject):
 
         backend = self.local_config.agent_common.backend
         agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
-        agent_cls = agent_mod.get_agent_cls()
+        agent_cls: Type[AbstractAgent] = agent_mod.get_agent_cls()
 
-        return agent_cls.new(etcd, agent_config, **agent_kwargs)
+        return await agent_cls.new(etcd, agent_config, **agent_kwargs)
