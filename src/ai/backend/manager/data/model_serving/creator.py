@@ -85,9 +85,9 @@ class EndpointCreator(Creator):
 class ModelServiceCreator(Creator):
     service_name: str
     replicas: int
-    image: str
+    image: Optional[str]
     runtime_variant: RuntimeVariant
-    architecture: str
+    architecture: Optional[str]
     group_name: str
     domain_name: str
     cluster_size: int

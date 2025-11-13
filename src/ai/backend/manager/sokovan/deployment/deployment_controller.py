@@ -14,6 +14,7 @@ from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalin
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     ModelRevisionSpec,
+    RequestedModelRevisionSpec,
 )
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -78,19 +79,26 @@ class DeploymentController:
             DeploymentInfo: Information about the created deployment
         """
         log.info("Creating deployment '{}' in project {}", creator.name, creator.project)
-        await self._validate_model_revision(creator.model_revision)
-        deployment_info = await self._deployment_repository.create_endpoint(creator)
+        model_revision = await self._generate_model_revision(creator.requested_model_revision)
+        deployment_info = await self._deployment_repository.create_endpoint(
+            creator.to_final_deployment_creator(model_revision)
+        )
         return deployment_info
 
-    async def _validate_model_revision(self, model_revision: ModelRevisionSpec) -> None:
+    async def _generate_model_revision(
+        self, requested_model_revision: RequestedModelRevisionSpec
+    ) -> ModelRevisionSpec:
         """Validate the model revision specification."""
         generator = self._model_definition_generator_registry.get(
-            model_revision.execution.runtime_variant
+            requested_model_revision.execution.runtime_variant
         )
-        model_revision = await generator.generate_model_revision(model_revision)
+        model_revision: ModelRevisionSpec = await generator.generate_model_revision(
+            requested_model_revision
+        )
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision(model_revision=model_revision)
         )
+        return model_revision
 
     async def update_deployment(
         self,
@@ -113,7 +121,9 @@ class DeploymentController:
         )
         target_revision = modified_endpoint.target_revision()
         if target_revision:
-            await self._validate_model_revision(target_revision)
+            await self._scheduling_controller.validate_session_spec(
+                SessionValidationSpec.from_revision(model_revision=target_revision)
+            )
         res = await self._deployment_repository.update_endpoint_with_modifier(endpoint_id, modifier)
         try:
             await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)

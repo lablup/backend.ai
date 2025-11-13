@@ -3,11 +3,12 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence
 
 import yarl
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import HttpUrl
 
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import (
     AccessKey,
     AutoScalingMetricComparator,
@@ -19,19 +20,14 @@ from ai.backend.common.types import (
     RuntimeVariant,
     VFolderMount,
 )
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
-from ai.backend.manager.data.deployment.types import (
-    EndpointLifecycle,
-    ModelRevisionSpec,
-    RouteStatus,
-)
-from ai.backend.manager.data.image.types import ImageData, ImageIdentifier
+from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.user.types import UserRole
 
-# Re-export for backward compatibility
+if TYPE_CHECKING:
+    from ai.backend.manager.data.deployment.types import RouteStatus
+
 __all__ = [
     "EndpointLifecycle",
-    "RouteStatus",
     "EndpointData",
     "RoutingData",
     "EndpointTokenData",
@@ -176,7 +172,7 @@ class ServiceConfig:
     extra_mounts: dict[uuid.UUID, MountOption]
     environ: Optional[dict[str, str]]
     scaling_group: str
-    resources: dict[str, str | int]
+    resources: Optional[dict[str, str | int]]
     resource_opts: dict[str, str | int | bool]
 
     def to_dict(self) -> dict[str, Any]:
@@ -243,89 +239,3 @@ class MutationResult:
 class RuntimeVariantData:
     name: str
     human_readable_name: str
-
-
-class ImageEnvironment(BaseModel):
-    image: str = Field(
-        description="""
-        Container image to use for the model service.
-        """,
-        examples=[
-            "myregistry/myimage:latest",
-        ],
-    )
-    architecture: str = Field(
-        description="""
-        Architecture of the container image.
-        """,
-        examples=[
-            "x86_64",
-            "arm64",
-        ],
-    )
-
-
-class ModelServiceDefinition(BaseModel):
-    environment: Optional[ImageEnvironment] = Field(
-        default=None,
-        description="""
-        Environment in which the model service will run.
-        """,
-        examples=[
-            {
-                "image": "myregistry/myimage:latest",
-                "architecture": "x86_64",
-            }
-        ],
-    )
-    resource_slots: Optional[dict[str, Any]] = Field(
-        default=None,
-        description="""
-        Resource slots used by the model service session.
-        """,
-        examples=[
-            {"cpu": 1, "mem": "2gb"},
-        ],
-    )
-    environ: Optional[dict[str, str]] = Field(
-        default=None,
-        description="""
-        Environment variables to set for the model service.
-        """,
-        examples=[
-            {"MY_ENV_VAR": "value", "ANOTHER_VAR": "another_value"},
-        ],
-    )
-
-    def override_model_revision(self, model_revision: ModelRevisionSpec) -> ModelRevisionSpec:
-        """Override model revision configuration with model service definition values."""
-        if self.resource_slots:
-            model_revision.resource_spec.resource_slots = self.resource_slots
-        if self.environment:
-            model_revision.image_identifier = ImageIdentifier(
-                canonical=self.environment.image, architecture=self.environment.architecture
-            )
-        if self.environ:
-            if model_revision.execution.environ:
-                model_revision.execution.environ.update(self.environ)
-            else:
-                model_revision.execution.environ = self.environ
-
-        return model_revision
-
-    def override_creator(self, creator: DeploymentCreator) -> DeploymentCreator:
-        """Override deployment creator configuration with model service definition values."""
-        # Override resource slots if specified
-        if self.resource_slots:
-            creator.model_revision.resource_spec.resource_slots = self.resource_slots
-        if self.environment:
-            creator.model_revision.image_identifier = ImageIdentifier(
-                canonical=self.environment.image, architecture=self.environment.architecture
-            )
-        if self.environ:
-            if creator.model_revision.execution.environ:
-                creator.model_revision.execution.environ.update(self.environ)
-            else:
-                creator.model_revision.execution.environ = self.environ
-
-        return creator

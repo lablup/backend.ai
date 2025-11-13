@@ -36,12 +36,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.deployment.types import ModelServiceDefinition
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.creator import EndpointCreator
 from ai.backend.manager.data.model_serving.types import (
     CompactServiceInfo,
     ErrorInfo,
-    ModelServiceDefinition,
     RequesterCtx,
     RouteInfo,
     ServiceInfo,
@@ -216,12 +216,6 @@ class ModelServingService:
                     else:
                         action.creator.config.environ = variant_def.environ
 
-        # Resolve image row - EndpointRow constructor needs the actual ImageRow object
-        image_row = await self._repository.resolve_image_for_endpoint_creation([
-            ImageIdentifier(action.creator.image, action.creator.architecture),
-            ImageAlias(action.creator.image),
-        ])
-
         creation_config = action.creator.config.to_dict()
         creation_config["mounts"] = [
             service_prepare_ctx.model_id,
@@ -237,6 +231,19 @@ class ModelServingService:
             m.vfid.folder_id: {"permission": m.mount_perm} for m in service_prepare_ctx.extra_mounts
         }
         sudo_session_enabled = action.creator.sudo_session_enabled
+
+        # Resolve image row - EndpointRow constructor needs the actual ImageRow object
+        if action.creator.image is None or action.creator.image.strip() == "":
+            raise InvalidAPIParameters("Image must be specified for model service creation")
+        if action.creator.architecture is None or action.creator.architecture.strip() == "":
+            raise InvalidAPIParameters("Architecture must be specified for model service creation")
+        image_row = await self._repository.resolve_image_for_endpoint_creation([
+            ImageIdentifier(action.creator.image, action.creator.architecture),
+            ImageAlias(action.creator.image),
+        ])
+
+        if action.creator.config.resources is None:
+            raise InvalidAPIParameters("Resources must be specified for model service creation")
 
         # check if session is valid to be created
         await self._agent_registry.create_session(
