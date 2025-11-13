@@ -42,16 +42,27 @@ def generate_proxy_url(
     | TraefikWildcardDomainConfig,
     protocol: str,
     circuit: Circuit,
+    redirect_path: str | None = None,
 ) -> str:
+    # Generate base URL based on config type
     match config:
         case PortProxyConfig():
-            return f"{protocol}://{config.advertised_host or config.bind_host}:{circuit.port}"
+            base_url = f"{protocol}://{config.advertised_host or config.bind_host}:{circuit.port}"
         case TraefikPortProxyConfig():
-            return f"{protocol}://{config.advertised_host}:{circuit.port}"
+            base_url = f"{protocol}://{config.advertised_host}:{circuit.port}"
         case WildcardDomainConfig():
-            return f"{protocol}://{circuit.subdomain}{config.domain}:{config.advertised_port or config.bind_addr.port}"
+            base_url = f"{protocol}://{circuit.subdomain}{config.domain}:{config.advertised_port or config.bind_addr.port}"
         case TraefikWildcardDomainConfig():
-            return f"{protocol}://{circuit.subdomain}{config.domain}:{config.advertised_port}"
+            base_url = f"{protocol}://{circuit.subdomain}{config.domain}:{config.advertised_port}"
+
+    # Append redirect path if provided
+    if redirect_path:
+        # Ensure redirect path starts with /
+        if not redirect_path.startswith("/"):
+            redirect_path = f"/{redirect_path}"
+        return f"{base_url}{redirect_path}"
+
+    return base_url
 
 
 async def ensure_traefik_route_set_up(traefik_api_port: int, circuit: Circuit) -> None:
@@ -148,16 +159,9 @@ async def setup(
     match circuit.protocol:
         case ProxyProtocol.HTTP:
             protocol = "https" if use_tls else "http"
-            base_url = generate_proxy_url(port_config, protocol, circuit)
-
-            # Handle redirect parameter from JWT body
             redirect_path = jwt_body.get("redirect", "")
-            if redirect_path and not redirect_path.startswith("/"):
-                redirect_path = f"/{redirect_path}"
-
-            full_url = f"{base_url}{redirect_path}" if redirect_path else base_url
-
-            response = web.HTTPPermanentRedirect(full_url, headers=cors_headers)
+            proxy_url = generate_proxy_url(port_config, protocol, circuit, redirect_path)
+            response = web.HTTPPermanentRedirect(proxy_url, headers=cors_headers)
             cookie_domain = None
             if circuit.frontend_mode == FrontendMode.WILDCARD_DOMAIN:
                 wildcard_info = config.wildcard_domain
@@ -176,7 +180,7 @@ async def setup(
                 "directTCP": "true",
                 "auth": params.token,
                 "proto": protocol,
-                "gateway": generate_proxy_url(port_config, protocol, circuit),
+                "gateway": generate_proxy_url(port_config, protocol, circuit, redirect_path=None),
             }
             if jwt_body["redirect"]:
                 return web.HTTPPermanentRedirect(
