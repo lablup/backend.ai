@@ -6,7 +6,7 @@ from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.common.auth import PublicKey
-from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import aobject
 
 
@@ -48,6 +48,10 @@ class AgentRuntime(aobject):
 
     def mark_stop_signal(self, stop_signal: signal.Signals) -> None:
         self._stop_signal = stop_signal
+
+    async def update_status(self, status) -> None:
+        etcd = self.get_etcd()
+        await etcd.put("", status, scope=ConfigScopes.NODE)
 
     async def _create_agent(
         self,

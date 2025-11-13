@@ -539,8 +539,7 @@ class AgentRPCServer(aobject):
 
     @collect_error
     async def update_status(self, status):
-        etcd = self.runtime.get_etcd()
-        await etcd.put("", status, scope=ConfigScopes.NODE)
+        await self.runtime.update_status(status)
 
     @rpc_function
     @collect_error
