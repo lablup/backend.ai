@@ -3,8 +3,8 @@ from __future__ import annotations
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.health_checker.exceptions import DatabaseHealthCheckError
-from ai.backend.manager.health_checker.database import DatabaseHealthChecker
+from ai.backend.common.health.exceptions import DatabaseHealthCheckError
+from ai.backend.manager.health.database import DatabaseHealthChecker
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 

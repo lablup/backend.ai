@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from ai.backend.common.health_checker.abc import HealthChecker
-from ai.backend.common.health_checker.exceptions import DatabaseHealthCheckError
+from ai.backend.common.health.abc import HealthChecker
+from ai.backend.common.health.exceptions import DatabaseHealthCheckError
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 

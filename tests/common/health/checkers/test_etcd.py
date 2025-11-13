@@ -5,8 +5,8 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
-from ai.backend.common.health_checker.exceptions import EtcdHealthCheckError
+from ai.backend.common.health.checkers.etcd import EtcdHealthChecker
+from ai.backend.common.health.exceptions import EtcdHealthCheckError
 from ai.backend.testutils.bootstrap import HostPortPairModel
 
 

@@ -11,7 +11,7 @@ import pytest
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation
 from ai.backend.common.types import AgentId
 from ai.backend.manager.clients.agent.client import AgentClient
-from ai.backend.manager.health_checker.rpc import AgentRpcHealthChecker, RpcHealthCheckError
+from ai.backend.manager.health.rpc import AgentRpcHealthChecker, RpcHealthCheckError
 
 
 class TestAgentRpcHealthChecker:

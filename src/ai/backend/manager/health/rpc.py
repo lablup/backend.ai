@@ -3,8 +3,8 @@ from __future__ import annotations
 from aiohttp import web
 
 from ai.backend.common.exception import ErrorCode, ErrorDetail, ErrorDomain, ErrorOperation
-from ai.backend.common.health_checker.abc import HealthChecker
-from ai.backend.common.health_checker.exceptions import HealthCheckError
+from ai.backend.common.health.abc import HealthChecker
+from ai.backend.common.health.exceptions import HealthCheckError
 from ai.backend.manager.clients.agent.client import AgentClient
 
 

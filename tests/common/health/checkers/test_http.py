@@ -8,8 +8,8 @@ import aiohttp
 import pytest
 from aiohttp import web
 
-from ai.backend.common.health_checker.checkers.http import HttpHealthChecker
-from ai.backend.common.health_checker.exceptions import HttpHealthCheckError
+from ai.backend.common.health.checkers.http import HttpHealthChecker
+from ai.backend.common.health.exceptions import HttpHealthCheckError
 
 
 class TestHttpHealthChecker:

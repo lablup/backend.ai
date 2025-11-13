@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from ai.backend.common.health_checker import (
+from ai.backend.common.health import (
     ComponentId,
     HealthChecker,
     HealthCheckKey,

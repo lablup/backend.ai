@@ -78,6 +78,20 @@ class DatabaseHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
         )
 
 
+class DockerHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
+    """Raised when Docker daemon health check fails."""
+
+    error_type = "https://api.backend.ai/probs/docker-health-check-failed"
+    error_title = "Docker health check failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.HEALTH_CHECK,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
 class HealthCheckerAlreadyRegistered(BackendAIError, web.HTTPConflict):
     """
     Raised when attempting to register a health checker that is already registered.

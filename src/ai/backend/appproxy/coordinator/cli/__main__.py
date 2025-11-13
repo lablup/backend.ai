@@ -17,6 +17,7 @@ from ai.backend.appproxy.common.config import generate_example_json
 from ai.backend.appproxy.common.openapi import generate_openapi
 from ai.backend.appproxy.common.utils import ensure_json_serializable
 from ai.backend.cli.types import ExitCode
+from ai.backend.common.cli import LazyGroup
 from ai.backend.logging import BraceStyleAdapter, LogLevel
 
 from ..config import ServerConfig
@@ -215,6 +216,11 @@ def dbshell(cli_ctx: CLIContext, container_name, psql_help, psql_args):
         *psql_args,
     ]
     subprocess.run(cmd)
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.health:cli")
+def health() -> None:
+    """Command set for health checking."""
 
 
 if __name__ == "__main__":

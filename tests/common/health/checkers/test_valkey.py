@@ -5,8 +5,8 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.clients.valkey_client.client import ValkeyStandaloneClient
-from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
-from ai.backend.common.health_checker.exceptions import ValkeyHealthCheckError
+from ai.backend.common.health.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health.exceptions import ValkeyHealthCheckError
 from ai.backend.testutils.bootstrap import HostPortPairModel
 
 

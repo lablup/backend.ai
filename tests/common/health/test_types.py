@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from ai.backend.common.health_checker import (
+from ai.backend.common.health import (
     AGENT,
     APPPROXY,
     DATABASE,

@@ -27,7 +27,7 @@ class HealthProbeOptions:
     Configuration options for the health probe.
     """
 
-    check_interval: float = 1.0
+    check_interval: float = 60.0
 
 
 @dataclass

@@ -3,7 +3,7 @@ from __future__ import annotations
 from aiohttp import web
 
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation
-from ai.backend.common.health_checker import (
+from ai.backend.common.health import (
     HealthCheckerAlreadyRegistered,
     HealthCheckerNotFound,
 )
