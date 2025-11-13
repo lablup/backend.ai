@@ -280,7 +280,7 @@ class AsyncEtcd(AbstractKVStore):
         if isinstance(addrs, HostPortPair):
             # Make it plural.
             addrs = [addrs]
-        log.info(
+        log.debug(
             'using etcd cluster at [{}] with namespace "{}"',
             ", ".join(str(addr) for addr in addrs),
             namespace,
