@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -9,6 +11,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 import yarl
+from pydantic import BaseModel, Field
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -18,6 +21,7 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -28,6 +32,59 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.image.types import ImageIdentifier
+
+
+class ImageEnvironment(BaseModel):
+    image: str = Field(
+        description="""
+        Container image to use for the model service.
+        """,
+        examples=[
+            "myregistry/myimage:latest",
+        ],
+    )
+    architecture: str = Field(
+        description="""
+        Architecture of the container image.
+        """,
+        examples=[
+            "x86_64",
+            "arm64",
+        ],
+    )
+
+
+class ModelServiceDefinition(BaseModel):
+    environment: Optional[ImageEnvironment] = Field(
+        default=None,
+        description="""
+        Environment in which the model service will run.
+        """,
+        examples=[
+            {
+                "image": "myregistry/myimage:latest",
+                "architecture": "x86_64",
+            }
+        ],
+    )
+    resource_slots: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="""
+        Resource slots used by the model service session.
+        """,
+        examples=[
+            {"cpu": 1, "mem": "2gb"},
+        ],
+    )
+    environ: Optional[dict[str, str]] = Field(
+        default=None,
+        description="""
+        Environment variables to set for the model service.
+        """,
+        examples=[
+            {"MY_ENV_VAR": "value", "ANOTHER_VAR": "another_value"},
+        ],
+    )
 
 
 class RouteStatus(enum.Enum):
@@ -150,6 +207,112 @@ class ModelRevisionSpec:
     resource_spec: ResourceSpec
     mounts: MountMetadata
     execution: ExecutionSpec
+
+
+@dataclass
+class RequestedImageIdentifier:
+    canonical: Optional[str]
+    architecture: Optional[str]
+
+
+@dataclass
+class RequestedResourceSpec:
+    cluster_mode: ClusterMode
+    cluster_size: int
+    resource_slots: Optional[Mapping[str, Any]]
+    resource_opts: Optional[Mapping[str, Any]] = None
+
+
+@dataclass
+class RequestedModelRevisionSpec:
+    image_identifier: RequestedImageIdentifier
+    resource_spec: RequestedResourceSpec
+    mounts: MountMetadata
+    execution: ExecutionSpec
+
+    def to_model_revision_spec_with_service_definition(
+        self, service_definition: ModelServiceDefinition
+    ) -> ModelRevisionSpec:
+        if service_definition.resource_slots is not None:
+            resource_spec = ResourceSpec(
+                cluster_mode=self.resource_spec.cluster_mode,
+                cluster_size=self.resource_spec.cluster_size,
+                resource_slots=service_definition.resource_slots,
+                resource_opts=self.resource_spec.resource_opts,
+            )
+        else:
+            if self.resource_spec.resource_slots is None:
+                raise InvalidAPIParameters(
+                    "Resource slots must be specified in either requested model revision or model service definition."
+                )
+            resource_spec = ResourceSpec(
+                cluster_mode=self.resource_spec.cluster_mode,
+                cluster_size=self.resource_spec.cluster_size,
+                resource_slots=self.resource_spec.resource_slots,
+                resource_opts=self.resource_spec.resource_opts,
+            )
+
+        if service_definition.environment is not None:
+            image_identifier = ImageIdentifier(
+                canonical=service_definition.environment.image,
+                architecture=service_definition.environment.architecture,
+            )
+        else:
+            if self.image_identifier.canonical is None or self.image_identifier.canonical == "":
+                raise InvalidAPIParameters(
+                    "Image canonical and architecture must be specified in requested model revision if not provided in model service definition."
+                )
+            if (
+                self.image_identifier.architecture is None
+                or self.image_identifier.architecture == ""
+            ):
+                raise InvalidAPIParameters(
+                    "Image architecture must be specified in requested model revision if not provided in model service definition."
+                )
+            image_identifier = ImageIdentifier(
+                canonical=self.image_identifier.canonical,
+                architecture=self.image_identifier.architecture,
+            )
+
+        return ModelRevisionSpec(
+            image_identifier=image_identifier,
+            resource_spec=resource_spec,
+            mounts=self.mounts,
+            execution=self.execution,
+        )
+
+    def to_model_revision_spec(self) -> ModelRevisionSpec:
+        requested_image_identifier = self.image_identifier
+        if (
+            requested_image_identifier.architecture == ""
+            or requested_image_identifier.architecture is None
+        ):
+            raise InvalidAPIParameters("Architecture must be specified for CMD runtime variant.")
+        if (
+            requested_image_identifier.canonical == ""
+            or requested_image_identifier.canonical is None
+        ):
+            raise InvalidAPIParameters(
+                "Canonical image identifier must be specified for CMD runtime variant."
+            )
+        requested_resource_spec = self.resource_spec
+        if requested_resource_spec.resource_slots is None:
+            raise InvalidAPIParameters("Resource slots must be specified for CMD runtime variant.")
+
+        return ModelRevisionSpec(
+            image_identifier=ImageIdentifier(
+                canonical=requested_image_identifier.canonical,
+                architecture=requested_image_identifier.architecture,
+            ),
+            resource_spec=ResourceSpec(
+                cluster_mode=requested_resource_spec.cluster_mode,
+                cluster_size=requested_resource_spec.cluster_size,
+                resource_slots=requested_resource_spec.resource_slots,
+                resource_opts=requested_resource_spec.resource_opts,
+            ),
+            mounts=self.mounts,
+            execution=self.execution,
+        )
 
 
 @dataclass
