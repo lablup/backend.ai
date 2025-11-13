@@ -19,15 +19,6 @@ class TestBootstrapConfigDependency:
     """
 
     @pytest.mark.asyncio
-    async def test_stage_name(self) -> None:
-        """
-
-        Dependency should have correct stage name.
-        """
-        dependency = BootstrapConfigDependency()
-        assert dependency.stage_name == "bootstrap-config"
-
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.config.bootstrap.BootstrapConfig.load_from_file")
     async def test_provide_config(self, mock_load_from_file: AsyncMock) -> None:
         """

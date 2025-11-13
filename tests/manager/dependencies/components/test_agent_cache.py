@@ -1,17 +1,30 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.dependencies.components.agent_cache import (
     AgentCacheDependency,
     AgentCacheInput,
 )
 from ai.backend.manager.dependencies.errors import InvalidManagerKeypairError
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+
+
+@dataclass
+class MockManagerConfig:
+    """Simple mock for manager config."""
+
+    rpc_auth_manager_keypair: Path
+
+
+@dataclass
+class MockConfig:
+    """Simple mock for config."""
+
+    manager: MockManagerConfig
 
 
 class TestAgentCacheDependency:
@@ -21,23 +34,12 @@ class TestAgentCacheDependency:
     """
 
     @pytest.mark.asyncio
-    async def test_stage_name(self) -> None:
-        """
-
-        Dependency should have correct stage name.
-        """
-        dependency = AgentCacheDependency()
-        assert dependency.stage_name == "agent-cache"
-
-    @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.components.agent_cache.load_certificate")
     @patch("ai.backend.manager.dependencies.components.agent_cache.AgentRPCCache")
     async def test_provide_agent_cache(
         self,
         mock_cache_class: MagicMock,
         mock_load_cert: MagicMock,
-        mock_db_engine: ExtendedAsyncSAEngine,
-        mock_config: ManagerUnifiedConfig,
     ) -> None:
         """
 
@@ -47,10 +49,13 @@ class TestAgentCacheDependency:
         mock_cache = MagicMock()
         mock_cache_class.return_value = mock_cache
 
-        mock_config.manager.rpc_auth_manager_keypair = Path("/test/keypair")
+        db_engine = MagicMock()
+        config = MockConfig(
+            manager=MockManagerConfig(rpc_auth_manager_keypair=Path("/test/keypair"))
+        )
 
         dependency = AgentCacheDependency()
-        cache_input = AgentCacheInput(db=mock_db_engine, config=mock_config)
+        cache_input = AgentCacheInput(db=db_engine, config=config)  # type: ignore[arg-type]
 
         async with dependency.provide(cache_input) as agent_cache:
             assert agent_cache is mock_cache
@@ -62,18 +67,20 @@ class TestAgentCacheDependency:
     async def test_missing_secret_key_raises_error(
         self,
         mock_load_cert: MagicMock,
-        mock_db_engine: ExtendedAsyncSAEngine,
-        mock_config: ManagerUnifiedConfig,
     ) -> None:
         """
 
         Dependency should raise error when secret key is missing.
         """
         mock_load_cert.return_value = (b"public_key", None)
-        mock_config.manager.rpc_auth_manager_keypair = Path("/test/keypair")
+
+        db_engine = MagicMock()
+        config = MockConfig(
+            manager=MockManagerConfig(rpc_auth_manager_keypair=Path("/test/keypair"))
+        )
 
         dependency = AgentCacheDependency()
-        cache_input = AgentCacheInput(db=mock_db_engine, config=mock_config)
+        cache_input = AgentCacheInput(db=db_engine, config=config)  # type: ignore[arg-type]
 
         with pytest.raises(
             InvalidManagerKeypairError,

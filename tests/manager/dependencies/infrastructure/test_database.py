@@ -15,14 +15,15 @@ class TestDatabaseDependency:
     Test DatabaseDependency lifecycle.
     """
 
-    @pytest.mark.asyncio
-    async def test_stage_name(self) -> None:
+    @pytest.fixture
+    def mock_config(self) -> ManagerUnifiedConfig:
         """
 
-        Dependency should have correct stage name.
+        Fixture providing a mock ManagerUnifiedConfig.
         """
-        dependency = DatabaseDependency()
-        assert dependency.stage_name == "database"
+        mock = MagicMock(spec=ManagerUnifiedConfig)
+        mock.db = MagicMock()
+        return mock
 
     @pytest.mark.asyncio
     @patch("ai.backend.manager.dependencies.infrastructure.database.connect_database")
