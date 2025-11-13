@@ -9,6 +9,7 @@ from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.logging.types import LogLevel
 
 from .bootstrap import BootstrapComposer, BootstrapInput
+from .components import ComponentsComposer, ComponentsInput, ComponentsResources
 from .infrastructure import (
     InfrastructureComposer,
     InfrastructureInput,
@@ -32,19 +33,21 @@ class DependencyResources:
     """Container for all initialized dependency resources.
 
     Holds all foundational dependencies in the correct initialization order:
-    1. Bootstrap stage: etcd
-    2. Infrastructure stage: valkey clients, database
+    1. Infrastructure stage: valkey clients, database
+    2. Components stage: storage manager, agent cache
     """
 
     infrastructure: InfrastructureResources
+    components: ComponentsResources
 
 
 class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyResources]):
     """Composes all manager dependencies in the correct order.
 
-    Composes the two-stage dependency initialization:
+    Composes the three-stage dependency initialization:
     1. Bootstrap: etcd and config provider
     2. Infrastructure: valkey clients and database
+    3. Components: storage manager and agent cache
     """
 
     @property
@@ -88,5 +91,20 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
             infra_input,
         )
 
+        # Stage 3: Components (storage manager + agent cache)
+        components_composer = ComponentsComposer()
+        components_input = ComponentsInput(
+            config=bootstrap.config_provider.config,
+            db=infrastructure.db,
+            etcd=bootstrap.etcd,
+        )
+        components = await stack.enter_composer(
+            components_composer,
+            components_input,
+        )
+
         # Yield all resources
-        yield DependencyResources(infrastructure=infrastructure)
+        yield DependencyResources(
+            infrastructure=infrastructure,
+            components=components,
+        )
