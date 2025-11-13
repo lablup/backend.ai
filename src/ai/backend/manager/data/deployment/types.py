@@ -274,6 +274,12 @@ class RequestedModelRevisionSpec:
                 architecture=self.image_identifier.architecture,
             )
 
+        if service_definition.environ is not None:
+            if self.execution.environ:
+                self.execution.environ.update(service_definition.environ)
+            else:
+                self.execution.environ = service_definition.environ
+
         return ModelRevisionSpec(
             image_identifier=image_identifier,
             resource_spec=resource_spec,
