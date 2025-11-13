@@ -54,11 +54,6 @@ def pytest_collection_modifyitems(config, items) -> None:
                 item.add_marker(do_skip)
 
 
-@pytest.fixture(scope="session", autouse=True)
-def test_ns() -> str:
-    return f"test-{secrets.token_hex(8)}"
-
-
 @pytest.fixture
 def test_case_ns() -> str:
     return secrets.token_hex(8)
@@ -67,33 +62,6 @@ def test_case_ns() -> str:
 @pytest.fixture
 def test_node_id() -> str:
     return f"test-{secrets.token_hex(4)}"
-
-
-@pytest.fixture
-async def etcd(
-    etcd_container: tuple[str, HostPortPairModel],  # noqa: F811
-    test_ns: str,
-) -> AsyncIterator[AsyncEtcd]:
-    etcd = AsyncEtcd(
-        addrs=[etcd_container[1].to_legacy()],
-        namespace=test_ns,
-        scope_prefix_map={
-            ConfigScopes.GLOBAL: "global",
-            ConfigScopes.SGROUP: "sgroup/testing",
-            ConfigScopes.NODE: "node/i-test",
-        },
-    )
-    try:
-        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
-        await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
-        await etcd.delete_prefix("", scope=ConfigScopes.NODE)
-        yield etcd
-    finally:
-        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
-        await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
-        await etcd.delete_prefix("", scope=ConfigScopes.NODE)
-        await etcd.close()
-        del etcd
 
 
 @pytest.fixture

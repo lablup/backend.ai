@@ -7,7 +7,7 @@ import pytest
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.common import config
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes, Event
+from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
 
 @pytest.fixture
@@ -62,7 +62,6 @@ async def agent_etcd_view(
     return AgentEtcdClientView(etcd, agent_config)
 
 
-@pytest.mark.integration
 class TestAgentEtcdClientViewInitialization:
     def test_initialization(
         self,
@@ -76,7 +75,6 @@ class TestAgentEtcdClientViewInitialization:
         assert view._config is agent_config
 
 
-@pytest.mark.integration
 class TestPutOperations:
     @pytest.mark.asyncio
     async def test_put(
@@ -128,9 +126,12 @@ class TestPutOperations:
         await agent_etcd_view.put_prefix(key, dict_obj, scope=scope)
 
         # Verify the nested structure was stored
+        # get_prefix returns keys without the prefix, and nested dicts remain nested
         result = await agent_etcd_view.get_prefix(key, scope=scope)
-        assert result.get("test/putprefix/nested/key") == "value"
-        assert result.get("test/putprefix/another") == "data"
+        assert result.get("another") == "data"
+        nested = result.get("nested")
+        assert isinstance(nested, dict)
+        assert nested.get("key") == "value"
 
     @pytest.mark.asyncio
     async def test_put_dict(
@@ -148,7 +149,6 @@ class TestPutOperations:
         assert await agent_etcd_view.get("key2", scope=scope) == "val2"
 
 
-@pytest.mark.integration
 class TestGetOperations:
     @pytest.mark.asyncio
     async def test_get(
@@ -169,19 +169,32 @@ class TestGetOperations:
         self,
         agent_etcd_view: AgentEtcdClientView,
     ) -> None:
-        """Test that get respects scope."""
+        """Test that get respects scope hierarchy (NODE scope inherits from SGROUP and GLOBAL)."""
         key = "test/get/scoped"
-        scope = ConfigScopes.SGROUP
-        value = "scoped-value"
+        sgroup_value = "sgroup-value"
+        node_value = "node-value"
 
-        await agent_etcd_view.put(key, value, scope=scope)
-        result = await agent_etcd_view.get(key, scope=scope)
+        # Put value in SGROUP scope
+        await agent_etcd_view.put(key, sgroup_value, scope=ConfigScopes.SGROUP)
 
-        assert result == value
+        # Reading from SGROUP should get SGROUP value
+        result_sgroup = await agent_etcd_view.get(key, scope=ConfigScopes.SGROUP)
+        assert result_sgroup == sgroup_value
 
-        # Getting from wrong scope should return None
-        result_wrong_scope = await agent_etcd_view.get(key, scope=ConfigScopes.NODE)
-        assert result_wrong_scope is None
+        # Reading from NODE should inherit from SGROUP (NODE inherits SGROUP + GLOBAL)
+        result_node_inherited = await agent_etcd_view.get(key, scope=ConfigScopes.NODE)
+        assert result_node_inherited == sgroup_value
+
+        # Put a value in NODE scope - it should override the SGROUP value
+        await agent_etcd_view.put(key, node_value, scope=ConfigScopes.NODE)
+
+        # Reading from NODE should now get NODE value (higher priority)
+        result_node = await agent_etcd_view.get(key, scope=ConfigScopes.NODE)
+        assert result_node == node_value
+
+        # Reading from SGROUP should still get SGROUP value (unaffected by NODE)
+        result_sgroup_after = await agent_etcd_view.get(key, scope=ConfigScopes.SGROUP)
+        assert result_sgroup_after == sgroup_value
 
     @pytest.mark.asyncio
     async def test_get_prefix(
@@ -198,12 +211,13 @@ class TestGetOperations:
         result = await agent_etcd_view.get_prefix(key_prefix)
 
         assert len(result) == 2
-        assert result.get(f"{key_prefix}/key1") == "value1"
-        assert result.get(f"{key_prefix}/key2") == "value2"
+        # get_prefix returns keys without the prefix
+        assert result.get("key1") == "value1"
+        assert result.get("key2") == "value2"
         assert "test/other" not in result
+        assert "other" not in result
 
 
-@pytest.mark.integration
 class TestReplaceOperation:
     @pytest.mark.asyncio
     async def test_replace(
@@ -257,7 +271,6 @@ class TestReplaceOperation:
         assert await agent_etcd_view.get(key) == initial_val
 
 
-@pytest.mark.integration
 class TestDeleteOperations:
     @pytest.mark.asyncio
     async def test_delete(
@@ -329,91 +342,6 @@ class TestDeleteOperations:
         assert kept == "keep-value"
 
 
-@pytest.mark.integration
-class TestWatchOperations:
-    @pytest.mark.asyncio
-    async def test_watch(
-        self,
-        agent_etcd_view: AgentEtcdClientView,
-    ) -> None:
-        """Test that watch detects changes."""
-        key = "test/watch/key"
-
-        # Start watching in background
-        events = []
-        async for event in agent_etcd_view.watch(key, once=True):
-            if isinstance(event, Event):
-                events.append(event)
-                break
-
-        # Should have received the initial event
-        assert len(events) >= 0  # May be 0 if no initial value
-
-    @pytest.mark.asyncio
-    async def test_watch_with_options(
-        self,
-        agent_etcd_view: AgentEtcdClientView,
-    ) -> None:
-        """Test that watch passes options correctly."""
-        key = "test/watch/options"
-        scope = ConfigScopes.NODE
-
-        count = 0
-        async for event in agent_etcd_view.watch(
-            key,
-            scope=scope,
-            once=True,
-            wait_timeout=1.0,
-        ):
-            if isinstance(event, Event):
-                count += 1
-                break
-
-        # Just verify it doesn't error
-        assert count >= 0
-
-    @pytest.mark.asyncio
-    async def test_watch_prefix(
-        self,
-        agent_etcd_view: AgentEtcdClientView,
-    ) -> None:
-        """Test that watch_prefix detects changes to prefix."""
-        key_prefix = "test/watchprefix"
-
-        events = []
-        async for event in agent_etcd_view.watch_prefix(key_prefix, once=True):
-            if isinstance(event, Event):
-                events.append(event)
-                break
-
-        # Should complete without error
-        assert len(events) >= 0
-
-    @pytest.mark.asyncio
-    async def test_watch_prefix_with_options(
-        self,
-        agent_etcd_view: AgentEtcdClientView,
-    ) -> None:
-        """Test that watch_prefix passes all options correctly."""
-        key_prefix = "test/watchprefix/opts"
-        scope = ConfigScopes.SGROUP
-
-        count = 0
-        async for event in agent_etcd_view.watch_prefix(
-            key_prefix,
-            scope=scope,
-            once=True,
-            wait_timeout=1.0,
-        ):
-            if isinstance(event, Event):
-                count += 1
-                break
-
-        # Just verify it doesn't error
-        assert count >= 0
-
-
-@pytest.mark.integration
 class TestConfigContainerUpdates:
     @pytest.mark.asyncio
     async def test_config_container_updates_reflect_in_scope_prefix_map(

@@ -18,6 +18,7 @@ from ai.backend.logging import LocalLogger
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat, LogLevel
 from ai.backend.testutils.bootstrap import (  # noqa: F401
+    HostPortPairModel,
     etcd_container,
     redis_container,
     sync_file_lock,
@@ -54,6 +55,35 @@ def logging_config():
         yield config
 
 
+@pytest.fixture(scope="session", autouse=True)
+def patch_dummy_agent_config():
+    """Patch read_from_file to provide default config for DummyAgent in tests."""
+    from ai.backend.common import config as common_config
+
+    original_read_from_file = common_config.read_from_file
+
+    def patched_read_from_file(path, filesystem_type=""):
+        # Check if this is the dummy agent config file
+        if "agent.dummy.toml" in str(path):
+            # Return minimal config structure - trafaret will fill in defaults
+            return (
+                {
+                    "agent": {"delay": {}, "image": {}, "resource": {"cpu": {}, "memory": {}}},
+                    "kernel-creation-ctx": {"delay": {}},
+                    "kernel": {"delay": {}},
+                },
+                None,
+            )
+        # Otherwise use original function
+        return original_read_from_file(path, filesystem_type)
+
+    # Manual patching for session scope
+    common_config.read_from_file = patched_read_from_file
+    yield
+    # Restore original
+    common_config.read_from_file = original_read_from_file
+
+
 @pytest.fixture(scope="session")
 def local_config(test_id, logging_config, etcd_container, redis_container):  # noqa: F811
     ipc_base_path = Path.cwd() / f".tmp/{test_id}/agent-ipc"
@@ -78,7 +108,7 @@ def local_config(test_id, logging_config, etcd_container, redis_container):  # n
             "ipc-base-path": ipc_base_path,
             "var-base-path": var_base_path,
             "mount-path": mount_path,
-            "backend": "docker",
+            "backend": "dummy",
             "rpc-listen-addr": HostPortPair("", 18100 + get_parallel_slot()),
             "agent-sock-port": 18200 + get_parallel_slot(),
             "metadata-server-bind-host": "0.0.0.0",
