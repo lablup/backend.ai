@@ -194,7 +194,7 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         glide_client = await GlideClient.create(config)
         self._valkey_client = glide_client
 
-        log.info(
+        log.debug(
             "Created ValkeyClient for standalone at {}:{} for database {}",
             target_host,
             target_port,

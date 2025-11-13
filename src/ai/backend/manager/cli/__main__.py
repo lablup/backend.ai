@@ -413,5 +413,10 @@ def config():
     """Command set for configuration management."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dependencies:cli")
+def dependencies():
+    """Command set for dependency verification and validation."""
+
+
 if __name__ == "__main__":
     main()
