@@ -122,6 +122,15 @@ class ValkeyStreamClient:
         self._closed = True
         await self._client.disconnect()
 
+    async def ping(self) -> None:
+        """
+        Ping the Valkey server to check if the connection is alive.
+
+        Raises:
+            Exception: If the ping fails or connection is not available
+        """
+        await self._client.ping()
+
     async def make_consumer_group(
         self,
         stream_key: str,

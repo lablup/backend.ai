@@ -158,6 +158,16 @@ class ExtendedAsyncSAEngine(SAEngine):
             async with conn_with_isolation.begin():
                 yield conn_with_isolation
 
+    async def ping(self) -> None:
+        """
+        Ping the database to check if the connection is alive.
+
+        Raises:
+            Exception: If the ping fails or connection is not available
+        """
+        async with self.connect() as conn:
+            await conn.execute(sa.text("SELECT 1"))
+
     @actxmgr
     async def begin_readonly(
         self,

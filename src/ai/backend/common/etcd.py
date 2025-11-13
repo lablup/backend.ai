@@ -318,6 +318,18 @@ class AsyncEtcd(AbstractKVStore):
     async def close(self):
         pass  # for backward compatibility
 
+    async def ping(self) -> None:
+        """
+        Ping the etcd server to check if the connection is alive.
+
+        Raises:
+            Exception: If the ping fails or connection is not available
+        """
+        # Attempt a simple get operation to test the connection
+        # Even if the key doesn't exist, a successful query means the connection works
+        # Connection errors will raise exceptions
+        await self.get("_")
+
     def _mangle_key(self, k: str) -> str:
         if k.startswith("/"):
             k = k[1:]

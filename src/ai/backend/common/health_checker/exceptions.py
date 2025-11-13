@@ -17,21 +17,65 @@ class HealthCheckError(BackendAIError):
 
     Subclasses should inherit this along with appropriate web.HTTPxxx classes
     and implement the error_code() method.
-
-    Example:
-        class DatabaseHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
-            error_type = "https://api.backend.ai/probs/database-health-check-failed"
-            error_title = "Database health check failed"
-
-            def error_code(self) -> ErrorCode:
-                return ErrorCode(
-                    domain=ErrorDomain.BACKENDAI,
-                    operation=ErrorOperation.GENERIC,
-                    error_detail=ErrorDetail.UNAVAILABLE,
-                )
     """
 
     pass
+
+
+class HttpHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
+    """Raised when HTTP endpoint health check fails."""
+
+    error_type = "https://api.backend.ai/probs/http-health-check-failed"
+    error_title = "HTTP health check failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.HEALTH_CHECK,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class ValkeyHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
+    """Raised when Valkey/Redis health check fails."""
+
+    error_type = "https://api.backend.ai/probs/valkey-health-check-failed"
+    error_title = "Valkey health check failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.HEALTH_CHECK,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class EtcdHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
+    """Raised when etcd health check fails."""
+
+    error_type = "https://api.backend.ai/probs/etcd-health-check-failed"
+    error_title = "Etcd health check failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.HEALTH_CHECK,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class DatabaseHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
+    """Raised when database health check fails."""
+
+    error_type = "https://api.backend.ai/probs/database-health-check-failed"
+    error_title = "Database health check failed"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.HEALTH_CHECK,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
 
 
 class HealthCheckerAlreadyRegistered(BackendAIError, web.HTTPConflict):

@@ -45,13 +45,13 @@ async def test_signout_successful_with_valid_credentials(
         "role": UserRole.USER,
         "status": UserStatus.ACTIVE,
     }
-    mock_auth_repository.deactivate_user_and_keypairs_validated.return_value = None
+    mock_auth_repository.deactivate_user_and_keypairs.return_value = None
 
     result = await auth_service.signout(action)
 
     assert result.success is True
     mock_auth_repository.check_credential_without_migration.assert_called_once()
-    mock_auth_repository.deactivate_user_and_keypairs_validated.assert_called_once()
+    mock_auth_repository.deactivate_user_and_keypairs.assert_called_once()
 
 
 @pytest.mark.asyncio
