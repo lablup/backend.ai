@@ -19,7 +19,9 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_meta impor
 
 @strawberry.type(description="Added in 25.14.0")
 class ArtifactRegistry:
-    id: ID = strawberry.field(description="Added in 25.17.0, ID of the artifact registry metadata row.")
+    id: ID = strawberry.field(
+        description="Added in 25.17.0, ID of the artifact registry metadata row."
+    )
     registry_id: ID = strawberry.field(
         description="Added in 25.17.0, Registry ID of the artifact registry database row."
     )
