@@ -1,10 +1,10 @@
+import importlib
 import signal
 from typing import Optional
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
-from ai.backend.agent.types import AgentBackend
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.types import aobject
@@ -60,16 +60,8 @@ class AgentRuntime(aobject):
             "agent_public_key": self.agent_public_key,
         }
 
-        match self.local_config.agent_common.backend:
-            case AgentBackend.DOCKER:
-                from .docker.agent import DockerAgent
+        backend = self.local_config.agent_common.backend
+        agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
+        agent_cls = agent_mod.get_agent_cls()
 
-                return await DockerAgent.new(etcd, agent_config, **agent_kwargs)
-            case AgentBackend.KUBERNETES:
-                from .kubernetes.agent import KubernetesAgent
-
-                return await KubernetesAgent.new(etcd, agent_config, **agent_kwargs)
-            case AgentBackend.DUMMY:
-                from ai.backend.agent.dummy.agent import DummyAgent
-
-                return await DummyAgent.new(etcd, agent_config, **agent_kwargs)
+        return agent_cls.new(etcd, agent_config, **agent_kwargs)
