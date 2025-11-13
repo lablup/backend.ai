@@ -1,0 +1,9 @@
+python_tests(
+    name="tests",
+    sources=["test_*.py"],
+    dependencies=[
+        "tests/manager/dependencies:test_utils",
+        "src/ai/backend/common:src",
+        "src/ai/backend/manager:src",
+    ],
+)
