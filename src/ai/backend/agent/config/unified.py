@@ -11,6 +11,7 @@ import logging
 import os
 import sys
 import textwrap
+from decimal import Decimal
 from pathlib import Path
 from typing import (
     Any,
@@ -49,6 +50,8 @@ from ai.backend.common.types import (
     BinarySizeField,
     ResourceGroupType,
     ServiceDiscoveryType,
+    SlotName,
+    SlotNameField,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
@@ -75,6 +78,12 @@ class ScratchType(enum.StrEnum):
     HOSTFILE = "hostfile"
     MEMORY = "memory"
     K8S_NFS = "k8s-nfs"
+
+
+class ResourceAllocationMode(enum.StrEnum):
+    SHARED = "shared"
+    AUTO_SPLIT = "auto-split"
+    MANUAL = "manual"
 
 
 class AgentConfigValidationContext(BaseConfigValidationContext):
@@ -504,6 +513,34 @@ class CommonAgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("metadata-server-port", "metadata_server_port"),
         serialization_alias="metadata-server-port",
     )
+    allow_compute_plugins: Optional[set[str]] = Field(
+        default=None,
+        description="Allowed compute plugins",
+        examples=[{"ai.backend.activator.agent", "ai.backend.accelerator.cuda_open"}],
+        validation_alias=AliasChoices("allow-compute-plugins", "allow_compute_plugins"),
+        serialization_alias="allow-compute-plugins",
+    )
+    block_compute_plugins: Optional[set[str]] = Field(
+        default=None,
+        description="Blocked compute plugins",
+        examples=[{"ai.backend.accelerator.mock"}],
+        validation_alias=AliasChoices("block-compute-plugins", "block_compute_plugins"),
+        serialization_alias="block-compute-plugins",
+    )
+    allow_network_plugins: Optional[set[str]] = Field(
+        default=None,
+        description="Allowed network plugins",
+        examples=[{"ai.backend.manager.network.overlay"}],
+        validation_alias=AliasChoices("allow-network-plugins", "allow_network_plugins"),
+        serialization_alias="allow-network-plugins",
+    )
+    block_network_plugins: Optional[set[str]] = Field(
+        default=None,
+        description="Blocked network plugins",
+        examples=[{"ai.backend.manager.network.overlay"}],
+        validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
+        serialization_alias="block-network-plugins",
+    )
     image_commit_path: AutoDirectoryPath = Field(
         default=AutoDirectoryPath("./tmp/backend.ai/commit"),
         description="Path for image commit",
@@ -595,34 +632,6 @@ class OverridableAgentConfig(BaseConfigSchema):
         examples=[item.value for item in ResourceGroupType],
         validation_alias=AliasChoices("scaling-group-type", "scaling_group_type"),
         serialization_alias="scaling-group-type",
-    )
-    allow_compute_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Allowed compute plugins",
-        examples=[{"ai.backend.activator.agent", "ai.backend.accelerator.cuda_open"}],
-        validation_alias=AliasChoices("allow-compute-plugins", "allow_compute_plugins"),
-        serialization_alias="allow-compute-plugins",
-    )
-    block_compute_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Blocked compute plugins",
-        examples=[{"ai.backend.accelerator.mock"}],
-        validation_alias=AliasChoices("block-compute-plugins", "block_compute_plugins"),
-        serialization_alias="block-compute-plugins",
-    )
-    allow_network_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Allowed network plugins",
-        examples=[{"ai.backend.manager.network.overlay"}],
-        validation_alias=AliasChoices("allow-network-plugins", "allow_network_plugins"),
-        serialization_alias="allow-network-plugins",
-    )
-    block_network_plugins: Optional[set[str]] = Field(
-        default=None,
-        description="Blocked network plugins",
-        examples=[{"ai.backend.manager.network.overlay"}],
-        validation_alias=AliasChoices("block-network-plugins", "block_network_plugins"),
-        serialization_alias="block-network-plugins",
     )
     force_terminate_abusing_containers: bool = Field(
         default=False,
@@ -867,6 +876,48 @@ class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
     pass
 
 
+class ResourceAllocationConfig(BaseConfigSchema):
+    cpu: int = Field(
+        description=textwrap.dedent("""
+        Hard CPU allocation for this agent (e.g., 8 cores).
+        Only used in MANUAL allocation mode.
+        All agents must specify this value when allocation-mode is MANUAL.
+        """),
+        examples=[8, 16],
+    )
+    mem: BinarySizeField = Field(
+        description=textwrap.dedent("""
+        Hard memory allocation for this agent (e.g., "32G").
+        Only used in MANUAL allocation mode.
+        All agents must specify this value when allocation-mode is MANUAL.
+        """),
+        examples=["32G", "64G"],
+    )
+    devices: Mapping[SlotNameField, Decimal] = Field(
+        default_factory=dict,
+        description=textwrap.dedent("""
+        Device-specific per-slot resource allocations.
+        Only used in MANUAL allocation mode.
+        """),
+        examples=[{"cuda.mem": "0.3", "cuda.shares": "0.5"}],
+    )
+
+    model_config = ConfigDict(
+        extra="allow",
+        arbitrary_types_allowed=True,
+    )
+
+    @model_validator(mode="after")
+    def validate_values_are_positive(self) -> Self:
+        if self.cpu is not None and self.cpu < 0:
+            raise ValueError(f"Allocated cpu must not be a negative value, but given {self.cpu}")
+        if self.mem is not None and self.mem < 0:
+            raise ValueError(f"Allocated mem must not be a negative value, but given {self.mem}")
+        if any(value < 0 for value in self.devices.values()):
+            raise ValueError("All allocated device resource values must not be a negative value")
+        return self
+
+
 class ResourceConfig(BaseConfigSchema):
     reserved_cpu: int = Field(
         default=1,
@@ -898,6 +949,25 @@ class ResourceConfig(BaseConfigSchema):
         examples=["8G", "16G"],
         validation_alias=AliasChoices("reserved-disk", "reserved_disk"),
         serialization_alias="reserved-disk",
+    )
+    allocation_mode: ResourceAllocationMode = Field(
+        default=ResourceAllocationMode.SHARED,
+        description=textwrap.dedent("""
+        Resource allocation mode for multi-agent scenarios.
+        - `shared`: All agents share the full resource pool (default, backward compatible).
+        - `auto-split`: Automatically divide resources equally (1/N) among all agents.
+        - `manual`: Manually specify per-agent resource allocations via config.
+        """),
+        examples=[item.value for item in ResourceAllocationMode],
+        validation_alias=AliasChoices("allocation-mode", "allocation_mode"),
+        serialization_alias="allocation-mode",
+    )
+    allocations: Optional[ResourceAllocationConfig] = Field(
+        default=None,
+        description=textwrap.dedent("""
+        Resource allocations.
+        Only used in MANUAL allocation mode.
+        """),
     )
     memory_align_size: BinarySizeField = Field(
         default=BinarySize.finite_from_str("16M"),
@@ -1183,11 +1253,11 @@ class AgentOverrideConfig(BaseConfigSchema):
         Only override fields if necessary.
         """),
     )
-    container: OverridableContainerConfig | None = Field(
+    container: Optional[OverridableContainerConfig] = Field(
         default=None,
         description="Container config overrides for the individual agent",
     )
-    resource: ResourceConfig | None = Field(
+    resource: Optional[ResourceAllocationConfig] = Field(
         default=None,
         description="Resource config overrides for the individual agent",
     )
@@ -1209,10 +1279,19 @@ class AgentOverrideConfig(BaseConfigSchema):
                 update=container_override_fields
             )
         if self.resource is not None:
-            resource_override_fields = self.resource.model_dump(
-                include=self.resource.model_fields_set
+            default_allocations = default.resource.allocations
+            override_allocations = self.resource
+            if default_allocations is None:
+                merged_allocations = override_allocations
+            else:
+                merged_allocations = default_allocations.model_copy(
+                    update=override_allocations.model_dump(
+                        include=override_allocations.model_fields_set
+                    )
+                )
+            agent_updates["resource"] = default.resource.model_copy(
+                update={"allocations": merged_allocations}
             )
-            agent_updates["resource"] = default.resource.model_copy(update=resource_override_fields)
         return default.model_copy(update=agent_updates)
 
 
@@ -1312,5 +1391,32 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
     def _validate_agent_configs(self) -> Self:
         for config in self.get_agent_configs():
             config.validate_agent_specific_config()
+
+        return self
+
+    @model_validator(mode="after")
+    def _validate_resource_allocation_mode(self) -> Self:
+        agent_configs = self.get_agent_configs()
+
+        match self.resource.allocation_mode:
+            case ResourceAllocationMode.SHARED | ResourceAllocationMode.AUTO_SPLIT:
+                for config in agent_configs:
+                    if config.resource.allocations is not None:
+                        raise ValueError(
+                            "On non-MANUAL mode, config must not specify manual resource allocations"
+                        )
+
+            case ResourceAllocationMode.MANUAL:
+                slot_names: list[set[SlotName]] = []
+                for config in agent_configs:
+                    if config.resource.allocations is None:
+                        raise ValueError(
+                            "On MANUAL mode, config must specify cpu and mem resource allocations"
+                        )
+
+                    slot_names.append(set(config.resource.allocations.devices.keys()))
+
+                if not all(slot_name == slot_names[0] for slot_name in slot_names):
+                    raise ValueError("All agents must have the same slots defined in the devices!")
 
         return self

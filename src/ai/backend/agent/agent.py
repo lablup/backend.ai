@@ -64,6 +64,7 @@ from tenacity import (
 )
 from trafaret import DataError
 
+from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.metrics.metric import (
     StatScope,
     StatTaskObserver,
@@ -228,6 +229,7 @@ from .exception import AgentError, ContainerCreationError, ResourceError
 from .kernel import (
     RUN_ID_FOR_BATCH_JOB,
     AbstractKernel,
+    KernelRegistry,
     match_distro_data,
 )
 from .observer.heartbeat import HeartbeatObserver
@@ -256,7 +258,6 @@ from .utils import generate_local_instance_id, get_arch_name
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
-    from ai.backend.common.etcd import AsyncEtcd
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -762,7 +763,7 @@ class AbstractAgent(
     id: AgentId
     loop: asyncio.AbstractEventLoop
     local_config: AgentUnifiedConfig
-    etcd: AsyncEtcd
+    etcd: AgentEtcdClientView
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
     computers: MutableMapping[DeviceName, ComputerContext]
@@ -829,13 +830,14 @@ class AbstractAgent(
 
     def __init__(
         self,
-        etcd: AsyncEtcd,
+        etcd: AgentEtcdClientView,
         local_config: AgentUnifiedConfig,
         *,
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
+        kernel_registry: KernelRegistry,
     ) -> None:
         self._skip_initial_scan = skip_initial_scan
         self.loop = current_loop()
@@ -844,7 +846,7 @@ class AbstractAgent(
         self.id = AgentId(local_config.agent.id or f"agent-{uuid4()}")
         self.local_instance_id = generate_local_instance_id(__file__)
         self.agent_public_key = agent_public_key
-        self.kernel_registry = {}
+        self.kernel_registry = kernel_registry.agent_mapping(self.id)
         self.computers = {}
         self.images = {}
         self.restarting_kernels = {}
@@ -2274,7 +2276,7 @@ class AbstractAgent(
         """
         ipc_base_path = self.local_config.agent.ipc_base_path
         var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.local_instance_id}.dat"
+        last_registry_file = f"last_registry.{self.id}.dat"
         if os.path.isfile(ipc_base_path / last_registry_file):
             shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
         try:
@@ -3743,7 +3745,7 @@ class AbstractAgent(
         if (not force) and (now <= self.last_registry_written_time + 60):
             return  # don't save too frequently
         var_base_path = self.local_config.agent.var_base_path
-        last_registry_file = f"last_registry.{self.local_instance_id}.dat"
+        last_registry_file = f"last_registry.{self.id}.dat"
         try:
             with open(var_base_path / last_registry_file, "wb") as f:
                 pickle.dump(self.kernel_registry, f)

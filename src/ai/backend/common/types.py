@@ -101,6 +101,7 @@ __all__ = (
     "ResourceSlot",
     "ResourceGroupType",
     "SlotName",
+    "SlotNameField",
     "SlotTypes",
     "IntrinsicSlotNames",
     "DefaultForUnspecified",
@@ -363,6 +364,17 @@ class SlotName(UserString):
         if self.major_type in ("device", "devices", "share", "shares"):
             return True
         return False
+
+
+def _validate_slot_name(v: Any) -> SlotName:
+    """Validator for SlotName fields."""
+    if isinstance(v, SlotName):
+        return v
+    return SlotName(v)
+
+
+# Create a custom type annotation for SlotName fields
+SlotNameField = Annotated[SlotName, PlainValidator(_validate_slot_name)]
 
 
 MetricKey = NewType("MetricKey", str)

@@ -2,7 +2,7 @@ import logging
 from decimal import Decimal
 from typing import Any, Mapping, MutableMapping
 
-from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.types import DeviceName, SlotName
 from ai.backend.logging import BraceStyleAdapter
 
@@ -17,7 +17,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def load_resources(
-    etcd: AsyncEtcd,
+    etcd: AbstractKVStore,
     local_config: Mapping[str, Any],
     dummy_config: Mapping[str, Any],
 ) -> Mapping[DeviceName, AbstractComputePlugin]:

@@ -21,8 +21,10 @@ from typing import (
     Any,
     Dict,
     FrozenSet,
+    Iterator,
     List,
     Literal,
+    MutableMapping,
     NotRequired,
     Optional,
     Set,
@@ -30,6 +32,7 @@ from typing import (
     TypedDict,
     Union,
     cast,
+    overload,
 )
 
 import zmq
@@ -450,6 +453,102 @@ class AbstractKernel(UserDict, aobject, metaclass=ABCMeta):
         except asyncio.CancelledError:
             await self.runner.close()
             raise
+
+
+@dataclass(frozen=True)
+class AgentKernelRegistryKey:
+    agent_id: AgentId
+    kernel_id: KernelId
+
+
+class KernelRegistryAgentMapping(MutableMapping[KernelId, AbstractKernel]):
+    _registry: KernelRegistry
+    _agent_id: AgentId
+
+    def __init__(self, kernel_registry: KernelRegistry, agent_id: AgentId) -> None:
+        super().__init__()
+
+        self._registry = kernel_registry
+        self._agent_id = agent_id
+
+    def __getitem__(self, key: KernelId) -> AbstractKernel:
+        return self._registry[AgentKernelRegistryKey(self._agent_id, key)]
+
+    def __setitem__(self, key: KernelId, value: AbstractKernel) -> None:
+        self._registry[AgentKernelRegistryKey(self._agent_id, key)] = value
+
+    def __delitem__(self, key: KernelId) -> None:
+        del self._registry[AgentKernelRegistryKey(self._agent_id, key)]
+
+    def __iter__(self) -> Iterator[KernelId]:
+        for registry_key in self._registry:
+            if registry_key.agent_id == self._agent_id:
+                yield registry_key.kernel_id
+
+    def __len__(self) -> int:
+        return sum(1 for key in self._registry if key.agent_id == self._agent_id)
+
+
+class KernelRegistryGlobalView(Mapping[KernelId, AbstractKernel]):
+    _registry: KernelRegistry
+
+    def __init__(self, kernel_registry: KernelRegistry) -> None:
+        super().__init__()
+
+        self._registry = kernel_registry
+
+    def __getitem__(self, key: KernelId) -> AbstractKernel:
+        return self._registry[key]
+
+    def __iter__(self) -> Iterator[KernelId]:
+        for registry_key in self._registry:
+            yield registry_key.kernel_id
+
+    def __len__(self) -> int:
+        return len(self._registry)
+
+
+class KernelRegistry(MutableMapping[AgentKernelRegistryKey, AbstractKernel]):
+    _registry: MutableMapping[AgentKernelRegistryKey, AbstractKernel]
+    _global_registry: MutableMapping[KernelId, AbstractKernel]
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        self._registry = {}
+        self._global_registry = {}
+
+    def agent_mapping(self, agent_id: AgentId) -> KernelRegistryAgentMapping:
+        return KernelRegistryAgentMapping(self, agent_id)
+
+    def global_view(self) -> KernelRegistryGlobalView:
+        return KernelRegistryGlobalView(self)
+
+    @overload
+    def __getitem__(self, key: KernelId) -> AbstractKernel: ...
+
+    @overload
+    def __getitem__(self, key: AgentKernelRegistryKey) -> AbstractKernel: ...
+
+    def __getitem__(self, key: KernelId | AgentKernelRegistryKey) -> AbstractKernel:
+        if isinstance(key, AgentKernelRegistryKey):
+            return self._registry[key]
+        else:
+            return self._global_registry[key]
+
+    def __setitem__(self, key: AgentKernelRegistryKey, value: AbstractKernel) -> None:
+        self._registry[key] = value
+        self._global_registry[key.kernel_id] = value
+
+    def __delitem__(self, key: AgentKernelRegistryKey) -> None:
+        del self._registry[key]
+        del self._global_registry[key.kernel_id]
+
+    def __iter__(self) -> Iterator[AgentKernelRegistryKey]:
+        return iter(self._registry)
+
+    def __len__(self) -> int:
+        return len(self._registry)
 
 
 _zctx = None
