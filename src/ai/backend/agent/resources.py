@@ -31,7 +31,8 @@ import aiodocker
 import attrs
 
 import ai.backend.agent.alloc_map as alloc_map_mod
-from ai.backend.agent.etcd import AgentUnifiedConfig, AsyncEtcd
+from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (

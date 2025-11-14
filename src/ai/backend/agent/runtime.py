@@ -46,7 +46,7 @@ class AgentRuntime:
         agent_public_key: Optional[PublicKey],
     ) -> AgentRuntime:
         kernel_registry = KernelRegistry()
-        resource_allocator = ResourceAllocator(local_config, etcd)
+        resource_allocator = await ResourceAllocator.new(local_config, etcd)
 
         if local_config.agent_common.backend == AgentBackend.DOCKER:
             metadata_server = await cls._create_metadata_server(local_config, etcd, kernel_registry)
