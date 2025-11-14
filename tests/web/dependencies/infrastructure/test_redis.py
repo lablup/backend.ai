@@ -38,7 +38,6 @@ class TestRedisProvider:
         config = WebServerUnifiedConfig(session=session_config)  # type: ignore[call-arg]
         return config
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_provide_redis_client(
         self,
@@ -53,7 +52,6 @@ class TestRedisProvider:
             server_time = await client.get_server_time_second()
             assert server_time > 0
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
