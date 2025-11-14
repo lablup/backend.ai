@@ -142,15 +142,16 @@ class ContainerRegistryDBSource:
     async def fetch_by_registry_and_project(
         self,
         registry_name: str,
-        project: Optional[str] = None,
+        project: str,
     ) -> ContainerRegistryData:
-        """Fetch container registry data by registry name and optional project."""
+        """Fetch container registry data by registry name and project."""
         async with self._db.begin_readonly_session() as session:
             stmt = sa.select(ContainerRegistryRow).where(
-                ContainerRegistryRow.registry_name == registry_name,
+                sa.and_(
+                    ContainerRegistryRow.registry_name == registry_name,
+                    ContainerRegistryRow.project == project,
+                )
             )
-            if project:
-                stmt = stmt.where(ContainerRegistryRow.project == project)
 
             row: Optional[ContainerRegistryRow] = await session.scalar(stmt)
             if row is None:
@@ -178,18 +179,21 @@ class ContainerRegistryDBSource:
     async def mark_images_as_deleted(
         self,
         registry_name: str,
-        project: Optional[str] = None,
+        project: str,
     ) -> None:
         """Mark all images as deleted for a given registry and optional project."""
         async with self._db.begin_session() as session:
             update_stmt = (
                 sa.update(ImageRow)
-                .where(ImageRow.registry == registry_name)
-                .where(ImageRow.status != ImageStatus.DELETED)
+                .where(
+                    sa.and_(
+                        ImageRow.registry == registry_name,
+                        ImageRow.status != ImageStatus.DELETED,
+                        ImageRow.project == project,
+                    )
+                )
                 .values(status=ImageStatus.DELETED)
             )
-            if project:
-                update_stmt = update_stmt.where(ImageRow.project == project)
 
             await session.execute(update_stmt)
 
@@ -211,18 +215,16 @@ class ContainerRegistryDBSource:
     async def fetch_registry_row(
         self,
         registry_name: str,
-        project: Optional[str] = None,
+        project: str,
     ) -> ContainerRegistryRow:
-        """
-        Fetch the raw ContainerRegistryRow object.
-        Raise ContainerRegistryNotFound if registry is not found.
-        """
+        """Fetch container registry data by registry name and project."""
         async with self._db.begin_readonly_session() as session:
             stmt = sa.select(ContainerRegistryRow).where(
-                ContainerRegistryRow.registry_name == registry_name,
+                sa.and_(
+                    ContainerRegistryRow.registry_name == registry_name,
+                    ContainerRegistryRow.project == project,
+                )
             )
-            if project:
-                stmt = stmt.where(ContainerRegistryRow.project == project)
 
             row: Optional[ContainerRegistryRow] = await session.scalar(stmt)
             if row is None:

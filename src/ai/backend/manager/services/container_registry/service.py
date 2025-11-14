@@ -1,4 +1,5 @@
 from ai.backend.manager.container_registry import get_container_registry_cls
+from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.container_registry.admin_repository import (
@@ -78,10 +79,6 @@ class ContainerRegistryService:
         registry_name = action.registry
         project = action.project
 
-        registry_data = await self._container_registry_repository.get_by_registry_and_project(
-            registry_name, project
-        )
-
         registry_row = await self._container_registry_repository.get_registry_row_for_scanner(
             registry_name, project
         )
@@ -91,7 +88,7 @@ class ContainerRegistryService:
         result = await scanner.rescan_single_registry(action.progress_reporter)
 
         return RescanImagesActionResult(
-            images=result.images, errors=result.errors, registry=registry_data
+            images=result.images, errors=result.errors, registry=registry_row.to_dataclass()
         )
 
     async def clear_images(self, action: ClearImagesAction) -> ClearImagesActionResult:
@@ -104,6 +101,7 @@ class ContainerRegistryService:
     async def load_container_registries(
         self, action: LoadContainerRegistriesAction
     ) -> LoadContainerRegistriesActionResult:
+        registries: list[ContainerRegistryData] = []
         if action.project is not None:
             try:
                 registry_data = (
@@ -113,7 +111,7 @@ class ContainerRegistryService:
                 )
                 registries = [registry_data]
             except ContainerRegistryNotFound:
-                registries = []
+                pass
         else:
             registries = await self._container_registry_repository.get_by_registry_name(
                 action.registry
