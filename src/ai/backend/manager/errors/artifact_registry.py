@@ -13,8 +13,7 @@ class ArtifactRegistryNotFoundError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/artifact-registry-not-found"
     error_title = "Artifact Registry Not Found"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_REGISTRY,
             operation=ErrorOperation.READ,
@@ -26,8 +25,7 @@ class ArtifactRegistryBadScanRequestError(BackendAIError, web.HTTPNotFound):
     error_type = "https://api.backend.ai/probs/artifact-registry-bad-scan-request"
     error_title = "Artifact Registry Bad Scan Request"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_REGISTRY,
             operation=ErrorOperation.READ,
@@ -39,8 +37,7 @@ class InvalidArtifactRegistryTypeError(BackendAIError, web.HTTPInternalServerErr
     error_type = "https://api.backend.ai/probs/invalid-artifact-registry-type"
     error_title = "Invalid Artifact Registry Type"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_REGISTRY,
             operation=ErrorOperation.GENERIC,
@@ -52,8 +49,7 @@ class ReservoirConnectionError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/reservoir-connection-error"
     error_title = "Reservoir Connection Error"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_REGISTRY,
             operation=ErrorOperation.REQUEST,
@@ -65,8 +61,7 @@ class RemoteReservoirScanError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/remote-reservoir-scan-error"
     error_title = "Remote Reservoir Scan Error"
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.ARTIFACT_REGISTRY,
             operation=ErrorOperation.REQUEST,

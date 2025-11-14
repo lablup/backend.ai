@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Iterable, Optional, Self
 
-import glide
 from glide import (
     AdvancedGlideClientConfiguration,
     GlideClient,
@@ -17,6 +16,7 @@ from glide import (
 )
 from redis.asyncio.sentinel import Sentinel
 
+from ai.backend.common.exception import ClientNotConnectedError
 from ai.backend.common.utils import addr_to_hostport_pair
 from ai.backend.logging import BraceStyleAdapter
 
@@ -102,6 +102,16 @@ class AbstractValkeyClient(ABC):
     async def disconnect(self) -> None:
         pass
 
+    @abstractmethod
+    async def ping(self) -> None:
+        """
+        Ping the server to check if the connection is alive.
+
+        Raises:
+            Exception: If the ping fails or connection is not available
+        """
+        pass
+
 
 class ValkeyStandaloneClient(AbstractValkeyClient):
     _target: ValkeyStandaloneTarget
@@ -184,47 +194,36 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
         glide_client = await GlideClient.create(config)
         self._valkey_client = glide_client
 
-        log.info(
+        log.debug(
             "Created ValkeyClient for standalone at {}:{} for database {}",
             target_host,
             target_port,
             self._human_readable_name,
         )
 
-    async def _ping(self) -> bool:
+    async def ping(self) -> None:
         """
         Ping the server to check if the connection is alive.
+
+        Raises:
+            ClientNotConnectedError: If the client is not connected
+            Exception: If the ping fails
         """
         if self._valkey_client is None:
-            return False
-        try:
-            await self._valkey_client.ping()
-            return True
-        except glide.ClosingError as e:
-            target_host, target_port = addr_to_hostport_pair(self._target.address)
-            log.warning(
-                "Valkey client is closed for standalone at {}:{}, human readable name '{}': {}",
-                target_host,
-                target_port,
-                self._human_readable_name,
-                e,
+            raise ClientNotConnectedError(
+                "ValkeyStandaloneClient not connected. Call connect() first."
             )
-            return False
-        except Exception as e:
-            log.debug(
-                "Failed to ping to service '{}', human readable name '{}', but cannot check if the connection is alive: {}",
-                self._target.address,
-                self._human_readable_name,
-                e,
-            )
-            return True
+        await self._valkey_client.ping()
 
     async def _check_connection(self) -> bool:
         """
         Check if the current connection is alive.
         If not, return False to trigger reconnection.
         """
-        if not await self._ping():
+        try:
+            await self.ping()
+            return True
+        except Exception:
             target_host, target_port = addr_to_hostport_pair(self._target.address)
             log.warning(
                 "Connection to standalone server {}:{} is down, attempting to reconnect",
@@ -232,7 +231,6 @@ class ValkeyStandaloneClient(AbstractValkeyClient):
                 target_port,
             )
             return False
-        return True
 
     async def _monitor_connection(self) -> None:
         while True:
@@ -385,38 +383,28 @@ class ValkeySentinelClient(AbstractValkeyClient):
             )
             return None
 
-    async def _ping(self) -> bool:
+    async def ping(self) -> None:
         """
         Ping the current master to check if the connection is alive.
+
+        Raises:
+            ClientNotConnectedError: If the client is not connected
+            Exception: If the ping fails
         """
         if self._valkey_client is None:
-            return False
-        try:
-            await self._valkey_client.ping()
-            return True
-        except glide.ClosingError as e:
-            log.warning(
-                "Valkey client is closed for service '{}', human readable name '{}': {}",
-                self._target.service_name,
-                self._human_readable_name,
-                e,
+            raise ClientNotConnectedError(
+                "ValkeySentinelClient not connected. Call connect() first."
             )
-            return False
-        except Exception as e:
-            log.debug(
-                "Failed to ping to service '{}', human readable name '{}', but cannot check if the connection is alive: {}",
-                self._target.service_name,
-                self._human_readable_name,
-                e,
-            )
-            return True
+        await self._valkey_client.ping()
 
     async def _check_connection(self) -> bool:
         """
         Check if the current master connection is alive.
         If not, attempt to reconnect.
         """
-        if not await self._ping():
+        try:
+            await self.ping()
+        except Exception:
             log.warning(
                 "Connection to master {}:{} is down, attempting to reconnect",
                 self._master_address[0] if self._master_address else "unregistered",

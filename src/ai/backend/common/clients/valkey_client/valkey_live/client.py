@@ -109,6 +109,15 @@ class ValkeyLiveClient:
         self._closed = True
         await self._client.disconnect()
 
+    async def ping(self) -> None:
+        """
+        Ping the Valkey server to check if the connection is alive.
+
+        Raises:
+            Exception: If the ping fails or connection is not available
+        """
+        await self._client.ping()
+
     def _create_batch(self, is_atomic: bool = False) -> Batch:
         """
         Create a batch for pipeline operations (internal use only).

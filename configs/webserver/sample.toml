@@ -283,7 +283,8 @@
 [apollo_router]
   # Whether to enable Apollo Router.
   enabled = false
-  # Apollo Router endpoint.
+  # Apollo Router endpoint(s).
+  # Supports multiple endpoints separated by commas for load balancing.
   endpoint = "http://127.0.0.1:4000"
 
 [logging]
