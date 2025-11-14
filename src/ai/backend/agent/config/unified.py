@@ -11,8 +11,16 @@ import logging
 import os
 import sys
 import textwrap
+from decimal import Decimal
 from pathlib import Path
-from typing import Any, Mapping, Optional, Self
+from typing import (
+    Any,
+    Mapping,
+    Optional,
+    Self,
+    Sequence,
+)
+from uuid import uuid4
 
 from pydantic import (
     AliasChoices,
@@ -37,10 +45,13 @@ from ai.backend.common.typed_validators import (
     UserID,
 )
 from ai.backend.common.types import (
+    AgentId,
     BinarySize,
     BinarySizeField,
     ResourceGroupType,
     ServiceDiscoveryType,
+    SlotName,
+    SlotNameField,
 )
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
@@ -67,6 +78,12 @@ class ScratchType(enum.StrEnum):
     HOSTFILE = "hostfile"
     MEMORY = "memory"
     K8S_NFS = "k8s-nfs"
+
+
+class ResourceAllocationMode(enum.StrEnum):
+    SHARED = "shared"
+    AUTO_SPLIT = "auto-split"
+    MANUAL = "manual"
 
 
 class AgentConfigValidationContext(BaseConfigValidationContext):
@@ -313,7 +330,11 @@ class DebugConfig(BaseConfigSchema):
         return context.debug
 
 
-class AgentConfig(BaseConfigSchema):
+class CommonAgentConfig(BaseConfigSchema):
+    """
+    Agent settings that cannot be overridden per-agent.
+    """
+
     backend: AgentBackend = Field(
         description=textwrap.dedent("""
         Backend type for the agent.
@@ -388,20 +409,6 @@ class AgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("rpc-auth-agent-keypair", "rpc_auth_agent_keypair"),
         serialization_alias="rpc-auth-agent-keypair",
     )
-    agent_sock_port: int = Field(
-        default=6007,
-        ge=1024,
-        le=65535,
-        description="Agent socket port",
-        examples=[6007],
-        validation_alias=AliasChoices("agent-sock-port", "agent_sock_port"),
-        serialization_alias="agent-sock-port",
-    )
-    id: Optional[str] = Field(
-        default=None,
-        description="Agent ID",
-        examples=["agent-001"],
-    )
     ipc_base_path: AutoDirectoryPath = Field(
         default=AutoDirectoryPath("/tmp/backend.ai/ipc"),
         description="Base path for IPC",
@@ -448,20 +455,6 @@ class AgentConfig(BaseConfigSchema):
         examples=["m5.large"],
         validation_alias=AliasChoices("instance-type", "instance_type"),
         serialization_alias="instance-type",
-    )
-    scaling_group: str = Field(
-        default="default",
-        description="Scaling group name",
-        examples=["default", "gpu-group"],
-        validation_alias=AliasChoices("scaling-group", "scaling_group"),
-        serialization_alias="scaling-group",
-    )
-    scaling_group_type: ResourceGroupType = Field(
-        default=ResourceGroupType.COMPUTE,
-        description="Scaling group type",
-        examples=[item.value for item in ResourceGroupType],
-        validation_alias=AliasChoices("scaling-group-type", "scaling_group_type"),
-        serialization_alias="scaling-group-type",
     )
     pid_file: Path = Field(
         default=Path(os.devnull),
@@ -562,24 +555,6 @@ class AgentConfig(BaseConfigSchema):
         validation_alias=AliasChoices("abuse-report-path", "abuse_report_path"),
         serialization_alias="abuse-report-path",
     )
-    force_terminate_abusing_containers: bool = Field(
-        default=False,
-        description="Whether to force terminate abusing containers",
-        examples=[True, False],
-        validation_alias=AliasChoices(
-            "force-terminate-abusing-containers", "force_terminate_abusing_containers"
-        ),
-        serialization_alias="force-terminate-abusing-containers",
-    )
-    kernel_creation_concurrency: int = Field(
-        default=4,
-        ge=1,
-        le=32,
-        description="Kernel creation concurrency",
-        examples=[4, 8],
-        validation_alias=AliasChoices("kernel-creation-concurrency", "kernel_creation_concurrency"),
-        serialization_alias="kernel-creation-concurrency",
-    )
     use_experimental_redis_event_dispatcher: bool = Field(
         default=False,
         description="Whether to use experimental Redis event dispatcher",
@@ -588,12 +563,6 @@ class AgentConfig(BaseConfigSchema):
             "use-experimental-redis-event-dispatcher", "use_experimental_redis_event_dispatcher"
         ),
         serialization_alias="use-experimental-redis-event-dispatcher",
-    )
-    sync_container_lifecycles: SyncContainerLifecyclesConfig = Field(
-        default_factory=SyncContainerLifecyclesConfig,
-        description="Container lifecycle synchronization config",
-        validation_alias=AliasChoices("sync-container-lifecycles", "sync_container_lifecycles"),
-        serialization_alias="sync-container-lifecycles",
     )
     docker_mode: Optional[str] = Field(
         default=None,
@@ -631,21 +600,82 @@ class AgentConfig(BaseConfigSchema):
         return rpc_listen_addr
 
 
-class ContainerConfig(BaseConfigSchema):
-    kernel_uid: UserID = Field(
-        default=UserID(-1),
-        description="Kernel user ID",
-        examples=[1000, -1],
-        validation_alias=AliasChoices("kernel-uid", "kernel_uid"),
-        serialization_alias="kernel-uid",
+class OverridableAgentConfig(BaseConfigSchema):
+    """
+    Agent settings that can be overridden per-agent in multi-agent mode.
+    """
+
+    id: str = Field(
+        default_factory=lambda: f"agent-{uuid4()}",
+        description="Agent ID",
+        examples=["agent-001"],
     )
-    kernel_gid: GroupID = Field(
-        default=GroupID(-1),
-        description="Kernel group ID",
-        examples=[1000, -1],
-        validation_alias=AliasChoices("kernel-gid", "kernel_gid"),
-        serialization_alias="kernel-gid",
+    agent_sock_port: int = Field(
+        default=6007,
+        ge=1024,
+        le=65535,
+        description="Agent socket port",
+        examples=[6007],
+        validation_alias=AliasChoices("agent-sock-port", "agent_sock_port"),
+        serialization_alias="agent-sock-port",
     )
+    scaling_group: str = Field(
+        default="default",
+        description="Scaling group name",
+        examples=["default", "gpu-group"],
+        validation_alias=AliasChoices("scaling-group", "scaling_group"),
+        serialization_alias="scaling-group",
+    )
+    scaling_group_type: ResourceGroupType = Field(
+        default=ResourceGroupType.COMPUTE,
+        description="Scaling group type",
+        examples=[item.value for item in ResourceGroupType],
+        validation_alias=AliasChoices("scaling-group-type", "scaling_group_type"),
+        serialization_alias="scaling-group-type",
+    )
+    force_terminate_abusing_containers: bool = Field(
+        default=False,
+        description="Whether to force terminate abusing containers",
+        examples=[True, False],
+        validation_alias=AliasChoices(
+            "force-terminate-abusing-containers", "force_terminate_abusing_containers"
+        ),
+        serialization_alias="force-terminate-abusing-containers",
+    )
+    kernel_creation_concurrency: int = Field(
+        default=4,
+        ge=1,
+        le=32,
+        description="Kernel creation concurrency",
+        examples=[4, 8],
+        validation_alias=AliasChoices("kernel-creation-concurrency", "kernel_creation_concurrency"),
+        serialization_alias="kernel-creation-concurrency",
+    )
+    sync_container_lifecycles: SyncContainerLifecyclesConfig = Field(
+        default_factory=SyncContainerLifecyclesConfig,
+        description="Container lifecycle synchronization config",
+        validation_alias=AliasChoices("sync-container-lifecycles", "sync_container_lifecycles"),
+        serialization_alias="sync-container-lifecycles",
+    )
+
+    model_config = ConfigDict(
+        extra="allow",
+    )
+
+
+class AgentConfig(CommonAgentConfig, OverridableAgentConfig):
+    """
+    Complete agent configuration (common + overridable).
+    """
+
+    pass
+
+
+class CommonContainerConfig(BaseConfigSchema):
+    """
+    Container settings that cannot be overridden per-agent.
+    """
+
     bind_host: str = Field(
         default="",
         description="Bind host for containers",
@@ -660,9 +690,54 @@ class ContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("advertised-host", "advertised_host"),
         serialization_alias="advertised-host",
     )
+    krunner_volumes: Optional[Mapping[str, str]] = Field(
+        default=None,
+        description=textwrap.dedent("""
+        KRunner volumes configuration, mapping container names to host paths.
+        This is used to specify volumes that should be mounted into containers
+        when using the KRunner backend.
+        This fields is filled by the agent at runtime based on the
+        `krunner_volumes` configuration in the agent's environment.
+        It is not intended to be set in the configuration file.
+        """),
+        examples=[],
+        validation_alias=AliasChoices("krunner-volumes", "krunner_volumes"),
+        serialization_alias="krunner-volumes",
+    )
+
+    model_config = ConfigDict(
+        extra="allow",
+        arbitrary_types_allowed=True,
+    )
+
+
+class OverridableContainerConfig(BaseConfigSchema):
+    """
+    Container settings that can be overridden per-agent in multi-agent mode.
+    """
+
+    kernel_uid: UserID = Field(
+        default=UserID(-1),
+        description="Kernel user ID",
+        examples=[1000, -1],
+        validation_alias=AliasChoices("kernel-uid", "kernel_uid"),
+        serialization_alias="kernel-uid",
+    )
+    kernel_gid: GroupID = Field(
+        default=GroupID(-1),
+        description="Kernel group ID",
+        examples=[1000, -1],
+        validation_alias=AliasChoices("kernel-gid", "kernel_gid"),
+        serialization_alias="kernel-gid",
+    )
     port_range: tuple[int, int] = Field(
         default=(30000, 31000),
-        description="Port range for containers",
+        description=textwrap.dedent("""
+        Port range for containers.
+        If multiple agents are used, user must ensure that the port ranges
+        do not overlap between the agent, else it may cause subtle issues
+        late into the agent's runtime.
+         """),
         examples=[(30000, 31000)],
         validation_alias=AliasChoices("port-range", "port_range"),
         serialization_alias="port-range",
@@ -689,6 +764,7 @@ class ContainerConfig(BaseConfigSchema):
         serialization_alias="jail-args",
     )
     scratch_type: ScratchType = Field(
+        default=ScratchType.HOSTDIR,
         description="Scratch type",
         examples=[item.value for item in ScratchType],
         validation_alias=AliasChoices("scratch-type", "scratch_type"),
@@ -708,7 +784,6 @@ class ContainerConfig(BaseConfigSchema):
         validation_alias=AliasChoices("scratch-size", "scratch_size"),
         serialization_alias="scratch-size",
     )
-
     scratch_nfs_address: Optional[str] = Field(
         default=None,
         description="Scratch NFS address",
@@ -729,20 +804,6 @@ class ContainerConfig(BaseConfigSchema):
         examples=["br-backend"],
         validation_alias=AliasChoices("alternative-bridge", "alternative_bridge"),
         serialization_alias="alternative-bridge",
-    )
-    krunner_volumes: Optional[Mapping[str, str]] = Field(
-        default=None,
-        description=textwrap.dedent("""
-        KRunner volumes configuration, mapping container names to host paths.
-        This is used to specify volumes that should be mounted into containers
-        when using the KRunner backend.
-        This fields is filled by the agent at runtime based on the
-        `krunner_volumes` configuration in the agent's environment.
-        It is not intended to be set in the configuration file.
-        """),
-        examples=[],
-        validation_alias=AliasChoices("krunner-volumes", "krunner_volumes"),
-        serialization_alias="krunner-volumes",
     )
     swarm_enabled: bool = Field(
         default=False,
@@ -798,6 +859,64 @@ class ContainerConfig(BaseConfigSchema):
                 raise ValueError("Cannot use hostfile scratch type unless the agent runs as root.")
         return scratch_type
 
+    def validate_kubernetes_nfs(self) -> None:
+        is_scratch_k8s_nfs = self.scratch_type == ScratchType.K8S_NFS
+        is_nfs_address_missing = self.scratch_nfs_address is None
+        is_nfs_options_missing = self.scratch_nfs_options is None
+
+        if is_scratch_k8s_nfs and (is_nfs_address_missing or is_nfs_options_missing):
+            raise ValueError("scratch-nfs-address and scratch-nfs-options are required for k8s-nfs")
+
+
+class ContainerConfig(CommonContainerConfig, OverridableContainerConfig):
+    """
+    Complete container configuration (common + overridable).
+    """
+
+    pass
+
+
+class ResourceAllocationConfig(BaseConfigSchema):
+    cpu: int = Field(
+        description=textwrap.dedent("""
+        Hard CPU allocation for this agent (e.g., 8 cores).
+        Only used in MANUAL allocation mode.
+        All agents must specify this value when allocation-mode is MANUAL.
+        """),
+        examples=[8, 16],
+    )
+    mem: BinarySizeField = Field(
+        description=textwrap.dedent("""
+        Hard memory allocation for this agent (e.g., "32G").
+        Only used in MANUAL allocation mode.
+        All agents must specify this value when allocation-mode is MANUAL.
+        """),
+        examples=["32G", "64G"],
+    )
+    devices: Mapping[SlotNameField, Decimal] = Field(
+        default_factory=dict,
+        description=textwrap.dedent("""
+        Device-specific per-slot resource allocations.
+        Only used in MANUAL allocation mode.
+        """),
+        examples=[{"cuda.mem": "0.3", "cuda.shares": "0.5"}],
+    )
+
+    model_config = ConfigDict(
+        extra="allow",
+        arbitrary_types_allowed=True,
+    )
+
+    @model_validator(mode="after")
+    def validate_values_are_positive(self) -> Self:
+        if self.cpu is not None and self.cpu < 0:
+            raise ValueError(f"Allocated cpu must not be a negative value, but given {self.cpu}")
+        if self.mem is not None and self.mem < 0:
+            raise ValueError(f"Allocated mem must not be a negative value, but given {self.mem}")
+        if any(value < 0 for value in self.devices.values()):
+            raise ValueError("All allocated device resource values must not be a negative value")
+        return self
+
 
 class ResourceConfig(BaseConfigSchema):
     reserved_cpu: int = Field(
@@ -831,11 +950,30 @@ class ResourceConfig(BaseConfigSchema):
         validation_alias=AliasChoices("reserved-disk", "reserved_disk"),
         serialization_alias="reserved-disk",
     )
+    allocation_mode: ResourceAllocationMode = Field(
+        default=ResourceAllocationMode.SHARED,
+        description=textwrap.dedent("""
+        Resource allocation mode for multi-agent scenarios.
+        - `shared`: All agents share the full resource pool (default, backward compatible).
+        - `auto-split`: Automatically divide resources equally (1/N) among all agents.
+        - `manual`: Manually specify per-agent resource allocations via config.
+        """),
+        examples=[item.value for item in ResourceAllocationMode],
+        validation_alias=AliasChoices("allocation-mode", "allocation_mode"),
+        serialization_alias="allocation-mode",
+    )
+    allocations: Optional[ResourceAllocationConfig] = Field(
+        default=None,
+        description=textwrap.dedent("""
+        Resource allocations.
+        Only used in MANUAL allocation mode.
+        """),
+    )
     memory_align_size: BinarySizeField = Field(
         default=BinarySize.finite_from_str("16M"),
         description=(
             "The alignment of the reported main memory size to absorb tiny deviations "
-            "from per-node firwmare/hardware settings. "
+            "from per-node firmware/hardware settings. "
             "Recommended to be multiple of the page/hugepage size (e.g., 2 MiB)."
         ),
         examples=["2M", "32M"],
@@ -994,14 +1132,12 @@ class DockerExtraConfig(BaseConfigSchema):
     )
 
 
-class AgentUnifiedConfig(BaseConfigSchema):
+class AgentGlobalConfig(BaseConfigSchema):
+    """
+    Configuration shared across all agents (logging, etcd, API, etc.).
+    """
+
     # Local config
-    agent: AgentConfig = Field(
-        description="Agent configuration",
-    )
-    container: ContainerConfig = Field(
-        description="Container configuration",
-    )
     pyroscope: PyroscopeConfig = Field(
         default_factory=PyroscopeConfig,
         description="Pyroscope configuration",
@@ -1009,9 +1145,6 @@ class AgentUnifiedConfig(BaseConfigSchema):
     logging: LoggingConfig = Field(
         default_factory=LoggingConfig,
         description="Logging configuration",
-    )
-    resource: ResourceConfig = Field(
-        description="Resource configuration",
     )
     otel: OTELConfig = Field(
         default_factory=OTELConfig,
@@ -1065,29 +1198,225 @@ class AgentUnifiedConfig(BaseConfigSchema):
         """),
     )
 
+    model_config = ConfigDict(
+        validate_assignment=True,
+    )
+
+
+class AgentSpecificConfig(BaseConfigSchema):
+    """
+    Default values for agent, container, and resource config.
+    """
+
+    agent: AgentConfig = Field(
+        description=textwrap.dedent("""
+        Agent configuration.
+        If agents field is populated, this field indicates the default values for all agents.
+        """),
+    )
+    container: ContainerConfig = Field(
+        description=textwrap.dedent("""
+        Container configuration.
+        If agents field is populated, this field indicates the default values for all agents.
+        """),
+    )
+    resource: ResourceConfig = Field(
+        description=textwrap.dedent("""
+        Resource configuration.
+        If agents field is populated, this field indicates the default values for all agents.
+        """),
+    )
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+    )
+
+    def validate_agent_specific_config(self) -> None:
+        match self.agent.backend:
+            case AgentBackend.KUBERNETES:
+                self.container.validate_kubernetes_nfs()
+            case AgentBackend.DOCKER:
+                DockerExtraConfig.model_validate(self.container.model_dump())
+            case AgentBackend.DUMMY:
+                pass
+
+
+class AgentOverrideConfig(BaseConfigSchema):
+    """
+    Per-agent overrides in multi-agent mode.
+    """
+
+    agent: OverridableAgentConfig = Field(
+        description=textwrap.dedent("""
+        Agent config overrides for the individual agent.
+        All fields except Agent ID are by default optional.
+        Only override fields if necessary.
+        """),
+    )
+    container: Optional[OverridableContainerConfig] = Field(
+        default=None,
+        description="Container config overrides for the individual agent",
+    )
+    resource: Optional[ResourceAllocationConfig] = Field(
+        default=None,
+        description="Resource config overrides for the individual agent",
+    )
+
+    model_config = ConfigDict(
+        validate_assignment=True,
+    )
+
+    def construct_unified_config(self, *, default: AgentUnifiedConfig) -> AgentUnifiedConfig:
+        agent_updates: dict[str, Any] = {}
+        if self.agent is not None:
+            agent_override_fields = self.agent.model_dump(include=self.agent.model_fields_set)
+            agent_updates["agent"] = default.agent.model_copy(update=agent_override_fields)
+        if self.container is not None:
+            container_override_fields = self.container.model_dump(
+                include=self.container.model_fields_set
+            )
+            agent_updates["container"] = default.container.model_copy(
+                update=container_override_fields
+            )
+        if self.resource is not None:
+            default_allocations = default.resource.allocations
+            override_allocations = self.resource
+            if default_allocations is None:
+                merged_allocations = override_allocations
+            else:
+                merged_allocations = default_allocations.model_copy(
+                    update=override_allocations.model_dump(
+                        include=override_allocations.model_fields_set
+                    )
+                )
+            agent_updates["resource"] = default.resource.model_copy(
+                update={"allocations": merged_allocations}
+            )
+        return default.model_copy(update=agent_updates)
+
+
+class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
+    agents: list[AgentOverrideConfig] = Field(
+        default_factory=list,
+        description=textwrap.dedent("""
+        Configuration overrides for multiple agents.
+        Use this field only to define 2 or more agents, as defining only one
+        agent using this field is redundant. Use the fields agent, container,
+        and resource to define the configuration at a global level.
+        Any field populated in the agents config will be treated as an
+        override to the global default values. Thus the global fields must still
+        be provided when defining multiple agents.
+        """),
+    )
+
     # TODO: Remove me after changing config injection logic
     model_config = ConfigDict(
         extra="allow",
+        validate_assignment=True,
     )
 
     @property
-    def agent_backend(self) -> AgentBackend:
-        return self.agent.backend
+    def agent_common(self) -> CommonAgentConfig:
+        return self.agent
+
+    @property
+    def agent_default(self) -> OverridableAgentConfig:
+        return self.agent
+
+    @property
+    def agent_ids(self) -> Sequence[AgentId]:
+        return [AgentId(agent_config.agent.id) for agent_config in self.get_agent_configs()]
+
+    def get_agent_configs(self) -> Sequence[AgentUnifiedConfig]:
+        agent_configs = [agent.construct_unified_config(default=self) for agent in self.agents]
+        if not agent_configs:
+            agent_configs = [self]
+        return agent_configs
+
+    def update(
+        self,
+        *,
+        agent_update: Optional[Mapping[str, Any]] = None,
+        container_update: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        # TODO: Replace setting update values with something like LoaderChain used in Manager.
+        if agent_update:
+            self.agent = self.agent.model_copy(update=agent_update)
+        if container_update:
+            self.container = self.container.model_copy(update=container_update)
+
+    def overwrite(
+        self,
+        *,
+        container_logs: Optional[ContainerLogsConfig] = None,
+        api: Optional[APIConfig] = None,
+        kernel_lifecycles: Optional[KernelLifecyclesConfig] = None,
+        redis: Optional[RedisConfig] = None,
+        plugins: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        # TODO: Replace setting update values with something like LoaderChain used in Manager.
+        if container_logs:
+            self.container_logs = container_logs
+        if api:
+            self.api = api
+        if kernel_lifecycles:
+            self.kernel_lifecycles = kernel_lifecycles
+        if redis:
+            self.redis = redis
+        if plugins:
+            self.plugins = plugins
+
+    @field_validator("agents", mode="after")
+    @classmethod
+    def _validate_min_agents(cls, agents: list[AgentOverrideConfig]) -> list[AgentOverrideConfig]:
+        if len(agents) == 1:
+            raise ValueError(
+                "agents should not be specified with only 1 agent configuration. "
+                "Please use the default single agent mode if only 1 agent is needed."
+            )
+
+        return agents
+
+    @field_validator("agents", mode="after")
+    @classmethod
+    def _validate_agent_id_uniqueness(
+        cls, agents: list[AgentOverrideConfig]
+    ) -> list[AgentOverrideConfig]:
+        agent_ids = {agent.agent.id for agent in agents}
+        if len(agent_ids) != len(agents):
+            raise ValueError("Duplicate agent IDs found!")
+        return agents
 
     @model_validator(mode="after")
-    def _validate_kubernetes_config(self) -> Self:
-        if self.agent_backend == AgentBackend.KUBERNETES:
-            if self.container.scratch_type == ScratchType.K8S_NFS and (
-                self.container.scratch_nfs_address is None
-                or self.container.scratch_nfs_options is None
-            ):
-                raise ValueError(
-                    "scratch-nfs-address and scratch-nfs-options are required for k8s-nfs"
-                )
+    def _validate_agent_configs(self) -> Self:
+        for config in self.get_agent_configs():
+            config.validate_agent_specific_config()
+
         return self
 
     @model_validator(mode="after")
-    def _validate_docker_config(self) -> Self:
-        if self.agent_backend == AgentBackend.DOCKER:
-            DockerExtraConfig.model_validate(self.container.model_dump())
+    def _validate_resource_allocation_mode(self) -> Self:
+        agent_configs = self.get_agent_configs()
+
+        match self.resource.allocation_mode:
+            case ResourceAllocationMode.SHARED | ResourceAllocationMode.AUTO_SPLIT:
+                for config in agent_configs:
+                    if config.resource.allocations is not None:
+                        raise ValueError(
+                            "On non-MANUAL mode, config must not specify manual resource allocations"
+                        )
+
+            case ResourceAllocationMode.MANUAL:
+                slot_names: list[set[SlotName]] = []
+                for config in agent_configs:
+                    if config.resource.allocations is None:
+                        raise ValueError(
+                            "On MANUAL mode, config must specify cpu and mem resource allocations"
+                        )
+
+                    slot_names.append(set(config.resource.allocations.devices.keys()))
+
+                if not all(slot_name == slot_names[0] for slot_name in slot_names):
+                    raise ValueError("All agents must have the same slots defined in the devices!")
+
         return self

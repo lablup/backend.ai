@@ -5,7 +5,7 @@ from typing import Any, Mapping, MutableMapping, Optional
 
 import aiofiles
 
-from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.types import DeviceName, SlotName
 from ai.backend.logging import BraceStyleAdapter
 
@@ -21,7 +21,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def load_resources(
-    etcd: AsyncEtcd, local_config: Mapping[str, Any]
+    etcd: AbstractKVStore, local_config: Mapping[str, Any]
 ) -> Mapping[DeviceName, AbstractComputePlugin]:
     """
     Detect and load the accelerator plugins.
