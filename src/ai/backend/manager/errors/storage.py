@@ -62,22 +62,12 @@ class VFolderNotFound(ObjectNotFound):
         )
 
 
-class QuotaScopeNotFoundError(ObjectNotFound):
-    object_name = "quota scope"
-
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.QUOTA_SCOPE,
-            operation=ErrorOperation.READ,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
-
-
 class ModelCardParseError(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/model-card-parse-error"
     error_title = "Model Card Parse Error"
 
-    def error_code(self) -> ErrorCode:
+    @classmethod
+    def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.MODEL_CARD,
             operation=ErrorOperation.READ,
