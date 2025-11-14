@@ -42,7 +42,7 @@ from ai.backend.appproxy.common.exceptions import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 
-from ..config import ServerConfig
+from ..config import DBConfig
 
 if TYPE_CHECKING:
     pass
@@ -320,18 +320,18 @@ def create_async_engine(
 
 @actxmgr
 async def connect_database(
-    local_config: ServerConfig,
+    db_config: DBConfig,
     isolation_level: str = "SERIALIZABLE",
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     from .base import pgsql_connect_opts
 
     db_url = (
-        URL(f"postgresql+asyncpg://{local_config.db.addr.host}/{local_config.db.name}")
-        .with_port(local_config.db.addr.port)
-        .with_user(local_config.db.user)
+        URL(f"postgresql+asyncpg://{db_config.addr.host}/{db_config.name}")
+        .with_port(db_config.addr.port)
+        .with_user(db_config.user)
     )
-    if local_config.db.password is not None:
-        db_url = db_url.with_password(local_config.db.password)
+    if db_config.password is not None:
+        db_url = db_url.with_password(db_config.password)
 
     version_check_db = create_async_engine(str(db_url))
     async with version_check_db.begin() as conn:
@@ -347,13 +347,13 @@ async def connect_database(
     db = create_async_engine(
         str(db_url),
         connect_args=pgsql_connect_opts,
-        pool_size=local_config.db.pool_size,
-        max_overflow=local_config.db.max_overflow,
+        pool_size=db_config.pool_size,
+        max_overflow=db_config.max_overflow,
         json_serializer=functools.partial(json.dumps, cls=ExtendedJSONEncoder),
         isolation_level=isolation_level,
         future=True,
         _txn_concurrency_threshold=max(
-            int(local_config.db.pool_size + max(0, local_config.db.max_overflow) * 0.5),
+            int(db_config.pool_size + max(0, db_config.max_overflow) * 0.5),
             2,
         ),
     )

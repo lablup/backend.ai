@@ -19,5 +19,5 @@ class DatabaseProvider(DependencyProvider[ServerConfig, ExtendedAsyncSAEngine]):
     @asynccontextmanager
     async def provide(self, setup_input: ServerConfig) -> AsyncIterator[ExtendedAsyncSAEngine]:
         """Create and provide database connection."""
-        async with connect_database(setup_input) as db:
+        async with connect_database(setup_input.db) as db:
             yield db

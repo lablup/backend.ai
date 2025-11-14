@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from unittest.mock import Mock
+
 import pytest
 
 from ai.backend.appproxy.coordinator.config import ServerConfig
@@ -33,8 +35,12 @@ class TestRedisProvider:
         }
         redis_config = redis_config_iv.check(redis_config_data)
 
-        # Create minimal ServerConfig with just redis settings
-        config = ServerConfig(redis=redis_config)  # type: ignore[call-arg]
+        config = Mock(spec=ServerConfig)
+        # redis_config is already a dict, wrap it in Mock with to_dict method
+        redis_mock = Mock()
+        redis_mock.to_dict.return_value = redis_config
+        config.redis = redis_mock
+        config.core_redis = None
         return config
 
     @pytest.mark.asyncio

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import secrets
+from unittest.mock import Mock
+
 import pytest
 
-from ai.backend.appproxy.coordinator.config import ServerConfig
+from ai.backend.appproxy.coordinator.config import ProxyCoordinatorConfig, ServerConfig
 from ai.backend.appproxy.coordinator.dependencies.infrastructure.etcd import (
     EtcdProvider,
 )
@@ -12,6 +15,11 @@ from ai.backend.testutils.bootstrap import HostPortPairModel
 
 class TestEtcdProvider:
     """Test EtcdProvider with real etcd container."""
+
+    @pytest.fixture
+    def test_ns(self) -> str:
+        """Generate a random namespace for etcd tests."""
+        return f"test-{secrets.token_hex(4)}"
 
     @pytest.fixture
     def coordinator_config_with_traefik(
@@ -39,23 +47,23 @@ class TestEtcdProvider:
         # Create traefik config
         traefik_config = TraefikConfig(etcd=etcd_config)
 
-        # Create proxy coordinator config with traefik enabled
-        proxy_config = ProxyCoordinatorConfig(  # type: ignore[call-arg]
-            enable_traefik=True,
-            traefik=traefik_config,
-        )
+        # Create configs with Mock
+        proxy_config = Mock(spec=ProxyCoordinatorConfig)
+        proxy_config.enable_traefik = True
+        proxy_config.traefik = traefik_config
 
-        # Create minimal ServerConfig
-        config = ServerConfig(proxy_coordinator=proxy_config)  # type: ignore[call-arg]
+        config = Mock(spec=ServerConfig)
+        config.proxy_coordinator = proxy_config
         return config
 
     @pytest.fixture
     def coordinator_config_without_traefik(self) -> ServerConfig:
         """Create a coordinator config with Traefik disabled."""
-        from ai.backend.appproxy.coordinator.config import ProxyCoordinatorConfig
+        proxy_config = Mock(spec=ProxyCoordinatorConfig)
+        proxy_config.enable_traefik = False
 
-        proxy_config = ProxyCoordinatorConfig(enable_traefik=False)  # type: ignore[call-arg]
-        config = ServerConfig(proxy_coordinator=proxy_config)  # type: ignore[call-arg]
+        config = Mock(spec=ServerConfig)
+        config.proxy_coordinator = proxy_config
         return config
 
     @pytest.mark.asyncio

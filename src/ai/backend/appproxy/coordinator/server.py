@@ -489,7 +489,7 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.utils import connect_database
 
-    async with connect_database(root_ctx.local_config) as db:
+    async with connect_database(root_ctx.local_config.db) as db:
         root_ctx.db = db
         yield
 
