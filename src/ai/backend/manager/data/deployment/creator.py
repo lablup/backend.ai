@@ -42,7 +42,7 @@ class ModelRevisionCreator:
 
 
 @dataclass
-class FinalDeploymentCreator:
+class DeploymentCreator:
     metadata: DeploymentMetadata
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
@@ -71,7 +71,7 @@ class FinalDeploymentCreator:
 
 
 @dataclass
-class DeploymentCreator:
+class DeploymentCreateRequest:
     metadata: DeploymentMetadata
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
@@ -98,11 +98,11 @@ class DeploymentCreator:
         """Get the deployment name from metadata."""
         return self.metadata.name
 
-    def to_final_deployment_creator(
+    def to_creator(
         self,
         model_revision: ModelRevisionSpec,
-    ) -> FinalDeploymentCreator:
-        return FinalDeploymentCreator(
+    ) -> DeploymentCreator:
+        return DeploymentCreator(
             metadata=self.metadata,
             replica_spec=self.replica_spec,
             network=self.network,

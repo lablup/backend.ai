@@ -36,7 +36,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.creator import DeploymentCreateRequest
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
@@ -745,7 +745,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     ):
         # Create deployment using the new deployment controller
         deployment_action = CreateLegacyDeploymentAction(
-            creator=DeploymentCreator(
+            request=DeploymentCreateRequest(
                 metadata=DeploymentMetadata(
                     name=params.service_name,
                     domain=params.domain_name,

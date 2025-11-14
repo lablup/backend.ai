@@ -8,7 +8,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.creator import DeploymentCreateRequest
 from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.types import (
@@ -67,7 +67,7 @@ class DeploymentController:
 
     async def create_deployment(
         self,
-        creator: DeploymentCreator,
+        request: DeploymentCreateRequest,
     ) -> DeploymentInfo:
         """
         Create a new deployment based on the provided specification.
@@ -78,10 +78,10 @@ class DeploymentController:
         Returns:
             DeploymentInfo: Information about the created deployment
         """
-        log.info("Creating deployment '{}' in project {}", creator.name, creator.project)
-        model_revision = await self._generate_model_revision(creator.requested_model_revision)
+        log.info("Creating deployment '{}' in project {}", request.name, request.project)
+        model_revision = await self._generate_model_revision(request.requested_model_revision)
         deployment_info = await self._deployment_repository.create_endpoint(
-            creator.to_final_deployment_creator(model_revision)
+            request.to_creator(model_revision)
         )
         return deployment_info
 
