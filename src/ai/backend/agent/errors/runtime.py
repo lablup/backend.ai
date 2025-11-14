@@ -8,8 +8,7 @@ from ai.backend.common.exception import (
 
 
 class AgentIdNotFoundError(BackendAIError):
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.AGENT,
             operation=ErrorOperation.ACCESS,
