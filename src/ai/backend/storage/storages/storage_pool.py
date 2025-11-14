@@ -40,7 +40,7 @@ class StoragePool(AbstractStoragePool):
 
         # Add Legacy Object Storage instances
         for legacy_storage_config in config.storages:
-            log.info(
+            log.debug(
                 f"Adding object storage: {legacy_storage_config.name} ({legacy_storage_config.endpoint})"
             )
             storages[legacy_storage_config.name] = ObjectStorage(
@@ -67,7 +67,7 @@ class StoragePool(AbstractStoragePool):
                         raise InvalidConfigError(
                             "object_storage config is required when storage_type is 'object_storage'"
                         )
-                    log.info(
+                    log.debug(
                         f"Adding object storage: {storage_name} ({artifact_storage_config.object_storage.endpoint})"
                     )
                     storages[storage_name] = ObjectStorage(
