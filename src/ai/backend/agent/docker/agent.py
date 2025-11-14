@@ -138,7 +138,6 @@ from ..utils import (
     update_nested_dict,
 )
 from .kernel import DockerKernel
-from .resources import load_resources, scan_available_resources
 from .utils import PersistentServiceContainer
 
 if TYPE_CHECKING:
@@ -1490,15 +1489,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     @override
     def get_cgroup_version(self) -> str:
         return self.docker_info["CgroupVersion"]
-
-    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(self.etcd, self.local_config.model_dump(by_alias=True))
-
-    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
-        return await scan_available_resources(
-            self.local_config.model_dump(by_alias=True),
-            {name: cctx.instance for name, cctx in self.computers.items()},
-        )
 
     async def extract_image_command(self, image: str) -> Optional[str]:
         async with closing_async(Docker()) as docker:
