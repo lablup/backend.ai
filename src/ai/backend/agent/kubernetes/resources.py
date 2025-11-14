@@ -23,9 +23,8 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 class KubernetesResourceDiscovery(AbstractResourceDiscovery):
     @override
-    @classmethod
     async def load_resources(
-        cls,
+        self,
         etcd: AbstractKVStore,
         local_config: Mapping[str, Any],
     ) -> Mapping[DeviceName, AbstractComputePlugin]:
@@ -71,9 +70,8 @@ class KubernetesResourceDiscovery(AbstractResourceDiscovery):
         return compute_device_types
 
     @override
-    @classmethod
     async def scan_available_resources(
-        cls,
+        self,
         compute_device_types: Mapping[DeviceName, AbstractComputePlugin],
     ) -> Mapping[SlotName, Decimal]:
         slots: MutableMapping[SlotName, Decimal] = {}

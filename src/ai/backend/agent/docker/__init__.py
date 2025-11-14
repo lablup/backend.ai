@@ -10,5 +10,5 @@ def get_agent_cls() -> Type[AbstractAgent]:
     return DockerAgent
 
 
-def get_resource_discovery_cls() -> Type[AbstractResourceDiscovery]:
-    return DockerResourceDiscovery
+def get_resource_discovery() -> AbstractResourceDiscovery:
+    return DockerResourceDiscovery()
