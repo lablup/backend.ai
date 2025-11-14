@@ -12,6 +12,7 @@ from ..resources import (
     ComputePluginContext,
     known_slot_types,
 )
+from .config import read_dummy_config
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -19,7 +20,6 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 async def load_resources(
     etcd: AbstractKVStore,
     local_config: Mapping[str, Any],
-    dummy_config: Mapping[str, Any],
 ) -> Mapping[DeviceName, AbstractComputePlugin]:
     """
     Detect and load the accelerator plugins.
@@ -40,6 +40,7 @@ async def load_resources(
         allowlist=local_config["agent"]["allow-compute-plugins"],
         blocklist=local_config["agent"]["block-compute-plugins"],
     )
+    dummy_config = read_dummy_config()
     if "cpu" not in compute_plugin_ctx.plugins:
         cpu_config = await etcd.get_prefix("config/plugins/cpu")
         cpu_plugin = CPUPlugin(cpu_config, local_config, dummy_config)
