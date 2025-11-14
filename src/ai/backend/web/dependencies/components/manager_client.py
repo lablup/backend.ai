@@ -49,7 +49,7 @@ class ManagerClientProvider(DependencyProvider[WebServerUnifiedConfig, ManagerCl
         try:
             yield ManagerClientInfo(
                 client_pool=client_pool,
-                endpoints=list(setup_input.api.endpoint),
+                endpoints=setup_input.api.endpoint,
             )
         finally:
             await client_pool.close()

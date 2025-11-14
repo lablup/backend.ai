@@ -50,7 +50,7 @@ class HiveRouterClientProvider(DependencyProvider[WebServerUnifiedConfig, HiveRo
         try:
             yield HiveRouterClientInfo(
                 client_pool=client_pool,
-                endpoints=list(setup_input.apollo_router.endpoints),
+                endpoints=setup_input.apollo_router.endpoints,
             )
         finally:
             await client_pool.close()
