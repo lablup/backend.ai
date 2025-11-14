@@ -12,15 +12,6 @@ from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import REDIS_BGTASK_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dependencies import DependencyProvider
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
-
-
-@dataclass
-class RedisProviderInput:
-    """Input for Redis provider."""
-
-    local_config: StorageProxyUnifiedConfig
-    etcd: AsyncEtcd
 
 
 @dataclass
@@ -31,7 +22,7 @@ class StorageProxyValkeyClients:
     artifact: ValkeyArtifactDownloadTrackingClient
 
 
-class RedisProvider(DependencyProvider[RedisProviderInput, StorageProxyValkeyClients]):
+class RedisProvider(DependencyProvider[AsyncEtcd, StorageProxyValkeyClients]):
     """Provider for Redis configuration and Valkey clients."""
 
     @property
@@ -39,12 +30,11 @@ class RedisProvider(DependencyProvider[RedisProviderInput, StorageProxyValkeyCli
         return "redis"
 
     @asynccontextmanager
-    async def provide(
-        self, setup_input: RedisProviderInput
-    ) -> AsyncIterator[StorageProxyValkeyClients]:
+    async def provide(self, setup_input: AsyncEtcd) -> AsyncIterator[StorageProxyValkeyClients]:
         """Load and provide Redis configuration and Valkey clients."""
         # Load Redis config from etcd
-        raw_redis_config = await setup_input.etcd.get_prefix("config/redis")
+        # TODO: Override UnifiedConfig with etcd values
+        raw_redis_config = await setup_input.get_prefix("config/redis")
         redis_config = RedisConfig.model_validate(raw_redis_config)
 
         redis_profile_target = redis_config.to_redis_profile_target()
