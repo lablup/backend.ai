@@ -124,7 +124,10 @@ def _dump_toml_scalar(
     if ctx is not None:
         match ctx.hint:
             case "BinarySize":
-                value = f"{BinarySize(value):s}".upper()
+                if isinstance(value, BinarySize):
+                    value = f"{value:s}".upper()
+                else:
+                    value = f"{BinarySize.from_str(str(value)):s}".upper()
             case "HostPortPair":
                 value = {"host": value["host"], "port": value["port"]}
             case "EnumByValue":

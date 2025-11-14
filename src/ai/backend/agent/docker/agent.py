@@ -48,6 +48,7 @@ from aiomonitor.task import preserve_termination_log
 from aiotools import TaskGroup
 from async_timeout import timeout
 
+from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.common.cgroup import get_cgroup_mount_point
 from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.docker import (
@@ -108,7 +109,7 @@ from ..agent import (
 from ..config.unified import AgentUnifiedConfig, ContainerSandboxType, ScratchType
 from ..exception import ContainerCreationError, UnsupportedResource
 from ..fs import create_scratch_filesystem, destroy_scratch_filesystem
-from ..kernel import AbstractKernel
+from ..kernel import AbstractKernel, KernelRegistry
 from ..plugin.network import ContainerNetworkCapability, ContainerNetworkInfo, NetworkPluginContext
 from ..proxy import DomainSocketProxy, proxy_connection
 from ..resources import (
@@ -119,7 +120,6 @@ from ..resources import (
     known_slot_types,
 )
 from ..scratch import create_loop_filesystem, destroy_loop_filesystem
-from ..server import get_extra_volumes
 from ..types import (
     AgentEventData,
     Container,
@@ -127,6 +127,7 @@ from ..types import (
     LifecycleEvent,
     MountInfo,
     Port,
+    VolumeInfo,
 )
 from ..utils import (
     closing_async,
@@ -137,13 +138,11 @@ from ..utils import (
     update_nested_dict,
 )
 from .kernel import DockerKernel
-from .metadata.server import MetadataServer
 from .resources import load_resources, scan_available_resources
 from .utils import PersistentServiceContainer
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
-    from ai.backend.common.etcd import AsyncEtcd
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 eof_sentinel = Sentinel.TOKEN
@@ -160,6 +159,49 @@ known_glibc_distros: Final[dict[float, str]] = {
     2.35: "ubuntu22.04",
     2.39: "ubuntu24.04",
 }
+
+deeplearning_image_keys = {
+    "tensorflow",
+    "caffe",
+    "keras",
+    "torch",
+    "mxnet",
+    "theano",
+}
+
+deeplearning_sample_volume = VolumeInfo(
+    "deeplearning-samples",
+    "/home/work/samples",
+    "ro",
+)
+
+
+async def get_extra_volumes(docker, lang):
+    avail_volumes = (await docker.volumes.list())["Volumes"]
+    if not avail_volumes:
+        return []
+    avail_volume_names = set(v["Name"] for v in avail_volumes)
+
+    # deeplearning specialization
+    # TODO: extract as config
+    volume_list = []
+    for k in deeplearning_image_keys:
+        if k in lang:
+            volume_list.append(deeplearning_sample_volume)
+            break
+
+    # Mount only actually existing volumes
+    mount_list = []
+    for vol in volume_list:
+        if vol.name in avail_volume_names:
+            mount_list.append(vol)
+        else:
+            log.info(
+                "skipped attaching extra volume {0} to a kernel based on image {1}",
+                vol.name,
+                lang,
+            )
+    return mount_list
 
 
 def container_from_docker_container(src: DockerContainer) -> Container:
@@ -1298,7 +1340,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     monitor_docker_task: asyncio.Task
     agent_sockpath: Path
     agent_sock_task: asyncio.Task
-    metadata_server: MetadataServer
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: Optional[str]
     checked_invalid_images: Set[str]
@@ -1307,13 +1348,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
 
     def __init__(
         self,
-        etcd: AsyncEtcd,
+        etcd: AgentEtcdClientView,
         local_config: AgentUnifiedConfig,
         *,
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
+        kernel_registry: KernelRegistry,
     ) -> None:
         super().__init__(
             etcd,
@@ -1322,6 +1364,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             error_monitor=error_monitor,
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
+            kernel_registry=kernel_registry,
         )
         self.checked_invalid_images = set()
 
@@ -1369,10 +1412,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.gwbridge_subnet = None
         ipc_base_path = self.local_config.agent.ipc_base_path
         (ipc_base_path / "container").mkdir(parents=True, exist_ok=True)
-        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.local_instance_id}.sock"
+        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.id}.sock"
         # Workaround for Docker Desktop for Mac's UNIX socket mount failure with virtiofs
         if sys.platform != "darwin":
-            socket_relay_name = f"backendai-socket-relay.{self.local_instance_id}"
+            socket_relay_name = f"backendai-socket-relay.{self.id}"
             socket_relay_container = PersistentServiceContainer(
                 "backendai-socket-relay:latest",
                 {
@@ -1398,12 +1441,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self.monitor_docker_task = asyncio.create_task(self.monitor_docker_events())
         self.docker_ptask_group = aiotools.PersistentTaskGroup()
 
-        self.metadata_server = await MetadataServer.new(
-            self.local_config,
-            self.etcd,
-            self.kernel_registry,
-        )
-        await self.metadata_server.start_server()
         # For legacy accelerator plugins
         self.docker = Docker()
 
@@ -1432,7 +1469,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 self.monitor_docker_task.cancel()
                 await self.monitor_docker_task
 
-        await self.metadata_server.cleanup()
         if self.docker:
             await self.docker.close()
 
