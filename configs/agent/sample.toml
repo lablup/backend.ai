@@ -16,14 +16,6 @@
   scaling-group = "default"
   # Scaling group type
   scaling-group-type = "compute"
-  # Allowed compute plugins
-  ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
-  # Blocked compute plugins
-  ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
-  # Allowed network plugins
-  ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
-  # Blocked network plugins
-  ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
   # Whether to force terminate abusing containers
   force-terminate-abusing-containers = false
   # Kernel creation concurrency
@@ -81,6 +73,14 @@
   metadata-server-bind-host = "0.0.0.0"
   # Metadata server port
   metadata-server-port = 40128
+  # Allowed compute plugins
+  ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
+  # Blocked compute plugins
+  ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
+  # Allowed network plugins
+  ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
+  # Blocked network plugins
+  ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
   # Path for image commit
   image-commit-path = "tmp/backend.ai/commit"
   # Path for abuse reports
@@ -156,6 +156,12 @@
   # Currently this value is unused. In future releases, it may be used to preserve
   # the minimum disk space from the scratch disk allocation via loopback files.
   reserved-disk = "8G"
+  # Resource allocation mode for multi-agent scenarios.
+  # - `shared`: All agents share the full resource pool (default, backward
+  # compatible).
+  # - `auto-split`: Automatically divide resources equally (1/N) among all agents.
+  # - `manual`: Manually specify per-agent resource allocations via config.
+  allocation-mode = "shared"
   # The alignment of the reported main memory size to absorb tiny deviations from
   # per-node firmware/hardware settings. Recommended to be multiple of the
   # page/hugepage size (e.g., 2 MiB).
@@ -164,6 +170,22 @@
   allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
   # Affinity policy
   affinity-policy = "INTERLEAVED"
+
+  # Resource allocations.
+  # Only used in MANUAL allocation mode.
+  [resource.allocations]
+    # Hard CPU allocation for this agent (e.g., 8 cores).
+    # Only used in MANUAL allocation mode.
+    # All agents must specify this value when allocation-mode is MANUAL.
+    cpu = 8
+    # Hard memory allocation for this agent (e.g., "32G").
+    # Only used in MANUAL allocation mode.
+    # All agents must specify this value when allocation-mode is MANUAL.
+    mem = "32G"
+
+    # Device-specific per-slot resource allocations.
+    # Only used in MANUAL allocation mode.
+    [resource.allocations.devices]
 
 # Pyroscope configuration
 [pyroscope]
@@ -351,14 +373,6 @@
     scaling-group = "default"
     # Scaling group type
     scaling-group-type = "compute"
-    # Allowed compute plugins
-    ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
-    # Blocked compute plugins
-    ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
-    # Allowed network plugins
-    ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
-    # Blocked network plugins
-    ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
     # Whether to force terminate abusing containers
     force-terminate-abusing-containers = false
     # Kernel creation concurrency
@@ -383,7 +397,7 @@
     # late into the agent's runtime.
     port-range = [ 30000, 31000,]
     # Statistics type
-    ## stats-type = "cgroup"
+    ## stats-type = "docker"
     # Sandbox type
     sandbox-type = "docker"
     # Jail arguments
@@ -393,7 +407,7 @@
     # Scratch root directory
     scratch-root = "scratches"
     # Scratch size
-    scratch-size = 0
+    scratch-size = "0"
     # Scratch NFS address
     ## scratch-nfs-address = "192.168.1.100:/export"
     # Scratch NFS options
@@ -409,24 +423,15 @@
 
   # Resource config overrides for the individual agent
   [agents.resource]
-    # The number of CPU cores reserved for the operating system and the agent
-    # service.
-    reserved-cpu = 1
-    # The memory space reserved for the operating system and the agent service. It
-    # is subtracted from the reported main memory size and not available for user
-    # workload allocation. Depending on the memory-align-size option and system
-    # configuration, this may not be the exact value but have slightly less or more
-    # values within the memory-align-size.
-    reserved-mem = 1073741824
-    # The disk space reserved for the operating system and the agent service.
-    # Currently this value is unused. In future releases, it may be used to preserve
-    # the minimum disk space from the scratch disk allocation via loopback files.
-    reserved-disk = 8589934592
-    # The alignment of the reported main memory size to absorb tiny deviations from
-    # per-node firmware/hardware settings. Recommended to be multiple of the
-    # page/hugepage size (e.g., 2 MiB).
-    memory-align-size = 16777216
-    # Resource allocation order
-    allocation-order = [ "cuda", "rocm", "tpu", "cpu", "mem",]
-    # Affinity policy
-    affinity-policy = 1
+    # Hard CPU allocation for this agent (e.g., 8 cores).
+    # Only used in MANUAL allocation mode.
+    # All agents must specify this value when allocation-mode is MANUAL.
+    cpu = 8
+    # Hard memory allocation for this agent (e.g., "32G").
+    # Only used in MANUAL allocation mode.
+    # All agents must specify this value when allocation-mode is MANUAL.
+    mem = "32G"
+
+    # Device-specific per-slot resource allocations.
+    # Only used in MANUAL allocation mode.
+    [agents.resource.devices]
