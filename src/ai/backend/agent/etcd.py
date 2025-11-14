@@ -48,8 +48,11 @@ class AgentEtcdClientView(AbstractKVStore):
         have the immutable version in typeshed.
         (ref: https://github.com/python/typeshed/issues/6042)
         """
+        if not override:
+            return self._agent_scope_prefix_map
+
         return ChainMap(
-            cast(MutableMapping, override) or {}, cast(MutableMapping, self._agent_scope_prefix_map)
+            cast(MutableMapping, override), cast(MutableMapping, self._agent_scope_prefix_map)
         )
 
     @override
