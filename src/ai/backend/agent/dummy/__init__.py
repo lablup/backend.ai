@@ -10,5 +10,5 @@ def get_agent_cls() -> Type[AbstractAgent]:
     return DummyAgent
 
 
-def get_resource_discovery_cls() -> Type[AbstractResourceDiscovery]:
-    return DummyResourceDiscovery
+def get_resource_discovery() -> AbstractResourceDiscovery:
+    return DummyResourceDiscovery()

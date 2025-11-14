@@ -41,7 +41,6 @@ from typing import (
     Generic,
     Literal,
     Optional,
-    Type,
     TypeVar,
     cast,
 )
@@ -1951,10 +1950,10 @@ class AbstractAgent(
         raise NotImplementedError
 
     @cached_property
-    def resource_discovery(self) -> Type[AbstractResourceDiscovery]:
+    def resource_discovery(self) -> AbstractResourceDiscovery:
         backend = self.local_config.agent_common.backend
         agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
-        return agent_mod.get_resource_discovery_cls()
+        return agent_mod.get_resource_discovery()
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
         return await self.resource_discovery.load_resources(

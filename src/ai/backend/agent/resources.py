@@ -503,9 +503,8 @@ class Mount:
 
 class AbstractResourceDiscovery(ABC):
     @abstractmethod
-    @classmethod
     async def load_resources(
-        cls,
+        self,
         etcd: AbstractKVStore,
         local_config: Mapping[str, Any],
     ) -> Mapping[DeviceName, AbstractComputePlugin]:
@@ -517,9 +516,8 @@ class AbstractResourceDiscovery(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    @classmethod
     async def scan_available_resources(
-        cls,
+        self,
         compute_device_types: Mapping[DeviceName, AbstractComputePlugin],
     ) -> Mapping[SlotName, Decimal]:
         """
