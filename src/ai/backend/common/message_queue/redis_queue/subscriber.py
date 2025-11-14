@@ -116,7 +116,7 @@ class RedisSubscriber(AbstractSubscriber):
         """
         Background task to read broadcast messages from subscribed channels.
         """
-        log.info("Starting read broadcast messages loop for channels {}", self._channels)
+        log.debug("Starting read broadcast messages loop for channels {}", self._channels)
 
         while not self._closed:
             try:

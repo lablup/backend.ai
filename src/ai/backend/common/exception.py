@@ -159,6 +159,7 @@ class ErrorDomain(enum.StrEnum):
     VFOLDER = "vfolder"
     QUOTA_SCOPE = "quota-scope"
     VFOLDER_INVITATION = "vfolder-invitation"
+    MODEL_CARD = "model-card"
     MODEL_SERVICE = "model-service"
     MODEL_DEPLOYMENT = "model-deployment"
     RESOURCE_PRESET = "resource-preset"
@@ -233,6 +234,7 @@ class ErrorDetail(enum.StrEnum):
     # For example, the user has not completed a 2FA setup or any verification.
     INCOMPLETE_USER_PROFILE = "incomplete-user-profile"
     NOT_READY = "not-ready"  # The resource is not ready to be used.
+    INVALID_DATA_FORMAT = "invalid-data-format"  # The data format is invalid.
 
     # Server Error
     INTERNAL_ERROR = (
@@ -798,6 +800,22 @@ class ClientNotConnectedError(BackendAIError, web.HTTPServiceUnavailable):
     def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class DatabaseError(BackendAIError, web.HTTPServiceUnavailable):
+    """
+    Raised when a database operation fails.
+    """
+
+    error_type = "https://api.backend.ai/probs/database-error"
+    error_title = "Database Error"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.HEALTH_CHECK,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.UNAVAILABLE,
         )

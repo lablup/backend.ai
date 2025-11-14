@@ -13,6 +13,7 @@ from setproctitle import setproctitle
 from ai.backend.appproxy.common.config import generate_example_json
 from ai.backend.appproxy.common.openapi import generate_openapi
 from ai.backend.appproxy.common.utils import ensure_json_serializable
+from ai.backend.common.cli import LazyGroup
 from ai.backend.logging.types import LogLevel
 
 from ..config import ServerConfig
@@ -91,6 +92,11 @@ def generate_openapi_spec(output: Path) -> None:
     else:
         with open(output, mode="w") as fw:
             fw.write(json.dumps(openapi, ensure_ascii=False, indent=2))
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.appproxy.worker.cli.dependencies:cli")
+def dependencies():
+    """Command set for dependency verification and validation."""
 
 
 if __name__ == "__main__":

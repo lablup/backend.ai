@@ -32,11 +32,11 @@ from kubernetes.client.models import V1Service, V1ServicePort
 from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
 
+from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.docker import ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
-from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.types import (
@@ -68,7 +68,7 @@ from ..agent import (
 )
 from ..config.unified import AgentUnifiedConfig, ScratchType
 from ..exception import K8sError, UnsupportedResource
-from ..kernel import AbstractKernel
+from ..kernel import AbstractKernel, KernelRegistry
 from ..resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -822,13 +822,14 @@ class KubernetesAgent(
 
     def __init__(
         self,
-        etcd: AsyncEtcd,
+        etcd: AgentEtcdClientView,
         local_config: AgentUnifiedConfig,
         *,
         stats_monitor: StatsPluginContext,
         error_monitor: ErrorPluginContext,
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
+        kernel_registry: KernelRegistry,
     ) -> None:
         super().__init__(
             etcd,
@@ -837,12 +838,13 @@ class KubernetesAgent(
             error_monitor=error_monitor,
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
+            kernel_registry=kernel_registry,
         )
 
     async def __ainit__(self) -> None:
         await super().__ainit__()
         ipc_base_path = self.local_config.agent.ipc_base_path
-        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.local_instance_id}.sock"
+        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.id}.sock"
 
         await self.check_krunner_pv_status()
         await self.fetch_workers()

@@ -8,7 +8,7 @@ from typing import Final
 
 from ai.backend.common.leader.base import LeadershipChecker, LeaderTask
 from ai.backend.common.leader.tasks.base import PeriodicTask
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
