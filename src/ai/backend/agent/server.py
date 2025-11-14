@@ -285,15 +285,9 @@ class AgentRPCServer(aobject):
         self.loop = current_loop()
         self.etcd = etcd
         self.local_config = local_config
-        self.runtime = AgentRuntime(self.local_config, self.etcd)
         self.skip_detect_manager = skip_detect_manager
 
     async def __ainit__(self) -> None:
-        # Start serving requests.
-        async with asyncio.TaskGroup() as tg:
-            for agent_id in self.local_config.agent_ids:
-                tg.create_task(self.update_status("starting", agent_id))
-
         if not self.skip_detect_manager:
             await self.detect_manager()
 
@@ -338,11 +332,18 @@ class AgentRPCServer(aobject):
             self.rpc_auth_agent_secret_key = None
             auth_handler = None
 
-        await self.runtime.create_agents(
+        self.runtime = await AgentRuntime.create_runtime(
+            self.local_config,
+            self.etcd,
             self.stats_monitor,
             self.error_monitor,
             self.rpc_auth_agent_public_key,
         )
+
+        # Start serving requests.
+        async with asyncio.TaskGroup() as tg:
+            for agent_id in self.local_config.agent_ids:
+                tg.create_task(self.update_status("starting", agent_id))
 
         rpc_addr = self.local_config.agent_common.rpc_listen_addr
         self.rpc_server = Peer(

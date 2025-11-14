@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import importlib
 import signal
@@ -20,59 +22,120 @@ if TYPE_CHECKING:
 
 class AgentRuntime:
     _local_config: AgentUnifiedConfig
-    _agents: dict[AgentId, AbstractAgent]
+    _etcd_views: Mapping[AgentId, AgentEtcdClientView]
+    _agents: Mapping[AgentId, AbstractAgent]
     _default_agent: AbstractAgent
     _kernel_registry: KernelRegistry
-    _etcd: AsyncEtcd
-    _etcd_views: Mapping[AgentId, AgentEtcdClientView]
+    _metadata_server: Optional[MetadataServer]
 
     _stop_signal: signal.Signals
+
+    @classmethod
+    async def create_runtime(
+        cls,
+        local_config: AgentUnifiedConfig,
+        etcd: AsyncEtcd,
+        stats_monitor: AgentStatsPluginContext,
+        error_monitor: AgentErrorPluginContext,
+        agent_public_key: Optional[PublicKey],
+    ) -> AgentRuntime:
+        kernel_registry = KernelRegistry()
+
+        if local_config.agent_common.backend == AgentBackend.DOCKER:
+            await cls._create_metadata_server(local_config, etcd, kernel_registry)
+
+        agent_configs = local_config.get_agent_configs()
+        etcd_views: dict[AgentId, AgentEtcdClientView] = {}
+        create_agent_tasks: list[asyncio.Task] = []
+        async with asyncio.TaskGroup() as tg:
+            for agent_config in agent_configs:
+                agent_id = AgentId(agent_config.agent.id)
+
+                etcd_view = AgentEtcdClientView(etcd, agent_config)
+                etcd_views[agent_id] = etcd_view
+
+                create_agent_task = tg.create_task(
+                    cls._create_agent(
+                        local_config,
+                        etcd_view,
+                        kernel_registry,
+                        agent_config,
+                        stats_monitor,
+                        error_monitor,
+                        agent_public_key,
+                    )
+                )
+                create_agent_tasks.append(create_agent_task)
+        agents_list = [task.result() for task in create_agent_tasks]
+        default_agent = agents_list[0]
+        agents = {agent.id: agent for agent in agents_list}
+
+        return AgentRuntime(
+            local_config=local_config,
+            etcd_views=etcd_views,
+            agents=agents,
+            default_agent=default_agent,
+            kernel_registry=kernel_registry,
+        )
+
+    @classmethod
+    async def _create_metadata_server(
+        cls,
+        local_config: AgentUnifiedConfig,
+        etcd: AsyncEtcd,
+        kernel_registry: KernelRegistry,
+    ) -> MetadataServer:
+        from .docker.metadata.server import MetadataServer
+
+        metadata_server = await MetadataServer.new(
+            local_config,
+            etcd,
+            kernel_registry=kernel_registry.global_view(),
+        )
+        await metadata_server.start_server()
+        return metadata_server
+
+    @classmethod
+    async def _create_agent(
+        cls,
+        local_config: AgentUnifiedConfig,
+        etcd_view: AgentEtcdClientView,
+        kernel_registry: KernelRegistry,
+        agent_config: AgentUnifiedConfig,
+        stats_monitor: AgentStatsPluginContext,
+        error_monitor: AgentErrorPluginContext,
+        agent_public_key: Optional[PublicKey],
+    ) -> AbstractAgent:
+        agent_kwargs = {
+            "kernel_registry": kernel_registry,
+            "stats_monitor": stats_monitor,
+            "error_monitor": error_monitor,
+            "agent_public_key": agent_public_key,
+        }
+
+        backend = local_config.agent_common.backend
+        agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
+        agent_cls: Type[AbstractAgent] = agent_mod.get_agent_cls()
+
+        return await agent_cls.new(etcd_view, agent_config, **agent_kwargs)
 
     def __init__(
         self,
         local_config: AgentUnifiedConfig,
-        etcd: AsyncEtcd,
+        etcd_views: Mapping[AgentId, AgentEtcdClientView],
+        agents: dict[AgentId, AbstractAgent],
+        default_agent: AbstractAgent,
+        kernel_registry: KernelRegistry,
+        metadata_server: Optional[MetadataServer] = None,
     ) -> None:
         self._local_config = local_config
-        self._agents = {}
-        self._kernel_registry = KernelRegistry()
-        self._etcd = etcd
-        self._etcd_views = {
-            AgentId(agent_config.agent.id): AgentEtcdClientView(self._etcd, agent_config)
-            for agent_config in self._local_config.get_agent_configs()
-        }
-        self._metadata_server: MetadataServer | None = None
+        self._etcd_views = etcd_views
+        self._agents = agents
+        self._default_agent = default_agent
+        self._kernel_registry = kernel_registry
+        self._metadata_server = metadata_server
 
         self._stop_signal = signal.SIGTERM
-
-    async def create_agents(
-        self,
-        stats_monitor: AgentStatsPluginContext,
-        error_monitor: AgentErrorPluginContext,
-        agent_public_key: Optional[PublicKey],
-    ) -> None:
-        if self._local_config.agent_common.backend == AgentBackend.DOCKER:
-            await self._initialize_metadata_server()
-
-        tasks: list[asyncio.Task] = []
-        async with asyncio.TaskGroup() as tg:
-            for agent_config in self._local_config.get_agent_configs():
-                agent_id = AgentId(agent_config.agent.id)
-                tasks.append(
-                    tg.create_task(
-                        self._create_agent(
-                            self.get_etcd(agent_id),
-                            agent_config,
-                            stats_monitor,
-                            error_monitor,
-                            agent_public_key,
-                        )
-                    )
-                )
-
-        agents = [task.result() for task in tasks]
-        self._default_agent = agents[0]
-        self._agents = {agent.id: agent for agent in agents}
 
     async def __aexit__(self, *exc_info) -> None:
         for agent in self._agents.values():
@@ -107,34 +170,3 @@ class AgentRuntime:
     async def update_status(self, status, agent_id: AgentId) -> None:
         etcd = self.get_etcd(agent_id)
         await etcd.put("", status, scope=ConfigScopes.NODE)
-
-    async def _create_agent(
-        self,
-        etcd_view: AgentEtcdClientView,
-        agent_config: AgentUnifiedConfig,
-        stats_monitor: AgentStatsPluginContext,
-        error_monitor: AgentErrorPluginContext,
-        agent_public_key: Optional[PublicKey],
-    ) -> AbstractAgent:
-        agent_kwargs = {
-            "kernel_registry": self._kernel_registry,
-            "stats_monitor": stats_monitor,
-            "error_monitor": error_monitor,
-            "agent_public_key": agent_public_key,
-        }
-
-        backend = self._local_config.agent_common.backend
-        agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
-        agent_cls: Type[AbstractAgent] = agent_mod.get_agent_cls()
-
-        return await agent_cls.new(etcd_view, agent_config, **agent_kwargs)
-
-    async def _initialize_metadata_server(self) -> None:
-        from .docker.metadata.server import MetadataServer
-
-        self._metadata_server = await MetadataServer.new(
-            self._local_config,
-            self._etcd,
-            kernel_registry=self._kernel_registry.global_view(),
-        )
-        await self._metadata_server.start_server()

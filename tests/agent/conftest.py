@@ -295,9 +295,13 @@ async def agent_runtime(
     mock_stats_monitor = Mock()
     mock_error_monitor = Mock()
 
-    runtime = AgentRuntime(local_config, etcd)
-
-    await runtime.create_agents(mock_stats_monitor, mock_error_monitor, None)
+    runtime = await AgentRuntime.create_runtime(
+        local_config,
+        etcd,
+        mock_stats_monitor,
+        mock_error_monitor,
+        None,
+    )
 
     try:
         yield runtime
