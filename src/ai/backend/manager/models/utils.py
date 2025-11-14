@@ -42,6 +42,7 @@ from tenacity import (
 )
 from yarl import URL
 
+from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.bootstrap import DatabaseConfig
@@ -163,10 +164,13 @@ class ExtendedAsyncSAEngine(SAEngine):
         Ping the database to check if the connection is alive.
 
         Raises:
-            Exception: If the ping fails or connection is not available
+            DatabaseError: If the ping fails or connection is not available
         """
-        async with self.connect() as conn:
-            await conn.execute(sa.text("SELECT 1"))
+        async with self.begin_readonly_read_committed() as conn:
+            result = await conn.execute(sa.text("SELECT 1"))
+            scalar_result = result.scalar()
+            if scalar_result != 1:
+                raise DatabaseError("Database ping failed: unexpected result")
 
     @actxmgr
     async def begin_readonly(

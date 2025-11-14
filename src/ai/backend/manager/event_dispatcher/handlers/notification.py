@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Callable
 
 from ai.backend.common.data.notification import NotifiableMessage
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 from ...data.notification import NotificationRuleType
 from ...services.notification.actions import ProcessNotificationAction

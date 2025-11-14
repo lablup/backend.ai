@@ -9,7 +9,7 @@ from typing import Callable, Final
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.types import AbstractAnycastEvent
 from ai.backend.common.leader.tasks.base import PeriodicTask
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

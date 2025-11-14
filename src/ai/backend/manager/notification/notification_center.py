@@ -9,7 +9,7 @@ import jinja2
 
 from ai.backend.common.clients.http_client import ClientPool
 from ai.backend.common.data.notification import NotifiableMessage, NotificationChannelType
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.notification import NotificationChannelData
 from ai.backend.manager.errors.notification import (
     InvalidNotificationChannelType,
