@@ -93,7 +93,7 @@ def verify(
                 from ai.backend.logging import LogLevel
 
                 dependency_input = DependencyInput(
-                    config_path=config_path or Path("webserver.toml"),
+                    config_path=config_path or Path("webserver.conf"),
                     log_level=LogLevel(log_level.upper()),
                 )
                 composer = WebDependencyComposer()

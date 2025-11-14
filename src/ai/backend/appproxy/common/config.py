@@ -1,9 +1,7 @@
 import enum
-import os
 import pwd
 import types
 import typing
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -109,32 +107,19 @@ class RedisConfig(BaseSchema):
         return base
 
 
-@dataclass
-class UserID:
-    default_uid: int | None = None
-
+class UserIDValidator:
     @classmethod
     def uid_validator(
         cls,
-        value: int | str | None,
+        value: int | str,
     ) -> int:
-        if value is None:
-            assert cls.default_uid, "value is None but default_uid not provided"
-            return cls.default_uid
-        assert isinstance(value, (int, str)), "value must be an integer"
+        assert isinstance(value, (int, str)), "value must be an integer or string"
         match value:
             case int():
-                if value == -1:
-                    return os.getuid()
-                else:
-                    return value
+                return value
             case str():
                 try:
-                    _value = int(value)
-                    if _value == -1:
-                        return os.getuid()
-                    else:
-                        return _value
+                    return int(value)
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_uid
@@ -181,31 +166,19 @@ class UserID:
         )
 
 
-@dataclass
-class GroupID:
-    default_gid: int | None = None
-
+class GroupIDValidator:
     @classmethod
     def uid_validator(
         cls,
-        value: int | str | None,
+        value: int | str,
     ) -> int:
-        if value is None:
-            assert cls.default_gid, "value is None but default_gid not provided"
-        assert isinstance(value, (int, str)), "value must be an integer"
+        assert isinstance(value, (int, str)), "value must be an integer or string"
         match value:
             case int():
-                if value == -1:
-                    return os.getgid()
-                else:
-                    return value
+                return value
             case str():
                 try:
-                    _value = int(value)
-                    if _value == -1:
-                        return os.getgid()
-                    else:
-                        return _value
+                    return int(value)
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_gid
