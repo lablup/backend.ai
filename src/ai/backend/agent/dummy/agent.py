@@ -71,7 +71,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: AgentUnifiedConfig,
-        computers: MutableMapping[DeviceName, ComputerContext],
+        computers: Mapping[DeviceName, ComputerContext],
         restarting: bool = False,
         *,
         dummy_config: Mapping[str, Any],

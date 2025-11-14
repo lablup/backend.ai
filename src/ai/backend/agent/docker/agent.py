@@ -293,7 +293,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: AgentUnifiedConfig,
-        computers: MutableMapping[DeviceName, ComputerContext],
+        computers: Mapping[DeviceName, ComputerContext],
         port_pool: Set[int],
         agent_sockpath: Path,
         resource_lock: asyncio.Lock,
@@ -1353,6 +1353,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
         kernel_registry: KernelRegistry,
+        computers: Mapping[DeviceName, ComputerContext],
+        slots: Mapping[SlotName, Decimal],
     ) -> None:
         super().__init__(
             etcd,
@@ -1362,6 +1364,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
             kernel_registry=kernel_registry,
+            computers=computers,
+            slots=slots,
         )
         self.checked_invalid_images = set()
 
