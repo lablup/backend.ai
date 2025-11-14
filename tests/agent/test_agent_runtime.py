@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import pytest
 
 from ai.backend.agent.errors.runtime import AgentIdNotFoundError
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common.types import AgentId
-
-if TYPE_CHECKING:
-    from ai.backend.agent.config.unified import AgentUnifiedConfig
 
 
 class TestAgentRuntimeSingleAgent:
@@ -90,70 +85,37 @@ class TestAgentRuntimeInitialization:
     @pytest.mark.asyncio
     async def test_runtime_creates_agents_from_config(
         self,
-        local_config: AgentUnifiedConfig,
-        etcd,
-        mocker,
+        agent_runtime: AgentRuntime,
     ) -> None:
         """
         AgentRuntime.create_agents() should initialize agents from config.
         """
-        from unittest.mock import Mock
+        # Verify agents were created
+        agents = agent_runtime.get_agents()
+        assert len(agents) > 0
 
-        mock_stats_monitor = Mock()
-        mock_error_monitor = Mock()
+        # Verify default agent is set
+        default_agent = agent_runtime.get_agent(None)
+        assert default_agent is not None
 
-        runtime = await AgentRuntime.create_runtime(
-            local_config,
-            etcd,
-            mock_stats_monitor,
-            mock_error_monitor,
-            None,
-        )
-
-        try:
-            # Verify agents were created
-            agents = runtime.get_agents()
-            assert len(agents) > 0
-
-            # Verify default agent is set
-            default_agent = runtime.get_agent(None)
-            assert default_agent is not None
-
-            # Verify all agents have valid IDs
-            for agent in agents:
-                assert agent.id is not None
-        finally:
-            await runtime.__aexit__(None, None, None)
+        # Verify all agents have valid IDs
+        for agent in agents:
+            assert agent.id is not None
 
     @pytest.mark.asyncio
     async def test_runtime_shutdown_cleans_up_agents(
         self,
-        local_config: AgentUnifiedConfig,
-        etcd,
-        mocker,
+        agent_runtime: AgentRuntime,
     ) -> None:
         """
         AgentRuntime.shutdown() should properly clean up all agents.
         """
-        from unittest.mock import Mock
-
-        mock_stats_monitor = Mock()
-        mock_error_monitor = Mock()
-
-        runtime = await AgentRuntime.create_runtime(
-            local_config,
-            etcd,
-            mock_stats_monitor,
-            mock_error_monitor,
-            None,
-        )
-
         # Verify agents exist before shutdown
-        agents = runtime.get_agents()
+        agents = agent_runtime.get_agents()
         assert len(agents) > 0
 
         # Shutdown
-        await runtime.__aexit__(None, None, None)
+        await agent_runtime.__aexit__(None, None, None)
 
         # After shutdown, the runtime should be in a clean state
         # (Specific behavior depends on implementation - adjust as needed)
