@@ -11,7 +11,6 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 class TestDatabaseHealthChecker:
     """Test DatabaseHealthChecker with real database connections."""
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_success(self, database_engine: ExtendedAsyncSAEngine) -> None:
         """Test successful health check with real database connection."""
@@ -23,7 +22,6 @@ class TestDatabaseHealthChecker:
         # Should not raise
         await checker.check_health()
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_timeout_property(
         self,
@@ -38,7 +36,6 @@ class TestDatabaseHealthChecker:
 
         assert checker.timeout == timeout_value
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_multiple_checks(
         self,

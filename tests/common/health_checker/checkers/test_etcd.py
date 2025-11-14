@@ -40,7 +40,6 @@ class TestEtcdHealthChecker:
         finally:
             await etcd.close()
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_success(self, etcd_client: AsyncEtcd) -> None:
         """Test successful health check with real etcd connection."""
@@ -52,7 +51,6 @@ class TestEtcdHealthChecker:
         # Should not raise
         await checker.check_health()
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_timeout_property(self, etcd_client: AsyncEtcd) -> None:
         """Test that timeout property returns the correct value."""
@@ -94,7 +92,6 @@ class TestEtcdHealthChecker:
         finally:
             await etcd.close()
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_multiple_checks(self, etcd_client: AsyncEtcd) -> None:
         """Test that multiple health checks work correctly."""

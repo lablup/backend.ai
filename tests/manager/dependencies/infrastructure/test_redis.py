@@ -37,7 +37,6 @@ class TestValkeyDependency:
         config = ManagerUnifiedConfig(redis=redis_config)  # type: ignore[call-arg]
         return config
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_provide_valkey_clients(
         self,
@@ -62,7 +61,6 @@ class TestValkeyDependency:
             server_time = await clients.live.get_server_time()
             assert server_time > 0
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
