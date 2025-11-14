@@ -529,6 +529,7 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         request_user_id: uuid.UUID,
         sudo_session_enabled: bool,
     ) -> DryRunModelServiceAction:
+        # TODO: Implement service definition override in dry-run
         if self.image is None or self.architecture is None or self.config.resources is None:
             raise InvalidAPIParameters(
                 "Image, architecture, and resources must be specified for dry-run service creation"
