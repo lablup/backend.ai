@@ -6,11 +6,13 @@ import subprocess
 from collections import defaultdict
 from pathlib import Path
 from typing import AsyncIterator
+from unittest.mock import AsyncMock, Mock
 
 import aiodocker
 import pytest
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.resources import ResourceAllocator
 from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common import config
 from ai.backend.common import validators as tx
@@ -276,10 +278,38 @@ async def create_container(test_id, docker):
 
 
 @pytest.fixture
+def mock_resource_allocator(mocker) -> AsyncMock:
+    """
+    Mock ResourceAllocator to avoid real resource scanning in tests.
+
+    This fixture patches ResourceAllocator.__new__ to return a mock that provides
+    empty computers and slots, suitable for testing agent initialization without
+    actual hardware resource detection and expensive plugin loading.
+
+    Returns the mock allocator instance for additional test customization.
+    """
+
+    mock_allocator = AsyncMock(spec=ResourceAllocator)
+    mock_allocator.get_computers.return_value = {}
+    mock_allocator.get_updated_slots.return_value = {}
+    mock_allocator.__aexit__ = AsyncMock()
+
+    # Patch __new__ to return our mock when ResourceAllocator() is called
+    mocker.patch.object(
+        ResourceAllocator,
+        "__new__",
+        return_value=mock_allocator,
+    )
+
+    return mock_allocator
+
+
+@pytest.fixture
 async def agent_runtime(
     local_config: AgentUnifiedConfig,
     etcd,
     mocker,
+    mock_resource_allocator,
 ) -> AsyncIterator[AgentRuntime]:
     """
     Create a real AgentRuntime instance for integration testing.
@@ -287,10 +317,10 @@ async def agent_runtime(
     This fixture provides a fully initialized AgentRuntime with:
     - Real etcd client
     - Real agent configuration
+    - Mocked ResourceAllocator (to avoid hardware resource detection)
     - Mocked stats and error monitors (external dependencies)
     - Proper cleanup after tests
     """
-    from unittest.mock import Mock
 
     mock_stats_monitor = Mock()
     mock_error_monitor = Mock()

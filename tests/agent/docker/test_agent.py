@@ -38,6 +38,8 @@ async def agent(local_config, test_id, mocker, socket_relay_image):
         skip_initial_scan=True,
         agent_public_key=None,
         kernel_registry=kernel_registry,
+        computers={},
+        slots={},
     )  # for faster test iteration
     agent.local_instance_id = test_case_id  # use per-test private registry file
     try:
