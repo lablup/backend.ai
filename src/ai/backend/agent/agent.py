@@ -30,6 +30,7 @@ from collections.abc import (
 from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
+from functools import cached_property
 from io import SEEK_END, BytesIO
 from pathlib import Path
 from types import TracebackType
@@ -40,6 +41,7 @@ from typing import (
     Generic,
     Literal,
     Optional,
+    Type,
     TypeVar,
     cast,
 )
@@ -238,6 +240,7 @@ from .observer.host_port import HostPortObserver
 from .resources import (
     AbstractComputeDevice,
     AbstractComputePlugin,
+    AbstractResourceDiscovery,
     ComputerContext,
     KernelResourceSpec,
     Mount,
@@ -1947,28 +1950,20 @@ class AbstractAgent(
     def get_cgroup_version(self) -> str:
         raise NotImplementedError
 
-    async def load_resources(
-        self,
-    ) -> Mapping[DeviceName, AbstractComputePlugin]:
-        """
-        Detect available resources attached on the system and load corresponding device plugin.
-        """
+    @cached_property
+    def resource_discovery(self) -> Type[AbstractResourceDiscovery]:
         backend = self.local_config.agent_common.backend
-        resources_mod = importlib.import_module(f"ai.backend.agent.{backend.value}.resources")
-        return await resources_mod.load_resources(
+        agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
+        return agent_mod.get_resource_discovery_cls()
+
+    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
+        return await self.resource_discovery.load_resources(
             self.etcd,
             self.local_config.model_dump(by_alias=True),
         )
 
-    async def scan_available_resources(
-        self,
-    ) -> Mapping[SlotName, Decimal]:
-        """
-        Scan and define the amount of available resource slots in this node.
-        """
-        backend = self.local_config.agent_common.backend
-        resources_mod = importlib.import_module(f"ai.backend.agent.{backend.value}.resources")
-        return await resources_mod.scan_available_resources({
+    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
+        return await self.resource_discovery.scan_available_resources({
             name: cctx.instance for name, cctx in self.computers.items()
         })
 
