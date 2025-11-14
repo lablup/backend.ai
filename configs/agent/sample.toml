@@ -16,14 +16,6 @@
   scaling-group = "default"
   # Scaling group type
   scaling-group-type = "compute"
-  # Allowed compute plugins
-  ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
-  # Blocked compute plugins
-  ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
-  # Allowed network plugins
-  ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
-  # Blocked network plugins
-  ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
   # Whether to force terminate abusing containers
   force-terminate-abusing-containers = false
   # Kernel creation concurrency
@@ -81,6 +73,14 @@
   metadata-server-bind-host = "0.0.0.0"
   # Metadata server port
   metadata-server-port = 40128
+  # Allowed compute plugins
+  ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
+  # Blocked compute plugins
+  ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
+  # Allowed network plugins
+  ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
+  # Blocked network plugins
+  ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
   # Path for image commit
   image-commit-path = "tmp/backend.ai/commit"
   # Path for abuse reports
@@ -373,14 +373,6 @@
     scaling-group = "default"
     # Scaling group type
     scaling-group-type = "compute"
-    # Allowed compute plugins
-    ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
-    # Blocked compute plugins
-    ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
-    # Allowed network plugins
-    ## allow-network-plugins = [ "ai.backend.manager.network.overlay",]
-    # Blocked network plugins
-    ## block-network-plugins = [ "ai.backend.manager.network.overlay",]
     # Whether to force terminate abusing containers
     force-terminate-abusing-containers = false
     # Kernel creation concurrency
