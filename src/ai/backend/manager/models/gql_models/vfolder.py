@@ -570,7 +570,7 @@ class ModelCard(graphene.ObjectType):
     ) -> Optional[Self]:
         try:
             return await cls.parse_row(graph_ctx, vfolder_row)
-        except ModelCardParseError as e:
+        except Exception as e:
             log.exception(
                 "Failed to parse model card from vfolder (id: {}, error: {})",
                 vfolder_row.id,
@@ -585,7 +585,7 @@ class ModelCard(graphene.ObjectType):
                     row_id=vfolder_row.id,
                     name=vfolder_row.name,
                     author=vfolder_row.creator or "",
-                    error_msg=e.extra_msg,
+                    error_msg=str(e),
                 )
             else:
                 return None
@@ -629,24 +629,12 @@ class ModelCard(graphene.ObjectType):
                 yaml = YAML()
                 model_definition_dict = yaml.load(model_definition_yaml)
             except YAMLError as e:
-                log.exception(
-                    "Failed to parse model definition YAML from vfolder (id: {}, filename: {}, error: {})",
-                    vfolder_row.id,
-                    model_definition_filename,
-                    repr(e),
-                )
                 raise ModelCardParseError(
                     extra_msg=f"Invalid YAML syntax (filename:{model_definition_filename}, detail:{str(e)})"
                 ) from e
             try:
                 model_definition = model_definition_iv.check(model_definition_dict)
             except t.DataError as e:
-                log.exception(
-                    "Failed to validate model definition file from vfolder (id: {}, filename: {}, error: {})",
-                    vfolder_row.id,
-                    model_definition_filename,
-                    repr(e),
-                )
                 raise ModelCardParseError(
                     extra_msg=f"Failed to validate model definition file (data:{model_definition_dict}, detail:{str(e)})"
                 )
