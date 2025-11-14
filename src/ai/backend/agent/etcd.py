@@ -12,24 +12,7 @@ from ai.backend.common.etcd import (
     GetPrefixValue,
     NestedStrKeyedMapping,
 )
-from ai.backend.common.exception import (
-    BackendAIError,
-    ErrorCode,
-    ErrorDetail,
-    ErrorDomain,
-    ErrorOperation,
-)
 from ai.backend.common.types import QueueSentinel
-
-
-class AgentEtcdError(BackendAIError):
-    @classmethod
-    def error_code(cls) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.AGENT,
-            operation=ErrorOperation.SETUP,
-            error_detail=ErrorDetail.NOT_FOUND,
-        )
 
 
 class AgentEtcdClientView(AbstractKVStore):
