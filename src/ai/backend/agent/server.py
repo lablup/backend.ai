@@ -549,7 +549,7 @@ class AgentRPCServer(aobject):
         await self.error_monitor.cleanup()
 
     @collect_error
-    async def update_status(self, status, agent_id: AgentId):
+    async def update_status(self, status: str, agent_id: AgentId):
         await self.runtime.update_status(status, agent_id)
 
     @rpc_function

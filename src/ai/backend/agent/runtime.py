@@ -42,7 +42,9 @@ class AgentRuntime:
         kernel_registry = KernelRegistry()
 
         if local_config.agent_common.backend == AgentBackend.DOCKER:
-            await cls._create_metadata_server(local_config, etcd, kernel_registry)
+            metadata_server = await cls._create_metadata_server(local_config, etcd, kernel_registry)
+        else:
+            metadata_server = None
 
         agent_configs = local_config.get_agent_configs()
         etcd_views: dict[AgentId, AgentEtcdClientView] = {}
@@ -76,6 +78,7 @@ class AgentRuntime:
             agents=agents,
             default_agent=default_agent,
             kernel_registry=kernel_registry,
+            metadata_server=metadata_server,
         )
 
     @classmethod
@@ -167,6 +170,6 @@ class AgentRuntime:
     def mark_stop_signal(self, stop_signal: signal.Signals) -> None:
         self._stop_signal = stop_signal
 
-    async def update_status(self, status, agent_id: AgentId) -> None:
+    async def update_status(self, status: str, agent_id: AgentId) -> None:
         etcd = self.get_etcd(agent_id)
         await etcd.put("", status, scope=ConfigScopes.NODE)
