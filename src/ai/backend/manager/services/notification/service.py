@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from ai.backend.common.data.notification import NotifiableMessage
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.notification import NotificationRuleType
 from ai.backend.manager.notification.types import ProcessRuleParams
 

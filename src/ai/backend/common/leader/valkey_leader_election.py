@@ -10,7 +10,7 @@ from typing import Final
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.leader.base import AbstractLeaderElection, LeaderTask
 from ai.backend.common.leader.exceptions import AlreadyStartedError
-from ai.backend.common.logging import BraceStyleAdapter
+from ai.backend.logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

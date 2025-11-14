@@ -801,3 +801,19 @@ class ClientNotConnectedError(BackendAIError, web.HTTPServiceUnavailable):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+
+class DatabaseError(BackendAIError, web.HTTPServiceUnavailable):
+    """
+    Raised when a database operation fails.
+    """
+
+    error_type = "https://api.backend.ai/probs/database-error"
+    error_title = "Database Error"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.HEALTH_CHECK,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )

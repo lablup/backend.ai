@@ -36,7 +36,6 @@ class TestValkeyHealthChecker:
         finally:
             await client.disconnect()
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_success(self, valkey_client: ValkeyStandaloneClient) -> None:
         """Test successful health check with real Valkey connection."""
@@ -48,7 +47,6 @@ class TestValkeyHealthChecker:
         # Should not raise
         await checker.check_health()
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_timeout_property(
         self,
@@ -97,7 +95,6 @@ class TestValkeyHealthChecker:
         finally:
             await client.disconnect()
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_multiple_checks(
         self,

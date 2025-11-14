@@ -33,7 +33,6 @@ class TestEtcdDependency:
         config = BootstrapConfig(etcd=etcd_config)
         return config
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_provide_etcd_client(
         self,
@@ -49,7 +48,6 @@ class TestEtcdDependency:
             value = await etcd.get("test_key")
             assert value == "test_value"
 
-    @pytest.mark.integration
     @pytest.mark.asyncio
     async def test_cleanup_on_exception(
         self,
