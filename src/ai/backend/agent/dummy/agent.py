@@ -58,7 +58,6 @@ from ..resources import (
 from ..types import Container, KernelOwnershipData, MountInfo
 from .config import read_dummy_config
 from .kernel import DummyKernel
-from .resources import load_resources, scan_available_resources
 
 
 class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
@@ -297,17 +296,6 @@ class DummyAgent(
     def get_cgroup_version(self) -> str:
         # Dummy agent does not use cgroups, so we return an empty string.
         return ""
-
-    @override
-    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(self.etcd, self.local_config.model_dump(by_alias=True))
-
-    @override
-    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
-        return await scan_available_resources(
-            self.local_config.model_dump(by_alias=True),
-            {name: cctx.instance for name, cctx in self.computers.items()},
-        )
 
     @override
     async def extract_image_command(self, image: str) -> str | None:

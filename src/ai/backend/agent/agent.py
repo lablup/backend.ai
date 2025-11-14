@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import logging
 import os
 import pickle
@@ -1946,21 +1947,30 @@ class AbstractAgent(
     def get_cgroup_version(self) -> str:
         raise NotImplementedError
 
-    @abstractmethod
     async def load_resources(
         self,
     ) -> Mapping[DeviceName, AbstractComputePlugin]:
         """
         Detect available resources attached on the system and load corresponding device plugin.
         """
+        backend = self.local_config.agent_common.backend
+        resources_mod = importlib.import_module(f"ai.backend.agent.{backend.value}.resources")
+        return await resources_mod.load_resources(
+            self.etcd,
+            self.local_config.model_dump(by_alias=True),
+        )
 
-    @abstractmethod
     async def scan_available_resources(
         self,
     ) -> Mapping[SlotName, Decimal]:
         """
         Scan and define the amount of available resource slots in this node.
         """
+        backend = self.local_config.agent_common.backend
+        resources_mod = importlib.import_module(f"ai.backend.agent.{backend.value}.resources")
+        return await resources_mod.scan_available_resources({
+            name: cctx.instance for name, cctx in self.computers.items()
+        })
 
     async def update_slots(
         self,

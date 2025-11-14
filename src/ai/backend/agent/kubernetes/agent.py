@@ -91,7 +91,6 @@ from .kube_object import (
     PersistentVolumeClaim,
     Service,
 )
-from .resources import load_resources, scan_available_resources
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
@@ -981,17 +980,6 @@ class KubernetesAgent(
     def get_cgroup_version(self) -> str:
         # Not implemented yet for K8s Agent
         return ""
-
-    @override
-    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(self.etcd, self.local_config.model_dump(by_alias=True))
-
-    @override
-    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
-        return await scan_available_resources(
-            self.local_config.model_dump(by_alias=True),
-            {name: cctx.instance for name, cctx in self.computers.items()},
-        )
 
     @override
     async def extract_image_command(self, image: str) -> str | None:
