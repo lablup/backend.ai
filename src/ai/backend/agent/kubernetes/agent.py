@@ -844,7 +844,7 @@ class KubernetesAgent(
     async def __ainit__(self) -> None:
         await super().__ainit__()
         ipc_base_path = self.local_config.agent.ipc_base_path
-        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.local_instance_id}.sock"
+        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.id}.sock"
 
         await self.check_krunner_pv_status()
         await self.fetch_workers()

@@ -138,7 +138,6 @@ from ..utils import (
     update_nested_dict,
 )
 from .kernel import DockerKernel
-from .metadata.server import MetadataServer
 from .resources import load_resources, scan_available_resources
 from .utils import PersistentServiceContainer
 
@@ -1341,7 +1340,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
     monitor_docker_task: asyncio.Task
     agent_sockpath: Path
     agent_sock_task: asyncio.Task
-    metadata_server: MetadataServer
     docker_ptask_group: aiotools.PersistentTaskGroup
     gwbridge_subnet: Optional[str]
     checked_invalid_images: Set[str]
@@ -1414,10 +1412,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             self.gwbridge_subnet = None
         ipc_base_path = self.local_config.agent.ipc_base_path
         (ipc_base_path / "container").mkdir(parents=True, exist_ok=True)
-        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.local_instance_id}.sock"
+        self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.id}.sock"
         # Workaround for Docker Desktop for Mac's UNIX socket mount failure with virtiofs
         if sys.platform != "darwin":
-            socket_relay_name = f"backendai-socket-relay.{self.local_instance_id}"
+            socket_relay_name = f"backendai-socket-relay.{self.id}"
             socket_relay_container = PersistentServiceContainer(
                 "backendai-socket-relay:latest",
                 {
@@ -1443,12 +1441,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self.monitor_docker_task = asyncio.create_task(self.monitor_docker_events())
         self.docker_ptask_group = aiotools.PersistentTaskGroup()
 
-        self.metadata_server = await MetadataServer.new(
-            self.local_config,
-            self.etcd,
-            self.kernel_registry,
-        )
-        await self.metadata_server.start_server()
         # For legacy accelerator plugins
         self.docker = Docker()
 
@@ -1477,7 +1469,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 self.monitor_docker_task.cancel()
                 await self.monitor_docker_task
 
-        await self.metadata_server.cleanup()
         if self.docker:
             await self.docker.close()
 
