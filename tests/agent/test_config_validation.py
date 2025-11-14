@@ -311,6 +311,83 @@ class AgentConfigTest:
 
         assert config.rpc_listen_addr.host == "192.168.1.100"
 
+    def test_internal_addr_alias_for_service_addr(self) -> None:
+        """Test that internal-addr works as an alias for service-addr."""
+        config = AgentConfig.model_validate({
+            "backend": "docker",
+            "internal-addr": HostPortPair(host="10.0.1.100", port=6003),
+        })
+
+        assert config.internal_addr.host == "10.0.1.100"
+        assert config.internal_addr.port == 6003
+
+    def test_announce_internal_addr_alias_for_announce_addr(self) -> None:
+        """Test that announce-internal-addr works as an alias for announce-addr."""
+        config = AgentConfig.model_validate({
+            "backend": "docker",
+            "announce-internal-addr": HostPortPair(host="10.0.2.200", port=6003),
+        })
+
+        assert config.announce_internal_addr.host == "10.0.2.200"
+        assert config.announce_internal_addr.port == 6003
+
+    def test_service_addr_and_internal_addr_produce_same_result(self) -> None:
+        """Test that service-addr and internal-addr are equivalent."""
+        config_with_service_addr = AgentConfig.model_validate({
+            "backend": "docker",
+            "service-addr": HostPortPair(host="192.168.1.50", port=7003),
+        })
+
+        config_with_internal_addr = AgentConfig.model_validate({
+            "backend": "docker",
+            "internal-addr": HostPortPair(host="192.168.1.50", port=7003),
+        })
+
+        assert config_with_service_addr.internal_addr == config_with_internal_addr.internal_addr
+
+    def test_announce_addr_and_announce_internal_addr_produce_same_result(self) -> None:
+        """Test that announce-addr and announce-internal-addr are equivalent."""
+        config_with_announce_addr = AgentConfig.model_validate({
+            "backend": "docker",
+            "announce-addr": HostPortPair(host="192.168.2.60", port=7003),
+        })
+
+        config_with_announce_internal_addr = AgentConfig.model_validate({
+            "backend": "docker",
+            "announce-internal-addr": HostPortPair(host="192.168.2.60", port=7003),
+        })
+
+        assert (
+            config_with_announce_addr.announce_internal_addr
+            == config_with_announce_internal_addr.announce_internal_addr
+        )
+
+    def test_service_addr_serialization_uses_canonical_name(self) -> None:
+        """Test that serialization uses the canonical internal-addr name."""
+        config = AgentConfig.model_validate({
+            "backend": "docker",
+            "service-addr": HostPortPair(host="10.0.1.100", port=6003),
+        })
+
+        serialized = config.model_dump(by_alias=True)
+        assert "internal-addr" in serialized
+        assert "service-addr" not in serialized
+        assert serialized["internal-addr"]["host"] == "10.0.1.100"
+        assert serialized["internal-addr"]["port"] == 6003
+
+    def test_announce_addr_serialization_uses_canonical_name(self) -> None:
+        """Test that serialization uses the canonical announce-internal-addr name."""
+        config = AgentConfig.model_validate({
+            "backend": "docker",
+            "announce-addr": HostPortPair(host="10.0.2.200", port=6003),
+        })
+
+        serialized = config.model_dump(by_alias=True)
+        assert "announce-internal-addr" in serialized
+        assert "announce-addr" not in serialized
+        assert serialized["announce-internal-addr"]["host"] == "10.0.2.200"
+        assert serialized["announce-internal-addr"]["port"] == 6003
+
 
 class ContainerConfigTest:
     ROOT_UID = 0
