@@ -672,7 +672,7 @@ class ResourceAllocator(aobject):
         available_total_slot = self.available_total_slots[slot_name]
         if alloc_map_type is DiscretePropertyAllocMap:
             slot, slot_extra = divmod(available_total_slot, self.num_agents)
-            remainder_value = 1 if agent_idx < slot_extra else 0
+            remainder_value = Decimal(1 if agent_idx < slot_extra else 0)
             return slot + remainder_value
         elif alloc_map_type is FractionAllocMap:
             return available_total_slot / self.num_agents
