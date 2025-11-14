@@ -12,7 +12,7 @@ class ContainerRegistryData:
     url: str
     registry_name: str
     type: ContainerRegistryType
-    project: Optional[str]
+    project: str
     username: Optional[str]
     password: Optional[str]
     ssl_verify: Optional[bool]

@@ -9,7 +9,7 @@ from ai.backend.manager.services.container_registry.actions.base import Containe
 @dataclass
 class ClearImagesAction(ContainerRegistryAction):
     registry: str
-    project: Optional[str]
+    project: str
 
     @override
     def entity_id(self) -> Optional[str]:
