@@ -159,6 +159,7 @@ class ErrorDomain(enum.StrEnum):
     VFOLDER = "vfolder"
     QUOTA_SCOPE = "quota-scope"
     VFOLDER_INVITATION = "vfolder-invitation"
+    MODEL_CARD = "model-card"
     MODEL_SERVICE = "model-service"
     MODEL_DEPLOYMENT = "model-deployment"
     RESOURCE_PRESET = "resource-preset"
@@ -233,6 +234,7 @@ class ErrorDetail(enum.StrEnum):
     # For example, the user has not completed a 2FA setup or any verification.
     INCOMPLETE_USER_PROFILE = "incomplete-user-profile"
     NOT_READY = "not-ready"  # The resource is not ready to be used.
+    INVALID_DATA_FORMAT = "invalid-data-format"  # The data format is invalid.
 
     # Server Error
     INTERNAL_ERROR = (
