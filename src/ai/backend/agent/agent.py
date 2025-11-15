@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import importlib
 import logging
 import os
 import pickle
@@ -29,6 +30,7 @@ from collections.abc import (
 from contextlib import contextmanager
 from dataclasses import dataclass
 from decimal import Decimal
+from functools import cached_property
 from io import SEEK_END, BytesIO
 from pathlib import Path
 from types import TracebackType
@@ -237,6 +239,7 @@ from .observer.host_port import HostPortObserver
 from .resources import (
     AbstractComputeDevice,
     AbstractComputePlugin,
+    AbstractResourceDiscovery,
     ComputerContext,
     KernelResourceSpec,
     Mount,
@@ -1940,21 +1943,22 @@ class AbstractAgent(
     def get_cgroup_version(self) -> str:
         raise NotImplementedError
 
-    @abstractmethod
-    async def load_resources(
-        self,
-    ) -> Mapping[DeviceName, AbstractComputePlugin]:
-        """
-        Detect available resources attached on the system and load corresponding device plugin.
-        """
+    @cached_property
+    def resource_discovery(self) -> AbstractResourceDiscovery:
+        backend = self.local_config.agent_common.backend
+        agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
+        return agent_mod.get_resource_discovery()
 
-    @abstractmethod
-    async def scan_available_resources(
-        self,
-    ) -> Mapping[SlotName, Decimal]:
-        """
-        Scan and define the amount of available resource slots in this node.
-        """
+    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
+        return await self.resource_discovery.load_resources(
+            self.etcd,
+            self.local_config.model_dump(by_alias=True),
+        )
+
+    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
+        return await self.resource_discovery.scan_available_resources({
+            name: cctx.instance for name, cctx in self.computers.items()
+        })
 
     async def update_slots(
         self,
