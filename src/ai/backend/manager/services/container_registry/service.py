@@ -11,6 +11,14 @@ from ai.backend.manager.services.container_registry.actions.clear_images import 
     ClearImagesAction,
     ClearImagesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.create_container_registry import (
+    CreateContainerRegistryAction,
+    CreateContainerRegistryActionResult,
+)
+from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
+    DeleteContainerRegistryAction,
+    DeleteContainerRegistryActionResult,
+)
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
     GetContainerRegistriesActionResult,
@@ -22,6 +30,10 @@ from ai.backend.manager.services.container_registry.actions.load_all_container_r
 from ai.backend.manager.services.container_registry.actions.load_container_registries import (
     LoadContainerRegistriesAction,
     LoadContainerRegistriesActionResult,
+)
+from ai.backend.manager.services.container_registry.actions.modify_container_registry import (
+    ModifyContainerRegistryAction,
+    ModifyContainerRegistryActionResult,
 )
 from ai.backend.manager.services.container_registry.actions.rescan_images import (
     RescanImagesAction,
@@ -43,6 +55,24 @@ class ContainerRegistryService:
         self._db = db
         self._container_registry_repository = container_registry_repository
         self._admin_container_registry_repository = admin_container_registry_repository
+
+    async def create_container_registry(
+        self, action: CreateContainerRegistryAction
+    ) -> CreateContainerRegistryActionResult:
+        data = await self._container_registry_repository.create_registry(action.creator)
+        return CreateContainerRegistryActionResult(data=data)
+
+    async def modify_container_registry(
+        self, action: ModifyContainerRegistryAction
+    ) -> ModifyContainerRegistryActionResult:
+        data = await self._container_registry_repository.modify_registry(action.id, action.modifier)
+        return ModifyContainerRegistryActionResult(data=data)
+
+    async def delete_container_registry(
+        self, action: DeleteContainerRegistryAction
+    ) -> DeleteContainerRegistryActionResult:
+        data = await self._container_registry_repository.delete_registry(action.id)
+        return DeleteContainerRegistryActionResult(data=data)
 
     async def rescan_images(self, action: RescanImagesAction) -> RescanImagesActionResult:
         registry_name = action.registry
