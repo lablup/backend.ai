@@ -7,7 +7,10 @@ from ai.backend.common.config import (
     ModelServiceConfig,
 )
 from ai.backend.common.types import MODEL_SERVICE_RUNTIME_PROFILES, RuntimeVariant
-from ai.backend.manager.data.deployment.types import ModelRevisionSpec
+from ai.backend.manager.data.deployment.types import (
+    ModelRevisionSpec,
+    RequestedModelRevisionSpec,
+)
 from ai.backend.manager.sokovan.deployment.definition_generator.base import ModelDefinitionGenerator
 
 
@@ -37,6 +40,8 @@ class HuggingFaceTGIModelDefinitionGenerator(ModelDefinitionGenerator):
         return ModelDefinition(models=[model])
 
     @override
-    async def generate_model_revision(self, model_revision: ModelRevisionSpec) -> ModelRevisionSpec:
+    async def generate_model_revision(
+        self, requested_model_revision: RequestedModelRevisionSpec
+    ) -> ModelRevisionSpec:
         # For non-custom variants, we don't modify the model revision
-        return model_revision
+        return requested_model_revision.to_model_revision_spec()
