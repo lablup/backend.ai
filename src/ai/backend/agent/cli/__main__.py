@@ -55,3 +55,8 @@ def main(
 @main.group(cls=LazyGroup, import_name="ai.backend.agent.cli.config:cli")
 def config() -> None:
     """Command set for configuration management."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.agent.cli.dependencies:cli")
+def dependencies() -> None:
+    """Command set for dependency verification and validation."""
