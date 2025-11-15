@@ -499,6 +499,34 @@ class Context(metaclass=ABCMeta):
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         toml_path = self.copy_config("storage-proxy.toml")
+
+        ssl_dir = self.install_info.base_path / "configs" / "storage-proxy" / "ssl"
+        ssl_dir.mkdir(parents=True, exist_ok=True)
+        cert_path = ssl_dir / "manager-api-selfsigned.cert.pem"
+        key_path = ssl_dir / "manager-api-selfsigned.key.pem"
+
+        # TODO: If the user disables SSL in the configuration, skip creating the PEM files.
+        self.log_header("Generating self-signed SSL certificate for storage-proxy (manager API)...")
+        public_addr = self.install_variable.public_facing_address
+        subj = f"/C=KR/ST=Seoul/L=Seoul/O=BackendAI/OU=StorageProxy/CN={public_addr}"
+        await asyncio.create_subprocess_exec(
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:2048",
+            "-keyout",
+            str(key_path),
+            "-out",
+            str(cert_path),
+            "-days",
+            "3650",
+            "-nodes",
+            "-subj",
+            subj,
+        )
+        self.log.write(Text.from_markup(f"Created SSL cert/key under {ssl_dir}"))
+
         with toml_path.open("r") as fp:
             data = tomlkit.load(fp)
             etcd_table = tomlkit.table()
