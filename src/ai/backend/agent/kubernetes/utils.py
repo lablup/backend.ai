@@ -3,10 +3,10 @@ import gzip
 import logging
 import subprocess
 from contextlib import closing
+from importlib.resources import files
 from pathlib import Path
 from typing import Any, Final, Mapping, Optional, Tuple
 
-import pkg_resources
 from aiodocker.docker import Docker
 from aiodocker.exceptions import DockerError
 
@@ -39,17 +39,15 @@ class PersistentServiceContainer:
         self.container_config = container_config
         self.img_version = int(
             Path(
-                pkg_resources.resource_filename(
-                    "ai.backend.agent.docker",
-                    f"{default_container_name}.version.txt",
+                str(
+                    files("ai.backend.agent.docker").joinpath(
+                        f"{default_container_name}.version.txt"
+                    )
                 )
             ).read_text()
         )
         self.img_path = Path(
-            pkg_resources.resource_filename(
-                "ai.backend.agent.docker",
-                f"{default_container_name}.img.tar.gz",
-            )
+            str(files("ai.backend.agent.docker").joinpath(f"{default_container_name}.img.tar.gz"))
         )
 
     async def get_container_version_and_status(self) -> Tuple[int, bool]:
