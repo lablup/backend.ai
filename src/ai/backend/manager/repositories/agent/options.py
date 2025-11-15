@@ -1,4 +1,5 @@
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
+from dataclasses import dataclass
 
 import sqlalchemy as sa
 
@@ -8,7 +9,20 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 
-class QueryConditions:
+@dataclass
+class ListAgentQueryOptions:
+    conditions: Sequence[QueryCondition]
+    orders: Sequence[QueryOrder]
+
+    def apply(self, query: sa.sql.Select) -> sa.sql.Select:
+        for condition in self.conditions:
+            query = query.where(condition())
+        for order in self.orders:
+            query = query.order_by(order)
+        return query
+
+
+class AgentQueryConditions:
     @staticmethod
     def by_ids(agent_ids: Collection[AgentId]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -31,7 +45,7 @@ class QueryConditions:
         return inner
 
 
-class QueryOrders:
+class AgentQueryOrders:
     @staticmethod
     def id(ascending: bool = True) -> QueryOrder:
         if ascending:
