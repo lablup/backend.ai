@@ -156,6 +156,19 @@ class ExtendedAsyncSAEngine(SAEngine):
             async with self._begin_readonly(bind, deferrable) as conn:
                 yield conn
 
+    async def ping(self) -> None:
+        """
+        Ping the database to check if the connection is alive.
+
+        Raises:
+            DatabaseError: If the ping fails or connection is not available
+        """
+        async with self.begin_readonly() as conn:
+            result = await conn.execute(sa.text("SELECT 1"))
+            scalar_result = result.scalar()
+            if scalar_result != 1:
+                raise DatabaseError("Database ping failed: unexpected result")
+
     @actxmgr
     async def begin_session(
         self,

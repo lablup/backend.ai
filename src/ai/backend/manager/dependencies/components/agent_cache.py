@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from zmq.auth.certs import load_certificate
 
 from ai.backend.common.auth import PublicKey, SecretKey
-from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -26,7 +26,7 @@ class AgentCacheInput:
     config: ManagerUnifiedConfig
 
 
-class AgentCacheDependency(DependencyProvider[AgentCacheInput, AgentRPCCache]):
+class AgentCacheDependency(NonMonitorableDependencyProvider[AgentCacheInput, AgentRPCCache]):
     """Provides AgentRPCCache lifecycle management."""
 
     @property

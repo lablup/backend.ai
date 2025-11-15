@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.config.loader.config_overrider import ConfigOverrider
@@ -33,7 +33,9 @@ class ConfigProviderInput:
     log_level: LogLevel = LogLevel.NOTSET
 
 
-class ConfigProviderDependency(DependencyProvider[ConfigProviderInput, ManagerConfigProvider]):
+class ConfigProviderDependency(
+    NonMonitorableDependencyProvider[ConfigProviderInput, ManagerConfigProvider]
+):
     """Provides ManagerConfigProvider lifecycle management.
 
     Creates the config provider with file, env, etcd-based loaders and watchers.

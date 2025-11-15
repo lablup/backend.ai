@@ -3,12 +3,12 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
 from ai.backend.storage.storages.storage_pool import StoragePool
 
 
-class StoragePoolProvider(DependencyProvider[StorageProxyUnifiedConfig, StoragePool]):
+class StoragePoolProvider(NonMonitorableDependencyProvider[StorageProxyUnifiedConfig, StoragePool]):
     """Provider for storage pool."""
 
     @property

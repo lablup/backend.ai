@@ -5,11 +5,11 @@ from contextlib import asynccontextmanager
 
 from ai.backend.common import config as common_config
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.etcd import AsyncEtcd
 
 
-class RedisConfigDependency(DependencyProvider[AsyncEtcd, RedisConfig]):
+class RedisConfigDependency(NonMonitorableDependencyProvider[AsyncEtcd, RedisConfig]):
     """Reads redis configuration from etcd.
 
     Matches the behavior in server.py's read_agent_config() (lines 457-473).

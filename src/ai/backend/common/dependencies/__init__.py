@@ -2,17 +2,21 @@ from .base import (
     DependencyComposer,
     DependencyProvider,
     DependencyStack,
+    HealthCheckerRegistration,
+    NonMonitorableDependencyProvider,
     ResourcesT,
     ResourceT,
     SetupInputT,
 )
-from .stacks import AsyncExitDependencyStack
+from .stacks import DependencyBuilderStack
 
 __all__ = [
     "DependencyProvider",
     "DependencyComposer",
     "DependencyStack",
-    "AsyncExitDependencyStack",
+    "DependencyBuilderStack",
+    "NonMonitorableDependencyProvider",
+    "HealthCheckerRegistration",
     "SetupInputT",
     "ResourceT",
     "ResourcesT",

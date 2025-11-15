@@ -1,27 +1,37 @@
 from __future__ import annotations
 
-from ai.backend.common.clients.valkey_client.client import AbstractValkeyClient
+from typing import Protocol, runtime_checkable
 
 from ..abc import HealthChecker
 from ..exceptions import ValkeyHealthCheckError
+
+
+@runtime_checkable
+class ValkeyPingable(Protocol):
+    """Protocol for any client that supports ping() method."""
+
+    async def ping(self) -> None:
+        """Ping the server to check connection health."""
+        ...
 
 
 class ValkeyHealthChecker(HealthChecker):
     """
     Health checker for Valkey/Redis connections.
 
-    Uses the ping() method of AbstractValkeyClient to check connection health.
+    Accepts any client implementing the ValkeyPingable protocol
+    (i.e., has a ping() method).
     """
 
-    _client: AbstractValkeyClient
+    _client: ValkeyPingable
     _timeout: float
 
-    def __init__(self, client: AbstractValkeyClient, timeout: float = 5.0) -> None:
+    def __init__(self, client: ValkeyPingable, timeout: float = 5.0) -> None:
         """
         Initialize ValkeyHealthChecker.
 
         Args:
-            client: The Valkey client instance to check
+            client: Any client instance with a ping() method
             timeout: Timeout in seconds for the health check
         """
         self._client = client

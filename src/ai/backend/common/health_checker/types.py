@@ -16,6 +16,8 @@ APPPROXY: ServiceGroup = ServiceGroup("appproxy")
 DATABASE: ServiceGroup = ServiceGroup("database")
 ETCD: ServiceGroup = ServiceGroup("etcd")
 REDIS: ServiceGroup = ServiceGroup("redis")
+API: ServiceGroup = ServiceGroup("api")
+CONTAINER: ServiceGroup = ServiceGroup("container")
 
 # Component ID is a string identifier with type safety
 # For services like database, redis, etcd: use service name (e.g., "postgres", "redis")

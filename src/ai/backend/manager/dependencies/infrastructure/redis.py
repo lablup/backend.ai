@@ -24,6 +24,10 @@ from ai.backend.common.defs import (
     REDIS_STREAM_DB,
     RedisRole,
 )
+from ai.backend.common.dependencies import HealthCheckerRegistration
+from ai.backend.common.health_checker import HealthCheckKey
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.types import REDIS, ComponentId
 from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
@@ -125,3 +129,51 @@ class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
             yield clients
         finally:
             await clients.close()
+
+    def gen_health_checkers(
+        self,
+        resource: ValkeyClients,
+    ) -> list[HealthCheckerRegistration]:
+        """
+        Return health checkers for all 8 Valkey clients.
+
+        Args:
+            resource: The initialized Valkey clients
+
+        Returns:
+            List of health checker registrations for all 8 Valkey clients
+        """
+        return [
+            HealthCheckerRegistration(
+                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("artifact")),
+                checker=ValkeyHealthChecker(client=resource.artifact),
+            ),
+            HealthCheckerRegistration(
+                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("container_log")),
+                checker=ValkeyHealthChecker(client=resource.container_log),
+            ),
+            HealthCheckerRegistration(
+                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("live")),
+                checker=ValkeyHealthChecker(client=resource.live),
+            ),
+            HealthCheckerRegistration(
+                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("stat")),
+                checker=ValkeyHealthChecker(client=resource.stat),
+            ),
+            HealthCheckerRegistration(
+                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("image")),
+                checker=ValkeyHealthChecker(client=resource.image),
+            ),
+            HealthCheckerRegistration(
+                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("stream")),
+                checker=ValkeyHealthChecker(client=resource.stream),
+            ),
+            HealthCheckerRegistration(
+                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("schedule")),
+                checker=ValkeyHealthChecker(client=resource.schedule),
+            ),
+            HealthCheckerRegistration(
+                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("bgtask")),
+                checker=ValkeyHealthChecker(client=resource.bgtask),
+            ),
+        ]

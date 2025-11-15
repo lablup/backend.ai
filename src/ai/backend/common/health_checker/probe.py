@@ -13,12 +13,13 @@ from ai.backend.common.dto.internal.health import (
     ComponentConnectivityStatus,
     HealthCheckResponse,
 )
+from ai.backend.logging.utils import BraceStyleAdapter
 
 from .abc import HealthChecker
 from .exceptions import HealthCheckerAlreadyRegistered, HealthCheckerNotFound
 from .types import HealthCheckKey, HealthCheckStatus
 
-log = logging.getLogger(__spec__.name)  # type: ignore[name-defined]
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -27,7 +28,7 @@ class HealthProbeOptions:
     Configuration options for the health probe.
     """
 
-    check_interval: float = 1.0
+    check_interval: float = 60.0
 
 
 @dataclass

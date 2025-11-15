@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 
 from ...config import ServerConfig, load
 
@@ -17,7 +17,7 @@ class ConfigInput:
     config_path: Path | None
 
 
-class ConfigProvider(DependencyProvider[ConfigInput, ServerConfig]):
+class ConfigProvider(NonMonitorableDependencyProvider[ConfigInput, ServerConfig]):
     """Provider for app proxy worker configuration."""
 
     @property

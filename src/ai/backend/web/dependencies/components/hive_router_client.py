@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import aiohttp
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
-from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.web.config.unified import WebServerUnifiedConfig
 
 
@@ -19,7 +19,9 @@ class HiveRouterClientInfo:
     endpoints: list[str]
 
 
-class HiveRouterClientProvider(DependencyProvider[WebServerUnifiedConfig, HiveRouterClientInfo]):
+class HiveRouterClientProvider(
+    NonMonitorableDependencyProvider[WebServerUnifiedConfig, HiveRouterClientInfo]
+):
     """
     Provider for Hive Router (Apollo Router) client pool.
     """

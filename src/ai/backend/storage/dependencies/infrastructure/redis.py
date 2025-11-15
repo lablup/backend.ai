@@ -10,8 +10,11 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import REDIS_BGTASK_DB, REDIS_STATISTICS_DB, RedisRole
-from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.dependencies import DependencyProvider, HealthCheckerRegistration
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.health_checker import HealthCheckKey
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.types import REDIS, ComponentId
 
 
 @dataclass
@@ -63,3 +66,26 @@ class RedisProvider(DependencyProvider[AsyncEtcd, StorageProxyValkeyClients]):
         finally:
             await bgtask_client.close()
             await artifact_client.close()
+
+    def gen_health_checkers(
+        self, resource: StorageProxyValkeyClients
+    ) -> list[HealthCheckerRegistration]:
+        """
+        Return health checkers for storage proxy Valkey clients.
+
+        Args:
+            resource: The initialized Valkey clients
+
+        Returns:
+            List of health checker registrations for bgtask and artifact clients
+        """
+        return [
+            HealthCheckerRegistration(
+                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("bgtask")),
+                checker=ValkeyHealthChecker(client=resource.bgtask),
+            ),
+            HealthCheckerRegistration(
+                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("artifact")),
+                checker=ValkeyHealthChecker(client=resource.artifact),
+            ),
+        ]

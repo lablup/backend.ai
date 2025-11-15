@@ -5,7 +5,12 @@ from contextlib import asynccontextmanager
 
 import pytest
 
-from ai.backend.common.dependencies import DependencyComposer, DependencyProvider, DependencyStack
+from ai.backend.common.dependencies import (
+    DependencyComposer,
+    DependencyProvider,
+    DependencyStack,
+    NonMonitorableDependencyProvider,
+)
 
 
 class TestDependencyProviderInterface:
@@ -53,7 +58,7 @@ class TestDependencyStackInterface:
             DependencyStack()  # type: ignore[abstract]
 
 
-class SimpleDependencyProvider(DependencyProvider[str, str]):
+class SimpleDependencyProvider(NonMonitorableDependencyProvider[str, str]):
     """
 
     Simple concrete provider for testing.
@@ -106,7 +111,7 @@ class TestDependencyProviderConcrete:
 
         tracker = CleanupTracker()
 
-        class ProviderWithCleanup(DependencyProvider[str, str]):
+        class ProviderWithCleanup(NonMonitorableDependencyProvider[str, str]):
             @property
             def stage_name(self) -> str:
                 return "cleanup-test"

@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from ai.backend.common.health_checker.exceptions import DatabaseHealthCheckError
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.manager.config.bootstrap import DatabaseConfig
-from ai.backend.manager.health_checker.database import DatabaseHealthChecker
+from ai.backend.manager.health.database import DatabaseHealthChecker
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_database
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     HostPortPairModel,

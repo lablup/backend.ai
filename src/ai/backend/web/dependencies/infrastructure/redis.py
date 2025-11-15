@@ -5,7 +5,10 @@ from contextlib import asynccontextmanager
 
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
-from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.dependencies import DependencyProvider, HealthCheckerRegistration
+from ai.backend.common.health_checker import HealthCheckKey
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.types import REDIS, ComponentId
 from ai.backend.web.config.unified import WebServerUnifiedConfig
 
 
@@ -39,3 +42,20 @@ class RedisProvider(DependencyProvider[WebServerUnifiedConfig, ValkeySessionClie
             yield valkey_session_client
         finally:
             await valkey_session_client.close()
+
+    def gen_health_checkers(self, resource: ValkeySessionClient) -> list[HealthCheckerRegistration]:
+        """
+        Return health checker for session Valkey client.
+
+        Args:
+            resource: The initialized Valkey session client
+
+        Returns:
+            List containing health checker registration for session storage
+        """
+        return [
+            HealthCheckerRegistration(
+                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("session")),
+                checker=ValkeyHealthChecker(client=resource),
+            )
+        ]

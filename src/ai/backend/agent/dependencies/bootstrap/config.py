@@ -7,7 +7,7 @@ from pathlib import Path
 
 from ai.backend.agent.config.unified import AgentConfigValidationContext, AgentUnifiedConfig
 from ai.backend.common import config as common_config
-from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.logging.types import LogLevel
 
 
@@ -23,7 +23,9 @@ class AgentConfigLoaderInput:
     log_level: LogLevel = LogLevel.NOTSET
 
 
-class AgentConfigLoaderDependency(DependencyProvider[AgentConfigLoaderInput, AgentUnifiedConfig]):
+class AgentConfigLoaderDependency(
+    NonMonitorableDependencyProvider[AgentConfigLoaderInput, AgentUnifiedConfig]
+):
     """Loads agent configuration exactly as server.py does.
 
     Matches the config loading behavior in server.py's main() function (lines 1598-1646):

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from ai.backend.common.dependencies import HealthCheckerRegistration
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.storage import StorageSessionManager
 
@@ -33,3 +34,20 @@ class StorageManagerDependency(ComponentDependency[StorageSessionManager]):
             yield storage_manager
         finally:
             await storage_manager.aclose()
+
+    def gen_health_checkers(
+        self,
+        resource: StorageSessionManager,
+    ) -> list[HealthCheckerRegistration]:
+        """
+        Return health checkers for storage manager.
+
+        Currently no health checks are implemented for storage manager.
+
+        Args:
+            resource: The initialized storage session manager
+
+        Returns:
+            Empty list
+        """
+        return []

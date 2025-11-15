@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
-from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.logging.types import LogLevel
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 
@@ -21,7 +21,9 @@ class BootstrapConfigInput:
     log_level: LogLevel = LogLevel.NOTSET
 
 
-class BootstrapConfigDependency(DependencyProvider[BootstrapConfigInput, BootstrapConfig]):
+class BootstrapConfigDependency(
+    NonMonitorableDependencyProvider[BootstrapConfigInput, BootstrapConfig]
+):
     """Provides BootstrapConfig lifecycle management.
 
     Loads bootstrap configuration from file with log level overrides.

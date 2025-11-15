@@ -1,11 +1,23 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import AsyncContextManager, Generic, TypeVar
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, AsyncContextManager, Generic, TypeVar, final
+
+if TYPE_CHECKING:
+    from ai.backend.common.health_checker import HealthChecker, HealthCheckKey
 
 SetupInputT = TypeVar("SetupInputT")
 ResourceT = TypeVar("ResourceT")
 ResourcesT = TypeVar("ResourcesT")
+
+
+@dataclass
+class HealthCheckerRegistration:
+    """Registration information for a health checker."""
+
+    key: HealthCheckKey
+    checker: HealthChecker
 
 
 class DependencyProvider(ABC, Generic[SetupInputT, ResourceT]):
@@ -40,6 +52,44 @@ class DependencyProvider(ABC, Generic[SetupInputT, ResourceT]):
             An async context manager that yields the initialized dependency
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def gen_health_checkers(self, resource: ResourceT) -> list[HealthCheckerRegistration]:
+        """
+        Return health checkers for the provided resource.
+
+        Override this method to provide health checking capability for this dependency.
+        The health checkers will be automatically collected by DependencyBuilderStack.
+
+        Args:
+            resource: The initialized resource from provide()
+
+        Returns:
+            List of HealthCheckerRegistration
+        """
+        raise NotImplementedError
+
+
+class NonMonitorableDependencyProvider(DependencyProvider[SetupInputT, ResourceT]):
+    """
+    Base class for dependency providers that do not require health monitoring.
+
+    This class provides a default implementation of get_health_checker()
+    that returns an empty list, indicating no health checks are needed.
+    """
+
+    @final
+    def gen_health_checkers(self, resource: ResourceT) -> list[HealthCheckerRegistration]:
+        """
+        Return empty list as this dependency does not require health monitoring.
+
+        Args:
+            resource: The initialized resource from provide()
+
+        Returns:
+            Empty list indicating no health checks
+        """
+        return []
 
 
 class DependencyComposer(ABC, Generic[SetupInputT, ResourcesT]):
