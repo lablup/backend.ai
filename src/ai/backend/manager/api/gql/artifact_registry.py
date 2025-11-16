@@ -20,10 +20,21 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_meta impor
 @strawberry.type(description="Added in 25.14.0")
 class ArtifactRegistry:
     id: ID = strawberry.field(
-        description="Added in 25.17.0, ID of the artifact registry metadata row."
+        description=(
+            "Added in 25.17.0. "
+            "Internal identifier for the artifact registry metadata record in the 'artifact_registries' table. "
+            "This ID is unique across all registry types and represents the metadata record itself. "
+            "Example: When you need to reference a registry entry in the metadata table, use this ID."
+        )
     )
     registry_id: ID = strawberry.field(
-        description="Added in 25.17.0, Registry ID of the artifact registry database row."
+        description=(
+            "Added in 25.17.0. "
+            "Identifier of the actual registry implementation (e.g., HuggingFace registry, Reservoir registry). "
+            "This ID corresponds to the primary key in the registry-type-specific table. "
+            "Example: For a HuggingFace registry, this value matches the 'id' field in the 'huggingface_registries' table. "
+            "Use this ID when you need to access type-specific registry details."
+        )
     )
     name: str = strawberry.field(description="Name of the default artifact registry.")
     type: ArtifactRegistryType = strawberry.field(
