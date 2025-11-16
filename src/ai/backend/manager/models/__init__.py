@@ -116,6 +116,7 @@ from .resource_preset import *  # noqa
 from .resource_usage import *  # noqa
 from .routing import *  # noqa
 from .scaling_group import *  # noqa
+from .scheduler_history import *  # noqa
 from .huggingface_registry import *  # noqa
 from .session import *  # noqa
 from .session_template import *  # noqa

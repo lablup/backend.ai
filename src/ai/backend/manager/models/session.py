@@ -838,6 +838,12 @@ class SessionRow(Base):
     """
 
     routing = relationship("RoutingRow", back_populates="session_row")
+    scheduler_history = relationship(
+        "SchedulerExecutionHistoryRow",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="SchedulerExecutionHistoryRow.started_at",
+    )
 
     __table_args__ = (
         # indexing
