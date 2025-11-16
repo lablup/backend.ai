@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from ai.backend.appproxy.common.etcd import TraefikEtcd
 from ai.backend.common.config import ConfigScopes
 from ai.backend.common.dependencies import DependencyProvider
-from ai.backend.common.health_checker import HealthChecker
+from ai.backend.common.health_checker import ServiceHealthChecker
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 from ai.backend.common.types import HostPortPair
 
@@ -41,7 +41,7 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
         else:
             yield None
 
-    def gen_health_checkers(self, resource: TraefikEtcd | None) -> HealthChecker | None:
+    def gen_health_checkers(self, resource: TraefikEtcd | None) -> ServiceHealthChecker | None:
         """
         Return health checker for etcd if enabled.
 

@@ -9,12 +9,12 @@ from ai.backend.common.health_checker import (
     AGENT,
     DATABASE,
     MANAGER,
-    AllHealthCheckResults,
-    HealthChecker,
+    AllServicesHealth,
     HealthCheckerAlreadyRegistered,
     HealthCheckerNotFound,
     HealthProbe,
     ServiceGroup,
+    ServiceHealthChecker,
 )
 
 
@@ -22,7 +22,7 @@ from ai.backend.common.health_checker import (
 async def test_probe_register_checker(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
-    mock_healthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test registering a health checker."""
     await health_probe.register(sample_service_group, mock_healthy_checker)
@@ -38,7 +38,7 @@ async def test_probe_register_checker(
 async def test_probe_register_duplicate_checker_raises_error(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
-    mock_healthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test that registering a duplicate checker raises HealthCheckerAlreadyRegistered."""
     await health_probe.register(sample_service_group, mock_healthy_checker)
@@ -55,7 +55,7 @@ async def test_probe_register_duplicate_checker_raises_error(
 async def test_probe_unregister_checker(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
-    mock_healthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test unregistering a health checker."""
     await health_probe.register(sample_service_group, mock_healthy_checker)
@@ -82,7 +82,7 @@ async def test_probe_unregister_nonexistent_checker_raises_error(
 @pytest.mark.asyncio
 async def test_probe_register_multiple_checkers(
     health_probe: HealthProbe,
-    mock_healthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test registering multiple health checkers."""
     await health_probe.register(MANAGER, mock_healthy_checker)
@@ -100,14 +100,14 @@ async def test_probe_register_multiple_checkers(
 async def test_probe_check_healthy_checker(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
-    mock_healthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test checking a healthy checker returns success result."""
     await health_probe.register(sample_service_group, mock_healthy_checker)
 
     all_results = await health_probe.check_all()
 
-    assert isinstance(all_results, AllHealthCheckResults)
+    assert isinstance(all_results, AllServicesHealth)
     assert sample_service_group in all_results.results
     result = all_results.results[sample_service_group]
     # Result contains component statuses
@@ -122,14 +122,14 @@ async def test_probe_check_healthy_checker(
 async def test_probe_check_unhealthy_checker(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
-    mock_unhealthy_checker: HealthChecker,
+    mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test checking an unhealthy checker returns failure result."""
     await health_probe.register(sample_service_group, mock_unhealthy_checker)
 
     all_results = await health_probe.check_all()
 
-    assert isinstance(all_results, AllHealthCheckResults)
+    assert isinstance(all_results, AllServicesHealth)
     assert sample_service_group in all_results.results
     result = all_results.results[sample_service_group]
     assert len(result.results) > 0
@@ -143,14 +143,14 @@ async def test_probe_check_unhealthy_checker(
 async def test_probe_check_timeout_checker(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
-    mock_timeout_checker: HealthChecker,
+    mock_timeout_checker: ServiceHealthChecker,
 ) -> None:
     """Test checking a timeout checker returns empty result."""
     await health_probe.register(sample_service_group, mock_timeout_checker)
 
     all_results = await health_probe.check_all()
 
-    assert isinstance(all_results, AllHealthCheckResults)
+    assert isinstance(all_results, AllServicesHealth)
     assert sample_service_group in all_results.results
     result = all_results.results[sample_service_group]
     # Timeout returns empty results
@@ -161,7 +161,7 @@ async def test_probe_check_timeout_checker(
 async def test_probe_check_all_updates_internal_status(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
-    mock_healthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test that check_all() updates the internal result registry."""
     await health_probe.register(sample_service_group, mock_healthy_checker)
@@ -180,8 +180,8 @@ async def test_probe_check_all_updates_internal_status(
 @pytest.mark.asyncio
 async def test_probe_check_all_mixed_results(
     health_probe: HealthProbe,
-    mock_healthy_checker: HealthChecker,
-    mock_unhealthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
+    mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test check_all() with a mix of healthy and unhealthy checkers."""
     await health_probe.register(MANAGER, mock_healthy_checker)
@@ -189,7 +189,7 @@ async def test_probe_check_all_mixed_results(
 
     all_results = await health_probe.check_all()
 
-    assert isinstance(all_results, AllHealthCheckResults)
+    assert isinstance(all_results, AllServicesHealth)
     assert len(all_results.results) == 2
     # Check healthy result
     manager_result = all_results.results[MANAGER]
@@ -202,8 +202,8 @@ async def test_probe_check_all_mixed_results(
 @pytest.mark.asyncio
 async def test_probe_check_all_continues_on_exception(
     health_probe: HealthProbe,
-    mock_healthy_checker: HealthChecker,
-    mock_unhealthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
+    mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test that check_all() continues checking even if some checkers fail."""
     await health_probe.register(MANAGER, mock_healthy_checker)
@@ -213,7 +213,7 @@ async def test_probe_check_all_continues_on_exception(
     all_results = await health_probe.check_all()
 
     # All three should be checked
-    assert isinstance(all_results, AllHealthCheckResults)
+    assert isinstance(all_results, AllServicesHealth)
     assert len(all_results.results) == 3
     assert MANAGER in all_results.results
     assert DATABASE in all_results.results
@@ -226,7 +226,7 @@ async def test_probe_check_all_empty_registry(
 ) -> None:
     """Test check_all() with no registered checkers returns empty results."""
     all_results = await health_probe.check_all()
-    assert isinstance(all_results, AllHealthCheckResults)
+    assert isinstance(all_results, AllServicesHealth)
     assert all_results.results == {}
 
 
@@ -280,7 +280,7 @@ async def test_probe_stop_not_running(
 @pytest.mark.asyncio
 async def test_probe_periodic_check(
     health_probe: HealthProbe,
-    mock_healthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test that the probe periodically checks registered checkers."""
     await health_probe.register(MANAGER, mock_healthy_checker)
@@ -303,7 +303,7 @@ async def test_probe_periodic_check(
 @pytest.mark.asyncio
 async def test_probe_dynamic_registration_during_loop(
     health_probe: HealthProbe,
-    mock_healthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test that checkers can be registered/unregistered while the loop is running."""
     # Start with one checker
@@ -336,7 +336,7 @@ async def test_probe_dynamic_registration_during_loop(
 @pytest.mark.asyncio
 async def test_probe_get_health_response_all_healthy(
     health_probe: HealthProbe,
-    mock_healthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test get_health_response() when all components are healthy."""
     await health_probe.register(MANAGER, mock_healthy_checker)
@@ -356,8 +356,8 @@ async def test_probe_get_health_response_all_healthy(
 @pytest.mark.asyncio
 async def test_probe_get_health_response_some_unhealthy(
     health_probe: HealthProbe,
-    mock_healthy_checker: HealthChecker,
-    mock_unhealthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
+    mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test get_health_response() when some components are unhealthy."""
     await health_probe.register(MANAGER, mock_healthy_checker)
@@ -387,7 +387,7 @@ async def test_probe_get_health_response_empty_registry(
 @pytest.mark.asyncio
 async def test_probe_get_health_response_excludes_unchecked(
     health_probe: HealthProbe,
-    mock_healthy_checker: HealthChecker,
+    mock_healthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test that get_health_response() excludes checkers that haven't been checked yet."""
     await health_probe.register(MANAGER, mock_healthy_checker)
@@ -405,7 +405,7 @@ async def test_probe_get_health_response_excludes_unchecked(
 async def test_probe_get_health_response_component_fields(
     health_probe: HealthProbe,
     sample_service_group: ServiceGroup,
-    mock_unhealthy_checker: HealthChecker,
+    mock_unhealthy_checker: ServiceHealthChecker,
 ) -> None:
     """Test that ComponentConnectivityStatus in response has correct fields."""
     await health_probe.register(sample_service_group, mock_unhealthy_checker)

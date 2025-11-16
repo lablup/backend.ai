@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, AsyncContextManager, Generic, Optional, TypeVar, final
 
 if TYPE_CHECKING:
-    from ai.backend.common.health_checker import HealthChecker
+    from ai.backend.common.health_checker import ServiceHealthChecker
 
 SetupInputT = TypeVar("SetupInputT")
 ResourceT = TypeVar("ResourceT")
@@ -45,7 +45,7 @@ class DependencyProvider(ABC, Generic[SetupInputT, ResourceT]):
         raise NotImplementedError
 
     @abstractmethod
-    def gen_health_checkers(self, resource: ResourceT) -> Optional[HealthChecker]:
+    def gen_health_checkers(self, resource: ResourceT) -> Optional[ServiceHealthChecker]:
         """
         Return a health checker for the provided resource.
 
@@ -57,7 +57,7 @@ class DependencyProvider(ABC, Generic[SetupInputT, ResourceT]):
             resource: The initialized resource from provide()
 
         Returns:
-            HealthChecker instance or None if no health checking is needed
+            ServiceHealthChecker instance or None if no health checking is needed
         """
         raise NotImplementedError
 

@@ -14,9 +14,9 @@ from ai.backend.common.dto.internal.health import (
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 
-from .abc import HealthChecker
+from .abc import ServiceHealthChecker
 from .exceptions import HealthCheckerAlreadyRegistered, HealthCheckerNotFound
-from .types import AllHealthCheckResults, HealthCheckResult, ServiceGroup
+from .types import AllServicesHealth, ServiceGroup, ServiceHealth
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -40,11 +40,11 @@ class RegisteredChecker:
     for multiple components within that service group.
     """
 
-    checker: HealthChecker
-    result: Optional[HealthCheckResult] = None
+    checker: ServiceHealthChecker
+    result: Optional[ServiceHealth] = None
 
     @property
-    def current_result(self) -> Optional[HealthCheckResult]:
+    def current_result(self) -> Optional[ServiceHealth]:
         """
         Get the current health check result.
 
@@ -117,7 +117,7 @@ class HealthProbe:
 
         log.info("Stopped health probe")
 
-    async def check_all(self) -> AllHealthCheckResults:
+    async def check_all(self) -> AllServicesHealth:
         """
         Check all registered health checkers immediately and return their results.
 
@@ -125,7 +125,7 @@ class HealthProbe:
         Updates the internal result registry with the results.
 
         Returns:
-            AllHealthCheckResults containing results from all registered checkers
+            AllServicesHealth containing results from all registered checkers
         """
         registered = await self._get_all_registered()
         now = datetime.now(timezone.utc)
@@ -137,7 +137,7 @@ class HealthProbe:
         ]
         results_or_exc = await asyncio.gather(*check_tasks, return_exceptions=True)
 
-        results: dict[ServiceGroup, HealthCheckResult] = {}
+        results: dict[ServiceGroup, ServiceHealth] = {}
         for (service_group, _), result_or_exc in zip(registered.items(), results_or_exc):
             if isinstance(result_or_exc, BaseException):
                 log.error(f"Unexpected error checking {service_group}: {result_or_exc}")
@@ -151,12 +151,12 @@ class HealthProbe:
                 # Checker was unregistered while we were checking
                 log.debug(f"Checker unregistered during check: {service_group}")
 
-        return AllHealthCheckResults(results=results)
+        return AllServicesHealth(results=results)
 
     async def register(
         self,
         service_group: ServiceGroup,
-        checker: HealthChecker,
+        checker: ServiceHealthChecker,
     ) -> None:
         """
         Register a health checker for a specific service group.
@@ -211,7 +211,7 @@ class HealthProbe:
     async def _update_result(
         self,
         service_group: ServiceGroup,
-        result: HealthCheckResult,
+        result: ServiceHealth,
     ) -> None:
         """
         Update the health check result for a specific service group.
@@ -255,9 +255,9 @@ class HealthProbe:
     async def _check_single(
         self,
         service_group: ServiceGroup,
-        checker: HealthChecker,
+        checker: ServiceHealthChecker,
         check_time: datetime,
-    ) -> HealthCheckResult:
+    ) -> ServiceHealth:
         """
         Execute a single health check for a service group.
 
@@ -271,19 +271,19 @@ class HealthProbe:
         """
         try:
             # Run the health check with timeout
-            result = await asyncio.wait_for(checker.check_health(), timeout=checker.timeout)
+            result = await asyncio.wait_for(checker.check_service(), timeout=checker.timeout)
             log.debug(f"Health check succeeded for {service_group}")
             return result
 
         except asyncio.TimeoutError:
             # Health check timed out - return empty result
             log.warning(f"Health check timed out for {service_group} after {checker.timeout}s")
-            return HealthCheckResult(results={})
+            return ServiceHealth(results={})
 
         except Exception as e:
             # Health check failed with exception
             log.error(f"Health check failed for {service_group}: {e}", exc_info=True)
-            return HealthCheckResult(results={})
+            return ServiceHealth(results={})
 
     async def get_health_response(self) -> HealthCheckResponse:
         """

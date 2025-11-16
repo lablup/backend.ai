@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from ..base import DependencyStack
 
 if TYPE_CHECKING:
-    from ai.backend.common.health_checker import HealthChecker
+    from ai.backend.common.health_checker import ServiceHealthChecker
     from ai.backend.common.health_checker.types import ServiceGroup
 
     from ..base import DependencyComposer, DependencyProvider, ResourcesT, ResourceT, SetupInputT
@@ -28,7 +28,7 @@ class DependencyBuilderStack(DependencyStack):
     """
 
     _stack: AsyncExitStack
-    _health_checkers: dict[ServiceGroup, HealthChecker]
+    _health_checkers: dict[ServiceGroup, ServiceHealthChecker]
 
     def __init__(self) -> None:
         self._stack = AsyncExitStack()
@@ -80,12 +80,12 @@ class DependencyBuilderStack(DependencyStack):
 
         return resources
 
-    def get_health_checkers(self) -> dict[ServiceGroup, HealthChecker]:
+    def get_health_checkers(self) -> dict[ServiceGroup, ServiceHealthChecker]:
         """
         Return collected health checkers.
 
         Returns:
-            Dictionary mapping ServiceGroup to HealthChecker instances
+            Dictionary mapping ServiceGroup to ServiceHealthChecker instances
             collected from all initialized dependencies.
         """
         return self._health_checkers.copy()

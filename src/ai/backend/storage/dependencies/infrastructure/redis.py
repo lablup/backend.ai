@@ -15,7 +15,7 @@ from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.health_checker import (
     CID_REDIS_ARTIFACT,
     CID_REDIS_BGTASK,
-    HealthChecker,
+    ServiceHealthChecker,
 )
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 
@@ -70,7 +70,7 @@ class RedisProvider(DependencyProvider[AsyncEtcd, StorageProxyValkeyClients]):
             await bgtask_client.close()
             await artifact_client.close()
 
-    def gen_health_checkers(self, resource: StorageProxyValkeyClients) -> HealthChecker:
+    def gen_health_checkers(self, resource: StorageProxyValkeyClients) -> ServiceHealthChecker:
         """
         Return health checkers for storage proxy Valkey clients.
 

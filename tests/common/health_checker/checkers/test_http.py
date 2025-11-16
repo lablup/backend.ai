@@ -91,7 +91,7 @@ class TestHttpHealthChecker:
             timeout=5.0,
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
         assert len(result.results) == 1
         status = result.results[list(result.results.keys())[0]]
         assert status.is_healthy
@@ -112,7 +112,7 @@ class TestHttpHealthChecker:
             timeout=5.0,
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
         assert len(result.results) == 1
         status = result.results[list(result.results.keys())[0]]
         assert status.is_healthy
@@ -132,7 +132,7 @@ class TestHttpHealthChecker:
             timeout=5.0,
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
         assert len(result.results) == 1
         status = result.results[list(result.results.keys())[0]]
         assert status.is_healthy
@@ -152,7 +152,7 @@ class TestHttpHealthChecker:
             timeout=5.0,
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
         assert len(result.results) == 1
         status = result.results[list(result.results.keys())[0]]
         assert status.is_healthy
@@ -173,7 +173,7 @@ class TestHttpHealthChecker:
         )
 
         # 204 is in expected_status_codes, should return healthy status
-        result = await checker.check_health()
+        result = await checker.check_service()
         assert len(result.results) == 1
         status = result.results[list(result.results.keys())[0]]
         assert status.is_healthy
@@ -192,7 +192,7 @@ class TestHttpHealthChecker:
             timeout=5.0,
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
         assert len(result.results) == 1
         status = result.results[list(result.results.keys())[0]]
         assert not status.is_healthy
@@ -214,7 +214,7 @@ class TestHttpHealthChecker:
             timeout=5.0,
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
         assert len(result.results) == 1
         status = result.results[list(result.results.keys())[0]]
         assert not status.is_healthy
@@ -235,7 +235,7 @@ class TestHttpHealthChecker:
             timeout=0.5,  # Short timeout
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
         assert len(result.results) == 1
         status = result.results[list(result.results.keys())[0]]
         assert not status.is_healthy
@@ -257,7 +257,7 @@ class TestHttpHealthChecker:
             timeout=2.0,
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
         assert len(result.results) == 1
         status = result.results[list(result.results.keys())[0]]
         assert not status.is_healthy
@@ -296,7 +296,7 @@ class TestHttpHealthChecker:
             timeout=5.0,
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
         assert len(result.results) == 1
         status = result.results[list(result.results.keys())[0]]
         assert not status.is_healthy

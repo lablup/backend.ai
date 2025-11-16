@@ -59,12 +59,11 @@ class HealthCheckKey:
 
 
 @dataclass
-class HealthCheckStatus:
+class ComponentHealthStatus:
     """
-    Internal representation of health check status for a single component.
+    Health status for a single component.
 
-    This is used internally by the registry and probe to track
-    the current health status of each component.
+    Represents the result of checking one component within a service group.
     """
 
     is_healthy: bool
@@ -73,23 +72,23 @@ class HealthCheckStatus:
 
 
 @dataclass
-class HealthCheckResult:
+class ServiceHealth:
     """
-    Result of a health check containing status for multiple components.
+    Health status of a service group containing multiple components.
 
-    A single health checker (per ServiceGroup) can check multiple components
-    and return their individual statuses.
+    A service health checker checks multiple components and returns
+    their individual statuses aggregated in this structure.
     """
 
-    results: dict[ComponentId, HealthCheckStatus]
+    results: dict[ComponentId, ComponentHealthStatus]
 
 
 @dataclass
-class AllHealthCheckResults:
+class AllServicesHealth:
     """
-    Aggregated results of all health checks across all service groups.
+    Aggregated health status of all service groups.
 
-    Contains results from all registered health checkers in the system.
+    Contains health results from all registered service health checkers.
     """
 
-    results: dict[ServiceGroup, HealthCheckResult]
+    results: dict[ServiceGroup, ServiceHealth]

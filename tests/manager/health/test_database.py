@@ -47,7 +47,7 @@ class TestDatabaseHealthChecker:
         )
 
         # Should not raise - this tests actual DB connection
-        await checker.check_health()
+        await checker.check_service()
 
     @pytest.mark.asyncio
     async def test_timeout_property(self) -> None:
@@ -82,9 +82,9 @@ class TestDatabaseHealthChecker:
         )
 
         # Multiple checks should all succeed
-        await checker.check_health()
-        await checker.check_health()
-        await checker.check_health()
+        await checker.check_service()
+        await checker.check_service()
+        await checker.check_service()
 
     @pytest.mark.asyncio
     async def test_invalid_connection(self) -> None:
@@ -105,7 +105,7 @@ class TestDatabaseHealthChecker:
             )
 
             with pytest.raises(DatabaseHealthCheckError) as exc_info:
-                await checker.check_health()
+                await checker.check_service()
 
             # Should contain error information
             assert "health check failed" in str(exc_info.value).lower()

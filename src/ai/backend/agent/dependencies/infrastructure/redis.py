@@ -24,7 +24,7 @@ from ai.backend.common.health_checker import (
     CID_REDIS_CONTAINER_LOG,
     CID_REDIS_STAT,
     CID_REDIS_STREAM,
-    HealthChecker,
+    ServiceHealthChecker,
 )
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 
@@ -97,7 +97,7 @@ class AgentValkeyDependency(DependencyProvider[RedisConfig, AgentValkeyClients])
         finally:
             await clients.close()
 
-    def gen_health_checkers(self, resource: AgentValkeyClients) -> HealthChecker:
+    def gen_health_checkers(self, resource: AgentValkeyClients) -> ServiceHealthChecker:
         """
         Return health checkers for all 4 agent Valkey clients.
 

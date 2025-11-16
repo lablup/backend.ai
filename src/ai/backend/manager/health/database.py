@@ -2,18 +2,18 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from ai.backend.common.health_checker.abc import HealthChecker
+from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
 from ai.backend.common.health_checker.types import (
     CID_POSTGRES,
     DATABASE,
-    HealthCheckResult,
-    HealthCheckStatus,
+    ComponentHealthStatus,
     ServiceGroup,
+    ServiceHealth,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-class DatabaseHealthChecker(HealthChecker):
+class DatabaseHealthChecker(StaticServiceHealthChecker):
     """
     Health checker for database connections.
 
@@ -39,30 +39,30 @@ class DatabaseHealthChecker(HealthChecker):
         """The service group this checker monitors."""
         return DATABASE
 
-    async def check_health(self) -> HealthCheckResult:
+    async def check_service(self) -> ServiceHealth:
         """
         Check database connection health by pinging the server.
 
         Returns:
-            HealthCheckResult containing status for postgres component
+            ServiceHealth containing status for postgres component
         """
         check_time = datetime.now(timezone.utc)
 
         try:
             await self._db.ping()
-            status = HealthCheckStatus(
+            status = ComponentHealthStatus(
                 is_healthy=True,
                 last_checked_at=check_time,
                 error_message=None,
             )
         except Exception as e:
-            status = HealthCheckStatus(
+            status = ComponentHealthStatus(
                 is_healthy=False,
                 last_checked_at=check_time,
                 error_message=str(e),
             )
 
-        return HealthCheckResult(results={CID_POSTGRES: status})
+        return ServiceHealth(results={CID_POSTGRES: status})
 
     @property
     def timeout(self) -> float:

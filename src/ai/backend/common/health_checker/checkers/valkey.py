@@ -4,8 +4,8 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Protocol, runtime_checkable
 
-from ..abc import HealthChecker
-from ..types import REDIS, ComponentId, HealthCheckResult, HealthCheckStatus, ServiceGroup
+from ..abc import StaticServiceHealthChecker
+from ..types import REDIS, ComponentHealthStatus, ComponentId, ServiceGroup, ServiceHealth
 
 
 @runtime_checkable
@@ -17,7 +17,7 @@ class ValkeyPingable(Protocol):
         ...
 
 
-class ValkeyHealthChecker(HealthChecker):
+class ValkeyHealthChecker(StaticServiceHealthChecker):
     """
     Health checker for Valkey/Redis connections.
 
@@ -58,7 +58,7 @@ class ValkeyHealthChecker(HealthChecker):
         component_id: ComponentId,
         client: ValkeyPingable,
         check_time: datetime,
-    ) -> tuple[ComponentId, HealthCheckStatus]:
+    ) -> tuple[ComponentId, ComponentHealthStatus]:
         """
         Check health of a single Valkey/Redis component with timeout.
 
@@ -73,19 +73,19 @@ class ValkeyHealthChecker(HealthChecker):
         try:
             async with asyncio.timeout(self._component_timeout):
                 await client.ping()
-            status = HealthCheckStatus(
+            status = ComponentHealthStatus(
                 is_healthy=True,
                 last_checked_at=check_time,
                 error_message=None,
             )
         except asyncio.TimeoutError:
-            status = HealthCheckStatus(
+            status = ComponentHealthStatus(
                 is_healthy=False,
                 last_checked_at=check_time,
                 error_message=f"Component timeout after {self._component_timeout}s",
             )
         except Exception as e:
-            status = HealthCheckStatus(
+            status = ComponentHealthStatus(
                 is_healthy=False,
                 last_checked_at=check_time,
                 error_message=str(e),
@@ -93,12 +93,12 @@ class ValkeyHealthChecker(HealthChecker):
 
         return (component_id, status)
 
-    async def check_health(self) -> HealthCheckResult:
+    async def check_service(self) -> ServiceHealth:
         """
         Check health of all Valkey/Redis clients concurrently.
 
         Returns:
-            HealthCheckResult containing status for each component
+            ServiceHealth containing status for each component
         """
         check_time = datetime.now(timezone.utc)
 
@@ -111,13 +111,13 @@ class ValkeyHealthChecker(HealthChecker):
         check_results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Process results
-        results: dict[ComponentId, HealthCheckStatus] = {}
+        results: dict[ComponentId, ComponentHealthStatus] = {}
         for i, result in enumerate(check_results):
             if isinstance(result, BaseException):
                 # This shouldn't happen since _check_component catches all exceptions,
                 # but handle it just in case
                 component_id = list(self._clients.keys())[i]
-                results[component_id] = HealthCheckStatus(
+                results[component_id] = ComponentHealthStatus(
                     is_healthy=False,
                     last_checked_at=check_time,
                     error_message=f"Unexpected error: {result}",
@@ -126,7 +126,7 @@ class ValkeyHealthChecker(HealthChecker):
                 comp_id, status = result
                 results[comp_id] = status
 
-        return HealthCheckResult(results=results)
+        return ServiceHealth(results=results)
 
     @property
     def timeout(self) -> float:

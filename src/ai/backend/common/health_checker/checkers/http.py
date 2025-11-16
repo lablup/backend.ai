@@ -7,11 +7,11 @@ from http import HTTPMethod
 
 import aiohttp
 
-from ..abc import HealthChecker
-from ..types import API, ComponentId, HealthCheckResult, HealthCheckStatus, ServiceGroup
+from ..abc import StaticServiceHealthChecker
+from ..types import API, ComponentHealthStatus, ComponentId, ServiceGroup, ServiceHealth
 
 
-class HttpHealthChecker(HealthChecker):
+class HttpHealthChecker(StaticServiceHealthChecker):
     """
     Health checker for HTTP endpoints.
 
@@ -58,12 +58,12 @@ class HttpHealthChecker(HealthChecker):
         """The service group this checker monitors."""
         return API
 
-    async def check_health(self) -> HealthCheckResult:
+    async def check_service(self) -> ServiceHealth:
         """
         Check HTTP endpoint health by performing an HTTP request.
 
         Returns:
-            HealthCheckResult containing status for the HTTP endpoint
+            ServiceHealth containing status for the HTTP endpoint
         """
         check_time = datetime.now(timezone.utc)
 
@@ -71,37 +71,37 @@ class HttpHealthChecker(HealthChecker):
             async with asyncio.timeout(self._timeout):
                 async with self._session.request(self._method.value, self._url) as response:
                     if response.status not in self._expected_status_codes:
-                        status = HealthCheckStatus(
+                        status = ComponentHealthStatus(
                             is_healthy=False,
                             last_checked_at=check_time,
                             error_message=f"HTTP {self._method} {self._url} returned status {response.status}, expected one of {sorted(self._expected_status_codes)}",
                         )
                     else:
-                        status = HealthCheckStatus(
+                        status = ComponentHealthStatus(
                             is_healthy=True,
                             last_checked_at=check_time,
                             error_message=None,
                         )
         except asyncio.TimeoutError:
-            status = HealthCheckStatus(
+            status = ComponentHealthStatus(
                 is_healthy=False,
                 last_checked_at=check_time,
                 error_message=f"HTTP health check timed out after {self._timeout}s: {self._method} {self._url}",
             )
         except aiohttp.ClientError as e:
-            status = HealthCheckStatus(
+            status = ComponentHealthStatus(
                 is_healthy=False,
                 last_checked_at=check_time,
                 error_message=f"HTTP health check failed for {self._method} {self._url}: {e}",
             )
         except Exception as e:
-            status = HealthCheckStatus(
+            status = ComponentHealthStatus(
                 is_healthy=False,
                 last_checked_at=check_time,
                 error_message=f"Unexpected error during HTTP health check for {self._method} {self._url}: {e}",
             )
 
-        return HealthCheckResult(results={self._component_id: status})
+        return ServiceHealth(results={self._component_id: status})
 
     @property
     def timeout(self) -> float:

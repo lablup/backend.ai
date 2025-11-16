@@ -2,20 +2,50 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from ai.backend.common.health_checker.types import HealthCheckResult, ServiceGroup
+from .types import ComponentHealthStatus, ComponentId, ServiceGroup, ServiceHealth
 
 
-class HealthChecker(ABC):
+class ComponentHealthChecker(ABC):
     """
-    Abstract base class for health checking components.
+    Abstract base class for individual component health checkers.
 
-    Each HealthChecker is responsible for checking all components within a specific
-    ServiceGroup (e.g., REDIS, DATABASE, ETCD). A single checker can verify multiple
-    components and return their individual health statuses.
+    Each component health checker monitors a single component and reports
+    its health status. These are used by ServiceHealthChecker implementations
+    to check individual components within a service group.
+    """
+
+    @property
+    @abstractmethod
+    def component_id(self) -> ComponentId:
+        """
+        The component identifier this checker monitors.
+
+        Returns:
+            ComponentId for this specific component
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def check_component(self) -> ComponentHealthStatus:
+        """
+        Perform a health check on this component.
+
+        Returns:
+            ComponentHealthStatus containing the health status of this component
+        """
+        raise NotImplementedError
+
+
+class ServiceHealthChecker(ABC):
+    """
+    Abstract base class for service group health checkers.
+
+    Each service health checker monitors a specific service group (e.g., REDIS, DATABASE, ETCD)
+    and checks the health of all components within that group.
 
     Subclasses must implement:
     - target_service_group: Which service group this checker is responsible for
-    - check_health: Check all components and return their statuses
+    - check_service: Check all components and return their statuses
     - timeout: Timeout for the entire check operation
     """
 
@@ -23,26 +53,25 @@ class HealthChecker(ABC):
     @abstractmethod
     def target_service_group(self) -> ServiceGroup:
         """
-        The service group this health checker is responsible for.
+        The service group this checker monitors.
 
         Returns:
-            The ServiceGroup this checker monitors (e.g., REDIS, DATABASE, ETCD)
+            ServiceGroup identifier (e.g., REDIS, DATABASE, ETCD)
         """
         raise NotImplementedError
 
     @abstractmethod
-    async def check_health(self) -> HealthCheckResult:
+    async def check_service(self) -> ServiceHealth:
         """
-        Check the health of all components in this service group.
+        Perform a health check on all components in the service group.
 
         Returns:
-            HealthCheckResult containing status for each component along with metadata
-            (e.g., latency, endpoint information)
+            ServiceHealth containing status for each component in the service group
 
         Raises:
             HealthCheckError: When the check itself fails catastrophically.
                 Individual component failures should be reflected in the
-                HealthCheckResult.results dict, not raised as exceptions.
+                ServiceHealth.results dict, not raised as exceptions.
         """
         raise NotImplementedError
 
@@ -50,9 +79,51 @@ class HealthChecker(ABC):
     @abstractmethod
     def timeout(self) -> float:
         """
-        The timeout for the entire health check operation in seconds.
+        The timeout for the health check in seconds.
 
-        Returns:
-            The check timeout in seconds
+        This is used by the probe to enforce a maximum check duration
+        for the entire service group check.
+        """
+        raise NotImplementedError
+
+
+class StaticServiceHealthChecker(ServiceHealthChecker):
+    """
+    Base class for static service health checkers.
+
+    Static services have a fixed set of components that are determined
+    at initialization time (e.g., Redis clients, Database connections).
+    Components cannot be added or removed after initialization.
+    """
+
+    pass
+
+
+class DynamicServiceHealthChecker(ServiceHealthChecker):
+    """
+    Base class for dynamic service health checkers.
+
+    Dynamic services have components that can be added or removed at runtime
+    (e.g., Agents joining/leaving the cluster). Provides methods to manage
+    the set of component health checkers.
+    """
+
+    @abstractmethod
+    def register_component(self, checker: ComponentHealthChecker) -> None:
+        """
+        Register a component health checker.
+
+        Args:
+            checker: The component health checker to register
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def unregister_component(self, component_id: ComponentId) -> None:
+        """
+        Unregister a component health checker.
+
+        Args:
+            component_id: The component identifier to unregister
         """
         raise NotImplementedError

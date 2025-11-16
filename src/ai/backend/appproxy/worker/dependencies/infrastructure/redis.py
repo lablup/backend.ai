@@ -8,7 +8,7 @@ from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiv
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dependencies import DependencyProvider
-from ai.backend.common.health_checker import CID_REDIS_LIVE, CID_REDIS_STAT, HealthChecker
+from ai.backend.common.health_checker import CID_REDIS_LIVE, CID_REDIS_STAT, ServiceHealthChecker
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.types import RedisProfileTarget
 
@@ -57,7 +57,7 @@ class RedisProvider(DependencyProvider[ServerConfig, WorkerValkeyClients]):
             await valkey_live.close()
             await valkey_stat.close()
 
-    def gen_health_checkers(self, resource: WorkerValkeyClients) -> HealthChecker:
+    def gen_health_checkers(self, resource: WorkerValkeyClients) -> ServiceHealthChecker:
         """
         Return health checkers for worker Valkey clients.
 

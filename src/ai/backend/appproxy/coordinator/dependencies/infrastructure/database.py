@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from ai.backend.common.dependencies import DependencyProvider
-from ai.backend.common.health_checker import HealthChecker
+from ai.backend.common.health_checker import ServiceHealthChecker
 
 from ...config import ServerConfig
 from ...health.database import DatabaseHealthChecker
@@ -24,7 +24,7 @@ class DatabaseProvider(DependencyProvider[ServerConfig, ExtendedAsyncSAEngine]):
         async with connect_database(setup_input.db) as db:
             yield db
 
-    def gen_health_checkers(self, resource: ExtendedAsyncSAEngine) -> HealthChecker:
+    def gen_health_checkers(self, resource: ExtendedAsyncSAEngine) -> ServiceHealthChecker:
         """
         Return database health checker.
 

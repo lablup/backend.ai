@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from .abc import HealthChecker
+from .abc import (
+    ComponentHealthChecker,
+    DynamicServiceHealthChecker,
+    ServiceHealthChecker,
+    StaticServiceHealthChecker,
+)
 from .checkers import (
     EtcdHealthChecker,
     HttpHealthChecker,
@@ -33,16 +38,19 @@ from .types import (
     MANAGER,
     REDIS,
     STORAGE_PROXY,
-    AllHealthCheckResults,
+    AllServicesHealth,
+    ComponentHealthStatus,
     ComponentId,
-    HealthCheckResult,
-    HealthCheckStatus,
     ServiceGroup,
+    ServiceHealth,
 )
 
 __all__ = [
     # ABC
-    "HealthChecker",
+    "ComponentHealthChecker",
+    "ServiceHealthChecker",
+    "StaticServiceHealthChecker",
+    "DynamicServiceHealthChecker",
     # Checkers
     "EtcdHealthChecker",
     "HttpHealthChecker",
@@ -54,9 +62,9 @@ __all__ = [
     # Types
     "ServiceGroup",
     "ComponentId",
-    "HealthCheckResult",
-    "HealthCheckStatus",
-    "AllHealthCheckResults",
+    "ComponentHealthStatus",
+    "ServiceHealth",
+    "AllServicesHealth",
     # Built-in ServiceGroups
     "MANAGER",
     "AGENT",

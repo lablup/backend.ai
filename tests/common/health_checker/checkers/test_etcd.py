@@ -47,7 +47,7 @@ class TestEtcdHealthChecker:
             timeout=5.0,
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
         assert len(result.results) == 1
         status = result.results[list(result.results.keys())[0]]
         assert status.is_healthy
@@ -86,7 +86,7 @@ class TestEtcdHealthChecker:
                 timeout=1.0,
             )
 
-            result = await checker.check_health()
+            result = await checker.check_service()
             assert len(result.results) == 1
             status = result.results[list(result.results.keys())[0]]
             assert not status.is_healthy
@@ -103,11 +103,11 @@ class TestEtcdHealthChecker:
         )
 
         # Multiple checks should all succeed
-        result1 = await checker.check_health()
+        result1 = await checker.check_service()
         assert result1.results[list(result1.results.keys())[0]].is_healthy
 
-        result2 = await checker.check_health()
+        result2 = await checker.check_service()
         assert result2.results[list(result2.results.keys())[0]].is_healthy
 
-        result3 = await checker.check_health()
+        result3 = await checker.check_service()
         assert result3.results[list(result3.results.keys())[0]].is_healthy

@@ -10,8 +10,8 @@ from ai.backend.common.health_checker import (
     MANAGER,
     REDIS,
     STORAGE_PROXY,
+    ComponentHealthStatus,
     ComponentId,
-    HealthCheckStatus,
     ServiceGroup,
 )
 
@@ -39,10 +39,10 @@ def test_component_id_newtype() -> None:
     assert component_id == "postgres"
 
 
-def test_health_check_status_creation() -> None:
-    """Test HealthCheckStatus dataclass creation."""
+def test_component_health_status_creation() -> None:
+    """Test ComponentHealthStatus dataclass creation."""
     now = datetime.now(timezone.utc)
-    status = HealthCheckStatus(
+    status = ComponentHealthStatus(
         is_healthy=True,
         last_checked_at=now,
         error_message=None,
@@ -53,11 +53,11 @@ def test_health_check_status_creation() -> None:
     assert status.error_message is None
 
 
-def test_health_check_status_with_error() -> None:
-    """Test HealthCheckStatus with error message."""
+def test_component_health_status_with_error() -> None:
+    """Test ComponentHealthStatus with error message."""
     now = datetime.now(timezone.utc)
     error_msg = "Connection failed"
-    status = HealthCheckStatus(
+    status = ComponentHealthStatus(
         is_healthy=False,
         last_checked_at=now,
         error_message=error_msg,

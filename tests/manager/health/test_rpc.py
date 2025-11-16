@@ -46,7 +46,7 @@ class TestAgentRpcHealthChecker:
             timeout=5.0,
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
 
         # Verify health() was called
         mock_health: AsyncMock = mock_agent_client.health  # type: ignore[assignment]
@@ -100,7 +100,7 @@ class TestAgentRpcHealthChecker:
             timeout=5.0,
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
 
         # Verify result indicates failure
         assert len(result.results) == 1
@@ -123,9 +123,9 @@ class TestAgentRpcHealthChecker:
         )
 
         # Multiple checks should all succeed
-        result1 = await checker.check_health()
-        result2 = await checker.check_health()
-        result3 = await checker.check_health()
+        result1 = await checker.check_service()
+        result2 = await checker.check_service()
+        result3 = await checker.check_service()
 
         # health() should have been called 3 times
         mock_health: AsyncMock = mock_agent_client.health  # type: ignore[assignment]
@@ -149,7 +149,7 @@ class TestAgentRpcHealthChecker:
             timeout=5.0,
         )
 
-        result = await checker.check_health()
+        result = await checker.check_service()
 
         # Verify result indicates failure
         assert len(result.results) == 1

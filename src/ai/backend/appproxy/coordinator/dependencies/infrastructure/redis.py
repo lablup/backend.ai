@@ -15,7 +15,7 @@ from ai.backend.common.health_checker import (
     CID_REDIS_CORE_LIVE,
     CID_REDIS_LIVE,
     CID_REDIS_SCHEDULE,
-    HealthChecker,
+    ServiceHealthChecker,
 )
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.types import RedisProfileTarget
@@ -91,7 +91,7 @@ class RedisProvider(DependencyProvider[ServerConfig, CoordinatorValkeyClients]):
             await valkey_schedule.close()
             await redis_lock.close()
 
-    def gen_health_checkers(self, resource: CoordinatorValkeyClients) -> HealthChecker:
+    def gen_health_checkers(self, resource: CoordinatorValkeyClients) -> ServiceHealthChecker:
         """
         Return health checkers for coordinator Valkey clients.
 

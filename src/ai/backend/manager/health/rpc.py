@@ -5,14 +5,14 @@ from datetime import datetime, timezone
 from aiohttp import web
 
 from ai.backend.common.exception import ErrorCode, ErrorDetail, ErrorDomain, ErrorOperation
-from ai.backend.common.health_checker.abc import HealthChecker
+from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
 from ai.backend.common.health_checker.exceptions import HealthCheckError
 from ai.backend.common.health_checker.types import (
     AGENT,
+    ComponentHealthStatus,
     ComponentId,
-    HealthCheckResult,
-    HealthCheckStatus,
     ServiceGroup,
+    ServiceHealth,
 )
 from ai.backend.manager.clients.agent.client import AgentClient
 
@@ -31,7 +31,7 @@ class RpcHealthCheckError(HealthCheckError, web.HTTPServiceUnavailable):
         )
 
 
-class AgentRpcHealthChecker(HealthChecker):
+class AgentRpcHealthChecker(StaticServiceHealthChecker):
     """
     Health checker for Agent RPC connections.
 
@@ -57,33 +57,33 @@ class AgentRpcHealthChecker(HealthChecker):
         """The service group this checker monitors."""
         return AGENT
 
-    async def check_health(self) -> HealthCheckResult:
+    async def check_service(self) -> ServiceHealth:
         """
         Check agent RPC health by calling the health RPC method.
 
         Verifies connectivity by making a lightweight RPC call to the agent.
 
         Returns:
-            HealthCheckResult containing status for the agent RPC connection
+            ServiceHealth containing status for the agent RPC connection
         """
         check_time = datetime.now(timezone.utc)
         component_id = ComponentId(str(self._agent_client.agent_id))
 
         try:
             await self._agent_client.health()
-            status = HealthCheckStatus(
+            status = ComponentHealthStatus(
                 is_healthy=True,
                 last_checked_at=check_time,
                 error_message=None,
             )
         except Exception as e:
-            status = HealthCheckStatus(
+            status = ComponentHealthStatus(
                 is_healthy=False,
                 last_checked_at=check_time,
                 error_message=f"Agent RPC health check failed: {e}",
             )
 
-        return HealthCheckResult(results={component_id: status})
+        return ServiceHealth(results={component_id: status})
 
     @property
     def timeout(self) -> float:

@@ -33,7 +33,7 @@ from ai.backend.common.health_checker import (
     CID_REDIS_SCHEDULE,
     CID_REDIS_STAT,
     CID_REDIS_STREAM,
-    HealthChecker,
+    ServiceHealthChecker,
 )
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
@@ -141,7 +141,7 @@ class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
     def gen_health_checkers(
         self,
         resource: ValkeyClients,
-    ) -> HealthChecker:
+    ) -> ServiceHealthChecker:
         """
         Return a single health checker for all 8 Valkey clients.
 

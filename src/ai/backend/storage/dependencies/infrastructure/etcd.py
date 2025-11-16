@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from ai.backend.common.dependencies import DependencyProvider
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.health_checker import HealthChecker
+from ai.backend.common.health_checker import ServiceHealthChecker
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 from ai.backend.storage.config.loaders import make_etcd
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig
@@ -27,7 +27,7 @@ class EtcdProvider(DependencyProvider[StorageProxyUnifiedConfig, AsyncEtcd]):
         finally:
             await etcd.close()
 
-    def gen_health_checkers(self, resource: AsyncEtcd) -> HealthChecker:
+    def gen_health_checkers(self, resource: AsyncEtcd) -> ServiceHealthChecker:
         """
         Return health checker for etcd.
 
