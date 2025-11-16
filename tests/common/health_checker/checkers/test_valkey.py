@@ -5,8 +5,8 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.clients.valkey_client.client import ValkeyStandaloneClient
+from ai.backend.common.health_checker import ComponentId
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
-from ai.backend.common.health_checker.exceptions import ValkeyHealthCheckError
 from ai.backend.testutils.bootstrap import HostPortPairModel
 
 
@@ -40,12 +40,15 @@ class TestValkeyHealthChecker:
     async def test_success(self, valkey_client: ValkeyStandaloneClient) -> None:
         """Test successful health check with real Valkey connection."""
         checker = ValkeyHealthChecker(
-            client=valkey_client,
+            clients={ComponentId("test"): valkey_client},
             timeout=5.0,
         )
 
-        # Should not raise
-        await checker.check_health()
+        result = await checker.check_health()
+        assert len(result.results) == 1
+        status = result.results[list(result.results.keys())[0]]
+        assert status.is_healthy
+        assert status.error_message is None
 
     @pytest.mark.asyncio
     async def test_timeout_property(
@@ -55,7 +58,7 @@ class TestValkeyHealthChecker:
         """Test that timeout property returns the correct value."""
         timeout_value = 3.5
         checker = ValkeyHealthChecker(
-            client=valkey_client,
+            clients={ComponentId("test"): valkey_client},
             timeout=timeout_value,
         )
 
@@ -83,15 +86,15 @@ class TestValkeyHealthChecker:
 
         try:
             checker = ValkeyHealthChecker(
-                client=client,
+                clients={ComponentId("test"): client},
                 timeout=1.0,
             )
 
-            with pytest.raises(ValkeyHealthCheckError) as exc_info:
-                await checker.check_health()
-
-            # Should contain error information
-            assert "health check failed" in str(exc_info.value).lower()
+            result = await checker.check_health()
+            assert len(result.results) == 1
+            status = result.results[list(result.results.keys())[0]]
+            assert not status.is_healthy
+            assert status.error_message is not None
         finally:
             await client.disconnect()
 
@@ -102,11 +105,16 @@ class TestValkeyHealthChecker:
     ) -> None:
         """Test that multiple health checks work correctly."""
         checker = ValkeyHealthChecker(
-            client=valkey_client,
+            clients={ComponentId("test"): valkey_client},
             timeout=5.0,
         )
 
         # Multiple checks should all succeed
-        await checker.check_health()
-        await checker.check_health()
-        await checker.check_health()
+        result1 = await checker.check_health()
+        assert result1.results[list(result1.results.keys())[0]].is_healthy
+
+        result2 = await checker.check_health()
+        assert result2.results[list(result2.results.keys())[0]].is_healthy
+
+        result3 = await checker.check_health()
+        assert result3.results[list(result3.results.keys())[0]].is_healthy

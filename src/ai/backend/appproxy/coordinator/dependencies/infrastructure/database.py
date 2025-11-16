@@ -3,9 +3,8 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from ai.backend.common.dependencies import DependencyProvider, HealthCheckerRegistration
-from ai.backend.common.health_checker import HealthCheckKey
-from ai.backend.common.health_checker.types import DATABASE, ComponentId
+from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.health_checker import HealthChecker
 
 from ...config import ServerConfig
 from ...health.database import DatabaseHealthChecker
@@ -25,10 +24,7 @@ class DatabaseProvider(DependencyProvider[ServerConfig, ExtendedAsyncSAEngine]):
         async with connect_database(setup_input.db) as db:
             yield db
 
-    def gen_health_checkers(
-        self,
-        resource: ExtendedAsyncSAEngine,
-    ) -> list[HealthCheckerRegistration]:
+    def gen_health_checkers(self, resource: ExtendedAsyncSAEngine) -> HealthChecker:
         """
         Return database health checker.
 
@@ -36,11 +32,6 @@ class DatabaseProvider(DependencyProvider[ServerConfig, ExtendedAsyncSAEngine]):
             resource: The initialized database engine
 
         Returns:
-            List containing health checker registration for PostgreSQL database
+            Health checker for PostgreSQL database
         """
-        return [
-            HealthCheckerRegistration(
-                key=HealthCheckKey(service_group=DATABASE, component_id=ComponentId("postgres")),
-                checker=DatabaseHealthChecker(db=resource),
-            )
-        ]
+        return DatabaseHealthChecker(db=resource)

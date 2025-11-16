@@ -2,54 +2,55 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from aiodocker import Docker
+
 from ai.backend.common.health_checker.abc import HealthChecker
 from ai.backend.common.health_checker.types import (
-    CID_POSTGRES,
-    DATABASE,
+    CID_DOCKER,
+    CONTAINER,
     HealthCheckResult,
     HealthCheckStatus,
     ServiceGroup,
 )
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
-class DatabaseHealthChecker(HealthChecker):
+class DockerHealthChecker(HealthChecker):
     """
-    Health checker for database connections.
+    Health checker for Docker connections.
 
-    Uses the ping() method of ExtendedAsyncSAEngine to check connection health.
+    Uses the version() method of Docker to check connection health.
     """
 
-    _db: ExtendedAsyncSAEngine
+    _docker: Docker
     _timeout: float
 
-    def __init__(self, db: ExtendedAsyncSAEngine, timeout: float = 5.0) -> None:
+    def __init__(self, docker: Docker, timeout: float = 5.0) -> None:
         """
-        Initialize DatabaseHealthChecker.
+        Initialize DockerHealthChecker.
 
         Args:
-            db: The database engine instance to check
+            docker: The Docker client instance to check
             timeout: Timeout in seconds for the health check
         """
-        self._db = db
+        self._docker = docker
         self._timeout = timeout
 
     @property
     def target_service_group(self) -> ServiceGroup:
         """The service group this checker monitors."""
-        return DATABASE
+        return CONTAINER
 
     async def check_health(self) -> HealthCheckResult:
         """
-        Check database connection health by pinging the server.
+        Check Docker connection health by getting version info.
 
         Returns:
-            HealthCheckResult containing status for postgres component
+            HealthCheckResult containing status for docker component
         """
         check_time = datetime.now(timezone.utc)
 
         try:
-            await self._db.ping()
+            await self._docker.version()
             status = HealthCheckStatus(
                 is_healthy=True,
                 last_checked_at=check_time,
@@ -62,7 +63,7 @@ class DatabaseHealthChecker(HealthChecker):
                 error_message=str(e),
             )
 
-        return HealthCheckResult(results={CID_POSTGRES: status})
+        return HealthCheckResult(results={CID_DOCKER: status})
 
     @property
     def timeout(self) -> float:

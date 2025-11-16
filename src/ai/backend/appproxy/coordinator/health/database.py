@@ -1,7 +1,15 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from ai.backend.common.health_checker.abc import HealthChecker
-from ai.backend.common.health_checker.exceptions import DatabaseHealthCheckError
+from ai.backend.common.health_checker.types import (
+    CID_POSTGRES,
+    DATABASE,
+    HealthCheckResult,
+    HealthCheckStatus,
+    ServiceGroup,
+)
 
 from ..models.utils import ExtendedAsyncSAEngine
 
@@ -27,17 +35,35 @@ class DatabaseHealthChecker(HealthChecker):
         self._db = db
         self._timeout = timeout
 
-    async def check_health(self) -> None:
+    @property
+    def target_service_group(self) -> ServiceGroup:
+        """The service group this checker monitors."""
+        return DATABASE
+
+    async def check_health(self) -> HealthCheckResult:
         """
         Check database connection health by pinging the server.
 
-        Raises:
-            DatabaseHealthCheckError: If the ping fails
+        Returns:
+            HealthCheckResult containing the database health status
         """
+        check_time = datetime.now(timezone.utc)
+
         try:
             await self._db.ping()
+            status = HealthCheckStatus(
+                is_healthy=True,
+                last_checked_at=check_time,
+                error_message=None,
+            )
         except Exception as e:
-            raise DatabaseHealthCheckError(f"Database health check failed: {e}") from e
+            status = HealthCheckStatus(
+                is_healthy=False,
+                last_checked_at=check_time,
+                error_message=str(e),
+            )
+
+        return HealthCheckResult(results={CID_POSTGRES: status})
 
     @property
     def timeout(self) -> float:

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pytest
-
 from ai.backend.common.health_checker import (
     AGENT,
     APPPROXY,
@@ -13,7 +11,6 @@ from ai.backend.common.health_checker import (
     REDIS,
     STORAGE_PROXY,
     ComponentId,
-    HealthCheckKey,
     HealthCheckStatus,
     ServiceGroup,
 )
@@ -40,49 +37,6 @@ def test_component_id_newtype() -> None:
     """Test ComponentId NewType creation."""
     component_id = ComponentId("postgres")
     assert component_id == "postgres"
-
-
-def test_health_check_key_creation() -> None:
-    """Test HealthCheckKey frozen dataclass creation."""
-    key = HealthCheckKey(
-        service_group=MANAGER,
-        component_id=ComponentId("postgres"),
-    )
-    assert key.service_group == MANAGER
-    assert key.component_id == ComponentId("postgres")
-
-
-def test_health_check_key_hashable() -> None:
-    """Test that HealthCheckKey is hashable and can be used as dict key."""
-    key1 = HealthCheckKey(MANAGER, ComponentId("redis"))
-    key2 = HealthCheckKey(MANAGER, ComponentId("redis"))
-    key3 = HealthCheckKey(AGENT, ComponentId("redis"))
-
-    # Same keys should have same hash
-    assert key1 == key2
-    assert hash(key1) == hash(key2)
-
-    # Different keys should not be equal
-    assert key1 != key3
-
-    # Can be used as dict key
-    test_dict: dict[HealthCheckKey, str] = {
-        key1: "value1",
-        key3: "value2",
-    }
-    assert test_dict[key1] == "value1"
-    assert test_dict[key3] == "value2"
-
-
-def test_health_check_key_immutable() -> None:
-    """Test that HealthCheckKey is immutable (frozen dataclass)."""
-    key = HealthCheckKey(
-        service_group=MANAGER,
-        component_id=ComponentId("postgres"),
-    )
-
-    with pytest.raises(AttributeError):
-        key.service_group = AGENT  # type: ignore
 
 
 def test_health_check_status_creation() -> None:

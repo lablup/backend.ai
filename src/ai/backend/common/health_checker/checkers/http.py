@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
+from datetime import datetime, timezone
 from http import HTTPMethod
 
 import aiohttp
 
 from ..abc import HealthChecker
-from ..exceptions import HttpHealthCheckError
+from ..types import API, ComponentId, HealthCheckResult, HealthCheckStatus, ServiceGroup
 
 
 class HttpHealthChecker(HealthChecker):
@@ -19,6 +20,7 @@ class HttpHealthChecker(HealthChecker):
     """
 
     _url: str
+    _component_id: ComponentId
     _timeout: float
     _session: aiohttp.ClientSession
     _expected_status_codes: frozenset[int]
@@ -27,6 +29,7 @@ class HttpHealthChecker(HealthChecker):
     def __init__(
         self,
         url: str,
+        component_id: ComponentId,
         session: aiohttp.ClientSession,
         timeout: float = 5.0,
         expected_status_codes: Sequence[int] = (200,),
@@ -37,46 +40,68 @@ class HttpHealthChecker(HealthChecker):
 
         Args:
             url: The HTTP endpoint URL to check
+            component_id: Component identifier for this endpoint
             session: aiohttp ClientSession to use for requests
             timeout: Timeout in seconds for the health check request
             expected_status_codes: HTTP status codes considered healthy (default: [200])
             method: HTTP method to use for health check (default: GET)
         """
         self._url = url
+        self._component_id = component_id
         self._timeout = timeout
         self._session = session
         self._expected_status_codes = frozenset(expected_status_codes)
         self._method = method
 
-    async def check_health(self) -> None:
+    @property
+    def target_service_group(self) -> ServiceGroup:
+        """The service group this checker monitors."""
+        return API
+
+    async def check_health(self) -> HealthCheckResult:
         """
         Check HTTP endpoint health by performing an HTTP request.
 
-        Raises:
-            HttpHealthCheckError: If the endpoint returns an unexpected status code or request fails
+        Returns:
+            HealthCheckResult containing status for the HTTP endpoint
         """
+        check_time = datetime.now(timezone.utc)
+
         try:
             async with asyncio.timeout(self._timeout):
                 async with self._session.request(self._method.value, self._url) as response:
                     if response.status not in self._expected_status_codes:
-                        raise HttpHealthCheckError(
-                            f"HTTP health check failed: {self._method} {self._url} returned status {response.status}, "
-                            f"expected one of {sorted(self._expected_status_codes)}"
+                        status = HealthCheckStatus(
+                            is_healthy=False,
+                            last_checked_at=check_time,
+                            error_message=f"HTTP {self._method} {self._url} returned status {response.status}, expected one of {sorted(self._expected_status_codes)}",
                         )
-        except HttpHealthCheckError:
-            raise
-        except asyncio.TimeoutError as e:
-            raise HttpHealthCheckError(
-                f"HTTP health check timed out after {self._timeout}s: {self._method} {self._url}"
-            ) from e
+                    else:
+                        status = HealthCheckStatus(
+                            is_healthy=True,
+                            last_checked_at=check_time,
+                            error_message=None,
+                        )
+        except asyncio.TimeoutError:
+            status = HealthCheckStatus(
+                is_healthy=False,
+                last_checked_at=check_time,
+                error_message=f"HTTP health check timed out after {self._timeout}s: {self._method} {self._url}",
+            )
         except aiohttp.ClientError as e:
-            raise HttpHealthCheckError(
-                f"HTTP health check failed for {self._method} {self._url}: {e}"
-            ) from e
+            status = HealthCheckStatus(
+                is_healthy=False,
+                last_checked_at=check_time,
+                error_message=f"HTTP health check failed for {self._method} {self._url}: {e}",
+            )
         except Exception as e:
-            raise HttpHealthCheckError(
-                f"Unexpected error during HTTP health check for {self._method} {self._url}: {e}"
-            ) from e
+            status = HealthCheckStatus(
+                is_healthy=False,
+                last_checked_at=check_time,
+                error_message=f"Unexpected error during HTTP health check for {self._method} {self._url}: {e}",
+            )
+
+        return HealthCheckResult(results={self._component_id: status})
 
     @property
     def timeout(self) -> float:

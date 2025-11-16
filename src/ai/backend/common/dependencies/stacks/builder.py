@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING
 from ..base import DependencyStack
 
 if TYPE_CHECKING:
-    from ai.backend.common.health_checker import HealthChecker, HealthCheckKey
+    from ai.backend.common.health_checker import HealthChecker
+    from ai.backend.common.health_checker.types import ServiceGroup
 
     from ..base import DependencyComposer, DependencyProvider, ResourcesT, ResourceT, SetupInputT
 
@@ -16,14 +17,18 @@ class DependencyBuilderStack(DependencyStack):
     DependencyStack that collects health checkers from providers.
 
     Uses AsyncExitStack internally for lifecycle management while automatically
-    collecting health checkers from providers that implement get_health_checker() method.
+    collecting health checkers from providers that implement gen_health_checkers() method.
+
+    Health checkers are registered by their ServiceGroup (e.g., REDIS, DATABASE, ETCD).
+    Each ServiceGroup can have only one health checker, which checks multiple components
+    within that service group.
 
     Health checkers can be retrieved after dependency initialization
     to register them with a HealthProbe for health monitoring.
     """
 
     _stack: AsyncExitStack
-    _health_checkers: dict[HealthCheckKey, HealthChecker]
+    _health_checkers: dict[ServiceGroup, HealthChecker]
 
     def __init__(self) -> None:
         self._stack = AsyncExitStack()
@@ -35,14 +40,17 @@ class DependencyBuilderStack(DependencyStack):
         setup_input: SetupInputT,
     ) -> ResourceT:
         """
-        Execute a dependency provider and collect health checkers.
+        Execute a dependency provider and collect health checker.
+
+        If the provider returns a health checker, it will be registered using
+        checker.target_service_group as the key.
         """
         resource = await self._stack.enter_async_context(provider.provide(setup_input))
 
-        # Collect health checkers from provider
-        registrations = provider.gen_health_checkers(resource)
-        for registration in registrations:
-            self._health_checkers[registration.key] = registration.checker
+        # Collect health checker from provider
+        checker = provider.gen_health_checkers(resource)
+        if checker is not None:
+            self._health_checkers[checker.target_service_group] = checker
 
         return resource
 
@@ -67,17 +75,17 @@ class DependencyBuilderStack(DependencyStack):
         )
 
         # Collect health checkers from nested stack
-        for key, checker in nested_stack._health_checkers.items():
-            self._health_checkers[key] = checker
+        for service_group, checker in nested_stack._health_checkers.items():
+            self._health_checkers[service_group] = checker
 
         return resources
 
-    def get_health_checkers(self) -> dict[HealthCheckKey, HealthChecker]:
+    def get_health_checkers(self) -> dict[ServiceGroup, HealthChecker]:
         """
         Return collected health checkers.
 
         Returns:
-            Dictionary mapping HealthCheckKey to HealthChecker instances
+            Dictionary mapping ServiceGroup to HealthChecker instances
             collected from all initialized dependencies.
         """
         return self._health_checkers.copy()

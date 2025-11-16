@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from ai.backend.common.etcd import AsyncEtcd
 
 from ..abc import HealthChecker
-from ..exceptions import EtcdHealthCheckError
+from ..types import CID_ETCD, ETCD, HealthCheckResult, HealthCheckStatus, ServiceGroup
 
 
 class EtcdHealthChecker(HealthChecker):
@@ -27,17 +29,35 @@ class EtcdHealthChecker(HealthChecker):
         self._etcd = etcd
         self._timeout = timeout
 
-    async def check_health(self) -> None:
+    @property
+    def target_service_group(self) -> ServiceGroup:
+        """The service group this checker monitors."""
+        return ETCD
+
+    async def check_health(self) -> HealthCheckResult:
         """
         Check etcd connection health by pinging the server.
 
-        Raises:
-            EtcdHealthCheckError: If the ping fails
+        Returns:
+            HealthCheckResult containing status for etcd component
         """
+        check_time = datetime.now(timezone.utc)
+
         try:
             await self._etcd.ping()
+            status = HealthCheckStatus(
+                is_healthy=True,
+                last_checked_at=check_time,
+                error_message=None,
+            )
         except Exception as e:
-            raise EtcdHealthCheckError(f"Etcd health check failed: {e}") from e
+            status = HealthCheckStatus(
+                is_healthy=False,
+                last_checked_at=check_time,
+                error_message=str(e),
+            )
+
+        return HealthCheckResult(results={CID_ETCD: status})
 
     @property
     def timeout(self) -> float:

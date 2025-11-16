@@ -1,23 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, AsyncContextManager, Generic, TypeVar, final
+from typing import TYPE_CHECKING, AsyncContextManager, Generic, Optional, TypeVar, final
 
 if TYPE_CHECKING:
-    from ai.backend.common.health_checker import HealthChecker, HealthCheckKey
+    from ai.backend.common.health_checker import HealthChecker
 
 SetupInputT = TypeVar("SetupInputT")
 ResourceT = TypeVar("ResourceT")
 ResourcesT = TypeVar("ResourcesT")
-
-
-@dataclass
-class HealthCheckerRegistration:
-    """Registration information for a health checker."""
-
-    key: HealthCheckKey
-    checker: HealthChecker
 
 
 class DependencyProvider(ABC, Generic[SetupInputT, ResourceT]):
@@ -54,18 +45,19 @@ class DependencyProvider(ABC, Generic[SetupInputT, ResourceT]):
         raise NotImplementedError
 
     @abstractmethod
-    def gen_health_checkers(self, resource: ResourceT) -> list[HealthCheckerRegistration]:
+    def gen_health_checkers(self, resource: ResourceT) -> Optional[HealthChecker]:
         """
-        Return health checkers for the provided resource.
+        Return a health checker for the provided resource.
 
         Override this method to provide health checking capability for this dependency.
-        The health checkers will be automatically collected by DependencyBuilderStack.
+        The health checker will be automatically collected by DependencyBuilderStack
+        and registered using checker.target_service_group as the key.
 
         Args:
             resource: The initialized resource from provide()
 
         Returns:
-            List of HealthCheckerRegistration
+            HealthChecker instance or None if no health checking is needed
         """
         raise NotImplementedError
 
@@ -74,22 +66,22 @@ class NonMonitorableDependencyProvider(DependencyProvider[SetupInputT, ResourceT
     """
     Base class for dependency providers that do not require health monitoring.
 
-    This class provides a default implementation of get_health_checker()
-    that returns an empty list, indicating no health checks are needed.
+    This class provides a default implementation of gen_health_checkers()
+    that returns None, indicating no health checks are needed.
     """
 
     @final
-    def gen_health_checkers(self, resource: ResourceT) -> list[HealthCheckerRegistration]:
+    def gen_health_checkers(self, resource: ResourceT) -> None:
         """
-        Return empty list as this dependency does not require health monitoring.
+        Return None as this dependency does not require health monitoring.
 
         Args:
             resource: The initialized resource from provide()
 
         Returns:
-            Empty list indicating no health checks
+            None indicating no health checks
         """
-        return []
+        return None
 
 
 class DependencyComposer(ABC, Generic[SetupInputT, ResourcesT]):

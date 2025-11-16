@@ -3,11 +3,9 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from ai.backend.common.dependencies import HealthCheckerRegistration
 from ai.backend.common.etcd import AsyncEtcd
-from ai.backend.common.health_checker import HealthCheckKey
+from ai.backend.common.health_checker import HealthChecker
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
-from ai.backend.common.health_checker.types import ETCD, ComponentId
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 
 from .base import BootstrapDependency
@@ -36,7 +34,7 @@ class EtcdDependency(BootstrapDependency[AsyncEtcd]):
         finally:
             await etcd.close()
 
-    def gen_health_checkers(self, resource: AsyncEtcd) -> list[HealthCheckerRegistration]:
+    def gen_health_checkers(self, resource: AsyncEtcd) -> HealthChecker:
         """
         Return health checker for etcd.
 
@@ -44,11 +42,6 @@ class EtcdDependency(BootstrapDependency[AsyncEtcd]):
             resource: The initialized etcd client
 
         Returns:
-            List containing health checker registration for etcd
+            EtcdHealthChecker for etcd
         """
-        return [
-            HealthCheckerRegistration(
-                key=HealthCheckKey(service_group=ETCD, component_id=ComponentId("config")),
-                checker=EtcdHealthChecker(etcd=resource),
-            )
-        ]
+        return EtcdHealthChecker(etcd=resource)

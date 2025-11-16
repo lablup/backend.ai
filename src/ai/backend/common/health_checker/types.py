@@ -24,6 +24,27 @@ CONTAINER: ServiceGroup = ServiceGroup("container")
 # For servers: use server-specific identifier
 ComponentId = NewType("ComponentId", str)
 
+# Built-in component IDs for database
+CID_POSTGRES: ComponentId = ComponentId("postgres")
+
+# Built-in component IDs for Redis/Valkey
+CID_REDIS_ARTIFACT: ComponentId = ComponentId("artifact")
+CID_REDIS_CONTAINER_LOG: ComponentId = ComponentId("container_log")
+CID_REDIS_LIVE: ComponentId = ComponentId("live")
+CID_REDIS_STAT: ComponentId = ComponentId("stat")
+CID_REDIS_IMAGE: ComponentId = ComponentId("image")
+CID_REDIS_STREAM: ComponentId = ComponentId("stream")
+CID_REDIS_SCHEDULE: ComponentId = ComponentId("schedule")
+CID_REDIS_BGTASK: ComponentId = ComponentId("bgtask")
+CID_REDIS_SESSION: ComponentId = ComponentId("session")
+CID_REDIS_CORE_LIVE: ComponentId = ComponentId("core_live")
+
+# Built-in component IDs for etcd
+CID_ETCD: ComponentId = ComponentId("etcd")
+
+# Built-in component IDs for container
+CID_DOCKER: ComponentId = ComponentId("docker")
+
 
 @dataclass(frozen=True)
 class HealthCheckKey:
@@ -40,7 +61,7 @@ class HealthCheckKey:
 @dataclass
 class HealthCheckStatus:
     """
-    Internal representation of health check status stored in memory.
+    Internal representation of health check status for a single component.
 
     This is used internally by the registry and probe to track
     the current health status of each component.
@@ -49,3 +70,26 @@ class HealthCheckStatus:
     is_healthy: bool
     last_checked_at: datetime
     error_message: Optional[str] = None
+
+
+@dataclass
+class HealthCheckResult:
+    """
+    Result of a health check containing status for multiple components.
+
+    A single health checker (per ServiceGroup) can check multiple components
+    and return their individual statuses.
+    """
+
+    results: dict[ComponentId, HealthCheckStatus]
+
+
+@dataclass
+class AllHealthCheckResults:
+    """
+    Aggregated results of all health checks across all service groups.
+
+    Contains results from all registered health checkers in the system.
+    """
+
+    results: dict[ServiceGroup, HealthCheckResult]

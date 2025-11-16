@@ -2,31 +2,47 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
+from ai.backend.common.health_checker.types import HealthCheckResult, ServiceGroup
+
 
 class HealthChecker(ABC):
     """
     Abstract base class for health checking components.
 
-    Implementations should check the health of a specific component or service
-    (e.g., database, Redis, etcd, HTTP endpoints) and raise appropriate
-    HealthCheckError subclasses when unhealthy.
+    Each HealthChecker is responsible for checking all components within a specific
+    ServiceGroup (e.g., REDIS, DATABASE, ETCD). A single checker can verify multiple
+    components and return their individual health statuses.
 
-    Subclasses must also define a timeout property.
+    Subclasses must implement:
+    - target_service_group: Which service group this checker is responsible for
+    - check_health: Check all components and return their statuses
+    - timeout: Timeout for the entire check operation
     """
 
+    @property
     @abstractmethod
-    async def check_health(self) -> None:
+    def target_service_group(self) -> ServiceGroup:
         """
-        Check if the component is healthy.
+        The service group this health checker is responsible for.
 
-        This method should complete normally if the component is healthy.
-        If the component is unhealthy, it should raise a specific HealthCheckError
-        subclass defined by the implementation.
+        Returns:
+            The ServiceGroup this checker monitors (e.g., REDIS, DATABASE, ETCD)
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    async def check_health(self) -> HealthCheckResult:
+        """
+        Check the health of all components in this service group.
+
+        Returns:
+            HealthCheckResult containing status for each component along with metadata
+            (e.g., latency, endpoint information)
 
         Raises:
-            HealthCheckError: Each implementation must define and raise its own
-                specific error type (e.g., DatabaseHealthCheckError,
-                RedisHealthCheckError, EtcdHealthCheckError, HttpHealthCheckError).
+            HealthCheckError: When the check itself fails catastrophically.
+                Individual component failures should be reflected in the
+                HealthCheckResult.results dict, not raised as exceptions.
         """
         raise NotImplementedError
 
@@ -34,7 +50,7 @@ class HealthChecker(ABC):
     @abstractmethod
     def timeout(self) -> float:
         """
-        The timeout for each health check in seconds.
+        The timeout for the entire health check operation in seconds.
 
         Returns:
             The check timeout in seconds

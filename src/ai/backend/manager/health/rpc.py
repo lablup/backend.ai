@@ -1,10 +1,19 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from aiohttp import web
 
 from ai.backend.common.exception import ErrorCode, ErrorDetail, ErrorDomain, ErrorOperation
 from ai.backend.common.health_checker.abc import HealthChecker
 from ai.backend.common.health_checker.exceptions import HealthCheckError
+from ai.backend.common.health_checker.types import (
+    AGENT,
+    ComponentId,
+    HealthCheckResult,
+    HealthCheckStatus,
+    ServiceGroup,
+)
 from ai.backend.manager.clients.agent.client import AgentClient
 
 
@@ -43,21 +52,38 @@ class AgentRpcHealthChecker(HealthChecker):
         self._agent_client = agent_client
         self._timeout = timeout
 
-    async def check_health(self) -> None:
+    @property
+    def target_service_group(self) -> ServiceGroup:
+        """The service group this checker monitors."""
+        return AGENT
+
+    async def check_health(self) -> HealthCheckResult:
         """
         Check agent RPC health by calling the health RPC method.
 
         Verifies connectivity by making a lightweight RPC call to the agent.
 
-        Raises:
-            RpcHealthCheckError: If the RPC call fails
+        Returns:
+            HealthCheckResult containing status for the agent RPC connection
         """
+        check_time = datetime.now(timezone.utc)
+        component_id = ComponentId(str(self._agent_client.agent_id))
+
         try:
             await self._agent_client.health()
+            status = HealthCheckStatus(
+                is_healthy=True,
+                last_checked_at=check_time,
+                error_message=None,
+            )
         except Exception as e:
-            raise RpcHealthCheckError(
-                f"Agent RPC health check failed for {self._agent_client.agent_id}: {e}"
-            ) from e
+            status = HealthCheckStatus(
+                is_healthy=False,
+                last_checked_at=check_time,
+                error_message=f"Agent RPC health check failed: {e}",
+            )
+
+        return HealthCheckResult(results={component_id: status})
 
     @property
     def timeout(self) -> float:

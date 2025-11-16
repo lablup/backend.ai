@@ -8,8 +8,8 @@ import aiohttp
 import pytest
 from aiohttp import web
 
+from ai.backend.common.health_checker import ComponentId
 from ai.backend.common.health_checker.checkers.http import HttpHealthChecker
-from ai.backend.common.health_checker.exceptions import HttpHealthCheckError
 
 
 class TestHttpHealthChecker:
@@ -86,12 +86,16 @@ class TestHttpHealthChecker:
         """Test successful health check with GET method."""
         checker = HttpHealthChecker(
             url=f"{http_test_server}/health",
+            component_id=ComponentId("api"),
             session=aiohttp_session,
             timeout=5.0,
         )
 
-        # Should not raise
-        await checker.check_health()
+        result = await checker.check_health()
+        assert len(result.results) == 1
+        status = result.results[list(result.results.keys())[0]]
+        assert status.is_healthy
+        assert status.error_message is None
 
     @pytest.mark.asyncio
     async def test_success_post(
@@ -102,12 +106,16 @@ class TestHttpHealthChecker:
         """Test successful health check with POST method."""
         checker = HttpHealthChecker(
             url=f"{http_test_server}/health",
+            component_id=ComponentId("api"),
             session=aiohttp_session,
             method=HTTPMethod.POST,
             timeout=5.0,
         )
 
-        await checker.check_health()
+        result = await checker.check_health()
+        assert len(result.results) == 1
+        status = result.results[list(result.results.keys())[0]]
+        assert status.is_healthy
 
     @pytest.mark.asyncio
     async def test_success_head(
@@ -118,12 +126,16 @@ class TestHttpHealthChecker:
         """Test successful health check with HEAD method."""
         checker = HttpHealthChecker(
             url=f"{http_test_server}/health",
+            component_id=ComponentId("api"),
             session=aiohttp_session,
             method=HTTPMethod.HEAD,
             timeout=5.0,
         )
 
-        await checker.check_health()
+        result = await checker.check_health()
+        assert len(result.results) == 1
+        status = result.results[list(result.results.keys())[0]]
+        assert status.is_healthy
 
     @pytest.mark.asyncio
     async def test_success_options(
@@ -134,12 +146,16 @@ class TestHttpHealthChecker:
         """Test successful health check with OPTIONS method."""
         checker = HttpHealthChecker(
             url=f"{http_test_server}/health",
+            component_id=ComponentId("api"),
             session=aiohttp_session,
             method=HTTPMethod.OPTIONS,
             timeout=5.0,
         )
 
-        await checker.check_health()
+        result = await checker.check_health()
+        assert len(result.results) == 1
+        status = result.results[list(result.results.keys())[0]]
+        assert status.is_healthy
 
     @pytest.mark.asyncio
     async def test_custom_status_codes(
@@ -150,13 +166,17 @@ class TestHttpHealthChecker:
         """Test successful health check with custom expected status codes."""
         checker = HttpHealthChecker(
             url=f"{http_test_server}/health_204",
+            component_id=ComponentId("api"),
             session=aiohttp_session,
             expected_status_codes=[200, 204],
             timeout=5.0,
         )
 
-        # 204 is in expected_status_codes, should not raise
-        await checker.check_health()
+        # 204 is in expected_status_codes, should return healthy status
+        result = await checker.check_health()
+        assert len(result.results) == 1
+        status = result.results[list(result.results.keys())[0]]
+        assert status.is_healthy
 
     @pytest.mark.asyncio
     async def test_unexpected_status_code(
@@ -167,15 +187,18 @@ class TestHttpHealthChecker:
         """Test health check failure with unexpected status code."""
         checker = HttpHealthChecker(
             url=f"{http_test_server}/error",
+            component_id=ComponentId("api"),
             session=aiohttp_session,
             timeout=5.0,
         )
 
-        with pytest.raises(HttpHealthCheckError) as exc_info:
-            await checker.check_health()
-
-        assert "returned status 500" in str(exc_info.value)
-        assert "expected one of [200]" in str(exc_info.value)
+        result = await checker.check_health()
+        assert len(result.results) == 1
+        status = result.results[list(result.results.keys())[0]]
+        assert not status.is_healthy
+        assert status.error_message is not None
+        assert "returned status 500" in status.error_message
+        assert "expected one of [200]" in status.error_message
 
     @pytest.mark.asyncio
     async def test_not_found(
@@ -186,14 +209,17 @@ class TestHttpHealthChecker:
         """Test health check failure with 404 Not Found."""
         checker = HttpHealthChecker(
             url=f"{http_test_server}/not_found",
+            component_id=ComponentId("api"),
             session=aiohttp_session,
             timeout=5.0,
         )
 
-        with pytest.raises(HttpHealthCheckError) as exc_info:
-            await checker.check_health()
-
-        assert "returned status 404" in str(exc_info.value)
+        result = await checker.check_health()
+        assert len(result.results) == 1
+        status = result.results[list(result.results.keys())[0]]
+        assert not status.is_healthy
+        assert status.error_message is not None
+        assert "returned status 404" in status.error_message
 
     @pytest.mark.asyncio
     async def test_timeout(
@@ -204,15 +230,18 @@ class TestHttpHealthChecker:
         """Test health check timeout."""
         checker = HttpHealthChecker(
             url=f"{http_test_server}/slow",
+            component_id=ComponentId("api"),
             session=aiohttp_session,
             timeout=0.5,  # Short timeout
         )
 
-        with pytest.raises(HttpHealthCheckError) as exc_info:
-            await checker.check_health()
-
-        assert "timed out" in str(exc_info.value).lower()
-        assert "0.5s" in str(exc_info.value)
+        result = await checker.check_health()
+        assert len(result.results) == 1
+        status = result.results[list(result.results.keys())[0]]
+        assert not status.is_healthy
+        assert status.error_message is not None
+        assert "timed out" in status.error_message.lower()
+        assert "0.5s" in status.error_message
 
     @pytest.mark.asyncio
     async def test_connection_error(
@@ -223,15 +252,17 @@ class TestHttpHealthChecker:
         # Use a non-existent server
         checker = HttpHealthChecker(
             url="http://localhost:99999/health",
+            component_id=ComponentId("api"),
             session=aiohttp_session,
             timeout=2.0,
         )
 
-        with pytest.raises(HttpHealthCheckError) as exc_info:
-            await checker.check_health()
-
-        # Should contain error information
-        assert "health check failed" in str(exc_info.value).lower()
+        result = await checker.check_health()
+        assert len(result.results) == 1
+        status = result.results[list(result.results.keys())[0]]
+        assert not status.is_healthy
+        assert status.error_message is not None
+        assert "health check failed" in status.error_message.lower()
 
     @pytest.mark.asyncio
     async def test_timeout_property(
@@ -243,6 +274,7 @@ class TestHttpHealthChecker:
         timeout_value = 3.5
         checker = HttpHealthChecker(
             url=f"{http_test_server}/health",
+            component_id=ComponentId("api"),
             session=aiohttp_session,
             timeout=timeout_value,
         )
@@ -258,13 +290,16 @@ class TestHttpHealthChecker:
         """Test that HTTP method is included in error messages."""
         checker = HttpHealthChecker(
             url=f"{http_test_server}/error",
+            component_id=ComponentId("api"),
             session=aiohttp_session,
             method=HTTPMethod.POST,
             timeout=5.0,
         )
 
-        with pytest.raises(HttpHealthCheckError) as exc_info:
-            await checker.check_health()
-
+        result = await checker.check_health()
+        assert len(result.results) == 1
+        status = result.results[list(result.results.keys())[0]]
+        assert not status.is_healthy
+        assert status.error_message is not None
         # Error message should include the HTTP method
-        assert "POST" in str(exc_info.value)
+        assert "POST" in status.error_message

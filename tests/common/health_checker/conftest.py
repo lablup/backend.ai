@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import uuid
+from datetime import datetime, timezone
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock
 
@@ -9,7 +9,8 @@ import pytest
 from ai.backend.common.health_checker import (
     ComponentId,
     HealthChecker,
-    HealthCheckKey,
+    HealthCheckResult,
+    HealthCheckStatus,
     HealthProbe,
     HealthProbeOptions,
     ServiceGroup,
@@ -20,29 +21,54 @@ TEST_SERVICE_GROUP: ServiceGroup = ServiceGroup("test")
 
 
 @pytest.fixture
-def sample_health_check_key() -> HealthCheckKey:
-    """Sample HealthCheckKey for testing."""
-    return HealthCheckKey(
-        service_group=TEST_SERVICE_GROUP,
-        component_id=ComponentId(str(uuid.uuid4())),
-    )
+def sample_service_group() -> ServiceGroup:
+    """Sample ServiceGroup for testing."""
+    return TEST_SERVICE_GROUP
 
 
 @pytest.fixture
 def mock_healthy_checker() -> HealthChecker:
     """Mock HealthChecker that always succeeds."""
     checker = AsyncMock(spec=HealthChecker)
-    checker.check_health = AsyncMock(return_value=None)
+
+    # Create healthy result
+    check_time = datetime.now(timezone.utc)
+    healthy_result = HealthCheckResult(
+        results={
+            ComponentId("test-component"): HealthCheckStatus(
+                is_healthy=True,
+                last_checked_at=check_time,
+                error_message=None,
+            )
+        }
+    )
+
+    checker.check_health = AsyncMock(return_value=healthy_result)
     checker.timeout = 1.0
+    checker.target_service_group = TEST_SERVICE_GROUP
     return checker
 
 
 @pytest.fixture
 def mock_unhealthy_checker() -> HealthChecker:
-    """Mock HealthChecker that always fails with an exception."""
+    """Mock HealthChecker that returns unhealthy status."""
     checker = AsyncMock(spec=HealthChecker)
-    checker.check_health = AsyncMock(side_effect=RuntimeError("Service unavailable"))
+
+    # Create unhealthy result
+    check_time = datetime.now(timezone.utc)
+    unhealthy_result = HealthCheckResult(
+        results={
+            ComponentId("test-component"): HealthCheckStatus(
+                is_healthy=False,
+                last_checked_at=check_time,
+                error_message="Service unavailable",
+            )
+        }
+    )
+
+    checker.check_health = AsyncMock(return_value=unhealthy_result)
     checker.timeout = 1.0
+    checker.target_service_group = TEST_SERVICE_GROUP
     return checker
 
 
@@ -51,13 +77,15 @@ def mock_timeout_checker() -> HealthChecker:
     """Mock HealthChecker that times out."""
     checker = AsyncMock(spec=HealthChecker)
 
-    async def slow_check() -> None:
+    async def slow_check() -> HealthCheckResult:
         import asyncio
 
         await asyncio.sleep(10)  # Will timeout
+        return HealthCheckResult(results={})
 
     checker.check_health = slow_check
     checker.timeout = 0.1  # Very short timeout
+    checker.target_service_group = TEST_SERVICE_GROUP
     return checker
 
 

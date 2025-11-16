@@ -7,10 +7,9 @@ from dataclasses import dataclass
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STATISTICS_DB, RedisRole
-from ai.backend.common.dependencies import DependencyProvider, HealthCheckerRegistration
-from ai.backend.common.health_checker import HealthCheckKey
+from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.health_checker import CID_REDIS_LIVE, CID_REDIS_STAT, HealthChecker
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
-from ai.backend.common.health_checker.types import REDIS, ComponentId
 from ai.backend.common.types import RedisProfileTarget
 
 from ...config import ServerConfig
@@ -58,7 +57,7 @@ class RedisProvider(DependencyProvider[ServerConfig, WorkerValkeyClients]):
             await valkey_live.close()
             await valkey_stat.close()
 
-    def gen_health_checkers(self, resource: WorkerValkeyClients) -> list[HealthCheckerRegistration]:
+    def gen_health_checkers(self, resource: WorkerValkeyClients) -> HealthChecker:
         """
         Return health checkers for worker Valkey clients.
 
@@ -66,15 +65,11 @@ class RedisProvider(DependencyProvider[ServerConfig, WorkerValkeyClients]):
             resource: The initialized Valkey clients
 
         Returns:
-            List of health checker registrations for Valkey clients
+            Health checker for Valkey clients
         """
-        return [
-            HealthCheckerRegistration(
-                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("live")),
-                checker=ValkeyHealthChecker(client=resource.valkey_live),
-            ),
-            HealthCheckerRegistration(
-                key=HealthCheckKey(service_group=REDIS, component_id=ComponentId("stat")),
-                checker=ValkeyHealthChecker(client=resource.valkey_stat),
-            ),
-        ]
+        return ValkeyHealthChecker(
+            clients={
+                CID_REDIS_LIVE: resource.valkey_live,
+                CID_REDIS_STAT: resource.valkey_stat,
+            }
+        )
