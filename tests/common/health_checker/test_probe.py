@@ -292,10 +292,10 @@ async def test_probe_periodic_check(
 
     await health_probe.stop()
 
-    # Verify that check_health was called multiple times
+    # Verify that check_service was called multiple times
     from unittest.mock import AsyncMock
 
-    mock = mock_healthy_checker.check_health  # type: ignore[attr-defined]
+    mock = mock_healthy_checker.check_service  # type: ignore[attr-defined]
     assert isinstance(mock, AsyncMock)
     assert mock.call_count >= 2
 
