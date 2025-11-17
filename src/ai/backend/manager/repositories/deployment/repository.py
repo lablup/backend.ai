@@ -696,11 +696,11 @@ class DeploymentRepository:
                 metric_type = metric_value.get("__type")
                 match metric_type:
                     case "HISTOGRAM":
-                        log.exception("Unable to set metric")
+                        log.exception("Unable to set auto-scaling rule on histogram metrics. Skip")
                         continue
                     case "GAUGE" | "COUNTER":
-                        pass
-                current_value = Decimal(str(metric_value.get("current", 0))) / Decimal(route_count)
+                        current_metric_value = metric_value.get("current", 0)
+                        current_value = Decimal(str(current_metric_value)) / Decimal(route_count)
 
             else:
                 log.warning(
