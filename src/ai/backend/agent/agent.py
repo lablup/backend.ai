@@ -2671,6 +2671,21 @@ class AbstractAgent(
                 # Get the resource spec from existing kernel scratches
                 # or create a new resource spec from ctx.kernel_config
                 resource_spec, resource_opts = await ctx.prepare_resource_spec()
+
+                # implicitly attach unified accelerators to every created kernels
+                for dev_type, computer_ctx in self.computers.items():
+                    for slot_name, slot_type in computer_ctx.instance.slot_types:
+                        if slot_type == SlotTypes.UNIFIED:
+                            log.debug(
+                                "mount_krunner(): Attaching Unified device {} to kernel {}",
+                                slot_name,
+                                kernel_id,
+                            )
+                            resource_spec.allocations[dev_type] = {
+                                **(resource_spec.allocations.get(dev_type) or {}),
+                                slot_name: {DeviceId("unified"): Decimal("1")},
+                            }
+
                 # When creating a new kernel,
                 # we need to allocate agent resources, prepare the networks,
                 # adn specify the container mounts.
