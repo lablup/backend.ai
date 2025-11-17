@@ -1,9 +1,10 @@
+from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.manager.models.base import batch_result_in_scalar_stream
+from ai.backend.manager.models.base import DecimalType, batch_result_in_scalar_stream
 
 
 @pytest.mark.asyncio
@@ -38,3 +39,45 @@ async def test_batch_result_in_scalar_stream():
 
     expected_result = [{"id": 1, "data": "data1"}, None, {"id": 3, "data": "data3"}]
     assert result == expected_result
+
+
+class TestDecimalType:
+    def test_process_bind_param_with_positive_value(self) -> None:
+        decimal_type = DecimalType()
+        result = decimal_type.process_bind_param(Decimal("123.45"), None)  # type: ignore[arg-type]
+        assert result == "123.45"
+
+    def test_process_bind_param_with_negative_value(self) -> None:
+        decimal_type = DecimalType()
+        result = decimal_type.process_bind_param(Decimal("-123.45"), None)  # type: ignore[arg-type]
+        assert result == "-123.45"
+
+    def test_process_bind_param_with_zero(self) -> None:
+        decimal_type = DecimalType()
+        result = decimal_type.process_bind_param(Decimal("0"), None)  # type: ignore[arg-type]
+        assert result == "0"
+
+    def test_process_bind_param_with_none(self) -> None:
+        decimal_type = DecimalType()
+        result = decimal_type.process_bind_param(None, None)  # type: ignore[arg-type]
+        assert result is None
+
+    def test_process_result_value_with_positive_value(self) -> None:
+        decimal_type = DecimalType()
+        result = decimal_type.process_result_value("123.45", None)  # type: ignore[arg-type]
+        assert result == Decimal("123.45")
+
+    def test_process_result_value_with_negative_value(self) -> None:
+        decimal_type = DecimalType()
+        result = decimal_type.process_result_value("-123.45", None)  # type: ignore[arg-type]
+        assert result == Decimal("-123.45")
+
+    def test_process_result_value_with_zero(self) -> None:
+        decimal_type = DecimalType()
+        result = decimal_type.process_result_value("0", None)  # type: ignore[arg-type]
+        assert result == Decimal("0")
+
+    def test_process_result_value_with_none(self) -> None:
+        decimal_type = DecimalType()
+        result = decimal_type.process_result_value(None, None)  # type: ignore[arg-type]
+        assert result is None

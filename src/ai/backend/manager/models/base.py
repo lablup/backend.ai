@@ -1750,14 +1750,14 @@ class DecimalType(TypeDecorator, Decimal):
         value: Optional[Decimal],
         dialect: Dialect,
     ) -> Optional[str]:
-        return f"{value:f}" if value else None
+        return f"{value:f}" if value is not None else None
 
     def process_result_value(
         self,
         value: str,
         dialect: Dialect,
     ) -> Optional[Decimal]:
-        return Decimal(value) if value else None
+        return Decimal(value) if value is not None else None
 
     @property
     def python_type(self) -> type[Decimal]:
