@@ -693,6 +693,13 @@ class DeploymentRepository:
 
                 metric_value = cast(dict[str, Any], endpoint_stat[rule.condition.metric_name])
                 route_count = len(routes) if routes else 1
+                metric_type = metric_value.get("__type")
+                match metric_type:
+                    case "HISTOGRAM":
+                        log.exception("Unable to set metric")
+                        continue
+                    case "GAUGE" | "COUNTER":
+                        pass
                 current_value = Decimal(str(metric_value.get("current", 0))) / Decimal(route_count)
 
             else:

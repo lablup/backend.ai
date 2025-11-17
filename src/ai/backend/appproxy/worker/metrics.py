@@ -100,13 +100,17 @@ async def gather_prometheus_inference_measures(
                             histogram_metrics_labels[metric_name] = tuple(labels)
                             histogram_bucket_metrics[metric_name][route.route_id] = tuple(values)
                         case "gauge":
-                            gauge_metrics[metric_name][route.route_id] = Decimal(
-                                metric_family.samples[0].value
-                            )
+                            try:
+                                value = metric_family.samples[0].value
+                            except IndexError:
+                                continue
+                            gauge_metrics[metric_name][route.route_id] = Decimal(value)
                         case "counter":
-                            counter_metrics[metric_name][route.route_id] = Decimal(
-                                metric_family.samples[0].value
-                            )
+                            try:
+                                value = metric_family.samples[0].value
+                            except IndexError:
+                                continue
+                            gauge_metrics[metric_name][route.route_id] = Decimal(value)
 
     measures: list[InferenceMeasurement] = []
     for metric_name, per_route_histogram_metrics in histogram_bucket_metrics.items():
