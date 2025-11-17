@@ -1,0 +1,102 @@
+"""Abstract base class for model revision generation."""
+
+from __future__ import annotations
+
+from abc import ABC, abstractmethod
+from typing import Optional
+from uuid import UUID
+
+from ai.backend.manager.data.deployment.types import (
+    ModelRevisionSpec,
+    ModelServiceDefinition,
+    RequestedModelRevisionSpec,
+)
+
+
+class RevisionGenerator(ABC):
+    """
+    Abstract base class for generating model revisions.
+
+    Different runtime variants may have different validation rules,
+    but all share the same override logic.
+    """
+
+    @abstractmethod
+    async def generate_revision(
+        self,
+        requested_revision: RequestedModelRevisionSpec,
+        vfolder_id: UUID,
+        model_definition_path: Optional[str],
+    ) -> ModelRevisionSpec:
+        """
+        Process requested revision by loading service definition and merging.
+
+        Args:
+            requested_revision: Requested model revision from API
+            vfolder_id: VFolder ID containing model and service definition
+            model_definition_path: Optional path to model definition directory
+
+        Returns:
+            Final ModelRevisionSpec ready for deployment
+
+        Raises:
+            InvalidAPIParameters: When validation fails
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def load_service_definition(
+        self,
+        vfolder_id: UUID,
+        model_definition_path: Optional[str],
+        runtime_variant: str,
+    ) -> Optional[ModelServiceDefinition]:
+        """
+        Load service definition from vfolder.
+
+        Args:
+            vfolder_id: VFolder ID containing service definition
+            model_definition_path: Optional path to service definition file
+            runtime_variant: Runtime variant to load definition for
+
+        Returns:
+            Service definition if found, None otherwise
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def merge_revision(
+        self,
+        requested_revision: RequestedModelRevisionSpec,
+        service_definition: Optional[ModelServiceDefinition],
+    ) -> ModelRevisionSpec:
+        """
+        Merge requested revision with service definition.
+
+        Args:
+            requested_revision: Requested model revision from API
+            service_definition: Optional service definition from file
+
+        Returns:
+            Merged ModelRevisionSpec
+
+        Raises:
+            InvalidAPIParameters: When required fields are missing
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def validate_revision(self, revision: ModelRevisionSpec) -> None:
+        """
+        Validate the final revision spec.
+
+        This is called after merging and allows variant-specific validation.
+        For example, CUSTOM variant may validate model definition existence.
+
+        Args:
+            revision: Final revision spec to validate
+
+        Raises:
+            InvalidAPIParameters: When validation fails
+        """
+        raise NotImplementedError()

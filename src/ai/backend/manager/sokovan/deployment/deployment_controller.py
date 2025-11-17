@@ -11,16 +11,12 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import DeploymentCreateRequest
 from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
-from ai.backend.manager.data.deployment.types import (
-    DeploymentInfo,
-    ModelRevisionSpec,
-    RequestedModelRevisionSpec,
-)
+from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    ModelDefinitionGeneratorRegistry,
-    RegistryArgs,
+from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
+    RevisionGeneratorRegistry,
+    RevisionGeneratorRegistryArgs,
 )
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
@@ -51,7 +47,7 @@ class DeploymentController:
     _storage_manager: StorageSessionManager
     _event_producer: EventProducer
     _valkey_schedule: ValkeyScheduleClient
-    _model_definition_generator_registry: ModelDefinitionGeneratorRegistry
+    _revision_generator_registry: RevisionGeneratorRegistry
 
     def __init__(self, args: DeploymentControllerArgs) -> None:
         """Initialize the deployment controller with required services."""
@@ -61,8 +57,8 @@ class DeploymentController:
         self._storage_manager = args.storage_manager
         self._event_producer = args.event_producer
         self._valkey_schedule = args.valkey_schedule
-        self._model_definition_generator_registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(deployment_repository=self._deployment_repository)
+        self._revision_generator_registry = RevisionGeneratorRegistry(
+            RevisionGeneratorRegistryArgs(deployment_repository=self._deployment_repository)
         )
 
     async def create_deployment(
@@ -73,32 +69,31 @@ class DeploymentController:
         Create a new deployment based on the provided specification.
 
         Args:
-            creator: Deployment creation specification
+            request: Deployment creation specification
 
         Returns:
             DeploymentInfo: Information about the created deployment
         """
         log.info("Creating deployment '{}' in project {}", request.name, request.project)
-        model_revision = await self._generate_model_revision(request.requested_model_revision)
+
+        generator = self._revision_generator_registry.get(
+            request.requested_model_revision.execution.runtime_variant
+        )
+        model_revision = await generator.generate_revision(
+            requested_revision=request.requested_model_revision,
+            vfolder_id=request.requested_model_revision.mounts.model_vfolder_id,
+            model_definition_path=request.requested_model_revision.mounts.model_definition_path,
+        )
+        print(model_revision.model_dump_json())
+
+        await self._scheduling_controller.validate_session_spec(
+            SessionValidationSpec.from_revision(model_revision=model_revision)
+        )
+
         deployment_info = await self._deployment_repository.create_endpoint(
             request.to_creator(model_revision)
         )
         return deployment_info
-
-    async def _generate_model_revision(
-        self, requested_model_revision: RequestedModelRevisionSpec
-    ) -> ModelRevisionSpec:
-        """Validate the model revision specification."""
-        generator = self._model_definition_generator_registry.get(
-            requested_model_revision.execution.runtime_variant
-        )
-        model_revision: ModelRevisionSpec = await generator.generate_model_revision(
-            requested_model_revision
-        )
-        await self._scheduling_controller.validate_session_spec(
-            SessionValidationSpec.from_revision(model_revision=model_revision)
-        )
-        return model_revision
 
     async def update_deployment(
         self,

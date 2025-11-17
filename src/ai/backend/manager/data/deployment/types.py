@@ -11,7 +11,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 import yarl
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -21,7 +21,6 @@ from ai.backend.common.data.model_deployment.types import (
     ModelDeploymentStatus,
     ReadinessStatus,
 )
-from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import (
     AutoScalingMetricSource,
     ClusterMode,
@@ -183,16 +182,26 @@ class ReplicaSpec:
         return self.replica_count
 
 
-@dataclass
-class ResourceSpec:
+class ConfiguredModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+class ResourceSpec(ConfiguredModel):
+    """
+    Resource specification with required resource_slots.
+
+    Used in final ModelRevisionSpec after merging with service definition.
+    """
+
     cluster_mode: ClusterMode
     cluster_size: int
     resource_slots: Mapping[str, Any]
     resource_opts: Optional[Mapping[str, Any]] = None
 
 
-@dataclass
-class ExecutionSpec:
+class ExecutionSpec(ConfiguredModel):
+    """Execution specification for model service."""
+
     startup_command: Optional[str] = None
     bootstrap_script: Optional[str] = None
     environ: Optional[dict[str, str]] = None
@@ -201,124 +210,64 @@ class ExecutionSpec:
     inference_runtime_config: Optional[Mapping[str, Any]] = None
 
 
-@dataclass
-class ModelRevisionSpec:
+class ModelRevisionSpec(ConfiguredModel):
+    """
+    Final model revision specification after merging request with service definition.
+
+    All required fields must be present. Pydantic validates this automatically.
+    """
+
     image_identifier: ImageIdentifier
     resource_spec: ResourceSpec
     mounts: MountMetadata
     execution: ExecutionSpec
 
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-@dataclass
-class RequestedImageIdentifier:
+    @field_validator("image_identifier")
+    @classmethod
+    def validate_image_identifier(cls, v: ImageIdentifier) -> ImageIdentifier:
+        """Validate image identifier fields are not empty."""
+        if not v.canonical or v.canonical.strip() == "":
+            raise ValueError("Image canonical must be specified")
+        if not v.architecture or v.architecture.strip() == "":
+            raise ValueError("Image architecture must be specified")
+        return v
+
+
+class RequestedImageIdentifier(ConfiguredModel):
+    """
+    Requested image identifier with optional fields.
+
+    Fields are optional to allow service definition to provide them.
+    """
+
     canonical: Optional[str]
     architecture: Optional[str]
 
 
-@dataclass
-class RequestedResourceSpec:
+class RequestedResourceSpec(ConfiguredModel):
+    """
+    Requested resource specification with optional resource_slots.
+
+    resource_slots is optional to allow service definition to provide it.
+    """
+
     cluster_mode: ClusterMode
     cluster_size: int
     resource_slots: Optional[Mapping[str, Any]]
     resource_opts: Optional[Mapping[str, Any]] = None
 
 
-@dataclass
-class RequestedModelRevisionSpec:
+class RequestedModelRevisionSpec(ConfiguredModel):
+    """
+    Requested model revision specification from API.
+    """
+
     image_identifier: RequestedImageIdentifier
     resource_spec: RequestedResourceSpec
     mounts: MountMetadata
     execution: ExecutionSpec
-
-    def to_model_revision_spec_with_service_definition(
-        self, service_definition: ModelServiceDefinition
-    ) -> ModelRevisionSpec:
-        if service_definition.resource_slots is not None:
-            resource_spec = ResourceSpec(
-                cluster_mode=self.resource_spec.cluster_mode,
-                cluster_size=self.resource_spec.cluster_size,
-                resource_slots=service_definition.resource_slots,
-                resource_opts=self.resource_spec.resource_opts,
-            )
-        else:
-            if self.resource_spec.resource_slots is None:
-                raise InvalidAPIParameters(
-                    "Resource slots must be specified in either requested model revision or model service definition."
-                )
-            resource_spec = ResourceSpec(
-                cluster_mode=self.resource_spec.cluster_mode,
-                cluster_size=self.resource_spec.cluster_size,
-                resource_slots=self.resource_spec.resource_slots,
-                resource_opts=self.resource_spec.resource_opts,
-            )
-
-        if service_definition.environment is not None:
-            image_identifier = ImageIdentifier(
-                canonical=service_definition.environment.image,
-                architecture=service_definition.environment.architecture,
-            )
-        else:
-            if self.image_identifier.canonical is None or self.image_identifier.canonical == "":
-                raise InvalidAPIParameters(
-                    "Image canonical and architecture must be specified in requested model revision if not provided in model service definition."
-                )
-            if (
-                self.image_identifier.architecture is None
-                or self.image_identifier.architecture == ""
-            ):
-                raise InvalidAPIParameters(
-                    "Image architecture must be specified in requested model revision if not provided in model service definition."
-                )
-            image_identifier = ImageIdentifier(
-                canonical=self.image_identifier.canonical,
-                architecture=self.image_identifier.architecture,
-            )
-
-        if service_definition.environ is not None:
-            if self.execution.environ:
-                self.execution.environ.update(service_definition.environ)
-            else:
-                self.execution.environ = service_definition.environ
-
-        return ModelRevisionSpec(
-            image_identifier=image_identifier,
-            resource_spec=resource_spec,
-            mounts=self.mounts,
-            execution=self.execution,
-        )
-
-    def to_model_revision_spec(self) -> ModelRevisionSpec:
-        requested_image_identifier = self.image_identifier
-        if (
-            requested_image_identifier.architecture == ""
-            or requested_image_identifier.architecture is None
-        ):
-            raise InvalidAPIParameters("Architecture must be specified for CMD runtime variant.")
-        if (
-            requested_image_identifier.canonical == ""
-            or requested_image_identifier.canonical is None
-        ):
-            raise InvalidAPIParameters(
-                "Canonical image identifier must be specified for CMD runtime variant."
-            )
-        requested_resource_spec = self.resource_spec
-        if requested_resource_spec.resource_slots is None:
-            raise InvalidAPIParameters("Resource slots must be specified for CMD runtime variant.")
-
-        return ModelRevisionSpec(
-            image_identifier=ImageIdentifier(
-                canonical=requested_image_identifier.canonical,
-                architecture=requested_image_identifier.architecture,
-            ),
-            resource_spec=ResourceSpec(
-                cluster_mode=requested_resource_spec.cluster_mode,
-                cluster_size=requested_resource_spec.cluster_size,
-                resource_slots=requested_resource_spec.resource_slots,
-                resource_opts=requested_resource_spec.resource_opts,
-            ),
-            mounts=self.mounts,
-            execution=self.execution,
-        )
 
 
 @dataclass
