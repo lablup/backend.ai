@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Optional
 
 import strawberry
-from strawberry import Info
+from strawberry import ID, Info
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -19,6 +19,23 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_meta impor
 
 @strawberry.type(description="Added in 25.14.0")
 class ArtifactRegistry:
+    id: ID = strawberry.field(
+        description=(
+            "Added in 25.17.0. "
+            "Internal identifier for the artifact registry metadata record in the 'artifact_registries' table. "
+            "This ID is unique across all registry types and represents the metadata record itself. "
+            "Example: When you need to reference a registry entry in the metadata table, use this ID."
+        )
+    )
+    registry_id: ID = strawberry.field(
+        description=(
+            "Added in 25.17.0. "
+            "Identifier of the actual registry implementation (e.g., HuggingFace registry, Reservoir registry). "
+            "This ID corresponds to the primary key in the registry-type-specific table. "
+            "Example: For a HuggingFace registry, this value matches the 'id' field in the 'huggingface_registries' table. "
+            "Use this ID when you need to access type-specific registry details."
+        )
+    )
     name: str = strawberry.field(description="Name of the default artifact registry.")
     type: ArtifactRegistryType = strawberry.field(
         description="Type of the default artifact registry."
@@ -48,9 +65,11 @@ async def default_artifact_registry(
         )
     )
 
-    registry_type = artifact_registry_meta.result.type
+    registry_data = artifact_registry_meta.result
 
     return ArtifactRegistry(
+        id=ID(str(registry_data.id)),
+        registry_id=ID(str(registry_data.registry_id)),
         name=registry_name,
-        type=registry_type,
+        type=registry_data.type,
     )
