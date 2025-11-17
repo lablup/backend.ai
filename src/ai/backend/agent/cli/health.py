@@ -7,7 +7,7 @@ from .context import CLIContext
 
 @click.group()
 def cli() -> None:
-    """Health check commands for manager components."""
+    """Health check commands for agent components."""
     pass
 
 
@@ -30,9 +30,9 @@ def check(
     log_level: str,
 ) -> None:
     """
-    Perform health checks on all manager dependencies.
+    Perform health checks on all agent dependencies.
 
-    This command initializes all manager dependencies and then performs
+    This command initializes all agent dependencies and then performs
     health checks on each component to verify they are responsive.
 
     The output shows health check results with status indicators:
@@ -43,13 +43,13 @@ def check(
     Examples:
 
         # Check all health endpoints with default WARNING log level
-        $ backend.ai mgr health check
+        $ backend.ai ag health check
 
         # Hide timestamps in output
-        $ backend.ai mgr health check --no-timestamps
+        $ backend.ai ag health check --no-timestamps
 
         # Set log level to DEBUG to see detailed check logs
-        $ backend.ai mgr health check --log-level DEBUG
+        $ backend.ai ag health check --log-level DEBUG
     """
     import asyncio
     import logging as std_logging
@@ -82,24 +82,24 @@ def check(
         probe: HealthProbe,
     ) -> AsyncIterator[None]:
         """
-        Initialize dependencies using ManagerDependencyComposer.
+        Initialize dependencies using AgentDependencyComposer.
 
-        Uses the ManagerDependencyComposer to initialize all dependencies in the correct order,
+        Uses the AgentDependencyComposer to initialize all dependencies in the correct order,
         then collects health checkers from the DependencyBuilderStack.
         """
-        from ai.backend.common.dependencies.stacks.builder import DependencyBuilderStack
-        from ai.backend.manager.dependencies.composer import (
-            DependencyInput,
-            ManagerDependencyComposer,
+        from ai.backend.agent.dependencies.composer import (
+            AgentDependencyComposer,
+            AgentDependencyInput,
         )
+        from ai.backend.common.dependencies.stacks.builder import DependencyBuilderStack
 
         dependency_stack = DependencyBuilderStack()
 
         async with dependency_stack:
-            # Use ManagerDependencyComposer to initialize all dependencies
-            manager_composer = ManagerDependencyComposer()
-            manager_input = DependencyInput(config_path=config_path, log_level=log_level)
-            await dependency_stack.enter_composer(manager_composer, manager_input)
+            # Use AgentDependencyComposer to initialize all dependencies
+            agent_composer = AgentDependencyComposer()
+            agent_input = AgentDependencyInput(config_path=config_path, log_level=log_level)
+            await dependency_stack.enter_composer(agent_composer, agent_input)
 
             # Get collected health checkers and register them
             health_checkers = dependency_stack.get_health_checkers()
@@ -161,9 +161,9 @@ def check(
         print("=" * 60)
 
     async def _check_health() -> bool:
-        """Perform health checks on all manager components."""
+        """Perform health checks on all agent components."""
         print("\n" + "=" * 60)
-        print("Manager Health Check")
+        print("Agent Health Check")
         print("=" * 60)
         print(f"Config: {config_path or 'default locations'}")
         print(f"Log Level: {log_level.upper()}")
@@ -176,7 +176,7 @@ def check(
 
         try:
             async with _initialize_and_check_all_components(
-                config_path or Path("manager.toml"),
+                config_path or Path("agent.toml"),
                 LogLevel(log_level.upper()),
                 probe,
             ):
