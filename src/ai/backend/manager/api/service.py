@@ -1,4 +1,5 @@
 import logging
+import re
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -20,6 +21,7 @@ from pydantic import (
     HttpUrl,
     NonNegativeFloat,
     NonNegativeInt,
+    field_validator,
     model_validator,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -410,7 +412,7 @@ class ValidationResult:
 
 
 class NewServiceRequestModel(LegacyBaseRequestModel):
-    service_name: tv.SessionName = Field(
+    service_name: str = Field(
         description="Name of the service",
         validation_alias=AliasChoices("name", "clientSessionToken"),
     )
@@ -477,6 +479,20 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
         default=False,
     )
     config: ServiceConfigModel
+
+    @field_validator("service_name")
+    @classmethod
+    def validate_service_name(cls, name: str) -> str:
+        service_name_matcher = re.compile(
+            r"^(?=.{4,%d}$)\w[\w-]*\w$" % (tv.SESSION_NAME_MAX_LENGTH,), re.ASCII
+        )
+        if not service_name_matcher.search(name):
+            raise InvalidAPIParameters(
+                f"Invalid service name format."
+                f"Service name must be 4-{tv.SESSION_NAME_MAX_LENGTH} characters long, and can only contain alphanumeric characters, underscores, and hyphens."
+                f"It must start and end with an alphanumeric character."
+            )
+        return name
 
     def to_create_action(
         self,

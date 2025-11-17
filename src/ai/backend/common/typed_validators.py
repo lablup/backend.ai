@@ -2,7 +2,6 @@ import datetime
 import ipaddress
 import os
 import pwd
-import re
 from collections.abc import Mapping, Sequence
 from datetime import tzinfo
 from pathlib import Path
@@ -27,7 +26,6 @@ from pydantic import (
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import core_schema
 
-from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import HostPortPair as LegacyHostPortPair
 
 from .defs import (
@@ -170,24 +168,6 @@ NaiveTimeDuration = Annotated[TVariousDelta, _NaiveTimeDurationPydanticAnnotatio
 """Time duration validator which also accepts negative value"""
 
 SESSION_NAME_MAX_LENGTH: Final[int] = 24
-SESSION_NAME_MATCHER = re.compile(
-    r"^(?=.{4,%d}$)\w[\w-]*\w$" % (SESSION_NAME_MAX_LENGTH,), re.ASCII
-)
-
-
-def _session_name_validator(s: str) -> str:
-    if SESSION_NAME_MATCHER.search(s):
-        return s
-    else:
-        raise InvalidAPIParameters(
-            f"Invalid service name format."
-            f"Service name must be 4-{SESSION_NAME_MAX_LENGTH} characters long, and can only contain alphanumeric characters, underscores, and hyphens."
-            f"It must start and end with an alphanumeric character."
-        )
-
-
-SessionName = Annotated[str, AfterValidator(_session_name_validator)]
-"""Validator with extended re.ASCII option to match session name string literal"""
 
 
 def _vfolder_name_validator(name: str) -> str:
