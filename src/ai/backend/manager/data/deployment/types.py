@@ -187,12 +187,6 @@ class ConfiguredModel(BaseModel):
 
 
 class ResourceSpec(ConfiguredModel):
-    """
-    Resource specification with required resource_slots.
-
-    Used in final ModelRevisionSpec after merging with service definition.
-    """
-
     cluster_mode: ClusterMode
     cluster_size: int
     resource_slots: Mapping[str, Any]
@@ -200,8 +194,6 @@ class ResourceSpec(ConfiguredModel):
 
 
 class ExecutionSpec(ConfiguredModel):
-    """Execution specification for model service."""
-
     startup_command: Optional[str] = None
     bootstrap_script: Optional[str] = None
     environ: Optional[dict[str, str]] = None
@@ -211,12 +203,6 @@ class ExecutionSpec(ConfiguredModel):
 
 
 class ModelRevisionSpec(ConfiguredModel):
-    """
-    Final model revision specification after merging request with service definition.
-
-    All required fields must be present. Pydantic validates this automatically.
-    """
-
     image_identifier: ImageIdentifier
     resource_spec: ResourceSpec
     mounts: MountMetadata
@@ -227,7 +213,6 @@ class ModelRevisionSpec(ConfiguredModel):
     @field_validator("image_identifier")
     @classmethod
     def validate_image_identifier(cls, v: ImageIdentifier) -> ImageIdentifier:
-        """Validate image identifier fields are not empty."""
         if not v.canonical or v.canonical.strip() == "":
             raise ValueError("Image canonical must be specified")
         if not v.architecture or v.architecture.strip() == "":
@@ -236,23 +221,11 @@ class ModelRevisionSpec(ConfiguredModel):
 
 
 class RequestedImageIdentifier(ConfiguredModel):
-    """
-    Requested image identifier with optional fields.
-
-    Fields are optional to allow service definition to provide them.
-    """
-
     canonical: Optional[str]
     architecture: Optional[str]
 
 
 class RequestedResourceSpec(ConfiguredModel):
-    """
-    Requested resource specification with optional resource_slots.
-
-    resource_slots is optional to allow service definition to provide it.
-    """
-
     cluster_mode: ClusterMode
     cluster_size: int
     resource_slots: Optional[Mapping[str, Any]]
@@ -260,10 +233,6 @@ class RequestedResourceSpec(ConfiguredModel):
 
 
 class RequestedModelRevisionSpec(ConfiguredModel):
-    """
-    Requested model revision specification from API.
-    """
-
     image_identifier: RequestedImageIdentifier
     resource_spec: RequestedResourceSpec
     mounts: MountMetadata
