@@ -6,6 +6,8 @@ from contextlib import asynccontextmanager
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.common.dependencies import DependencyProvider
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.health_checker import ServiceHealthChecker
+from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 
 
 class AgentEtcdDependency(DependencyProvider[AgentUnifiedConfig, AsyncEtcd]):
@@ -61,3 +63,15 @@ class AgentEtcdDependency(DependencyProvider[AgentUnifiedConfig, AsyncEtcd]):
             yield etcd
         finally:
             await etcd.close()
+
+    def gen_health_checkers(self, resource: AsyncEtcd) -> ServiceHealthChecker:
+        """
+        Return health checker for etcd.
+
+        Args:
+            resource: The initialized etcd client
+
+        Returns:
+            Health checker for etcd
+        """
+        return EtcdHealthChecker(etcd=resource)

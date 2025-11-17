@@ -2,7 +2,7 @@ import asyncio
 import importlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import aiohttp_cors
 import click
@@ -17,9 +17,28 @@ from ai.backend.common.cli import LazyGroup
 from ai.backend.logging.types import LogLevel
 
 from ..config import ServerConfig
+from .context import CLIContext
 
 
 @click.group(invoke_without_command=False, context_settings={"help_option_names": ["-h", "--help"]})
+@click.option(
+    "-f",
+    "--config-path",
+    "--config",
+    type=click.Path(
+        file_okay=True,
+        dir_okay=False,
+        exists=True,
+        path_type=Path,
+    ),
+    default=None,
+    help="The config file path. (default: ./app-proxy-worker.toml)",
+)
+@click.option(
+    "--debug",
+    is_flag=True,
+    help="Set the logging level to DEBUG",
+)
 @click.option(
     "--log-level",
     type=click.Choice([*LogLevel.__members__.keys()], case_sensitive=False),
@@ -29,12 +48,17 @@ from ..config import ServerConfig
 @click.pass_context
 def main(
     ctx: click.Context,
+    debug: bool,
     log_level: str,
+    config_path: Optional[Path] = None,
 ) -> None:
     """
     Proxy Worker Administration CLI
     """
     setproctitle("backend.ai: proxy-worker.cli")
+    if debug:
+        log_level = "DEBUG"
+    ctx.obj = ctx.with_resource(CLIContext(config_path=config_path, log_level=LogLevel(log_level)))
 
 
 @main.command()
@@ -97,6 +121,11 @@ def generate_openapi_spec(output: Path) -> None:
 @main.group(cls=LazyGroup, import_name="ai.backend.appproxy.worker.cli.dependencies:cli")
 def dependencies():
     """Command set for dependency verification and validation."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.appproxy.worker.cli.health:cli")
+def health():
+    """Command set for health checking."""
 
 
 if __name__ == "__main__":

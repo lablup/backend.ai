@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import AsyncContextManager, Generic, TypeVar
+from typing import TYPE_CHECKING, AsyncContextManager, Generic, Optional, TypeVar, final
+
+if TYPE_CHECKING:
+    from ai.backend.common.health_checker import ServiceHealthChecker
 
 SetupInputT = TypeVar("SetupInputT")
 ResourceT = TypeVar("ResourceT")
@@ -40,6 +43,45 @@ class DependencyProvider(ABC, Generic[SetupInputT, ResourceT]):
             An async context manager that yields the initialized dependency
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def gen_health_checkers(self, resource: ResourceT) -> Optional[ServiceHealthChecker]:
+        """
+        Return a health checker for the provided resource.
+
+        Override this method to provide health checking capability for this dependency.
+        The health checker will be automatically collected by DependencyBuilderStack
+        and registered using checker.target_service_group as the key.
+
+        Args:
+            resource: The initialized resource from provide()
+
+        Returns:
+            ServiceHealthChecker instance or None if no health checking is needed
+        """
+        raise NotImplementedError
+
+
+class NonMonitorableDependencyProvider(DependencyProvider[SetupInputT, ResourceT]):
+    """
+    Base class for dependency providers that do not require health monitoring.
+
+    This class provides a default implementation of gen_health_checkers()
+    that returns None, indicating no health checks are needed.
+    """
+
+    @final
+    def gen_health_checkers(self, resource: ResourceT) -> None:
+        """
+        Return None as this dependency does not require health monitoring.
+
+        Args:
+            resource: The initialized resource from provide()
+
+        Returns:
+            None indicating no health checks
+        """
+        return None
 
 
 class DependencyComposer(ABC, Generic[SetupInputT, ResourcesT]):

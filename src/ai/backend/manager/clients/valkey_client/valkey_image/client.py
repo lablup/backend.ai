@@ -89,6 +89,10 @@ class ValkeyImageClient:
         self._closed = True
         await self._client.disconnect()
 
+    async def ping(self) -> None:
+        """Ping the Valkey server to check connection health."""
+        await self._client.ping()
+
     @valkey_image_resilience.apply()
     async def add_agent_to_images(
         self,

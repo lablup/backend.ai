@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.common.dependencies.stacks.asyncexit import AsyncExitDependencyStack
+from ai.backend.common.dependencies.stacks.builder import DependencyBuilderStack
 from ai.backend.common.typed_validators import CommaSeparatedStrList
 from ai.backend.web.dependencies.components.composer import (
     ComponentComposer,
@@ -74,7 +74,7 @@ class TestComponentComposer:
         mock_hive_pool_class.return_value = mock_hive_pool
 
         composer = ComponentComposer()
-        stack = AsyncExitDependencyStack()
+        stack = DependencyBuilderStack()
 
         async with stack:
             async with composer.compose(stack, config) as resources:  # type: ignore[arg-type]
@@ -114,7 +114,7 @@ class TestComponentComposer:
         mock_manager_pool_class.return_value = mock_manager_pool
 
         composer = ComponentComposer()
-        stack = AsyncExitDependencyStack()
+        stack = DependencyBuilderStack()
 
         async with stack:
             async with composer.compose(stack, config) as resources:  # type: ignore[arg-type]

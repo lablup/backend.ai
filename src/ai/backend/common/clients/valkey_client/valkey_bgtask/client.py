@@ -129,6 +129,10 @@ class ValkeyBgtaskClient:
             await self._client.disconnect()
             self._closed = True
 
+    async def ping(self) -> None:
+        """Ping the Valkey server to check connection health."""
+        await self._client.ping()
+
     def _get_tag_key(self, tag: str) -> str:
         return f"{_TAG_KEY_PREFIX}:{tag}"
 

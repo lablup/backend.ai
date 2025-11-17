@@ -9,9 +9,10 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.exception import ErrorDetail, ErrorDomain, ErrorOperation
+from ai.backend.common.health_checker import AGENT, ComponentId
 from ai.backend.common.types import AgentId
 from ai.backend.manager.clients.agent.client import AgentClient
-from ai.backend.manager.health_checker.rpc import AgentRpcHealthChecker, RpcHealthCheckError
+from ai.backend.manager.health.rpc import AgentRpcHealthChecker, RpcHealthCheckError
 
 
 class TestAgentRpcHealthChecker:
@@ -45,12 +46,33 @@ class TestAgentRpcHealthChecker:
             timeout=5.0,
         )
 
-        # Should not raise
-        await checker.check_health()
+        result = await checker.check_service()
 
         # Verify health() was called
         mock_health: AsyncMock = mock_agent_client.health  # type: ignore[assignment]
         mock_health.assert_called_once()
+
+        # Verify result
+        assert len(result.results) == 1
+        component_id = ComponentId(str(mock_agent_client.agent_id))
+        assert component_id in result.results
+        status = result.results[component_id]
+        assert status.is_healthy is True
+        assert status.error_message is None
+        assert isinstance(status.last_checked_at, datetime)
+
+    @pytest.mark.asyncio
+    async def test_target_service_group(
+        self,
+        mock_agent_client: AgentClient,
+    ) -> None:
+        """Test that target_service_group returns AGENT."""
+        checker = AgentRpcHealthChecker(
+            agent_client=mock_agent_client,
+            timeout=5.0,
+        )
+
+        assert checker.target_service_group == AGENT
 
     @pytest.mark.asyncio
     async def test_timeout_property(
@@ -78,12 +100,16 @@ class TestAgentRpcHealthChecker:
             timeout=5.0,
         )
 
-        with pytest.raises(RpcHealthCheckError) as exc_info:
-            await checker.check_health()
+        result = await checker.check_service()
 
-        # Error message should include agent_id
-        assert str(mock_agent_client.agent_id) in str(exc_info.value)
-        assert "health check failed" in str(exc_info.value).lower()
+        # Verify result indicates failure
+        assert len(result.results) == 1
+        component_id = ComponentId(str(mock_agent_client.agent_id))
+        status = result.results[component_id]
+        assert status.is_healthy is False
+        assert status.error_message is not None
+        assert "health check failed" in status.error_message.lower()
+        assert isinstance(status.last_checked_at, datetime)
 
     @pytest.mark.asyncio
     async def test_multiple_checks(
@@ -97,13 +123,19 @@ class TestAgentRpcHealthChecker:
         )
 
         # Multiple checks should all succeed
-        await checker.check_health()
-        await checker.check_health()
-        await checker.check_health()
+        result1 = await checker.check_service()
+        result2 = await checker.check_service()
+        result3 = await checker.check_service()
 
         # health() should have been called 3 times
         mock_health: AsyncMock = mock_agent_client.health  # type: ignore[assignment]
         assert mock_health.call_count == 3
+
+        # All results should be healthy
+        component_id = ComponentId(str(mock_agent_client.agent_id))
+        assert result1.results[component_id].is_healthy
+        assert result2.results[component_id].is_healthy
+        assert result3.results[component_id].is_healthy
 
     @pytest.mark.asyncio
     async def test_connection_timeout(self, mock_agent_client: AgentClient) -> None:
@@ -117,13 +149,16 @@ class TestAgentRpcHealthChecker:
             timeout=5.0,
         )
 
-        with pytest.raises(RpcHealthCheckError) as exc_info:
-            await checker.check_health()
+        result = await checker.check_service()
 
-        # Error message should indicate the issue
-        error_msg = str(exc_info.value).lower()
-        assert "health check failed" in error_msg
-        assert str(mock_agent_client.agent_id) in str(exc_info.value)
+        # Verify result indicates failure
+        assert len(result.results) == 1
+        component_id = ComponentId(str(mock_agent_client.agent_id))
+        status = result.results[component_id]
+        assert status.is_healthy is False
+        assert status.error_message is not None
+        assert "health check failed" in status.error_message.lower()
+        assert isinstance(status.last_checked_at, datetime)
 
 
 class TestRpcHealthCheckError:

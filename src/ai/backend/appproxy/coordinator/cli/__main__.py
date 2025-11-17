@@ -223,5 +223,10 @@ def dependencies():
     """Command set for dependency verification and validation."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.health:cli")
+def health():
+    """Command set for health checking."""
+
+
 if __name__ == "__main__":
     main()

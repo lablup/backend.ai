@@ -126,6 +126,10 @@ class ValkeyStatClient:
         self._closed = True
         await self._client.disconnect()
 
+    async def ping(self) -> None:
+        """Ping the Valkey server to check connection health."""
+        await self._client.ping()
+
     @valkey_stat_resilience.apply()
     async def get_keypair_query_count(self, access_key: str) -> int:
         """

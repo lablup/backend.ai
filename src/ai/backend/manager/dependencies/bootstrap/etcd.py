@@ -4,6 +4,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.health_checker import ServiceHealthChecker
+from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
 from ai.backend.manager.config.bootstrap import BootstrapConfig
 
 from .base import BootstrapDependency
@@ -31,3 +33,15 @@ class EtcdDependency(BootstrapDependency[AsyncEtcd]):
             yield etcd
         finally:
             await etcd.close()
+
+    def gen_health_checkers(self, resource: AsyncEtcd) -> ServiceHealthChecker:
+        """
+        Return health checker for etcd.
+
+        Args:
+            resource: The initialized etcd client
+
+        Returns:
+            EtcdHealthChecker for etcd
+        """
+        return EtcdHealthChecker(etcd=resource)

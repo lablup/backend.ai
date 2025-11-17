@@ -12,6 +12,12 @@ from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import REDIS_BGTASK_DB, REDIS_STATISTICS_DB, RedisRole
 from ai.backend.common.dependencies import DependencyProvider
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.health_checker import (
+    CID_REDIS_ARTIFACT,
+    CID_REDIS_BGTASK,
+    ServiceHealthChecker,
+)
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 
 
 @dataclass
@@ -63,3 +69,20 @@ class RedisProvider(DependencyProvider[AsyncEtcd, StorageProxyValkeyClients]):
         finally:
             await bgtask_client.close()
             await artifact_client.close()
+
+    def gen_health_checkers(self, resource: StorageProxyValkeyClients) -> ServiceHealthChecker:
+        """
+        Return health checkers for storage proxy Valkey clients.
+
+        Args:
+            resource: The initialized Valkey clients
+
+        Returns:
+            Health checker for bgtask and artifact clients
+        """
+        return ValkeyHealthChecker(
+            clients={
+                CID_REDIS_BGTASK: resource.bgtask,
+                CID_REDIS_ARTIFACT: resource.artifact,
+            }
+        )

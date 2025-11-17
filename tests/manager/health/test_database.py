@@ -5,10 +5,10 @@ from collections.abc import AsyncIterator
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.health_checker.exceptions import DatabaseHealthCheckError
+from ai.backend.common.health_checker.types import CID_POSTGRES
 from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.manager.config.bootstrap import DatabaseConfig
-from ai.backend.manager.health_checker.database import DatabaseHealthChecker
+from ai.backend.manager.health.database import DatabaseHealthChecker
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, connect_database
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     HostPortPairModel,
@@ -47,7 +47,7 @@ class TestDatabaseHealthChecker:
         )
 
         # Should not raise - this tests actual DB connection
-        await checker.check_health()
+        await checker.check_service()
 
     @pytest.mark.asyncio
     async def test_timeout_property(self) -> None:
@@ -82,9 +82,9 @@ class TestDatabaseHealthChecker:
         )
 
         # Multiple checks should all succeed
-        await checker.check_health()
-        await checker.check_health()
-        await checker.check_health()
+        await checker.check_service()
+        await checker.check_service()
+        await checker.check_service()
 
     @pytest.mark.asyncio
     async def test_invalid_connection(self) -> None:
@@ -104,10 +104,13 @@ class TestDatabaseHealthChecker:
                 timeout=2.0,
             )
 
-            with pytest.raises(DatabaseHealthCheckError) as exc_info:
-                await checker.check_health()
+            # check_service returns unhealthy status instead of raising exception
+            result = await checker.check_service()
 
-            # Should contain error information
-            assert "health check failed" in str(exc_info.value).lower()
+            # Should return unhealthy status with error message
+            assert CID_POSTGRES in result.results
+            status = result.results[CID_POSTGRES]
+            assert not status.is_healthy
+            assert status.error_message is not None
         finally:
             await extended_engine.dispose()

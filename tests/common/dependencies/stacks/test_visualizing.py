@@ -8,14 +8,18 @@ from typing import Any
 
 import pytest
 
-from ai.backend.common.dependencies import DependencyComposer, DependencyProvider, DependencyStack
+from ai.backend.common.dependencies import (
+    DependencyComposer,
+    DependencyStack,
+    NonMonitorableDependencyProvider,
+)
 from ai.backend.common.dependencies.stacks.visualizing import (
     DependencyStatus,
     VisualizingDependencyStack,
 )
 
 
-class SimpleDependencyProvider(DependencyProvider[Any, str]):
+class SimpleDependencyProvider(NonMonitorableDependencyProvider[Any, str]):
     """
     Simple dependency provider for testing.
     """

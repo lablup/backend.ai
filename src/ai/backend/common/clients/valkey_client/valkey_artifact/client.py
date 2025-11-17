@@ -98,6 +98,10 @@ class ValkeyArtifactDownloadTrackingClient:
         self._closed = True
         await self._client.disconnect()
 
+    async def ping(self) -> None:
+        """Ping the Valkey server to check connection health."""
+        await self._client.ping()
+
     def _create_batch(self, is_atomic: bool = False) -> Batch:
         """
         Create a batch for transaction operations.

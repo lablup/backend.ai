@@ -60,3 +60,8 @@ def config() -> None:
 @main.group(cls=LazyGroup, import_name="ai.backend.agent.cli.dependencies:cli")
 def dependencies() -> None:
     """Command set for dependency verification and validation."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.agent.cli.health:cli")
+def health() -> None:
+    """Command set for health checking."""

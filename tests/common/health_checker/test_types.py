@@ -2,8 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-import pytest
-
 from ai.backend.common.health_checker import (
     AGENT,
     APPPROXY,
@@ -12,9 +10,8 @@ from ai.backend.common.health_checker import (
     MANAGER,
     REDIS,
     STORAGE_PROXY,
+    ComponentHealthStatus,
     ComponentId,
-    HealthCheckKey,
-    HealthCheckStatus,
     ServiceGroup,
 )
 
@@ -42,53 +39,10 @@ def test_component_id_newtype() -> None:
     assert component_id == "postgres"
 
 
-def test_health_check_key_creation() -> None:
-    """Test HealthCheckKey frozen dataclass creation."""
-    key = HealthCheckKey(
-        service_group=MANAGER,
-        component_id=ComponentId("postgres"),
-    )
-    assert key.service_group == MANAGER
-    assert key.component_id == ComponentId("postgres")
-
-
-def test_health_check_key_hashable() -> None:
-    """Test that HealthCheckKey is hashable and can be used as dict key."""
-    key1 = HealthCheckKey(MANAGER, ComponentId("redis"))
-    key2 = HealthCheckKey(MANAGER, ComponentId("redis"))
-    key3 = HealthCheckKey(AGENT, ComponentId("redis"))
-
-    # Same keys should have same hash
-    assert key1 == key2
-    assert hash(key1) == hash(key2)
-
-    # Different keys should not be equal
-    assert key1 != key3
-
-    # Can be used as dict key
-    test_dict: dict[HealthCheckKey, str] = {
-        key1: "value1",
-        key3: "value2",
-    }
-    assert test_dict[key1] == "value1"
-    assert test_dict[key3] == "value2"
-
-
-def test_health_check_key_immutable() -> None:
-    """Test that HealthCheckKey is immutable (frozen dataclass)."""
-    key = HealthCheckKey(
-        service_group=MANAGER,
-        component_id=ComponentId("postgres"),
-    )
-
-    with pytest.raises(AttributeError):
-        key.service_group = AGENT  # type: ignore
-
-
-def test_health_check_status_creation() -> None:
-    """Test HealthCheckStatus dataclass creation."""
+def test_component_health_status_creation() -> None:
+    """Test ComponentHealthStatus dataclass creation."""
     now = datetime.now(timezone.utc)
-    status = HealthCheckStatus(
+    status = ComponentHealthStatus(
         is_healthy=True,
         last_checked_at=now,
         error_message=None,
@@ -99,11 +53,11 @@ def test_health_check_status_creation() -> None:
     assert status.error_message is None
 
 
-def test_health_check_status_with_error() -> None:
-    """Test HealthCheckStatus with error message."""
+def test_component_health_status_with_error() -> None:
+    """Test ComponentHealthStatus with error message."""
     now = datetime.now(timezone.utc)
     error_msg = "Connection failed"
-    status = HealthCheckStatus(
+    status = ComponentHealthStatus(
         is_healthy=False,
         last_checked_at=now,
         error_message=error_msg,

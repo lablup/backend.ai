@@ -33,3 +33,17 @@ class StorageManagerDependency(ComponentDependency[StorageSessionManager]):
             yield storage_manager
         finally:
             await storage_manager.aclose()
+
+    def gen_health_checkers(self, resource: StorageSessionManager) -> None:
+        """
+        Return health checkers for storage manager.
+
+        Currently no health checks are implemented for storage manager.
+
+        Args:
+            resource: The initialized storage session manager
+
+        Returns:
+            None (no health checks)
+        """
+        return None

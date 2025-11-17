@@ -6,7 +6,9 @@ from contextlib import asynccontextmanager
 from aiodocker import Docker
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.health import DockerHealthChecker
 from ai.backend.common.dependencies import DependencyProvider
+from ai.backend.common.health_checker import ServiceHealthChecker
 
 
 class DockerDependency(DependencyProvider[AgentUnifiedConfig, Docker]):
@@ -35,3 +37,18 @@ class DockerDependency(DependencyProvider[AgentUnifiedConfig, Docker]):
             yield docker
         finally:
             await docker.close()
+
+    def gen_health_checkers(
+        self,
+        resource: Docker,
+    ) -> ServiceHealthChecker:
+        """
+        Return Docker health checker.
+
+        Args:
+            resource: The initialized Docker client
+
+        Returns:
+            DockerHealthChecker for Docker
+        """
+        return DockerHealthChecker(docker=resource)

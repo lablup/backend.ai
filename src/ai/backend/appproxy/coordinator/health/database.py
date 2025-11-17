@@ -2,49 +2,55 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.health_checker.abc import StaticServiceHealthChecker
+from ai.backend.common.health_checker.types import (
+    CID_POSTGRES,
+    DATABASE,
+    ComponentHealthStatus,
+    ServiceGroup,
+    ServiceHealth,
+)
 
-from ..abc import StaticServiceHealthChecker
-from ..types import CID_ETCD, ETCD, ComponentHealthStatus, ServiceGroup, ServiceHealth
+from ..models.utils import ExtendedAsyncSAEngine
 
 
-class EtcdHealthChecker(StaticServiceHealthChecker):
+class DatabaseHealthChecker(StaticServiceHealthChecker):
     """
-    Health checker for etcd connections.
+    Health checker for database connections.
 
-    Uses the ping() method of AsyncEtcd to check connection health.
+    Uses the ping() method of ExtendedAsyncSAEngine to check connection health.
     """
 
-    _etcd: AsyncEtcd
+    _db: ExtendedAsyncSAEngine
     _timeout: float
 
-    def __init__(self, etcd: AsyncEtcd, timeout: float = 5.0) -> None:
+    def __init__(self, db: ExtendedAsyncSAEngine, timeout: float = 5.0) -> None:
         """
-        Initialize EtcdHealthChecker.
+        Initialize DatabaseHealthChecker.
 
         Args:
-            etcd: The etcd client instance to check
+            db: The database engine instance to check
             timeout: Timeout in seconds for the health check
         """
-        self._etcd = etcd
+        self._db = db
         self._timeout = timeout
 
     @property
     def target_service_group(self) -> ServiceGroup:
         """The service group this checker monitors."""
-        return ETCD
+        return DATABASE
 
     async def check_service(self) -> ServiceHealth:
         """
-        Check etcd connection health by pinging the server.
+        Check database connection health by pinging the server.
 
         Returns:
-            ServiceHealth containing status for etcd component
+            ServiceHealth containing the database health status
         """
         check_time = datetime.now(timezone.utc)
 
         try:
-            await self._etcd.ping()
+            await self._db.ping()
             status = ComponentHealthStatus(
                 is_healthy=True,
                 last_checked_at=check_time,
@@ -57,7 +63,7 @@ class EtcdHealthChecker(StaticServiceHealthChecker):
                 error_message=str(e),
             )
 
-        return ServiceHealth(results={CID_ETCD: status})
+        return ServiceHealth(results={CID_POSTGRES: status})
 
     @property
     def timeout(self) -> float:

@@ -6,7 +6,6 @@ import pytest
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
-from ai.backend.common.health_checker.exceptions import EtcdHealthCheckError
 from ai.backend.testutils.bootstrap import HostPortPairModel
 
 
@@ -48,8 +47,11 @@ class TestEtcdHealthChecker:
             timeout=5.0,
         )
 
-        # Should not raise
-        await checker.check_health()
+        result = await checker.check_service()
+        assert len(result.results) == 1
+        status = result.results[list(result.results.keys())[0]]
+        assert status.is_healthy
+        assert status.error_message is None
 
     @pytest.mark.asyncio
     async def test_timeout_property(self, etcd_client: AsyncEtcd) -> None:
@@ -84,11 +86,11 @@ class TestEtcdHealthChecker:
                 timeout=1.0,
             )
 
-            with pytest.raises(EtcdHealthCheckError) as exc_info:
-                await checker.check_health()
-
-            # Should contain error information
-            assert "health check failed" in str(exc_info.value).lower()
+            result = await checker.check_service()
+            assert len(result.results) == 1
+            status = result.results[list(result.results.keys())[0]]
+            assert not status.is_healthy
+            assert status.error_message is not None
         finally:
             await etcd.close()
 
@@ -101,6 +103,11 @@ class TestEtcdHealthChecker:
         )
 
         # Multiple checks should all succeed
-        await checker.check_health()
-        await checker.check_health()
-        await checker.check_health()
+        result1 = await checker.check_service()
+        assert result1.results[list(result1.results.keys())[0]].is_healthy
+
+        result2 = await checker.check_service()
+        assert result2.results[list(result2.results.keys())[0]].is_healthy
+
+        result3 = await checker.check_service()
+        assert result3.results[list(result3.results.keys())[0]].is_healthy

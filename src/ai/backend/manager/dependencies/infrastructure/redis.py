@@ -24,6 +24,18 @@ from ai.backend.common.defs import (
     REDIS_STREAM_DB,
     RedisRole,
 )
+from ai.backend.common.health_checker import (
+    CID_REDIS_ARTIFACT,
+    CID_REDIS_BGTASK,
+    CID_REDIS_CONTAINER_LOG,
+    CID_REDIS_IMAGE,
+    CID_REDIS_LIVE,
+    CID_REDIS_SCHEDULE,
+    CID_REDIS_STAT,
+    CID_REDIS_STREAM,
+    ServiceHealthChecker,
+)
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
@@ -125,3 +137,29 @@ class ValkeyDependency(InfrastructureDependency[ValkeyClients]):
             yield clients
         finally:
             await clients.close()
+
+    def gen_health_checkers(
+        self,
+        resource: ValkeyClients,
+    ) -> ServiceHealthChecker:
+        """
+        Return a single health checker for all 8 Valkey clients.
+
+        Args:
+            resource: The initialized Valkey clients
+
+        Returns:
+            ValkeyHealthChecker that checks all 8 Valkey clients
+        """
+        return ValkeyHealthChecker(
+            clients={
+                CID_REDIS_ARTIFACT: resource.artifact,
+                CID_REDIS_CONTAINER_LOG: resource.container_log,
+                CID_REDIS_LIVE: resource.live,
+                CID_REDIS_STAT: resource.stat,
+                CID_REDIS_IMAGE: resource.image,
+                CID_REDIS_STREAM: resource.stream,
+                CID_REDIS_SCHEDULE: resource.schedule,
+                CID_REDIS_BGTASK: resource.bgtask,
+            }
+        )
