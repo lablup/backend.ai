@@ -236,7 +236,9 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
             alloc_sum = Decimal(0)
             for per_dev_alloc in device_alloc.values():
                 alloc_sum += sum(per_dev_alloc.values())
-            do_hook_mount = alloc_sum > 0
+            do_hook_mount = alloc_sum > 0 or (
+                set([k for k, v in computer_ctx.instance.slot_types]) & set(device_alloc.keys())
+            )
             if do_hook_mount:
                 hook_paths = await computer_ctx.instance.get_hooks(
                     runner_info.distro, runner_info.architecture

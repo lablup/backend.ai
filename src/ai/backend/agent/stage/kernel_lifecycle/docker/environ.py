@@ -167,10 +167,12 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
             alloc_sum = Decimal(0)
             for per_dev_alloc in device_alloc.values():
                 alloc_sum += sum(per_dev_alloc.values())
-            do_hook_mount = alloc_sum > 0
+            computer_ctx = spec.agent_info.computers[dev_type]
+            do_hook_mount = alloc_sum > 0 or (
+                set([k for k, v in computer_ctx.instance.slot_types]) & set(device_alloc.keys())
+            )
             if not do_hook_mount:
                 continue
-            computer_ctx = spec.agent_info.computers[dev_type]
             hook_paths = await computer_ctx.instance.get_hooks(
                 spec.agent_info.distro, spec.agent_info.architecture
             )
