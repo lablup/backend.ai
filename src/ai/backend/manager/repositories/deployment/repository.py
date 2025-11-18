@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 from typing import Any, Optional, cast
 
 import tomli
@@ -693,7 +693,23 @@ class DeploymentRepository:
 
                 metric_value = cast(dict[str, Any], endpoint_stat[rule.condition.metric_name])
                 route_count = len(routes) if routes else 1
-                current_value = Decimal(str(metric_value.get("current", 0))) / Decimal(route_count)
+                metric_type = metric_value.get("__type")
+                match metric_type:
+                    case "HISTOGRAM":
+                        log.exception("Unable to set auto-scaling rule on histogram metrics. Skip")
+                        continue
+                    case "GAUGE" | "COUNTER" | _:
+                        current_metric_value = metric_value.get("current", 0)
+                        try:
+                            current_value = Decimal(str(current_metric_value)) / Decimal(
+                                route_count
+                            )
+                        except DecimalException:
+                            log.exception(
+                                "Unable parse metric value '{}' to decimal. Skip",
+                                current_metric_value,
+                            )
+                            continue
 
             else:
                 log.warning(
