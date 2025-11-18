@@ -317,9 +317,12 @@ class ServiceConfigModel(LegacyBaseRequestModel):
 
 
 class NewServiceRequestModel(LegacyBaseRequestModel):
-    service_name: tv.SessionName = Field(
+    service_name: str = Field(
         description="Name of the service",
         validation_alias=AliasChoices("name", "clientSessionToken"),
+        pattern=r"^\w[\w-]*\w$",
+        min_length=4,
+        max_length=tv.SESSION_NAME_MAX_LENGTH,
     )
     replicas: int = Field(
         description="Number of sessions to serve traffic. Replacement of `desired_session_count` (or `desiredSessionCount`).",

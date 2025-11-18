@@ -1,6 +1,11 @@
 import datetime
-import re
-from typing import Annotated, Any, Final, TypeAlias
+import ipaddress
+import os
+import pwd
+from collections.abc import Mapping, Sequence
+from datetime import tzinfo
+from pathlib import Path
+from typing import Annotated, Any, ClassVar, Final, Optional, TypeAlias, TypeVar
 
 from dateutil.relativedelta import relativedelta
 from pydantic import (
@@ -151,20 +156,6 @@ NaiveTimeDuration = Annotated[TVariousDelta, _NaiveTimeDurationPydanticAnnotatio
 """Time duration validator which also accepts negative value"""
 
 SESSION_NAME_MAX_LENGTH: Final[int] = 24
-SESSION_NAME_MATCHER = re.compile(
-    r"^(?=.{4,%d}$)\w[\w.-]*\w$" % (SESSION_NAME_MAX_LENGTH,), re.ASCII
-)
-
-
-def session_name_validator(s: str) -> str:
-    if SESSION_NAME_MATCHER.search(s):
-        return s
-    else:
-        raise AssertionError(f"String did not match {SESSION_NAME_MATCHER}")
-
-
-SessionName = Annotated[str, AfterValidator(session_name_validator)]
-"""Validator with extended re.ASCII option to match session name string literal"""
 
 
 def _vfolder_name_validator(name: str) -> str:
