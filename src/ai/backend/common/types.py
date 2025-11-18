@@ -398,6 +398,7 @@ class SlotTypes(enum.StrEnum):
     COUNT = "count"
     BYTES = "bytes"
     UNIQUE = "unique"
+    UNIFIED = "unified"
 
 
 class HardwareMetadata(TypedDict):
