@@ -942,6 +942,9 @@
         "properties": {
           "name": {
             "description": "Name of the service",
+            "maxLength": 24,
+            "minLength": 4,
+            "pattern": "^\\w[\\w-]*\\w$",
             "title": "Name",
             "type": "string"
           },
