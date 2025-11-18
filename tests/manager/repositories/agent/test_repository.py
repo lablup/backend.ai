@@ -20,11 +20,11 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended, AgentStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.options import (
-    AgentQueryConditions,
-    AgentQueryOrders,
-    ListAgentQueryOptions,
+    AgentConditions,
+    AgentOrders,
 )
 from ai.backend.manager.repositories.agent.repository import AgentRepository
+from ai.backend.manager.repositories.base import Querier
 
 
 class TestAgentRepository:
@@ -157,9 +157,9 @@ class TestAgentRepository:
     ) -> None:
         """Test list_data properly delegates to db_source"""
         # Given
-        options = ListAgentQueryOptions(
-            conditions=[AgentQueryConditions.by_scaling_group("default")],
-            orders=[AgentQueryOrders.id(ascending=True)],
+        querier = Querier(
+            conditions=[AgentConditions.by_scaling_group("default")],
+            orders=[AgentOrders.id(ascending=True)],
         )
 
         expected_agents = [
@@ -211,14 +211,14 @@ class TestAgentRepository:
             "fetch_agent_data_list",
             new=AsyncMock(return_value=expected_agents),
         ) as mock_fetch:
-            result = await agent_repository.list_data(options)
+            result = await agent_repository.list_data(querier)
 
             # Then
             assert len(result) == 2
             assert result[0].id == AgentId("agent-001")
             assert result[1].id == AgentId("agent-002")
             assert all(agent.scaling_group == "default" for agent in result)
-            mock_fetch.assert_called_once_with(options)
+            mock_fetch.assert_called_once_with(querier)
 
     @pytest.mark.asyncio
     async def test_list_data_with_empty_result(
@@ -227,8 +227,8 @@ class TestAgentRepository:
     ) -> None:
         """Test list_data returns empty list when no agents match"""
         # Given
-        options = ListAgentQueryOptions(
-            conditions=[AgentQueryConditions.by_scaling_group("non-existent")],
+        querier = Querier(
+            conditions=[AgentConditions.by_scaling_group("non-existent")],
             orders=[],
         )
 
@@ -238,11 +238,11 @@ class TestAgentRepository:
             "fetch_agent_data_list",
             new=AsyncMock(return_value=[]),
         ) as mock_fetch:
-            result = await agent_repository.list_data(options)
+            result = await agent_repository.list_data(querier)
 
             # Then
             assert len(result) == 0
-            mock_fetch.assert_called_once_with(options)
+            mock_fetch.assert_called_once_with(querier)
 
     @pytest.mark.asyncio
     async def test_list_extended_data_delegates_to_db_source(
@@ -252,9 +252,9 @@ class TestAgentRepository:
     ) -> None:
         """Test list_extended_data properly delegates to db_source with requirements"""
         # Given
-        options = ListAgentQueryOptions(
-            conditions=[AgentQueryConditions.by_statuses([AgentStatus.ALIVE])],
-            orders=[AgentQueryOrders.id(ascending=False)],
+        querier = Querier(
+            conditions=[AgentConditions.by_statuses([AgentStatus.ALIVE])],
+            orders=[AgentOrders.id(ascending=False)],
         )
 
         known_slot_types = {
@@ -321,7 +321,7 @@ class TestAgentRepository:
             "fetch_agent_extended_data_list",
             new=AsyncMock(return_value=expected_agents),
         ) as mock_fetch:
-            result = await agent_repository.list_extended_data(options)
+            result = await agent_repository.list_extended_data(querier)
 
             # Then
             assert len(result) == 2
@@ -336,8 +336,8 @@ class TestAgentRepository:
             # Verify db_source was called with correct arguments
             mock_fetch.assert_called_once()
             call_args = mock_fetch.call_args
-            assert call_args[0][0] == options
-            assert call_args[0][1].known_slot_types == known_slot_types
+            assert call_args[0][0].known_slot_types == known_slot_types
+            assert call_args[0][1] == querier
 
     @pytest.mark.asyncio
     async def test_list_extended_data_with_multiple_conditions(
@@ -347,12 +347,12 @@ class TestAgentRepository:
     ) -> None:
         """Test list_extended_data with multiple query conditions"""
         # Given
-        options = ListAgentQueryOptions(
+        querier = Querier(
             conditions=[
-                AgentQueryConditions.by_scaling_group("gpu-group"),
-                AgentQueryConditions.by_statuses([AgentStatus.ALIVE, AgentStatus.RESTARTING]),
+                AgentConditions.by_scaling_group("gpu-group"),
+                AgentConditions.by_statuses([AgentStatus.ALIVE, AgentStatus.RESTARTING]),
             ],
-            orders=[AgentQueryOrders.scaling_group(ascending=True)],
+            orders=[AgentOrders.scaling_group(ascending=True)],
         )
 
         known_slot_types = {
@@ -393,7 +393,7 @@ class TestAgentRepository:
             "fetch_agent_extended_data_list",
             new=AsyncMock(return_value=[expected_agent]),
         ) as mock_fetch:
-            result = await agent_repository.list_extended_data(options)
+            result = await agent_repository.list_extended_data(querier)
 
             # Then
             assert len(result) == 1

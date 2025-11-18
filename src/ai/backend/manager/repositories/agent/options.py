@@ -1,5 +1,6 @@
-from collections.abc import Collection, Sequence
-from dataclasses import dataclass
+from __future__ import annotations
+
+from collections.abc import Collection
 
 import sqlalchemy as sa
 
@@ -9,20 +10,7 @@ from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.repositories.base import QueryCondition, QueryOrder
 
 
-@dataclass
-class ListAgentQueryOptions:
-    conditions: Sequence[QueryCondition]
-    orders: Sequence[QueryOrder]
-
-    def apply(self, query: sa.sql.Select) -> sa.sql.Select:
-        for condition in self.conditions:
-            query = query.where(condition())
-        for order in self.orders:
-            query = query.order_by(order)
-        return query
-
-
-class AgentQueryConditions:
+class AgentConditions:
     @staticmethod
     def by_ids(agent_ids: Collection[AgentId]) -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
@@ -45,7 +33,7 @@ class AgentQueryConditions:
         return inner
 
 
-class AgentQueryOrders:
+class AgentOrders:
     @staticmethod
     def id(ascending: bool = True) -> QueryOrder:
         if ascending:

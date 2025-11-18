@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from typing import TYPE_CHECKING, Optional, cast
 
@@ -26,7 +28,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.scaling_group import ScalingGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.agent.options import ListAgentQueryOptions
+from ai.backend.manager.repositories.base import Querier
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -149,7 +151,7 @@ class AgentDBSource:
             )
             await session.execute(query)
 
-    async def fetch_agent_data_list(self, options: ListAgentQueryOptions) -> list[AgentData]:
+    async def fetch_agent_data_list(self, querier: Optional[Querier] = None) -> list[AgentData]:
         stmt: sa.sql.Select = (
             sa.select(AgentRow)
             .select_from(
@@ -168,17 +170,23 @@ class AgentDBSource:
             )
         )
 
-        final_stmt = options.apply(stmt)
+        if querier:
+            for condition in querier.conditions:
+                stmt = stmt.where(condition())
+            for order in querier.orders:
+                stmt = stmt.order_by(order)
+            if querier.pagination:
+                stmt = querier.pagination.apply(stmt)
 
         async with self._db.begin_readonly_session() as db_session:
-            result = await db_session.scalars(final_stmt)
+            result = await db_session.scalars(stmt)
             agent_rows = cast(list[AgentRow], result.unique().all())
             return [agent_row.to_data() for agent_row in agent_rows]
 
     async def fetch_agent_extended_data_list(
         self,
-        options: ListAgentQueryOptions,
         requirements: AgentDataExtendedRequirements,
+        querier: Optional[Querier] = None,
     ) -> list[AgentDataExtended]:
         stmt: sa.sql.Select = (
             sa.select(AgentRow)
@@ -198,8 +206,15 @@ class AgentDBSource:
             )
         )
 
-        final_stmt = options.apply(stmt)
+        if querier:
+            for condition in querier.conditions:
+                stmt = stmt.where(condition())
+            for order in querier.orders:
+                stmt = stmt.order_by(order)
+            if querier.pagination:
+                stmt = querier.pagination.apply(stmt)
+
         async with self._db.begin_readonly_session() as db_session:
-            result = await db_session.scalars(final_stmt)
+            result = await db_session.scalars(stmt)
             agent_rows = cast(list[AgentRow], result.unique().all())
             return [agent_row.to_extended_data(requirements) for agent_row in agent_rows]
