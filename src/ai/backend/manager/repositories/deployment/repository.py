@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 from typing import Any, Optional, cast
 
 import tomli
@@ -698,9 +698,18 @@ class DeploymentRepository:
                     case "HISTOGRAM":
                         log.exception("Unable to set auto-scaling rule on histogram metrics. Skip")
                         continue
-                    case "GAUGE" | "COUNTER":
+                    case "GAUGE" | "COUNTER" | _:
                         current_metric_value = metric_value.get("current", 0)
-                        current_value = Decimal(str(current_metric_value)) / Decimal(route_count)
+                        try:
+                            current_value = Decimal(str(current_metric_value)) / Decimal(
+                                route_count
+                            )
+                        except DecimalException:
+                            log.exception(
+                                "Unable parse metric value '{}' to decimal. Skip",
+                                current_metric_value,
+                            )
+                            continue
 
             else:
                 log.warning(
