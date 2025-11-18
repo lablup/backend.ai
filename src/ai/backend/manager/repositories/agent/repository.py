@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import logging
 import zlib
-from typing import Any, Mapping
+from typing import Any, Mapping, Optional
 
 from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -27,9 +29,8 @@ from ai.backend.manager.data.image.types import ImageDataWithDetails
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
+from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
-
-from .options import ListAgentQueryOptions
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -151,21 +152,21 @@ class AgentRepository:
     @agent_repository_resilience.apply()
     async def list_data(
         self,
-        options: ListAgentQueryOptions,
+        querier: Optional[Querier] = None,
     ) -> list[AgentData]:
-        return await self._db_source.fetch_agent_data_list(options)
+        return await self._db_source.fetch_agent_data_list(querier)
 
     @agent_repository_resilience.apply()
     async def list_extended_data(
         self,
-        options: ListAgentQueryOptions,
+        querier: Optional[Querier] = None,
     ) -> list[AgentDataExtended]:
         requirements = AgentDataExtendedRequirements(
             known_slot_types=(
                 await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
             )
         )
-        return await self._db_source.fetch_agent_extended_data_list(options, requirements)
+        return await self._db_source.fetch_agent_extended_data_list(requirements, querier)
 
     @agent_repository_resilience.apply()
     async def update_gpu_alloc_map(self, agent_id: AgentId, alloc_map: Mapping[str, Any]) -> None:

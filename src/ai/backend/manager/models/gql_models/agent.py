@@ -28,10 +28,10 @@ from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.data.agent.types import AgentData, AgentDataExtended
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.repositories.agent.options import (
-    AgentQueryConditions,
-    AgentQueryOrders,
-    ListAgentQueryOptions,
+    AgentConditions,
+    AgentOrders,
 )
+from ai.backend.manager.repositories.base import Querier
 
 from ..agent import (
     ADMIN_PERMISSIONS,
@@ -158,9 +158,9 @@ class AgentNode(graphene.ObjectType):
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Optional[Self]:
         graphene_ctx: GraphQueryContext = info.context
         _, raw_agent_id = AsyncNode.resolve_global_id(info, id)
-        condition = [AgentQueryConditions.by_ids([AgentId(raw_agent_id)])]
-        options = ListAgentQueryOptions(conditions=condition, orders=[])
-        agent_list = await graphene_ctx.agent_repository.list_extended_data(options)
+        condition = [AgentConditions.by_ids([AgentId(raw_agent_id)])]
+        querier = Querier(conditions=condition, orders=[])
+        agent_list = await graphene_ctx.agent_repository.list_extended_data(querier)
         if len(agent_list) == 0:
             return None
         return cls.from_extended_data(agent_list[0])
@@ -309,9 +309,9 @@ class AgentNode(graphene.ObjectType):
             permissions = await permission_getter(row)
             agent_permissions[row.id] = list(permissions)
         list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
-        condition = [AgentQueryConditions.by_ids(agent_ids)]
-        options = ListAgentQueryOptions(conditions=condition, orders=[])
-        agent_list = await graph_ctx.agent_repository.list_extended_data(options)
+        condition = [AgentConditions.by_ids(agent_ids)]
+        querier = Querier(conditions=condition, orders=[])
+        agent_list = await graph_ctx.agent_repository.list_extended_data(querier)
 
         result: list[AgentNode] = []
         for agent in sorted(agent_list, key=lambda obj: list_order[obj.id]):
@@ -544,9 +544,9 @@ class Agent(graphene.ObjectType):
             async for row in await conn.stream(query):
                 agent_ids.append(row.id)
         list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
-        condition = [AgentQueryConditions.by_ids(agent_ids)]
-        options = ListAgentQueryOptions(conditions=condition, orders=[])
-        agent_list = await graph_ctx.agent_repository.list_extended_data(options)
+        condition = [AgentConditions.by_ids(agent_ids)]
+        querier = Querier(conditions=condition, orders=[])
+        agent_list = await graph_ctx.agent_repository.list_extended_data(querier)
         return [
             cls.from_extended_data(agent)
             for agent in sorted(agent_list, key=lambda obj: list_order[obj.id])
@@ -562,12 +562,12 @@ class Agent(graphene.ObjectType):
     ) -> Sequence[Agent]:
         conditions = []
         if scaling_group is not None:
-            conditions.append(AgentQueryConditions.by_scaling_group(scaling_group))
+            conditions.append(AgentConditions.by_scaling_group(scaling_group))
         if raw_status is not None:
-            conditions.append(AgentQueryConditions.by_statuses([AgentStatus[raw_status]]))
+            conditions.append(AgentConditions.by_statuses([AgentStatus[raw_status]]))
 
-        options = ListAgentQueryOptions(conditions=conditions, orders=[])
-        agent_list = await graph_ctx.agent_repository.list_extended_data(options)
+        querier = Querier(conditions=conditions, orders=[])
+        agent_list = await graph_ctx.agent_repository.list_extended_data(querier)
         return [cls.from_extended_data(agent) for agent in agent_list]
 
     @classmethod
@@ -578,12 +578,12 @@ class Agent(graphene.ObjectType):
         *,
         raw_status: Optional[str] = None,
     ) -> Sequence[Agent | None]:
-        condition = [AgentQueryConditions.by_ids(agent_ids)]
-        order = [AgentQueryOrders.id(ascending=True)]
-        options = ListAgentQueryOptions(conditions=condition, orders=order)
+        condition = [AgentConditions.by_ids(agent_ids)]
+        order = [AgentOrders.id(ascending=True)]
         if raw_status is not None:
-            condition.append(AgentQueryConditions.by_statuses([AgentStatus[raw_status]]))
-        agent_list = await graph_ctx.agent_repository.list_extended_data(options)
+            condition.append(AgentConditions.by_statuses([AgentStatus[raw_status]]))
+        querier = Querier(conditions=condition, orders=order)
+        agent_list = await graph_ctx.agent_repository.list_extended_data(querier)
         return [cls.from_extended_data(agent) for agent in agent_list]
 
     @classmethod
@@ -836,9 +836,9 @@ class AgentSummary(graphene.ObjectType):
                 agent_ids.append(row.id)
 
         list_order = {agent_id: idx for idx, agent_id in enumerate(agent_ids)}
-        condition = [AgentQueryConditions.by_ids(agent_ids)]
-        options = ListAgentQueryOptions(conditions=condition, orders=[])
-        agent_list = await graph_ctx.agent_repository.list_data(options)
+        condition = [AgentConditions.by_ids(agent_ids)]
+        querier = Querier(conditions=condition, orders=[])
+        agent_list = await graph_ctx.agent_repository.list_data(querier)
         return [
             cls.from_data(agent) for agent in sorted(agent_list, key=lambda obj: list_order[obj.id])
         ]
