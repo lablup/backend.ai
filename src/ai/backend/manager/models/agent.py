@@ -175,7 +175,7 @@ class AgentRow(Base):
 
     @classmethod
     async def get_agents_by_condition(
-        cls, conditions: Sequence["QueryCondition"], *, db: ExtendedAsyncSAEngine
+        cls, conditions: Sequence[QueryCondition], *, db: ExtendedAsyncSAEngine
     ) -> list[Self]:
         query_stmt = sa.select(AgentRow)
         for cond in conditions:
@@ -223,7 +223,7 @@ class AgentRow(Base):
 
 def by_scaling_group(
     scaling_group: str,
-) -> "QueryCondition":
+) -> QueryCondition:
     def _by_scaling_group(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.expression.BinaryExpression:
@@ -234,7 +234,7 @@ def by_scaling_group(
 
 def by_status(
     status: AgentStatus,
-) -> "QueryCondition":
+) -> QueryCondition:
     def _by_status(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.expression.BinaryExpression:
@@ -245,7 +245,7 @@ def by_status(
 
 def by_schedulable(
     schedulable: bool,
-) -> "QueryCondition":
+) -> QueryCondition:
     def _by_schedulable(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.expression.BinaryExpression:

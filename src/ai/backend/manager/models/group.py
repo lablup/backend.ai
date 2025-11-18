@@ -258,8 +258,8 @@ class GroupRow(Base):
     @classmethod
     async def query_by_condition(
         cls,
-        conditions: Sequence["QueryCondition"],
-        options: Sequence["QueryOption"] = tuple(),
+        conditions: Sequence[QueryCondition],
+        options: Sequence[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
@@ -317,7 +317,7 @@ class GroupRow(Base):
         return rows[0]
 
 
-def by_id(project_id: uuid.UUID) -> "QueryCondition":
+def by_id(project_id: uuid.UUID) -> QueryCondition:
     def _by_id(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:

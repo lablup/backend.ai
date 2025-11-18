@@ -285,7 +285,7 @@ class ScalingGroupRow(Base):
     @classmethod
     async def list_by_condition(
         cls,
-        conditions: Iterable["QueryCondition"],
+        conditions: Iterable[QueryCondition],
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:

@@ -272,7 +272,7 @@ class UserRow(Base):
     @classmethod
     async def query_by_condition(
         cls,
-        conditions: Sequence["QueryCondition"],
+        conditions: Sequence[QueryCondition],
         options: Sequence["QueryOption"] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
@@ -390,7 +390,7 @@ class UserRow(Base):
 
 def by_user_uuid(
     user_uuid: UUID,
-) -> "QueryCondition":
+) -> QueryCondition:
     def _by_user_uuid(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:
@@ -401,7 +401,7 @@ def by_user_uuid(
 
 def by_username(
     username: str,
-) -> "QueryCondition":
+) -> QueryCondition:
     def _by_username(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:
@@ -412,7 +412,7 @@ def by_username(
 
 def by_user_email(
     email: str,
-) -> "QueryCondition":
+) -> QueryCondition:
     def _by_email(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:

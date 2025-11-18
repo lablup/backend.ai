@@ -587,7 +587,7 @@ class KernelRow(Base):
     @classmethod
     async def get_kernels(
         cls,
-        conditions: Sequence["QueryCondition"],
+        conditions: Sequence[QueryCondition],
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
@@ -1071,7 +1071,7 @@ async def recalc_concurrency_used(
 
 def by_status(
     status: Iterable[KernelStatus],
-) -> "QueryCondition":
+) -> QueryCondition:
     def _by_status(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:
@@ -1082,7 +1082,7 @@ def by_status(
 
 def by_agent_id(
     agent_id: str,
-) -> "QueryCondition":
+) -> QueryCondition:
     def _by_agent_id(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:
@@ -1093,7 +1093,7 @@ def by_agent_id(
 
 def by_kernel_ids(
     kernel_ids: Iterable[KernelId],
-) -> "QueryCondition":
+) -> QueryCondition:
     def _by_kernel_id(
         query_stmt: sa.sql.Select,
     ) -> sa.sql.Select:

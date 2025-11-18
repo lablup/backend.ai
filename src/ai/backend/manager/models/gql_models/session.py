@@ -772,7 +772,7 @@ class TotalResourceSlot(graphene.ObjectType):
             status_list = [SessionStatus[s] for s in statuses]
         else:
             status_list = None
-        query_conditions: list["QueryCondition"] = []
+        query_conditions: list[QueryCondition] = []
         if raw_filter is not None:
             query_conditions.append(by_raw_filter(_queryfilter_fieldspec, raw_filter))
         if status_list is not None:
