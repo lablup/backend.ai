@@ -47,9 +47,11 @@ class DummyKernel(AbstractKernel):
         self.dummy_config = dummy_config
         self.dummy_kernel_cfg = self.dummy_config["kernel"]
 
+    @override
     async def close(self) -> None:
         pass
 
+    @override
     async def create_code_runner(
         self,
         event_producer: EventProducer,
@@ -80,43 +82,52 @@ class DummyKernel(AbstractKernel):
                 client_features=client_features,
             )
 
+    @override
     async def check_status(self):
         delay = self.dummy_kernel_cfg["delay"]["check-status"]
         await asyncio.sleep(delay)
         return {}
 
+    @override
     async def get_completions(self, text, opts) -> CodeCompletionResp:
         delay = self.dummy_kernel_cfg["delay"]["get-completions"]
         await asyncio.sleep(delay)
         return CodeCompletionResp(result=CodeCompletionResult.success({"suggestions": []}))
 
+    @override
     async def get_logs(self):
         delay = self.dummy_kernel_cfg["delay"]["get-logs"]
         await asyncio.sleep(delay)
         return {"logs": "my logs"}
 
+    @override
     async def interrupt_kernel(self):
         delay = self.dummy_kernel_cfg["delay"]["interrupt-kernel"]
         await asyncio.sleep(delay)
 
+    @override
     async def start_service(self, service, opts):
         delay = self.dummy_kernel_cfg["delay"]["start-service"]
         await asyncio.sleep(delay)
 
+    @override
     async def start_model_service(self, model_service: Mapping[str, Any]):
         delay = self.dummy_kernel_cfg["delay"]["start-model-service"]
         await asyncio.sleep(delay)
         return {}
 
+    @override
     async def shutdown_service(self, service):
         delay = self.dummy_kernel_cfg["delay"]["shutdown-service"]
         await asyncio.sleep(delay)
 
+    @override
     async def check_duplicate_commit(self, kernel_id, subdir) -> CommitStatus:
         if self.is_commiting:
             return CommitStatus.ONGOING
         return CommitStatus.READY
 
+    @override
     async def commit(
         self,
         kernel_id,
@@ -131,6 +142,7 @@ class DummyKernel(AbstractKernel):
         await asyncio.sleep(delay)
         self.is_commiting = False
 
+    @override
     async def get_service_apps(self):
         delay = self.dummy_kernel_cfg["delay"]["get-service-apps"]
         await asyncio.sleep(delay)
@@ -162,6 +174,7 @@ class DummyKernel(AbstractKernel):
         await asyncio.sleep(delay)
         return {"files": "", "errors": "", "abspath": ""}
 
+    @override
     async def notify_event(self, evdata: AgentEventData):
         raise NotImplementedError
 
@@ -194,9 +207,11 @@ class DummyCodeRunner(AbstractCodeRunner):
         self.repl_in_port = repl_in_port
         self.repl_out_port = repl_out_port
 
+    @override
     async def get_repl_in_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_in_port}"
 
+    @override
     async def get_repl_out_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
@@ -267,51 +282,66 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
         self.watchdog_task = None
         self._closed = False
 
+    @override
     async def get_repl_in_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_in_port}"
 
+    @override
     async def get_repl_out_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
+    @override
     async def close(self) -> None:
         return None
 
+    @override
     async def ping_status(self):
         return None
 
+    @override
     async def feed_batch(self, opts):
         return None
 
+    @override
     async def feed_code(self, text: str):
         return None
 
+    @override
     async def feed_input(self, text: str):
         return None
 
+    @override
     async def feed_interrupt(self):
         return None
 
+    @override
     async def feed_and_get_status(self):
         return None
 
+    @override
     async def feed_and_get_completion(self, code_text, opts):
-        return []
+        return CodeCompletionResult.failure("not-implemented")
 
+    @override
     async def feed_start_model_service(self, model_info):
         return {"status": "failed", "error": "not-implemented"}
 
+    @override
     async def feed_start_service(self, service_info):
         return {"status": "failed", "error": "not-implemented"}
 
+    @override
     async def feed_service_apps(self):
         return {"status": "failed", "error": "not-implemented"}
 
+    @override
     @staticmethod
     def aggregate_console(
         result: NextResult, records: Sequence[ResultRecord], api_ver: int
     ) -> None:
         return
 
+    @override
     async def get_next_result(self, api_ver=2, flush_timeout=2.0) -> NextResult:
         return {
             "runId": self.current_run_id,
@@ -320,15 +350,19 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
             "options": None,
         }
 
+    @override
     async def attach_output_queue(self, run_id: str | None) -> None:
         return
 
+    @override
     def resume_output_queue(self) -> None:
         return
 
+    @override
     def next_output_queue(self) -> None:
         return
 
+    @override
     async def read_output(self) -> None:
         return
 
