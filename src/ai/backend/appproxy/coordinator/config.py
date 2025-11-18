@@ -298,7 +298,6 @@ class ProxyCoordinatorConfig(BaseSchema):
             self.advertised_addr if self.advertised_addr is not None else self.bind_addr
         )
         protocol = "https" if (self.tls_advertised or self.tls_listen) else "http"
-        # Strip any protocol that might be in the host
         return f"{protocol}://{connection_info.clean_host}:{connection_info.port}"
 
 
