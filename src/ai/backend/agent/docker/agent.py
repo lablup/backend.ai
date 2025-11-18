@@ -321,9 +321,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.tmp_dir = tmp_dir
         self.config_dir = scratch_dir / "config"
         self.work_dir = scratch_dir / "work"
-        self.uid = kernel_config["uid"]
-        self.main_gid = kernel_config["main_gid"]
-        self.supplementary_gids = set(kernel_config["supplementary_gids"])
 
         self.port_pool = port_pool
         self.agent_sockpath = agent_sockpath
@@ -337,18 +334,6 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
         self.gwbridge_subnet = gwbridge_subnet
 
         self.network_plugin_ctx = network_plugin_ctx
-
-    @override
-    def get_overriding_uid(self) -> Optional[int]:
-        return self.uid
-
-    @override
-    def get_overriding_gid(self) -> Optional[int]:
-        return self.main_gid
-
-    @override
-    def get_supplementary_gids(self) -> set[int]:
-        return self.supplementary_gids
 
     def _kernel_resource_spec_read(self, filename):
         with open(filename, "r") as f:

@@ -357,6 +357,9 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self.kernel_config = kernel_config
         self.image_ref = kernel_image
         self.distro = distro
+        self.uid = kernel_config["uid"]
+        self.main_gid = kernel_config["main_gid"]
+        self.supplementary_gids = set(kernel_config["supplementary_gids"])
         self.internal_data = kernel_config["internal_data"] or {}
         self.computers = computers
         self.restarting = restarting
@@ -705,13 +708,13 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         update_additional_gids(environ, list(additional_gid_set))
 
     def get_overriding_uid(self) -> Optional[int]:
-        return None
+        return self.uid
 
     def get_overriding_gid(self) -> Optional[int]:
-        return None
+        return self.main_gid
 
     def get_supplementary_gids(self) -> set[int]:
-        return set()
+        return self.supplementary_gids
 
 
 KernelCreationContextType = TypeVar(
