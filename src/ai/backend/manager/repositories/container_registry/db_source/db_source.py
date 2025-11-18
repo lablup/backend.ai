@@ -73,7 +73,7 @@ class ContainerRegistryDBSource:
             if result.rowcount == 0:
                 raise ContainerRegistryNotFound(f"Container registry not found (id:{registry_id})")
 
-            reg_row = await session.scalar(
+            reg_row: ContainerRegistryRow = await session.scalar(
                 sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == registry_id)
             )
 
@@ -142,7 +142,7 @@ class ContainerRegistryDBSource:
     async def fetch_by_registry_and_project(
         self,
         registry_name: str,
-        project: str,
+        project: Optional[str],
     ) -> ContainerRegistryData:
         """Fetch container registry data by registry name and project."""
         async with self._db.begin_readonly_session() as session:
@@ -179,7 +179,7 @@ class ContainerRegistryDBSource:
     async def mark_images_as_deleted(
         self,
         registry_name: str,
-        project: str,
+        project: Optional[str],
     ) -> None:
         """Mark all images as deleted for a given registry and optional project."""
         async with self._db.begin_session() as session:
@@ -215,7 +215,7 @@ class ContainerRegistryDBSource:
     async def fetch_registry_row(
         self,
         registry_name: str,
-        project: str,
+        project: Optional[str],
     ) -> ContainerRegistryRow:
         """Fetch container registry data by registry name and project."""
         async with self._db.begin_readonly_session() as session:

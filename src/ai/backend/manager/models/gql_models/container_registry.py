@@ -425,7 +425,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
             type=OptionalState.from_graphql(type),
             registry_name=OptionalState.from_graphql(registry_name),
             is_global=TriState.from_graphql(is_global),
-            project=OptionalState.from_graphql(project),
+            project=TriState.from_graphql(project),
             username=TriState.from_graphql(username),
             password=TriState.from_graphql(password),
             ssl_verify=TriState.from_graphql(ssl_verify),

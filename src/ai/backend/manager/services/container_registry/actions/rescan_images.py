@@ -11,7 +11,7 @@ from ai.backend.manager.services.container_registry.actions.base import Containe
 @dataclass
 class RescanImagesAction(ContainerRegistryAction):
     registry: str
-    project: str
+    project: Optional[str]
     progress_reporter: Optional[ProgressReporter]
 
     @override
