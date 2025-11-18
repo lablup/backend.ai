@@ -708,12 +708,15 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         update_additional_gids(environ, list(additional_gid_set))
 
     def get_overriding_uid(self) -> Optional[int]:
+        # TODO(BA-3073): This should be separated out to its own class/module.
         return self.uid
 
     def get_overriding_gid(self) -> Optional[int]:
+        # TODO(BA-3073): This should be separated out to its own class/module.
         return self.main_gid
 
     def get_supplementary_gids(self) -> set[int]:
+        # TODO(BA-3073): This should be separated out to its own class/module.
         return self.supplementary_gids
 
 
