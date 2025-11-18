@@ -367,5 +367,5 @@ class DummyFakeCodeRunner(AbstractCodeRunner):
         return
 
 
-async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, Sequence[str]]:
+async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, str]:
     return {}

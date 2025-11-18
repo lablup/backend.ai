@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-import importlib
 import signal
-from typing import TYPE_CHECKING, Mapping, Optional, Type
+from typing import TYPE_CHECKING, Mapping, Optional
 
-from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.agent import AbstractAgent, get_agent_discovery
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.errors.runtime import AgentIdNotFoundError
 from ai.backend.agent.etcd import AgentEtcdClientView
@@ -117,9 +116,7 @@ class AgentRuntime:
         }
 
         backend = local_config.agent_common.backend
-        agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
-        agent_cls: Type[AbstractAgent] = agent_mod.get_agent_cls()
-
+        agent_cls = get_agent_discovery(backend).get_agent_cls()
         return await agent_cls.new(etcd_view, agent_config, **agent_kwargs)
 
     def __init__(

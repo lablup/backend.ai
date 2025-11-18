@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import functools
-import importlib
 import logging
 import os
 import shutil
@@ -49,7 +48,7 @@ from pydantic import ValidationError
 from setproctitle import setproctitle
 from zmq.auth.certs import load_certificate
 
-from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.agent import AbstractAgent, get_agent_discovery
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.resources import scan_gpu_alloc_map
@@ -1369,10 +1368,8 @@ async def etcd_ctx(local_config: AgentUnifiedConfig) -> AsyncGenerator[AsyncEtcd
 
 async def prepare_krunner_volumes(local_config: AgentUnifiedConfig) -> None:
     log.info("Preparing kernel runner environments...")
-    kernel_mod = importlib.import_module(
-        f"ai.backend.agent.{local_config.agent_common.backend.value}.kernel",
-    )
-    krunner_volumes: Mapping[str, str] = await kernel_mod.prepare_krunner_env(
+    agent_discovery = get_agent_discovery(local_config.agent_common.backend)
+    krunner_volumes = await agent_discovery.prepare_krunner_env(
         local_config.model_dump(by_alias=True)
     )
     # TODO: merge k8s branch: nfs_mount_path = local_config['baistatic']['mounted-at']

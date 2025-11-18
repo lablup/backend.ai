@@ -5,7 +5,7 @@ import copy
 import logging
 import pprint
 import textwrap
-from abc import ABC, ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from collections.abc import (
     Collection,
@@ -29,7 +29,6 @@ from typing import (
 import aiodocker
 import attrs
 
-from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
@@ -499,31 +498,6 @@ class Mount:
             raise ValueError("Mount target must be an absolute path.", target)
         perm = MountPermission(perm)
         return cls(type, source, target, perm, None)
-
-
-class AbstractResourceDiscovery(ABC):
-    @abstractmethod
-    async def load_resources(
-        self,
-        etcd: AbstractKVStore,
-        local_config: Mapping[str, Any],
-    ) -> Mapping[DeviceName, AbstractComputePlugin]:
-        """
-        Detect and load the accelerator plugins.
-
-        limit_cpus, limit_gpus are deprecated.
-        """
-        raise NotImplementedError()
-
-    @abstractmethod
-    async def scan_available_resources(
-        self,
-        compute_device_types: Mapping[DeviceName, AbstractComputePlugin],
-    ) -> Mapping[SlotName, Decimal]:
-        """
-        Detect available computing resource of the system.
-        """
-        raise NotImplementedError()
 
 
 async def scan_resource_usage_per_slot(

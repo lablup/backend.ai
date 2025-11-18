@@ -13,7 +13,7 @@ import time
 import traceback
 import weakref
 import zlib
-from abc import ABCMeta, abstractmethod
+from abc import ABC, ABCMeta, abstractmethod
 from collections import defaultdict
 from collections.abc import (
     AsyncGenerator,
@@ -41,6 +41,7 @@ from typing import (
     Generic,
     Literal,
     Optional,
+    Type,
     TypeVar,
     cast,
 )
@@ -101,6 +102,7 @@ from ai.backend.common.docker import (
 )
 from ai.backend.common.dto.agent.response import CodeCompletionResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
+from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.events.dispatcher import (
     AbstractAnycastEvent,
     AbstractBroadcastEvent,
@@ -239,7 +241,6 @@ from .observer.host_port import HostPortObserver
 from .resources import (
     AbstractComputeDevice,
     AbstractComputePlugin,
-    AbstractResourceDiscovery,
     ComputerContext,
     KernelResourceSpec,
     Mount,
@@ -249,6 +250,7 @@ from .resources import (
 )
 from .stats import StatContext, StatModes
 from .types import (
+    AgentBackend,
     Container,
     ContainerLifecycleEvent,
     ContainerStatus,
@@ -316,6 +318,52 @@ class CreateTaskInfo:
 
     kernel_id: KernelId
     session_id: SessionId
+
+
+class AbstractAgentDiscovery(ABC):
+    @abstractmethod
+    def get_agent_cls(self) -> Type[AbstractAgent]:
+        """
+        Return the concrete implementation class of AbstactAgent for the backend.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def load_resources(
+        self,
+        etcd: AbstractKVStore,
+        local_config: Mapping[str, Any],
+    ) -> Mapping[DeviceName, AbstractComputePlugin]:
+        """
+        Detect and load the accelerator plugins.
+
+        limit_cpus, limit_gpus are deprecated.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def scan_available_resources(
+        self,
+        compute_device_types: Mapping[DeviceName, AbstractComputePlugin],
+    ) -> Mapping[SlotName, Decimal]:
+        """
+        Detect available computing resource of the system.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def prepare_krunner_env(self, local_config: Mapping[str, Any]) -> Mapping[str, str]:
+        """
+        Check if the volume "backendai-krunner.{distro}.{arch}" exists and is up-to-date.
+        If not, automatically create it and update its content from the packaged pre-built krunner
+        tar archives.
+        """
+        raise NotImplementedError()
+
+
+def get_agent_discovery(backend: AgentBackend) -> AbstractAgentDiscovery:
+    agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
+    return agent_mod.get_agent_discovery()
 
 
 class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
@@ -1950,19 +1998,18 @@ class AbstractAgent(
         raise NotImplementedError
 
     @cached_property
-    def resource_discovery(self) -> AbstractResourceDiscovery:
+    def agent_discovery(self) -> AbstractAgentDiscovery:
         backend = self.local_config.agent_common.backend
-        agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
-        return agent_mod.get_resource_discovery()
+        return get_agent_discovery(backend)
 
     async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await self.resource_discovery.load_resources(
+        return await self.agent_discovery.load_resources(
             self.etcd,
             self.local_config.model_dump(by_alias=True),
         )
 
     async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
-        return await self.resource_discovery.scan_available_resources({
+        return await self.agent_discovery.scan_available_resources({
             name: cctx.instance for name, cctx in self.computers.items()
         })
 
