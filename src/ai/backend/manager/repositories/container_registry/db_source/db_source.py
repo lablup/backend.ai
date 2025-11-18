@@ -12,6 +12,7 @@ from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryCreator,
     ContainerRegistryData,
+    ContainerRegistryLocationInfo,
     ContainerRegistryModifier,
 )
 from ai.backend.manager.data.image.types import ImageStatus
@@ -197,18 +198,24 @@ class ContainerRegistryDBSource:
 
             await session.execute(update_stmt)
 
-    async def fetch_known_registries(self) -> dict[str, str]:
+    async def fetch_known_registries(self) -> list[ContainerRegistryLocationInfo]:
         """Fetch all known container registries from the database."""
         async with self._db.begin_readonly_session() as session:
             known_registries_map = await ContainerRegistryRow.get_known_container_registries(
                 session
             )
 
-            known_registries = {}
+            known_registries: list[ContainerRegistryLocationInfo] = []
             for project, registries in known_registries_map.items():
                 for registry_name, url in registries.items():
                     if project not in known_registries:
-                        known_registries[f"{project}/{registry_name}"] = url.human_repr()
+                        known_registries.append(
+                            ContainerRegistryLocationInfo(
+                                registry_name=registry_name,
+                                project=project,
+                                url=url.human_repr(),
+                            )
+                        )
 
             return known_registries
 

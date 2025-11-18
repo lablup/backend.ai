@@ -1,5 +1,8 @@
 import pytest
 
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryLocationInfo,
+)
 from ai.backend.manager.services.container_registry.actions.get_container_registries import (
     GetContainerRegistriesAction,
     GetContainerRegistriesActionResult,
@@ -19,14 +22,32 @@ from ...utils import ScenarioBase
             "Success Case",
             GetContainerRegistriesAction(),
             GetContainerRegistriesActionResult(
-                registries={
-                    # fixtures from fixtures.py
-                    "test_project/registry.example.com": "https://registry.example.com/",
+                registries=[
                     # fixtures from example-container-registries-harbor.json
-                    "community/cr.backend.ai": "https://cr.backend.ai/",
-                    "multiarch/cr.backend.ai": "https://cr.backend.ai/",
-                    "stable/cr.backend.ai": "https://cr.backend.ai/",
-                }
+                    # Sorted by registry_name first (cr.backend.ai < registry.example.com),
+                    # then by project (community < multiarch < stable)
+                    ContainerRegistryLocationInfo(
+                        project="community",
+                        registry_name="cr.backend.ai",
+                        url="https://cr.backend.ai/",
+                    ),
+                    ContainerRegistryLocationInfo(
+                        project="multiarch",
+                        registry_name="cr.backend.ai",
+                        url="https://cr.backend.ai/",
+                    ),
+                    ContainerRegistryLocationInfo(
+                        project="stable",
+                        registry_name="cr.backend.ai",
+                        url="https://cr.backend.ai/",
+                    ),
+                    # fixtures from fixtures.py
+                    ContainerRegistryLocationInfo(
+                        project="test_project",
+                        registry_name="registry.example.com",
+                        url="https://registry.example.com/",
+                    ),
+                ],
             ),
         ),
     ],

@@ -323,7 +323,7 @@ async def test_get_container_registries_integration(
         # For global registry, actually set project to None in the database
         registry_id = None
         async with database_engine.begin_session() as session:
-            registry = ContainerRegistryRow(
+            registry_row = ContainerRegistryRow(
                 url="https://registry3.example.com",
                 registry_name="registry3",
                 type=ContainerRegistryType.DOCKER,
@@ -334,9 +334,9 @@ async def test_get_container_registries_integration(
                 is_global=True,
                 extra=None,
             )
-            session.add(registry)
+            session.add(registry_row)
             await session.commit()
-            registry_id = registry.id
+            registry_id = registry_row.id
 
         # Action: Get known registries
         action = GetContainerRegistriesAction()
@@ -345,12 +345,15 @@ async def test_get_container_registries_integration(
         )
 
         # Verify: Should return mapping of project/registry to URL
-        assert "projectA/registry1" in result.registries
-        assert result.registries["projectA/registry1"] == "https://registry1.example.com/"
-        assert "projectB/registry2" in result.registries
-        assert result.registries["projectB/registry2"] == "https://registry2.example.com/"
+        response = {}
+        for registry in result.registries:
+            response[f"{registry.project}/{registry.registry_name}"] = registry.url
+        assert "projectA/registry1" in response
+        assert response["projectA/registry1"] == "https://registry1.example.com/"
+        assert "projectB/registry2" in response
+        assert response["projectB/registry2"] == "https://registry2.example.com/"
         # Global registry should be included with None prefix
-        assert "None/registry3" in result.registries
+        assert "None/registry3" in response
 
         # Cleanup the global registry manually
         if registry_id:
