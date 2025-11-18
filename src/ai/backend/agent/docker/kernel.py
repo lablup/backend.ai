@@ -75,6 +75,7 @@ class DockerKernel(AbstractKernel):
 
         self.network_driver = network_driver
 
+    @override
     async def close(self) -> None:
         pass
 
@@ -87,6 +88,7 @@ class DockerKernel(AbstractKernel):
             props["network_driver"] = "bridge"
         super().__setstate__(props)
 
+    @override
     async def create_code_runner(
         self, event_producer: EventProducer, *, client_features: FrozenSet[str], api_version: int
     ) -> AbstractCodeRunner:
@@ -101,16 +103,19 @@ class DockerKernel(AbstractKernel):
             client_features=client_features,
         )
 
+    @override
     async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
         assert self.runner is not None
         result = await self.runner.feed_and_get_completion(text, opts)
         return CodeCompletionResp(result=result)
 
+    @override
     async def check_status(self):
         assert self.runner is not None
         result = await self.runner.feed_and_get_status()
         return result
 
+    @override
     async def get_logs(self):
         container_id = self.data["container_id"]
         async with closing_async(Docker()) as docker:
@@ -118,11 +123,13 @@ class DockerKernel(AbstractKernel):
             logs = await container.log(stdout=True, stderr=True, follow=False)
         return {"logs": "".join(logs)}
 
+    @override
     async def interrupt_kernel(self):
         assert self.runner is not None
         await self.runner.feed_interrupt()
         return {"status": "finished"}
 
+    @override
     async def start_service(self, service: str, opts: Mapping[str, Any]):
         assert self.runner is not None
         if self.data.get("block_service_ports", False):
@@ -144,15 +151,18 @@ class DockerKernel(AbstractKernel):
         })
         return result
 
+    @override
     async def start_model_service(self, model_service: Mapping[str, Any]):
         assert self.runner is not None
         result = await self.runner.feed_start_model_service(model_service)
         return result
 
+    @override
     async def shutdown_service(self, service: str):
         assert self.runner is not None
         await self.runner.feed_shutdown_service(service)
 
+    @override
     async def get_service_apps(self):
         assert self.runner is not None
         result = await self.runner.feed_service_apps()
@@ -164,12 +174,14 @@ class DockerKernel(AbstractKernel):
         lock_path = commit_path / "lock" / str(kernel_id)
         return commit_path, lock_path
 
+    @override
     async def check_duplicate_commit(self, kernel_id: KernelId, subdir: str) -> CommitStatus:
         _, lock_path = self._get_commit_path(kernel_id, subdir)
         if lock_path.exists():
             return CommitStatus.ONGOING
         return CommitStatus.READY
 
+    @override
     async def commit(
         self,
         kernel_id,
@@ -422,6 +434,7 @@ class DockerKernel(AbstractKernel):
         err = raw_err.decode("utf-8")
         return {"files": out, "errors": err, "abspath": str(container_path)}
 
+    @override
     async def notify_event(self, evdata: AgentEventData):
         assert self.runner is not None
         await self.runner.feed_event(evdata)
@@ -455,9 +468,11 @@ class DockerCodeRunner(AbstractCodeRunner):
         self.repl_in_port = repl_in_port
         self.repl_out_port = repl_out_port
 
+    @override
     async def get_repl_in_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_in_port}"
 
+    @override
     async def get_repl_out_addr(self) -> str:
         return f"tcp://{self.kernel_host}:{self.repl_out_port}"
 
