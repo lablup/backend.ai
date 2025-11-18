@@ -9,6 +9,7 @@ from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryCreator,
     ContainerRegistryData,
+    ContainerRegistryLocationInfo,
     ContainerRegistryModifier,
 )
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -91,7 +92,7 @@ class ContainerRegistryRepository:
         return await self._db_source.fetch_by_registry_and_project(registry_name, project)
 
     @container_registry_repository_resilience.apply()
-    async def get_known_registries(self) -> dict[str, str]:
+    async def get_known_registries(self) -> list[ContainerRegistryLocationInfo]:
         return await self._db_source.fetch_known_registries()
 
     @container_registry_repository_resilience.apply()
