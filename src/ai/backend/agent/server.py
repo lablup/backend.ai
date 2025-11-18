@@ -48,7 +48,7 @@ from pydantic import ValidationError
 from setproctitle import setproctitle
 from zmq.auth.certs import load_certificate
 
-from ai.backend.agent.agent import AbstractAgent, get_agent_discovery
+from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.resources import scan_gpu_alloc_map
@@ -133,6 +133,7 @@ from .types import (
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
+    get_agent_discovery,
 )
 from .utils import get_subnet_ip
 

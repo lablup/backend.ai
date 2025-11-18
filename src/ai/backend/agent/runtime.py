@@ -4,13 +4,13 @@ import asyncio
 import signal
 from typing import TYPE_CHECKING, Mapping, Optional
 
-from ai.backend.agent.agent import AbstractAgent, get_agent_discovery
+from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.errors.runtime import AgentIdNotFoundError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
-from ai.backend.agent.types import AgentBackend
+from ai.backend.agent.types import AgentBackend, get_agent_discovery
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import AgentId

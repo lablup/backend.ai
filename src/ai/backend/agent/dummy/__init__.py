@@ -4,8 +4,9 @@ from typing import Any, Mapping, Type, override
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.types import DeviceName, SlotName
 
-from ..agent import AbstractAgent, AbstractAgentDiscovery
+from ..agent import AbstractAgent
 from ..resources import AbstractComputePlugin
+from ..types import AbstractAgentDiscovery
 from .agent import DummyAgent
 from .kernel import prepare_krunner_env
 from .resources import load_resources, scan_available_resources
