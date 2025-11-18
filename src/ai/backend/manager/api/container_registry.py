@@ -60,9 +60,7 @@ async def patch_container_registry(
         if params.registry_name is not None
         else OptionalState.nop(),
         type=OptionalState.update(params.type) if params.type is not None else OptionalState.nop(),
-        project=OptionalState.update(params.project)
-        if params.project is not None
-        else OptionalState.nop(),
+        project=TriState.update(params.project) if params.project is not None else TriState.nop(),
         username=TriState.update(params.username)
         if params.username is not None
         else TriState.nop(),

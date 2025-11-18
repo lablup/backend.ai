@@ -56,7 +56,7 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
     type = ContainerRegistryTypeField(required=True, description="Added in 25.3.0.")
     registry_name = graphene.String(required=True, description="Added in 25.3.0.")
     is_global = graphene.Boolean(description="Added in 25.3.0.")
-    project = graphene.String(required=True, description="Added in 25.3.0.")
+    project = graphene.String(description="Added in 25.3.0.")
     username = graphene.String(description="Added in 25.3.0.")
     password = graphene.String(description="Added in 25.3.0.")
     ssl_verify = graphene.Boolean(description="Added in 25.3.0.")
@@ -73,7 +73,7 @@ class CreateContainerRegistryNodeInputV2(graphene.InputObjectType):
                 type=self.type,
                 registry_name=self.registry_name,
                 is_global=value_or_none(self.is_global),
-                project=self.project,
+                project=value_or_none(self.project),
                 username=value_or_none(self.username),
                 password=value_or_none(self.password),
                 ssl_verify=value_or_none(self.ssl_verify),
@@ -106,7 +106,7 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
             ContainerRegistryValidatorArgs(
                 url=props.url,
                 type=props.type,
-                project=props.project,
+                project=props.project if props.project is not Undefined else None,
             )
         )
 
@@ -142,7 +142,7 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):
             type=OptionalState.from_graphql(self.type),
             registry_name=OptionalState.from_graphql(self.registry_name),
             is_global=TriState.from_graphql(self.is_global),
-            project=OptionalState.from_graphql(self.project),
+            project=TriState.from_graphql(self.project),
             username=TriState.from_graphql(self.username),
             password=TriState.from_graphql(self.password),
             ssl_verify=TriState.from_graphql(self.ssl_verify),

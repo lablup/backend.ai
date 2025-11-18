@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from ai.backend.manager.container_registry import get_container_registry_cls
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
@@ -41,6 +43,9 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
     RescanImagesActionResult,
 )
 
+if TYPE_CHECKING:
+    from ai.backend.manager.models.container_registry import ContainerRegistryRow
+
 
 class ContainerRegistryService:
     _db: ExtendedAsyncSAEngine
@@ -79,8 +84,10 @@ class ContainerRegistryService:
         registry_name = action.registry
         project = action.project
 
-        registry_row = await self._container_registry_repository.get_registry_row_for_scanner(
-            registry_name, project
+        registry_row: ContainerRegistryRow = (
+            await self._container_registry_repository.get_registry_row_for_scanner(
+                registry_name, project
+            )
         )
 
         scanner_cls = get_container_registry_cls(registry_row)

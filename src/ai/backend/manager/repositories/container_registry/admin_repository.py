@@ -1,3 +1,5 @@
+from typing import Optional
+
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -35,7 +37,7 @@ class AdminContainerRegistryRepository:
     async def clear_images_force(
         self,
         registry_name: str,
-        project: str,
+        project: Optional[str],
     ) -> ContainerRegistryData:
         """
         Forcefully clear images from a container registry without any validation.
@@ -51,7 +53,7 @@ class AdminContainerRegistryRepository:
     async def get_by_registry_and_project_force(
         self,
         registry_name: str,
-        project: str,
+        project: Optional[str],
     ) -> ContainerRegistryData:
         """
         Forcefully get container registry by name and project without any validation.

@@ -1,3 +1,4 @@
+from typing import Optional
 from uuid import UUID
 
 from ai.backend.common.exception import BackendAIError
@@ -65,7 +66,7 @@ class ContainerRegistryRepository:
     async def get_by_registry_and_project(
         self,
         registry_name: str,
-        project: str,
+        project: Optional[str],
     ) -> ContainerRegistryData:
         return await self._db_source.fetch_by_registry_and_project(registry_name, project)
 
@@ -81,7 +82,7 @@ class ContainerRegistryRepository:
     async def clear_images(
         self,
         registry_name: str,
-        project: str,
+        project: Optional[str],
     ) -> ContainerRegistryData:
         # Clear images
         await self._db_source.mark_images_as_deleted(registry_name, project)
@@ -97,7 +98,7 @@ class ContainerRegistryRepository:
     async def get_registry_row_for_scanner(
         self,
         registry_name: str,
-        project: str,
+        project: Optional[str],
     ) -> ContainerRegistryRow:
         """
         Get the raw ContainerRegistryRow object needed for container registry scanner.

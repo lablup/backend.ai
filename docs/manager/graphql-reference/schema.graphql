@@ -3433,7 +3433,7 @@ input CreateContainerRegistryNodeInputV2 {
   is_global: Boolean
 
   """Added in 25.3.0."""
-  project: String!
+  project: String
 
   """Added in 25.3.0."""
   username: String

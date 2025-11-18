@@ -12,7 +12,7 @@ class ContainerRegistryData:
     url: str
     registry_name: str
     type: ContainerRegistryType
-    project: str
+    project: Optional[str]
     username: Optional[str]
     password: Optional[str]
     ssl_verify: Optional[bool]
@@ -27,7 +27,7 @@ class ContainerRegistryCreator(Creator):
     type: ContainerRegistryType
     registry_name: str
     is_global: Optional[bool]
-    project: str
+    project: Optional[str]
     username: Optional[str]
     password: Optional[str]
     ssl_verify: Optional[bool]
@@ -54,7 +54,7 @@ class ContainerRegistryModifier(PartialModifier):
     type: OptionalState[ContainerRegistryType]
     registry_name: OptionalState[str]
     is_global: TriState[bool]
-    project: OptionalState[str]
+    project: TriState[str]
     username: TriState[str]
     password: TriState[str]
     ssl_verify: TriState[bool]
