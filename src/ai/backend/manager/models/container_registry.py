@@ -235,12 +235,16 @@ class ContainerRegistryRow(Base):
         cls,
         session: AsyncSession,
     ) -> Mapping[str, Mapping[str, yarl.URL]]:
-        query_stmt = sa.select(ContainerRegistryRow).options(
-            load_only(
-                ContainerRegistryRow.project,
-                ContainerRegistryRow.registry_name,
-                ContainerRegistryRow.url,
+        query_stmt = (
+            sa.select(ContainerRegistryRow)
+            .options(
+                load_only(
+                    ContainerRegistryRow.project,
+                    ContainerRegistryRow.registry_name,
+                    ContainerRegistryRow.url,
+                )
             )
+            .order_by(ContainerRegistryRow.registry_name, ContainerRegistryRow.project)
         )
         registries = cast(list[ContainerRegistryRow], (await session.scalars(query_stmt)).all())
         result: MutableMapping[str, MutableMapping[str, yarl.URL]] = {}

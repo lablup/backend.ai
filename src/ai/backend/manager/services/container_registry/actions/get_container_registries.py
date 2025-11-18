@@ -1,7 +1,10 @@
 from dataclasses import dataclass
-from typing import Any, Optional, override
+from typing import Optional, override
 
 from ai.backend.manager.actions.action import BaseActionResult
+from ai.backend.manager.data.container_registry.types import (
+    ContainerRegistryLocationInfo,
+)
 from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
 
 
@@ -19,7 +22,7 @@ class GetContainerRegistriesAction(ContainerRegistryAction):
 
 @dataclass
 class GetContainerRegistriesActionResult(BaseActionResult):
-    registries: Any
+    registries: list[ContainerRegistryLocationInfo]
 
     @override
     def entity_id(self) -> Optional[str]:

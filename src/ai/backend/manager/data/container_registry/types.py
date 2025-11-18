@@ -73,3 +73,10 @@ class ContainerRegistryModifier(PartialModifier):
         self.ssl_verify.update_dict(to_update, "ssl_verify")
         self.extra.update_dict(to_update, "extra")
         return to_update
+
+
+@dataclass
+class ContainerRegistryLocationInfo:
+    project: Optional[str]
+    registry_name: str
+    url: str
