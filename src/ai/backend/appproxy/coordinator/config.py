@@ -287,6 +287,20 @@ class ProxyCoordinatorConfig(BaseSchema):
         ),
     ]
 
+    @property
+    def advertise_base_url(self) -> str:
+        """
+        Generate the full advertise URL with protocol.
+        Uses advertised_addr if set, otherwise falls back to bind_addr.
+        Protocol is determined by tls_advertised or tls_listen flags.
+        """
+        connection_info = (
+            self.advertised_addr if self.advertised_addr is not None else self.bind_addr
+        )
+        protocol = "https" if (self.tls_advertised or self.tls_listen) else "http"
+        # Strip any protocol that might be in the host
+        return f"{protocol}://{connection_info.clean_host}:{connection_info.port}"
+
 
 class ServerConfig(BaseSchema):
     db: DBConfig
