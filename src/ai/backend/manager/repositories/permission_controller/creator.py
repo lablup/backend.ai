@@ -1,9 +1,8 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
-import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
@@ -25,47 +24,54 @@ class RBACEntityCreateInput:
     object_id: ObjectId
 
 
-TEntityCreateInput = TypeVar("TEntityCreateInput")
-TCreatedEntity = TypeVar("TCreatedEntity")
+@dataclass
+class CreatorResult:
+    row: Any
+    scope_map_rows: list[AssociationScopesEntitiesRow]
 
 
-class RBACEntityCreator(Generic[TEntityCreateInput, TCreatedEntity], ABC):
-    async def create_entity(
-        self,
-        db_session: SASession,
-        input: TEntityCreateInput,
-        rbac_input: RBACEntityCreateInput,
-    ) -> TCreatedEntity:
-        result = await self._create_entity(db_session, input)
-        await self._create_rbac_entity(db_session, rbac_input)
-        return result
+TRow = TypeVar("TRow")
+
+
+class RBACEntityCreator(Generic[TRow], ABC):
+    @abstractmethod
+    def row(self) -> TRow:
+        pass
 
     @abstractmethod
-    async def _create_entity(
-        self,
-        db_session: SASession,
-        input: TEntityCreateInput,
-    ) -> TCreatedEntity:
-        raise NotImplementedError
+    def rbac_scope_inputs(self) -> list[RBACEntityCreateInput]:
+        pass
 
-    async def _create_rbac_entity(
-        self,
-        db_session: SASession,
-        rbac_input: RBACEntityCreateInput,
-    ) -> None:
-        scope_id = rbac_input.scope_id
-        entity_id = rbac_input.object_id
-        creator = AssociationScopesEntitiesCreateInput(
+
+async def execute_cretor(
+    db_sess: SASession,
+    creator: RBACEntityCreator,
+) -> CreatorResult:
+    created_row = creator.row()
+    db_sess.add(created_row)
+    await db_sess.flush()
+
+    created_scope_map_rows: list[AssociationScopesEntitiesRow] = []
+    for scope_input in creator.rbac_scope_inputs():
+        scope_id = scope_input.scope_id
+        entity_id = scope_input.object_id
+        scope_mapper = AssociationScopesEntitiesCreateInput(
             scope_id=scope_id,
             object_id=entity_id,
         )
+        map_row = AssociationScopesEntitiesRow.from_input(scope_mapper)
         try:
-            await db_session.execute(
-                sa.insert(AssociationScopesEntitiesRow).values(creator.fields_to_store())
-            )
+            db_sess.add(map_row)
+            await db_sess.flush()
+            created_scope_map_rows.append(map_row)
         except IntegrityError:
             log.exception(
                 "entity and scope mapping already exists: {}, {}. Skipping.",
                 entity_id.to_str(),
                 scope_id.to_str(),
             )
+
+    return CreatorResult(
+        row=created_row,
+        scope_map_rows=created_scope_map_rows,
+    )

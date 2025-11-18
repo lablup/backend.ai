@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import Self
 
 import sqlalchemy as sa
 
 from ai.backend.manager.data.permission.association_scopes_entities import (
+    AssociationScopesEntitiesCreateInput,
     AssociationScopesEntitiesData,
 )
 from ai.backend.manager.data.permission.id import ObjectId, ScopeId
@@ -70,4 +72,13 @@ class AssociationScopesEntitiesRow(Base):
                 scope_id=self.scope_id,
             ),
             object_id=self.object_id(),
+        )
+
+    @classmethod
+    def from_input(cls, input: AssociationScopesEntitiesCreateInput) -> Self:
+        return cls(
+            scope_type=input.scope_id.scope_type,
+            scope_id=input.scope_id.scope_id,
+            entity_type=input.object_id.entity_type,
+            entity_id=input.object_id.entity_id,
         )
