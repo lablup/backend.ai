@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Final, Iterable, Optional, Self
 
+from aiotools import cancel_and_wait
 from glide import (
     AdvancedGlideClientConfiguration,
     GlideClient,
@@ -420,11 +421,7 @@ class MonitoringValkeyClient(AbstractValkeyClient):
 
     async def disconnect(self) -> None:
         if self._monitor_task:
-            self._monitor_task.cancel()
-            try:
-                await self._monitor_task
-            except asyncio.CancelledError:
-                pass
+            await cancel_and_wait(self._monitor_task)
             self._monitor_task = None
 
         await self._monitor_client.disconnect()
@@ -447,8 +444,6 @@ class MonitoringValkeyClient(AbstractValkeyClient):
             try:
                 await asyncio.sleep(10.0)
                 await self._monitor_client.ping()
-            except asyncio.CancelledError:
-                break
             except reconnectable_exceptions as e:
                 log.warning("Connection error: {}, reconnecting...", e)
                 await self._reconnect()
