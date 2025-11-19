@@ -4,7 +4,12 @@ from typing import Any, Sequence, cast
 
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 
-from ..service_discovery import ServiceDiscovery, ServiceMetadata
+from ..service_discovery import (
+    MODEL_SERVICE_GROUP,
+    ModelServiceMetadata,
+    ServiceDiscovery,
+    ServiceMetadata,
+)
 
 _DEFAULT_PREFIX = "ai/backend/service_discovery"
 
@@ -68,6 +73,44 @@ class ETCDServiceDiscovery(ServiceDiscovery):
             raise ValueError(f"Service with ID {service_id} not found.")
         service_config = cast(dict[str, Any], raw_service_config)
         return ServiceMetadata.from_dict(service_config)
+
+    async def sync_model_service_routes(
+        self,
+        routes: Sequence[ModelServiceMetadata],
+    ) -> None:
+        """
+        Synchronize model service routes for Prometheus service discovery.
+
+        Writes all current routes to etcd. Routes not included in this sync
+        will be explicitly removed.
+        """
+        # First, get all existing model-services to clean up stale ones
+        existing_route_ids = set()
+        try:
+            existing_routes = await self.get_service_group(MODEL_SERVICE_GROUP)
+            existing_route_ids = {route.id for route in existing_routes}
+        except ValueError:
+            # No existing routes, which is fine
+            pass
+
+        # Batch write all current routes
+        for route in routes:
+            # Convert to ServiceMetadata for storage
+            service_meta = route.to_service_metadata()
+            service_meta.health_status.update_heartbeat()
+
+            prefix = self._service_prefix(service_meta.service_group, service_meta.id)
+            await self._etcd.put_prefix(
+                prefix,
+                service_meta.to_dict(),
+                scope=ConfigScopes.GLOBAL,
+            )
+
+        # Remove routes that are no longer present
+        current_route_ids = {route.route_id for route in routes}
+        stale_route_ids = existing_route_ids - current_route_ids
+        for stale_id in stale_route_ids:
+            await self.unregister(MODEL_SERVICE_GROUP, stale_id)
 
     def _service_group_prefix(self, service_group: str) -> str:
         return f"{self._prefix}/{service_group}"
