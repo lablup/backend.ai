@@ -315,7 +315,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
         )
         registry_name = graphene.String(required=True, description="Added in 24.09.0.")
         is_global = graphene.Boolean(description="Added in 24.09.0.")
-        project = graphene.String(required=True, description="Added in 24.09.0.")
+        project = graphene.String(description="Added in 24.09.0.")
         username = graphene.String(description="Added in 24.09.0.")
         password = graphene.String(description="Added in 24.09.0.")
         ssl_verify = graphene.Boolean(description="Added in 24.09.0.")
