@@ -297,8 +297,10 @@ class ProxyCoordinatorConfig(BaseSchema):
         connection_info = (
             self.advertised_addr if self.advertised_addr is not None else self.bind_addr
         )
+        if connection_info.host_set_with_protocol:
+            return f"{connection_info.host}:{connection_info.port}"
         protocol = "https" if (self.tls_advertised or self.tls_listen) else "http"
-        return f"{protocol}://{connection_info.clean_host}:{connection_info.port}"
+        return f"{protocol}://{connection_info.host}:{connection_info.port}"
 
 
 class ServerConfig(BaseSchema):

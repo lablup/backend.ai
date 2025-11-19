@@ -47,27 +47,21 @@ class HostPortPair(BaseSchema):
     port: Annotated[int, Field(gt=0, lt=65536, examples=[8201])]
 
     @property
-    def clean_host(self) -> str:
-        """
-        Remove protocol (http://, https://) from host if present.
-        Host should contain only the hostname or IP address.
-        """
-        for protocol in ("https://", "http://"):
-            if self.host.lower().startswith(protocol):
-                self.host = self.host[len(protocol) :]
-                break
-        self.host = self.host.rstrip("/")
-        return self.host
+    def host_set_with_protocol(self) -> bool:
+        for protocol in ("http://", "https://"):
+            if self.host.startswith(protocol):
+                return True
+        return False
 
     def __repr__(self) -> str:
-        return f"{self.clean_host}:{self.port}"
+        return f"{self.host}:{self.port}"
 
     def __str__(self) -> str:
         return self.__repr__()
 
     def __getitem__(self, *args) -> int | str:
         if args[0] == 0:
-            return self.clean_host
+            return self.host
         elif args[0] == 1:
             return self.port
         else:
