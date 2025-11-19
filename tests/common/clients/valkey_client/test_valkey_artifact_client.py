@@ -9,6 +9,7 @@ import pytest
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
+from ai.backend.common.exception import ClientNotConnectedError
 
 
 class TestValkeyArtifactDownloadTrackingClient:
@@ -36,7 +37,7 @@ class TestValkeyArtifactDownloadTrackingClient:
                     await test_valkey_artifact._client.client.delete(cast(list[str | bytes], keys))
                 if cursor == b"0":
                     break
-        except RuntimeError:
+        except ClientNotConnectedError:
             # Client already closed, skip cleanup
             pass
 
