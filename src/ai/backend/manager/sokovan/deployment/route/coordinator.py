@@ -14,7 +14,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoRouteLifecycleIfNeededEvent,
 )
 from ai.backend.common.leader.tasks import EventTaskSpec
-from ai.backend.common.service_discovery.types import ServiceDiscovery
+from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.deployment import DeploymentRepository
