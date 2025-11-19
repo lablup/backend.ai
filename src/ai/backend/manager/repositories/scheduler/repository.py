@@ -125,7 +125,6 @@ class SchedulerRepository:
 
         await self._db_source.batch_update_terminated_status(session_results)
 
-    @scheduler_repository_resilience.apply()
     async def batch_update_kernels_terminated(
         self,
         kernel_results: list[KernelTerminationResult],
@@ -140,7 +139,6 @@ class SchedulerRepository:
 
         await self._db_source.batch_update_kernels_terminated(kernel_results, reason)
 
-    @scheduler_repository_resilience.apply()
     async def mark_sessions_terminating(
         self, session_ids: list[SessionId], reason: str = "USER_REQUESTED"
     ) -> MarkTerminatingResult:
@@ -164,7 +162,6 @@ class SchedulerRepository:
         """
         return await self._db_source.get_terminating_sessions()
 
-    @scheduler_repository_resilience.apply()
     async def get_terminating_kernels_with_lost_agents(
         self,
     ) -> list[TerminatingKernelWithAgentData]:
