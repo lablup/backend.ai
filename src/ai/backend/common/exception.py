@@ -805,6 +805,22 @@ class ClientNotConnectedError(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class ValkeySentinelMasterNotFound(BackendAIError, web.HTTPServiceUnavailable):
+    """
+    Raised when Sentinel cannot find the master for a service.
+    """
+
+    error_type = "https://api.backend.ai/probs/valkey-sentinel-master-not-found"
+    error_title = "Valkey Sentinel Master Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
 class DatabaseError(BackendAIError, web.HTTPServiceUnavailable):
     """
     Raised when a database operation fails.
