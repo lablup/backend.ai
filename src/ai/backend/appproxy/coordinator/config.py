@@ -186,7 +186,8 @@ class ProxyCoordinatorConfig(BaseSchema):
         ),
     ]
     redlock_config: Annotated[
-        RedisLockConfig, Field(default=RedisLockConfig(), description="Redis lock configuration")
+        RedisLockConfig,
+        Field(default_factory=lambda: RedisLockConfig(), description="Redis lock configuration"),
     ]
 
     tls_listen: Annotated[bool, Field(default=False, description="Opt in to HTTPS setup.")]
