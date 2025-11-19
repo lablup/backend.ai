@@ -39,6 +39,7 @@ from .handlers import (
     SchedulerHandler,
     ScheduleSessionsHandler,
     StartSessionsHandler,
+    SweepLostAgentKernelsHandler,
     SweepSessionsHandler,
     TerminateSessionsHandler,
 )
@@ -135,6 +136,9 @@ class ScheduleCoordinator:
                 self._scheduler._repository,
             ),
             ScheduleType.SWEEP: SweepSessionsHandler(self._scheduler, self._scheduler._repository),
+            ScheduleType.SWEEP_LOST_AGENT_KERNELS: SweepLostAgentKernelsHandler(
+                self._scheduler, self._scheduler._repository
+            ),
             ScheduleType.CHECK_PULLING_PROGRESS: CheckPullingProgressHandler(
                 self._scheduler, self._scheduling_controller, self._event_producer
             ),
@@ -362,6 +366,13 @@ class ScheduleCoordinator:
             # Sweep is a maintenance task - only needs long cycle task
             SchedulerTaskSpec(
                 ScheduleType.SWEEP,
+                short_interval=None,  # No short-cycle task for maintenance
+                long_interval=60.0,
+                initial_delay=30.0,
+            ),
+            # Sweep lost agent kernels - maintenance task to clean up kernels with lost agents
+            SchedulerTaskSpec(
+                ScheduleType.SWEEP_LOST_AGENT_KERNELS,
                 short_interval=None,  # No short-cycle task for maintenance
                 long_interval=60.0,
                 initial_delay=30.0,
