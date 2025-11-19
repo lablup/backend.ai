@@ -87,12 +87,14 @@ from ..types.scaling_group import ScalingGroupMeta
 from ..types.scheduling import SchedulingData
 from ..types.session import (
     KernelData,
+    KernelTerminationResult,
     MarkTerminatingResult,
     PendingSessionData,
     PendingSessions,
     SessionTerminationResult,
     SweptSessionInfo,
     TerminatingKernelData,
+    TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
 from ..types.session_creation import (
@@ -868,6 +870,51 @@ class ScheduleDBSource:
                 )
 
             return terminating_sessions
+
+    async def get_terminating_kernels_with_lost_agents(
+        self,
+    ) -> list[TerminatingKernelWithAgentData]:
+        """
+        Fetch kernels in TERMINATING state that have lost or missing agents.
+
+        This includes kernels where:
+        - agent_id is None (never assigned)
+        - agent status is unavailable (LOST or TERMINATED)
+        """
+        async with self._begin_readonly_session_read_committed() as session:
+            query = (
+                sa.select(
+                    KernelRow.id,
+                    KernelRow.session_id,
+                    KernelRow.status,
+                    KernelRow.agent,
+                    AgentRow.status.label("agent_status"),
+                )
+                .select_from(KernelRow)
+                .outerjoin(AgentRow, KernelRow.agent == AgentRow.id)
+                .where(
+                    KernelRow.status == KernelStatus.TERMINATING,
+                    sa.or_(
+                        KernelRow.agent.is_(None),  # No agent assigned
+                        AgentRow.status.in_(
+                            AgentStatus.unavailable_statuses()
+                        ),  # Agent unavailable
+                    ),
+                )
+            )
+            result = await session.execute(query)
+            rows = result.fetchall()
+
+            return [
+                TerminatingKernelWithAgentData(
+                    kernel_id=str(row.id),
+                    session_id=row.session_id,
+                    status=row.status,
+                    agent_id=row.agent,
+                    agent_status=str(row.agent_status) if row.agent_status else None,
+                )
+                for row in rows
+            ]
 
     async def get_pending_timeout_sessions(self) -> list[SweptSessionInfo]:
         """Get sessions that have exceeded their pending timeout."""
@@ -1714,6 +1761,58 @@ class ScheduleDBSource:
             # Sync agent occupied slots to AgentRow
             # This must be done within the same transaction to ensure consistency
             await self._sync_agent_occupied_slots(db_sess, affected_agent_ids)
+
+    async def batch_update_kernels_terminated(
+        self,
+        kernel_results: list[KernelTerminationResult],
+        reason: str,
+    ) -> None:
+        """
+        Batch update kernel statuses to TERMINATED without updating session status.
+        Used for cleanup operations where kernels need to be marked terminated
+        but session state management is handled separately.
+
+        :param kernel_results: List of kernel termination results
+        :param reason: Termination reason to record in status_info
+        """
+        if not kernel_results:
+            return
+
+        now = datetime.now(tzutc())
+
+        # Collect successful kernel IDs
+        successful_kernel_ids = []
+
+        for kernel in kernel_results:
+            if kernel.success:
+                successful_kernel_ids.append(kernel.kernel_id)
+
+        if not successful_kernel_ids:
+            return
+
+        async with self._begin_session_read_committed() as db_sess:
+            # Update successful kernels to TERMINATED (only if currently TERMINATING)
+            kernel_stmt = (
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.id.in_(successful_kernel_ids),
+                        KernelRow.status == KernelStatus.TERMINATING,
+                    )
+                )
+                .values(
+                    status=KernelStatus.TERMINATED,
+                    status_info=reason,
+                    status_changed=now,
+                    terminated_at=now,
+                    status_history=sql_json_merge(
+                        KernelRow.status_history,
+                        (),
+                        {KernelStatus.TERMINATED.name: now.isoformat()},
+                    ),
+                )
+            )
+            await db_sess.execute(kernel_stmt)
 
     async def sync_agent_occupied_slots(self, agent_ids: Optional[set[AgentId]] = None) -> None:
         """

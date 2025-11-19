@@ -104,7 +104,7 @@ class TestTerminateSessions:
         mock_repository,
         mock_agent_pool,
     ):
-        """Test successful termination of a single session."""
+        """Test successful termination RPC call for a single session."""
         # Setup
         session_id = SessionId(uuid4())
         kernel_id = uuid4()
@@ -139,10 +139,9 @@ class TestTerminateSessions:
         result = await scheduler.terminate_sessions()
 
         # Verify
-        # Single session should be successfully terminated
-        assert len(result.scheduled_sessions) == 1
-        assert result.scheduled_sessions[0].session_id == session_id
-        assert result.scheduled_sessions[0].creation_id == "test-creation"
+        # Returns empty result (status updates handled by events/sweep)
+        assert isinstance(result, ScheduleResult)
+        assert len(result.scheduled_sessions) == 0
 
         # Verify agent destroy_kernel was called with correct parameters
         mock_agent.destroy_kernel.assert_called_once_with(
@@ -158,7 +157,7 @@ class TestTerminateSessions:
         mock_repository,
         mock_agent_pool,
     ):
-        """Test termination of a session with multiple kernels."""
+        """Test termination RPC calls for a session with multiple kernels."""
         # Setup
         session_id = SessionId(uuid4())
         kernel_ids = [uuid4() for _ in range(3)]
@@ -190,12 +189,11 @@ class TestTerminateSessions:
         result = await scheduler.terminate_sessions()
 
         # Verify
-        # Session with multiple kernels should be successfully terminated
-        assert len(result.scheduled_sessions) == 1
-        assert result.scheduled_sessions[0].session_id == session_id
-        assert result.scheduled_sessions[0].creation_id == "test-creation"
+        # Returns empty result (status updates handled by events/sweep)
+        assert isinstance(result, ScheduleResult)
+        assert len(result.scheduled_sessions) == 0
 
-        # Verify all kernels were terminated
+        # Verify all kernels had RPC calls made
         for i in range(3):
             mock_agent = mock_agent_pool.get_agent_client(agent_ids[i])
             mock_agent.destroy_kernel.assert_called_once_with(
@@ -266,11 +264,32 @@ class TestTerminateSessions:
         mock_repository,
         mock_agent_pool,
     ):
-        """Test that kernel terminations are executed concurrently."""
+        """Test that kernel termination RPC calls are executed concurrently."""
         # Setup multiple sessions
         sessions = []
+        all_kernel_ids = []
+        all_agent_ids = []
         for i in range(3):
             session_id = SessionId(uuid4())
+            kernels = []
+            for j in range(2):  # 2 kernels per session
+                kernel_id = uuid4()
+                agent_id = AgentId(f"agent-{i}-{j}")
+                all_kernel_ids.append(kernel_id)
+                all_agent_ids.append(agent_id)
+                kernels.append(
+                    TerminatingKernelData(
+                        kernel_id=KernelId(kernel_id),
+                        status=KernelStatus.TERMINATING,
+                        container_id=f"container-{i}-{j}",
+                        agent_id=agent_id,
+                        agent_addr=f"10.0.{i}.{j}:2001",
+                        occupied_slots=ResourceSlot({
+                            "cpu": Decimal("1"),
+                            "mem": Decimal("2048"),
+                        }),
+                    )
+                )
             sessions.append(
                 TerminatingSessionData(
                     session_id=session_id,
@@ -279,20 +298,7 @@ class TestTerminateSessions:
                     status=SessionStatus.TERMINATING,
                     status_info="BATCH_TERMINATION",
                     session_type=SessionTypes.INTERACTIVE,
-                    kernels=[
-                        TerminatingKernelData(
-                            kernel_id=KernelId(uuid4()),
-                            status=KernelStatus.TERMINATING,
-                            container_id=f"container-{i}-{j}",
-                            agent_id=AgentId(f"agent-{i}-{j}"),
-                            agent_addr=f"10.0.{i}.{j}:2001",
-                            occupied_slots=ResourceSlot({
-                                "cpu": Decimal("1"),
-                                "mem": Decimal("2048"),
-                            }),
-                        )
-                        for j in range(2)  # 2 kernels per session
-                    ],
+                    kernels=kernels,
                 )
             )
 
@@ -303,10 +309,9 @@ class TestTerminateSessions:
             await asyncio.sleep(0.1)
             return None
 
-        for session in sessions:
-            for kernel in session.kernels:
-                mock_agent = mock_agent_pool.get_agent_client(kernel.agent_id)
-                mock_agent.destroy_kernel.side_effect = delayed_destroy
+        for agent_id in all_agent_ids:
+            mock_agent = mock_agent_pool.get_agent_client(agent_id)
+            mock_agent.destroy_kernel.side_effect = delayed_destroy
 
         # Execute
         import time
@@ -316,10 +321,14 @@ class TestTerminateSessions:
         elapsed = time.time() - start_time
 
         # Verify
-        # All sessions should be successfully terminated
-        assert len(result.scheduled_sessions) == 3
-        for i, scheduled in enumerate(result.scheduled_sessions):
-            assert scheduled.creation_id == f"creation-{i}"
+        # Returns empty result (status updates handled by events/sweep)
+        assert isinstance(result, ScheduleResult)
+        assert len(result.scheduled_sessions) == 0
+
+        # Verify all RPC calls were made
+        for i, agent_id in enumerate(all_agent_ids):
+            mock_agent = mock_agent_pool.get_agent_client(agent_id)
+            assert mock_agent.destroy_kernel.call_count == 1
 
         # If executed sequentially, it would take at least 0.6 seconds (6 kernels * 0.1s)
         # With concurrent execution, it should be much faster

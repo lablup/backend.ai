@@ -5,8 +5,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from itertools import groupby
-from typing import Any, Awaitable, Coroutine, Optional
-from uuid import UUID
+from typing import Any, Awaitable, Optional
 
 import aiotools
 import async_timeout
@@ -48,9 +47,9 @@ from ai.backend.manager.repositories.scheduler import (
     KernelTerminationResult,
     SchedulerRepository,
     SchedulingData,
-    SessionTerminationResult,
     TerminatingKernelData,
 )
+from ai.backend.manager.scheduler.types import ScheduleType
 from ai.backend.manager.types import DistributedLockFactory
 
 from .allocators.allocator import SchedulingAllocator
@@ -552,16 +551,14 @@ class Scheduler:
 
     async def terminate_sessions(self) -> ScheduleResult:
         """
-        Terminate all sessions marked with TERMINATING status.
+        Send termination requests to all agents for sessions marked as TERMINATING.
 
-        This method:
-        1. Fetches all terminating sessions from the repository
-        2. Groups kernels by session for batch processing
-        3. Sends termination requests to agents concurrently
-        4. Updates session/kernel statuses to TERMINATED
+        This method only sends RPC calls to agents. Actual status updates are handled by:
+        - Agent event callbacks (for successful terminations)
+        - sweep_lost_agent_kernels() (for lost agents or failed RPC calls)
 
         Returns:
-            ScheduleResult with the count of terminated sessions
+            Empty ScheduleResult (no status updates performed here)
         """
         # Fetch all terminating sessions
         terminating_sessions = await self._repository.get_terminating_sessions()
@@ -572,74 +569,65 @@ class Scheduler:
 
         log.info("Processing {} sessions for termination", len(terminating_sessions))
 
-        # Build session termination results
-        session_results: list[SessionTerminationResult] = []
-        for session in terminating_sessions:
-            # Create session result with reason from session's status_info
-            session_result = SessionTerminationResult(
-                session_id=session.session_id,
-                access_key=session.access_key,
-                creation_id=session.creation_id,
-                session_type=session.session_type,
-                reason=session.status_info,
-                kernel_results=[],
-            )
+        # Collect all termination tasks from all sessions
+        all_tasks: list[Awaitable[KernelTerminationResult]] = []
+        skipped_kernels = 0
 
-            # Create termination tasks for all kernels in this session
-            termination_tasks: list[Awaitable[KernelTerminationResult]] = []
+        for session in terminating_sessions:
             for kernel in session.kernels:
+                # Only process kernels with assigned agents
                 if kernel.agent_id:
-                    # Create task to terminate this kernel
                     task = self._terminate_kernel(
                         kernel.agent_id,
                         str(kernel.kernel_id),
                         str(session.session_id),
-                        session_result.reason,
+                        session.status_info,
                         kernel.occupied_slots,
                     )
-                    termination_tasks.append(task)
+                    all_tasks.append(task)
                 else:
-                    log.warning(
-                        "Kernel {} in session {} has not been assigned to agent, skipping termination",
-                        kernel.kernel_id,
-                        session.session_id,
-                    )
-                    # If no agent, just mark as successful termination
-                    # This is a fallback for kernels that might not have been scheduled properly
-                    # or were already terminated
-                    await self._repository.update_kernel_status_terminated(
-                        UUID(kernel.kernel_id),
-                        session_result.reason,
-                    )
-                    session_result.kernel_results.append(
-                        KernelTerminationResult(
-                            kernel_id=str(kernel.kernel_id),
-                            agent_id=kernel.agent_id,
-                            occupied_slots=kernel.occupied_slots,
-                            success=True,
-                        )
-                    )
+                    # Kernel has no agent assigned - needs sweep
+                    skipped_kernels += 1
 
-            # Execute all termination tasks concurrently for this session
-            if termination_tasks:
-                # Use asyncio.gather to run all tasks concurrently
-                kernel_results = await asyncio.gather(*termination_tasks)
-                session_result.kernel_results.extend(kernel_results)
-
-            session_results.append(session_result)
-
-        # Convert only successfully terminated sessions to ScheduledSessionData format
-        scheduled_data = [
-            ScheduledSessionData(
-                session_id=result.session_id,
-                creation_id=result.creation_id,
-                access_key=result.access_key,
-                reason=result.reason,
+        # If there are kernels without agents, trigger sweep
+        if skipped_kernels > 0:
+            log.info(
+                "Found {} kernels without agents, requesting sweep",
+                skipped_kernels,
             )
-            for result in session_results
-            if result.should_terminate_session
-        ]
-        return ScheduleResult(scheduled_sessions=scheduled_data)
+            await self._valkey_schedule.mark_schedule_needed(
+                ScheduleType.SWEEP_LOST_AGENT_KERNELS.value
+            )
+
+        # Execute all termination tasks concurrently across all sessions
+        if not all_tasks:
+            log.debug("No kernels with agents to terminate")
+            return ScheduleResult()
+
+        log.info("Terminating {} kernels in parallel", len(all_tasks))
+
+        # Use gather with return_exceptions to ensure partial failures don't block others
+        results = await asyncio.gather(*all_tasks, return_exceptions=True)
+
+        # Log results but don't update DB (handled by events and sweep)
+        success_count = 0
+        failed_count = 0
+        for r in results:
+            if isinstance(r, BaseException):
+                failed_count += 1
+                continue
+            if not r.success:
+                failed_count += 1
+                continue
+            success_count += 1
+
+        log.info(
+            "Termination RPC calls completed: {} successful, {} failed",
+            success_count,
+            failed_count,
+        )
+
+        return ScheduleResult()
 
     async def _terminate_kernel(
         self,
@@ -726,6 +714,70 @@ class Scheduler:
                 for session in timed_out_sessions
             ]
             return ScheduleResult(scheduled_sessions=scheduled_data)
+
+        return ScheduleResult()
+
+    async def sweep_lost_agent_kernels(self) -> ScheduleResult:
+        """
+        Sweep kernels in TERMINATING sessions that cannot be terminated normally.
+
+        This handles kernels where:
+        - Agent is LOST
+        - Agent is None (never assigned)
+
+        These kernels are directly marked as TERMINATED without RPC calls.
+        This is a cleanup operation separate from normal termination.
+        Only kernel status is updated; session status updates are handled
+        by other mechanisms when all kernels are terminated.
+
+        Returns:
+            ScheduleResult (empty - no scheduled sessions)
+        """
+        # Fetch kernels with lost or missing agents
+        lost_kernels = await self._repository.get_terminating_kernels_with_lost_agents()
+
+        if not lost_kernels:
+            log.debug("No lost agent kernels to sweep")
+            return ScheduleResult()
+
+        log.info(
+            "Sweeping {} kernels with lost/missing agents",
+            len(lost_kernels),
+        )
+
+        # Build kernel results
+        kernel_results: list[KernelTerminationResult] = []
+
+        for kernel in lost_kernels:
+            log.info(
+                "Sweeping kernel {} in session {} (agent: {}, agent_status: {})",
+                kernel.kernel_id,
+                kernel.session_id,
+                kernel.agent_id,
+                kernel.agent_status,
+            )
+
+            # Mark as successfully terminated since agent is gone
+            kernel_result = KernelTerminationResult(
+                kernel_id=kernel.kernel_id,
+                agent_id=kernel.agent_id,
+                occupied_slots=ResourceSlot(),  # Empty since agent is lost/missing
+                success=True,
+            )
+            kernel_results.append(kernel_result)
+
+        # Batch update all swept kernels (sessions will be updated by other handlers)
+        await self._repository.batch_update_kernels_terminated(
+            kernel_results,
+            reason="swept-lost-agent",
+        )
+
+        log.info("Successfully swept {} kernels", len(kernel_results))
+
+        # Request check-terminating-progress to update session status
+        await self._valkey_schedule.mark_schedule_needed(
+            ScheduleType.CHECK_TERMINATING_PROGRESS.value
+        )
 
         return ScheduleResult()
 
