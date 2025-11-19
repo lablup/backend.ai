@@ -722,7 +722,7 @@ async def on_prepare(request: web.Request, response: web.StreamResponse) -> None
 async def status(request: web.Request) -> web.Response:
     root_ctx: RootContext = request.app["_root.context"]
     request["do_not_print_access_log"] = True
-    advertised_addr = root_ctx.local_config.proxy_coordinator.advertised_addr
+    advertised_addr = root_ctx.local_config.proxy_coordinator.advertise_base_url
     if advertised_addr is None:
         return web.json_response({
             "api_version": "v2",
