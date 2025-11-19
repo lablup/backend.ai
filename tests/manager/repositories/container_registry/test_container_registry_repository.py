@@ -13,6 +13,7 @@ from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRe
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryCreator,
     ContainerRegistryData,
+    ContainerRegistryLocationInfo,
     ContainerRegistryModifier,
 )
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -32,9 +33,11 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.repositories.container_registry.admin_repository import (
     AdminContainerRegistryRepository,
 )
+from ai.backend.manager.repositories.container_registry.options import ContainerRegistryOrders
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -1009,3 +1012,282 @@ class TestContainerRegistryRepository:
         # Then - Should raise error for non-existent group
         with pytest.raises(ContainerRegistryGroupsAssociationNotFound):
             await repository.modify_registry(sample_registry.id, modifier)
+
+    @pytest.fixture
+    async def two_registries_for_known_registries(
+        self, test_registry_factory
+    ) -> AsyncGenerator[_TwoRegistries, None]:
+        """Pre-created two registries for known registries testing."""
+        async with test_registry_factory() as registry1:
+            async with test_registry_factory() as registry2:
+                yield _TwoRegistries(registry1=registry1, registry2=registry2)
+
+    @pytest.mark.asyncio
+    async def test_fetch_known_registries_without_querier(
+        self,
+        repository: ContainerRegistryRepository,
+        two_registries_for_known_registries: _TwoRegistries,
+    ) -> None:
+        """Test fetching known registries without querier returns all registries"""
+        # When
+        result = await repository.get_known_registries(querier=None)
+
+        # Then - Should return all known registries
+        assert len(result) == 2
+        assert all(isinstance(r, ContainerRegistryLocationInfo) for r in result)
+
+        # Verify our test registries are in the results
+        registry_names = {r.registry_name for r in result}
+        assert two_registries_for_known_registries.registry1.registry_name in registry_names
+        assert two_registries_for_known_registries.registry2.registry_name in registry_names
+
+    @dataclass
+    class _ThreeRegistriesForOrdering:
+        """Three registries for ordering tests."""
+
+        registry1: ContainerRegistryData
+        registry2: ContainerRegistryData
+        registry3: ContainerRegistryData
+
+    @pytest.fixture
+    async def three_registries_different_names_and_projects(
+        self, test_registry_factory
+    ) -> AsyncGenerator[_ThreeRegistriesForOrdering, None]:
+        """Pre-created three registries with different names and projects."""
+        registry1_name = "registry-a.example.com"
+        registry2_name = "registry-b.example.com"
+        registry3_name = "registry-c.example.com"
+        project1_name = "project-x"
+        project2_name = "project-y"
+        project3_name = "project-z"
+
+        async with test_registry_factory(
+            registry_name=registry1_name, project=project1_name
+        ) as registry1:
+            async with test_registry_factory(
+                registry_name=registry2_name, project=project2_name
+            ) as registry2:
+                async with test_registry_factory(
+                    registry_name=registry3_name, project=project3_name
+                ) as registry3:
+                    yield self._ThreeRegistriesForOrdering(
+                        registry1=registry1, registry2=registry2, registry3=registry3
+                    )
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "querier, extract_field, ascending",
+        [
+            # Order by project ascending
+            (
+                Querier(orders=[ContainerRegistryOrders.project(ascending=True)]),
+                "project",
+                True,
+            ),
+            # Order by project descending
+            (
+                Querier(orders=[ContainerRegistryOrders.project(ascending=False)]),
+                "project",
+                False,
+            ),
+            # Order by registry_name ascending
+            (
+                Querier(orders=[ContainerRegistryOrders.registry_name(ascending=True)]),
+                "registry_name",
+                True,
+            ),
+            # Order by registry_name descending
+            (
+                Querier(orders=[ContainerRegistryOrders.registry_name(ascending=False)]),
+                "registry_name",
+                False,
+            ),
+        ],
+    )
+    async def test_fetch_known_registries_with_ordering(
+        self,
+        repository: ContainerRegistryRepository,
+        three_registries_different_names_and_projects: _ThreeRegistriesForOrdering,
+        querier: Querier,
+        extract_field: str,
+        ascending: bool,
+    ) -> None:
+        """Test fetching known registries with different ordering options"""
+        # When
+        results = await repository.get_known_registries(querier=querier)
+
+        # Then - Should return ordered results
+        assert len(results) == 3
+
+        # Verify ordering
+        field_values = [getattr(result, extract_field) for result in results]
+
+        if ascending:
+            assert field_values == sorted(field_values)
+        else:
+            assert field_values == sorted(field_values, reverse=True)
+
+    @dataclass
+    class _ThreeRegistriesForMultipleOrdering:
+        """Three registries: 2 with same name but different projects, 1 with different name."""
+
+        same_registry1: ContainerRegistryData
+        same_registry2: ContainerRegistryData
+        diff_registry: ContainerRegistryData
+
+    @pytest.fixture
+    async def three_registries_for_multiple_ordering(
+        self, test_registry_factory
+    ) -> AsyncGenerator[_ThreeRegistriesForMultipleOrdering, None]:
+        """Pre-created registries: 2 with same name ('registry-same'), 1 different ('registry-diff')."""
+        same_registry_name = "registry-same.example.com"
+        diff_registry_name = "registry-diff.example.com"
+        project1_name = "project-a"
+        project2_name = "project-b"
+        project3_name = "project-c"
+
+        async with test_registry_factory(
+            registry_name=same_registry_name, project=project1_name
+        ) as same_reg1:
+            async with test_registry_factory(
+                registry_name=same_registry_name, project=project2_name
+            ) as same_reg2:
+                async with test_registry_factory(
+                    registry_name=diff_registry_name, project=project3_name
+                ) as diff_reg:
+                    yield self._ThreeRegistriesForMultipleOrdering(
+                        same_registry1=same_reg1,
+                        same_registry2=same_reg2,
+                        diff_registry=diff_reg,
+                    )
+
+    @pytest.mark.asyncio
+    async def test_fetch_known_registries_with_multiple_ordering_project_first(
+        self,
+        repository: ContainerRegistryRepository,
+        three_registries_for_multiple_ordering: _ThreeRegistriesForMultipleOrdering,
+    ) -> None:
+        """Test fetching known registries with multiple order conditions (project first)"""
+        # Given - Querier with project -> registry_name ordering
+        querier = Querier(
+            orders=[
+                ContainerRegistryOrders.project(ascending=True),
+                ContainerRegistryOrders.registry_name(ascending=True),
+            ]
+        )
+
+        # When
+        result = await repository.get_known_registries(querier=querier)
+
+        # Then - Should return exactly 3 registries
+        assert len(result) == 3
+
+        # Then - Verify ordering: project-a, project-b, project-c
+        assert result[0].project == "project-a"
+        assert result[0].registry_name == "registry-same.example.com"
+        assert result[1].project == "project-b"
+        assert result[1].registry_name == "registry-same.example.com"
+        assert result[2].project == "project-c"
+        assert result[2].registry_name == "registry-diff.example.com"
+
+    @pytest.mark.asyncio
+    async def test_fetch_known_registries_with_multiple_ordering_registry_first(
+        self,
+        repository: ContainerRegistryRepository,
+        three_registries_for_multiple_ordering: _ThreeRegistriesForMultipleOrdering,
+    ) -> None:
+        """Test fetching known registries with multiple order conditions (registry_name first)"""
+        # Given - Querier with registry_name -> project ordering
+        querier = Querier(
+            orders=[
+                ContainerRegistryOrders.registry_name(ascending=True),
+                ContainerRegistryOrders.project(ascending=True),
+            ]
+        )
+
+        # When
+        result = await repository.get_known_registries(querier=querier)
+
+        # Then - Should return exactly 3 registries
+        assert len(result) == 3
+
+        # Then - Verify ordering: registry-diff first, then registry-same (project-a, project-b)
+        assert result[0].registry_name == "registry-diff.example.com"
+        assert result[0].project == "project-c"
+        assert result[1].registry_name == "registry-same.example.com"
+        assert result[1].project == "project-a"
+        assert result[2].registry_name == "registry-same.example.com"
+        assert result[2].project == "project-b"
+
+    @dataclass
+    class _FourRegistriesForMixedOrdering:
+        """Four registries: 2 in project-a, 2 in project-b with different registry names."""
+
+        registry1: ContainerRegistryData  # registry-x, project-a
+        registry2: ContainerRegistryData  # registry-y, project-a
+        registry3: ContainerRegistryData  # registry-a, project-b
+        registry4: ContainerRegistryData  # registry-b, project-b
+
+    @pytest.fixture
+    async def four_registries_for_mixed_ordering(
+        self, test_registry_factory
+    ) -> AsyncGenerator[_FourRegistriesForMixedOrdering, None]:
+        """Pre-created 4 registries: 2 in project-a, 2 in project-b with different names."""
+        registry1_name = "registry-x.example.com"
+        registry2_name = "registry-y.example.com"
+        registry3_name = "registry-a.example.com"
+        registry4_name = "registry-b.example.com"
+        project1_name = "project-a"
+        project2_name = "project-a"  # Same as project1
+        project3_name = "project-b"
+        project4_name = "project-b"  # Same as project3
+
+        async with test_registry_factory(
+            registry_name=registry1_name, project=project1_name
+        ) as reg1:
+            async with test_registry_factory(
+                registry_name=registry2_name, project=project2_name
+            ) as reg2:
+                async with test_registry_factory(
+                    registry_name=registry3_name, project=project3_name
+                ) as reg3:
+                    async with test_registry_factory(
+                        registry_name=registry4_name, project=project4_name
+                    ) as reg4:
+                        yield self._FourRegistriesForMixedOrdering(
+                            registry1=reg1,
+                            registry2=reg2,
+                            registry3=reg3,
+                            registry4=reg4,
+                        )
+
+    @pytest.mark.asyncio
+    async def test_fetch_known_registries_with_multiple_ordering_mixed(
+        self,
+        repository: ContainerRegistryRepository,
+        four_registries_for_mixed_ordering: _FourRegistriesForMixedOrdering,
+    ) -> None:
+        """Test fetching known registries with multiple projects and secondary ordering"""
+        # Given - Querier with project ascending, then registry_name descending
+        querier = Querier(
+            orders=[
+                ContainerRegistryOrders.project(ascending=True),
+                ContainerRegistryOrders.registry_name(ascending=False),
+            ]
+        )
+
+        # When
+        result = await repository.get_known_registries(querier=querier)
+
+        # Then - Should return exactly 4 registries
+        assert len(result) == 4
+
+        # Then - Verify ordering: project-a (y, x), project-b (b, a)
+        assert result[0].project == "project-a"
+        assert result[0].registry_name == "registry-y.example.com"
+        assert result[1].project == "project-a"
+        assert result[1].registry_name == "registry-x.example.com"
+        assert result[2].project == "project-b"
+        assert result[2].registry_name == "registry-b.example.com"
+        assert result[3].project == "project-b"
+        assert result[3].registry_name == "registry-a.example.com"
