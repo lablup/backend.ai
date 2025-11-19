@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from typing import Mapping, Optional
 from uuid import UUID
 
@@ -12,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common.exception import ResourcePresetConflict
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     DefaultForUnspecified,
     ResourceSlot,
     SlotName,
@@ -333,36 +335,70 @@ class ResourcePresetDBSource:
         """
         Get available resources from agents in given scaling groups.
 
+        Calculate actual occupied slots by aggregating from kernels with
+        resource_occupied_statuses (RUNNING, TERMINATING) instead of using
+        the cached AgentRow.occupied_slots value.
+
+        Uses two efficient queries: one for agents, and one for filtered kernels
+        only with resource_occupied_statuses to minimize data loading.
+
         :param db_sess: Database session
         :param sgroup_names: List of scaling group names
         :param known_slot_types: Known slot types for initialization
         :return: Tuple of (per_sgroup_remaining, agent_slots_list)
         """
+        # Query 1: Get agents in the scaling groups
+        agent_query = sa.select(AgentRow).where(
+            sa.and_(
+                AgentRow.scaling_group.in_(sgroup_names),
+                AgentRow.available_slots.isnot(None),
+                AgentRow.schedulable == sa.true(),
+            )
+        )
+
+        agent_result = await db_sess.execute(agent_query)
+        agent_rows = list(agent_result.scalars().all())
+
+        if not agent_rows:
+            # No agents found, return empty results
+            return (
+                {
+                    sgname: ResourceSlot.from_known_slots(known_slot_types)
+                    for sgname in sgroup_names
+                },
+                [],
+            )
+
+        # Query 2: Get only kernels with resource_occupied_statuses for these agents
+        agent_ids = [agent.id for agent in agent_rows]
+        kernel_query = sa.select(KernelRow.agent, KernelRow.occupied_slots).where(
+            sa.and_(
+                KernelRow.agent.in_(agent_ids),
+                KernelRow.status.in_(KernelStatus.resource_occupied_statuses()),
+            )
+        )
+
+        kernel_result = await db_sess.execute(kernel_query)
+
+        # Aggregate occupied slots by agent
+        agent_occupied: dict[AgentId, ResourceSlot] = defaultdict(
+            lambda: ResourceSlot.from_known_slots(known_slot_types)
+        )
+        for row in kernel_result:
+            if row.agent and row.occupied_slots:
+                agent_occupied[row.agent] += row.occupied_slots
+
+        # Calculate remaining resources per agent and per scaling group
         per_sgroup_remaining = {
             sgname: ResourceSlot.from_known_slots(known_slot_types) for sgname in sgroup_names
         }
         agent_slots = []
-        query = (
-            sa.select([
-                AgentRow.available_slots,
-                AgentRow.occupied_slots,
-                AgentRow.scaling_group,
-            ])
-            .select_from(AgentRow)
-            .where(
-                sa.and_(
-                    AgentRow.scaling_group.in_(sgroup_names),
-                    AgentRow.available_slots.isnot(None),
-                    AgentRow.occupied_slots.isnot(None),
-                    AgentRow.schedulable == sa.true(),
-                )
-            )
-        )
 
-        async for row in await db_sess.stream(query):
-            remaining = row["available_slots"] - row["occupied_slots"]
+        for agent in agent_rows:
+            actual_occupied = agent_occupied[agent.id]
+            remaining = agent.available_slots - actual_occupied
             agent_slots.append(remaining)
-            per_sgroup_remaining[row["scaling_group"]] += remaining
+            per_sgroup_remaining[agent.scaling_group] += remaining
 
         return per_sgroup_remaining, agent_slots
 
