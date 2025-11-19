@@ -103,7 +103,7 @@ class RedisConfig(BaseSchema):
     password: Annotated[
         str | None, Field(default=None, description="Redis password.", examples=["P@ssw0rd!"])
     ]
-    redis_helper_config: Annotated[RedisHelperConfig, Field(default_factory=RedisHelperConfig())]
+    redis_helper_config: Annotated[RedisHelperConfig, Field(default_factory=RedisHelperConfig)]
 
     def to_dict(self) -> dict[str, Any]:
         base = self.model_dump()
