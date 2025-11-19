@@ -57,3 +57,15 @@ class RouteData:
     created_at: datetime
     updated_at: Optional[datetime] = None
     error_data: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RouteServiceDiscoveryInfo:
+    """Service discovery information for a model service route."""
+
+    route_id: uuid.UUID
+    endpoint_id: uuid.UUID
+    endpoint_name: str
+    runtime_variant: str
+    kernel_host: str
+    kernel_port: int

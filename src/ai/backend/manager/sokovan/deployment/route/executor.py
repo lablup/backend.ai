@@ -6,6 +6,8 @@ from uuid import UUID
 
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.service_discovery import ServiceDiscovery
+from ai.backend.common.service_discovery.service_discovery import ModelServiceMetadata
 from ai.backend.common.types import SessionId
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -33,12 +35,14 @@ class RouteExecutor:
         config_provider: ManagerConfigProvider,
         client_pool: ClientPool,
         valkey_schedule: ValkeyScheduleClient,
+        service_discovery: ServiceDiscovery,
     ):
         self._deployment_repo = deployment_repo
         self._scheduling_controller = scheduling_controller
         self._config_provider = config_provider
         self._client_pool = client_pool
         self._valkey_schedule = valkey_schedule
+        self._service_discovery = service_discovery
 
     async def provision_routes(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Provision routes by creating sessions.
@@ -213,3 +217,55 @@ class RouteExecutor:
             successes=successes,
             errors=errors,
         )
+
+    async def sync_service_discovery(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
+        """
+        Sync healthy routes to service discovery backend for Prometheus scraping.
+
+        For each route, extracts kernel host and port information and registers
+        with service discovery so Prometheus can discover and scrape metrics endpoints.
+
+        Args:
+            routes: Healthy routes to sync
+
+        Returns:
+            Empty result (no status changes)
+        """
+        # Filter routes that have sessions
+        route_ids_with_session = {
+            route.route_id for route in routes if route.session_id is not None
+        }
+
+        if not route_ids_with_session:
+            log.debug("No routes with sessions to sync")
+            return RouteExecutionResult(successes=[], errors=[])
+
+        # Fetch service discovery information through repository
+        route_discovery_data = await self._deployment_repo.fetch_route_service_discovery_info(
+            route_ids_with_session
+        )
+
+        # Construct ModelServiceMetadata for each route
+        metadata_list: list[ModelServiceMetadata] = []
+        for data in route_discovery_data:
+            metadata = ModelServiceMetadata(
+                route_id=data.route_id,
+                model_service_name=data.endpoint_name,
+                host=data.kernel_host,
+                port=data.kernel_port,
+                metrics_path="/metrics",
+                labels={
+                    "runtime_variant": data.runtime_variant,
+                    "endpoint_id": str(data.endpoint_id),
+                },
+            )
+            metadata_list.append(metadata)
+
+        # Sync to service discovery
+        if metadata_list:
+            await self._service_discovery.sync_model_service_routes(metadata_list)
+            log.debug("Synced {} routes to service discovery", len(metadata_list))
+        else:
+            log.debug("No valid routes to sync to service discovery")
+
+        return RouteExecutionResult(successes=[], errors=[])

@@ -14,6 +14,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
     DoRouteLifecycleIfNeededEvent,
 )
 from ai.backend.common.leader.tasks import EventTaskSpec
+from ai.backend.common.service_discovery import ServiceDiscovery
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.repositories.deployment import DeploymentRepository
@@ -22,6 +23,7 @@ from ai.backend.manager.sokovan.deployment.route.handlers import (
     HealthCheckRouteHandler,
     ProvisioningRouteHandler,
     RouteHandler,
+    ServiceDiscoverySyncHandler,
     TerminatingRouteHandler,
 )
 from ai.backend.manager.sokovan.deployment.route.handlers.running import RunningRouteHandler
@@ -81,6 +83,7 @@ class RouteCoordinator:
         config_provider: ManagerConfigProvider,
         scheduling_controller: SchedulingController,
         client_pool: ClientPool,
+        service_discovery: ServiceDiscovery,
     ) -> None:
         """Initialize the route coordinator."""
         self._valkey_schedule = valkey_schedule
@@ -96,6 +99,7 @@ class RouteCoordinator:
             config_provider=self._config_provider,
             client_pool=client_pool,
             valkey_schedule=self._valkey_schedule,
+            service_discovery=service_discovery,
         )
         self._route_handlers = self._init_handlers(executor)
 
@@ -115,6 +119,10 @@ class RouteCoordinator:
                 event_producer=self._event_producer,
             ),
             RouteLifecycleType.TERMINATING: TerminatingRouteHandler(
+                route_executor=executor,
+                event_producer=self._event_producer,
+            ),
+            RouteLifecycleType.SERVICE_DISCOVERY_SYNC: ServiceDiscoverySyncHandler(
                 route_executor=executor,
                 event_producer=self._event_producer,
             ),
@@ -219,6 +227,13 @@ class RouteCoordinator:
                 short_interval=None,  # No short-cycle for cleanup
                 long_interval=30.0,
                 initial_delay=15.0,
+            ),
+            # Service discovery sync - only long cycle
+            RouteTaskSpec(
+                RouteLifecycleType.SERVICE_DISCOVERY_SYNC,
+                short_interval=None,  # No short-cycle for sync
+                long_interval=60.0,
+                initial_delay=30.0,
             ),
         ]
 

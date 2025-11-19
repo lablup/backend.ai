@@ -13,6 +13,7 @@ class RouteLifecycleType(StrEnum):
     RUNNING = "running"
     HEALTH_CHECK = "health_check"
     TERMINATING = "terminating"
+    SERVICE_DISCOVERY_SYNC = "service_discovery_sync"
 
 
 @dataclass

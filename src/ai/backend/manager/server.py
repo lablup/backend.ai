@@ -1209,6 +1209,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         config_provider=root_ctx.config_provider,
         scheduling_controller=root_ctx.scheduling_controller,
         client_pool=client_pool,
+        service_discovery=root_ctx.service_discovery,
     )
 
     # Create sokovan orchestrator with lock factory for timers

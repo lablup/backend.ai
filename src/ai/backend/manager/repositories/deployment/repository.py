@@ -54,7 +54,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import Dep
 
 from .db_source import DeploymentDBSource
 from .storage_source import DeploymentStorageSource
-from .types import RouteData
+from .types import RouteData, RouteServiceDiscoveryInfo
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -844,3 +844,18 @@ class DeploymentRepository:
             Endpoint ID if found, None otherwise
         """
         return await self._db_source.get_endpoint_id_by_session(session_id)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_route_service_discovery_info(
+        self,
+        route_ids: set[uuid.UUID],
+    ) -> list[RouteServiceDiscoveryInfo]:
+        """Fetch service discovery information for routes.
+
+        Args:
+            route_ids: Set of route IDs to fetch information for
+
+        Returns:
+            List of RouteServiceDiscoveryInfo containing kernel host/port and endpoint details
+        """
+        return await self._db_source.fetch_route_service_discovery_info(route_ids)
