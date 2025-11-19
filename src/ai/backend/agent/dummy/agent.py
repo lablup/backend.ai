@@ -13,7 +13,6 @@ from typing import (
     override,
 )
 
-from ai.backend.common.config import read_from_file
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -57,9 +56,8 @@ from ..resources import (
     known_slot_types,
 )
 from ..types import Container, KernelOwnershipData, MountInfo
-from .config import DEFAULT_CONFIG_PATH, dummy_local_config
+from .config import read_dummy_config
 from .kernel import DummyKernel
-from .resources import load_resources, scan_available_resources
 
 
 class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
@@ -73,7 +71,7 @@ class DummyKernelCreationContext(AbstractKernelCreationContext[DummyKernel]):
         kernel_config: KernelCreationConfig,
         distro: str,
         local_config: AgentUnifiedConfig,
-        computers: MutableMapping[DeviceName, ComputerContext],
+        computers: Mapping[DeviceName, ComputerContext],
         restarting: bool = False,
         *,
         dummy_config: Mapping[str, Any],
@@ -252,8 +250,7 @@ class DummyAgent(
         **kwargs,
     ) -> None:
         super().__init__(*args, **kwargs)
-        raw_config, _ = read_from_file(DEFAULT_CONFIG_PATH, "dummy")
-        self.dummy_config = dummy_local_config.check(raw_config)
+        self.dummy_config = read_dummy_config()
         self.dummy_agent_cfg = self.dummy_config["agent"]
 
     @override
@@ -299,19 +296,6 @@ class DummyAgent(
     def get_cgroup_version(self) -> str:
         # Dummy agent does not use cgroups, so we return an empty string.
         return ""
-
-    @override
-    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(
-            self.etcd, self.local_config.model_dump(by_alias=True), self.dummy_config
-        )
-
-    @override
-    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
-        return await scan_available_resources(
-            self.local_config.model_dump(by_alias=True),
-            {name: cctx.instance for name, cctx in self.computers.items()},
-        )
 
     @override
     async def extract_image_command(self, image: str) -> str | None:

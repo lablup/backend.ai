@@ -91,7 +91,6 @@ from .kube_object import (
     PersistentVolumeClaim,
     Service,
 )
-from .resources import load_resources, scan_available_resources
 
 if TYPE_CHECKING:
     from ai.backend.common.auth import PublicKey
@@ -122,7 +121,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         distro: str,
         local_config: AgentUnifiedConfig,
         agent_sockpath: Path,
-        computers: MutableMapping[DeviceName, ComputerContext],
+        computers: Mapping[DeviceName, ComputerContext],
         workers: Mapping[str, Mapping[str, str]],
         static_pvc_name: str,
         restarting: bool = False,
@@ -845,6 +844,8 @@ class KubernetesAgent(
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
         kernel_registry: KernelRegistry,
+        computers: Mapping[DeviceName, ComputerContext],
+        slots: Mapping[SlotName, Decimal],
     ) -> None:
         super().__init__(
             etcd,
@@ -854,6 +855,8 @@ class KubernetesAgent(
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
             kernel_registry=kernel_registry,
+            computers=computers,
+            slots=slots,
         )
 
     async def __ainit__(self) -> None:
@@ -981,17 +984,6 @@ class KubernetesAgent(
     def get_cgroup_version(self) -> str:
         # Not implemented yet for K8s Agent
         return ""
-
-    @override
-    async def load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
-        return await load_resources(self.etcd, self.local_config.model_dump(by_alias=True))
-
-    @override
-    async def scan_available_resources(self) -> Mapping[SlotName, Decimal]:
-        return await scan_available_resources(
-            self.local_config.model_dump(by_alias=True),
-            {name: cctx.instance for name, cctx in self.computers.items()},
-        )
 
     @override
     async def extract_image_command(self, image: str) -> str | None:
