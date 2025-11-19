@@ -46,6 +46,13 @@ class HostPortPair(BaseSchema):
     host: Annotated[str, Field(examples=["127.0.0.1"])]
     port: Annotated[int, Field(gt=0, lt=65536, examples=[8201])]
 
+    @property
+    def host_set_with_protocol(self) -> bool:
+        for protocol in ("http://", "https://"):
+            if self.host.startswith(protocol):
+                return True
+        return False
+
     def __repr__(self) -> str:
         return f"{self.host}:{self.port}"
 
@@ -96,7 +103,9 @@ class RedisConfig(BaseSchema):
     password: Annotated[
         str | None, Field(default=None, description="Redis password.", examples=["P@ssw0rd!"])
     ]
-    redis_helper_config: Annotated[RedisHelperConfig, Field(default=RedisHelperConfig())]
+    redis_helper_config: Annotated[
+        RedisHelperConfig, Field(default_factory=lambda: RedisHelperConfig())
+    ]
 
     def to_dict(self) -> dict[str, Any]:
         base = self.model_dump()

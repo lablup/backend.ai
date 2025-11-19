@@ -186,7 +186,8 @@ class ProxyCoordinatorConfig(BaseSchema):
         ),
     ]
     redlock_config: Annotated[
-        RedisLockConfig, Field(default=RedisLockConfig(), description="Redis lock configuration")
+        RedisLockConfig,
+        Field(default_factory=lambda: RedisLockConfig(), description="Redis lock configuration"),
     ]
 
     tls_listen: Annotated[bool, Field(default=False, description="Opt in to HTTPS setup.")]
@@ -286,6 +287,21 @@ class ProxyCoordinatorConfig(BaseSchema):
             description=("Manually set the announced address for service discovery. "),
         ),
     ]
+
+    @property
+    def advertise_base_url(self) -> str:
+        """
+        Generate the full advertise URL with protocol.
+        Uses advertised_addr if set, otherwise falls back to bind_addr.
+        Protocol is determined by tls_advertised or tls_listen flags.
+        """
+        connection_info = (
+            self.advertised_addr if self.advertised_addr is not None else self.bind_addr
+        )
+        if connection_info.host_set_with_protocol:
+            return f"{connection_info.host}:{connection_info.port}"
+        protocol = "https" if (self.tls_advertised or self.tls_listen) else "http"
+        return f"{protocol}://{connection_info.host}:{connection_info.port}"
 
 
 class ServerConfig(BaseSchema):
