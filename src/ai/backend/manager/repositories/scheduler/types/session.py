@@ -132,6 +132,17 @@ class TerminatingSessionData:
 
 
 @dataclass
+class TerminatingKernelWithAgentData:
+    """Kernel data with agent status for lost agent cleanup."""
+
+    kernel_id: str
+    session_id: SessionId
+    status: KernelStatus
+    agent_id: Optional[AgentId]
+    agent_status: Optional[str]  # Agent status from AgentRow  # Agent status from AgentRow
+
+
+@dataclass
 class KernelTerminationResult:
     """Result of termination for a single kernel."""
 
