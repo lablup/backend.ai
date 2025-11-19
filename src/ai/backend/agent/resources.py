@@ -15,6 +15,7 @@ from collections.abc import (
     Sequence,
 )
 from decimal import Decimal
+from functools import cached_property
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -29,6 +30,9 @@ from typing import (
 import aiodocker
 import attrs
 
+import ai.backend.agent.alloc_map as alloc_map_mod
+from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
 from ai.backend.common.types import (
@@ -44,6 +48,7 @@ from ai.backend.common.types import (
     ResourceSlot,
     SlotName,
     SlotTypes,
+    aobject,
 )
 from ai.backend.logging import BraceStyleAdapter
 
@@ -56,8 +61,8 @@ from .alloc_map import DiscretePropertyAllocMap as DiscretePropertyAllocMap  # n
 from .alloc_map import FractionAllocMap as FractionAllocMap  # noqa: F401
 from .exception import ResourceError
 from .stats import ContainerMeasurement, NodeMeasurement, ProcessMeasurement, StatContext
+from .types import AbstractAgentDiscovery, MountInfo, get_agent_discovery
 from .types import Container as SessionContainer
-from .types import MountInfo
 
 if TYPE_CHECKING:
     from io import TextIOWrapper
@@ -442,6 +447,94 @@ class AbstractComputePlugin(AbstractPlugin, metaclass=ABCMeta):
         e.g., ["io_uring_enter", "io_uring_setup", "io_uring_register"] for enabling io_uring in the container.
         """
         return []
+
+
+ComputersMap: TypeAlias = Mapping[DeviceName, ComputerContext]
+SlotsMap: TypeAlias = Mapping[SlotName, Decimal]
+
+
+class ResourceAllocator(aobject):
+    local_config: AgentUnifiedConfig
+    etcd: AsyncEtcd
+
+    computers: ComputersMap
+
+    def __init__(self, local_config: AgentUnifiedConfig, etcd: AsyncEtcd) -> None:
+        self.local_config = local_config
+        self.etcd = etcd
+
+    async def __ainit__(self) -> None:
+        alloc_map_mod.log_alloc_map = self.local_config.debug.log_alloc_map
+        computers = await self._load_resources()
+
+        computer_contexts: dict[DeviceName, ComputerContext] = {}
+        for name, computer in computers.items():
+            devices = await computer.list_devices()
+            alloc_map = await computer.create_alloc_map()
+            computer_contexts[name] = ComputerContext(computer, devices, alloc_map)
+        self.computers = computer_contexts
+
+    async def __aexit__(self, *exc_info) -> None:
+        for _, computer in self.computers.items():
+            try:
+                await computer.instance.cleanup()
+            except Exception:
+                log.exception("Failed to clean up computer instance:")
+
+    def get_computers(self) -> ComputersMap:
+        return self.computers
+
+    async def get_updated_slots(self) -> SlotsMap:
+        """
+        Finalize the resource slots from the resource slots scanned by each device plugin,
+        excluding reserved capacities for the system and agent itself.
+        """
+
+        scanned_slots = await self._scan_available_resources()
+        reserved_slots = {
+            SlotName("cpu"): Decimal(self.local_config.resource.reserved_cpu),
+            SlotName("mem"): Decimal(self.local_config.resource.reserved_mem),
+            SlotName("disk"): Decimal(self.local_config.resource.reserved_disk),
+        }
+        usable_slots: dict[SlotName, Decimal] = {}
+
+        for slot_name, slot_capacity in scanned_slots.items():
+            if slot_name == SlotName("mem"):
+                mem_reserved = int(reserved_slots.get(slot_name, 0))
+                mem_align = int(self.local_config.resource.memory_align_size)
+                mem_usable, mem_reserved = align_memory(
+                    int(slot_capacity), mem_reserved, align=mem_align
+                )
+                usable_capacity = Decimal(mem_usable)
+                log.debug(
+                    "usable-mem: {:m}, reserved-mem: {:m} after {:m} alignment",
+                    BinarySize(mem_usable),
+                    BinarySize(mem_reserved),
+                    BinarySize(mem_align),
+                )
+            else:
+                usable_capacity = max(
+                    Decimal(0), slot_capacity - reserved_slots.get(slot_name, Decimal(0))
+                )
+            usable_slots[slot_name] = usable_capacity
+
+        return usable_slots
+
+    @cached_property
+    def _agent_discovery(self) -> AbstractAgentDiscovery:
+        backend = self.local_config.agent_common.backend
+        return get_agent_discovery(backend)
+
+    async def _load_resources(self) -> Mapping[DeviceName, AbstractComputePlugin]:
+        return await self._agent_discovery.load_resources(
+            self.etcd,
+            self.local_config.model_dump(by_alias=True),
+        )
+
+    async def _scan_available_resources(self) -> Mapping[SlotName, Decimal]:
+        return await self._agent_discovery.scan_available_resources({
+            name: cctx.instance for name, cctx in self.computers.items()
+        })
 
 
 class ComputePluginContext(BasePluginContext[AbstractComputePlugin]):

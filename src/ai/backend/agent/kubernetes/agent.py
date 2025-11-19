@@ -121,7 +121,7 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
         distro: str,
         local_config: AgentUnifiedConfig,
         agent_sockpath: Path,
-        computers: MutableMapping[DeviceName, ComputerContext],
+        computers: Mapping[DeviceName, ComputerContext],
         workers: Mapping[str, Mapping[str, str]],
         static_pvc_name: str,
         restarting: bool = False,
@@ -844,6 +844,8 @@ class KubernetesAgent(
         skip_initial_scan: bool = False,
         agent_public_key: Optional[PublicKey],
         kernel_registry: KernelRegistry,
+        computers: Mapping[DeviceName, ComputerContext],
+        slots: Mapping[SlotName, Decimal],
     ) -> None:
         super().__init__(
             etcd,
@@ -853,6 +855,8 @@ class KubernetesAgent(
             skip_initial_scan=skip_initial_scan,
             agent_public_key=agent_public_key,
             kernel_registry=kernel_registry,
+            computers=computers,
+            slots=slots,
         )
 
     async def __ainit__(self) -> None:
