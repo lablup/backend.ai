@@ -38,9 +38,11 @@ from .db_source.db_source import ScheduleDBSource
 from .types.base import SchedulingSpec
 from .types.scheduling import SchedulingData
 from .types.session import (
+    KernelTerminationResult,
     MarkTerminatingResult,
     SessionTerminationResult,
     SweptSessionInfo,
+    TerminatingKernelWithAgentData,
     TerminatingSessionData,
 )
 from .types.session_creation import (
@@ -123,6 +125,20 @@ class SchedulerRepository:
 
         await self._db_source.batch_update_terminated_status(session_results)
 
+    async def batch_update_kernels_terminated(
+        self,
+        kernel_results: list[KernelTerminationResult],
+        reason: str,
+    ) -> None:
+        """
+        Update kernel statuses to TERMINATED without updating session status.
+        Agent occupied slots are synced directly in the DB.
+        """
+        if not kernel_results:
+            return
+
+        await self._db_source.batch_update_kernels_terminated(kernel_results, reason)
+
     async def mark_sessions_terminating(
         self, session_ids: list[SessionId], reason: str = "USER_REQUESTED"
     ) -> MarkTerminatingResult:
@@ -145,6 +161,15 @@ class SchedulerRepository:
         For sokovan scheduler compatibility.
         """
         return await self._db_source.get_terminating_sessions()
+
+    async def get_terminating_kernels_with_lost_agents(
+        self,
+    ) -> list[TerminatingKernelWithAgentData]:
+        """
+        Get kernels in TERMINATING sessions that have lost or missing agents.
+        For lost agent cleanup operations.
+        """
+        return await self._db_source.get_terminating_kernels_with_lost_agents()
 
     async def _get_known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
         """

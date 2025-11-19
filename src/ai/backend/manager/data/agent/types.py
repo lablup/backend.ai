@@ -38,6 +38,14 @@ class AgentStatus(enum.Enum):
                     return cls.TERMINATED
         return None
 
+    @classmethod
+    def unavailable_statuses(cls) -> tuple[AgentStatus, ...]:
+        """
+        Return agent statuses that indicate the agent is unavailable for kernel operations.
+        These agents cannot handle kernel termination or other operations.
+        """
+        return (cls.LOST, cls.TERMINATED)
+
 
 @dataclass
 class AgentData:
