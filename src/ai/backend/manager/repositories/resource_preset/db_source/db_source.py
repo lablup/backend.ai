@@ -382,7 +382,9 @@ class ResourcePresetDBSource:
         kernel_result = await db_sess.execute(kernel_query)
 
         # Aggregate occupied slots by agent
-        agent_occupied: dict[AgentId, ResourceSlot] = defaultdict(ResourceSlot)
+        agent_occupied: dict[AgentId, ResourceSlot] = defaultdict(
+            lambda: ResourceSlot.from_known_slots(known_slot_types)
+        )
         for row in kernel_result:
             if row.agent and row.occupied_slots:
                 agent_occupied[row.agent] += row.occupied_slots
@@ -394,7 +396,7 @@ class ResourcePresetDBSource:
         agent_slots = []
 
         for agent in agent_rows:
-            actual_occupied = agent_occupied.get(agent.id, ResourceSlot())
+            actual_occupied = agent_occupied[agent.id]
             remaining = agent.available_slots - actual_occupied
             agent_slots.append(remaining)
             per_sgroup_remaining[agent.scaling_group] += remaining
