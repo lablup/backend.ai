@@ -2442,7 +2442,7 @@ type Mutation {
     password: String
 
     """Added in 24.09.0."""
-    project: String!
+    project: String
 
     """Added in 24.09.0."""
     registry_name: String!
