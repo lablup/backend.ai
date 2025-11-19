@@ -133,7 +133,7 @@ class ContainerRegistryService:
         return LoadAllContainerRegistriesActionResult(registries=registries)
 
     async def get_container_registries(
-        self, _action: GetContainerRegistriesAction
+        self, action: GetContainerRegistriesAction
     ) -> GetContainerRegistriesActionResult:
-        registries = await self._container_registry_repository.get_known_registries()
+        registries = await self._container_registry_repository.get_known_registries(action.querier)
         return GetContainerRegistriesActionResult(registries=registries)

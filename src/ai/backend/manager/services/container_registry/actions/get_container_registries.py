@@ -5,11 +5,14 @@ from ai.backend.manager.actions.action import BaseActionResult
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryLocationInfo,
 )
+from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.services.container_registry.actions.base import ContainerRegistryAction
 
 
 @dataclass
 class GetContainerRegistriesAction(ContainerRegistryAction):
+    querier: Optional[Querier] = None
+
     @override
     def entity_id(self) -> Optional[str]:
         return None

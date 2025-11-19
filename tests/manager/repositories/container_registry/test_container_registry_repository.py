@@ -16,6 +16,7 @@ from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRe
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryCreator,
     ContainerRegistryData,
+    ContainerRegistryLocationInfo,
     ContainerRegistryModifier,
 )
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -35,9 +36,11 @@ from ai.backend.manager.models.resource_policy import (
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import Querier
 from ai.backend.manager.repositories.container_registry.admin_repository import (
     AdminContainerRegistryRepository,
 )
+from ai.backend.manager.repositories.container_registry.options import ContainerRegistryOrders
 from ai.backend.manager.repositories.container_registry.repository import (
     ContainerRegistryRepository,
 )
@@ -919,3 +922,227 @@ class TestContainerRegistryRepository:
 
             with pytest.raises(ContainerRegistryGroupsAssociationNotFound):
                 await repository.modify_registry(registry_data.id, modifier)
+
+    @pytest.mark.asyncio
+    async def test_fetch_known_registries_without_querier(
+        self, repository: ContainerRegistryRepository, database_engine: ExtendedAsyncSAEngine
+    ) -> None:
+        """Test fetching known registries without querier returns all registries"""
+        registry1_name = "test-registry1.example.com"
+        registry2_name = "test-registry2.example.com"
+        project1_name = "project-a"
+        project2_name = "project-b"
+
+        async with (
+            self.create_test_registry(database_engine, registry1_name, project1_name),
+            self.create_test_registry(database_engine, registry2_name, project2_name),
+        ):
+            # When
+            result = await repository.get_known_registries(querier=None)
+
+            # Then - Should return all known registries
+            assert len(result) >= 2
+            assert all(isinstance(r, ContainerRegistryLocationInfo) for r in result)
+
+            # Verify our test registries are in the results
+            registry_names = {r.registry_name for r in result}
+            assert registry1_name in registry_names
+            assert registry2_name in registry_names
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "querier, extract_field, ascending",
+        [
+            # Order by project ascending
+            (Querier(orders=[ContainerRegistryOrders.project(ascending=True)]), "project", True),
+            # Order by project descending
+            (Querier(orders=[ContainerRegistryOrders.project(ascending=False)]), "project", False),
+            # Order by registry_name ascending
+            (
+                Querier(orders=[ContainerRegistryOrders.registry_name(ascending=True)]),
+                "registry_name",
+                True,
+            ),
+            # Order by registry_name descending
+            (
+                Querier(orders=[ContainerRegistryOrders.registry_name(ascending=False)]),
+                "registry_name",
+                False,
+            ),
+        ],
+    )
+    async def test_fetch_known_registries_with_ordering(
+        self,
+        repository: ContainerRegistryRepository,
+        database_engine: ExtendedAsyncSAEngine,
+        querier: Querier,
+        extract_field: str,
+        ascending: bool,
+    ) -> None:
+        """Test fetching known registries with different ordering options"""
+        registry1_name = "registry-a.example.com"
+        registry2_name = "registry-b.example.com"
+        registry3_name = "registry-c.example.com"
+        project1_name = "project-x"
+        project2_name = "project-y"
+        project3_name = "project-z"
+
+        async with (
+            self.create_test_registry(database_engine, registry1_name, project1_name),
+            self.create_test_registry(database_engine, registry2_name, project2_name),
+            self.create_test_registry(database_engine, registry3_name, project3_name),
+        ):
+            # When
+            results = await repository.get_known_registries(querier=querier)
+
+            # Then - Should return ordered results
+            assert len(results) >= 3
+
+            # Verify ordering
+            field_values = [getattr(result, extract_field) for result in results]
+
+            if ascending:
+                assert field_values == sorted(field_values)
+            else:
+                assert field_values == sorted(field_values, reverse=True)
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "querier,expected_projects,expected_registries",
+        [
+            # project -> registry_name: same registry appears in order of projects
+            (
+                Querier(
+                    orders=[
+                        ContainerRegistryOrders.project(ascending=True),
+                        ContainerRegistryOrders.registry_name(ascending=True),
+                    ]
+                ),
+                ["project-a", "project-b", "project-c"],
+                [
+                    "registry-same.example.com",
+                    "registry-same.example.com",
+                    "registry-diff.example.com",
+                ],
+            ),
+            # registry_name -> project: same registry groups together, then different
+            (
+                Querier(
+                    orders=[
+                        ContainerRegistryOrders.registry_name(ascending=True),
+                        ContainerRegistryOrders.project(ascending=True),
+                    ]
+                ),
+                ["project-c", "project-a", "project-b"],
+                [
+                    "registry-diff.example.com",
+                    "registry-same.example.com",
+                    "registry-same.example.com",
+                ],
+            ),
+        ],
+    )
+    async def test_fetch_known_registries_with_multiple_ordering(
+        self,
+        repository: ContainerRegistryRepository,
+        database_engine: ExtendedAsyncSAEngine,
+        querier: Querier,
+        expected_projects: list[str],
+        expected_registries: list[str],
+    ) -> None:
+        """Test fetching known registries with multiple order conditions"""
+        # Create registries: same registry_name (2), different registry_name (1), all different projects
+        same_registry_name = "registry-same.example.com"
+        diff_registry_name = "registry-diff.example.com"
+        project1_name = "project-a"
+        project2_name = "project-b"
+        project3_name = "project-c"
+
+        async with (
+            self.create_test_registry(database_engine, same_registry_name, project1_name),
+            self.create_test_registry(database_engine, same_registry_name, project2_name),
+            self.create_test_registry(database_engine, diff_registry_name, project3_name),
+        ):
+            # When
+            result = await repository.get_known_registries(querier=querier)
+
+            # Then - Should return ordered results
+            assert len(result) >= 3
+            assert all(isinstance(r, ContainerRegistryLocationInfo) for r in result)
+
+            # Filter results to only our test registries
+            test_results = [
+                r
+                for r in result
+                if r.registry_name in {same_registry_name, diff_registry_name}
+                and r.project in {project1_name, project2_name, project3_name}
+            ]
+
+            # Verify we have all 3 registries
+            assert len(test_results) == 3
+
+            # Verify ordering matches expected
+            projects = [r.project for r in test_results]
+            registry_names = [r.registry_name for r in test_results]
+
+            assert projects == expected_projects
+            assert registry_names == expected_registries
+
+    @pytest.mark.asyncio
+    async def test_fetch_known_registries_with_multiple_ordering_mixed(
+        self, repository: ContainerRegistryRepository, database_engine: ExtendedAsyncSAEngine
+    ) -> None:
+        """Test fetching known registries with multiple projects and secondary ordering"""
+        # Create registries to test multi-level ordering
+        registry1_name = "registry-x.example.com"
+        registry2_name = "registry-y.example.com"
+        registry3_name = "registry-a.example.com"
+        registry4_name = "registry-b.example.com"
+        project1_name = "project-a"
+        project2_name = "project-a"  # Same as project1
+        project3_name = "project-b"
+        project4_name = "project-b"  # Same as project3
+
+        async with (
+            self.create_test_registry(database_engine, registry1_name, project1_name),
+            self.create_test_registry(database_engine, registry2_name, project2_name),
+            self.create_test_registry(database_engine, registry3_name, project3_name),
+            self.create_test_registry(database_engine, registry4_name, project4_name),
+        ):
+            # When - Order by project ascending, then registry_name descending
+            querier = Querier(
+                orders=[
+                    ContainerRegistryOrders.project(ascending=True),
+                    ContainerRegistryOrders.registry_name(ascending=False),
+                ]
+            )
+            result = await repository.get_known_registries(querier=querier)
+
+            # Then - Should return ordered results
+            assert len(result) >= 4
+            assert all(isinstance(r, ContainerRegistryLocationInfo) for r in result)
+
+            # Filter to our test data
+            test_results = [
+                r
+                for r in result
+                if r.registry_name
+                in {registry1_name, registry2_name, registry3_name, registry4_name}
+            ]
+
+            # Verify we have all 4 registries
+            assert len(test_results) == 4
+
+            # Group by project and verify ordering
+            project_a_results = [r for r in test_results if r.project == "project-a"]
+            project_b_results = [r for r in test_results if r.project == "project-b"]
+
+            # Within project-a, registry_name should be descending
+            project_a_names = [r.registry_name for r in project_a_results]
+            assert project_a_names == sorted(project_a_names, reverse=True)
+            assert project_a_names == [registry2_name, registry1_name]
+
+            # Within project-b, registry_name should be descending
+            project_b_names = [r.registry_name for r in project_b_results]
+            assert project_b_names == sorted(project_b_names, reverse=True)
+            assert project_b_names == [registry4_name, registry3_name]

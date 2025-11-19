@@ -5,6 +5,7 @@ from typing import Optional
 from uuid import UUID
 
 import sqlalchemy as sa
+import yarl
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.container_registry import AllowedGroupsModel
@@ -30,6 +31,7 @@ from ai.backend.manager.models.container_registry import (
 )
 from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.base import Querier, execute_querier
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
@@ -198,24 +200,29 @@ class ContainerRegistryDBSource:
 
             await session.execute(update_stmt)
 
-    async def fetch_known_registries(self) -> list[ContainerRegistryLocationInfo]:
+    async def fetch_known_registries(
+        self, querier: Optional[Querier]
+    ) -> list[ContainerRegistryLocationInfo]:
         """Fetch all known container registries from the database."""
         async with self._db.begin_readonly_session() as session:
-            known_registries_map = await ContainerRegistryRow.get_known_container_registries(
-                session
+            query_stmt = sa.select(
+                ContainerRegistryRow.project,
+                ContainerRegistryRow.registry_name,
+                ContainerRegistryRow.url,
+                sa.func.count().over().label("total_count"),
             )
 
+            result = await execute_querier(session, query_stmt, querier, ContainerRegistryRow)
+            rows = result.rows
             known_registries: list[ContainerRegistryLocationInfo] = []
-            for project, registries in known_registries_map.items():
-                for registry_name, url in registries.items():
-                    if project not in known_registries:
-                        known_registries.append(
-                            ContainerRegistryLocationInfo(
-                                registry_name=registry_name,
-                                project=project,
-                                url=url.human_repr(),
-                            )
-                        )
+            for row in rows:
+                known_registries.append(
+                    ContainerRegistryLocationInfo(
+                        registry_name=row.registry_name,
+                        project=row.project,
+                        url=yarl.URL(row.url).human_repr(),
+                    )
+                )
 
             return known_registries
 
