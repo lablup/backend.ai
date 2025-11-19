@@ -54,6 +54,7 @@ from ai.backend.manager.models.endpoint import (
 )
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.scaling_group import scaling_groups
@@ -71,6 +72,7 @@ from ai.backend.manager.utils import query_userinfo_from_session
 
 from ..types import (
     RouteData,
+    RouteServiceDiscoveryInfo,
 )
 
 
@@ -622,6 +624,80 @@ class DeploymentDBSource:
             result = await db_sess.execute(query)
             endpoint_id = result.scalar_one_or_none()
             return endpoint_id
+
+    async def fetch_route_service_discovery_info(
+        self,
+        route_ids: set[uuid.UUID],
+    ) -> list[RouteServiceDiscoveryInfo]:
+        """Fetch service discovery information for routes.
+
+        Joins routes with kernels and endpoints to get all necessary information
+        for service discovery registration (kernel host/port, endpoint name, etc).
+
+        Args:
+            route_ids: Set of route IDs to fetch information for
+
+        Returns:
+            List of RouteServiceDiscoveryInfo containing kernel host/port and endpoint details
+        """
+        if not route_ids:
+            return []
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            # Join route -> session -> kernel -> endpoint to get all needed info
+            query = (
+                sa.select(
+                    RoutingRow.id.label("route_id"),
+                    RoutingRow.endpoint.label("endpoint_id"),
+                    EndpointRow.name.label("endpoint_name"),
+                    EndpointRow.runtime_variant.label("runtime_variant"),
+                    KernelRow.kernel_host,
+                    KernelRow.service_ports,
+                )
+                .select_from(RoutingRow)
+                .join(EndpointRow, RoutingRow.endpoint == EndpointRow.id)
+                .join(
+                    KernelRow,
+                    sa.and_(
+                        KernelRow.session_id == RoutingRow.session,
+                        KernelRow.cluster_role == "main",
+                    ),
+                )
+                .where(RoutingRow.id.in_(route_ids))
+            )
+
+            result = await db_sess.execute(query)
+            rows = result.all()
+
+            # Process results
+            discovery_infos: list[RouteServiceDiscoveryInfo] = []
+            for row in rows:
+                # Extract inference port from service_ports
+                inference_port: Optional[int] = None
+                if row.service_ports:
+                    for port_info in row.service_ports:
+                        if port_info.get("is_inference", False):
+                            host_ports = port_info.get("host_ports", [])
+                            if host_ports:
+                                inference_port = host_ports[0]
+                            break
+
+                if not inference_port:
+                    # Skip routes without inference port
+                    continue
+
+                discovery_infos.append(
+                    RouteServiceDiscoveryInfo(
+                        route_id=row.route_id,
+                        endpoint_id=row.endpoint_id,
+                        endpoint_name=row.endpoint_name,
+                        runtime_variant=row.runtime_variant.value,
+                        kernel_host=row.kernel_host,
+                        kernel_port=inference_port,
+                    )
+                )
+
+            return discovery_infos
 
     async def _delete_routes_and_endpoint(
         self,
