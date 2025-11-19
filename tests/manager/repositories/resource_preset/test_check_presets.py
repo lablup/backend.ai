@@ -11,11 +11,13 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
 from decimal import Decimal
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -27,6 +29,7 @@ from ai.backend.common.types import (
     SessionTypes,
     SlotName,
     SlotTypes,
+    ValkeyTarget,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -46,11 +49,16 @@ from ai.backend.manager.models import (
     SessionRow,
     UserResourcePolicyRow,
     UserRow,
+    association_groups_users,
+    sgroups_for_domains,
 )
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.resource_preset.db_source.db_source import (
-    ResourcePresetDBSource,
+from ai.backend.manager.repositories.resource_preset.repository import (
+    ResourcePresetRepository,
+)
+from ai.backend.manager.repositories.resource_preset.types import (
+    CheckPresetsResult,
 )
 
 
@@ -111,6 +119,7 @@ class TestCheckPresetsOccupiedSlots:
     async def test_scaling_group_name(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_name: str,
     ) -> AsyncGenerator[str, None]:
         """Create test scaling group and return scaling group name"""
         sg_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
@@ -130,6 +139,15 @@ class TestCheckPresetsOccupiedSlots:
                 is_active=True,
             )
             db_sess.add(sg)
+            await db_sess.flush()
+
+            # Associate scaling group with domain
+            await db_sess.execute(
+                sa.insert(sgroups_for_domains).values(
+                    scaling_group=sg_name,
+                    domain=test_domain_name,
+                )
+            )
             await db_sess.flush()
 
         try:
@@ -193,6 +211,7 @@ class TestCheckPresetsOccupiedSlots:
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_resource_policy_name: str,
+        test_user_uuid: uuid.UUID,
     ) -> AsyncGenerator[uuid.UUID, None]:
         """Create test group and return group ID"""
         group_id = uuid.uuid4()
@@ -211,10 +230,37 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(group)
             await db_sess.flush()
 
+            # Add user to group
+            await db_sess.execute(
+                sa.insert(association_groups_users).values(
+                    user_id=test_user_uuid,
+                    group_id=group_id,
+                )
+            )
+            await db_sess.flush()
+
         try:
             yield group_id
         finally:
             # Cleanup handled by db_with_cleanup
+            pass
+
+    @pytest.fixture
+    async def test_group_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group_id: uuid.UUID,
+    ) -> AsyncGenerator[str, None]:
+        """Get group name from group ID"""
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            group_result = await db_sess.execute(
+                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
+            )
+            group_name = group_result.scalar_one()
+
+        try:
+            yield group_name
+        finally:
             pass
 
     @pytest.fixture
@@ -326,19 +372,67 @@ class TestCheckPresetsOccupiedSlots:
             pass
 
     @pytest.fixture
-    def db_source(
+    def mock_config_provider(self) -> MagicMock:
+        """Create mocked ManagerConfigProvider for repository"""
+        mock = MagicMock()
+        # Mock legacy etcd config loader
+        mock.legacy_etcd_config_loader.get_resource_slots = AsyncMock(
+            return_value={
+                SlotName("cpu"): SlotTypes("count"),
+                SlotName("mem"): SlotTypes("bytes"),
+                SlotName("cuda.device"): SlotTypes("count"),
+            }
+        )
+        mock.legacy_etcd_config_loader.get_raw = AsyncMock(
+            return_value="true"  # group_resource_visibility
+        )
+        return mock
+
+    @pytest.fixture
+    async def valkey_stat_client(
+        self,
+        redis_container: tuple[str, tuple[str, int]],
+    ) -> AsyncGenerator[ValkeyStatClient, None]:
+        """Create ValkeyStatClient with real Redis container"""
+        _, redis_addr = redis_container
+
+        valkey_target = ValkeyTarget(
+            addr=f"{redis_addr[0]}:{redis_addr[1]}",
+        )
+
+        client = await ValkeyStatClient.create(
+            valkey_target=valkey_target,
+            db_id=0,
+            human_readable_name="test-valkey-stat-preset",
+        )
+
+        try:
+            yield client
+        finally:
+            await client.close()
+
+    @pytest.fixture
+    async def repository(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-    ) -> ResourcePresetDBSource:
-        """Create ResourcePresetDBSource instance"""
-        return ResourcePresetDBSource(db=db_with_cleanup)
+        valkey_stat_client: ValkeyStatClient,
+        mock_config_provider: MagicMock,
+    ) -> AsyncGenerator[ResourcePresetRepository, None]:
+        """Create ResourcePresetRepository instance with real cache"""
+        repo = ResourcePresetRepository(
+            db=db_with_cleanup,
+            valkey_stat=valkey_stat_client,
+            config_provider=mock_config_provider,
+        )
+        yield repo
 
     async def test_running_kernels_count_towards_occupied_slots(
         self,
-        db_source: ResourcePresetDBSource,
+        repository: ResourcePresetRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_scaling_group_name: str,
+        test_resource_policy_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_keypair_access_key: AccessKey,
@@ -347,6 +441,7 @@ class TestCheckPresetsOccupiedSlots:
         """
         Test that RUNNING kernels contribute to occupied slots.
         Expected: available_slots - RUNNING kernel's occupied_slots
+        Tests both DB source and cache layer (cache miss → DB fetch).
         """
         async with db_with_cleanup.begin_session() as db_sess:
             # Create session and kernel with RUNNING status
@@ -364,6 +459,7 @@ class TestCheckPresetsOccupiedSlots:
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_keypair_access_key,
+                scaling_group_name=test_scaling_group_name,
                 result=SessionResult.UNDEFINED,
                 agent_ids=[],
                 designated_agent_ids=[],
@@ -406,32 +502,50 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(kernel)
             await db_sess.flush()
 
-        # Test: get_agent_available_resources should calculate from kernel
+        # Test: Repository.check_presets should calculate from kernel (cache miss → DB)
+        # Get group name for the API call
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            known_slot_types: dict[SlotName, SlotTypes] = {
-                SlotName("cpu"): SlotTypes("count"),
-                SlotName("mem"): SlotTypes("bytes"),
-            }
-            per_sgroup_remaining, agent_slots = await db_source._get_agent_available_resources(
-                db_sess,
-                [test_scaling_group_name],
-                known_slot_types,
+            group_result = await db_sess.execute(
+                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
             )
+            group_name = group_result.scalar_one()
+
+        # Get resource policy data
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            kp_policy_result = await db_sess.execute(
+                sa.select(KeyPairResourcePolicyRow).where(
+                    KeyPairResourcePolicyRow.name == test_resource_policy_name
+                )
+            )
+            kp_policy = kp_policy_result.scalar_one()
+            resource_policy_dict = {
+                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
+                "default_for_unspecified": str(kp_policy.default_for_unspecified),
+            }
+
+        result: CheckPresetsResult = await repository.check_presets(
+            access_key=test_keypair_access_key,
+            user_id=test_user_uuid,
+            group_name=group_name,
+            domain_name=test_domain_name,
+            resource_policy=resource_policy_dict,
+            scaling_group=test_scaling_group_name,
+        )
 
         # Verify: available (16 CPU, 32GB) - occupied (4 CPU, 8GB) = remaining (12 CPU, 24GB)
-        assert per_sgroup_remaining[test_scaling_group_name]["cpu"] == Decimal("12")
-        assert per_sgroup_remaining[test_scaling_group_name]["mem"] == Decimal("24576")
-
-        assert len(agent_slots) == 1
-        assert agent_slots[0]["cpu"] == Decimal("12")
-        assert agent_slots[0]["mem"] == Decimal("24576")
+        sg_data = result.scaling_groups[test_scaling_group_name]
+        assert sg_data.remaining["cpu"] == Decimal("12")
+        assert sg_data.remaining["mem"] == Decimal("24576")
+        assert sg_data.using["cpu"] == Decimal("4")
+        assert sg_data.using["mem"] == Decimal("8192")
 
     async def test_terminating_kernels_count_towards_occupied_slots(
         self,
-        db_source: ResourcePresetDBSource,
+        repository: ResourcePresetRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_scaling_group_name: str,
+        test_resource_policy_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_keypair_access_key: AccessKey,
@@ -439,6 +553,7 @@ class TestCheckPresetsOccupiedSlots:
     ) -> None:
         """
         Test that TERMINATING kernels also contribute to occupied slots.
+        Tests Repository layer with cache miss → DB fetch.
         """
         async with db_with_cleanup.begin_session() as db_sess:
             # Create session and kernel with TERMINATING status
@@ -456,6 +571,7 @@ class TestCheckPresetsOccupiedSlots:
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_keypair_access_key,
+                scaling_group_name=test_scaling_group_name,
                 result=SessionResult.UNDEFINED,
                 agent_ids=[],
                 designated_agent_ids=[],
@@ -498,32 +614,49 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(kernel)
             await db_sess.flush()
 
-        # Test: get_agent_available_resources should include TERMINATING kernels
+        # Test: Repository.check_presets should include TERMINATING kernels
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            known_slot_types: dict[SlotName, SlotTypes] = {
-                SlotName("cpu"): SlotTypes("count"),
-                SlotName("mem"): SlotTypes("bytes"),
-            }
-            per_sgroup_remaining, agent_slots = await db_source._get_agent_available_resources(
-                db_sess,
-                [test_scaling_group_name],
-                known_slot_types,
+            group_result = await db_sess.execute(
+                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
             )
+            group_name = group_result.scalar_one()
+
+        # Get resource policy data
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            kp_policy_result = await db_sess.execute(
+                sa.select(KeyPairResourcePolicyRow).where(
+                    KeyPairResourcePolicyRow.name == test_resource_policy_name
+                )
+            )
+            kp_policy = kp_policy_result.scalar_one()
+            resource_policy_dict = {
+                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
+                "default_for_unspecified": str(kp_policy.default_for_unspecified),
+            }
+
+        result: CheckPresetsResult = await repository.check_presets(
+            access_key=test_keypair_access_key,
+            user_id=test_user_uuid,
+            group_name=group_name,
+            domain_name=test_domain_name,
+            resource_policy=resource_policy_dict,
+            scaling_group=test_scaling_group_name,
+        )
 
         # Verify: available (16 CPU, 32GB) - occupied (2 CPU, 4GB) = remaining (14 CPU, 28GB)
-        assert per_sgroup_remaining[test_scaling_group_name]["cpu"] == Decimal("14")
-        assert per_sgroup_remaining[test_scaling_group_name]["mem"] == Decimal("28672")
-
-        assert len(agent_slots) == 1
-        assert agent_slots[0]["cpu"] == Decimal("14")
-        assert agent_slots[0]["mem"] == Decimal("28672")
+        sg_data = result.scaling_groups[test_scaling_group_name]
+        assert sg_data.remaining["cpu"] == Decimal("14")
+        assert sg_data.remaining["mem"] == Decimal("28672")
+        assert sg_data.using["cpu"] == Decimal("2")
+        assert sg_data.using["mem"] == Decimal("4096")
 
     async def test_pending_kernels_do_not_count_towards_occupied_slots(
         self,
-        db_source: ResourcePresetDBSource,
+        repository: ResourcePresetRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_scaling_group_name: str,
+        test_resource_policy_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_keypair_access_key: AccessKey,
@@ -531,6 +664,7 @@ class TestCheckPresetsOccupiedSlots:
     ) -> None:
         """
         Test that PENDING kernels DO NOT contribute to occupied slots.
+        Tests Repository layer with cache miss → DB fetch.
         """
         async with db_with_cleanup.begin_session() as db_sess:
             # Create session and kernel with PENDING status
@@ -548,6 +682,7 @@ class TestCheckPresetsOccupiedSlots:
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_keypair_access_key,
+                scaling_group_name=test_scaling_group_name,
                 result=SessionResult.UNDEFINED,
                 agent_ids=[],
                 designated_agent_ids=[],
@@ -590,39 +725,57 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(kernel)
             await db_sess.flush()
 
-        # Test: get_agent_available_resources should ignore PENDING kernels
+        # Test: Repository.check_presets should ignore PENDING kernels
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            known_slot_types: dict[SlotName, SlotTypes] = {
-                SlotName("cpu"): SlotTypes("count"),
-                SlotName("mem"): SlotTypes("bytes"),
-            }
-            per_sgroup_remaining, agent_slots = await db_source._get_agent_available_resources(
-                db_sess,
-                [test_scaling_group_name],
-                known_slot_types,
+            group_result = await db_sess.execute(
+                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
             )
+            group_name = group_result.scalar_one()
+
+        # Get resource policy data
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            kp_policy_result = await db_sess.execute(
+                sa.select(KeyPairResourcePolicyRow).where(
+                    KeyPairResourcePolicyRow.name == test_resource_policy_name
+                )
+            )
+            kp_policy = kp_policy_result.scalar_one()
+            resource_policy_dict = {
+                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
+                "default_for_unspecified": str(kp_policy.default_for_unspecified),
+            }
+
+        result: CheckPresetsResult = await repository.check_presets(
+            access_key=test_keypair_access_key,
+            user_id=test_user_uuid,
+            group_name=group_name,
+            domain_name=test_domain_name,
+            resource_policy=resource_policy_dict,
+            scaling_group=test_scaling_group_name,
+        )
 
         # Verify: available (16 CPU, 32GB) - occupied (0) = remaining (16 CPU, 32GB)
-        assert per_sgroup_remaining[test_scaling_group_name]["cpu"] == Decimal("16")
-        assert per_sgroup_remaining[test_scaling_group_name]["mem"] == Decimal("32768")
-
-        assert len(agent_slots) == 1
-        assert agent_slots[0]["cpu"] == Decimal("16")
-        assert agent_slots[0]["mem"] == Decimal("32768")
+        sg_data = result.scaling_groups[test_scaling_group_name]
+        assert sg_data.remaining["cpu"] == Decimal("16")
+        assert sg_data.remaining["mem"] == Decimal("32768")
+        assert sg_data.using["cpu"] == Decimal("0")
+        assert sg_data.using["mem"] == Decimal("0")
 
     async def test_ignores_cached_occupied_slots_in_agent_row(
         self,
-        db_source: ResourcePresetDBSource,
+        repository: ResourcePresetRepository,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain_name: str,
         test_scaling_group_name: str,
+        test_resource_policy_name: str,
         test_group_id: uuid.UUID,
         test_user_uuid: uuid.UUID,
         test_keypair_access_key: AccessKey,
     ) -> None:
         """
-        Test that the method ignores AgentRow.occupied_slots (cached value)
+        Test that Repository.check_presets ignores AgentRow.occupied_slots (cached value)
         and calculates from actual kernel states even when cached value is wrong.
+        Tests Repository layer with cache miss → DB fetch.
         """
         # Create agent with WRONG cached occupied_slots
         agent_id = AgentId(f"agent-wrong-cache-{uuid.uuid4().hex[:8]}")
@@ -666,6 +819,7 @@ class TestCheckPresetsOccupiedSlots:
                 group_id=test_group_id,
                 user_uuid=test_user_uuid,
                 access_key=test_keypair_access_key,
+                scaling_group_name=test_scaling_group_name,
                 result=SessionResult.UNDEFINED,
                 agent_ids=[],
                 designated_agent_ids=[],
@@ -709,26 +863,39 @@ class TestCheckPresetsOccupiedSlots:
             db_sess.add(kernel)
             await db_sess.flush()
 
-        # Test: should use ACTUAL kernel occupied slots, not cached agent value
+        # Test: Repository.check_presets should use ACTUAL kernel occupied slots, not cached agent value
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            known_slot_types: dict[SlotName, SlotTypes] = {
-                SlotName("cpu"): SlotTypes("count"),
-                SlotName("mem"): SlotTypes("bytes"),
-            }
-            per_sgroup_remaining, agent_slots = await db_source._get_agent_available_resources(
-                db_sess,
-                [test_scaling_group_name],
-                known_slot_types,
+            group_result = await db_sess.execute(
+                sa.select(GroupRow.name).where(GroupRow.id == test_group_id)
             )
+            group_name = group_result.scalar_one()
+
+        # Get resource policy data
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            kp_policy_result = await db_sess.execute(
+                sa.select(KeyPairResourcePolicyRow).where(
+                    KeyPairResourcePolicyRow.name == test_resource_policy_name
+                )
+            )
+            kp_policy = kp_policy_result.scalar_one()
+            resource_policy_dict = {
+                "total_resource_slots": kp_policy.total_resource_slots.to_json(),
+                "default_for_unspecified": str(kp_policy.default_for_unspecified),
+            }
+
+        result: CheckPresetsResult = await repository.check_presets(
+            access_key=test_keypair_access_key,
+            user_id=test_user_uuid,
+            group_name=group_name,
+            domain_name=test_domain_name,
+            resource_policy=resource_policy_dict,
+            scaling_group=test_scaling_group_name,
+        )
 
         # Verify: Should use actual kernel occupied (3 CPU, 6GB) NOT cached (10 CPU, 20GB)
         # available (16 CPU, 32GB) - actual occupied (3 CPU, 6GB) = remaining (13 CPU, 26GB)
-        assert per_sgroup_remaining[test_scaling_group_name]["cpu"] == Decimal("13")
-        assert per_sgroup_remaining[test_scaling_group_name]["mem"] == Decimal("26624")
-
-        # Should have 1 agent (only the agent with wrong cache that has a kernel)
-        assert len(agent_slots) == 1
-
-        # Verify the agent with wrong cache has correct remaining slots
-        assert agent_slots[0]["cpu"] == Decimal("13")
-        assert agent_slots[0]["mem"] == Decimal("26624")
+        sg_data = result.scaling_groups[test_scaling_group_name]
+        assert sg_data.remaining["cpu"] == Decimal("13")
+        assert sg_data.remaining["mem"] == Decimal("26624")
+        assert sg_data.using["cpu"] == Decimal("3")
+        assert sg_data.using["mem"] == Decimal("6144")
