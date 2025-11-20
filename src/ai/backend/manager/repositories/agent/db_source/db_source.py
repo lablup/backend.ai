@@ -15,7 +15,7 @@ from ai.backend.manager.data.agent.types import (
     AgentStatus,
     UpsertResult,
 )
-from ai.backend.manager.data.image.types import ImageDataWithDetails
+from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.errors.resource import ScalingGroupNotFound
 from ai.backend.manager.models import agents
 from ai.backend.manager.models.agent import AgentRow
@@ -37,6 +37,25 @@ class AgentDBSource:
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
 
+    async def get_images_by_image_identifiers(
+        self, image_identifiers: list[ImageIdentifier]
+    ) -> dict[ImageID, ImageDataWithDetails]:
+        async with self._db.begin_readonly_session() as db_session:
+            identifier_tuples = [
+                (identifier.canonical, identifier.architecture) for identifier in image_identifiers
+            ]
+
+            query = (
+                sa.select(ImageRow)
+                .where(sa.tuple_(ImageRow.name, ImageRow.architecture).in_(identifier_tuples))
+                .options(selectinload(ImageRow.aliases))
+            )
+            image_rows: list[ImageRow] = (await db_session.scalars(query)).all()
+            images_data: dict[ImageID, ImageDataWithDetails] = {}
+            for image_row in image_rows:
+                images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()
+            return images_data
+
     async def get_images_by_digest(self, digests: list[str]) -> dict[ImageID, ImageDataWithDetails]:
         async with self._db.begin_readonly_session() as db_session:
             query = (
@@ -56,7 +75,7 @@ class AgentDBSource:
                 sa.select(AgentRow).where(AgentRow.id == agent_id)
             )
             if agent_row is None:
-                log.error(f"Agent with id {agent_id} not found")
+                log.error("Agent with id {} not found", agent_id)
                 raise AgentNotFound(f"Agent with id {agent_id} not found")
             return agent_row.to_data()
 
