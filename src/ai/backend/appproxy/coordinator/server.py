@@ -729,7 +729,7 @@ async def status(request: web.Request) -> web.Response:
         })
     return web.json_response({
         "api_version": "v2",
-        "advertise_address": str(root_ctx.local_config.proxy_coordinator.advertised_addr),
+        "advertise_address": str(root_ctx.local_config.proxy_coordinator.advertise_base_url),
     })
 
 
