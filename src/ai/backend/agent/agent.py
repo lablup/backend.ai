@@ -776,7 +776,7 @@ class AbstractAgent(
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
     slots: Mapping[SlotName, Decimal]
-    computers: MutableMapping[DeviceName, ComputerContext]
+    computers: Mapping[DeviceName, ComputerContext]
     images: Mapping[ImageCanonical, ImageInfo]
     port_pool: set[int]
 
