@@ -378,7 +378,7 @@ class AbstractKernelCreationContext(aobject, Generic[KernelObjectType]):
         self,
     ) -> tuple[KernelResourceSpec, Optional[Mapping[str, Any]]]:
         """
-        Generates base resource spec lacking non agent backend agnostic informations
+        Generates base resource spec lacking non agent backend agnostic information
         (e.g. unified device allocation). Do not call this method directly outside
         `generate_resource_spec` implementation.
         """
