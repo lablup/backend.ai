@@ -244,14 +244,6 @@ HealthCheckRouteHandler performs periodic health checks using a 3-state health c
 - **UNHEALTHY**: Readiness check fails
 - **DEGRADED**: Health data is stale or missing (TTL expired in Redis)
 
-**Health Check Configuration:**
-```json
-{
-    "route_health_ttl": 120,           # Redis TTL for health data (seconds)
-    "max_health_staleness": 300        # Threshold for marking data as stale (seconds)
-}
-```
-
 **Processing Flow:**
 ```
 1. Fetch health status from Redis for all routes
