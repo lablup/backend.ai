@@ -40,6 +40,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
     RouteStatus,
     ScaleOutDecision,
+    ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
@@ -179,6 +180,21 @@ class DeploymentRepository:
     ) -> list[DeploymentInfo]:
         """Get endpoints by their IDs."""
         return await self._db_source.get_endpoints_by_ids(endpoint_ids)
+
+    @deployment_repository_resilience.apply()
+    async def get_scaling_group_cleanup_configs(
+        self, scaling_group_names: Sequence[str]
+    ) -> Mapping[str, ScalingGroupCleanupConfig]:
+        """
+        Get route cleanup target statuses configuration for scaling groups.
+
+        Args:
+            scaling_group_names: List of scaling group names to query
+
+        Returns:
+            Mapping of scaling group name to ScalingGroupCleanupConfig
+        """
+        return await self._db_source.get_scaling_group_cleanup_configs(scaling_group_names)
 
     @deployment_repository_resilience.apply()
     async def get_endpoints_by_statuses(
