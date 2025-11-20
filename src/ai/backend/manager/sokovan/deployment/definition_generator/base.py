@@ -13,7 +13,3 @@ class ModelDefinitionGenerator(ABC):
     async def generate_model_definition(self, model_revision: ModelRevisionSpec) -> ModelDefinition:
         """Generate a model definition based on the provided revision (RuntimeVariant)."""
         raise NotImplementedError
-
-    @abstractmethod
-    async def generate_model_revision(self, model_revision: ModelRevisionSpec) -> ModelRevisionSpec:
-        raise NotImplementedError

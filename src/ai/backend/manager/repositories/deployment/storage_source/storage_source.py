@@ -5,7 +5,7 @@ from typing import Optional
 import tomli
 
 from ai.backend.common.types import VFolderID
-from ai.backend.manager.data.model_serving.types import ModelServiceDefinition
+from ai.backend.manager.data.deployment.types import ModelServiceDefinition
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import DefinitionFileNotFound
 from ai.backend.manager.models.storage import StorageSessionManager

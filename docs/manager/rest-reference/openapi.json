@@ -886,16 +886,24 @@
             "type": "string"
           },
           "resources": {
-            "additionalProperties": {
-              "anyOf": [
-                {
-                  "type": "string"
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "integer"
+                    }
+                  ]
                 },
-                {
-                  "type": "integer"
-                }
-              ]
-            },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "examples": [
               {
                 "cpu": 4,
@@ -903,8 +911,7 @@
                 "mem": "32g"
               }
             ],
-            "title": "Resources",
-            "type": "object"
+            "title": "Resources"
           },
           "resource_opts": {
             "additionalProperties": {
@@ -954,12 +961,20 @@
             "type": "integer"
           },
           "lang": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "String reference of the image which will be used to create session",
             "examples": [
               "cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3"
             ],
-            "title": "Lang",
-            "type": "string"
+            "title": "Lang"
           },
           "runtime_variant": {
             "$ref": "#/components/schemas/RuntimeVariant",
@@ -967,10 +982,17 @@
             "description": "Type of the inference runtime the image will try to load."
           },
           "arch": {
-            "default": "x86_64",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "Image architecture",
-            "title": "Arch",
-            "type": "string"
+            "title": "Arch"
           },
           "group": {
             "default": "default",
@@ -1070,7 +1092,6 @@
         "required": [
           "name",
           "desired_session_count",
-          "lang",
           "config"
         ],
         "title": "NewServiceRequestModel",

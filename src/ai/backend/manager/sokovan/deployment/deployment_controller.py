@@ -8,18 +8,15 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.creator import DeploymentCreator
+from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
-from ai.backend.manager.data.deployment.types import (
-    DeploymentInfo,
-    ModelRevisionSpec,
-)
+from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.sokovan.deployment.definition_generator.registry import (
-    ModelDefinitionGeneratorRegistry,
-    RegistryArgs,
+from ai.backend.manager.sokovan.deployment.revision_generator.registry import (
+    RevisionGeneratorRegistry,
+    RevisionGeneratorRegistryArgs,
 )
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
@@ -50,7 +47,7 @@ class DeploymentController:
     _storage_manager: StorageSessionManager
     _event_producer: EventProducer
     _valkey_schedule: ValkeyScheduleClient
-    _model_definition_generator_registry: ModelDefinitionGeneratorRegistry
+    _revision_generator_registry: RevisionGeneratorRegistry
 
     def __init__(self, args: DeploymentControllerArgs) -> None:
         """Initialize the deployment controller with required services."""
@@ -60,37 +57,40 @@ class DeploymentController:
         self._storage_manager = args.storage_manager
         self._event_producer = args.event_producer
         self._valkey_schedule = args.valkey_schedule
-        self._model_definition_generator_registry = ModelDefinitionGeneratorRegistry(
-            RegistryArgs(deployment_repository=self._deployment_repository)
+        self._revision_generator_registry = RevisionGeneratorRegistry(
+            RevisionGeneratorRegistryArgs(deployment_repository=self._deployment_repository)
         )
 
     async def create_deployment(
         self,
-        creator: DeploymentCreator,
+        draft: DeploymentCreationDraft,
     ) -> DeploymentInfo:
         """
         Create a new deployment based on the provided specification.
 
         Args:
-            creator: Deployment creation specification
+            draft: Deployment creation specification
 
         Returns:
             DeploymentInfo: Information about the created deployment
         """
-        log.info("Creating deployment '{}' in project {}", creator.name, creator.project)
-        await self._validate_model_revision(creator.model_revision)
-        deployment_info = await self._deployment_repository.create_endpoint(creator)
-        return deployment_info
-
-    async def _validate_model_revision(self, model_revision: ModelRevisionSpec) -> None:
-        """Validate the model revision specification."""
-        generator = self._model_definition_generator_registry.get(
-            model_revision.execution.runtime_variant
+        log.info("Creating deployment '{}' in project {}", draft.name, draft.project)
+        generator = self._revision_generator_registry.get(
+            draft.draft_model_revision.execution.runtime_variant
         )
-        model_revision = await generator.generate_model_revision(model_revision)
+        model_revision = await generator.generate_revision(
+            draft_revision=draft.draft_model_revision,
+            vfolder_id=draft.draft_model_revision.mounts.model_vfolder_id,
+            model_definition_path=draft.draft_model_revision.mounts.model_definition_path,
+        )
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision(model_revision=model_revision)
         )
+
+        deployment_info = await self._deployment_repository.create_endpoint(
+            draft.to_creator(model_revision)
+        )
+        return deployment_info
 
     async def update_deployment(
         self,
@@ -113,7 +113,9 @@ class DeploymentController:
         )
         target_revision = modified_endpoint.target_revision()
         if target_revision:
-            await self._validate_model_revision(target_revision)
+            await self._scheduling_controller.validate_session_spec(
+                SessionValidationSpec.from_revision(model_revision=target_revision)
+            )
         res = await self._deployment_repository.update_endpoint_with_modifier(endpoint_id, modifier)
         try:
             await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)

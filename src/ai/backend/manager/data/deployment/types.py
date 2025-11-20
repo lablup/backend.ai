@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import enum
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -9,6 +11,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 import yarl
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.model_deployment.types import (
@@ -28,6 +31,59 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.image.types import ImageIdentifier
+
+
+class ImageEnvironment(BaseModel):
+    image: str = Field(
+        description="""
+        Container image to use for the model service.
+        """,
+        examples=[
+            "myregistry/myimage:latest",
+        ],
+    )
+    architecture: str = Field(
+        description="""
+        Architecture of the container image.
+        """,
+        examples=[
+            "x86_64",
+            "arm64",
+        ],
+    )
+
+
+class ModelServiceDefinition(BaseModel):
+    environment: Optional[ImageEnvironment] = Field(
+        default=None,
+        description="""
+        Environment in which the model service will run.
+        """,
+        examples=[
+            {
+                "image": "myregistry/myimage:latest",
+                "architecture": "x86_64",
+            }
+        ],
+    )
+    resource_slots: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="""
+        Resource slots used by the model service session.
+        """,
+        examples=[
+            {"cpu": 1, "mem": "2gb"},
+        ],
+    )
+    environ: Optional[dict[str, str]] = Field(
+        default=None,
+        description="""
+        Environment variables to set for the model service.
+        """,
+        examples=[
+            {"MY_ENV_VAR": "value", "ANOTHER_VAR": "another_value"},
+        ],
+    )
 
 
 class RouteStatus(enum.Enum):
@@ -141,16 +197,18 @@ class ReplicaSpec:
         return self.replica_count
 
 
-@dataclass
-class ResourceSpec:
+class ConfiguredModel(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+
+class ResourceSpec(ConfiguredModel):
     cluster_mode: ClusterMode
     cluster_size: int
     resource_slots: Mapping[str, Any]
     resource_opts: Optional[Mapping[str, Any]] = None
 
 
-@dataclass
-class ExecutionSpec:
+class ExecutionSpec(ConfiguredModel):
     startup_command: Optional[str] = None
     bootstrap_script: Optional[str] = None
     environ: Optional[dict[str, str]] = None
@@ -159,10 +217,39 @@ class ExecutionSpec:
     inference_runtime_config: Optional[Mapping[str, Any]] = None
 
 
-@dataclass
-class ModelRevisionSpec:
+class ModelRevisionSpec(ConfiguredModel):
     image_identifier: ImageIdentifier
     resource_spec: ResourceSpec
+    mounts: MountMetadata
+    execution: ExecutionSpec
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator("image_identifier")
+    @classmethod
+    def validate_image_identifier(cls, v: ImageIdentifier) -> ImageIdentifier:
+        if not v.canonical or v.canonical.strip() == "":
+            raise ValueError("Image canonical must be specified")
+        if not v.architecture or v.architecture.strip() == "":
+            raise ValueError("Image architecture must be specified")
+        return v
+
+
+class ImageIdentifierDraft(ConfiguredModel):
+    canonical: Optional[str]
+    architecture: Optional[str]
+
+
+class ResourceSpecDraft(ConfiguredModel):
+    cluster_mode: ClusterMode
+    cluster_size: int
+    resource_slots: Optional[Mapping[str, Any]]
+    resource_opts: Optional[Mapping[str, Any]] = None
+
+
+class ModelRevisionSpecDraft(ConfiguredModel):
+    image_identifier: ImageIdentifierDraft
+    resource_spec: ResourceSpecDraft
     mounts: MountMetadata
     execution: ExecutionSpec
 
