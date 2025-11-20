@@ -512,7 +512,7 @@ class ResourceAllocator(aobject):
             res = await self._calculate_agent_partition(agent_idx, agent_config)
             agent_computer, reserved_slots, resource_scaling_factor = res
 
-            agent_id = AgentId(agent_config.agent.id)
+            agent_id = AgentId(agent_config.agent.defaulted_id)
             agent_computers[agent_id] = agent_computer
             agent_reserved_slots[agent_id] = reserved_slots
             agent_resource_scaling_factor[agent_id] = resource_scaling_factor
