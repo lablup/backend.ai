@@ -84,8 +84,6 @@ class DeploymentController:
             vfolder_id=request.requested_model_revision.mounts.model_vfolder_id,
             model_definition_path=request.requested_model_revision.mounts.model_definition_path,
         )
-        print(model_revision.model_dump_json())
-
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision(model_revision=model_revision)
         )
