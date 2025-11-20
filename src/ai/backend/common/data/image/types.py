@@ -1,6 +1,26 @@
 from dataclasses import dataclass
 from typing import Self
 
+from pydantic import BaseModel
+
+
+class ImageInfo(BaseModel):
+    canonical: str
+    digest: str
+    architecture: str
+
+    @classmethod
+    def from_inspect_result(cls, canonical: str, inspect_result: dict[str, str]) -> Self:
+        architecture = inspect_result.get("Architecture", "x86_64")
+        match architecture:
+            case "arm64":
+                architecture = "aarch64"
+        return cls(
+            canonical=canonical,
+            digest=inspect_result["Id"],
+            architecture=architecture,
+        )
+
 
 @dataclass
 class ScannedImage:

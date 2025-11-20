@@ -83,7 +83,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
-from ai.backend.common.data.image.types import ScannedImage
+from ai.backend.common.data.image.types import ImageInfo, ScannedImage
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
@@ -296,8 +296,8 @@ def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int
 
 @dataclass
 class ScanImagesResult:
-    scanned_images: Mapping[ImageCanonical, ScannedImage]
-    removed_images: Mapping[ImageCanonical, ScannedImage]
+    scanned_images: Mapping[ImageCanonical, ImageInfo]
+    removed_images: Mapping[ImageCanonical, ImageInfo]
 
 
 @dataclass
@@ -772,9 +772,9 @@ class AbstractAgent(
     etcd: AgentEtcdClientView
     local_instance_id: str
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
-    computers: Mapping[DeviceName, ComputerContext]
     slots: Mapping[SlotName, Decimal]
-    images: Mapping[ImageCanonical, ScannedImage]
+    computers: MutableMapping[DeviceName, ComputerContext]
+    images: Mapping[ImageCanonical, ImageInfo]
     port_pool: set[int]
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
@@ -1189,8 +1189,8 @@ class AbstractAgent(
                 },
                 images=zlib.compress(
                     msgpack.packb([
-                        (str(canonical), scanned_image.digest)
-                        for canonical, scanned_image in self.images.items()
+                        (str(canonical), image_info.digest)
+                        for canonical, image_info in self.images.items()
                     ])
                 ),
                 images_opts=ImageOpts(compression="zlib"),  # compression: zlib or None
@@ -2038,7 +2038,12 @@ class AbstractAgent(
         self.images = result.scanned_images
         if result.removed_images:
             await self.anycast_event(
-                AgentInstalledImagesRemoveEvent(scanned_images=result.removed_images)
+                AgentInstalledImagesRemoveEvent(
+                    scanned_images={
+                        image_canonical: ScannedImage(canonical=img.canonical, digest=img.digest)
+                        for image_canonical, img in self.images.items()
+                    }
+                )
             )
 
     @abstractmethod
