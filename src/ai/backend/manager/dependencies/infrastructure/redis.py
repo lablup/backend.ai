@@ -11,6 +11,7 @@ from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyB
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
 )
+from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -36,7 +37,6 @@ from ai.backend.common.health_checker import (
     ServiceHealthChecker,
 )
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
-from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 
 from .base import InfrastructureDependency
