@@ -130,7 +130,7 @@ class TestAgentService:
             need_resource_slot_update=False,
         )
         mock_agent_repository.sync_agent_heartbeat.return_value = upsert_result
-        mock_agent_repository.add_agent_to_images.return_value = None
+        mock_agent_repository.sync_installed_images.return_value = None
 
         # When
         result = await agent_service.handle_heartbeat(action)
@@ -156,9 +156,8 @@ class TestAgentService:
         mock_event_producer.anycast_event.assert_not_called()
 
         # Verify image registration
-        mock_agent_repository.add_agent_to_images.assert_called_once_with(
+        mock_agent_repository.sync_installed_images.assert_called_once_with(
             agent_id=agent_id,
-            images=sample_agent_info.images,
         )
 
         # Verify hook notification
@@ -193,7 +192,7 @@ class TestAgentService:
             need_resource_slot_update=False,
         )
         mock_agent_repository.sync_agent_heartbeat.return_value = upsert_result
-        mock_agent_repository.add_agent_to_images.return_value = None
+        mock_agent_repository.sync_installed_images.return_value = None
 
         # When
         result = await agent_service.handle_heartbeat(action)
@@ -248,7 +247,7 @@ class TestAgentService:
             need_resource_slot_update=True,  # New agent
         )
         mock_agent_repository.sync_agent_heartbeat.return_value = upsert_result
-        mock_agent_repository.add_agent_to_images.return_value = None
+        mock_agent_repository.sync_installed_images.return_value = None
 
         # When
         result = await agent_service.handle_heartbeat(action)
@@ -262,7 +261,7 @@ class TestAgentService:
 
         # Verify all other operations still happen
         mock_agent_cache.update.assert_called_once()
-        mock_agent_repository.add_agent_to_images.assert_called_once()
+        mock_agent_repository.sync_installed_images.assert_called_once()
         mock_hook_plugin_ctx.notify.assert_called_once()
 
     @pytest.mark.asyncio
@@ -309,7 +308,7 @@ class TestAgentService:
             need_resource_slot_update=True,  # Resources changed
         )
         mock_agent_repository.sync_agent_heartbeat.return_value = upsert_result
-        mock_agent_repository.add_agent_to_images.return_value = None
+        mock_agent_repository.sync_installed_images.return_value = None
 
         # When
         result = await agent_service.handle_heartbeat(action)
@@ -352,7 +351,7 @@ class TestAgentService:
             need_resource_slot_update=False,
         )
         mock_agent_repository.sync_agent_heartbeat.return_value = upsert_result
-        mock_agent_repository.add_agent_to_images.return_value = None
+        mock_agent_repository.sync_installed_images.return_value = None
 
         # When - simulate concurrent heartbeats
         import asyncio
@@ -369,5 +368,5 @@ class TestAgentService:
         # Verify all operations were called for each agent
         assert mock_agent_repository.sync_agent_heartbeat.call_count == 5
         assert mock_agent_cache.update.call_count == 5
-        assert mock_agent_repository.add_agent_to_images.call_count == 5
+        assert mock_agent_repository.sync_installed_images.call_count == 5
         assert mock_hook_plugin_ctx.notify.call_count == 5
