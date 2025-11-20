@@ -32,6 +32,7 @@ from ai.backend.appproxy.common.types import (
     FrontendMode,
     SerializableCircuit,
 )
+from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -309,6 +310,7 @@ class RootContext:
     event_producer: EventProducer
     valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
+    http_client_pool: ClientPool
     worker_id: UUID
     local_config: ServerConfig
     last_used_time_marker_redis_queue: asyncio.Queue[tuple[list[str], float]]
