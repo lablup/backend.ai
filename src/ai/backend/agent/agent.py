@@ -1269,12 +1269,12 @@ class AbstractAgent(
             chunk_buffer.close()
 
     @_observe_stat_task(stat_scope=StatScope.NODE)
-    async def collect_node_stat(self):
+    async def collect_node_stat(self, resource_scaling_factors: Mapping[SlotName, Decimal]):
         if self.local_config.debug.log_stats:
             log.debug("collecting node statistics")
         try:
             async with asyncio.timeout(STAT_COLLECTION_TIMEOUT):
-                await self.stat_ctx.collect_node_stat()
+                await self.stat_ctx.collect_node_stat(resource_scaling_factors)
         except Exception:
             log.exception("unhandled exception while syncing node stats")
             await self.produce_error_event()

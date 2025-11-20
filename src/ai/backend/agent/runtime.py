@@ -63,8 +63,8 @@ class AgentRuntime:
                 etcd_view = AgentEtcdClientView(etcd, agent_config)
                 etcd_views[agent_id] = etcd_view
 
-                computers = resource_allocator.get_computers()
-                slots = await resource_allocator.get_updated_slots()
+                computers = resource_allocator.get_computers(agent_id)
+                slots = await resource_allocator.get_updated_slots(agent_id)
 
                 create_agent_task = tg.create_task(
                     cls._create_agent(
@@ -198,10 +198,12 @@ class AgentRuntime:
         await etcd.put("", status, scope=ConfigScopes.NODE)
 
     async def _update_slots(self, interval: float) -> None:
-        updated_slots = await self._resource_allocator.get_updated_slots()
         for agent_id, agent in self._agents.items():
+            updated_slots = await self._resource_allocator.get_updated_slots(agent_id)
             agent.update_slots(updated_slots)
 
     async def _collect_node_stat(self, interval: float) -> None:
         for agent_id, agent in self._agents.items():
-            await agent.collect_node_stat()
+            await agent.collect_node_stat(
+                self._resource_allocator.get_resource_scaling_factor(agent_id)
+            )
