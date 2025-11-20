@@ -272,6 +272,39 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         await root_ctx.valkey_stat.close()
 
 
+@asynccontextmanager
+async def http_client_pool_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from functools import partial
+
+    import aiohttp
+
+    from ai.backend.common.clients.http_client.client_pool import (
+        ClientPool,
+        tcp_client_session_factory,
+    )
+
+    client_timeout = aiohttp.ClientTimeout(
+        total=None,
+        connect=10.0,
+        sock_connect=10.0,
+        sock_read=None,
+    )
+    cleanup_interval = root_ctx.local_config.proxy_worker.client_pool_cleanup_interval
+
+    root_ctx.http_client_pool = ClientPool(
+        partial(
+            tcp_client_session_factory,
+            timeout=client_timeout,
+            ssl=True,  # SSL verification per endpoint via ClientKey
+        ),
+        cleanup_interval_seconds=cleanup_interval,
+    )
+    try:
+        yield
+    finally:
+        await root_ctx.http_client_pool.close()
+
+
 async def _make_message_queue(
     root_ctx: RootContext,
 ) -> AbstractMessageQueue:
@@ -699,6 +732,7 @@ def build_root_app(
             cleanup_contexts = [
                 proxy_frontend_ctx,
                 redis_ctx,
+                http_client_pool_ctx,
                 health_probe_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
@@ -708,6 +742,7 @@ def build_root_app(
             cleanup_contexts = [
                 proxy_frontend_ctx,
                 redis_ctx,
+                http_client_pool_ctx,
                 event_dispatcher_ctx,
                 event_handler_ctx,
                 health_probe_ctx,
