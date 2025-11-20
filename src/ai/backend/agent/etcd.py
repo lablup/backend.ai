@@ -36,7 +36,7 @@ class AgentEtcdClientView(AbstractKVStore):
         """
         return {
             ConfigScopes.SGROUP: f"sgroup/{self._config.agent.scaling_group}",
-            ConfigScopes.NODE: f"nodes/agents/{self._config.agent.id}",
+            ConfigScopes.NODE: f"nodes/agents/{self._config.agent.defaulted_id}",
         }
 
     def _augment_scope_prefix_map(

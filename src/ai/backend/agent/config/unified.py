@@ -45,7 +45,6 @@ from ai.backend.common.typed_validators import (
     UserID,
 )
 from ai.backend.common.types import (
-    AgentId,
     BinarySize,
     BinarySizeField,
     ResourceGroupType,
@@ -605,8 +604,8 @@ class OverridableAgentConfig(BaseConfigSchema):
     Agent settings that can be overridden per-agent in multi-agent mode.
     """
 
-    id: str = Field(
-        default_factory=lambda: f"agent-{uuid4()}",
+    id: Optional[str] = Field(
+        default=None,
         description="Agent ID",
         examples=["agent-001"],
     )
@@ -661,6 +660,12 @@ class OverridableAgentConfig(BaseConfigSchema):
     model_config = ConfigDict(
         extra="allow",
     )
+
+    @property
+    def defaulted_id(self) -> str:
+        if self.id is None:
+            self.id = f"agent-{uuid4()}"
+        return self.id
 
 
 class AgentConfig(CommonAgentConfig, OverridableAgentConfig):
@@ -1323,10 +1328,6 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
     def agent_default(self) -> OverridableAgentConfig:
         return self.agent
 
-    @property
-    def agent_ids(self) -> Sequence[AgentId]:
-        return [AgentId(agent_config.agent.id) for agent_config in self.get_agent_configs()]
-
     def get_agent_configs(self) -> Sequence[AgentUnifiedConfig]:
         agent_configs = [agent.construct_unified_config(default=self) for agent in self.agents]
         if not agent_configs:
@@ -1382,8 +1383,9 @@ class AgentUnifiedConfig(AgentGlobalConfig, AgentSpecificConfig):
     def _validate_agent_id_uniqueness(
         cls, agents: list[AgentOverrideConfig]
     ) -> list[AgentOverrideConfig]:
-        agent_ids = {agent.agent.id for agent in agents}
-        if len(agent_ids) != len(agents):
+        agents_with_ids = [agent for agent in agents if agent.agent.id is not None]
+        agent_ids = {agent.agent.id for agent in agents_with_ids}
+        if len(agent_ids) != len(agents_with_ids):
             raise ValueError("Duplicate agent IDs found!")
         return agents
 
