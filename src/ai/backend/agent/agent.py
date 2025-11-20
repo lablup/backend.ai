@@ -2054,7 +2054,7 @@ class AbstractAgent(
                 AgentInstalledImagesRemoveEvent(
                     scanned_images={
                         image_canonical: ScannedImage(canonical=img.canonical, digest=img.digest)
-                        for image_canonical, img in self.images.items()
+                        for image_canonical, img in result.removed_images.items()
                     }
                 )
             )
