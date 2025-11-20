@@ -79,6 +79,7 @@ from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyB
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
 )
+from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
@@ -87,6 +88,7 @@ from ai.backend.common.data.image.types import ImageInfo, ScannedImage
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
+    REDIS_IMAGE_DB,
     REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     UNKNOWN_CONTAINER_ID,
@@ -175,6 +177,7 @@ from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.plugin.monitor import ErrorPluginContext, StatsPluginContext
 from ai.backend.common.runner.types import Runner
 from ai.backend.common.service_ports import parse_service_ports
+from ai.backend.common.typed_validators import HostPortPair
 from ai.backend.common.types import (
     MODEL_SERVICE_RUNTIME_PROFILES,
     AbuseReportValue,
@@ -933,7 +936,11 @@ class AbstractAgent(
             human_readable_name="agent.bgtask",
             db_id=REDIS_BGTASK_DB,
         )
-
+        self.valkey_image_client = await ValkeyImageClient.create(
+            redis_profile_target.profile_target(RedisRole.IMAGE).to_valkey_target(),
+            human_readable_name="agent.image",
+            db_id=REDIS_IMAGE_DB,
+        )
         self.background_task_manager = BackgroundTaskManager(
             self.event_producer,
             valkey_client=self.valkey_bgtask_client,
@@ -1077,6 +1084,13 @@ class AbstractAgent(
         await self.valkey_stream_client.close()
         await self.valkey_stat_client.close()
         await self.valkey_bgtask_client.close()
+        await self.valkey_image_client.close()
+
+    @property
+    def rpc_addr(self) -> HostPortPair:
+        if self.local_config.agent.advertised_rpc_addr:
+            return self.local_config.agent.advertised_rpc_addr
+        return self.local_config.agent.rpc_listen_addr
 
     async def _pre_anycast_event(self, event: AbstractEvent) -> None:
         if self.local_config.debug.log_heartbeats:
@@ -1166,15 +1180,11 @@ class AbstractAgent(
                 for slot_key, slot_type in cctx.instance.slot_types:
                     slot_key_and_units[slot_key] = slot_type
                     res_slots[slot_key] = Decimal(str(self.slots.get(slot_key, 0)))
-            if self.local_config.agent.advertised_rpc_addr:
-                rpc_addr = self.local_config.agent.advertised_rpc_addr
-            else:
-                rpc_addr = self.local_config.agent.rpc_listen_addr
             agent_info = AgentInfo(
-                ip=str(rpc_addr.host),
+                ip=str(self.rpc_addr.host),
                 region=self.local_config.agent.region,
                 scaling_group=self.local_config.agent.scaling_group,
-                addr=f"tcp://{rpc_addr}",
+                addr=f"tcp://{self.rpc_addr}",
                 public_key=self.agent_public_key,
                 public_host=str(self._get_public_host()),
                 available_resource_slots=ResourceSlot(res_slots),
@@ -1198,6 +1208,9 @@ class AbstractAgent(
                 auto_terminate_abusing_kernel=self.local_config.agent.force_terminate_abusing_containers,
             )
             await self.anycast_event(AgentHeartbeatEvent(agent_info))
+            await self.valkey_image_client.add_agent_installed_images(
+                agent_ip=self.rpc_addr.host, image_info=list(self.images.values())
+            )
         except asyncio.TimeoutError:
             log.warning("event dispatch timeout: instance_heartbeat")
         except Exception:

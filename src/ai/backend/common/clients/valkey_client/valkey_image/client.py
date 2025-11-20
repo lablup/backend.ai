@@ -8,7 +8,9 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.data.image.types import ImageInfo
 from ai.backend.common.exception import BackendAIError
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     BackoffStrategy,
@@ -112,6 +114,24 @@ class ValkeyImageClient:
         for image_id in image_ids:
             tx.sadd(str(image_id), [agent_id])
         await self._client.client.exec(tx, raise_on_error=True)
+
+    @valkey_image_resilience.apply()
+    async def add_agent_installed_images(
+        self,
+        agent_ip: str,
+        image_info: list[ImageInfo],
+    ) -> None:
+        """
+        Add installed image info for an agent.
+
+        :param agent_ip: The agent IP to add.
+        :param image_info: list of image information
+        """
+        if not image_info:
+            return
+
+        value = dump_json_str([img.model_dump() for img in image_info])
+        await self._client.client.set(key=f"installed_image:{agent_ip}", value=value)
 
     # For compatibility with redis key made with image canonical strings
     # Use remove_agent_from_images instead of this if possible
