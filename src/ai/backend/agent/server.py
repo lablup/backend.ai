@@ -350,8 +350,8 @@ class AgentRPCServer(aobject):
 
         # Start serving requests.
         async with asyncio.TaskGroup() as tg:
-            for agent_id in self.local_config.agent_ids:
-                tg.create_task(self.update_status("starting", agent_id))
+            for agent in self.runtime.get_agents():
+                tg.create_task(self.update_status("starting", agent.id))
 
         rpc_addr = self.local_config.agent_common.rpc_listen_addr
         self.rpc_server = Peer(
@@ -1394,7 +1394,7 @@ async def etcd_ctx(local_config: AgentUnifiedConfig) -> AsyncGenerator[AsyncEtcd
     scope_prefix_map = {
         ConfigScopes.GLOBAL: "",
         ConfigScopes.SGROUP: f"sgroup/{local_config.agent.scaling_group}",
-        ConfigScopes.NODE: f"nodes/agents/{local_config.agent.id}",
+        ConfigScopes.NODE: f"nodes/agents/{local_config.agent.defaulted_id}",
     }
     etcd_config_data = local_config.etcd.to_dataclass()
     etcd = AsyncEtcd(
@@ -1533,7 +1533,7 @@ async def service_discovery_ctx(
         sd_type,
         service_discovery,
         ServiceMetadata(
-            display_name=f"agent-{local_config.agent_default.id}",  # defaults to instance id
+            display_name=f"agent-{local_config.agent_default.defaulted_id}",  # defaults to instance id
             service_group="agent",
             version=VERSION,
             endpoint=ServiceEndpoint(

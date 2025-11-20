@@ -58,7 +58,7 @@ class AgentRuntime:
         create_agent_tasks: list[asyncio.Task] = []
         async with asyncio.TaskGroup() as tg:
             for agent_config in agent_configs:
-                agent_id = AgentId(agent_config.agent.id)
+                agent_id = AgentId(agent_config.agent.defaulted_id)
 
                 etcd_view = AgentEtcdClientView(etcd, agent_config)
                 etcd_views[agent_id] = etcd_view
