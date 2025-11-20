@@ -60,6 +60,7 @@
   "button": {
     "Add": "Dodaj",
     "Apply": "Zastosuj",
+    "AutoRefresh": "Automatyczne odświeżanie",
     "Cancel": "Anuluj",
     "Clear": "Usuwać",
     "ClearLogs": "Wyczyść dzienniki",
@@ -320,8 +321,11 @@
       "Name": "Nazwa",
       "NewFileName": "Nowa nazwa pliku",
       "NewFolder": "Nowy folder",
+      "NoAccessPermissionToVolume": "Bieżący projekt nie ma dostępu do woluminu SFTP.",
       "NoImagesSupportingFileBrowser": "Nie ma jeszcze obrazów obsługujących przeglądarkę plików. Do przesłania folderów wymagany jest co najmniej jeden obraz obsługujący przeglądarkę plików.",
       "NoImagesSupportingSystemSession": "Nie ma jeszcze obrazu obsługującego SSH / SFTP. Co najmniej jeden obraz, który obsługuje obrazy ról systemowych do korzystania z SSH / SFTP.",
+      "NoPermissionToMountFolder": "Bieżący projekt nie ma uprawnień do montowania hosta pamięci masowej powiązanego z tym folderem.",
+      "NoSFTPSupportingScalingGroup": "Host przechowywania tego folderu nie ma grupy zasobów SFTP.",
       "NoSharedFolders": "Brak folderów udostępnionych",
       "NoSharedUsers": "Nikt nie został zaproszony",
       "NotEnoughResourceForFileBrowserSession": "Brak wystarczających zasobów (cpu: 1 rdzeń, mem: 0,5 GB), aby utworzyć sesję dla przeglądarki plików. sprawdź dostępne zasoby.",
@@ -614,6 +618,7 @@
     "AuthenticationFailed": "Uwierzytelnianie nie powiodło się. Sprawdź informacje i status menedżera.",
     "CannotChangeVirtualFolderOption": "Nie można zmienić opcji folderu v, który nie jest moją własnością.",
     "CannotSharePrivateAutomountFolder": "Nie można udostępniać folderów vfolder automount zgodnie z zasadami.",
+    "FailedToLoadTableData": "Wystąpił błąd podczas ładowania listy.",
     "FolderSharingNotAvailableToUser": "Udostępnianie folderów nie jest dostępne dla żądanych użytkowników.",
     "InternalServerError": "Wewnętrzny błąd serwera. Spróbuj ponownie później.",
     "InvalidBaseURL": "Adres URL punktu końcowego jest nieprawidłowy.",
@@ -723,6 +728,7 @@
     "CreateButtonCode": "Stwórz",
     "CreateNotebookButton": "Przycisk Utwórz notatnik",
     "Downloading": "Ściąganie...",
+    "FailedToFetchRepositoryInformation": "Nie udało się pobrać informacji o repozytorium.",
     "FolderAlreadyExists": "Istnieje folder o tej samej nazwie. nazwa zostanie zmieniona.",
     "FolderCreated": "Utworzono folder.",
     "FolderName": "Nazwa importowanego folderu:",
@@ -739,6 +745,8 @@
     "ImportGithubRepo": "Importuj repozytorium GitHub",
     "ImportGitlabRepo": "Importowanie repozytorium GitLab",
     "ImportNotebook": "Importuj notatnik",
+    "InvalidGitHubURL": "Nieprawidłowy adres URL GitHub. Wprowadź prawidłowy adres URL repozytorium GitHub.",
+    "InvalidGitLabURL": "Nieprawidłowy adres URL GitLab. Musi to być prawidłowy adres URL repozytorium GitLab.",
     "InvalidNotebookURL": "Nieprawidłowy adres URL notatnika.",
     "NoNotebookCode": "Adres notatnika jest pusty. Wprowadź prawidłowy kod notebooka, aby skopiować kod plakietki.",
     "NoSuitableResourceFoundOnGivenURL": "Nie znaleziono odpowiedniego zasobu pod podanym adresem URL.",
@@ -750,8 +758,11 @@
     "Preparing": "Przygotowuję...",
     "ReadyToImport": "Gotowy do importu",
     "RepoWillBeFolder": "Zaimportowane repozytoria GitHub są konwertowane na foldery i można je zamontować po rozpoczęciu sesji.",
+    "RepositoryNotFound": "Nie znaleziono repozytorium.",
+    "StorageHost": "Host pamięci masowej",
+    "VFolderUsageMode": "Tryb użycia folderu",
     "WrongURLType": "Nieprawidłowy typ adresu URL",
-    "YouCanCreateNotebookCode": "Wprowadź adres URL notatnika, aby utworzyć kod plakietki, taki jak poniżej, który możesz uruchomić bezpośrednio w Backend.AI."
+    "YouCanCreateNotebookCode": "Ta odznaka umożliwia bezpośrednie uruchamianie Twojego notatnika na Backend.AI. Skopiuj kod, aby użyć go w dowolnym miejscu."
   },
   "information": {
     "APIVersion": "Wersja API",
@@ -1301,6 +1312,7 @@
     "ElapsedTime": "Upływający czas",
     "EnvironmentAndVersion": "Środowisko i wersja",
     "EnvironmentInfo": "Informacje o środowisku",
+    "ExecuteSpecificApp": "Uruchom {{appName}}",
     "ExecuteTerminalApp": "Uruchom aplikację terminalową",
     "ExpiresAfter": "Pozostały czas",
     "ExportCSV": "eksportuj CSV",
@@ -1417,6 +1429,7 @@
       "ConfirmAndRun": "Sprawdziłem i zacznę",
       "ConnectUrlIsNotValid": "Adres URL połączenia jest nieprawidłowy.",
       "DownloadSSHKey": "Pobierz klucz SSH",
+      "LaunchingApp": "Uruchamianie aplikacji {{appName}}.",
       "NoExistingConnectionExample": "Brak przykładu połączenia do skopiowania.",
       "OpenVSCodeRemote": "Otwórz lokalny kod Visual Studio",
       "Prepared": "Przygotowany",
@@ -1440,6 +1453,7 @@
       "BatchMode": "Partia",
       "BatchModeConfig": "Konfiguracja trybu wsadowego",
       "BatchModeDesc": "Możesz uruchomić swój kod z wieloma węzłami i klastrami, aby skalować swój pomysł",
+      "BootstrapScriptDetail": "Skrypt inicjalizacyjny",
       "CPU": "procesor",
       "ChooseEnvironment": "Wybierz środowisko",
       "ClusterMode": "Tryb klastra",
@@ -1457,7 +1471,8 @@
       "DescMemory": " <p> Pamięć komputera to tymczasowy obszar przechowywania. </p> <p> Zawiera dane i instrukcje, których potrzebuje jednostka centralna (CPU). </p> <p> W przypadku korzystania z procesora GPU w obciążeniu uczenia maszynowego należy przydzielić co najmniej dwa razy więcej pamięci procesora GPU do pamięci. W przeciwnym razie czas bezczynności GPU wydłuży się, co spowoduje spadek wydajności. </p>",
       "DescMultiNode": " <p> Podczas uruchamiania sesji jeden węzeł zarządzany i jeden lub więcej węzłów roboczych są dzielone na wiele węzłów fizycznych lub maszyn wirtualnych. </p>",
       "DescOpenMPOptimization": "<p>Wartość ta ustawia liczbę wątków do użycia w regionach równoległych poprzez ustawienie początkowej wartości wewnętrznej zmiennej kontrolnej nthreads-var.</p><p>Backend.AI ustawia tę wartość równą liczbie rdzeni procesora, co ma wpływ na przyspieszenie typowych obciążeń obliczeniowych o wysokiej wydajności. Jednak w przypadku niektórych obciążeń wielowątkowych wiele procesów korzystających z OpenMP jest używanych w tym samym czasie, co skutkuje nienormalnie dużą liczbą wątków i znacznym spadkiem wydajności. W takim przypadku należy dostosować tę wartość do 1 lub 2.</p>",
-      "DescSelectAgent": "Zasoby wyświetlane po prawej stronie agenta reprezentują rzeczywistą ilość dostępnych zasobów. \nObecnie wybór agenta jest dostępny tylko w środowisku z jednym węzłem i jednym kontenerem. \nUstawieniem domyślnym jest przydzielanie agentów przez program planujący.",
+      "DescSelectAgent": "Zasoby po prawej stronie agenta pokazują rzeczywistą dostępną ilość. Wybrane agenty reprezentują kandydatów do przydziału — nawet jeśli wybierzesz kilka, przydział nastąpi tylko do jednego z nich. Domyślnie przydział odbywa się automatycznie przez scheduler.",
+      "DescSelectAgentBefore2516": "Zasoby wyświetlane po prawej stronie agenta odzwierciedlają rzeczywistą ilość dostępnych zasobów. Obecnie wybór agenta jest możliwy tylko w środowisku z jednym węzłem i jednym kontenerem. Domyślnie agenty są przydzielane przez scheduler.",
       "DescSession": " <p> Sesja to jednostka środowiska obliczeniowego tworzona zgodnie z określonym środowiskiem i zasobami. </p> <p> Jeśli ta wartość jest ustawiona na wartość większą niż 1, tworzonych jest wiele sesji odpowiadających zasobowi ustawionemu powyżej. </p> <p> Jeśli nie ma wystarczającej ilości dostępnych zasobów, żądania utworzenia sesji, których nie można utworzyć, są umieszczane w kolejce oczekiwania. </p>",
       "DescSetEnv": " <p> Jeśli ustawisz domyślną zmienną środowiskową w kontenerze, a także ustawisz zmienną środowiskową o tej samej nazwie w Backend.AI, wartość ustawiona w Backend.AI ma pierwszeństwo. </p> <p style='color:var(--paper-red-400);'> Każda wartość wejściowa zostanie zainicjowana po uruchomieniu uruchamiania sesji. <br /> Ponadto, te środowiska zostaną przekazane tylko wtedy, gdy zarówno zmienna, jak i wartość nie są puste. </p>",
       "DescSetPreOpenPort": "\"Wstępnie otwarte porty\" odnoszą się do określonego <span style=\"color:var(--paper-red-400);\">wewnętrznego portu kontenera</span>, który umożliwia połączenia przychodzące z zewnętrznych urządzeń lub komputerów na urządzeniu sieciowym lub komputerze.",
@@ -1599,6 +1614,7 @@
       "TitleSession": "Sesja (Backend.AI)",
       "TotalAllocation": "Całkowity przydział",
       "UserResourceLimit": "Limit zasobów użytkownika",
+      "UsingBootstrapScriptInfo": "Skrypt bootstrap jest dołączony.",
       "Version": "Wersja",
       "YouCanStartWithHistory": "Są to ostatnio utworzone rekordy sesji. Kliknij nazwę sesji, aby rozpocząć nową sesję."
     },
@@ -1880,6 +1896,12 @@
     "SelectColumnToDisplay": "Wybierz, które kolumny mają być wyświetlane",
     "SettingTable": "Nakrycie stołu"
   },
+  "theme": {
+    "PreviewModeAlert": "Obecnie korzystasz z trybu podglądu motywu. Kontynuuj swoją pracę w oryginalnym oknie.",
+    "button": {
+      "ExportToJson": "Eksportuj JSON"
+    }
+  },
   "time": {
     "Day": "day",
     "Hour": "godzina",
@@ -1992,10 +2014,30 @@
     "SSHKeypairManagement": "Zarządzanie parami kluczy SSH",
     "SessionTerminationDialog": "Zakończenia sesji nie można cofnąć. Czy chcesz kontynuować, aby zakończyć sesję?",
     "ShellEnvironments": "Środowiska powłoki",
+    "Theme": "Temat",
     "ThemeMode": "Tryb tematyczny",
     "UseCompactSidebar": "Ustaw Kompaktowy Pasek Boczny jako Domyślny",
     "UseSystemSetting": "Użyj ustawień systemowych",
-    "UserConfigScript": "Skrypt konfiguracji użytkownika"
+    "UserConfigScript": "Skrypt konfiguracji użytkownika",
+    "theme": {
+      "CustomThemeSettingAlert": "Zaktualizowanego motywu nie można zastosować od razu. Jeśli chcesz go zastosować, skontaktuj się z naszym zespołem wsparcia i dołącz wyeksportowany plik konfiguracyjny w formacie JSON.",
+      "ErrorColor": "Kolor błędu",
+      "ErrorColorDesc": "Kolor zastosowany do przycisków lub alertów reprezentujących krytyczne działania, takie jak usuwanie, w celu wskazania ostrzeżeń lub błędów.",
+      "HeaderBg": "Kolor tła nagłówka",
+      "HeaderBgDesc": "Kolor zastosowany do tła nagłówka, z wyjątkiem sekcji logo.",
+      "InfoColor": "Kolor informacyjny",
+      "InfoColorDesc": "Kolor stosowany w ikonach informacyjnych i edycyjnych, używany dla elementów przekazujących informacje użytkownikom.",
+      "LinkColor": "Kolor łącza",
+      "LinkColorDesc": "Kolor używany w przypadku linków przekierowujących do innej strony lub otwierających dodatkowe elementy interfejsu użytkownika, takie jak szuflady lub moduły.",
+      "NoChangesMade": "Nie wprowadzono żadnych zmian.",
+      "Preview": "Zapowiedź",
+      "PrimaryColor": "Kolor podstawowy",
+      "PrimaryColorDesc": "Główny kolor stosowany do przycisków lub tekstu opisowego reprezentującego kluczowe działania. \nJest on również stosowany jako kolor tła sekcji logo w nagłówku.",
+      "SuccessColor": "Kolor sukcesu",
+      "SuccessColorDesc": "Kolor zastosowany do przycisków, alertów lub ikon wskazujących, że czynność użytkownika została pomyślnie wykonana.",
+      "TextColor": "Kolor tekstu",
+      "TextColorDesc": "Kolor używany w tekście ogólnym."
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Zaawansowane korzystanie z terminala internetowego: Skopiuj zawartość terminala",
@@ -2024,6 +2066,7 @@
       "AgentSummary": "Podsumowanie agenta",
       "Architecture": "Architektura",
       "ArtifactDetails": "Szczegóły artefaktu",
+      "Branding": "Identyfikacja wizualna",
       "Cancel": "Anuluj",
       "ChangePassword": "Zmień hasło",
       "Chat": "Czat",

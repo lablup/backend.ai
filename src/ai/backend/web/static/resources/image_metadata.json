@@ -855,6 +855,20 @@
           "color": "blue"
         }
       ]
+    },
+    "sglang": {
+      "name": "SGLang",
+      "description": "SGLang is a high-performance serving framework for large language models and vision-language models.",
+      "group": "Inference",
+      "tags": [],
+      "icon": "sglang.svg",
+      "label": [
+        {
+          "category": "Env",
+          "tag": "SGLang",
+          "color": "red"
+        }
+      ]
     }
   },
   "tagAlias": {
@@ -969,7 +983,8 @@
     "ff": "Research Env.",
     "atom-orbit": "Orbit",
     "vllm": "vLLM",
-    "mojo-max": "MAX (Mojo)"
+    "mojo-max": "MAX (Mojo)",
+    "sglang": "SGLang"
   },
   "tagReplace": {
     "^(tf)([0-9.]*)$": "TensorFlow $2",

@@ -60,6 +60,7 @@
   "button": {
     "Add": "追加",
     "Apply": "応募する",
+    "AutoRefresh": "自動更新",
     "Cancel": "キャンセル",
     "Clear": "消去",
     "ClearLogs": "ログをクリアする",
@@ -319,8 +320,11 @@
       "Name": "名前",
       "NewFileName": "新しいファイル名",
       "NewFolder": "新しいフォルダ",
+      "NoAccessPermissionToVolume": "現在のプロジェクトはSFTPボリュームへのアクセス権がありません。",
       "NoImagesSupportingFileBrowser": "Filebrowserを利用するには、対応するイメージが必要です。現在はまだ登録されていません。フォルダーをアップロードするには、少なくとも1つ以上の対応イメージを追加してください。",
       "NoImagesSupportingSystemSession": "SSH / SFTPをサポートするイメージがありません。 SSH / SFTPを利用するには、システムイメージが必要です。",
+      "NoPermissionToMountFolder": "現在のプロジェクトには、このフォルダーに紐づくストレージホストをマウントする権限がありません。",
+      "NoSFTPSupportingScalingGroup": "このフォルダのストレージホストにSFTPのリソースグループがありません。",
       "NoSharedFolders": "共有フォルダーはありません",
       "NoSharedUsers": "誰も招待されていません",
       "NotEnoughResourceForFileBrowserSession": "ファイルブラウザのセッションを作成するのに十分なリソース（CPU：1コア、メモリ：0.5GB）がありません。利用可能なリソースを確認してください。",
@@ -613,6 +617,7 @@
     "AuthenticationFailed": "認証に失敗しました。情報とマネージャーのステータスを確認してください。",
     "CannotChangeVirtualFolderOption": "自分が所有していないvfolderのオプションを変更することはできません。",
     "CannotSharePrivateAutomountFolder": "ポリシーに従って自動マウントVフォルダーを共有できない。",
+    "FailedToLoadTableData": "一覧の読み込み中にエラーが発生しました。",
     "FolderSharingNotAvailableToUser": "要求されたユーザーのフォルダ共有は利用できません。",
     "InternalServerError": "内部サーバーエラーです。後でもう一度お試しください。",
     "InvalidBaseURL": "エンドポイント URL が無効です。",
@@ -723,6 +728,7 @@
     "CreateButtonCode": "作成する",
     "CreateNotebookButton": "ノートブック実行ボタン生成",
     "Downloading": "ダウンロード中...",
+    "FailedToFetchRepositoryInformation": "リポジトリ情報の取得に失敗しました。",
     "FolderAlreadyExists": "同じ名前のフォルダがあります。名前が変更されます。",
     "FolderCreated": "フォルダが作成されました。",
     "FolderName": "インポートされたフォルダ名：",
@@ -739,6 +745,8 @@
     "ImportGithubRepo": "GitHubリポジトリをインポートする",
     "ImportGitlabRepo": "GitLabリポジトリ取り込み",
     "ImportNotebook": "ノートブック取り込み",
+    "InvalidGitHubURL": "無効なGitHub URLです。有効なGitHubリポジトリのURLを指定してください。",
+    "InvalidGitLabURL": "GitLab の URL が無効です。正しい GitLab リポジトリの URL を指定してください。",
     "InvalidNotebookURL": "ノートブックの URL が無効です。",
     "NoNotebookCode": "ノートブックアドレスが空です。バッジコードをコピーするには、有効なノートブックコードを入力してください。",
     "NoSuitableResourceFoundOnGivenURL": "指定されたURLに適切なリソースが見つかりません。",
@@ -750,8 +758,11 @@
     "Preparing": "準備...",
     "ReadyToImport": "インポートする準備ができました",
     "RepoWillBeFolder": "インポートされたGitHubリポジトリはフォルダーに変換され、セッションの開始時にマウントできます。",
+    "RepositoryNotFound": "リポジトリが見つかりません。",
+    "StorageHost": "ストレージホスト",
+    "VFolderUsageMode": "フォルダ利用モード",
     "WrongURLType": "間違ったURLタイプ",
-    "YouCanCreateNotebookCode": "ノートブックのURLを入力すると、Backend.AIで直接実行できる以下のようなバッジコードを生成します。"
+    "YouCanCreateNotebookCode": "このバッジを使うと、ノートブックを Backend.AI 上で直接実行できます。コードをコピーして任意の場所でご利用ください。"
   },
   "information": {
     "APIVersion": "APIバージョン",
@@ -1301,6 +1312,7 @@
     "ElapsedTime": "経過時間",
     "EnvironmentAndVersion": "環境とバージョン",
     "EnvironmentInfo": "環境情報",
+    "ExecuteSpecificApp": "{{appName}} アプリを起動",
     "ExecuteTerminalApp": "ターミナルアプリを起動する",
     "ExpiresAfter": "残り時間",
     "ExportCSV": "CSVをエクスポート",
@@ -1417,6 +1429,7 @@
       "ConfirmAndRun": "確認して始めます",
       "ConnectUrlIsNotValid": "接続 URL が無効です。",
       "DownloadSSHKey": "SSHキーをダウンロード",
+      "LaunchingApp": "{{appName}} アプリを起動しています。",
       "NoExistingConnectionExample": "コピーする接続例がありません。",
       "OpenVSCodeRemote": "ローカルVisual Studio Codeを開く",
       "Prepared": "準備",
@@ -1440,6 +1453,7 @@
       "BatchMode": "バッチ",
       "BatchModeConfig": "Batchモード設定",
       "BatchModeDesc": "複数のノードやクラスタでコードを実行し、アイデアをスケールさせることができます。",
+      "BootstrapScriptDetail": "ブートストラップスクリプト",
       "CPU": "CPU",
       "ChooseEnvironment": "環境を選択",
       "ClusterMode": "クラスターモード",
@@ -1457,7 +1471,8 @@
       "DescMemory": " <p>コンピュータのメモリは一時的な記憶領域です。 </p> <p>中央処理装置（CPU）が必要とするデータと命令を保持します。 </p> <p>機械学習ワークロードでGPUを使用する場合、GPUのメモリの少なくとも2倍をメモリに割り当てる必要があります。そうしないと、GPUのアイドル時間が長くなり、パフォーマンスが低下します。 </p>",
       "DescMultiNode": " <p>セッションを実行すると、1つの管理対象ノードと1つ以上のワーカーノードが複数の物理ノードまたは仮想マシンに分割されます。 </p>",
       "DescOpenMPOptimization": "<p>この値はnthreads-var内部制御変数の初期値を設定し、並列領域に使用するスレッド数を設定します。</p><p>Backend.AIはこの値をCPUコア数と同じに設定し、一般的な高性能コンピューティングワークロードを加速する効果があります。 しかし、一部のマルチスレッドワークロードの場合、OpenMPを使用する複数のプロセスが同時に使用され、異常に多くのスレッドが生成され、パフォーマンスが大幅に低下します。このような場合は、この値を1または2に調整してください</p>。",
-      "DescSelectAgent": "エージェントの右側に表示されるリソースは、使用可能なリソースの実際の量を表します。\n現在、エージェントの選択は、単一ノード、単一コンテナー環境でのみ使用できます。\nデフォルト設定は、スケジューラによるエージェント割り当てです。",
+      "DescSelectAgent": "エージェントの右に表示されているリソースは、実際に利用可能な量を示しています。選択されたエージェントは割り当て候補を表しており、複数選択しても1つのエージェントにしか割り当てられないことがあります。既定ではスケジューラーによる自動割り当てです。",
+      "DescSelectAgentBefore2516": "エージェントの右側に表示されているリソースは、実際に利用可能なリソース量を示しています。現在、エージェントの選択は単一ノード・単一コンテナ環境でのみ利用可能です。デフォルト設定はスケジューラによるエージェント割り当てです。",
       "DescSession": " <p>セッションは、指定された環境とリソースに従って作成される計算環境の単位です。 </p> <p>この値が1より大きい値に設定されている場合、上記のリソースセットに対応する複数のセッションが作成されます。 </p> <p>使用可能なリソースが十分にない場合、作成できないセッションを作成する要求は待機キューに入れられます。 </p>",
       "DescSetEnv": " <p>コンテナにデフォルトの環境変数を設定し、Backend.AIに同じ名前の環境変数を設定すると、Backend.AIに設定された値が優先されます。 </p> <p style='color:var(--paper-red-400);'>すべての入力値は、セッションランチャーの開始後に初期化されます。 <br />また、これらの環境は、変数と値の両方が空でない場合にのみ渡されます。 </p>",
       "DescSetPreOpenPort": "ネットワーク機器またはコンピュータで外部からの接続を許可する <span style='color:var(--paper-red-400);'> コンテナ内部の特定のポート番号</span>を「事前開放ポート」の値に設定します。",
@@ -1599,6 +1614,7 @@
       "TitleSession": "セッション（Backend.AI）",
       "TotalAllocation": "総割り当て",
       "UserResourceLimit": "ユーザーリソース制限",
+      "UsingBootstrapScriptInfo": "ブートストラップスクリプトが含まれています。",
       "Version": "バージョン",
       "YouCanStartWithHistory": "これらは最近作成されたセッション記録です。セッション名をクリックすると、新しいセッションが開始されます。"
     },
@@ -1880,6 +1896,12 @@
     "SelectColumnToDisplay": "表示する列を選択します",
     "SettingTable": "テーブルセッティング"
   },
+  "theme": {
+    "PreviewModeAlert": "現在、テーマのプレビュー モードを使用しています。実際の作業は元のウィンドウで行ってください。",
+    "button": {
+      "ExportToJson": "JSON をエクスポート"
+    }
+  },
   "time": {
     "Day": "日",
     "Hour": "時間",
@@ -1992,10 +2014,30 @@
     "SSHKeypairManagement": "SSHキーペア管理",
     "SessionTerminationDialog": "セッションの終了は元に戻せません。セッションの終了に進みますか？",
     "ShellEnvironments": "シェル環境",
+    "Theme": "テーマ",
     "ThemeMode": "テーマモード",
     "UseCompactSidebar": "コンパクトサイドバーをデフォルトに設定",
     "UseSystemSetting": "システム設定を使用する",
-    "UserConfigScript": "ユーザー構成スクリプト"
+    "UserConfigScript": "ユーザー構成スクリプト",
+    "theme": {
+      "CustomThemeSettingAlert": "更新されたテーマはすぐには適用できません。テーマを適用したい場合は、エクスポートした設定のJSONファイルを添えてサポートチームまでご連絡ください。",
+      "ErrorColor": "エラーの色",
+      "ErrorColorDesc": "警告やエラーを示すために、削除などの重要なアクションを表すボタンまたはアラートに適用される色。",
+      "HeaderBg": "ヘッダーの背景色",
+      "HeaderBgDesc": "ロゴセクションを除く、ヘッダーの背景に適用される色。",
+      "InfoColor": "情報の色",
+      "InfoColorDesc": "ユーザーに情報を伝える要素（情報案内や編集アイコン）に適用される色。",
+      "LinkColor": "リンクの色",
+      "LinkColorDesc": "別のページにリダイレクトするリンク、またはドロワーやモーダルなどの追加の UI 要素を開くリンクに使用される色。",
+      "NoChangesMade": "変更はありません。",
+      "Preview": "プレビュー",
+      "PrimaryColor": "原色",
+      "PrimaryColorDesc": "キーアクションを表すボタンまたは説明テキストに適用されるメインカラー。\nヘッダーのロゴセクションの背景色としても適用されます。",
+      "SuccessColor": "サクセスカラー",
+      "SuccessColorDesc": "ユーザーアクションが正常に完了したことを示すボタン、アラート、またはアイコンに適用される色。",
+      "TextColor": "文字の色",
+      "TextColorDesc": "一般的なテキストに使用される色。"
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高度なWeb端末の使用法：端末の内容をコピーする",
@@ -2024,6 +2066,7 @@
       "AgentSummary": "リソース概要",
       "Architecture": "建築",
       "ArtifactDetails": "アーティファクトの詳細",
+      "Branding": "ブランディング",
       "Cancel": "キャンセル",
       "ChangePassword": "パスワードを変更する",
       "Chat": "チャット",

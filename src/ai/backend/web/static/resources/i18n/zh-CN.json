@@ -60,6 +60,7 @@
   "button": {
     "Add": "添加",
     "Apply": "申请",
+    "AutoRefresh": "自动刷新",
     "Cancel": "取消",
     "Clear": "删除",
     "ClearLogs": "清除日志",
@@ -320,8 +321,11 @@
       "Name": "名称",
       "NewFileName": "新文件名",
       "NewFolder": "新建文件夹",
+      "NoAccessPermissionToVolume": "当前项目没有对 SFTP 卷的访问权限。",
       "NoImagesSupportingFileBrowser": "尚无支持文件浏览器的图像。上传文件夹至少需要一张或多张支持文件浏览器的图片。",
       "NoImagesSupportingSystemSession": "目前还没有支持 SSH / SFTP 的映像。至少有一个或多个支持系统角色映像的映像可使用 SSH / SFTP。",
+      "NoPermissionToMountFolder": "当前项目没有对与此文件夹关联的存储主机的挂载权限。",
+      "NoSFTPSupportingScalingGroup": "此文件夹的存储主机未配置 SFTP 资源组。",
       "NoSharedFolders": "没有共享文件夹",
       "NoSharedUsers": "没有人被邀请",
       "NotEnoughResourceForFileBrowserSession": "没有足够的资源（cpu: 1 Core, mem: 0.5GB）来为文件浏览器创建会话。请检查可用资源。",
@@ -614,6 +618,7 @@
     "AuthenticationFailed": "验证失败。检查信息和管理器状态。",
     "CannotChangeVirtualFolderOption": "您不能更改不属于自己的 v 文件夹的选项。",
     "CannotSharePrivateAutomountFolder": "无法按照策略共享自动挂载 v 文件夹。",
+    "FailedToLoadTableData": "加载列表时出错。",
     "FolderSharingNotAvailableToUser": "请求的用户无法共享文件夹。",
     "InternalServerError": "内部服务器错误。请稍后再试。",
     "InvalidBaseURL": "端点 URL 无效。",
@@ -724,6 +729,7 @@
     "CreateButtonCode": "创造",
     "CreateNotebookButton": "创建笔记本按钮",
     "Downloading": "正在下载...",
+    "FailedToFetchRepositoryInformation": "获取仓库信息失败。",
     "FolderAlreadyExists": "有一个同名文件夹。名称将被重命名。",
     "FolderCreated": "文件夹已创建。",
     "FolderName": "导入的文件夹名称：",
@@ -740,6 +746,8 @@
     "ImportGithubRepo": "导入 GitHub 存储库",
     "ImportGitlabRepo": "导入 GitLab 仓库",
     "ImportNotebook": "进口笔记本",
+    "InvalidGitHubURL": "无效的 GitHub URL。必须为有效的 GitHub 仓库 URL。",
+    "InvalidGitLabURL": "无效的 GitLab URL。必须是有效的 GitLab 仓库 URL。",
     "InvalidNotebookURL": "笔记本 URL 无效。",
     "NoNotebookCode": "笔记本地址为空。请输入有效的笔记本代码以复制胸卡代码。",
     "NoSuitableResourceFoundOnGivenURL": "在给定的 URL 上找不到合适的资源。",
@@ -751,8 +759,11 @@
     "Preparing": "正在准备...",
     "ReadyToImport": "准备进口",
     "RepoWillBeFolder": "导入的 GitHub 存储库转换为文件夹，并且可以在会话开始时挂载。",
+    "RepositoryNotFound": "未找到仓库。",
+    "StorageHost": "存储主机",
+    "VFolderUsageMode": "文件夹使用模式",
     "WrongURLType": "错误的网址类型",
-    "YouCanCreateNotebookCode": "输入笔记本 URL 以创建如下所示的徽章代码，您可以直接在 Backend.AI 上运行。"
+    "YouCanCreateNotebookCode": "此徽章可在 Backend.AI 上直接运行您的笔记本。复制代码即可在任何地方使用。"
   },
   "information": {
     "APIVersion": "接口版本",
@@ -1302,6 +1313,7 @@
     "ElapsedTime": "所用时间",
     "EnvironmentAndVersion": "环境及版本",
     "EnvironmentInfo": "环境信息",
+    "ExecuteSpecificApp": "启动 {{appName}} 应用",
     "ExecuteTerminalApp": "执行终端应用程序",
     "ExpiresAfter": "剩余时间",
     "ExportCSV": "导出 CSV",
@@ -1418,6 +1430,7 @@
       "ConfirmAndRun": "我检查过，我会开始",
       "ConnectUrlIsNotValid": "连接 URL 无效。",
       "DownloadSSHKey": "下载 SSH 密钥",
+      "LaunchingApp": "{{appName}} 应用正在启动。",
       "NoExistingConnectionExample": "无连接示例可复制。",
       "OpenVSCodeRemote": "打开本地 Visual Studio 代码",
       "Prepared": "准备好了",
@@ -1441,6 +1454,7 @@
       "BatchMode": "批次",
       "BatchModeConfig": "批处理模式配置",
       "BatchModeDesc": "您可以使用多个节点和集群运行代码，以扩展您的想法",
+      "BootstrapScriptDetail": "引导脚本",
       "CPU": "中央处理器",
       "ChooseEnvironment": "选择环境",
       "ClusterMode": "集群模式",
@@ -1458,7 +1472,8 @@
       "DescMemory": " <p> 计算机内存是一个临时存储区域。 </p> <p> 它保存中央处理单元 (CPU) 所需的数据和指令。 </p> <p> 在机器学习工作负载中使用 GPU 时，您必须将至少两倍于 GPU 的内存分配给内存。否则，GPU 的空闲时间会增加，从而导致性能损失。 </p>",
       "DescMultiNode": " <p> 运行会话时，一个受管节点和一个或多个工作程序节点被拆分为多个物理节点或虚拟机。 </p>",
       "DescOpenMPOptimization": "<p>该值通过设置 nthreads-var 内部控制变量的初始值来设置并行区域使用的线程数。</p><p>Backend.AI 将该值设置为与 CPU 内核数相等，从而达到加速典型高性能计算工作负载的效果。但是，对于某些多线程工作负载，同时使用多个使用 OpenMP 的进程会导致线程数量异常庞大，性能明显下降。在这种情况下，请将此值调整为 1 或 2。",
-      "DescSelectAgent": "代理右侧显示的资源代表实际可用资源量。\n目前，代理选择仅适用于单节点单容器环境。\n默认设置是由调度程序分配代理。",
+      "DescSelectAgent": "代理右侧的资源表示实际可用量。被选中的代理表示可分配的候选池。即使选择多个，也只能分配给其中一个代理。默认设置为由调度器自动分配。",
+      "DescSelectAgentBefore2516": "Agent 右侧显示的资源表示实际可用的资源量。当前仅在单节点单容器环境下支持选择 Agent。默认情况下由调度器分配 Agent。",
       "DescSession": " <p> 会话是根据指定的环境和资源创建的计算环境单元。 </p> <p> 如果将此值设置为大于 1 的值，则会创建与上面设置的资源对应的多个会话。 </p> <p> 如果没有足够的可用资源，则创建无法创建的会话的请求将置于等待队列中。 </p>",
       "DescSetEnv": " <p> 如果在容器中设置了默认环境变量，并且在Backend.AI上也设置了同名环境变量，则Backend.AI上设置的值优先。 </p> <p style='color:var(--paper-red-400);'> 启动会话启动器后，每个输入值都将被初始化。 <br /> 此外，只有当变量和值都不为空时，才会传递这些环境。 </p>",
       "DescSetPreOpenPort": "预开放端口 \"指的是特定的<span style='color:var(--paper-red-400);'>内部容器端口</span>，它允许从网络设备或计算机上的外部设备或计算机传入连接。",
@@ -1600,6 +1615,7 @@
       "TitleSession": "会话（后端.AI）",
       "TotalAllocation": "总分配",
       "UserResourceLimit": "用户资源限制",
+      "UsingBootstrapScriptInfo": "已包含引导脚本。",
       "Version": "版本",
       "YouCanStartWithHistory": "这些是您最近创建的会话记录。点击会话名称即可开始新的会话。"
     },
@@ -1881,6 +1897,12 @@
     "SelectColumnToDisplay": "选择要显示的列",
     "SettingTable": "桌面设置"
   },
+  "theme": {
+    "PreviewModeAlert": "您当前处于主题预览模式。请在原窗口继续进行实际工作。",
+    "button": {
+      "ExportToJson": "导出 JSON"
+    }
+  },
   "time": {
     "Day": "day",
     "Hour": "小时",
@@ -1993,10 +2015,30 @@
     "SSHKeypairManagement": "SSH 密钥对管理",
     "SessionTerminationDialog": "会话终止无法撤消。您要继续终止会话吗？",
     "ShellEnvironments": "外壳环境",
+    "Theme": "主题",
     "ThemeMode": "主题模式",
     "UseCompactSidebar": "将紧凑侧边栏设为默认",
     "UseSystemSetting": "使用系统设置",
-    "UserConfigScript": "用户配置脚本"
+    "UserConfigScript": "用户配置脚本",
+    "theme": {
+      "CustomThemeSettingAlert": "更新后的主题无法立即应用。如果您希望应用该主题，请将导出的 JSON 配置文件发送给我们的支持团队。",
+      "ErrorColor": "错误颜色",
+      "ErrorColorDesc": "应用于表示关键操作（例如删除）的按钮或警报的颜色，以指示警告或错误。",
+      "HeaderBg": "标题背景颜色",
+      "HeaderBgDesc": "应用于标题背景的颜色，徽标部分除外。",
+      "InfoColor": "信息颜色",
+      "InfoColorDesc": "用于信息引导和编辑图标的颜色，适用于向用户传达信息的元素。",
+      "LinkColor": "链接颜色",
+      "LinkColorDesc": "用于重定向到另一个页面或打开其他 UI 元素（例如抽屉或模式）的链接的颜色。",
+      "NoChangesMade": "未进行任何更改。",
+      "Preview": "预览",
+      "PrimaryColor": "原色",
+      "PrimaryColorDesc": "应用于代表关键操作的按钮或描述性文本的主要颜色。\n它还用作标题中徽标部分的背景颜色。",
+      "SuccessColor": "成功色彩",
+      "SuccessColorDesc": "应用于按钮、警报或图标的颜色，指示用户操作已成功完成。",
+      "TextColor": "文字颜色",
+      "TextColorDesc": "用于一般文本的颜色。"
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高级 Web 终端使用：复制终端内容",
@@ -2025,6 +2067,7 @@
       "AgentSummary": "代理摘要",
       "Architecture": "建筑学",
       "ArtifactDetails": "文物细节",
+      "Branding": "品牌",
       "Cancel": "取消",
       "ChangePassword": "更改密码",
       "Chat": "聊天",
