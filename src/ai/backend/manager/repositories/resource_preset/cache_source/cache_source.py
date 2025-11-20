@@ -128,9 +128,7 @@ class ResourcePresetCacheSource:
 
     async def invalidate_all_presets(self) -> None:
         """
-        Invalidate all cached presets.
-        Note: Without scan capability, we can't delete all keys with a pattern.
-        The cache will expire naturally with TTL (1 minute).
+        Invalidate all cached presets by deleting all preset-related cache keys.
+        This ensures immediate cache invalidation rather than waiting for TTL expiration.
         """
-        # Since we can't scan for patterns, we'll just log that cache will expire
-        log.debug("Preset cache will expire naturally with TTL ({}s)", CACHE_TTL)
+        await self._valkey_stat.invalidate_all_resource_presets()
