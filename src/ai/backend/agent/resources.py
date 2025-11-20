@@ -155,7 +155,7 @@ class KernelResourceSpec:
         """
         View of effective list of devices mounted to kernel, aggregating both non-unified and unified devices.
         DeviceView representing unified devices will always have empty `device_alloc` map.
-        Unlike `allocations` property, this view will not list ineffective slots - slots without any alloc map defined.
+        Unlike the `allocations` property, this view will not list slots with zero allocation - that is, slots without any alloc map defined.
         """
         devices = []
         for device, allocs in self.allocations.items():
