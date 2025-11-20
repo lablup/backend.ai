@@ -13,6 +13,7 @@ import pytest
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
     MAX_HEALTH_STALENESS_SEC,
+    HealthCheckStatus,
     ValkeyScheduleClient,
 )
 from ai.backend.common.defs import REDIS_LIVE_DB
@@ -66,7 +67,8 @@ class TestValkeyScheduleClient:
     ) -> None:
         """Test validation with healthy status and fresh timestamp"""
         fresh_timestamp = str(int(time()))
-        assert await valkey_schedule_client._validate_health_status("1", fresh_timestamp) is True
+        result = await valkey_schedule_client._validate_health_status("1", fresh_timestamp)
+        assert result == HealthCheckStatus.HEALTHY
 
     @pytest.mark.asyncio
     async def test_validate_health_status_with_stale_timestamp(
@@ -74,7 +76,8 @@ class TestValkeyScheduleClient:
     ) -> None:
         """Test validation with healthy status but stale timestamp"""
         stale_timestamp = str(int(time()) - MAX_HEALTH_STALENESS_SEC - 10)
-        assert await valkey_schedule_client._validate_health_status("1", stale_timestamp) is False
+        result = await valkey_schedule_client._validate_health_status("1", stale_timestamp)
+        assert result == HealthCheckStatus.STALE
 
     @pytest.mark.asyncio
     async def test_validate_health_status_with_unhealthy_status(
@@ -82,15 +85,18 @@ class TestValkeyScheduleClient:
     ) -> None:
         """Test validation with unhealthy status regardless of timestamp"""
         fresh_timestamp = str(int(time()))
-        assert await valkey_schedule_client._validate_health_status("0", fresh_timestamp) is False
+        result = await valkey_schedule_client._validate_health_status("0", fresh_timestamp)
+        assert result == HealthCheckStatus.UNHEALTHY
 
     @pytest.mark.asyncio
     async def test_validate_health_status_with_invalid_timestamp(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
         """Test validation with invalid timestamp formats"""
-        assert await valkey_schedule_client._validate_health_status("1", "invalid") is False
-        assert await valkey_schedule_client._validate_health_status("1", "") is False
+        result1 = await valkey_schedule_client._validate_health_status("1", "invalid")
+        assert result1 == HealthCheckStatus.STALE
+        result2 = await valkey_schedule_client._validate_health_status("1", "")
+        assert result2 == HealthCheckStatus.STALE
 
     @pytest.mark.asyncio
     async def test_initialize_routes_health_status_batch(
@@ -101,12 +107,12 @@ class TestValkeyScheduleClient:
 
         await valkey_schedule_client.initialize_routes_health_status_batch(route_ids)
 
-        # Verify all initialized routes are considered unhealthy
+        # Verify all initialized routes are considered stale (no timestamp data)
         for route_id in route_ids:
             status = await valkey_schedule_client.get_route_health_status(route_id)
             assert status is not None
-            assert status.readiness is False, "Initialized route should be unhealthy"
-            assert status.liveness is False, "Initialized route should be unhealthy"
+            assert status.readiness == HealthCheckStatus.STALE, "Initialized route should be stale"
+            assert status.liveness == HealthCheckStatus.STALE, "Initialized route should be stale"
 
     @pytest.mark.asyncio
     async def test_update_route_readiness_healthy(
@@ -119,7 +125,9 @@ class TestValkeyScheduleClient:
 
         status = await valkey_schedule_client.get_route_health_status(route_id)
         assert status is not None
-        assert status.readiness is True, "Route should be ready after healthy update"
+        assert status.readiness == HealthCheckStatus.HEALTHY, (
+            "Route should be ready after healthy update"
+        )
 
     @pytest.mark.asyncio
     async def test_update_route_readiness_unhealthy(
@@ -132,7 +140,9 @@ class TestValkeyScheduleClient:
 
         status = await valkey_schedule_client.get_route_health_status(route_id)
         assert status is not None
-        assert status.readiness is False, "Route should not be ready after unhealthy update"
+        assert status.readiness == HealthCheckStatus.UNHEALTHY, (
+            "Route should not be ready after unhealthy update"
+        )
 
     @pytest.mark.asyncio
     async def test_update_route_liveness_healthy(
@@ -145,7 +155,9 @@ class TestValkeyScheduleClient:
 
         status = await valkey_schedule_client.get_route_health_status(route_id)
         assert status is not None
-        assert status.liveness is True, "Route should be alive after healthy update"
+        assert status.liveness == HealthCheckStatus.HEALTHY, (
+            "Route should be alive after healthy update"
+        )
 
     @pytest.mark.asyncio
     async def test_update_route_liveness_unhealthy(
@@ -158,7 +170,9 @@ class TestValkeyScheduleClient:
 
         status = await valkey_schedule_client.get_route_health_status(route_id)
         assert status is not None
-        assert status.liveness is False, "Route should not be alive after unhealthy update"
+        assert status.liveness == HealthCheckStatus.UNHEALTHY, (
+            "Route should not be alive after unhealthy update"
+        )
 
     @pytest.mark.asyncio
     async def test_update_routes_readiness_batch(
@@ -177,8 +191,11 @@ class TestValkeyScheduleClient:
         for route_id, expected_readiness in route_readiness.items():
             status = await valkey_schedule_client.get_route_health_status(route_id)
             assert status is not None
-            assert status.readiness is expected_readiness, (
-                f"Route {route_id} should have readiness={expected_readiness}"
+            expected_status = (
+                HealthCheckStatus.HEALTHY if expected_readiness else HealthCheckStatus.UNHEALTHY
+            )
+            assert status.readiness == expected_status, (
+                f"Route {route_id} should have readiness={expected_status}"
             )
 
     @pytest.mark.asyncio
@@ -194,14 +211,14 @@ class TestValkeyScheduleClient:
 
         status = await valkey_schedule_client.get_route_health_status(route_id)
         assert status is not None
-        assert status.readiness is True
-        assert status.liveness is True
+        assert status.readiness == HealthCheckStatus.HEALTHY
+        assert status.liveness == HealthCheckStatus.HEALTHY
 
     @pytest.mark.asyncio
     async def test_get_route_health_status_healthy_but_stale(
         self, valkey_schedule_client: ValkeyScheduleClient
     ) -> None:
-        """Test that stale health data is considered unhealthy"""
+        """Test that stale health data is considered stale"""
         route_id = "test-stale-healthy"
 
         # Set stale health data
@@ -209,9 +226,13 @@ class TestValkeyScheduleClient:
 
         status = await valkey_schedule_client.get_route_health_status(route_id)
         assert status is not None
-        # Stale data should be considered unhealthy
-        assert status.readiness is False, "Stale health data should be considered unhealthy"
-        assert status.liveness is False, "Stale health data should be considered unhealthy"
+        # Stale data should be marked as stale
+        assert status.readiness == HealthCheckStatus.STALE, (
+            "Stale health data should be marked as stale"
+        )
+        assert status.liveness == HealthCheckStatus.STALE, (
+            "Stale health data should be marked as stale"
+        )
 
     @pytest.mark.asyncio
     async def test_get_route_health_status_unhealthy(
@@ -225,8 +246,8 @@ class TestValkeyScheduleClient:
 
         status = await valkey_schedule_client.get_route_health_status(route_id)
         assert status is not None
-        assert status.readiness is False
-        assert status.liveness is False
+        assert status.readiness == HealthCheckStatus.UNHEALTHY
+        assert status.liveness == HealthCheckStatus.UNHEALTHY
 
     @pytest.mark.asyncio
     async def test_get_route_health_status_missing_fields(
@@ -240,9 +261,9 @@ class TestValkeyScheduleClient:
 
         status = await valkey_schedule_client.get_route_health_status(route_id)
         assert status is not None
-        # Should be unhealthy without timestamp fields
-        assert status.readiness is False
-        assert status.liveness is False
+        # Should be stale without timestamp fields
+        assert status.readiness == HealthCheckStatus.STALE
+        assert status.liveness == HealthCheckStatus.STALE
 
     @pytest.mark.asyncio
     async def test_get_route_health_status_not_found(
@@ -285,15 +306,21 @@ class TestValkeyScheduleClient:
 
         healthy_status = statuses[healthy_route]
         assert healthy_status is not None
-        assert healthy_status.readiness is True, "Healthy route should be ready"
+        assert healthy_status.readiness == HealthCheckStatus.HEALTHY, (
+            "Healthy route should be ready"
+        )
 
         unhealthy_status = statuses[unhealthy_route]
         assert unhealthy_status is not None
-        assert unhealthy_status.readiness is False, "Unhealthy route should not be ready"
+        assert unhealthy_status.readiness == HealthCheckStatus.UNHEALTHY, (
+            "Unhealthy route should not be ready"
+        )
 
         stale_status = statuses[stale_route]
         assert stale_status is not None
-        assert stale_status.readiness is False, "Stale route should be considered unhealthy"
+        assert stale_status.readiness == HealthCheckStatus.STALE, (
+            "Stale route should be marked as stale"
+        )
 
     @pytest.mark.asyncio
     async def test_check_route_health_status_updates_last_check(
