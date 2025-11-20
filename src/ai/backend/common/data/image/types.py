@@ -5,6 +5,14 @@ from pydantic import BaseModel
 
 
 class InstalledImageInfo(BaseModel):
+    """ "
+    Information about an installed image on an agent.
+    Attributes:
+        canonical (str): The canonical name of the image.
+        digest (str): The digest of the image.
+        architecture (str): The architecture of the image. Supported values are 'x86_64' and 'aarch64'.
+    """
+
     canonical: str
     digest: str
     architecture: str
