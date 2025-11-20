@@ -63,6 +63,7 @@
   "button": {
     "Add": "Add",
     "Apply": "Apply",
+    "AutoRefresh": "Auto refresh",
     "Cancel": "Cancel",
     "Clear": "Clear",
     "ClearLogs": "Clear Logs",
@@ -323,8 +324,11 @@
       "Name": "Name",
       "NewFileName": "New file name",
       "NewFolder": "New Folder",
+      "NoAccessPermissionToVolume": "Current Project does not have access to SFTP volume.",
       "NoImagesSupportingFileBrowser": "There is no image supporting filebrowser yet. At least one or more image that supports filebrowser is required to upload folder(s).",
       "NoImagesSupportingSystemSession": "There is no image supporting SSH / SFTP yet. At least one or more image that supports system role images to use SSH / SFTP.",
+      "NoPermissionToMountFolder": "The current project does not have mount permissions for the storage host associated with this folder.",
+      "NoSFTPSupportingScalingGroup": "This folder’s storage host has no SFTP resource group.",
       "NoSharedFolders": "No shared folders",
       "NoSharedUsers": "No one has been invited",
       "NotEnoughResourceForFileBrowserSession": "No enough resources(cpu: 1 Core, mem: 0.5GB) to create the session for filebrowser. please check the available resources.",
@@ -619,6 +623,7 @@
     "CannotChangeVirtualFolderOption": "You cannot change the options of a vfolder that is not owned by myself.",
     "CannotSharePrivateAutomountFolder": "Cannot share automount vfolders in line with the policy.",
     "ErrorFetchingExternalContent": "Error fetching external content:",
+    "FailedToLoadTableData": "An error occurred while loading the list.",
     "FolderSharingNotAvailableToUser": "Folder sharing is not available for requested user(s).",
     "InternalServerError": "Internal Server Error. Please try again later.",
     "InvalidBaseURL": "Endpoint URL is not valid.",
@@ -729,6 +734,7 @@
     "CreateButtonCode": "Create",
     "CreateNotebookButton": "Create Notebook Button",
     "Downloading": "Downloading...",
+    "FailedToFetchRepositoryInformation": "Failed to fetch repository information.",
     "FolderAlreadyExists": "There is a folder with the same name. name will be renamed.",
     "FolderCreated": "Folder Created.",
     "FolderName": "Imported folder name: ",
@@ -745,6 +751,8 @@
     "ImportGithubRepo": "Import GitHub Repository",
     "ImportGitlabRepo": "Import GitLab Repository",
     "ImportNotebook": "Import Notebook",
+    "InvalidGitHubURL": "Invalid GitHub URL. Must be a valid GitHub repository URL",
+    "InvalidGitLabURL": "Invalid GitLab URL. Must be a valid GitLab repository URL",
     "InvalidNotebookURL": "Invalid Notebook URL.",
     "NoNotebookCode": "Notebook Address is empty. Please input a valid notebook code to copy the badge code.",
     "NoSuitableResourceFoundOnGivenURL": "No suitable resource found on given URL.",
@@ -756,8 +764,11 @@
     "Preparing": "Preparing...",
     "ReadyToImport": "Ready To Import",
     "RepoWillBeFolder": "Imported GitHub repositories are converted to folders and can be mounted when session starts.",
+    "RepositoryNotFound": "Repository Not Found.",
+    "StorageHost": "Storage Host",
+    "VFolderUsageMode": "Folder Usage Mode",
     "WrongURLType": "Wrong URL Type",
-    "YouCanCreateNotebookCode": "Enter the notebook URL to create a badge code like below that you can run directly on Backend.AI."
+    "YouCanCreateNotebookCode": "This badge enables direct execution of your notebook on Backend.AI. Copy the code to use it anywhere."
   },
   "information": {
     "APIVersion": "API version",
@@ -1308,6 +1319,7 @@
     "ElapsedTime": "Elapsed Time",
     "EnvironmentAndVersion": "Environment and Version",
     "EnvironmentInfo": "Environment Info",
+    "ExecuteSpecificApp": "Launch {{appName}}",
     "ExecuteTerminalApp": "Execute Terminal App",
     "ExpiresAfter": "ExpiresAfter",
     "ExportCSV": "export CSV",
@@ -1424,6 +1436,7 @@
       "ConfirmAndRun": "I checked and I'll start",
       "ConnectUrlIsNotValid": "Connect URL is not valid.",
       "DownloadSSHKey": "Download SSH Key",
+      "LaunchingApp": "Starting {{appName}} app.",
       "NoExistingConnectionExample": "No Connection Example to be copied.",
       "OpenVSCodeRemote": "Open local Visual Studio Code",
       "Prepared": "Prepared",
@@ -1447,6 +1460,7 @@
       "BatchMode": "Batch",
       "BatchModeConfig": "Batch mode Configuration",
       "BatchModeDesc": "runs your code with multiple node & clusters to scale your idea",
+      "BootstrapScriptDetail": "Bootstrap script",
       "CPU": "CPU",
       "ChooseEnvironment": "Choose Environment",
       "ClusterMode": "Cluster mode",
@@ -1464,7 +1478,8 @@
       "DescMemory": "<p>Computer memory is a temporary storage area.</p><p>It holds the data and instructions that the Central Processing Unit (CPU) needs.</p><p>When using a GPU in a machine learning workload, you must allocate at least twice the memory of the GPU to memory. Otherwise, the GPU's idle time will increase, resulting in a performance penalty.</p>",
       "DescMultiNode": "<p>When running a session, one managed node and one or more worker nodes are split across multiple physical nodes or virtual machines.</p>",
       "DescOpenMPOptimization": "<p>This value sets the number of threads to use for parallel regions by setting the initial value of the nthreads-var internal control variable.</p><p>Backend.AI sets this value equal to the number of CPU cores, which has the effect of accelerating typical high-performance computing workloads. However, for some multi-threaded workloads, multiple processes using OpenMP are used at the same time, resulting in an abnormally large number of threads and significant performance degradation. In this case, please adjust this value to 1 or 2.</p>",
-      "DescSelectAgent": "The resources displayed on the right side of the agent represent the actual amount of available resources. Currently, agent selection is only available in a single-node single-container environment. The default setting is agent allocation by the scheduler.",
+      "DescSelectAgent": "The resources shown on the right side of each agent represent the actual available capacity. The selected agents indicate the candidates that can be allocated, and even if multiple agents are selected, the allocation may be made to only one agent. By default, the scheduler automatically handles the allocation.",
+      "DescSelectAgentBefore2516": "The resources displayed on the right side of the agent represent the actual amount of available resources. Currently, agent selection is only available in a single-node single-container environment. The default setting is agent allocation by the scheduler.",
       "DescSession": "<p>A session is a unit of computational environment that is created according to a specified environment and resources.</p><p>If this value is set to a value greater than 1, multiple sessions corresponding to the resource set above are created.</p><p>If there are not enough resources available, requests to create sessions that cannot be created are put on the waiting queue.</p>",
       "DescSetEnv": "<p>If you set a default environment variable in the container and also set an environment variable with the same name on the Backend.AI, the value set on the Backend.AI takes precedence.</p><p style='color:var(--paper-red-400);'>Every input value will be initialized after starting session launcher.<br />Also, those environment will be passed only if both variable and value are not empty.</p>",
       "DescSetPreOpenPort": "'Preopen Ports' refers to a specific <span style='color:var(--paper-red-400);'>internal container port</span> that allows incoming connections from external devices or computers on a network device or computer.",
@@ -1607,6 +1622,7 @@
       "TitleSession": "Session (Backend.AI)",
       "TotalAllocation": "Total Allocation",
       "UserResourceLimit": "User Resource Limit",
+      "UsingBootstrapScriptInfo": "Bootstrap script is included.",
       "Version": "Version",
       "YouCanStartWithHistory": "These are your recently created session records. Click a session name to start a new session."
     },
@@ -1888,6 +1904,12 @@
     "SelectColumnToDisplay": "Select for columns to display",
     "SettingTable": "Table Setting"
   },
+  "theme": {
+    "PreviewModeAlert": "You are currently using the theme preview mode. Please proceed with your actual work in the original window.",
+    "button": {
+      "ExportToJson": "Export JSON"
+    }
+  },
   "time": {
     "Day": "day",
     "Hour": "hour",
@@ -2001,10 +2023,30 @@
     "SSHKeypairManagement": "SSH Keypair Management",
     "SessionTerminationDialog": "Session termination cannot be undone. Do you want to proceed to terminate the session?",
     "ShellEnvironments": "Shell Environments",
+    "Theme": "Theme",
     "ThemeMode": "Theme Mode",
     "UseCompactSidebar": "Set Compact Sidebar as Default",
     "UseSystemSetting": "Use System Setting",
-    "UserConfigScript": "User Config Script"
+    "UserConfigScript": "User Config Script",
+    "theme": {
+      "CustomThemeSettingAlert": "The updated theme cannot be applied immediately. If you would like to apply the theme, please contact our support team with the exported configuration JSON file.",
+      "ErrorColor": "Error Color",
+      "ErrorColorDesc": "The color applied to buttons or alert representing critical actions, such as deletion, to indicate warnings or errors.",
+      "HeaderBg": "Header Background Color",
+      "HeaderBgDesc": "The color applied to the header background, except for the logo section.",
+      "InfoColor": "Info Color",
+      "InfoColorDesc": "The color that applies to information guidance and modification icons, which is used for elements that communicate information to users.",
+      "LinkColor": "Link Color",
+      "LinkColorDesc": "The color used for links that redirect to another page or open additional UI elements such as drawers or modals.",
+      "NoChangesMade": "No changes made.",
+      "Preview": "Preview",
+      "PrimaryColor": "Primary Color",
+      "PrimaryColorDesc": "The main color applied to buttons or descriptive text that represent key actions. It is also applied as the background color for the logo section in the header.",
+      "SuccessColor": "Success Color",
+      "SuccessColorDesc": "The color applied to buttons, alerts, or icons that indicate a user action has been successfully completed.",
+      "TextColor": "Text Color",
+      "TextColorDesc": "The color used for general text."
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Advanced Web Terminal Usage: Copy terminal contents",
@@ -2033,6 +2075,7 @@
       "AgentSummary": "Agent Summary",
       "Architecture": "Architecture",
       "ArtifactDetails": "Artifact Details",
+      "Branding": "Branding",
       "Cancel": "Cancel",
       "ChangePassword": "Change Password",
       "Chat": "Chat",

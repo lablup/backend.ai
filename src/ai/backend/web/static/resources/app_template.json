@@ -151,7 +151,7 @@
         "name": "novnc",
         "title": "VNC (Web)",
         "category": "6.Desktop Environment",
-        "redirect": "/vnc.html?autoconnect=true&amp;password=backendai",
+        "redirect": "/vnc.html?autoconnect=true",
         "src": "./resources/icons/novnc.svg"
       }
     ],
