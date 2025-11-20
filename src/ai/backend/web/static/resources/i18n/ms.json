@@ -60,6 +60,7 @@
   "button": {
     "Add": "Tambah",
     "Apply": "Mohon",
+    "AutoRefresh": "Penyegaran automatik",
     "Cancel": "Batal",
     "Clear": "Padam",
     "ClearLogs": "Kosongkan Log",
@@ -319,8 +320,11 @@
       "Name": "Nama",
       "NewFileName": "Nama fail baru",
       "NewFolder": "Fail baharu",
+      "NoAccessPermissionToVolume": "Projek semasa tidak mempunyai akses ke volum SFTP.",
       "NoImagesSupportingFileBrowser": "Masih belum ada gambar yang menyokong penyaring gambar. Sekurang-kurangnya satu atau lebih gambar yang menyokong penyemak imbas diperlukan untuk memuat naik folder.",
       "NoImagesSupportingSystemSession": "Belum ada imej yang menyokong SSH / SFTP. \nSekurang-kurangnya satu atau lebih imej yang menyokong imej peranan sistem untuk menggunakan SSH / SFTP.",
+      "NoPermissionToMountFolder": "Projek semasa tidak mempunyai kebenaran untuk memasang hos storan yang berkaitan dengan folder ini.",
+      "NoSFTPSupportingScalingGroup": "Hos storan folder ini tidak mempunyai kumpulan sumber SFTP.",
       "NoSharedFolders": "Tiada folder kongsi",
       "NoSharedUsers": "Tidak ada yang dijemput",
       "NotEnoughResourceForFileBrowserSession": "Tidak ada sumber yang mencukupi (cpu: 1 Core, mem: 0.5GB) untuk membuat sesi untuk penyemak imbas fail. sila periksa sumber yang ada.",
@@ -613,6 +617,7 @@
     "AuthenticationFailed": "Pengesahan gagal. \nSemak maklumat dan status pengurus.",
     "CannotChangeVirtualFolderOption": "Anda tidak boleh menukar pilihan vfolder yang bukan milik saya sendiri.",
     "CannotSharePrivateAutomountFolder": "Tidak boleh berkongsi vfolder automount selaras dengan dasar.",
+    "FailedToLoadTableData": "Ralat berlaku semasa memuatkan senarai.",
     "FolderSharingNotAvailableToUser": "Perkongsian folder tidak tersedia untuk pengguna yang diminta.",
     "InternalServerError": "Ralat pelayan dalaman. \nSila cuba lagi kemudian.",
     "InvalidBaseURL": "URL Endpoint tidak sah.",
@@ -723,6 +728,7 @@
     "CreateButtonCode": "Buat",
     "CreateNotebookButton": "Buat Butang Notebook",
     "Downloading": "Memuat turun ...",
+    "FailedToFetchRepositoryInformation": "Gagal mendapatkan maklumat repositori.",
     "FolderAlreadyExists": "Terdapat folder dengan nama yang sama. nama akan dinamakan semula.",
     "FolderCreated": "Folder Dicipta.",
     "FolderName": "Nama folder yang diimport:",
@@ -739,6 +745,8 @@
     "ImportGithubRepo": "Import Repositori GitHub",
     "ImportGitlabRepo": "Import Repositori GitLab",
     "ImportNotebook": "Import Notebook",
+    "InvalidGitHubURL": "URL GitHub tidak sah. Mesti merupakan URL repositori GitHub yang sah.",
+    "InvalidGitLabURL": "URL GitLab tidak sah. Mesti merupakan URL repositori GitLab yang sah.",
     "InvalidNotebookURL": "URL Notebook tidak sah.",
     "NoNotebookCode": "Alamat Notebook kosong. Sila masukkan kod buku nota yang sah untuk menyalin kod lencana.",
     "NoSuitableResourceFoundOnGivenURL": "Tiada sumber yang sesuai dijumpai pada URL yang diberikan.",
@@ -750,8 +758,11 @@
     "Preparing": "Menyiapkan ...",
     "ReadyToImport": "Sedia Diimport",
     "RepoWillBeFolder": "Repositori GitHub yang diimport ditukar menjadi folder dan boleh dipasang semasa sesi dimulakan.",
+    "RepositoryNotFound": "Repositori tidak dijumpai.",
+    "StorageHost": "Hos Penyimpanan",
+    "VFolderUsageMode": "Mod Penggunaan Folder",
     "WrongURLType": "Jenis URL yang salah",
-    "YouCanCreateNotebookCode": "Masukkan URL buku nota untuk membuat kod lencana seperti di bawah yang boleh anda jalankan terus di Backend.AI."
+    "YouCanCreateNotebookCode": "Lencana ini membolehkan notebook anda dijalankan terus di Backend.AI. Salin kod untuk menggunakannya di mana-mana."
   },
   "information": {
     "APIVersion": "Versi API",
@@ -1301,6 +1312,7 @@
     "ElapsedTime": "Masa Berlalu",
     "EnvironmentAndVersion": "Persekitaran dan Versi",
     "EnvironmentInfo": "Maklumat Persekitaran",
+    "ExecuteSpecificApp": "Jalankan aplikasi {{appName}}",
     "ExecuteTerminalApp": "Jalankan Apl Terminal",
     "ExpiresAfter": "Masa yang tinggal",
     "ExportCSV": "eksport CSV",
@@ -1417,6 +1429,7 @@
       "ConfirmAndRun": "Saya periksa dan saya akan mulakan",
       "ConnectUrlIsNotValid": "URL Sambung tidak sah.",
       "DownloadSSHKey": "Muat turun Kunci SSH",
+      "LaunchingApp": "Menjalankan aplikasi {{appName}}.",
       "NoExistingConnectionExample": "Tiada Contoh Sambungan untuk disalin.",
       "OpenVSCodeRemote": "Buka Kod Visual Studio tempatan",
       "Prepared": "Bersedia",
@@ -1440,6 +1453,7 @@
       "BatchMode": "Kumpulan",
       "BatchModeConfig": "Konfigurasi mod kelompok",
       "BatchModeDesc": "Anda boleh menjalankan kod anda dengan berbilang nod",
+      "BootstrapScriptDetail": "Skrip Bootstrap",
       "CPU": "CPU",
       "ChooseEnvironment": "Pilih Persekitaran",
       "ClusterMode": "Mod kluster",
@@ -1457,7 +1471,8 @@
       "DescMemory": " <p> Memori komputer adalah kawasan simpanan sementara. </p> <p> Ia menyimpan data dan arahan yang diperlukan oleh Unit Pemprosesan Pusat (CPU). </p> <p> Semasa menggunakan GPU dalam beban kerja pembelajaran mesin, anda mesti memperuntukkan sekurang-kurangnya dua kali memori GPU ke memori. Jika tidak, masa senggang GPU akan meningkat, mengakibatkan hukuman prestasi. </p>",
       "DescMultiNode": " <p> Semasa menjalankan sesi, satu nod yang diuruskan dan satu atau lebih nod pekerja dibahagi di beberapa nod fizikal atau mesin maya. </p>",
       "DescOpenMPOptimization": "<p>Nilai ini menetapkan bilangan utas untuk digunakan untuk kawasan selari dengan menetapkan nilai awal pembolehubah kawalan dalaman nthreads-var.</p><p>Backend.AI menetapkan nilai ini sama dengan bilangan teras CPU, \nyang mempunyai kesan mempercepatkan beban kerja pengkomputeran berprestasi tinggi biasa. \nWalau bagaimanapun, untuk beberapa beban kerja berbilang benang, berbilang proses menggunakan OpenMP digunakan pada masa yang sama, mengakibatkan bilangan utas yang luar biasa besar dan kemerosotan prestasi yang ketara. \nDalam kes ini, sila laraskan nilai ini kepada 1 atau 2.</p>",
-      "DescSelectAgent": "Sumber yang dipaparkan di sebelah kanan ejen mewakili jumlah sebenar sumber yang tersedia. \nPada masa ini, pemilihan ejen hanya tersedia dalam persekitaran bekas tunggal nod tunggal. \nTetapan lalai ialah peruntukan ejen oleh penjadual.",
+      "DescSelectAgent": "Sumber di sebelah kanan agen menunjukkan jumlah yang sebenarnya boleh digunakan. Agen yang dipilih menunjukkan calon yang boleh diberi tugasan; walaupun beberapa dipilih, tugasan hanya boleh diberikan kepada satu agen sahaja. Tetapan lalai ialah penugasan automatik oleh penjadual.",
+      "DescSelectAgentBefore2516": "Sumber yang dipaparkan di sebelah kanan ejen mewakili jumlah sebenar sumber yang tersedia. Pada masa ini, pemilihan ejen hanya tersedia dalam persekitaran satu nod dan satu kontena. Tetapan lalai ialah pengagihan ejen oleh penjadual.",
       "DescSession": " <p> Sesi adalah unit persekitaran komputasi yang dibuat mengikut persekitaran dan sumber yang ditentukan. </p> <p> Sekiranya nilai ini ditetapkan ke nilai yang lebih besar daripada 1, beberapa sesi yang sesuai dengan sumber yang ditetapkan di atas dibuat. </p> <p> Sekiranya tidak ada sumber yang mencukupi, permintaan untuk membuat sesi yang tidak dapat dibuat dimasukkan ke dalam barisan menunggu. </p>",
       "DescSetEnv": " <p> Sekiranya anda menetapkan pemboleh ubah persekitaran lalai di dalam wadah dan juga menetapkan pemboleh ubah persekitaran dengan nama yang sama di Backend.AI, nilai yang ditetapkan di Backend.AI diutamakan. </p> <p style='color:var(--paper-red-400);'> Setiap nilai input akan dimulakan setelah memulakan sesi pelancaran. <br /> Juga, persekitaran tersebut akan dilalui hanya jika kedua-dua pemboleh ubah dan nilai tidak kosong. </p>",
       "DescSetPreOpenPort": "'Preopen Ports' merujuk kepada <span style='color:var(--paper-red-400);'>port kontena dalaman</span> tertentu yang membenarkan sambungan masuk daripada peranti luaran atau komputer pada peranti rangkaian atau komputer \n.",
@@ -1599,6 +1614,7 @@
       "TitleSession": "Sesi (Backend.AI)",
       "TotalAllocation": "Jumlah Peruntukan",
       "UserResourceLimit": "Had Sumber Pengguna",
+      "UsingBootstrapScriptInfo": "Skrip bootstrap disertakan.",
       "Version": "Versi",
       "YouCanStartWithHistory": "Ini adalah rekod sesi yang anda baru -baru ini. \nKlik nama sesi untuk memulakan sesi baru."
     },
@@ -1879,6 +1895,12 @@
     "SelectColumnToDisplay": "Pilih untuk lajur untuk dipaparkan",
     "SettingTable": "Tetapan Meja"
   },
+  "theme": {
+    "PreviewModeAlert": "Anda sedang menggunakan mod pratonton tema. Sila teruskan kerja sebenar anda di tetingkap asal.",
+    "button": {
+      "ExportToJson": "Eksport JSON"
+    }
+  },
   "time": {
     "Day": "day",
     "Hour": "jam",
@@ -1991,10 +2013,30 @@
     "SSHKeypairManagement": "Pengurusan Keypair SSH",
     "SessionTerminationDialog": "Penamatan sesi tidak boleh dibuat asal. Adakah anda mahu meneruskan untuk menamatkan sesi?",
     "ShellEnvironments": "Persekitaran Shell",
+    "Theme": "Tema",
     "ThemeMode": "Mod Tema",
     "UseCompactSidebar": "Tetapkan Bar Sisi Padat sebagai Lalai",
     "UseSystemSetting": "Gunakan Tetapan Sistem",
-    "UserConfigScript": "Skrip konfigurasi pengguna"
+    "UserConfigScript": "Skrip konfigurasi pengguna",
+    "theme": {
+      "CustomThemeSettingAlert": "Tema yang dikemas kini tidak dapat diterapkan serta-merta. Jika anda ingin menerapkan tema tersebut, sila hubungi pasukan sokongan kami dengan fail konfigurasi JSON yang dieksport.",
+      "ErrorColor": "Warna ralat",
+      "ErrorColorDesc": "Warna yang digunakan untuk butang atau amaran yang mewakili tindakan kritikal, seperti penghapusan, untuk menunjukkan amaran atau kesilapan.",
+      "HeaderBg": "Warna latar belakang header",
+      "HeaderBgDesc": "Warna yang digunakan untuk latar belakang header, kecuali bahagian logo.",
+      "InfoColor": "Warna maklumat",
+      "InfoColorDesc": "Warna bagi ikon panduan dan pengubahsuaian maklumat, digunakan untuk elemen yang menyampaikan maklumat kepada pengguna.",
+      "LinkColor": "Warna pautan",
+      "LinkColorDesc": "Warna yang digunakan untuk pautan yang mengalihkan ke halaman lain atau membuka elemen UI tambahan seperti laci atau modal.",
+      "NoChangesMade": "Tiada perubahan dibuat.",
+      "Preview": "Pratonton",
+      "PrimaryColor": "Warna utama",
+      "PrimaryColorDesc": "Warna utama yang digunakan untuk butang atau teks deskriptif yang mewakili tindakan utama. \nIa juga digunakan sebagai warna latar belakang untuk bahagian logo di tajuk.",
+      "SuccessColor": "Warna kejayaan",
+      "SuccessColorDesc": "Warna yang digunakan untuk butang, makluman, atau ikon yang menunjukkan tindakan pengguna telah berjaya diselesaikan.",
+      "TextColor": "Warna teks",
+      "TextColorDesc": "Warna yang digunakan untuk teks umum."
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Lanjutan: Salin kandungan terminal",
@@ -2023,6 +2065,7 @@
       "AgentSummary": "Ringkasan Agen",
       "Architecture": "Seni bina",
       "ArtifactDetails": "Butiran artifak",
+      "Branding": "Penjenamaan",
       "Cancel": "Batal",
       "ChangePassword": "Tukar kata laluan",
       "Chat": "Berbual",

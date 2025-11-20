@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Optional, Protocol, Type, TypeVar, cast
@@ -14,6 +14,8 @@ from strawberry.types import get_object_definition, has_object_definition
 
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.common.types import IntFilterData, StringFilterData
+from ai.backend.manager.repositories.base import QueryCondition
 
 if TYPE_CHECKING:
     from ai.backend.manager.types import (
@@ -53,37 +55,42 @@ class StringFilter:
     i_equals: Optional[str] = strawberry.field(name="iEquals", default=None)
     i_not_equals: Optional[str] = strawberry.field(name="iNotEquals", default=None)
 
-    def apply_to_column(self, column):
-        """Apply this string filter to a SQLAlchemy column and return the condition.
+    def to_dataclass(self) -> StringFilterData:
+        return StringFilterData(
+            contains=self.contains,
+            starts_with=self.starts_with,
+            ends_with=self.ends_with,
+            equals=self.equals,
+            not_equals=self.not_equals,
+            i_contains=self.i_contains,
+            i_starts_with=self.i_starts_with,
+            i_ends_with=self.i_ends_with,
+            i_equals=self.i_equals,
+            i_not_equals=self.i_not_equals,
+        )
+
+    def build_query_condition(
+        self,
+        contains_factory: Callable[[str, bool], QueryCondition],
+        equals_factory: Callable[[str, bool], QueryCondition],
+    ) -> Optional[QueryCondition]:
+        """Build a query condition from this filter using the provided factory callables.
 
         Args:
-            column: SQLAlchemy column to apply the filter to
+            contains_factory: Factory function that takes (value, case_insensitive) and returns QueryCondition
+            equals_factory: Factory function that takes (value, case_insensitive) and returns QueryCondition
 
         Returns:
-            SQLAlchemy condition expression or None if no filter is set
+            QueryCondition if any filter field is set, None otherwise
         """
-
         if self.equals:
-            return column == self.equals
+            return equals_factory(self.equals, False)
         elif self.i_equals:
-            return column.ilike(self.i_equals)
-        elif self.not_equals:
-            return column != self.not_equals
-        elif self.i_not_equals:
-            return ~column.ilike(self.i_not_equals)
-        elif self.starts_with:
-            return column.like(f"{self.starts_with}%")
-        elif self.i_starts_with:
-            return column.ilike(f"{self.i_starts_with}%")
-        elif self.ends_with:
-            return column.like(f"%{self.ends_with}")
-        elif self.i_ends_with:
-            return column.ilike(f"%{self.i_ends_with}")
+            return equals_factory(self.i_equals, True)
         elif self.contains:
-            return column.like(f"%{self.contains}%")
+            return contains_factory(self.contains, False)
         elif self.i_contains:
-            return column.ilike(f"%{self.i_contains}%")
-
+            return contains_factory(self.i_contains, True)
         return None
 
 
@@ -96,30 +103,15 @@ class IntFilter:
     less_than: Optional[int] = None
     less_than_or_equal: Optional[int] = None
 
-    def apply_to_column(self, column):
-        """Apply this int filter to a SQLAlchemy column and return the condition.
-
-        Args:
-            column: SQLAlchemy column to apply the filter to
-
-        Returns:
-            SQLAlchemy condition expression or None if no filter is set
-        """
-
-        if self.equals is not None:
-            return column == self.equals
-        elif self.not_equals is not None:
-            return column != self.not_equals
-        elif self.greater_than is not None:
-            return column > self.greater_than
-        elif self.greater_than_or_equal is not None:
-            return column >= self.greater_than_or_equal
-        elif self.less_than is not None:
-            return column < self.less_than
-        elif self.less_than_or_equal is not None:
-            return column <= self.less_than_or_equal
-
-        return None
+    def to_dataclass(self) -> IntFilterData:
+        return IntFilterData(
+            equals=self.equals,
+            not_equals=self.not_equals,
+            greater_than=self.greater_than,
+            greater_than_or_equal=self.greater_than_or_equal,
+            less_than=self.less_than,
+            less_than_or_equal=self.less_than_or_equal,
+        )
 
 
 @strawberry.enum

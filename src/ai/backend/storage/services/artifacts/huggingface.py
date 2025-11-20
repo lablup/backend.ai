@@ -4,15 +4,18 @@ import asyncio
 import logging
 import mimetypes
 import ssl
-import time
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Callable, Final, Optional, Protocol, override
+from typing import Any, Callable, Final, Optional, override
 
 import aiohttp
 
+from ai.backend.common.artifact_storage import AbstractStoragePool
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, ProgressReporter
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.storage.registries.types import (
     FileObjectData,
@@ -33,6 +36,7 @@ from ai.backend.storage.client.huggingface import (
     HuggingFaceScanner,
 )
 from ai.backend.storage.config.unified import HuggingfaceConfig
+from ai.backend.storage.context_types import ArtifactVerifierContext
 from ai.backend.storage.exception import (
     HuggingFaceAPIError,
     HuggingFaceModelNotFoundError,
@@ -40,6 +44,7 @@ from ai.backend.storage.exception import (
     RegistryNotFoundError,
     StorageStepRequiredStepNotProvided,
 )
+from ai.backend.storage.services.artifacts.common import ModelArchiveStep, ModelVerifyStep
 from ai.backend.storage.services.artifacts.storage_transfer import StorageTransferManager
 from ai.backend.storage.services.artifacts.types import (
     DownloadStepResult,
@@ -52,9 +57,8 @@ from ai.backend.storage.storages.storage_pool import StoragePool
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 _MiB = 1024 * 1024
-_DEFAULT_DOWNLOAD_LOGGING_INTERVAL_SECS = 15
-_DEFAULT_BYTESIZE_INTERVAL = 64 * _MiB
 
+_DOWNLOAD_PROGRESS_UPDATE_INTERVAL: Final[int] = 30
 _PROBE_HEAD_BASE_HEADER: Final[dict[str, str]] = {"Accept-Encoding": "identity"}
 
 _DOWNLOAD_RETRIABLE_ERROR = (
@@ -68,77 +72,9 @@ _DOWNLOAD_RETRIABLE_ERROR = (
 
 @dataclass
 class _ProbeHeadInfo:
-    total: Optional[int]
+    total: int
     etag: Optional[str]
     accept_ranges: bool
-
-
-class _DownloadProgressLogger(Protocol):
-    def __call__(self, offset: int, final: bool = False) -> None: ...
-
-
-def _make_download_progress_logger(
-    *,
-    total_getter: Callable[[], Optional[int]],
-    bytes_interval: int = _DEFAULT_BYTESIZE_INTERVAL,
-    secs_interval: float = _DEFAULT_DOWNLOAD_LOGGING_INTERVAL_SECS,
-) -> _DownloadProgressLogger:
-    """
-    Return a lightweight progress logging callback.
-
-    Args:
-        total_getter: A callable that returns the total number of bytes to download.
-        bytes_interval: The number of bytes to download before logging progress.
-        secs_interval: The number of seconds to wait before logging progress.
-    """
-
-    last_t = time.monotonic()
-    last_bytes = 0
-
-    def _fmt_eta(eta_sec: Optional[float]) -> str:
-        """Format ETA seconds as H:MM:SS or '?' if unknown."""
-        if eta_sec is None or eta_sec >= 1e9:
-            return "?"
-        m, s = divmod(int(eta_sec), 60)
-        h, m = divmod(m, 60)
-        return f"{h:d}:{m:02d}:{s:02d}"
-
-    def log_progress(offset: int, final: bool = False) -> None:
-        nonlocal last_t, last_bytes
-
-        now = time.monotonic()
-        bytes_since = offset - last_bytes
-        secs_since = now - last_t
-
-        # Skip if neither interval threshold is met (and not final)
-        if not final and bytes_since < bytes_interval and secs_since < secs_interval:
-            return
-
-        inst_mibs = (bytes_since / _MiB) / secs_since if secs_since > 0 else 0.0
-        total = total_getter()
-
-        if total:
-            pct = (offset * 100.0) / total if total > 0 else 0.0
-            remain = max(total - offset, 0)
-            eta_sec = (remain / (inst_mibs * _MiB)) if inst_mibs > 0 else None
-            eta_str = _fmt_eta(eta_sec)
-
-            log.trace(
-                "[stream_hf] Downloading... {:.1f}% ({:,.1f} / {:,.1f} MiB) inst={:.2f} MiB/s ETA={}".format(
-                    pct, offset / _MiB, total / _MiB, inst_mibs, eta_str
-                )
-            )
-        else:
-            log.trace(
-                "[stream_hf] Downloading... {:,.1f} MiB (total unknown) inst={:.2f} MiB/s".format(
-                    offset / _MiB, inst_mibs
-                )
-            )
-
-        last_t = now
-        last_bytes = offset
-
-    return log_progress
 
 
 class HuggingFaceFileDownloadStreamReader(StreamReader):
@@ -146,42 +82,88 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
     _chunk_size: int
     _max_retries: int
     _content_type: Optional[str]
+    _redis_client: ValkeyArtifactDownloadTrackingClient
+    _model_id: str
+    _revision: str
+    _file_path: str
+    _download_complete: bool
+    _progress_task: Optional[asyncio.Task[None]]
 
     def __init__(
-        self, url: str, chunk_size: int, max_retries: int, content_type: Optional[str]
+        self,
+        url: str,
+        chunk_size: int,
+        max_retries: int,
+        content_type: Optional[str],
+        redis_client: ValkeyArtifactDownloadTrackingClient,
+        model_id: str,
+        revision: str,
+        file_path: str,
     ) -> None:
         self._url = url
         self._chunk_size = chunk_size
         self._max_retries = max_retries
         self._content_type = content_type
+        self._redis_client = redis_client
+        self._model_id = model_id
+        self._revision = revision
+        self._file_path = file_path
+        self._download_complete = False
+        self._progress_task = None
+
+    async def _periodic_progress_update(
+        self,
+        offset_getter: Callable[[], int],
+        total_bytes: int,
+    ) -> None:
+        """
+        Background task that periodically updates Redis with download progress.
+
+        :param offset_getter: Callable that returns current download offset
+        :param total_bytes: Total bytes for this file
+        """
+        while not self._download_complete:
+            await asyncio.sleep(_DOWNLOAD_PROGRESS_UPDATE_INTERVAL)
+
+            try:
+                current = offset_getter()
+                await self._redis_client.update_file_progress(
+                    model_id=self._model_id,
+                    revision=self._revision,
+                    file_path=self._file_path,
+                    current_bytes=current,
+                    total_bytes=total_bytes,
+                    success=False,
+                )
+            except asyncio.CancelledError:
+                # Task is being cancelled, exit cleanly
+                break
+            except Exception as e:
+                # Log error but don't fail the download
+                log.warning(
+                    "Failed to update download progress in Redis: {}",
+                    str(e),
+                )
 
     async def _probe_head(self) -> _ProbeHeadInfo:
         """
         Probe metadata via HEAD.
-        - May set total size, etag, and Accept-Ranges support.
-        - Any failure is swallowed (best effort).
+        - Sets total size, etag, and Accept-Ranges support.
+        - Raises error if Content-Length is not available.
         """
-        total: Optional[int] = None
-        etag: Optional[str] = None
-        accept_ranges: bool = False
-
         headers_base = _PROBE_HEAD_BASE_HEADER
-        try:
-            async with self._session.head(
-                self._url, headers=headers_base, allow_redirects=True
-            ) as resp:
-                content_length = resp.headers.get("Content-Length")
-                if content_length and content_length.isdigit():
-                    total = int(content_length)
+        async with self._session.head(
+            self._url, headers=headers_base, allow_redirects=True
+        ) as resp:
+            content_length = resp.headers.get("Content-Length")
+            if not content_length or not content_length.isdigit():
+                raise aiohttp.ClientPayloadError(
+                    f"Content-Length header missing or invalid in HEAD response for {self._url}"
+                )
+            total = int(content_length)
 
-                new_etag = resp.headers.get("ETag")
-                if etag and new_etag and new_etag != etag:
-                    raise aiohttp.ClientPayloadError("ETag changed on HEAD")
-                etag = etag or new_etag
-                accept_ranges = "bytes" in (resp.headers.get("Accept-Ranges", "")).lower()
-        except Exception:
-            # HEAD is best-effort; ignore failures.
-            pass
+            etag = resp.headers.get("ETag")
+            accept_ranges = "bytes" in (resp.headers.get("Accept-Ranges", "")).lower()
 
         return _ProbeHeadInfo(total=total, etag=etag, accept_ranges=accept_ranges)
 
@@ -196,23 +178,28 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
         )
 
         headers_base = _PROBE_HEAD_BASE_HEADER
-        progress_logger = _make_download_progress_logger(
-            total_getter=lambda: total,
-        )
 
         offset = 0
         backoff = 1.0
         retries = 0
 
-        total: Optional[int] = None
-        etag: Optional[str] = None
-        accept_ranges = False
+        self._download_complete = False
+        self._progress_task = None
+
+        # Probe head first - if this fails, we can't proceed
+        probe_info = await self._probe_head()
+        total = probe_info.total
+        etag = probe_info.etag
+        accept_ranges = probe_info.accept_ranges
 
         try:
-            probe_info = await self._probe_head()
-            total = probe_info.total
-            etag = probe_info.etag
-            accept_ranges = probe_info.accept_ranges
+            # Start background progress task
+            self._progress_task = asyncio.create_task(
+                self._periodic_progress_update(
+                    offset_getter=lambda: offset,
+                    total_bytes=total,
+                )
+            )
 
             while True:
                 headers = dict(headers_base)
@@ -232,39 +219,14 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
                         if etag and resp_etag and resp_etag != etag:
                             raise aiohttp.ClientPayloadError("ETag changed during resume")
 
-                        # Fill total size from response headers if still unknown
-                        if total is None:
-                            if resp.status == 200:
-                                content_length = resp.headers.get("Content-Length")
-                                if content_length and content_length.isdigit():
-                                    total = int(content_length)
-                            elif resp.status == 206:
-                                content_range = resp.headers.get(
-                                    "Content-Range"
-                                )  # e.g. "bytes 123-456/789"
-                                if content_range and "/" in content_range:
-                                    try:
-                                        total = int(content_range.split("/")[-1])
-                                    except ValueError:
-                                        pass
-                            # TODO: Handle else case
-
                         async for chunk in resp.content.iter_chunked(self._chunk_size):
                             if not chunk:
                                 continue
                             offset += len(chunk)
-                            progress_logger(offset)
                             yield chunk
-
-                    # total unknown
-                    if total is None:
-                        progress_logger(offset, final=True)
-                        log.warning("Skipped download of %s since total size is unknown", self._url)
-                        break
 
                     # Completed
                     if offset >= total:
-                        progress_logger(offset, final=True)
                         break
 
                     # Unexpected early EOF → retry
@@ -273,7 +235,6 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
                 except _DOWNLOAD_RETRIABLE_ERROR as e:
                     retries += 1
                     if retries > self._max_retries:
-                        progress_logger(offset, final=True)
                         raise aiohttp.ClientPayloadError(
                             f"Exceeded retries while downloading {self._url} at offset={offset}"
                         ) from e
@@ -295,7 +256,45 @@ class HuggingFaceFileDownloadStreamReader(StreamReader):
                     etag = probe_info.etag
                     accept_ranges = probe_info.accept_ranges
                     continue
+        except Exception as e:
+            # Update Redis with error status
+            try:
+                await self._redis_client.update_file_progress(
+                    model_id=self._model_id,
+                    revision=self._revision,
+                    file_path=self._file_path,
+                    current_bytes=offset,
+                    total_bytes=total,
+                    success=False,
+                    error_message=str(e),
+                )
+            except Exception as redis_err:
+                log.warning("Failed to update error status in Redis: {}", str(redis_err))
+            raise
         finally:
+            self._download_complete = True
+
+            # Cancel and wait for progress task
+            if self._progress_task:
+                self._progress_task.cancel()
+                try:
+                    await self._progress_task
+                except asyncio.CancelledError:
+                    pass
+
+            # Final update to Redis
+            try:
+                await self._redis_client.update_file_progress(
+                    model_id=self._model_id,
+                    revision=self._revision,
+                    file_path=self._file_path,
+                    current_bytes=offset,
+                    total_bytes=total,
+                    success=(offset >= total),
+                )
+            except Exception as redis_err:
+                log.warning("Failed to update final status in Redis: {}", str(redis_err))
+
             await self._session.close()
 
     @override
@@ -309,6 +308,8 @@ class HuggingFaceServiceArgs:
     background_task_manager: BackgroundTaskManager
     storage_pool: StoragePool
     event_producer: EventProducer
+    artifact_verifier_ctx: ArtifactVerifierContext
+    redis_client: ValkeyArtifactDownloadTrackingClient
 
 
 class HuggingFaceService:
@@ -319,6 +320,8 @@ class HuggingFaceService:
     _registry_configs: dict[str, HuggingfaceConfig]
     _event_producer: EventProducer
     _transfer_manager: StorageTransferManager
+    _artifact_verifier_ctx: ArtifactVerifierContext
+    _redis_client: ValkeyArtifactDownloadTrackingClient
 
     def __init__(self, args: HuggingFaceServiceArgs):
         self._storage_pool = args.storage_pool
@@ -326,6 +329,8 @@ class HuggingFaceService:
         self._registry_configs = args.registry_configs
         self._event_producer = args.event_producer
         self._transfer_manager = StorageTransferManager(args.storage_pool)
+        self._artifact_verifier_ctx = args.artifact_verifier_ctx
+        self._redis_client = args.redis_client
 
     def _make_scanner(self, registry_name: str) -> HuggingFaceScanner:
         config = self._registry_configs.get(registry_name)
@@ -438,6 +443,23 @@ class HuggingFaceService:
         model_data = await scanner.scan_model(model)
         log.debug(f"Successfully retrieved single model with metadata: {model}")
         return model_data
+
+    async def get_model_commit_hash(
+        self,
+        registry_name: str,
+        model: ModelTarget,
+    ) -> Optional[str]:
+        """Get the commit hash for a specific model revision.
+
+        Args:
+            registry_name: Name of the HuggingFace registry
+            model: Model target with specific revision
+
+        Returns:
+            The commit hash (SHA) for the model revision, or None if not available
+        """
+        scanner = self._make_scanner(registry_name)
+        return await scanner._client.get_model_commit_hash(model)
 
     async def retrieve_models(
         self,
@@ -558,7 +580,6 @@ class HuggingFaceService:
                 model=model,
                 registry_name=registry_name,
                 storage_pool=self._storage_pool,
-                progress_reporter=None,  # Not needed for single model import
                 storage_step_mappings=storage_step_mappings,
                 step_metadata={},
             )
@@ -573,6 +594,11 @@ class HuggingFaceService:
         except Exception as e:
             raise HuggingFaceAPIError(f"Import failed for {model}: {str(e)}") from e
         finally:
+            scanner = self._make_scanner(registry_name)
+            commit_hash = None
+            if success:
+                commit_hash = await scanner.get_model_commit_hash(model)
+
             await self._event_producer.anycast_event(
                 ModelImportDoneEvent(
                     success=success,
@@ -580,6 +606,7 @@ class HuggingFaceService:
                     revision=model.resolve_revision(ArtifactRegistryType.HUGGINGFACE),
                     registry_name=registry_name,
                     registry_type=ArtifactRegistryType.HUGGINGFACE,
+                    digest=commit_hash,
                 )
             )
 
@@ -703,8 +730,13 @@ class HuggingFaceService:
 class HuggingFaceDownloadStep(ImportStep[None]):
     """Step to download files from HuggingFace"""
 
-    def __init__(self, registry_configs: dict[str, HuggingfaceConfig]) -> None:
+    def __init__(
+        self,
+        registry_configs: dict[str, HuggingfaceConfig],
+        redis_client: ValkeyArtifactDownloadTrackingClient,
+    ) -> None:
         self._registry_configs = registry_configs
+        self._redis_client = redis_client
 
     @property
     def step_type(self) -> ArtifactStorageImportStep:
@@ -756,6 +788,15 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             f"total_size={file_total_size / (1024 * 1024)} MB"
         )
 
+        # Initialize artifact download tracking in Redis with all file information
+        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+        file_info_list = [(file.path, file.size) for file in file_infos]
+        await self._redis_client.init_artifact_download(
+            model_id=context.model.model_id,
+            revision=revision,
+            file_info_list=file_info_list,
+        )
+
         downloaded_files: list[tuple[FileObjectData, str]] = []
         total_bytes = 0
 
@@ -766,6 +807,7 @@ class HuggingFaceDownloadStep(ImportStep[None]):
                 storage_name=download_storage_name,
                 storage_pool=context.storage_pool,
                 download_chunk_size=chunk_size,
+                redis_client=self._redis_client,
             )
             downloaded_files.append((file_info, storage_key))
             total_bytes += file_info.size
@@ -787,8 +829,9 @@ class HuggingFaceDownloadStep(ImportStep[None]):
         file_info: FileObjectData,
         model: ModelTarget,
         storage_name: str,
-        storage_pool: StoragePool,
+        storage_pool: AbstractStoragePool,
         download_chunk_size: int,
+        redis_client: ValkeyArtifactDownloadTrackingClient,
     ) -> str:
         """Download file from HuggingFace to specified storage"""
         storage = storage_pool.get_storage(storage_name)
@@ -808,6 +851,10 @@ class HuggingFaceDownloadStep(ImportStep[None]):
             chunk_size=download_chunk_size,
             max_retries=8,
             content_type=ctype,
+            redis_client=redis_client,
+            model_id=model.model_id,
+            revision=revision,
+            file_path=file_info.path,
         )
 
         await storage.stream_upload(
@@ -839,86 +886,45 @@ class HuggingFaceDownloadStep(ImportStep[None]):
                 f"[cleanup] Failed to cleanup download: {download_storage_name}:{model_prefix}: {str(e)}"
             )
 
+        # Note: Redis tracking data is kept for 24 hours (TTL) to allow inspection
+        # of download results, whether successful or failed
 
-class HuggingFaceArchiveStep(ImportStep[DownloadStepResult]):
-    """Step to move downloaded files to archive storage"""
 
-    def __init__(self, transfer_manager: StorageTransferManager) -> None:
-        self._transfer_manager = transfer_manager
+class HuggingFaceVerifyStep(ModelVerifyStep):
+    """Step to verify downloaded files in HuggingFace model import"""
 
     @property
-    def step_type(self) -> ArtifactStorageImportStep:
-        return ArtifactStorageImportStep.ARCHIVE
-
     @override
-    async def execute(self, context: ImportStepContext, input_data: DownloadStepResult) -> None:
-        download_storage = input_data.storage_name
-        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
+    def registry_type(self) -> ArtifactRegistryType:
+        return ArtifactRegistryType.HUGGINGFACE
 
-        if not archive_storage:
-            raise StorageStepRequiredStepNotProvided("No storage mapping provided for ARCHIVE step")
 
-        # No need to move if download and archive storage are the same
-        if download_storage == archive_storage:
-            log.info(
-                f"Archive step skipped - download and archive storage are the same: {archive_storage}"
-            )
-            return
+class HuggingFaceArchiveStep(ModelArchiveStep):
+    """Step to move downloaded files to archive storage"""
 
-        log.info(f"Starting archive transfer: {download_storage} -> {archive_storage}")
-
-        archieved_file_cnt = 0
-        # Move each file from download storage to archive storage
-        for file_info, storage_key in input_data.downloaded_files:
-            try:
-                archieved_file_cnt += await self._transfer_manager.transfer_directory(
-                    source_storage_name=download_storage,
-                    dest_storage_name=archive_storage,
-                    source_prefix=storage_key,
-                    dest_prefix=storage_key,
-                )
-                log.debug(f"Transferred file to archive: {storage_key}")
-            except Exception as e:
-                log.error(f"Failed to transfer file to archive: {storage_key}: {str(e)}")
-                raise
-
-        log.info(
-            f"Archive transfer completed: {download_storage} -> {archive_storage}, "
-            f"files={archieved_file_cnt}"
-        )
-
+    @property
     @override
-    async def cleanup_stage(self, context: ImportStepContext) -> None:
-        """Clean up files from archive storage on failure"""
-        archive_storage = context.storage_step_mappings.get(ArtifactStorageImportStep.ARCHIVE)
-        if not archive_storage:
-            return
-
-        # Delete entire model (cleaning up individual files is complex)
-        revision = context.model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
-        model_prefix = f"{context.model.model_id}/{revision}"
-
-        try:
-            storage = context.storage_pool.get_storage(archive_storage)
-            await storage.delete_file(model_prefix)
-            log.info(f"[cleanup] Removed archive files: {archive_storage}:{model_prefix}")
-        except Exception as e:
-            log.warning(
-                f"[cleanup] Failed to cleanup archive: {archive_storage}:{model_prefix}: {str(e)}"
-            )
+    def registry_type(self) -> ArtifactRegistryType:
+        return ArtifactRegistryType.HUGGINGFACE
 
 
 def create_huggingface_import_pipeline(
     registry_configs: dict[str, Any],
     transfer_manager: StorageTransferManager,
     storage_step_mappings: dict[ArtifactStorageImportStep, str],
+    artifact_verifier_ctx: ArtifactVerifierContext,
+    event_producer: EventProducer,
+    redis_client: ValkeyArtifactDownloadTrackingClient,
 ) -> ImportPipeline:
     """Create ImportPipeline for HuggingFace based on storage step mappings."""
     steps: list[ImportStep[Any]] = []
 
     # Add steps based on what's present in storage_step_mappings
     if ArtifactStorageImportStep.DOWNLOAD in storage_step_mappings:
-        steps.append(HuggingFaceDownloadStep(registry_configs))
+        steps.append(HuggingFaceDownloadStep(registry_configs, redis_client))
+
+    if ArtifactStorageImportStep.VERIFY in storage_step_mappings:
+        steps.append(HuggingFaceVerifyStep(artifact_verifier_ctx, transfer_manager, event_producer))
 
     if ArtifactStorageImportStep.ARCHIVE in storage_step_mappings:
         steps.append(HuggingFaceArchiveStep(transfer_manager))

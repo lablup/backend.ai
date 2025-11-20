@@ -3,9 +3,9 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 
+from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.types import AgentId, ImageID
 from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 

@@ -1,24 +1,35 @@
+from __future__ import annotations
+
 import asyncio
 import enum
+import importlib
 import uuid
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from decimal import Decimal
 from pathlib import Path
-from typing import Any, Mapping, Optional, Sequence, TypeAlias
+from typing import TYPE_CHECKING, Any, Mapping, Optional, Sequence, Type, TypeAlias
 
 import attrs
 from aiohttp.typedefs import Middleware
-from pydantic import BaseModel
 
 from ai.backend.common.docker import LabelName
+from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AgentId,
     ContainerId,
     ContainerStatus,
+    DeviceName,
     KernelId,
     MountTypes,
     SessionId,
+    SlotName,
 )
+
+if TYPE_CHECKING:
+    from .agent import AbstractAgent
+    from .resources import AbstractComputePlugin
 
 
 class AgentBackend(enum.StrEnum):
@@ -26,6 +37,52 @@ class AgentBackend(enum.StrEnum):
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
     DUMMY = "dummy"
+
+
+class AbstractAgentDiscovery(ABC):
+    @abstractmethod
+    def get_agent_cls(self) -> Type[AbstractAgent]:
+        """
+        Return the concrete implementation class of AbstactAgent for the backend.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def load_resources(
+        self,
+        etcd: AbstractKVStore,
+        local_config: Mapping[str, Any],
+    ) -> Mapping[DeviceName, AbstractComputePlugin]:
+        """
+        Detect and load the accelerator plugins.
+
+        limit_cpus, limit_gpus are deprecated.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def scan_available_resources(
+        self,
+        compute_device_types: Mapping[DeviceName, AbstractComputePlugin],
+    ) -> Mapping[SlotName, Decimal]:
+        """
+        Detect available computing resource of the system.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def prepare_krunner_env(self, local_config: Mapping[str, Any]) -> Mapping[str, str]:
+        """
+        Check if the volume "backendai-krunner.{distro}.{arch}" exists and is up-to-date.
+        If not, automatically create it and update its content from the packaged pre-built krunner
+        tar archives.
+        """
+        raise NotImplementedError()
+
+
+def get_agent_discovery(backend: AgentBackend) -> AbstractAgentDiscovery:
+    agent_mod = importlib.import_module(f"ai.backend.agent.{backend.value}")
+    return agent_mod.get_agent_discovery()
 
 
 @attrs.define(auto_attribs=True, slots=True)
@@ -169,11 +226,3 @@ class KernelOwnershipData:
 
 
 WebMiddleware: TypeAlias = Middleware
-
-
-class HealthResponse(BaseModel):
-    """Standard health check response"""
-
-    status: str
-    version: str
-    component: str

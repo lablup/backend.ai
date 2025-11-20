@@ -8,10 +8,15 @@ from ai.backend.manager.sokovan.deployment.route.route_controller import RouteCo
 
 if TYPE_CHECKING:
     from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+    from ai.backend.common.bgtask.task.registry import BackgroundTaskHandlerRegistry
+    from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+        ValkeyArtifactDownloadTrackingClient,
+    )
     from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
     from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
         ValkeyContainerLogClient,
     )
+    from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
     from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
     from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -20,6 +25,7 @@ if TYPE_CHECKING:
     from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.common.health_checker.probe import HealthProbe
     from ai.backend.common.jwt.validator import JWTValidator
     from ai.backend.common.leader import ValkeyLeaderElection
     from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -32,7 +38,6 @@ if TYPE_CHECKING:
         ServiceDiscoveryLoop,
     )
     from ai.backend.common.types import ValkeyProfileTarget
-    from ai.backend.manager.clients.valkey_client.valkey_image.client import ValkeyImageClient
     from ai.backend.manager.sokovan.deployment import DeploymentController
     from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
     from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
@@ -42,6 +47,7 @@ if TYPE_CHECKING:
     from ..idle import IdleCheckerHost
     from ..models.storage import StorageSessionManager
     from ..models.utils import ExtendedAsyncSAEngine
+    from ..notification import NotificationCenter
     from ..plugin.network import NetworkPluginContext
     from ..plugin.webapp import WebappPluginContext
     from ..registry import AgentRegistry
@@ -50,6 +56,7 @@ if TYPE_CHECKING:
     from ..service.base import ServicesContext
     from ..services.processors import Processors
     from ..types import DistributedLockFactory
+    from .gql.adapters import GQLAdapters
     from .types import CORSOptions
 
 
@@ -66,6 +73,7 @@ class RootContext(BaseContext):
     event_fetcher: EventFetcher
     event_producer: EventProducer
     etcd: AsyncEtcd
+    valkey_artifact: ValkeyArtifactDownloadTrackingClient
     valkey_container_log: ValkeyContainerLogClient
     valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
@@ -98,10 +106,14 @@ class RootContext(BaseContext):
     error_monitor: ErrorPluginContext
     stats_monitor: StatsPluginContext
     background_task_manager: BackgroundTaskManager
+    manager_bgtask_registry: BackgroundTaskHandlerRegistry
     metrics: CommonMetricRegistry
     repositories: Repositories
     processors: Processors
+    notification_center: NotificationCenter
     event_hub: EventHub
     message_queue: AbstractMessageQueue
     service_discovery: ServiceDiscovery
     sd_loop: ServiceDiscoveryLoop
+    gql_adapters: GQLAdapters
+    health_probe: HealthProbe

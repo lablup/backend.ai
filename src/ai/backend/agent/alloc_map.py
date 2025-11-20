@@ -114,8 +114,8 @@ class AbstractAllocMap(metaclass=ABCMeta):
             return True
         for t in self.exclusive_slot_types:
             if "*" in t:
-                a_in_exclusive_set = a_in_exclusive_set or fnmatch.fnmatchcase(a, t)
-                b_in_exclusive_set = b_in_exclusive_set or fnmatch.fnmatchcase(b, t)
+                a_in_exclusive_set = a_in_exclusive_set or fnmatch.fnmatchcase(str(a), str(t))
+                b_in_exclusive_set = b_in_exclusive_set or fnmatch.fnmatchcase(str(b), str(t))
         return a_in_exclusive_set and b_in_exclusive_set
 
     def format_current_allocations(self) -> str:
@@ -235,6 +235,17 @@ class AbstractAllocMap(metaclass=ABCMeta):
                 if dev.device_id == dev_id:
                     hint_for_next_allocation.append(dev)
         affinity_hint.devices = hint_for_next_allocation
+
+    @final
+    def update_device_slot_amounts(self, slot_amounts: Mapping[SlotName, Decimal]) -> None:
+        self.device_slots = {
+            device_id: DeviceSlotInfo(
+                slot_type=slot_info.slot_type,
+                slot_name=slot_info.slot_name,
+                amount=slot_amounts[slot_info.slot_name],
+            )
+            for device_id, slot_info in self.device_slots.items()
+        }
 
     @abstractmethod
     def allocate(
@@ -713,7 +724,7 @@ class FractionAllocMap(AbstractAllocMap):
         def allocate_across_devices(
             dev_allocs: list[tuple[DeviceId, Decimal]],
             remaining_alloc: Decimal,
-            slot_name: str,
+            slot_name: SlotName,
         ) -> dict[DeviceId, Decimal]:
             slot_allocation: dict[DeviceId, Decimal] = {}
             n_devices = len(dev_allocs)

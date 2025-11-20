@@ -25,6 +25,7 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.types import AGENTID_STORAGE
@@ -33,6 +34,7 @@ from ai.backend.logging import BraceStyleAdapter, LocalLogger, LogLevel
 from .config.loaders import load_local_config, make_etcd
 from .config.unified import StorageProxyUnifiedConfig
 from .context import DEFAULT_BACKENDS, EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
+from .context_types import ArtifactVerifierContext
 from .types import VFolderID
 from .volumes.abc import CAP_FAST_SIZE, AbstractVolume
 
@@ -256,6 +258,8 @@ async def check_and_upgrade(
         redis_mq,
         log_events=local_config.debug.log_events,
     )
+    # Create a dummy health probe for migration context (not started)
+    health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
     ctx = RootContext(
         pid=os.getpid(),
         pidx=0,
@@ -268,10 +272,14 @@ async def check_and_upgrade(
         volume_pool=None,  # type: ignore[arg-type]
         storage_pool=None,  # type: ignore[arg-type]
         background_task_manager=None,  # type: ignore[arg-type]
+        artifact_verifier_ctx=ArtifactVerifierContext(),  # type: ignore[arg-type]
         metric_registry=CommonMetricRegistry(),
         cors_options={},
+        manager_http_clients={},
+        valkey_artifact_client=None,  # type: ignore[arg-type]
         backends={**DEFAULT_BACKENDS},
         volumes={},
+        health_probe=health_probe,
     )
 
     volumes_to_upgrade = await check_latest(ctx)

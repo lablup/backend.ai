@@ -66,7 +66,7 @@ async def test_get_role_with_valid_group_membership(
     user_id = UUID("12345678-1234-5678-1234-567812345678")
 
     # Setup valid group membership
-    mock_auth_repository.get_group_membership_validated.return_value = {
+    mock_auth_repository.get_group_membership.return_value = {
         "group_id": group_id,
         "user_id": user_id,
     }
@@ -95,7 +95,7 @@ async def test_get_role_without_group_membership_raises_error(
     user_id = UUID("12345678-1234-5678-1234-567812345678")
 
     # Setup invalid group membership - raises exception
-    mock_auth_repository.get_group_membership_validated.side_effect = GroupMembershipNotFoundError(
+    mock_auth_repository.get_group_membership.side_effect = GroupMembershipNotFoundError(
         "No such project or you are not the member of it."
     )
 
@@ -126,7 +126,7 @@ async def test_get_role_verifies_correct_parameters(
         group_id=group_id,
     )
 
-    mock_auth_repository.get_group_membership_validated.return_value = {
+    mock_auth_repository.get_group_membership.return_value = {
         "group_id": group_id,
         "user_id": user_id,
     }
@@ -134,7 +134,7 @@ async def test_get_role_verifies_correct_parameters(
     result = await auth_service.get_role(action)
 
     # Verify repository was called with correct parameters
-    mock_auth_repository.get_group_membership_validated.assert_called_once_with(group_id, user_id)
+    mock_auth_repository.get_group_membership.assert_called_once_with(group_id, user_id)
 
     # Verify result
     assert result.global_role == "user"  # Not superadmin

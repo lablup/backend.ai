@@ -34,11 +34,15 @@ from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_STATISTICS_DB, RedisRole
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.dto.manager.auth.field import (
     AuthSuccessResponse,
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
 )
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
+from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.middlewares.exception import general_exception_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.web.session import (
@@ -498,17 +502,19 @@ async def extend_login_session(request: web.Request) -> web.Response:
 
 
 async def check_health(request: web.Request) -> web.Response:
-    """Simple health check endpoint"""
-    from .response import HealthResponse
-
+    """Health check endpoint with dependency connectivity status"""
     request["do_not_print_access_log"] = True
 
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_connectivity_status()
     response = HealthResponse(
-        status="healthy",
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
         component="webserver",
+        connectivity=connectivity,
     )
-    return web.json_response(response.model_dump())
+
+    return web.json_response(response.model_dump(mode="json"))
 
 
 async def webserver_healthcheck(request: web.Request) -> web.Response:
@@ -828,7 +834,7 @@ async def webapp_ctx(
     if config.apollo_router.enabled:
         # Use JWT authentication for Apollo Router if enabled, otherwise use HMAC
         supergraph_handler = partial(
-            web_handler_with_jwt, api_endpoint=str(config.apollo_router.endpoint)
+            web_handler_with_jwt, api_endpoints=list(config.apollo_router.endpoints)
         )
         cors.add(app.router.add_route("GET", "/func/admin/gql", supergraph_handler))
         cors.add(app.router.add_route("POST", "/func/admin/gql", supergraph_handler))
@@ -914,6 +920,20 @@ async def server_main(
         app["stats"] = WebStats()
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))
         await web_init_stack.enter_async_context(redis_ctx(config, app, pidx))
+
+        # Initialize health probe
+        health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+        await health_probe.register(
+            ValkeyHealthChecker(
+                clients={
+                    ComponentId("session"): app["redis"],
+                }
+            )
+        )
+        await health_probe.start()
+        web_init_stack.push_async_callback(health_probe.stop)
+        app["health_probe"] = health_probe
+
         await web_init_stack.enter_async_context(webapp_ctx(config, app))
         await web_init_stack.enter_async_context(service_discovery_ctx(config))
         log.info("Started the web gateway service.")

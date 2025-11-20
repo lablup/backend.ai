@@ -55,3 +55,13 @@ def main(
 @main.group(cls=LazyGroup, import_name="ai.backend.storage.cli.config:cli")
 def config() -> None:
     """Command set for configuration management."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.storage.cli.dependencies:cli")
+def dependencies() -> None:
+    """Command set for dependency verification."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.storage.cli.health:cli")
+def health() -> None:
+    """Command set for health checking."""

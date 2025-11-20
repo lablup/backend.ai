@@ -77,8 +77,7 @@ class ModifyImageActionUnknownImageReferenceError(BackendAIError):
     error_type = "https://api.backend.ai/probs/image-not-found"
     error_title = "Unknown image reference."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.IMAGE,
             operation=ErrorOperation.UPDATE,

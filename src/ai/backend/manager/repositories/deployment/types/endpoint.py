@@ -5,8 +5,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
 
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.types import SessionId
-from ai.backend.manager.data.model_serving.types import EndpointLifecycle, RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus
 
 
 @dataclass
@@ -57,3 +58,15 @@ class RouteData:
     created_at: datetime
     updated_at: Optional[datetime] = None
     error_data: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RouteServiceDiscoveryInfo:
+    """Service discovery information for a model service route."""
+
+    route_id: uuid.UUID
+    endpoint_id: uuid.UUID
+    endpoint_name: str
+    runtime_variant: str
+    kernel_host: str
+    kernel_port: int

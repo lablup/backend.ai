@@ -25,6 +25,9 @@ from aiohttp.typedefs import Middleware
 from setproctitle import setproctitle
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.config import (
     ConfigurationError,
@@ -33,11 +36,16 @@ from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import (
     NOOP_STORAGE_VOLUME_NAME,
     REDIS_BGTASK_DB,
+    REDIS_STATISTICS_DB,
     REDIS_STREAM_DB,
     RedisRole,
 )
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
+from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -69,6 +77,7 @@ from ai.backend.common.types import HostPortPair as CommonHostPortPair
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.storage.context_types import ArtifactVerifierContext
 
 from . import __version__ as VERSION
 from .config.loaders import load_local_config, make_etcd
@@ -426,7 +435,7 @@ async def api_ctx(
 
     @asynccontextmanager
     async def internal_api_ctx() -> AsyncGenerator[web.Application]:
-        internal_api_app = init_internal_app()
+        internal_api_app = init_internal_app(root_ctx)
         internal_api_runner = web.AppRunner(internal_api_app)
         await internal_api_runner.setup()
         internal_addr = local_config.api.manager.internal_addr
@@ -465,6 +474,7 @@ async def api_ctx(
         finally:
             # volume instances are lazily initialized upon their first usage by the API layers.
             await root_ctx.shutdown_volumes()
+            await root_ctx.shutdown_manager_http_clients()
 
 
 @asynccontextmanager
@@ -592,6 +602,29 @@ async def server_main(
             watcher_ctx(local_config, pidx)
         )
 
+        # Create ValkeyArtifactDownloadTrackingClient
+        valkey_target = redis_config.to_valkey_target()
+        valkey_artifact_client = await ValkeyArtifactDownloadTrackingClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_STATISTICS_DB,
+            human_readable_name=f"storage-proxy-artifact-download-tracker-{pidx}",
+        )
+        storage_init_stack.push_async_callback(valkey_artifact_client.close)
+
+        # Initialize health probe
+        health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+        await health_probe.register(EtcdHealthChecker(etcd=etcd))
+        await health_probe.register(
+            ValkeyHealthChecker(
+                clients={
+                    ComponentId("bgtask"): bgtask_mgr._valkey_client,
+                    ComponentId("artifact"): valkey_artifact_client,
+                }
+            )
+        )
+        await health_probe.start()
+        storage_init_stack.push_async_callback(health_probe.stop)
+
         root_ctx = RootContext(
             pid=os.getpid(),
             pidx=pidx,
@@ -610,11 +643,16 @@ async def server_main(
                     allow_credentials=False, expose_headers="*", allow_headers="*"
                 ),
             },
+            manager_http_clients={},
+            valkey_artifact_client=valkey_artifact_client,
+            health_probe=health_probe,
             backends={**DEFAULT_BACKENDS},
             volumes={
                 NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)
             },
+            artifact_verifier_ctx=ArtifactVerifierContext(),
         )
+        await root_ctx.init_storage_artifact_verifier_plugin()
         if pidx == 0:
             await check_latest(root_ctx)
 

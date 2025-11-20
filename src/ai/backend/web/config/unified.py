@@ -1106,12 +1106,15 @@ class ApolloRouterConfig(BaseConfigSchema):
         """,
         examples=[True, False],
     )
-    endpoint: str = Field(
-        default="http://127.0.0.1:4000",
+    endpoints: CommaSeparatedStrList = Field(
+        default_factory=lambda: CommaSeparatedStrList(["http://127.0.0.1:4000"]),
         description="""
-        Apollo Router endpoint.
+        Apollo Router endpoint(s).
+        Supports multiple endpoints separated by commas for load balancing.
         """,
-        examples=["http://127.0.0.1:4000"],
+        examples=["http://127.0.0.1:4000", "http://router1:4000,http://router2:4000"],
+        validation_alias=AliasChoices("endpoint", "endpoints"),
+        serialization_alias="endpoints",
     )
 
 

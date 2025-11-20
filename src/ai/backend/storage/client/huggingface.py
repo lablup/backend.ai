@@ -83,6 +83,7 @@ class HuggingFaceClient:
                     direction=-1,  # Descending order
                     limit=limit,
                     token=self._token,
+                    expand=["gated"],
                 ),
             )
             return list(models)
@@ -137,6 +138,25 @@ class HuggingFaceClient:
             return result
         except Exception as e:
             raise HuggingFaceAPIError(f"Failed to get model info for {model}: {str(e)}") from e
+
+    async def get_model_commit_hash(self, model: ModelTarget) -> Optional[str]:
+        """Get the commit hash for a specific model revision.
+
+        Args:
+            model: HuggingFace model with specific revision
+
+        Returns:
+            The commit hash (SHA) for the model revision, or None if not available
+        """
+        model_id = model.model_id
+        revision = model.resolve_revision(ArtifactRegistryType.HUGGINGFACE)
+        try:
+            result = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: model_info(model_id, revision=revision, token=self._token)
+            )
+            return result.sha
+        except Exception as e:
+            raise HuggingFaceAPIError(f"Failed to get commit hash for {model}: {str(e)}") from e
 
     async def list_model_filepaths(self, model: ModelTarget) -> list[str]:
         """List files in a model repository.
@@ -248,6 +268,8 @@ class HuggingFaceScanner:
                             modified_at=model.last_modified,
                             readme=None,
                             size=None,
+                            sha=None,
+                            extra={"gated": model.gated},
                         )
                         model_data_list.append(model_data)
 
@@ -300,6 +322,8 @@ class HuggingFaceScanner:
                 modified_at=model_info.last_modified,
                 readme=readme_content,
                 size=total_size,
+                sha=None,
+                extra={"gated": model_info.gated},
             )
 
             log.info(
@@ -334,6 +358,8 @@ class HuggingFaceScanner:
                 modified_at=model_info.last_modified,
                 readme=None,
                 size=None,
+                sha=None,
+                extra={"gated": model_info.gated},
             )
 
             log.info(
@@ -355,6 +381,17 @@ class HuggingFaceScanner:
             Download URL
         """
         return self._client.get_download_url(model, filename)
+
+    async def get_model_commit_hash(self, model: ModelTarget) -> Optional[str]:
+        """Get the commit hash for a specific model revision.
+
+        Args:
+            model: HuggingFace model with specific revision
+
+        Returns:
+            The commit hash (SHA) for the model revision, or None if not available
+        """
+        return await self._client.get_model_commit_hash(model)
 
     async def list_model_files_info(self, model: ModelTarget) -> list[FileObjectData]:
         """Get model file information list as FileInfo objects.
@@ -445,8 +482,8 @@ class HuggingFaceScanner:
                         await event_producer.anycast_event(
                             ModelMetadataFetchDoneEvent(model=metadata_info)
                         )
-                except Exception as e:
-                    log.warning(f"Failed to download metadata for {model_data.id}: {str(e)}")
+                except Exception:
+                    pass
 
         # Download metadata concurrently with semaphore limit
         tasks = [download_metadata(model) for model in models]
@@ -479,8 +516,8 @@ class HuggingFaceScanner:
                     # Update the model data with README content and size
                     model_data.readme = readme_content
                     model_data.size = total_size
-                except Exception as e:
-                    log.warning(f"Failed to download metadata for {model_data.id}: {str(e)}")
+                except Exception:
+                    pass
 
         # Download metadata concurrently with semaphore limit
         tasks = [download_and_update_metadata(model) for model in models]
@@ -504,19 +541,14 @@ class HuggingFaceScanner:
                         content = await response.text()
                         return content
                     else:
-                        log.warning(
-                            f"Failed to download README for {model}, status code: {response.status}"
-                        )
                         return None
 
-        except Exception as e:
-            log.warning(f"Failed to download README for {model}: {str(e)}")
+        except Exception:
             return None
 
     async def _calculate_model_size(self, model: ModelTarget) -> int:
         try:
             file_infos = await self.list_model_files_info(model)
             return sum(file.size for file in file_infos)
-        except Exception as size_error:
-            log.warning(f"Failed to calculate size for {model}: {str(size_error)}")
+        except Exception:
             return 0

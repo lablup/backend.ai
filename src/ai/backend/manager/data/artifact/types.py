@@ -1,10 +1,14 @@
 import enum
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Self
+from typing import Any, Optional, Self
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.artifact.types import (
+    ArtifactRegistryType,
+    VerificationStepResult,
+)
+from ai.backend.manager.data.common.types import StringFilterData
 
 
 class ArtifactType(enum.StrEnum):
@@ -63,6 +67,7 @@ class ArtifactData:
     scanned_at: datetime
     updated_at: datetime
     readonly: bool
+    extra: Optional[dict[str, Any]]
 
 
 @dataclass
@@ -76,6 +81,8 @@ class ArtifactRevisionData:
     remote_status: Optional[ArtifactRemoteStatus]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
+    digest: Optional[str]
+    verification_result: Optional[VerificationStepResult]
 
 
 @dataclass
@@ -90,6 +97,8 @@ class ArtifactRevisionResponseData:
     remote_status: Optional[ArtifactRemoteStatus]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
+    digest: Optional[str]
+    verification_result: Optional[VerificationStepResult]
 
     @classmethod
     def from_revision_data(cls, data: ArtifactRevisionData) -> Self:
@@ -102,6 +111,8 @@ class ArtifactRevisionResponseData:
             remote_status=data.remote_status,
             created_at=data.created_at,
             updated_at=data.updated_at,
+            digest=data.digest,
+            verification_result=data.verification_result,
         )
 
 
@@ -131,6 +142,7 @@ class ArtifactDataWithRevisions(ArtifactData):
             updated_at=artifact_data.updated_at,
             readonly=artifact_data.readonly,
             availability=artifact_data.availability,
+            extra=artifact_data.extra,
             revisions=revisions,
         )
 
@@ -158,6 +170,7 @@ class ArtifactDataWithRevisionsResponse(ArtifactData):
             updated_at=artifact_data.updated_at,
             readonly=artifact_data.readonly,
             availability=artifact_data.availability,
+            extra=artifact_data.extra,
             revisions=[ArtifactRevisionResponseData.from_revision_data(rev) for rev in revisions],
         )
 
@@ -178,6 +191,7 @@ class ArtifactDataWithRevisionsResponse(ArtifactData):
             updated_at=artifact_with_revisions.updated_at,
             readonly=artifact_with_revisions.readonly,
             availability=artifact_with_revisions.availability,
+            extra=artifact_with_revisions.extra,
             revisions=[
                 ArtifactRevisionResponseData.from_revision_data(rev)
                 for rev in artifact_with_revisions.revisions
@@ -205,3 +219,32 @@ class ArtifactRevisionOrderField(enum.StrEnum):
 class DelegateeTarget:
     delegatee_reservoir_id: uuid.UUID
     target_registry_id: uuid.UUID
+
+
+@dataclass
+class ArtifactOrderingOptions:
+    """Ordering options for artifact queries."""
+
+    order_by: list[tuple[ArtifactOrderField, bool]] = field(
+        default_factory=lambda: [(ArtifactOrderField.NAME, False)]
+    )  # (field, desc)
+
+
+@dataclass
+class ArtifactFilterOptions:
+    """Filtering options for artifacts."""
+
+    artifact_type: Optional[list[ArtifactType]] = None
+    name_filter: Optional[StringFilterData] = None
+    registry_filter: Optional[StringFilterData] = None
+    source_filter: Optional[StringFilterData] = None
+    registry_id: Optional[uuid.UUID] = None
+    registry_type: Optional[ArtifactRegistryType] = None
+    source_registry_id: Optional[uuid.UUID] = None
+    source_registry_type: Optional[ArtifactRegistryType] = None
+    availability: Optional[list[ArtifactAvailability]] = None
+
+    # Logical operations
+    AND: Optional[list["ArtifactFilterOptions"]] = None
+    OR: Optional[list["ArtifactFilterOptions"]] = None
+    NOT: Optional[list["ArtifactFilterOptions"]] = None

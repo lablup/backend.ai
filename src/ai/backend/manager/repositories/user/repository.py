@@ -16,6 +16,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.data.keypair.types import KeyPairCreator
@@ -519,8 +520,10 @@ class UserRepository:
             kernel_terminated_at: float = row.terminated_at.timestamp()
             cpu_value = int(occupied_slots.get("cpu", 0))
             mem_value = int(occupied_slots.get("mem", 0))
-            cuda_device_value = int(occupied_slots.get("cuda.devices", 0))
-            cuda_share_value = Decimal(occupied_slots.get("cuda.shares", 0))
+            gpu_allocated_value = Decimal(0)
+            for key, value in occupied_slots.items():
+                if SlotName(key).is_accelerator():
+                    gpu_allocated_value += value
 
             start_index = int((kernel_created_at - start_date_ts) // time_window)
             end_index = int((kernel_terminated_at - start_date_ts) // time_window) + 1
@@ -530,8 +533,7 @@ class UserRepository:
                 time_series["num_sessions"]["value"] += 1
                 time_series["cpu_allocated"]["value"] += cpu_value
                 time_series["mem_allocated"]["value"] += mem_value
-                time_series["gpu_allocated"]["value"] += cuda_device_value
-                time_series["gpu_allocated"]["value"] += cuda_share_value
+                time_series["gpu_allocated"]["value"] += gpu_allocated_value
                 time_series["io_read_bytes"]["value"] += io_read_byte
                 time_series["io_write_bytes"]["value"] += io_write_byte
                 time_series["disk_used"]["value"] += disk_used

@@ -30,8 +30,8 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
-from ai.backend.common.bgtask.types import TaskName
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.dto.storage.response import VFolderCloneResponse, VFolderDeleteResponse
 from ai.backend.common.events.event_types.volume.broadcast import (
     DoVolumeMountEvent,
@@ -55,10 +55,11 @@ from ai.backend.common.types import (
     VolumeMountableNodeType,
 )
 from ai.backend.logging import BraceStyleAdapter
+from ai.backend.storage.bgtask.types import StorageBgtaskName
 
 from .. import __version__
-from ..bgtask.tasks.clone import VFolderCloneTaskArgs
-from ..bgtask.tasks.delete import VFolderDeleteTaskArgs
+from ..bgtask.tasks.clone import VFolderCloneManifest
+from ..bgtask.tasks.delete import VFolderDeleteManifest
 from ..exception import (
     ExternalStorageServiceError,
     InvalidQuotaConfig,
@@ -94,10 +95,26 @@ async def token_auth_middleware(
     if not skip_token_auth:
         token = request.headers.get("X-BackendAI-Storage-Auth-Token", None)
         if not token:
-            raise web.HTTPForbidden()
+            raise web.HTTPForbidden(
+                text=dump_json_str(
+                    {
+                        "type": "https://api.backend.ai/probs/storage/forbidden",
+                        "title": "Forbidden (missing auth token)",
+                    },
+                ),
+                content_type="application/problem+json",
+            )
         ctx: RootContext = request.app["ctx"]
         if token != ctx.local_config.api.manager.secret:
-            raise web.HTTPForbidden()
+            raise web.HTTPForbidden(
+                text=dump_json_str(
+                    {
+                        "type": "https://api.backend.ai/probs/storage/forbidden",
+                        "title": "Forbidden (invalid auth token)",
+                    },
+                ),
+                content_type="application/problem+json",
+            )
     return await handler(request)
 
 
@@ -110,17 +127,20 @@ def skip_token_auth(
 
 @skip_token_auth
 async def check_health(request: web.Request) -> web.Response:
-    """Simple health check endpoint"""
-    from ..types import HealthResponse
+    """Health check endpoint with dependency connectivity status"""
 
     request["do_not_print_access_log"] = True
 
+    ctx: RootContext = request.app["ctx"]
+    connectivity = await ctx.health_probe.get_connectivity_status()
     response = HealthResponse(
-        status="healthy",
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
         component="storage-proxy",
+        connectivity=connectivity,
     )
-    return web.json_response(response.model_dump())
+
+    return web.json_response(response.model_dump(mode="json"))
 
 
 @skip_token_auth
@@ -436,13 +456,13 @@ async def delete_vfolder(request: web.Request) -> web.Response:
         await log_manager_api_entry(log, "delete_vfolder", params)
         ctx: RootContext = request.app["ctx"]
         vfid: VFolderID = params["vfid"]
-        delete_args = VFolderDeleteTaskArgs(
+        delete_manifest = VFolderDeleteManifest(
             volume=params["volume"],
             vfolder_id=vfid,
         )
         task_id = await ctx.background_task_manager.start_retriable(
-            TaskName.DELETE_VFOLDER,
-            delete_args,
+            StorageBgtaskName.DELETE_VFOLDER,
+            delete_manifest,
         )
         data = VFolderDeleteResponse(bgtask_id=task_id).model_dump(mode="json")
         return web.json_response(data, status=HTTPStatus.ACCEPTED)
@@ -475,14 +495,14 @@ async def clone_vfolder(request: web.Request) -> web.Response:
         ctx: RootContext = request.app["ctx"]
         if params["dst_volume"] is not None and params["dst_volume"] != params["src_volume"]:
             raise StorageProxyError("Cross-volume vfolder cloning is not implemented yet")
-        clone_args = VFolderCloneTaskArgs(
+        clone_manifest = VFolderCloneManifest(
             volume=params["src_volume"],
             src_vfolder=params["src_vfid"],
             dst_vfolder=params["dst_vfid"],
         )
         task_id = await ctx.background_task_manager.start_retriable(
-            TaskName.CLONE_VFOLDER,
-            clone_args,
+            StorageBgtaskName.CLONE_VFOLDER,
+            clone_manifest,
         )
         data = VFolderCloneResponse(bgtask_id=task_id).model_dump(mode="json")
         return web.json_response(data)
@@ -1241,9 +1261,11 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     return app
 
 
-def init_internal_app() -> web.Application:
+def init_internal_app(ctx: RootContext) -> web.Application:
     app = web.Application()
+    app["ctx"] = ctx
     metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", "/health", check_health)
     app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
     return app
 

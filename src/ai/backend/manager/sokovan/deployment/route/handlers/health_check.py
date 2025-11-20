@@ -6,7 +6,7 @@ from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.model_serving.types import RouteStatus
+from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
@@ -41,7 +41,7 @@ class HealthCheckRouteHandler(RouteHandler):
     @classmethod
     def target_statuses(cls) -> list[RouteStatus]:
         """Get the target route statuses for this handler."""
-        return [RouteStatus.HEALTHY, RouteStatus.UNHEALTHY]
+        return [RouteStatus.HEALTHY, RouteStatus.UNHEALTHY, RouteStatus.DEGRADED]
 
     @classmethod
     def next_status(cls) -> Optional[RouteStatus]:
@@ -53,6 +53,11 @@ class HealthCheckRouteHandler(RouteHandler):
         """Routes that fail health check become UNHEALTHY."""
         return RouteStatus.UNHEALTHY
 
+    @classmethod
+    def stale_status(cls) -> Optional[RouteStatus]:
+        """Routes with stale health data become DEGRADED."""
+        return RouteStatus.DEGRADED
+
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute health check for routes."""
         log.debug("Checking health for {} routes", len(routes))
@@ -63,18 +68,9 @@ class HealthCheckRouteHandler(RouteHandler):
 
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after health check."""
-        healthy_count = len(result.successes)
-        unhealthy_count = len(result.errors)
-
-        if unhealthy_count > 0:
-            log.debug(
-                "Health check complete: {} healthy, {} unhealthy routes",
-                healthy_count,
-                unhealthy_count,
-            )
-
-            # Log details of unhealthy routes
-            for error in result.errors:
-                log.trace("Route {} is unhealthy: {}", error.route_info.route_id, error.reason)
-        else:
-            log.trace("All {} routes are healthy", healthy_count)
+        log.debug(
+            "Health check: {} healthy, {} unhealthy, {} degraded",
+            len(result.successes),
+            len(result.errors),
+            len(result.stale),
+        )

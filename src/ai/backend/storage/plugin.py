@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Iterator, Optional
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Iterator, Optional
 
 from aiohttp import web
 
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
+from ai.backend.storage.services.artifacts.types import ImportStepContext
 
 if TYPE_CHECKING:
     from .api.types import CORSOptions, WebMiddleware
@@ -20,6 +23,19 @@ class AbstractStoragePlugin(AbstractPlugin, metaclass=ABCMeta):
         raise NotImplementedError
 
 
+@dataclass
+class VerifierPluginResult:
+    scanned_count: int
+    infected_count: int
+    metadata: dict[str, Any]
+
+
+class AbstractArtifactVerifierPlugin(AbstractPlugin, metaclass=ABCMeta):
+    @abstractmethod
+    async def verify(self, artifact_path: Path, context: ImportStepContext) -> VerifierPluginResult:
+        raise NotImplementedError
+
+
 class StoragePluginContext(BasePluginContext[AbstractStoragePlugin]):
     plugin_group = "backendai_storage_v10"
 
@@ -30,6 +46,20 @@ class StoragePluginContext(BasePluginContext[AbstractStoragePlugin]):
         allowlist: Optional[set[str]] = None,
         blocklist: Optional[set[str]] = None,
     ) -> Iterator[tuple[str, type[AbstractStoragePlugin]]]:
+        scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
+        yield from scanned_plugins
+
+
+class StorageArtifactVerifierPluginContext(BasePluginContext[AbstractArtifactVerifierPlugin]):
+    plugin_group = "backendai_storage_artifact_verifier_v1"
+
+    @classmethod
+    def discover_plugins(
+        cls,
+        plugin_group: str,
+        allowlist: Optional[set[str]] = None,
+        blocklist: Optional[set[str]] = None,
+    ) -> Iterator[tuple[str, type[AbstractArtifactVerifierPlugin]]]:
         scanned_plugins = [*super().discover_plugins(plugin_group, allowlist, blocklist)]
         yield from scanned_plugins
 

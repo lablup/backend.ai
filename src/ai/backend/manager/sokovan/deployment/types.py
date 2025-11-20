@@ -3,8 +3,7 @@ from enum import StrEnum
 from typing import Optional
 from uuid import UUID
 
-from ai.backend.manager.data.deployment.types import DeploymentInfo
-from ai.backend.manager.data.model_serving.types import RouteStatus
+from ai.backend.manager.data.deployment.types import DeploymentInfo, RouteStatus
 
 
 class DeploymentLifecycleType(StrEnum):

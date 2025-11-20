@@ -78,11 +78,7 @@ async def add(request: web.Request, params: AddRequestModel) -> PydanticResponse
     root_ctx: RootContext = request.app["_root.context"]
 
     coordinator_config = root_ctx.local_config.proxy_coordinator
-    if coordinator_config.advertised_addr:
-        connection_info = coordinator_config.advertised_addr
-    else:
-        connection_info = coordinator_config.bind_addr
-    base_url = f"{'https' if coordinator_config.tls_advertised or coordinator_config.tls_listen else 'http'}://{connection_info.host}:{connection_info.port}"
+    base_url = coordinator_config.advertise_base_url
     qdict = {
         **params.model_dump(mode="json", exclude_defaults=True),
         "token": request.match_info["token"],

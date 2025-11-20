@@ -60,6 +60,7 @@
   "button": {
     "Add": "Añadir",
     "Apply": "Solicitar",
+    "AutoRefresh": "Actualización automática",
     "Cancel": "Cancelar",
     "Clear": "Borrar",
     "ClearLogs": "Borrar registros",
@@ -320,8 +321,11 @@
       "Name": "Nombre",
       "NewFileName": "Nuevo nombre de archivo",
       "NewFolder": "Nueva carpeta",
+      "NoAccessPermissionToVolume": "El proyecto actual no tiene acceso al volumen SFTP.",
       "NoImagesSupportingFileBrowser": "Todavía no hay ninguna imagen que soporte filebrowser. Se requiere al menos una o más imágenes compatibles con filebrowser para cargar carpetas.",
       "NoImagesSupportingSystemSession": "Todavía no hay ninguna imagen que soporte SSH / SFTP. Al menos una o más imágenes que soporten imágenes de rol de sistema para usar SSH / SFTP.",
+      "NoPermissionToMountFolder": "El proyecto actual no tiene permisos para montar en el host de almacenamiento asociado a esta carpeta.",
+      "NoSFTPSupportingScalingGroup": "El host de almacenamiento de esta carpeta no tiene un grupo de recursos SFTP.",
       "NoSharedFolders": "Sin carpetas compartidas",
       "NoSharedUsers": "No se ha invitado a nadie.",
       "NotEnoughResourceForFileBrowserSession": "No hay recursos suficientes (cpu: 1 Core, mem: 0.5GB) para crear la sesión para filebrowser. por favor compruebe los recursos disponibles.",
@@ -614,6 +618,7 @@
     "AuthenticationFailed": "Autenticación fallida. Compruebe la información y el estado del gestor.",
     "CannotChangeVirtualFolderOption": "No se pueden cambiar las opciones de una carpeta v que no sea de mi propiedad.",
     "CannotSharePrivateAutomountFolder": "No se pueden compartir vfolders automount de acuerdo con la política.",
+    "FailedToLoadTableData": "Se produjo un error al cargar la lista.",
     "FolderSharingNotAvailableToUser": "El uso compartido de carpetas no está disponible para los usuarios solicitados.",
     "InternalServerError": "Error interno del servidor. Vuelva a intentarlo más tarde.",
     "InvalidBaseURL": "La URL del punto final no es válida.",
@@ -724,6 +729,7 @@
     "CreateButtonCode": "Cree",
     "CreateNotebookButton": "Botón Crear bloc de notas",
     "Downloading": "Descargando...",
+    "FailedToFetchRepositoryInformation": "No se pudo obtener la información del repositorio.",
     "FolderAlreadyExists": "Existe una carpeta con el mismo nombre. Se cambiará el nombre.",
     "FolderCreated": "Carpeta creada.",
     "FolderName": "Nombre de la carpeta importada:",
@@ -740,6 +746,8 @@
     "ImportGithubRepo": "Importar repositorio GitHub",
     "ImportGitlabRepo": "Importar repositorio GitLab",
     "ImportNotebook": "Importar cuaderno",
+    "InvalidGitHubURL": "URL de GitHub inválida. Debe ser una URL válida de un repositorio de GitHub.",
+    "InvalidGitLabURL": "URL de GitLab no válida. Debe corresponder a la URL de un repositorio de GitLab.",
     "InvalidNotebookURL": "URL del cuaderno no válida.",
     "NoNotebookCode": "La dirección del cuaderno está vacía. Introduzca un código de libreta válido para copiar el código de identificación.",
     "NoSuitableResourceFoundOnGivenURL": "No se ha encontrado ningún recurso adecuado en la URL indicada.",
@@ -751,8 +759,11 @@
     "Preparing": "Preparando...",
     "ReadyToImport": "Listo para importar",
     "RepoWillBeFolder": "Los repositorios de GitHub importados se convierten en carpetas y se pueden montar al iniciar la sesión.",
+    "RepositoryNotFound": "Repositorio no encontrado.",
+    "StorageHost": "Host de almacenamiento",
+    "VFolderUsageMode": "Modo de uso de la carpeta",
     "WrongURLType": "Tipo de URL incorrecto",
-    "YouCanCreateNotebookCode": "Introduce la URL del cuaderno para crear un código de insignia como el siguiente que puedes ejecutar directamente en Backend.AI."
+    "YouCanCreateNotebookCode": "Esta insignia habilita la ejecución directa de tu notebook en Backend.AI. Copia el código para usarlo en cualquier lugar."
   },
   "information": {
     "APIVersion": "Versión API",
@@ -1302,6 +1313,7 @@
     "ElapsedTime": "Tiempo transcurrido",
     "EnvironmentAndVersion": "Entorno y versión",
     "EnvironmentInfo": "Información medioambiental",
+    "ExecuteSpecificApp": "Iniciar {{appName}}",
     "ExecuteTerminalApp": "Ejecutar Terminal App",
     "ExpiresAfter": "Tiempo restante",
     "ExportCSV": "exportar CSV",
@@ -1418,6 +1430,7 @@
       "ConfirmAndRun": "Lo he comprobado y voy a empezar",
       "ConnectUrlIsNotValid": "La URL de conexión no es válida.",
       "DownloadSSHKey": "Descargar clave SSH",
+      "LaunchingApp": "{{appName}} se está iniciando.",
       "NoExistingConnectionExample": "No hay conexión Ejemplo a copiar.",
       "OpenVSCodeRemote": "Abrir código local de Visual Studio",
       "Prepared": "Preparado",
@@ -1441,6 +1454,7 @@
       "BatchMode": "Lote",
       "BatchModeConfig": "Modo por lotes Configuración",
       "BatchModeDesc": "Puedes ejecutar tu código con múltiples nodos y clusters para escalar tu idea",
+      "BootstrapScriptDetail": "Script de Bootstrap",
       "CPU": "CPU",
       "ChooseEnvironment": "Elija Entorno",
       "ClusterMode": "Modo clúster",
@@ -1458,7 +1472,8 @@
       "DescMemory": "<p>La memoria del ordenador es un área de almacenamiento temporal.</p><p>Contiene los datos y las instrucciones que necesita la Unidad Central de Procesamiento (CPU)</p><p>Cuando se utiliza una GPU en una carga de trabajo de aprendizaje automático, se debe asignar a la memoria al menos el doble de memoria que la GPU. De lo contrario, el tiempo de inactividad de la GPU aumentará, lo que se traducirá en una penalización del rendimiento.</p> <p>La memoria de la GPU es el doble de la memoria de la CPU.",
       "DescMultiNode": "<p>Cuando se ejecuta una sesión, un nodo gestionado y uno o más nodos de trabajo se dividen en varios nodos físicos o máquinas virtuales.</p> <p>Los nodos gestionados y uno o más nodos de trabajo se dividen en varios nodos físicos o máquinas virtuales.",
       "DescOpenMPOptimization": "<p>Este valor establece el número de hilos a utilizar para las regiones paralelas estableciendo el valor inicial de la variable de control interna nthreads-var.</p><p>Backend.AI establece este valor igual al número de núcleos de la CPU, lo que tiene el efecto de acelerar las cargas de trabajo típicas de computación de alto rendimiento. Sin embargo, para algunas cargas de trabajo multihilo, se utilizan varios procesos que utilizan OpenMP al mismo tiempo, lo que resulta en un número anormalmente grande de hilos y una degradación significativa del rendimiento. En este caso, por favor ajuste este valor a 1 o 2.</p> <p>",
-      "DescSelectAgent": "Los recursos que se muestran en el lado derecho del agente representan la cantidad real de recursos disponibles. \nActualmente, la selección de agentes solo está disponible en un entorno de un solo nodo y un solo contenedor. \nLa configuración predeterminada es la asignación de agentes por parte del programador.",
+      "DescSelectAgent": "Los recursos a la derecha del agente indican la cantidad realmente disponible. Los agentes seleccionados representan el conjunto de candidatos asignables; aunque se seleccionen varios, solo se asignará a uno de ellos. La configuración predeterminada es la asignación automática por el planificador.",
+      "DescSelectAgentBefore2516": "Los recursos mostrados en el lado derecho del agente representan la cantidad real de recursos disponibles. Actualmente, la selección de agente solo está disponible en un entorno de un solo nodo y un solo contenedor. Por defecto, el planificador asigna los agentes.",
       "DescSession": "<p>Una sesión es una unidad de entorno computacional que se crea de acuerdo con un entorno y unos recursos especificados.</p><p>Si este valor se establece en un valor superior a 1, se crean múltiples sesiones correspondientes al conjunto de recursos anterior.</p><p>Si no hay suficientes recursos disponibles, las solicitudes de creación de sesiones que no se pueden crear se ponen en la cola de espera.</p><p>Si no hay suficientes recursos disponibles, las solicitudes de creación de sesiones que no se pueden crear se ponen en la cola de espera.",
       "DescSetEnv": "<p>Si establece una variable de entorno predeterminada en el contenedor y también establece una variable de entorno con el mismo nombre en el Backend.AI, el valor establecido en el Backend.AI tiene prioridad.</p><p style='color:var(--paper-red-400);'>Todos los valores de entrada se inicializarán después de iniciar el iniciador de sesión.<br />Además, esos entornos se pasarán solo si tanto la variable como el valor no están vacíos.</p><p",
       "DescSetPreOpenPort": "'Puertos preabiertos' se refiere a un <span style='color:var(--paper-red-400);'>puerto contenedor interno</span> específico que permite conexiones entrantes desde dispositivos u ordenadores externos en un dispositivo u ordenador de red.",
@@ -1600,6 +1615,7 @@
       "TitleSession": "Sesión (Backend.AI)",
       "TotalAllocation": "Asignación total",
       "UserResourceLimit": "Límite de recursos de usuario",
+      "UsingBootstrapScriptInfo": "Script de arranque incluido.",
       "Version": "Versión",
       "YouCanStartWithHistory": "Estos son sus registros de sesión creados recientemente. Haga clic en un nombre de sesión para iniciar una nueva sesión."
     },
@@ -1881,6 +1897,12 @@
     "SelectColumnToDisplay": "Seleccionar columnas para mostrar",
     "SettingTable": "Ajuste de la tabla"
   },
+  "theme": {
+    "PreviewModeAlert": "Actualmente está usando el modo de vista previa del tema. Por favor, continúe con su trabajo en la ventana original.",
+    "button": {
+      "ExportToJson": "Exportar JSON"
+    }
+  },
   "time": {
     "Day": "day",
     "Hour": "hora",
@@ -1993,10 +2015,30 @@
     "SSHKeypairManagement": "Gestión de pares de claves SSH",
     "SessionTerminationDialog": "La finalización de la sesión no se puede deshacer. ¿Desea finalizar la sesión?",
     "ShellEnvironments": "Entornos de conchas",
+    "Theme": "Tema",
     "ThemeMode": "Modo temático",
     "UseCompactSidebar": "Utilizar la barra lateral compacta por defecto",
     "UseSystemSetting": "Usar configuración del sistema",
-    "UserConfigScript": "Script de configuración de usuario"
+    "UserConfigScript": "Script de configuración de usuario",
+    "theme": {
+      "CustomThemeSettingAlert": "El tema actualizado no se puede aplicar de inmediato. Si desea aplicarlo, póngase en contacto con nuestro equipo de soporte e incluya el archivo JSON de configuración exportado.",
+      "ErrorColor": "Color de error",
+      "ErrorColorDesc": "El color aplicado a los botones o alertas que representan acciones críticas, como la eliminación, para indicar advertencias o errores.",
+      "HeaderBg": "Color de fondo del encabezado",
+      "HeaderBgDesc": "El color aplicado al fondo del encabezado, excepto en la sección del logotipo.",
+      "InfoColor": "Color de información",
+      "InfoColorDesc": "Color aplicado a los iconos de orientación y modificación de información, usado para elementos que comunican información a los usuarios.",
+      "LinkColor": "Color del enlace",
+      "LinkColorDesc": "El color utilizado para los enlaces que redirigen a otra página o abren elementos adicionales de la interfaz de usuario, como cajones o modales.",
+      "NoChangesMade": "No se han realizado cambios.",
+      "Preview": "Avance",
+      "PrimaryColor": "Color primario",
+      "PrimaryColorDesc": "El color principal aplicado a botones o texto descriptivo que representan acciones clave. \nTambién se aplica como color de fondo para la sección del logotipo en el encabezado.",
+      "SuccessColor": "Color del éxito",
+      "SuccessColorDesc": "El color aplicado a los botones, alertas o íconos que indican que una acción del usuario se completó exitosamente.",
+      "TextColor": "Color del texto",
+      "TextColorDesc": "El color utilizado para el texto general."
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Uso avanzado del terminal web: Copiar el contenido del terminal",
@@ -2025,6 +2067,7 @@
       "AgentSummary": "Resumen del agente",
       "Architecture": "Arquitectura",
       "ArtifactDetails": "Detalles de artefactos",
+      "Branding": "Personalización de marca",
       "Cancel": "Cancelar",
       "ChangePassword": "Cambiar contraseña",
       "Chat": "Chat",

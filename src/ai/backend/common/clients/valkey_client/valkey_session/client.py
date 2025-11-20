@@ -162,3 +162,11 @@ class ValkeySessionClient:
         result = await self._client.client.time()
         seconds_bytes, _ = result
         return int(seconds_bytes)
+
+    async def ping(self) -> None:
+        """
+        Ping the Valkey server to check connection.
+
+        :raises: Exception if ping fails
+        """
+        await self._client.client.ping()

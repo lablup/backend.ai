@@ -10,17 +10,20 @@ from ..types import RootContext
 
 
 async def hello(request: web.Request) -> web.Response:
-    """Simple health check endpoint"""
-    from ai.backend.appproxy.common.types import HealthResponse
+    """Health check endpoint with dependency connectivity status"""
+    from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 
     request["do_not_print_access_log"] = True
 
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_connectivity_status()
     response = HealthResponse(
-        status="healthy",
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
         component="appproxy-worker",
+        connectivity=connectivity,
     )
-    return web.json_response(response.model_dump())
+    return web.json_response(response.model_dump_json())
 
 
 async def status(request: web.Request) -> web.Response:

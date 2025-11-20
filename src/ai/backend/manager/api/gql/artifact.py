@@ -9,7 +9,12 @@ from aiotools import apartial
 from strawberry import ID, UNSET, Info
 from strawberry.dataloader import DataLoader
 from strawberry.relay import Connection, Edge, Node, NodeID
+from strawberry.scalars import JSON
 
+from ai.backend.common.data.artifact.types import (
+    VerificationStepResult,
+    VerifierResult,
+)
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.data.storage.registries.types import ModelTarget as ModelTargetData
 from ai.backend.manager.api.gql.base import (
@@ -26,7 +31,9 @@ from ai.backend.manager.data.artifact.modifier import ArtifactModifier
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
     ArtifactData,
+    ArtifactFilterOptions,
     ArtifactOrderField,
+    ArtifactOrderingOptions,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
     ArtifactRevisionOrderField,
@@ -40,8 +47,6 @@ from ai.backend.manager.errors.artifact import (
     ArtifactScanLimitExceededError,
 )
 from ai.backend.manager.repositories.artifact.types import (
-    ArtifactFilterOptions,
-    ArtifactOrderingOptions,
     ArtifactRemoteStatusFilter,
     ArtifactRemoteStatusFilterType,
     ArtifactRevisionFilterOptions,
@@ -80,6 +85,94 @@ from ai.backend.manager.types import PaginationOptions, TriState
 from .artifact_registry_meta import ArtifactRegistryMeta
 
 
+@strawberry.type(
+    name="ArtifactVerifierResult",
+    description=dedent_strip("""
+    Added in 25.17.0.
+
+    Result from a single malware verifier containing scan results and metadata.
+
+    Each verifier scans the artifact for potential security issues and reports
+    findings including infected file count, scan time, and any errors encountered.
+    """),
+)
+class ArtifactVerifierGQLResult:
+    success: bool = strawberry.field(description="Whether the verification completed successfully")
+    infected_count: int = strawberry.field(
+        description="Number of infected or suspicious files detected"
+    )
+    scanned_at: datetime = strawberry.field(description="Timestamp when verification started")
+    scan_time: float = strawberry.field(
+        description="Time taken to complete verification in seconds"
+    )
+    scanned_count: int = strawberry.field(description="Total number of files scanned")
+    metadata: JSON = strawberry.field(description="Additional metadata from the verifier")
+    error: Optional[str] = strawberry.field(
+        description="Fatal error message if the verifier failed to complete"
+    )
+
+    @classmethod
+    def from_dataclass(cls, data: VerifierResult) -> Self:
+        return cls(
+            success=data.success,
+            infected_count=data.infected_count,
+            scanned_at=data.scanned_at,
+            scan_time=data.scan_time,
+            scanned_count=data.scanned_count,
+            metadata=data.metadata,
+            error=data.error,
+        )
+
+
+@strawberry.type(
+    name="ArtifactVerifierResultEntry",
+    description=dedent_strip("""
+    Added in 25.17.0.
+
+    Entry for a single verifier's result in the verification results.
+
+    Associates a verifier name with its scan results.
+    """),
+)
+class ArtifactVerifierGQLResultEntry:
+    name: str = strawberry.field(description="Name of the verifier (e.g., 'clamav', 'custom')")
+    result: ArtifactVerifierGQLResult = strawberry.field(
+        description="Scan result from this verifier"
+    )
+
+    @classmethod
+    def from_verifier_result(cls, name: str, result: VerifierResult) -> Self:
+        return cls(
+            name=name,
+            result=ArtifactVerifierGQLResult.from_dataclass(result),
+        )
+
+
+@strawberry.type(
+    name="ArtifactVerificationResult",
+    description=dedent_strip("""
+    Added in 25.17.0.
+
+    Complete verification result containing results from all configured verifiers.
+
+    Artifacts undergo malware scanning through multiple verifiers after being imported.
+    This type aggregates results from all verifiers that were run on the artifact.
+    """),
+)
+class ArtifactVerificationGQLResult:
+    verifiers: list[ArtifactVerifierGQLResultEntry] = strawberry.field(
+        description="Results from each verifier that scanned the artifact"
+    )
+
+    @classmethod
+    def from_dataclass(cls, data: VerificationStepResult) -> Self:
+        verifier_entries = [
+            ArtifactVerifierGQLResultEntry.from_verifier_result(verifier_name, verifier_result)
+            for verifier_name, verifier_result in data.verifiers.items()
+        ]
+        return cls(verifiers=verifier_entries)
+
+
 @strawberry.input(
     description=dedent_strip("""
     Added in 25.14.0.
@@ -106,9 +199,9 @@ class ArtifactFilter:
 
         # Handle basic filters
         repo_filter.artifact_type = self.type
-        repo_filter.name_filter = self.name
-        repo_filter.registry_filter = self.registry
-        repo_filter.source_filter = self.source
+        repo_filter.name_filter = self.name.to_dataclass() if self.name else None
+        repo_filter.registry_filter = self.registry.to_dataclass() if self.registry else None
+        repo_filter.source_filter = self.source.to_dataclass() if self.source else None
         repo_filter.availability = self.availability
 
         # Handle logical operations
@@ -508,6 +601,7 @@ class Artifact(Node):
     registry: SourceInfo
     source: SourceInfo
     readonly: bool
+    extra: Optional[JSON]
     scanned_at: datetime
     updated_at: datetime
     availability: ArtifactAvailability
@@ -522,6 +616,7 @@ class Artifact(Node):
             registry=SourceInfo(name=data.registry_type.value, url=registry_url),
             source=SourceInfo(name=data.source_registry_type.value, url=source_url),
             readonly=data.readonly,
+            extra=data.extra,
             scanned_at=data.scanned_at,
             updated_at=data.updated_at,
             availability=data.availability,
@@ -583,6 +678,12 @@ class ArtifactRevision(Node):
     size: Optional[ByteSize]
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
+    digest: Optional[str] = strawberry.field(
+        description="Digest at the time of import. None for models that have not been imported. Added in 25.17.0"
+    )
+    verification_result: Optional[ArtifactVerificationGQLResult] = strawberry.field(
+        description="Verification result containing malware scan results from all verifiers. None if not yet verified. Added in 25.17.0"
+    )
 
     @classmethod
     def from_dataclass(cls, data: ArtifactRevisionData) -> Self:
@@ -595,6 +696,12 @@ class ArtifactRevision(Node):
             size=ByteSize(data.size) if data.size is not None else None,
             created_at=data.created_at,
             updated_at=data.updated_at,
+            digest=data.digest,
+            verification_result=ArtifactVerificationGQLResult.from_dataclass(
+                data.verification_result
+            )
+            if data.verification_result
+            else None,
         )
 
     @strawberry.field
@@ -719,7 +826,7 @@ class DelegateScanArtifactsPayload:
     """)
 )
 class ArtifactRevisionImportTask:
-    task_id: ID
+    task_id: Optional[ID]
     artifact_revision: ArtifactRevision
 
 
@@ -1302,7 +1409,7 @@ async def scan_artifacts(
     Import scanned artifact revisions from external registries.
 
     Downloads the actual files for the specified artifact revisions, transitioning
-    them from SCANNED → PULLING → PULLED → AVAILABLE status.
+    them from SCANNED → PULLING → VERIFYING → AVAILABLE status.
 
     Returns background tasks that can be monitored for import progress.
     Once AVAILABLE, artifacts can be used by users in their sessions.
@@ -1445,10 +1552,13 @@ async def delegate_import_artifacts(
             "Mismatch between artifact revisions and task IDs returned"
         )
 
-    for task_id, artifact_revision in zip(action_result.task_ids, artifact_revisions, strict=True):
+    for task_uuid, artifact_revision in zip(
+        action_result.task_ids, artifact_revisions, strict=True
+    ):
+        task_id = ID(str(task_uuid)) if task_uuid is not None else None
         tasks.append(
             ArtifactRevisionImportTask(
-                task_id=ID(str(task_id)),
+                task_id=task_id,
                 artifact_revision=artifact_revision,
             )
         )

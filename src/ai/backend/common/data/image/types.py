@@ -1,6 +1,34 @@
 from dataclasses import dataclass
 from typing import Self
 
+from pydantic import BaseModel
+
+
+class InstalledImageInfo(BaseModel):
+    """ "
+    Information about an installed image on an agent.
+    Attributes:
+        canonical (str): The canonical name of the image.
+        digest (str): The digest of the image.
+        architecture (str): The architecture of the image. Supported values are 'x86_64' and 'aarch64'.
+    """
+
+    canonical: str
+    digest: str
+    architecture: str
+
+    @classmethod
+    def from_inspect_result(cls, canonical: str, inspect_result: dict[str, str]) -> Self:
+        architecture = inspect_result.get("Architecture", "x86_64")
+        match architecture:
+            case "arm64":
+                architecture = "aarch64"
+        return cls(
+            canonical=canonical,
+            digest=inspect_result["Id"],
+            architecture=architecture,
+        )
+
 
 @dataclass
 class ScannedImage:

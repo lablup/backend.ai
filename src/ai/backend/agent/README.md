@@ -38,6 +38,95 @@ The Agent is a compute node component responsible for container lifecycle manage
 - Update occupied and available resource slots
 - Report errors and exceptional conditions
 
+## Entry Points
+
+Agent has 4 entry points. The RPC Server handles Manager requests, Event Dispatcher sends and receives events, Background Task Handler performs async tasks, and Internal REST API is used exclusively for metrics exposure.
+
+### 1. RPC Server (Primary Request Handler)
+
+**Framework**: Callosum (ZeroMQ-based RPC, Curve authentication)
+
+**Port**: 6011 (default)
+
+**Key Features**:
+- Only Manager can send RPC requests to Agent (no direct user access)
+
+### 2. Event Dispatcher
+
+**System**: Backend.AI Event Dispatcher
+
+Agent sends Agent and Kernel lifecycle events to Manager.
+
+**Published Events**: Agent and Kernel lifecycle events
+
+**Consumed Events**: Plugin integration events
+
+**Related Documentation**: [Event Dispatcher System](../common/events/README.md)
+
+### 3. Background Task Handler
+
+**System**: Backend.AI Background Task Handler
+
+Handles long-running tasks asynchronously, issues Task IDs, and notifies completion via events.
+
+**Usage Examples**:
+- Image pulling tasks
+- Large-scale container cleanup tasks
+
+**Related Documentation**: [Background Task Handler System](../common/bgtask/README.md)
+
+### 4. Internal REST API (Metrics Only)
+
+**Framework**: aiohttp
+
+**Port**: 6003 (metrics only, separate from RPC port)
+
+**Endpoints**:
+- `GET /metrics` - Expose Prometheus metrics
+
+
+**Key Features**:
+- Metrics exposure only (no service logic triggering)
+- Prometheus scrapes periodically
+- Auto-registered via Manager's Service Discovery
+
+### Entry Point Interactions
+
+Each Entry Point operates independently. However, service logic can coordinate them:
+
+**Background Task Triggering**:
+- Service logic in RPC Server or Event Dispatcher can trigger long-running tasks as Background Tasks.
+
+**Event Publishing**:
+- RPC Server or Background Task can publish events via Event Dispatcher after task completion.
+
+**Integrated Architecture**:
+
+```
+┌──────────────┐  ┌──────────────┐  ┌──────────────┐
+│  RPC Server  │  │Event Dispatch│  │  Background  │
+│   (Callosum) │  │              │  │     Task     │
+│   Port 6011  │  │              │  │              │
+└───────┬──────┘  └───────┬──────┘  └───────┬──────┘
+        │                 │                 │
+        └─────────────────┴─────────────────┘
+                          │
+                ┌─────────▼──────────┐
+                │  Agent Core Logic  │
+                │  - Resource Mgmt   │
+                │  - Kernel Mgmt     │
+                └─────────┬──────────┘
+                          │
+                ┌─────────▼──────────┐
+                │  Container Backend │
+                └────────────────────┘
+
+        ┌──────────────────┐
+        │ Internal REST API│ (Independent, metrics only)
+        │   Port 6003      │
+        └──────────────────┘
+```
+
 ## Architecture
 
 ```
@@ -46,11 +135,11 @@ The Agent is a compute node component responsible for container lifecycle manage
 ├────────────────────────────────────────┤
 │    Container Backend (docker/)         │  ← Docker
 ├────────────────────────────────────────┤
-│  Resource Monitor (watcher/ stats.py)  │  ← CPU, GPU, Memory
+│      Resource Monitor (stats.py)       │  ← CPU, GPU, Memory
 ├────────────────────────────────────────┤
 │   Storage Manager (scratch.py fs.py)   │  ← Local and mounted storage
 ├────────────────────────────────────────┤
-│      Plugin System (plugin/)           │  ← Accelerator plugins
+│      Plugin System (plugin/)           │  ← Plugin
 └────────────────────────────────────────┘
 ```
 
@@ -61,16 +150,9 @@ agent/
 ├── docker/              # Docker container backend
 │   ├── agent.py        # Docker-specific agent implementation
 │   └── resources.py    # Docker resource management
-├── watcher/             # Resource monitoring
-│   ├── cpu.py          # CPU monitoring
-│   ├── mem.py          # Memory monitoring
-│   └── gpu.py          # GPU monitoring
-├── plugin/              # Accelerator plugins
-│   ├── cuda.py         # NVIDIA CUDA support
-│   ├── rocm.py         # AMD ROCm support
-│   └── tpu.py          # Google TPU support
+├── watcher/             # Agent watcher
+├── plugin/              # Plugin system
 ├── observer/            # Metrics observers
-│   └── stat.py         # Statistics collection
 ├── cli/                 # CLI commands
 ├── config/              # Configuration
 ├── agent.py             # Main agent logic
@@ -118,17 +200,15 @@ The Agent tracks:
 
 ### Scratch Storage
 Each kernel receives local scratch storage:
-- **Location**: `/tmp/backend.ai/scratches/{kernel_id}`
+- **Location**: `/scratches/{kernel_id}`
 - **Quota**: Configurable size limit per kernel
 - **Cleanup**: Automatically removed after kernel termination
-- **Performance**: Local SSD for fast I/O
 
 ### Virtual Folder Mounting
 VFolders are mounted to containers at runtime:
 - **Mount Point**: `/home/work/{vfolder_name}`
 - **Permissions**: RO, RW, or RW-DELETE
 - **Backend**: Storage Proxy manages actual storage
-- **Protocol**: NFS, SMB, or direct mount
 
 ## Resource Monitoring
 
@@ -158,7 +238,7 @@ VFolders are mounted to containers at runtime:
 
 ## Plugin System
 
-The Agent uses plugins for accelerator support:
+Agent can uses plugin system for accelerator support:
 
 ### CUDA Plugin
 - Detect NVIDIA GPUs via `nvidia-smi`
@@ -199,7 +279,7 @@ The Agent uses plugins for accelerator support:
   - Error notifications
 
 ### Agent → Storage Proxy
-- **Protocol**: HTTP or NFS/SMB
+- **Protocol**: HTTP
 - **Operations**:
   - Mount vfolder
   - Unmount vfolder
@@ -289,7 +369,7 @@ See `configs/agent/halfstack.toml` for configuration file examples.
 
 #### etcd (Global Configuration)
 - **Purpose**:
-  - Retrieve global configuration (container registry, storage volumes, etc.)
+  - Retrieve global configuration (storage volumes, etc.)
   - Auto-discover Manager address
 
 ### Optional Infrastructure (Observability)
@@ -348,7 +428,6 @@ Optional infrastructure for Agent monitoring.
   - Configurable per-session quota
 
 #### VFolder Mount
-- **Protocol**: NFS, SMB, direct mount
 - **Dependencies**: Storage Proxy or direct storage access
 - **Recommendations**:
   - High-performance network (10GbE or higher)

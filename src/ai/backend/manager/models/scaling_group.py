@@ -92,6 +92,9 @@ class ScalingGroupOpts(JSONSerializableMixin):
     allow_fractional_resource_fragmentation: bool = True
     """If set to false, agent will refuse to start kernel when they are forced to fragment fractional resource request"""
 
+    route_cleanup_target_statuses: list[str] = attr.field(factory=lambda: ["unhealthy"])
+    """List of route statuses that should be automatically cleaned up. Valid values: healthy, unhealthy, degraded"""
+
     def to_json(self) -> dict[str, Any]:
         return {
             "allowed_session_types": [item.value for item in self.allowed_session_types],
@@ -101,6 +104,7 @@ class ScalingGroupOpts(JSONSerializableMixin):
             "agent_selector_config": self.agent_selector_config,
             "enforce_spreading_endpoint_replica": self.enforce_spreading_endpoint_replica,
             "allow_fractional_resource_fragmentation": self.allow_fractional_resource_fragmentation,
+            "route_cleanup_target_statuses": self.route_cleanup_target_statuses,
         }
 
     @classmethod
@@ -122,6 +126,9 @@ class ScalingGroupOpts(JSONSerializableMixin):
             t.Key("agent_selector_config", default={}): agent_selector_config_iv,
             t.Key("enforce_spreading_endpoint_replica", default=False): t.ToBool,
             t.Key("allow_fractional_resource_fragmentation", default=True): t.ToBool,
+            t.Key("route_cleanup_target_statuses", default=["unhealthy"]): t.List(
+                t.Enum("healthy", "unhealthy", "degraded")
+            ),
         }).allow_extra("*")
 
 

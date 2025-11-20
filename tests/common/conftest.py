@@ -6,6 +6,9 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -51,11 +54,6 @@ def pytest_collection_modifyitems(config, items) -> None:
                 item.add_marker(do_skip)
 
 
-@pytest.fixture(scope="session", autouse=True)
-def test_ns() -> str:
-    return f"test-{secrets.token_hex(8)}"
-
-
 @pytest.fixture
 def test_case_ns() -> str:
     return secrets.token_hex(8)
@@ -64,30 +62,6 @@ def test_case_ns() -> str:
 @pytest.fixture
 def test_node_id() -> str:
     return f"test-{secrets.token_hex(4)}"
-
-
-@pytest.fixture
-async def etcd(etcd_container, test_ns: str) -> AsyncIterator[AsyncEtcd]:  # noqa: F811
-    etcd = AsyncEtcd(
-        addrs=[etcd_container[1]],
-        namespace=test_ns,
-        scope_prefix_map={
-            ConfigScopes.GLOBAL: "global",
-            ConfigScopes.SGROUP: "sgroup/testing",
-            ConfigScopes.NODE: "node/i-test",
-        },
-    )
-    try:
-        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
-        await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
-        await etcd.delete_prefix("", scope=ConfigScopes.NODE)
-        yield etcd
-    finally:
-        await etcd.delete_prefix("", scope=ConfigScopes.GLOBAL)
-        await etcd.delete_prefix("", scope=ConfigScopes.SGROUP)
-        await etcd.delete_prefix("", scope=ConfigScopes.NODE)
-        await etcd.close()
-        del etcd
 
 
 @pytest.fixture
@@ -149,6 +123,25 @@ async def test_valkey_rate_limit(redis_container) -> AsyncIterator[ValkeyRateLim
         valkey_target,
         human_readable_name="test.rate_limit",
         db_id=REDIS_RATE_LIMIT_DB,
+    )
+    try:
+        yield client
+    finally:
+        await client.close()
+
+
+@pytest.fixture
+async def test_valkey_artifact(
+    redis_container,  # noqa: F811
+) -> AsyncIterator[ValkeyArtifactDownloadTrackingClient]:
+    hostport_pair: HostPortPairModel = redis_container[1]
+    valkey_target = ValkeyTarget(
+        addr=hostport_pair.address,
+    )
+    client = await ValkeyArtifactDownloadTrackingClient.create(
+        valkey_target,
+        human_readable_name="test.artifact",
+        db_id=REDIS_STATISTICS_DB,
     )
     try:
         yield client

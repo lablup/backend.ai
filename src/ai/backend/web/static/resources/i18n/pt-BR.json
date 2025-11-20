@@ -60,6 +60,7 @@
   "button": {
     "Add": "Adicionar",
     "Apply": "Aplicar",
+    "AutoRefresh": "Atualização automática",
     "Cancel": "Cancelar",
     "Clear": "Excluir",
     "ClearLogs": "Limpar registros",
@@ -320,8 +321,11 @@
       "Name": "Nome",
       "NewFileName": "Novo nome de arquivo",
       "NewFolder": "Nova pasta",
+      "NoAccessPermissionToVolume": "O projeto atual não tem acesso ao volume SFTP.",
       "NoImagesSupportingFileBrowser": "Ainda não há imagens que suportem o navegador de arquivos. Pelo menos uma ou mais imagens que suportam o navegador de arquivos são necessárias para carregar a (s) pasta (s).",
       "NoImagesSupportingSystemSession": "Ainda não existe nenhuma imagem que suporte SSH / SFTP. Pelo menos uma ou mais imagens que suportam imagens de funções de sistema para usar SSH / SFTP.",
+      "NoPermissionToMountFolder": "O projeto atual não possui permissões de montagem no host de armazenamento associado a esta pasta.",
+      "NoSFTPSupportingScalingGroup": "O host de armazenamento desta pasta não possui um grupo de recursos SFTP.",
       "NoSharedFolders": "Nenhuma pasta compartilhada",
       "NoSharedUsers": "Ninguém foi convidado",
       "NotEnoughResourceForFileBrowserSession": "Sem recursos suficientes (cpu: 1 Core, mem: 0,5 GB) para criar a sessão para o navegador de arquivos. verifique os recursos disponíveis.",
@@ -614,6 +618,7 @@
     "AuthenticationFailed": "A autenticação falhou. Verificar as informações e o estado do gestor.",
     "CannotChangeVirtualFolderOption": "Não é possível alterar as opções de uma pasta v que não seja propriedade minha.",
     "CannotSharePrivateAutomountFolder": "Não é possível partilhar vfolders de montagem automática em conformidade com a política.",
+    "FailedToLoadTableData": "Ocorreu um erro ao carregar a lista.",
     "FolderSharingNotAvailableToUser": "A partilha de pastas não está disponível para o(s) utilizador(es) solicitado(s).",
     "InternalServerError": "Erro interno do servidor. Por favor, tente novamente mais tarde.",
     "InvalidBaseURL": "O URL do ponto final não é válido.",
@@ -724,6 +729,7 @@
     "CreateButtonCode": "Crio",
     "CreateNotebookButton": "Botão Criar Bloco de Notas",
     "Downloading": "Baixando...",
+    "FailedToFetchRepositoryInformation": "Falha ao obter informações do repositório.",
     "FolderAlreadyExists": "Existe uma pasta com o mesmo nome. nome será renomeado.",
     "FolderCreated": "Pasta criada.",
     "FolderName": "Nome da pasta importada:",
@@ -740,6 +746,8 @@
     "ImportGithubRepo": "Importar Repositório GitHub",
     "ImportGitlabRepo": "Importar o repositório GitLab",
     "ImportNotebook": "Importar Notebook",
+    "InvalidGitHubURL": "URL do GitHub inválida. Deve ser uma URL de repositório válida do GitHub.",
+    "InvalidGitLabURL": "URL do GitLab inválida. Deve ser uma URL de repositório GitLab válida.",
     "InvalidNotebookURL": "URL do bloco de anotações inválido.",
     "NoNotebookCode": "O endereço do notebook está vazio. Insira um código de notebook válido para copiar o código do crachá.",
     "NoSuitableResourceFoundOnGivenURL": "Nenhum recurso adequado encontrado no URL fornecido.",
@@ -751,8 +759,11 @@
     "Preparing": "Preparando...",
     "ReadyToImport": "Pronto para importar",
     "RepoWillBeFolder": "Os repositórios GitHub importados são convertidos em pastas e podem ser montados quando a sessão é iniciada.",
+    "RepositoryNotFound": "Repositório não encontrado.",
+    "StorageHost": "Host de Armazenamento",
+    "VFolderUsageMode": "Modo de Uso da Pasta",
     "WrongURLType": "Tipo de URL errado",
-    "YouCanCreateNotebookCode": "Insira a URL do notebook para criar um código de crachá como abaixo, que você pode executar diretamente no Backend.AI."
+    "YouCanCreateNotebookCode": "Este selo permite executar seu notebook diretamente no Backend.AI. Copie o código para usá-lo em qualquer lugar."
   },
   "information": {
     "APIVersion": "Versão API",
@@ -1302,6 +1313,7 @@
     "ElapsedTime": "Tempo decorrido",
     "EnvironmentAndVersion": "Ambiente e versão",
     "EnvironmentInfo": "Informações sobre o ambiente",
+    "ExecuteSpecificApp": "Executar o aplicativo {{appName}}",
     "ExecuteTerminalApp": "Executar a aplicação terminal",
     "ExpiresAfter": "Tempo restante",
     "ExportCSV": "exportar CSV",
@@ -1418,6 +1430,7 @@
       "ConfirmAndRun": "Eu verifiquei e vou começar",
       "ConnectUrlIsNotValid": "O URL de conexão não é válido.",
       "DownloadSSHKey": "Baixar chave SSH",
+      "LaunchingApp": "Iniciando o aplicativo {{appName}}.",
       "NoExistingConnectionExample": "Não há exemplo de ligação a copiar.",
       "OpenVSCodeRemote": "Abrir o código local do Visual Studio",
       "Prepared": "Preparado",
@@ -1441,6 +1454,7 @@
       "BatchMode": "Lote",
       "BatchModeConfig": "Modo batch Configuração",
       "BatchModeDesc": "Pode executar o seu código com vários nós e clusters para escalar a sua ideia",
+      "BootstrapScriptDetail": "Script de inicialização",
       "CPU": "CPU",
       "ChooseEnvironment": "Escolha o ambiente",
       "ClusterMode": "Modo de cluster",
@@ -1458,7 +1472,8 @@
       "DescMemory": " <p> A memória do computador é uma área de armazenamento temporário. </p> <p> Contém os dados e instruções de que a Unidade Central de Processamento (CPU) precisa. </p> <p> Ao usar uma GPU em uma carga de trabalho de aprendizado de máquina, você deve alocar pelo menos duas vezes a memória da GPU para a memória. Caso contrário, o tempo ocioso da GPU aumentará, resultando em uma penalidade de desempenho. </p>",
       "DescMultiNode": " <p> Ao executar uma sessão, um nó gerenciado e um ou mais nós de trabalho são divididos em vários nós físicos ou máquinas virtuais. </p>",
       "DescOpenMPOptimization": "<p>Este valor define o número de threads a serem usados para regiões paralelas, definindo o valor inicial da variável de controle interno nthreads-var.</p><p>Backend.AI define este valor igual ao número de núcleos da CPU, o que tem o efeito de acelerar cargas de trabalho típicas de computação de alto desempenho. No entanto, para algumas cargas de trabalho multithread, vários processos que usam OpenMP são usados ao mesmo tempo, resultando em um número anormalmente grande de threads e em uma degradação significativa do desempenho. Nesse caso, ajuste esse valor para 1 ou 2.</p>",
-      "DescSelectAgent": "Os recursos exibidos no lado direito do agente representam a quantidade real de recursos disponíveis. \nAtualmente, a seleção de agentes está disponível apenas em um ambiente de nó único e contêiner único. \nA configuração padrão é a alocação de agentes pelo agendador.",
+      "DescSelectAgent": "Os recursos à direita do agente representam a quantidade realmente disponível. Os agentes selecionados são candidatos elegíveis para alocação; mesmo que vários sejam selecionados, a atribuição será feita em apenas um agente. A configuração padrão é a alocação automática pelo agendador.",
+      "DescSelectAgentBefore2516": "Os recursos exibidos no lado direito do agente representam a quantidade real de recursos disponíveis. Atualmente, a seleção do agente está disponível apenas em um ambiente de nó único com um único contêiner. A configuração padrão é a alocação de agentes pelo escalonador.",
       "DescSession": " <p> Uma sessão é uma unidade de ambiente computacional criada de acordo com um ambiente e recursos especificados. </p> <p> Se este valor for definido como um valor maior que 1, várias sessões correspondentes ao conjunto de recursos acima são criadas. </p> <p> Se não houver recursos suficientes disponíveis, as solicitações para criar sessões que não podem ser criadas são colocadas na fila de espera. </p>",
       "DescSetEnv": " <p> Se você definir uma variável de ambiente padrão no contêiner e também definir uma variável de ambiente com o mesmo nome no Backend.AI, o valor definido no Backend.AI terá precedência. </p> <p style='color:var(--paper-red-400);'> Cada valor de entrada será inicializado após iniciar o iniciador de sessão. <br /> Além disso, esses ambientes serão passados apenas se a variável e o valor não estiverem vazios. </p>",
       "DescSetPreOpenPort": "'Portas pré-abertas' refere-se a uma <span style='color:var(--paper-red-400);'>porta de contentor interna</span> específica que permite ligações de entrada de dispositivos ou computadores externos num dispositivo de rede ou computador.",
@@ -1600,6 +1615,7 @@
       "TitleSession": "Sessão (Backend.AI)",
       "TotalAllocation": "Alocação Total",
       "UserResourceLimit": "Limite de recursos do usuário",
+      "UsingBootstrapScriptInfo": "O script de bootstrap está incluído.",
       "Version": "Versão",
       "YouCanStartWithHistory": "Estes são os registos de sessão criados recentemente. Clique no nome de uma sessão para iniciar uma nova sessão."
     },
@@ -1881,6 +1897,12 @@
     "SelectColumnToDisplay": "Selecione as colunas a serem exibidas",
     "SettingTable": "Configuração de mesa"
   },
+  "theme": {
+    "PreviewModeAlert": "Você está atualmente no modo de pré-visualização do tema. Por favor, continue seu trabalho na janela original.",
+    "button": {
+      "ExportToJson": "Exportar JSON"
+    }
+  },
   "time": {
     "Day": "day",
     "Hour": "hora",
@@ -1993,10 +2015,30 @@
     "SSHKeypairManagement": "Gerenciamento de par de chaves SSH",
     "SessionTerminationDialog": "O encerramento da sessão não pode ser desfeito. Você deseja prosseguir para encerrar a sessão?",
     "ShellEnvironments": "Ambientes Shell",
+    "Theme": "Tema",
     "ThemeMode": "Modo Tema",
     "UseCompactSidebar": "Definir Barra Lateral Compacta como Padrão",
     "UseSystemSetting": "Usar configuração do sistema",
-    "UserConfigScript": "Script de configuração do usuário"
+    "UserConfigScript": "Script de configuração do usuário",
+    "theme": {
+      "CustomThemeSettingAlert": "O tema atualizado não pode ser aplicado imediatamente. Se desejar aplicá-lo, entre em contato com nossa equipe de suporte enviando o arquivo JSON de configuração exportado.",
+      "ErrorColor": "Cor do erro",
+      "ErrorColorDesc": "A cor aplicada aos botões ou alertas que representam ações críticas, como exclusão, para indicar avisos ou erros.",
+      "HeaderBg": "Cor de fundo do cabeçalho",
+      "HeaderBgDesc": "A cor aplicada ao fundo do cabeçalho, exceto na seção do logotipo.",
+      "InfoColor": "Cor da informação",
+      "InfoColorDesc": "A cor aplicada aos ícones de orientação e de modificação de informações, usada para elementos que comunicam informações aos usuários.",
+      "LinkColor": "Cor do link",
+      "LinkColorDesc": "A cor usada para links que redirecionam para outra página ou abrem elementos adicionais da interface do usuário, como gavetas ou modais.",
+      "NoChangesMade": "Nenhuma alteração foi feita.",
+      "Preview": "Visualização",
+      "PrimaryColor": "Cor Primária",
+      "PrimaryColorDesc": "A cor principal aplicada a botões ou textos descritivos que representam ações principais. \nTambém é aplicada como cor de fundo para a seção do logotipo no cabeçalho.",
+      "SuccessColor": "Cor do sucesso",
+      "SuccessColorDesc": "A cor aplicada aos botões, alertas ou ícones que indicam que uma ação do usuário foi concluída com êxito.",
+      "TextColor": "Cor do texto",
+      "TextColorDesc": "A cor usada para texto geral."
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Uso avançado do terminal da Web: Copiar o conteúdo do terminal",
@@ -2025,6 +2067,7 @@
       "AgentSummary": "Resumo do agente",
       "Architecture": "Arquitetura",
       "ArtifactDetails": "Detalhes do artefato",
+      "Branding": "Personalização da marca",
       "Cancel": "Cancelar",
       "ChangePassword": "Alterar a senha",
       "Chat": "Conversa",

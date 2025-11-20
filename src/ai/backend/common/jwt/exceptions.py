@@ -20,8 +20,7 @@ class JWTError(BackendAIError):
     All JWT-specific exceptions inherit from this base class.
     """
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.AUTH,
@@ -39,8 +38,7 @@ class JWTExpiredError(JWTError, web.HTTPUnauthorized):
     error_type = "https://api.backend.ai/probs/jwt-expired"
     error_title = "JWT token has expired."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.USER,
             operation=ErrorOperation.AUTH,

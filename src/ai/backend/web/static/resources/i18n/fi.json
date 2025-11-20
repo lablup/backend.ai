@@ -60,6 +60,7 @@
   "button": {
     "Add": "Lisää",
     "Apply": "Hae",
+    "AutoRefresh": "Automaattinen päivitys",
     "Cancel": "Peruuta",
     "Clear": "Poistaa",
     "ClearLogs": "Tyhjennä lokit",
@@ -320,8 +321,11 @@
       "Name": "Nimi",
       "NewFileName": "Uusi tiedostonimi",
       "NewFolder": "Uusi kansio",
+      "NoAccessPermissionToVolume": "Tällä projektilla ei ole pääsyä SFTP-tilavuuteen.",
       "NoImagesSupportingFileBrowser": "Kuvia tukevaa tiedostoselainta ei ole vielä olemassa. Kansion tai kansioiden lataamiseen tarvitaan vähintään yksi tai useampi kuva, joka tukee tiedostoselainta.",
       "NoImagesSupportingSystemSession": "SSH:ta / SFTP:tä tukevaa kuvaa ei vielä ole. Ainakin yksi tai useampi kuva, joka tukee SSH:n / SFTP:n käyttöä tukevia järjestelmäroolikuvia.",
+      "NoPermissionToMountFolder": "Nykyisellä projektilla ei ole oikeuksia liittää tähän kansioon liitettyä tallennusisäntää.",
+      "NoSFTPSupportingScalingGroup": "Tämän kansion tallennuspalvelimella ei ole SFTP-resurssiryhmää.",
       "NoSharedFolders": "Ei jaettuja kansioita",
       "NoSharedUsers": "Ketään ei ole kutsuttu.",
       "NotEnoughResourceForFileBrowserSession": "Resurssit eivät riitä (cpu: 1 Core, mem: 0.5GB) filebrowser-istunnon luomiseen. tarkista käytettävissä olevat resurssit.",
@@ -614,6 +618,7 @@
     "AuthenticationFailed": "Tunnistautuminen epäonnistui. Tarkista tiedot ja managerin tila.",
     "CannotChangeVirtualFolderOption": "Et voi muuttaa sellaisen v-kansion asetuksia, joka ei ole minun omistuksessani.",
     "CannotSharePrivateAutomountFolder": "Automaattisesti kiinnitettyjä v-kansioita ei voida jakaa käytäntöjen mukaisesti.",
+    "FailedToLoadTableData": "Listan latauksessa tapahtui virhe.",
     "FolderSharingNotAvailableToUser": "Kansioiden jakaminen ei ole käytettävissä pyydetyille käyttäjille.",
     "InternalServerError": "Sisäinen palvelinvirhe. Yritä myöhemmin uudelleen.",
     "InvalidBaseURL": "Päätepisteen URL-osoite ei ole kelvollinen.",
@@ -724,6 +729,7 @@
     "CreateButtonCode": "Luo",
     "CreateNotebookButton": "Luo muistikirja -painike",
     "Downloading": "Lataaminen...",
+    "FailedToFetchRepositoryInformation": "Tietojen hakeminen repositoriosta epäonnistui.",
     "FolderAlreadyExists": "On olemassa kansio, jolla on sama nimi. nimi nimetään uudelleen.",
     "FolderCreated": "Kansio luotu.",
     "FolderName": "Tuodun kansion nimi:",
@@ -740,6 +746,8 @@
     "ImportGithubRepo": "Tuo GitHub-repositoriosta",
     "ImportGitlabRepo": "Tuo GitLab-repositoriosta",
     "ImportNotebook": "Tuo muistikirja",
+    "InvalidGitHubURL": "Virheellinen GitHub-URL. Sen tulee olla kelvollinen GitHub-repositorion URL-osoite.",
+    "InvalidGitLabURL": "Virheellinen GitLab-URL. Sen on oltava kelvollinen GitLab-repositorion osoite.",
     "InvalidNotebookURL": "Virheellinen muistikirjan URL-osoite.",
     "NoNotebookCode": "Muistikirjan osoite on tyhjä. Syötä voimassa oleva muistikirjan koodi kopioidaksesi virkamerkkikoodin.",
     "NoSuitableResourceFoundOnGivenURL": "Annetusta URL-osoitteesta ei löytynyt sopivaa resurssia.",
@@ -751,8 +759,11 @@
     "Preparing": "Valmistautuminen...",
     "ReadyToImport": "Valmis tuomaan",
     "RepoWillBeFolder": "Tuodut GitHub-arkistot muunnetaan kansioiksi ja ne voidaan asentaa istunnon alkaessa.",
+    "RepositoryNotFound": "Repositoriota ei löytynyt.",
+    "StorageHost": "Tallennuspalvelin",
+    "VFolderUsageMode": "Kansion käyttötila",
     "WrongURLType": "Väärä URL-tyyppi",
-    "YouCanCreateNotebookCode": "Kirjoita muistikirjan URL-osoite luodaksesi alla olevan kaltaisen merkkikoodin, jonka voit suorittaa suoraan Backend.AI:ssa."
+    "YouCanCreateNotebookCode": "Tämä badge mahdollistaa muistikirjasi suorittamisen suoraan Backend.AI:ssä. Kopioi koodi käyttääksesi sitä missä tahansa."
   },
   "information": {
     "APIVersion": "API-versio",
@@ -1301,6 +1312,7 @@
     "ElapsedTime": "Kulunut aika",
     "EnvironmentAndVersion": "Ympäristö ja versio",
     "EnvironmentInfo": "Ympäristötiedot",
+    "ExecuteSpecificApp": "Käynnistä {{appName}}-sovellus",
     "ExecuteTerminalApp": "Suorita päätelaitesovellus",
     "ExpiresAfter": "Jäljellä oleva aika",
     "ExportCSV": "viedä CSV",
@@ -1417,6 +1429,7 @@
       "ConfirmAndRun": "Tarkistin ja aloitan",
       "ConnectUrlIsNotValid": "Yhteyden URL-osoite ei kelpaa.",
       "DownloadSSHKey": "Lataa SSH-avain",
+      "LaunchingApp": "Käynnistetään {{appName}}-sovellusta.",
       "NoExistingConnectionExample": "Ei yhteyttä Kopioitava esimerkki.",
       "OpenVSCodeRemote": "Avaa paikallinen Visual Studio Code",
       "Prepared": "Valmisteltu",
@@ -1440,6 +1453,7 @@
       "BatchMode": "Erä",
       "BatchModeConfig": "Erätila Konfigurointi",
       "BatchModeDesc": "Voit ajaa koodisi useiden solmujen ja klustereiden kanssa ideasi skaalaamiseksi.",
+      "BootstrapScriptDetail": "Bootstrap-skripti",
       "CPU": "CPU",
       "ChooseEnvironment": "Valitse ympäristö",
       "ClusterMode": "Cluster-tila",
@@ -1457,7 +1471,8 @@
       "DescMemory": "<p>Tietokoneen muisti on väliaikainen tallennusalue.</p><p>Se sisältää tietoja ja ohjeita, joita keskusyksikkö (CPU) tarvitsee.</p><p>Käytettäessä näytönohjainta koneoppimisen työmäärässä on muistiin varattava vähintään kaksi kertaa enemmän muistia kuin näytönohjain. Muuten GPU:n joutokäyntiaika kasvaa, mikä johtaa suorituskyvyn heikkenemiseen.</p>",
       "DescMultiNode": "<p>Sessiota ajettaessa yksi hallittu solmu ja yksi tai useampi työläissolmu on jaettu useisiin fyysisiin solmuihin tai virtuaalikoneisiin.</p>Kaikki nämä solmut on jaettu useisiin fyysisiin solmuihin tai virtuaalikoneisiin.",
       "DescOpenMPOptimization": "<p>Tämä arvo määrittää rinnakkaisalueilla käytettävien säikeiden määrän asettamalla sisäisen nthreads-var-ohjausmuuttujan alkuarvon.</p><p>Backend.AI asettaa tämän arvon yhtä suureksi kuin suorittimen ytimien määrä, mikä kiihdyttää tyypillisiä suurteholaskennan työtehtäviä. Joissakin monisäikeisissä työmäärissä käytetään kuitenkin useita OpenMP:tä käyttäviä prosesseja samanaikaisesti, mikä johtaa epänormaalin suureen säikeiden määrään ja merkittävään suorituskyvyn heikkenemiseen. Tässä tapauksessa säädä tämä arvo arvoon 1 tai 2.</p>",
-      "DescSelectAgent": "Agentin oikealla puolella näkyvät resurssit edustavat käytettävissä olevien resurssien todellista määrää. \nTällä hetkellä agentin valinta on käytettävissä vain yhden solmun yhden säilön ympäristössä. \nOletusasetus on ajastimen suorittama agentin allokointi.",
+      "DescSelectAgent": "Agentin oikealla näkyvät resurssit tarkoittavat todellista käytettävissä olevaa määrää. Valitut agentit muodostavat mahdollisten kohteiden joukon; vaikka valitsisit useita, kohde voidaan kuitenkin osoittaa vain yhdelle agentille. Oletusasetus on automaattinen allokointi aikatauluttajan toimesta.",
+      "DescSelectAgentBefore2516": "Agentin oikealla puolella näkyvät resurssit kuvaavat käytettävissä olevien resurssien todellista määrää. Tällä hetkellä agentin valinta on käytettävissä vain yhden solmun ja yhden säiliön ympäristössä. Oletusasetuksena agentin kohdentaminen tapahtuu aikatauluttajan toimesta.",
       "DescSession": "<p>Sessio on laskentaympäristön yksikkö, joka luodaan määritellyn ympäristön ja resurssien mukaan.</p><p>Jos tämä arvo on suurempi kuin 1, luodaan useita edellä mainittua resurssijoukkoa vastaavia sessioita.</p><p>Jos resursseja ei ole riittävästi käytettävissä, sessioiden luomista koskevat pyynnöt, joita ei voida luoda, asetetaan odotusjonoon.</p>",
       "DescSetEnv": "<p>Jos asetat oletusympäristömuuttujan konttiin ja asetat samannimisen ympäristömuuttujan myös Backend.AI:ssa, Backend.AI:ssa asetettu arvo on etusijalla.</p><p style='color:var(--paper-red-400);'>Jokainen syöttöarvo alustetaan istunnon käynnistämisen jälkeen.<br />Ympäristömuuttujat siirretään vain, jos sekä muuttuja että arvo eivät ole tyhjiä.</p>",
       "DescSetPreOpenPort": "'Preopen Ports' viittaa tiettyyn <span style='color:var(--paperipunainen-400);'>sisäiseen konttiporttiin</span>, joka sallii verkkolaitteen tai -tietokoneen ulkoisista laitteista tai tietokoneista tulevat yhteydet.",
@@ -1599,6 +1614,7 @@
       "TitleSession": "Istunto (Backend.AI)",
       "TotalAllocation": "Kokonaismääräraha",
       "UserResourceLimit": "Käyttäjän resurssirajoitus",
+      "UsingBootstrapScriptInfo": "Bootstrap-skripti on mukana.",
       "Version": "Versio",
       "YouCanStartWithHistory": "Nämä ovat äskettäin luotuja istuntotietueita. Aloita uusi istunto napsauttamalla istunnon nimeä."
     },
@@ -1880,6 +1896,12 @@
     "SelectColumnToDisplay": "Valitse näytettävät sarakkeet",
     "SettingTable": "Kattaus"
   },
+  "theme": {
+    "PreviewModeAlert": "Käytät tällä hetkellä teeman esikatselutilaa. Jatka varsinaista työskentelyä alkuperäisessä ikkunassa.",
+    "button": {
+      "ExportToJson": "Vie JSON"
+    }
+  },
   "time": {
     "Day": "day",
     "Hour": "tunnin",
@@ -1992,10 +2014,30 @@
     "SSHKeypairManagement": "SSH-avainparin hallinta",
     "SessionTerminationDialog": "Istunnon lopettamista ei voi peruuttaa. Haluatko jatkaa istunnon lopettamista?",
     "ShellEnvironments": "Shell-ympäristöt",
+    "Theme": "Teema",
     "ThemeMode": "Teematila",
     "UseCompactSidebar": "Aseta Kompakti Sivupalkki Oletukseksi",
     "UseSystemSetting": "Käytä järjestelmäasetuksia",
-    "UserConfigScript": "Käyttäjän määrityskomentosarja"
+    "UserConfigScript": "Käyttäjän määrityskomentosarja",
+    "theme": {
+      "CustomThemeSettingAlert": "Päivitettyä teemaa ei voi ottaa käyttöön välittömästi. Jos haluat ottaa teeman käyttöön, ota yhteyttä tukitiimiimme ja lähetä viety konfiguraatio JSON-tiedostona.",
+      "ErrorColor": "Värivirhe",
+      "ErrorColorDesc": "Väri, jota käytetään painikkeissa tai varoituksissa, jotka edustavat kriittisiä toimia, kuten poistoa, varoitusten tai virheiden ilmaisemiseksi.",
+      "HeaderBg": "Otsikon taustaväri",
+      "HeaderBgDesc": "Ylätunnisteen taustalle käytetty väri logoosia lukuun ottamatta.",
+      "InfoColor": "Info Väri",
+      "InfoColorDesc": "Väri, jota käytetään tiedon antamiseen ja muokkausta ilmaiseviin kuvakkeisiin sekä muihin käyttäjille tietoa välittäviin elementteihin.",
+      "LinkColor": "Linkin väri",
+      "LinkColorDesc": "Väri, jota käytetään linkeissä, jotka ohjaavat toiselle sivulle tai avaavat käyttöliittymän lisäelementtejä, kuten vetolaatikoita tai modaaleja.",
+      "NoChangesMade": "Muutoksia ei tehty.",
+      "Preview": "Esikatselu",
+      "PrimaryColor": "Ensisijainen väri",
+      "PrimaryColorDesc": "Pääväri, jota käytetään painikkeissa tai kuvaavassa tekstissä, jotka edustavat avaintoimintoja. \nSitä käytetään myös otsikon logoosion taustavärinä.",
+      "SuccessColor": "Menestyksen väri",
+      "SuccessColorDesc": "Väri, jota käytetään painikkeissa, ilmoituksissa tai kuvakkeissa, jotka osoittavat, että käyttäjän toiminto on suoritettu onnistuneesti.",
+      "TextColor": "Tekstin väri",
+      "TextColorDesc": "Yleistekstin väri."
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Edistynyt verkkopäätteen käyttö: Kopioi terminaalin sisältö",
@@ -2024,6 +2066,7 @@
       "AgentSummary": "Agentin yhteenveto",
       "Architecture": "Arkkitehtuuri",
       "ArtifactDetails": "Esineiden yksityiskohdat",
+      "Branding": "Brändäys",
       "Cancel": "Peruuta",
       "ChangePassword": "Vaihda salasana",
       "Chat": "Chat",

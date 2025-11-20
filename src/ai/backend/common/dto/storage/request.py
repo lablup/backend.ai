@@ -230,6 +230,33 @@ class HuggingFaceImportModelsReq(BaseRequestModel):
     )
 
 
+class HuggingFaceGetCommitHashReqPathParam(BaseRequestModel):
+    """
+    Path parameters for getting HuggingFace model commit hash.
+    """
+
+    model_id: str = Field(description="The model to get commit hash for.")
+
+
+class HuggingFaceGetCommitHashReqQueryParam(BaseRequestModel):
+    """
+    Query parameters for getting HuggingFace model commit hash.
+    """
+
+    registry_name: str = Field(
+        description="""
+        Name of the HuggingFace registry.
+        This should match the configured registry name in the system.
+        """,
+        examples=["huggingface", "my-huggingface-registry"],
+    )
+    revision: Optional[str] = Field(
+        default=None,
+        description="The revision (branch/tag) of the model.",
+        examples=["main", "v1.0"],
+    )
+
+
 class ReservoirImportModelsReq(BaseRequestModel):
     """Request for batch importing multiple models to storage."""
 

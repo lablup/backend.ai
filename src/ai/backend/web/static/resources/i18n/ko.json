@@ -62,6 +62,7 @@
   "button": {
     "Add": "추가",
     "Apply": "적용",
+    "AutoRefresh": "자동 새로고침",
     "Cancel": "취소",
     "Clear": "삭제",
     "ClearLogs": "로그 삭제",
@@ -322,8 +323,11 @@
       "Name": "이름",
       "NewFileName": "새로운 파일 이름",
       "NewFolder": "새 폴더",
+      "NoAccessPermissionToVolume": "현재 프로젝트에 SFTP 볼륨에 대한 액세스 권한이 없습니다.",
       "NoImagesSupportingFileBrowser": "파일브라우저를 지원하는 이미지가 없습니다. 폴더를 업로드하려면 파일브라우저 지원 이미지가 필요합니다.",
       "NoImagesSupportingSystemSession": "SSH / SFTP를 지원하는 이미지가 없습니다. SSH / SFTP를 이용하려면 시스템 이미지가 필요합니다.",
+      "NoPermissionToMountFolder": "현재 프로젝트는 이 폴더에 연결된 스토리지 호스트에 대한 마운트 권한이 없습니다.",
+      "NoSFTPSupportingScalingGroup": "해당 폴더의 스토리지 호스트에 SFTP용 리소스 그룹이 없습니다.",
       "NoSharedFolders": "공유 폴더가 없습니다.",
       "NoSharedUsers": "공유된 사용자가 없습니다.",
       "NotEnoughResourceForFileBrowserSession": "파일브라우저용 세션 생성을 위한 충분한 자원(cpu: 1 Core, mem: 0.5GB)이 없습니다. 자원 확인 후 다시 시도하세요.",
@@ -616,6 +620,7 @@
     "AuthenticationFailed": "API 인증 실패. 사용자 정보나 Manager 상태를 확인하세요.",
     "CannotChangeVirtualFolderOption": "폴더 소유자가 아닌 경우 폴더 옵션을 변경할 수 없습니다.",
     "CannotSharePrivateAutomountFolder": "정책에 따라 자동마운트 폴더는 공유할 수 없습니다.",
+    "FailedToLoadTableData": "목록을 불러오는 중 오류가 발생했습니다.",
     "FolderSharingNotAvailableToUser": "요청한 사용자는 폴더 공유가 불가능한 상태입니다.",
     "InternalServerError": "내부 서버 오류입니다. 나중에 다시 시도해 주세요.",
     "InvalidBaseURL": "Endpoint URL 이 유효하지 않습니다.",
@@ -727,6 +732,7 @@
     "CreateButtonCode": "배지 코드 생성",
     "CreateNotebookButton": "노트북 실행 버튼 만들기",
     "Downloading": "다운로드 중...",
+    "FailedToFetchRepositoryInformation": "저장소 정보를 가져오지 못했습니다.",
     "FolderAlreadyExists": "같은 이름의 폴더가 이미 존재합니다. 이름을 변경합니다.",
     "FolderCreated": "폴더를 생성했습니다.",
     "FolderName": "가져올 폴더 이름: ",
@@ -743,6 +749,8 @@
     "ImportGithubRepo": "GitHub 저장소 가져오기",
     "ImportGitlabRepo": "GitLab 저장소 가져오기",
     "ImportNotebook": "노트북 가져오기",
+    "InvalidGitHubURL": "유효하지 않은 GitHub URL입니다. 유효한 GitHub 저장소 URL이어야 합니다.",
+    "InvalidGitLabURL": "잘못된 GitLab URL입니다. 유효한 GitLab 저장소 URL이어야 합니다.",
     "InvalidNotebookURL": "유효하지 않은 노트북 URL입니다.",
     "NoNotebookCode": "노트북 주소가 입력되지 않았습니다. 노트북 코드 입력 후 배지를 출력할 수 있는 코드를 복사할 수 있습니다.",
     "NoSuitableResourceFoundOnGivenURL": "URL에서 가져올 수 있는 항목이 없습니다.",
@@ -754,8 +762,11 @@
     "Preparing": "준비중...",
     "ReadyToImport": "가져올 준비가 완료되었습니다.",
     "RepoWillBeFolder": "가져온 GitHub 저장소는 폴더로 변환되며, 세션을 시작할 때 마운트할 수 있습니다.",
+    "RepositoryNotFound": "저장소를 찾을 수 없습니다.",
+    "StorageHost": "스토리지 호스트",
+    "VFolderUsageMode": "폴더 사용 방식",
     "WrongURLType": "잘못된 URL 형식입니다.",
-    "YouCanCreateNotebookCode": "노트북의 주소를 입력하면 어디에서나 Backend.AI로 바로 연결되어 실행할 수 있는 아래와 같은 배지 코드를 만들어 줍니다."
+    "YouCanCreateNotebookCode": "입력한 노트북을 Backend.AI에서 바로 실행할 수 있는 배지입니다. 코드를 복사해서 사용해보세요."
   },
   "information": {
     "APIVersion": "API 버전",
@@ -1306,6 +1317,7 @@
     "ElapsedTime": "경과 시간",
     "EnvironmentAndVersion": "환경 및 버전",
     "EnvironmentInfo": "환경 정보",
+    "ExecuteSpecificApp": "{{appName}} 앱 실행하기",
     "ExecuteTerminalApp": "터미널 앱 실행하기",
     "ExpiresAfter": "남은 시간",
     "ExportCSV": "CSV로 내보내기",
@@ -1422,6 +1434,7 @@
       "ConfirmAndRun": "확인했으며 시작하겠습니다",
       "ConnectUrlIsNotValid": "연결 URL이 유효하지 않습니다.",
       "DownloadSSHKey": "SSH 키 다운로드",
+      "LaunchingApp": "{{appName}} 앱을 실행합니다.",
       "NoExistingConnectionExample": "복사할 접속 예제가 없습니다.",
       "OpenVSCodeRemote": "로컬 Visual Studio Code 열기",
       "Prepared": "준비되었습니다",
@@ -1445,6 +1458,7 @@
       "BatchMode": "Batch",
       "BatchModeConfig": "Batch 모드 설정",
       "BatchModeDesc": "여러 노드 클러스터로 코드를 실행합니다.",
+      "BootstrapScriptDetail": "부트스트랩 스크립트",
       "CPU": "CPU",
       "ChooseEnvironment": "환경을 선택하세요",
       "ClusterMode": "클러스터 모드 설정",
@@ -1462,7 +1476,8 @@
       "DescMemory": "<p>컴퓨터 메모리는 임시 저장 영역입니다. 중앙 처리 장치 (CPU)에 필요한 데이터와 명령들을 보관하는 역할을 합니다.</p><p>머신 러닝 워크로드를 처리할 때 GPU를 연산 장치로 사용하는 경우, GPU 메모리의 두 배 이상의 메모리를 할당해야 합니다. 그렇지 않으면 GPU의 유휴 시간이 증가하여 성능이 저하됩니다.</p>",
       "DescMultiNode": "<p>세션을 실행할 때 하나의 관리 노드와 하나 이상의 워커 노드가 여러 물리 노드 또는 가상 머신에 나누어 배치되는 경우입니다.</p>",
       "DescOpenMPOptimization": "<p>이 값은 nthreads-var 내부 컨트롤 변수의 초기 값을 설정하여 병렬 영역에 사용할 스레드 수를 설정합니다.</p><p>Backend.AI는 이 값을 CPU 코어수와 같게 설정하며, 일반적인 고성능 컴퓨팅 워크로드를 가속하는 효과가 있습니다. 그러나 일부 멀티스레드 워크로드의 경우 OpenMP를 사용하는 여러 프로세스가 동시에 사용되어 비정상적으로 많은 스레드를 생성하여 상당한 성능 저하가 발생합니다. 이러한 경우 이 값을 1 또는 2로 조정하시기 바랍니다.</p>",
-      "DescSelectAgent": "에이전트 오른쪽에 표시되는 자원은 실제 사용 가능한 자원의 양을 나타냅니다. \n현재 에이전트 선택은 단일 노드 단일 컨테이너 환경에서만 사용할 수 있습니다. \n기본 설정은 스케줄러에 의한 에이전트 할당입니다.",
+      "DescSelectAgent": "에이전트 오른쪽의 자원은 실제 사용 가능한 양을 의미합니다. 선택된 에이전트는 할당 가능한 후보군을 나타내며, 여러 개를 선택해도 하나의 에이전트에만 할당될 수 있습니다. 기본 설정은 스케줄러에 의한 자동 할당입니다.",
+      "DescSelectAgentBefore2516": "에이전트 오른쪽에 표시되는 자원은 실제 사용 가능한 자원의 양을 나타냅니다. 현재 에이전트 선택은 단일 노드 단일 컨테이너 환경에서만 사용할 수 있습니다. 기본 설정은 스케줄러에 의한 에이전트 할당입니다.",
       "DescSession": "<p>세션은 지정된 환경과 자원에 따라 생성되는 계산 환경 단위입니다.</p><p>이 값을 1보다 큰 값으로 설정하면 위의 자원 설정을 이용한 여러 세션이 지정한 값 만큼 동시에 생성됩니다.</p><p>세션 시작 요청 시 사용 가능한 자원이 충분하지 않은 경우, 생성하지 못한 세션 시작 요청들은 생성 대기열에 추가됩니다.</p>",
       "DescSetEnv": "<p>사용자가 기본 환경 변수를 설정하고 Backend.AI 에서도 자체적인 동작을 위하여 이름이 같은 환경 변수를 설정한 경우, Backend.AI가 설정하는 값이 우선 적용됩니다.</p><p style='color:var(--paper-red-400);'>세션 런처 다이얼로그를 띄울 때마다 입력한 값은 모두 초기화됩니다.<br />이러한 설정은 환경 변수와 값 입력란이 각각 비어있지 않은 경우에만 전달됩니다.</p>",
       "DescSetPreOpenPort": "네트워크 기기 또는 컴퓨터에서 외부로부터의 접속을 허용하는 <span style='color:var(--paper-red-400);'>컨테이너 내부 특정 포트 번호</span>를 '사전 개방 포트' 값으로 설정합니다.",
@@ -1605,6 +1620,7 @@
       "TitleSession": "세션 (Backend.AI)",
       "TotalAllocation": "총 자원 할당량",
       "UserResourceLimit": "사용자 자원 제한",
+      "UsingBootstrapScriptInfo": "부트스트랩 스크립트가 포함되어 있습니다.",
       "Version": "버전",
       "YouCanStartWithHistory": "최근 생성된 세션 기록입니다. 세션 이름을 클릭하면 새 세션을 시작할 수 있습니다."
     },
@@ -1886,6 +1902,12 @@
     "SelectColumnToDisplay": "표시할 열 선택",
     "SettingTable": "테이블 설정"
   },
+  "theme": {
+    "PreviewModeAlert": "현재 테마 미리보기 모드를 사용하고 있습니다. 실제 작업은 기존 창에서 진행해 주세요.",
+    "button": {
+      "ExportToJson": "JSON 추출하기"
+    }
+  },
   "time": {
     "Day": "일",
     "Hour": "시간",
@@ -1998,10 +2020,30 @@
     "SSHKeypairManagement": "SSH 키페어 관리",
     "SessionTerminationDialog": "세션 종료는 취소할 수 없습니다. 종료하시겠습니까?",
     "ShellEnvironments": "쉘 스크립트 환경",
+    "Theme": "테마",
     "ThemeMode": "화면 모드",
     "UseCompactSidebar": "간결한 사이드바를 기본값으로 설정",
     "UseSystemSetting": "시스템 설정 사용",
-    "UserConfigScript": "사용자 환경 스크립트"
+    "UserConfigScript": "사용자 환경 스크립트",
+    "theme": {
+      "CustomThemeSettingAlert": "현재 변경된 테마를 바로 적용하는 기능이 제공되지 않습니다. 테마 적용을 원하시는 경우, 추출된 설정 JSON 파일과 함께 지원팀에 문의해 주세요. ",
+      "ErrorColor": "오류 색상",
+      "ErrorColorDesc": "삭제 등 중요한 작업에 대한 안내나 버튼 또는 오류 안내에 적용되는 색상입니다.",
+      "HeaderBg": "헤더 배경 색상",
+      "HeaderBgDesc": "로고 섹션을 제외한 헤더 배경에 적용되는 색상입니다.",
+      "InfoColor": "안내 색상",
+      "InfoColorDesc": "정보 안내 및 수정 아이콘에 적용되는 색상으로, 사용자에게 정보를 전달하는 요소에 사용되는 색상입니다.",
+      "LinkColor": "링크 색상",
+      "LinkColorDesc": "다른 페이지로 리디렉션되거나 모달과 같은 추가 UI 요소를 여는 링크에 사용되는 색상입니다.",
+      "NoChangesMade": "변경사항이 없습니다.",
+      "Preview": "미리보기",
+      "PrimaryColor": "주요 색상",
+      "PrimaryColorDesc": "주요 동작을 나타내는 버튼이나 설명 텍스트에 적용되는 기본 색상입니다. \n헤더의 로고 부분 배경색으로도 적용됩니다.",
+      "SuccessColor": "완료 색상",
+      "SuccessColorDesc": "사용자가 수행한 동작이 정상적으로 완료되었음을 나타내는 버튼, 알림 또는 아이콘에 사용되는 색상입니다.",
+      "TextColor": "텍스트 색상",
+      "TextColorDesc": "텍스트에 사용되는 색상입니다."
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "웹 터미널 고급 사용법: 터미널 내용 복사하기",
@@ -2030,6 +2072,7 @@
       "AgentSummary": "자원 요약",
       "Architecture": "운영체제",
       "ArtifactDetails": "아티팩트 상세",
+      "Branding": "브랜딩",
       "Cancel": "취소",
       "ChangePassword": "비밀번호 변경",
       "Chat": "채팅",

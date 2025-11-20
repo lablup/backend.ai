@@ -19,6 +19,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisions,
+    ArtifactFilterOptions,
     ArtifactRegistryType,
     ArtifactRemoteStatus,
     ArtifactRevisionData,
@@ -27,6 +28,7 @@ from ai.backend.manager.data.artifact.types import (
     ArtifactType,
 )
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
+from ai.backend.manager.data.common.types import StringFilterData
 from ai.backend.manager.dto.request import (
     DelegateScanArtifactsReq,
     SearchArtifactsReq,
@@ -197,20 +199,32 @@ class ArtifactService:
 
                 # TODO: Apply client_decorator instead of retrying here
                 offset = 0
-                limit = 10
+                limit = 10  # Fetch 10 items per request
                 all_artifacts: list[ArtifactDataWithRevisions] = []
                 MAX_RETRIES = 3
 
-                while True:
+                # Use action.limit to determine total number of artifacts to fetch
+                total_limit = action.limit if action.limit is not None else float("inf")
+                fetched_count = 0
+
+                while fetched_count < total_limit:
                     retry_count = 0
                     client_resp = None
 
                     while retry_count < MAX_RETRIES:
                         try:
+                            # Create filters from action parameters
+                            filters = None
+                            if action.search is not None:
+                                filters = ArtifactFilterOptions(
+                                    name_filter=StringFilterData(contains=action.search)
+                                )
+
                             req = SearchArtifactsReq(
                                 pagination=PaginationOptions(
                                     offset=OffsetBasedPaginationOptions(offset=offset, limit=limit)
-                                )
+                                ),
+                                filters=filters,
                             )
                             client_resp = await remote_reservoir_client.search_artifacts(req)
                             break
@@ -242,6 +256,9 @@ class ArtifactService:
 
                     # Convert response data back to full data with readme
                     for response_artifact in parsed.artifacts:
+                        if fetched_count >= total_limit:
+                            break
+
                         # Convert response revisions back to full revisions
                         full_revisions = []
                         for response_revision in response_artifact.revisions:
@@ -260,10 +277,14 @@ class ArtifactService:
                             try:
                                 # Try to get existing local revision to check current remote_status
                                 # If remote artifact is AVAILABLE and we were tracking it, update remote_status
-                                if response_revision.status == ArtifactStatus.AVAILABLE:
-                                    remote_status = ArtifactRemoteStatus.AVAILABLE
-                                if response_revision.status == ArtifactStatus.FAILED:
-                                    remote_status = ArtifactRemoteStatus.FAILED
+                                if response_revision.status in [
+                                    ArtifactStatus.AVAILABLE,
+                                    ArtifactStatus.SCANNED,
+                                    ArtifactStatus.FAILED,
+                                ]:
+                                    remote_status = ArtifactRemoteStatus(
+                                        response_revision.status.value
+                                    )
                             except ArtifactRevisionNotFoundError:
                                 # New artifact revision - no remote_status to track
                                 pass
@@ -279,6 +300,8 @@ class ArtifactService:
                                 remote_status=remote_status,
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
+                                digest=response_revision.digest,
+                                verification_result=response_revision.verification_result,
                             )
                             full_revisions.append(full_revision)
 
@@ -296,11 +319,13 @@ class ArtifactService:
                             updated_at=response_artifact.updated_at,
                             readonly=response_artifact.readonly,
                             availability=response_artifact.availability,
+                            extra=response_artifact.extra,
                             revisions=full_revisions,
                         )
                         all_artifacts.append(full_artifact)
+                        fetched_count += 1
 
-                    if len(parsed.artifacts) < limit:
+                    if len(parsed.artifacts) < limit or fetched_count >= total_limit:
                         break
 
                     offset += limit
@@ -373,20 +398,31 @@ class ArtifactService:
 
                 # TODO: Apply client_decorator instead of retrying here
                 offset = 0
-                limit = 10
+                limit = 10  # Fetch 10 items per request
                 all_artifacts: list[ArtifactDataWithRevisions] = []
                 MAX_RETRIES = 3
 
-                while True:
+                # Use action.limit to determine total number of artifacts to fetch
+                total_limit = action.limit if action.limit is not None else float("inf")
+                fetched_count = 0
+
+                while fetched_count < total_limit:
                     retry_count = 0
                     client_resp = None
 
                     while retry_count < MAX_RETRIES:
                         try:
+                            filters = None
+                            if action.search is not None:
+                                filters = ArtifactFilterOptions(
+                                    name_filter=StringFilterData(contains=action.search)
+                                )
+
                             req = SearchArtifactsReq(
                                 pagination=PaginationOptions(
                                     offset=OffsetBasedPaginationOptions(offset=offset, limit=limit)
-                                )
+                                ),
+                                filters=filters,
                             )
                             client_resp = await remote_reservoir_client.search_artifacts(req)
                             break
@@ -418,6 +454,9 @@ class ArtifactService:
 
                     # Convert response data back to full data with readme
                     for response_artifact in parsed.artifacts:
+                        if fetched_count >= total_limit:
+                            break
+
                         # Convert response revisions back to full revisions
                         full_revisions = []
                         for response_revision in response_artifact.revisions:
@@ -452,6 +491,8 @@ class ArtifactService:
                                 remote_status=remote_status,
                                 created_at=response_revision.created_at,
                                 updated_at=response_revision.updated_at,
+                                digest=response_revision.digest,
+                                verification_result=response_revision.verification_result,
                             )
                             full_revisions.append(full_revision)
 
@@ -469,11 +510,13 @@ class ArtifactService:
                             updated_at=response_artifact.updated_at,
                             readonly=response_artifact.readonly,
                             availability=response_artifact.availability,
+                            extra=response_artifact.extra,
                             revisions=full_revisions,
                         )
                         all_artifacts.append(full_artifact)
+                        fetched_count += 1
 
-                    if len(parsed.artifacts) < limit:
+                    if len(parsed.artifacts) < limit or fetched_count >= total_limit:
                         break
 
                     offset += limit
@@ -773,6 +816,8 @@ class ArtifactService:
                     remote_status=remote_status,
                     created_at=response_revision.created_at,
                     updated_at=response_revision.updated_at,
+                    digest=response_revision.digest,
+                    verification_result=response_revision.verification_result,
                 )
                 full_revisions.append(full_revision)
 
@@ -790,6 +835,7 @@ class ArtifactService:
                 updated_at=response_artifact.updated_at,
                 readonly=response_artifact.readonly,
                 availability=response_artifact.availability,
+                extra=response_artifact.extra,
                 revisions=full_revisions,
             )
             all_artifacts.append(full_artifact)

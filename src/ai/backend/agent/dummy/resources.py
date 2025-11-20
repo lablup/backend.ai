@@ -2,7 +2,7 @@ import logging
 from decimal import Decimal
 from typing import Any, Mapping, MutableMapping
 
-from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.types import DeviceName, SlotName
 from ai.backend.logging import BraceStyleAdapter
 
@@ -12,21 +12,15 @@ from ..resources import (
     ComputePluginContext,
     known_slot_types,
 )
+from .config import read_dummy_config
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 async def load_resources(
-    etcd: AsyncEtcd,
+    etcd: AbstractKVStore,
     local_config: Mapping[str, Any],
-    dummy_config: Mapping[str, Any],
 ) -> Mapping[DeviceName, AbstractComputePlugin]:
-    """
-    Detect and load the accelerator plugins.
-
-    limit_cpus, limit_gpus are deprecated.
-    """
-
     compute_device_types: MutableMapping[DeviceName, AbstractComputePlugin] = {}
 
     # Initialize intrinsic plugins by ourselves.
@@ -40,6 +34,7 @@ async def load_resources(
         allowlist=local_config["agent"]["allow-compute-plugins"],
         blocklist=local_config["agent"]["block-compute-plugins"],
     )
+    dummy_config = read_dummy_config()
     if "cpu" not in compute_plugin_ctx.plugins:
         cpu_config = await etcd.get_prefix("config/plugins/cpu")
         cpu_plugin = CPUPlugin(cpu_config, local_config, dummy_config)
@@ -70,12 +65,8 @@ async def load_resources(
 
 
 async def scan_available_resources(
-    local_config: Mapping[str, Any],
     compute_device_types: Mapping[DeviceName, AbstractComputePlugin],
 ) -> Mapping[SlotName, Decimal]:
-    """
-    Detect available computing resource of the system.
-    """
     slots: MutableMapping[SlotName, Decimal] = {}
     for key, computer in compute_device_types.items():
         known_slot_types.update(computer.slot_types)  # type: ignore  # (only updated here!)

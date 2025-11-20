@@ -45,10 +45,14 @@ from ai.backend.common import redis_helper
 from ai.backend.common.auth import PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.cli import LazyGroup
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
 )
+from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -68,12 +72,15 @@ from ai.backend.common.defs import (
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.artifact_registry.anycast import (
-    DoPullReservoirRegistryEvent,
     DoScanReservoirRegistryEvent,
 )
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.exception import BackendAIError, ErrorCode
+from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
+from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.jwt.validator import JWTValidator
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
@@ -112,10 +119,10 @@ from ai.backend.common.types import (
 from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.manager.server_gql_ctx import gql_adapters_ctx
 
 from . import __version__
 from .api.context import RootContext
-from .clients.valkey_client.valkey_image.client import ValkeyImageClient
 from .config.bootstrap import BootstrapConfig
 from .config.loader.config_overrider import ConfigOverrider
 from .config.loader.etcd_loader import (
@@ -132,6 +139,8 @@ from .config.loader.types import AbstractConfigLoader
 from .config.provider import ManagerConfigProvider
 from .config.unified import EventLoopType
 from .config.watchers.etcd import EtcdConfigWatcher
+from .health.database import DatabaseHealthChecker
+from .server_bgtask_ctx import manager_bgtask_registry_ctx
 from .sokovan.deployment.deployment_controller import (
     DeploymentController,
     DeploymentControllerArgs,
@@ -267,6 +276,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".logs",
     ".object_storage",
     ".vfs_storage",
+    ".notification",
 ]
 
 global_subapp_pkgs_for_public_metrics_app: Final[tuple[str, ...]] = (".health",)
@@ -551,6 +561,11 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     valkey_profile_target = root_ctx.config_provider.config.redis.to_valkey_profile_target()
     root_ctx.valkey_profile_target = valkey_profile_target
 
+    root_ctx.valkey_artifact = await ValkeyArtifactDownloadTrackingClient.create(
+        valkey_profile_target.profile_target(RedisRole.STATISTICS),
+        db_id=REDIS_STATISTICS_DB,
+        human_readable_name="artifact",  # tracking artifact download progress
+    )
     root_ctx.valkey_container_log = await ValkeyContainerLogClient.create(
         valkey_profile_target.profile_target(RedisRole.CONTAINER_LOG),
         db_id=REDIS_CONTAINER_LOG,
@@ -593,6 +608,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await root_ctx.valkey_artifact.close()
         await root_ctx.valkey_container_log.close()
         await root_ctx.valkey_image.close()
         await root_ctx.valkey_stat.close()
@@ -657,6 +673,17 @@ def _make_action_reporters(
 
 
 @asynccontextmanager
+async def notification_center_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    from .notification import NotificationCenter
+
+    root_ctx.notification_center = NotificationCenter()
+    try:
+        yield
+    finally:
+        await root_ctx.notification_center.close()
+
+
+@asynccontextmanager
 async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .actions.monitors.audit_log import AuditLogMonitor
     from .actions.monitors.prometheus import PrometheusMonitor
@@ -684,6 +711,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 storage_manager=root_ctx.storage_manager,
                 valkey_stat_client=root_ctx.valkey_stat,
                 valkey_live=root_ctx.valkey_live,
+                valkey_artifact_client=root_ctx.valkey_artifact,
                 event_fetcher=root_ctx.event_fetcher,
                 background_task_manager=root_ctx.background_task_manager,
                 event_hub=root_ctx.event_hub,
@@ -696,6 +724,7 @@ async def processors_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 deployment_controller=root_ctx.deployment_controller,
                 event_producer=root_ctx.event_producer,
                 agent_cache=root_ctx.agent_cache,
+                notification_center=root_ctx.notification_center,
             )
         ),
         [reporter_monitor, prometheus_monitor, audit_log_monitor],
@@ -765,6 +794,38 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @asynccontextmanager
+async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """Initialize and start health probe with all health checkers."""
+    probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+    root_ctx.health_probe = probe
+
+    # Register health checkers using already-initialized resources
+    await probe.register(DatabaseHealthChecker(db=root_ctx.db))
+    await probe.register(EtcdHealthChecker(etcd=root_ctx.etcd))
+    await probe.register(
+        ValkeyHealthChecker(
+            clients={
+                ComponentId("artifact"): root_ctx.valkey_artifact,
+                ComponentId("container_log"): root_ctx.valkey_container_log,
+                ComponentId("live"): root_ctx.valkey_live,
+                ComponentId("stat"): root_ctx.valkey_stat,
+                ComponentId("image"): root_ctx.valkey_image,
+                ComponentId("stream"): root_ctx.valkey_stream,
+                ComponentId("schedule"): root_ctx.valkey_schedule,
+                ComponentId("bgtask"): root_ctx.valkey_bgtask,
+            }
+        )
+    )
+
+    # Start periodic health checking
+    await probe.start()
+    try:
+        yield
+    finally:
+        await probe.stop()
+
+
+@asynccontextmanager
 async def message_queue_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.message_queue = await _make_message_queue(root_ctx)
     try:
@@ -817,6 +878,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             lambda: root_ctx.processors,
             root_ctx.storage_manager,
             root_ctx.config_provider,
+            root_ctx.event_producer,
             use_sokovan=root_ctx.config_provider.config.manager.use_sokovan,
         )
     )
@@ -1109,14 +1171,6 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 initial_delay=0,
             )
         )
-        task_specs.append(
-            EventTaskSpec(
-                name="reservoir_registry_pull",
-                event_factory=lambda: DoPullReservoirRegistryEvent(),
-                interval=600,  # 10 minutes
-                initial_delay=0,
-            )
-        )
 
     # Create event producer tasks from specs
     leader_tasks: list[PeriodicTask] = [
@@ -1192,6 +1246,7 @@ async def sokovan_orchestrator_ctx(root_ctx: RootContext) -> AsyncIterator[None]
         config_provider=root_ctx.config_provider,
         scheduling_controller=root_ctx.scheduling_controller,
         client_pool=client_pool,
+        service_discovery=root_ctx.service_discovery,
     )
 
     # Create sokovan orchestrator with lock factory for timers
@@ -1462,6 +1517,7 @@ def build_root_app(
             event_producer_ctx,
             storage_manager_ctx,
             repositories_ctx,
+            notification_center_ctx,
             hook_plugin_ctx,
             monitoring_ctx,
             network_plugin_ctx,
@@ -1469,6 +1525,7 @@ def build_root_app(
             idle_checker_ctx,
             agent_registry_ctx,
             sched_dispatcher_ctx,
+            service_discovery_ctx,
             sokovan_orchestrator_ctx,
             leader_election_ctx,
             event_dispatcher_ctx,
@@ -1476,7 +1533,9 @@ def build_root_app(
             stale_session_sweeper_ctx,
             stale_kernel_sweeper_ctx,
             processors_ctx,
-            service_discovery_ctx,
+            manager_bgtask_registry_ctx,
+            gql_adapters_ctx,
+            health_probe_ctx,
         ]
     shutdown_context_instances = []
 
@@ -1546,8 +1605,12 @@ def build_prometheus_service_discovery_handler(
 
 
 def build_internal_app(root_ctx: RootContext) -> web.Application:
+    from .public_api.health import hello as health_hello
+
     app = web.Application()
+    app["_root.context"] = root_ctx
     metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", r"/health", health_hello)
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     app.router.add_route(
         "GET", r"/metrics/service_discovery", build_prometheus_service_discovery_handler(root_ctx)

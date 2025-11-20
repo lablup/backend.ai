@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, DecimalException
 from typing import Any, Optional, cast
 
 import tomli
@@ -40,6 +40,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
     RouteStatus,
     ScaleOutDecision,
+    ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
@@ -54,7 +55,7 @@ from ai.backend.manager.repositories.scheduler.types.session_creation import Dep
 
 from .db_source import DeploymentDBSource
 from .storage_source import DeploymentStorageSource
-from .types import RouteData
+from .types import RouteData, RouteServiceDiscoveryInfo
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
 
@@ -179,6 +180,21 @@ class DeploymentRepository:
     ) -> list[DeploymentInfo]:
         """Get endpoints by their IDs."""
         return await self._db_source.get_endpoints_by_ids(endpoint_ids)
+
+    @deployment_repository_resilience.apply()
+    async def get_scaling_group_cleanup_configs(
+        self, scaling_group_names: Sequence[str]
+    ) -> Mapping[str, ScalingGroupCleanupConfig]:
+        """
+        Get route cleanup target statuses configuration for scaling groups.
+
+        Args:
+            scaling_group_names: List of scaling group names to query
+
+        Returns:
+            Mapping of scaling group name to ScalingGroupCleanupConfig
+        """
+        return await self._db_source.get_scaling_group_cleanup_configs(scaling_group_names)
 
     @deployment_repository_resilience.apply()
     async def get_endpoints_by_statuses(
@@ -693,7 +709,23 @@ class DeploymentRepository:
 
                 metric_value = cast(dict[str, Any], endpoint_stat[rule.condition.metric_name])
                 route_count = len(routes) if routes else 1
-                current_value = Decimal(str(metric_value.get("current", 0))) / Decimal(route_count)
+                metric_type = metric_value.get("__type")
+                match metric_type:
+                    case "HISTOGRAM":
+                        log.exception("Unable to set auto-scaling rule on histogram metrics. Skip")
+                        continue
+                    case "GAUGE" | "COUNTER" | _:
+                        current_metric_value = metric_value.get("current", 0)
+                        try:
+                            current_value = Decimal(str(current_metric_value)) / Decimal(
+                                route_count
+                            )
+                        except DecimalException:
+                            log.exception(
+                                "Unable parse metric value '{}' to decimal. Skip",
+                                current_metric_value,
+                            )
+                            continue
 
             else:
                 log.warning(
@@ -828,3 +860,18 @@ class DeploymentRepository:
             Endpoint ID if found, None otherwise
         """
         return await self._db_source.get_endpoint_id_by_session(session_id)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_route_service_discovery_info(
+        self,
+        route_ids: set[uuid.UUID],
+    ) -> list[RouteServiceDiscoveryInfo]:
+        """Fetch service discovery information for routes.
+
+        Args:
+            route_ids: Set of route IDs to fetch information for
+
+        Returns:
+            List of RouteServiceDiscoveryInfo containing kernel host/port and endpoint details
+        """
+        return await self._db_source.fetch_route_service_discovery_info(route_ids)

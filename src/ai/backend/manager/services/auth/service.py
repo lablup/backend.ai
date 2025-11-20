@@ -95,9 +95,7 @@ class AuthService:
         if action.group_id is not None:
             try:
                 # TODO: per-group role is not yet implemented.
-                await self._auth_repository.get_group_membership_validated(
-                    action.group_id, action.user_id
-                )
+                await self._auth_repository.get_group_membership(action.group_id, action.user_id)
                 group_role = "user"
             except GroupMembershipNotFoundError:
                 raise ObjectNotFound(
@@ -148,7 +146,7 @@ class AuthService:
         if user["status"] in INACTIVE_USER_STATUSES:
             raise AuthorizationFailed("User credential mismatch.")
         await self._check_password_age(user, auth_config)
-        user_row = await self._auth_repository.get_user_row_by_uuid_validated(user["uuid"])
+        user_row = await self._auth_repository.get_user_row_by_uuid(user["uuid"])
         if user_row is None:
             raise UserNotFound(extra_data=user["uuid"])
         main_keypair_row = user_row.get_main_keypair_row()
@@ -297,12 +295,12 @@ class AuthService:
         )
         if result is None:
             raise GenericBadRequest("Invalid email and/or password")
-        await self._auth_repository.deactivate_user_and_keypairs_validated(email)
+        await self._auth_repository.deactivate_user_and_keypairs(email)
 
         return SignoutActionResult(success=True)
 
     async def update_full_name(self, action: UpdateFullNameAction) -> UpdateFullNameActionResult:
-        success = await self._auth_repository.update_user_full_name_validated(
+        success = await self._auth_repository.update_user_full_name(
             action.email, action.domain_name, action.full_name
         )
         return UpdateFullNameActionResult(success=success)
@@ -348,7 +346,7 @@ class AuthService:
             rounds=auth_config.password_hash_rounds,
             salt_size=auth_config.password_hash_salt_size,
         )
-        await self._auth_repository.update_user_password_validated(email, password_info)
+        await self._auth_repository.update_user_password(email, password_info)
 
         return UpdatePasswordActionResult(
             success=True,
@@ -391,7 +389,7 @@ class AuthService:
             rounds=auth_config.password_hash_rounds,
             salt_size=auth_config.password_hash_salt_size,
         )
-        changed_at = await self._auth_repository.update_user_password_by_uuid_validated(
+        changed_at = await self._auth_repository.update_user_password_by_uuid(
             checked_user["uuid"], password_info
         )
 
@@ -401,14 +399,14 @@ class AuthService:
         )
 
     async def get_ssh_keypair(self, action: GetSSHKeypairAction) -> GetSSHKeypairActionResult:
-        pubkey = await self._auth_repository.get_ssh_public_key_validated(action.access_key)
+        pubkey = await self._auth_repository.get_ssh_public_key(action.access_key)
         return GetSSHKeypairActionResult(public_key=pubkey or "")
 
     async def generate_ssh_keypair(
         self, action: GenerateSSHKeypairAction
     ) -> GenerateSSHKeypairActionResult:
         pubkey, privkey = generate_ssh_keypair()
-        await self._auth_repository.update_ssh_keypair_validated(action.access_key, pubkey, privkey)
+        await self._auth_repository.update_ssh_keypair(action.access_key, pubkey, privkey)
 
         return GenerateSSHKeypairActionResult(
             ssh_keypair=SSHKeypair(
@@ -426,7 +424,7 @@ class AuthService:
         if not is_valid:
             raise InvalidAPIParameters(err_msg)
 
-        await self._auth_repository.update_ssh_keypair_validated(action.access_key, pubkey, privkey)
+        await self._auth_repository.update_ssh_keypair(action.access_key, pubkey, privkey)
 
         return UploadSSHKeypairActionResult(
             ssh_keypair=SSHKeypair(
@@ -444,7 +442,7 @@ class AuthService:
             if password_changed_at is None:
                 return  # Skip check if password_changed_at is not set
 
-            current_dt: datetime = await self._auth_repository.get_current_time_validated()
+            current_dt: datetime = await self._auth_repository.get_current_time()
             if password_changed_at + max_password_age < current_dt:
                 # Force user to update password
                 raise PasswordExpired(

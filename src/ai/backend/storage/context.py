@@ -14,16 +14,25 @@ from typing import (
 import aiohttp_cors
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
+from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
+    ValkeyArtifactDownloadTrackingClient,
+)
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.logging import BraceStyleAdapter
 
+from .client.manager import ManagerHTTPClient
 from .config.unified import StorageProxyUnifiedConfig
+from .context_types import ArtifactVerifierContext
 from .exception import InvalidVolumeError
+from .plugin import (
+    StorageArtifactVerifierPluginContext,
+)
 from .services.service import VolumeService
 from .storages.storage_pool import StoragePool
 from .types import VolumeInfo
@@ -92,10 +101,23 @@ class RootContext:
     metric_registry: CommonMetricRegistry
     background_task_manager: BackgroundTaskManager
     cors_options: Mapping[str, aiohttp_cors.ResourceOptions]
+    manager_http_clients: MutableMapping[str, ManagerHTTPClient]
+    valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
+    health_probe: HealthProbe
 
     # volume backend states
     backends: MutableMapping[str, type[AbstractVolume]]
     volumes: MutableMapping[str, AbstractVolume]
+    artifact_verifier_ctx: ArtifactVerifierContext
+
+    async def init_storage_artifact_verifier_plugin(self) -> None:
+        plugin_ctx = StorageArtifactVerifierPluginContext(self.etcd, self.local_config.model_dump())
+        await plugin_ctx.init()
+        plugins = {}
+        for plugin_name, plugin_instance in plugin_ctx.plugins.items():
+            log.info("Loading artifact verifier storage plugin: {0}", plugin_name)
+            plugins[plugin_name] = plugin_instance
+        self.artifact_verifier_ctx.load_verifiers(plugins)
 
     def list_volumes(self) -> Mapping[str, VolumeInfo]:
         return {name: info.to_dataclass() for name, info in self.local_config.volume.items()}
@@ -128,3 +150,8 @@ class RootContext:
     async def shutdown_volumes(self) -> None:
         for volume in self.volumes.values():
             await volume.shutdown()
+
+    async def shutdown_manager_http_clients(self) -> None:
+        """Close all manager HTTP client sessions."""
+        for client in self.manager_http_clients.values():
+            await client.cleanup()

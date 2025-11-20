@@ -32,6 +32,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
     RouteStatus,
     ScaleOutDecision,
+    ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
@@ -54,9 +55,10 @@ from ai.backend.manager.models.endpoint import (
 )
 from ai.backend.manager.models.group import groups
 from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import scaling_groups
+from ai.backend.manager.models.scaling_group import ScalingGroupRow, scaling_groups
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -71,6 +73,7 @@ from ai.backend.manager.utils import query_userinfo_from_session
 
 from ..types import (
     RouteData,
+    RouteServiceDiscoveryInfo,
 )
 
 
@@ -240,6 +243,45 @@ class DeploymentDBSource:
             rows: Sequence[EndpointRow] = result.scalars().all()
 
             return [row.to_deployment_info() for row in rows]
+
+    async def get_scaling_group_cleanup_configs(
+        self, scaling_group_names: Sequence[str]
+    ) -> dict[str, ScalingGroupCleanupConfig]:
+        """
+        Get route cleanup target statuses configuration for scaling groups.
+
+        Args:
+            scaling_group_names: List of scaling group names to query
+
+        Returns:
+            Mapping of scaling group name to ScalingGroupCleanupConfig
+        """
+        if not scaling_group_names:
+            return {}
+
+        async with self._db.begin_readonly_session() as db_sess:
+            stmt = sa.select(ScalingGroupRow.name, ScalingGroupRow.scheduler_opts).where(
+                ScalingGroupRow.name.in_(scaling_group_names)
+            )
+            result = await db_sess.execute(stmt)
+
+            cleanup_configs: dict[str, ScalingGroupCleanupConfig] = {}
+            for row in result:
+                # Convert str to RouteStatus
+                status_strs = row.scheduler_opts.route_cleanup_target_statuses
+                statuses = []
+                for status_str in status_strs:
+                    try:
+                        statuses.append(RouteStatus(status_str))
+                    except ValueError:
+                        # Skip invalid status strings
+                        pass
+
+                cleanup_configs[row.name] = ScalingGroupCleanupConfig(
+                    scaling_group_name=row.name, cleanup_target_statuses=statuses
+                )
+
+            return cleanup_configs
 
     async def get_endpoints_by_statuses(
         self, statuses: list[EndpointLifecycle]
@@ -622,6 +664,80 @@ class DeploymentDBSource:
             result = await db_sess.execute(query)
             endpoint_id = result.scalar_one_or_none()
             return endpoint_id
+
+    async def fetch_route_service_discovery_info(
+        self,
+        route_ids: set[uuid.UUID],
+    ) -> list[RouteServiceDiscoveryInfo]:
+        """Fetch service discovery information for routes.
+
+        Joins routes with kernels and endpoints to get all necessary information
+        for service discovery registration (kernel host/port, endpoint name, etc).
+
+        Args:
+            route_ids: Set of route IDs to fetch information for
+
+        Returns:
+            List of RouteServiceDiscoveryInfo containing kernel host/port and endpoint details
+        """
+        if not route_ids:
+            return []
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            # Join route -> session -> kernel -> endpoint to get all needed info
+            query = (
+                sa.select(
+                    RoutingRow.id.label("route_id"),
+                    RoutingRow.endpoint.label("endpoint_id"),
+                    EndpointRow.name.label("endpoint_name"),
+                    EndpointRow.runtime_variant.label("runtime_variant"),
+                    KernelRow.kernel_host,
+                    KernelRow.service_ports,
+                )
+                .select_from(RoutingRow)
+                .join(EndpointRow, RoutingRow.endpoint == EndpointRow.id)
+                .join(
+                    KernelRow,
+                    sa.and_(
+                        KernelRow.session_id == RoutingRow.session,
+                        KernelRow.cluster_role == "main",
+                    ),
+                )
+                .where(RoutingRow.id.in_(route_ids))
+            )
+
+            result = await db_sess.execute(query)
+            rows = result.all()
+
+            # Process results
+            discovery_infos: list[RouteServiceDiscoveryInfo] = []
+            for row in rows:
+                # Extract inference port from service_ports
+                inference_port: Optional[int] = None
+                if row.service_ports:
+                    for port_info in row.service_ports:
+                        if port_info.get("is_inference", False):
+                            host_ports = port_info.get("host_ports", [])
+                            if host_ports:
+                                inference_port = host_ports[0]
+                            break
+
+                if not inference_port:
+                    # Skip routes without inference port
+                    continue
+
+                discovery_infos.append(
+                    RouteServiceDiscoveryInfo(
+                        route_id=row.route_id,
+                        endpoint_id=row.endpoint_id,
+                        endpoint_name=row.endpoint_name,
+                        runtime_variant=row.runtime_variant.value,
+                        kernel_host=row.kernel_host,
+                        kernel_port=inference_port,
+                    )
+                )
+
+            return discovery_infos
 
     async def _delete_routes_and_endpoint(
         self,

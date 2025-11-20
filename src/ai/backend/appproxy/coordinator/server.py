@@ -80,6 +80,9 @@ from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.model_serving.anycast import (
     EndpointRouteListUpdatedEvent,
 )
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
+from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -110,6 +113,7 @@ from . import __version__
 from .config import ServerConfig
 from .config import load as load_config
 from .defs import EVENT_DISPATCHER_CONSUMER_GROUP, LockID
+from .health.database import DatabaseHealthChecker
 from .models import Circuit, Endpoint, Worker
 from .models.utils import execute_with_txn_retry
 from .types import (
@@ -489,7 +493,7 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from .models.utils import connect_database
 
-    async with connect_database(root_ctx.local_config) as db:
+    async with connect_database(root_ctx.local_config.db) as db:
         root_ctx.db = db
         yield
 
@@ -705,6 +709,31 @@ async def circuit_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     yield
 
 
+@asynccontextmanager
+async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """Initialize and start health probe with all health checkers."""
+    probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+    root_ctx.health_probe = probe
+
+    # Register health checkers using already-initialized resources
+    await probe.register(DatabaseHealthChecker(db=root_ctx.db))
+    await probe.register(
+        ValkeyHealthChecker(
+            clients={
+                ComponentId("live"): root_ctx.valkey_live,
+                ComponentId("schedule"): root_ctx.valkey_schedule,
+            }
+        )
+    )
+
+    # Start periodic health checking
+    await probe.start()
+    try:
+        yield
+    finally:
+        await probe.stop()
+
+
 async def metrics(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     root_ctx: RootContext = request.app["_root.context"]
@@ -732,8 +761,17 @@ async def on_prepare(request: web.Request, response: web.StreamResponse) -> None
 
 
 async def status(request: web.Request) -> web.Response:
+    root_ctx: RootContext = request.app["_root.context"]
     request["do_not_print_access_log"] = True
-    return web.json_response({"api_version": "v2"})
+    advertised_addr = root_ctx.local_config.proxy_coordinator.advertise_base_url
+    if advertised_addr is None:
+        return web.json_response({
+            "api_version": "v2",
+        })
+    return web.json_response({
+        "api_version": "v2",
+        "advertise_address": str(advertised_addr),
+    })
 
 
 def handle_loop_error(
@@ -853,6 +891,7 @@ def build_root_app(
             event_dispatcher_ctx,
             etcd_ctx,
             circuit_manager_ctx,
+            health_probe_ctx,
             health_check_ctx,
             unused_port_collection_ctx,
             event_handler_ctx,

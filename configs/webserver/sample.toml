@@ -6,6 +6,7 @@
 #
 # Generated automatically from the WebServerUnifiedConfig schema.
 
+# Service configuration.
 [service]
   # IP address to bind the webserver service.
   # Use '0.0.0.0' to bind to all interfaces.
@@ -84,20 +85,46 @@
   # Whether to enable reservoir feature.
   enable_reservoir = false
 
+  # WebSocket proxy configuration.
   [service.wsproxy]
     # WebSocket proxy URL.
     # Used to proxy WebSocket connections through a separate service.
     # Leave empty to disable WebSocket proxy.
     url = ""
 
+# Security configuration.
 [security]
   # List of request security policies.
   request_policies = []
   # List of response security policies.
   response_policies = []
-  # Content Security Policy configuration.
-  ## csp = "{ CSPConfig }"
 
+  # Content Security Policy configuration.
+  [security.csp]
+    # Content Security Policy default-src directive.
+    ## default_src = [ "..." ]
+    # Content Security Policy connect-src directive.
+    ## connect_src = [ "..." ]
+    # Content Security Policy img-src directive.
+    ## img_src = [ "..." ]
+    # Content Security Policy media-src directive.
+    ## media_src = [ "..." ]
+    # Content Security Policy font-src directive.
+    ## font_src = [ "..." ]
+    # Content Security Policy script-src directive.
+    ## script_src = [ "..." ]
+    # Content Security Policy style-src directive.
+    ## style_src = [ "..." ]
+    # Content Security Policy frame-src directive.
+    ## frame_src = [ "..." ]
+    # Content Security Policy object-src directive.
+    ## object_src = [ "..." ]
+    # Content Security Policy frame-ancestors directive.
+    ## frame_ancestors = [ "..." ]
+    # Content Security Policy form-action directive.
+    ## form_action = [ "..." ]
+
+# Resources configuration.
 [resources]
   # Whether to open ports to public.
   open_port_to_public = false
@@ -132,22 +159,26 @@
   # Maximum file upload size in bytes.
   max_file_upload_size = 4294967296
 
+# Environments configuration.
 [environments]
   # List of allowed environments.
   ## allowlist = "..."
   # Whether to show non-installed images.
   show_non_installed_images = false
 
+# Plugin configuration.
 [plugin]
   # List of page plugins.
   ## page = "..."
 
+# Pipeline configuration.
 [pipeline]
   # Pipeline service endpoint URL.
   endpoint = "http://127.0.0.1:9500"
   # Frontend endpoint URL for pipeline service.
   ## frontend_endpoint = "..."
 
+# UI configuration.
 [ui]
   # Default environment for new sessions.
   ## default_environment = "..."
@@ -160,6 +191,7 @@
   # Whether to enable model folders functionality.
   enable_model_folders = true
 
+# API configuration.
 [api]
   # API domain name.
   domain = "default"
@@ -191,6 +223,7 @@
   # Shorter expiration times are more secure but may impact user experience.
   token_expiration_seconds = 900
 
+# Session configuration.
 [session]
   # Session maximum age in seconds.
   max_age = 604800
@@ -207,15 +240,12 @@
   # Maximum count for preopen ports.
   max_count_for_preopen_ports = 10
 
+  # Redis configuration for sessions.
   [session.redis]
     # Network address and port of the Redis server.
     # Redis is used for distributed caching and messaging between managers.
     # Set to None when using Sentinel for high availability.
     ## addr = "{ HostPortPair }"
-    # List of Redis Sentinel addresses for high availability.
-    # If provided, the manager will use Redis Sentinel for automatic failover.
-    # When using Sentinel, the addr field is ignored and service_name is required.
-    ## sentinel = [ "{ HostPortPair }" ]
     # Service name for Redis Sentinel.
     # Required when using Redis Sentinel for high availability.
     # Identifies which service to monitor for failover.
@@ -233,12 +263,10 @@
     # Whether to skip TLS certificate verification.
     # Set to True for self-signed certificates or development environments.
     tls_skip_verify = false
-    # Optional override configurations for specific Redis contexts.
-    # Allows different Redis settings for different services within Backend.AI.
-    # Each key represents a context name, and the value is a complete Redis
-    # configuration.
-    ## override_configs = {  }
 
+    # Configuration for the Redis helper library.
+    # Controls timeouts and reconnection behavior.
+    # Adjust based on network conditions and reliability requirements.
     [session.redis.redis_helper_config]
       # Timeout in seconds for Redis socket operations.
       # Controls how long operations wait before timing out.
@@ -253,6 +281,27 @@
       # Lower values reconnect faster but may increase network load.
       reconnect_poll_timeout = 0.3
 
+    # Optional override configurations for specific Redis contexts.
+    # Allows different Redis settings for different services within Backend.AI.
+    # Each key represents a context name, and the value is a complete Redis
+    # configuration.
+    [session.redis.override_configs]
+
+    # List of Redis Sentinel addresses for high availability.
+    # If provided, the manager will use Redis Sentinel for automatic failover.
+    # When using Sentinel, the addr field is ignored and service_name is required.
+    [[session.redis.sentinel]]
+    # Add multiple [[session.redis.sentinel]] sections as needed
+      # Host address of the service.
+      # Can be a hostname, IP address, or special addresses like 0.0.0.0 to bind to
+      # all interfaces.
+      host = "127.0.0.1"
+      # Port number of the service.
+      # Must be between 1 and 65535.
+      # Ports below 1024 require root/admin privileges.
+      port = 8080
+
+# License configuration.
 [license]
   # License edition.
   edition = "Open Source"
@@ -261,6 +310,7 @@
   # License valid until date.
   valid_until = ""
 
+# Web server configuration.
 [webserver]
   # Event loop implementation to use.
   # 'asyncio' is the Python standard library implementation.
@@ -272,6 +322,7 @@
   # Process ID file path.
   pid_file = "/dev/null"
 
+# OpenTelemetry configuration.
 [otel]
   # Whether to enable OpenTelemetry.
   enabled = false
@@ -280,12 +331,15 @@
   # OpenTelemetry endpoint.
   endpoint = "http://127.0.0.1:4317"
 
+# Apollo Router configuration.
 [apollo_router]
   # Whether to enable Apollo Router.
   enabled = false
-  # Apollo Router endpoint.
+  # Apollo Router endpoint(s).
+  # Supports multiple endpoints separated by commas for load balancing.
   endpoint = "http://127.0.0.1:4000"
 
+# Logging configuration.
 [logging]
   # The version used by logging.dictConfig().
   version = 1
@@ -295,9 +349,6 @@
   disable-existing-loggers = false
   # The list of log drivers to activate.
   drivers = [ "console",]
-  ## file = "{ FileConfig }"
-  ## logstash = "{ LogstashConfig }"
-  ## graylog = "{ GraylogConfig }"
 
   # The mapping of log handler configurations.
   [logging.handlers]
@@ -311,9 +362,52 @@
     # Determine verbosity of log.
     format = "verbose"
 
+  [logging.file]
+    # Path to store log.
+    path = "/var/log/backend.ai"
+    # Log file name.
+    filename = "wsproxy.log"
+    # Number of outdated log files to retain.
+    backup-count = 5
+    # Maximum size for a single log file.
+    ## rotation-size = "..."  # |     # min=0
+    # Determine verbosity of log.
+    format = "verbose"
+
+  [logging.logstash]
+    # Connection information of logstash node.
+    endpoint = { host = "127.0.0.1", port = 8001 }
+    # Protocol to communicate with logstash server.
+    protocol = "tcp"
+    # Use TLS to communicate with logstash server.
+    ssl-enabled = true
+    # Verify validity of TLS certificate when communicating with logstash.
+    ssl-verify = true
+
+  [logging.graylog]
+    # Graylog hostname.
+    host = "127.0.0.1"
+    # Graylog server port number.
+    port = 8000
+    # Log level.
+    level = "INFO"
+    # The custom source identifier. If not specified, fqdn will be used instead.
+    ## localname = "..."
+    # The fuly qualified domain name of the source.
+    ## fqdn = "..."
+    # Verify validity of TLS certificate when communicating with logstash.
+    ssl-verify = true
+    # Path to Root CA certificate file.
+    ## ca-certs = "/etc/ssl/ca.pem"
+    # Path to TLS private key file.
+    ## keyfile = "/etc/backend.ai/graylog/privkey.pem"
+    # Path to TLS certificate file.
+    ## certfile = "/etc/backend.ai/graylog/cert.pem"
+
   # Override default log level for specific scope of package
   [logging.pkg_ns]
 
+# Debug configuration.
 [debug]
   # Whether to enable debug mode.
   enabled = false

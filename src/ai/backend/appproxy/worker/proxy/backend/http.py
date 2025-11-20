@@ -208,6 +208,16 @@ class HTTPBackend(BaseBackend):
                 finally:
                     await frontend_response.write_eof()
                 return frontend_response
+        except aiohttp.ServerDisconnectedError as e:
+            log.debug(
+                "Backend container disconnected unexpectedly: {}:{}, method={}, path={}, error={}",
+                route.current_kernel_host,
+                route.kernel_port,
+                frontend_request.method,
+                frontend_request.rel_url,
+                e,
+            )
+            raise
         except ConnectionResetError:
             raise asyncio.CancelledError()
         except aiohttp.ClientOSError as e:

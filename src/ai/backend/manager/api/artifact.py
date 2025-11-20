@@ -7,7 +7,12 @@ from typing import Iterable, Tuple
 import aiohttp_cors
 from aiohttp import web
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, api_handler
+from ai.backend.common.api_handlers import (
+    APIResponse,
+    BodyParam,
+    PathParam,
+    api_handler,
+)
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.data.artifact.types import ArtifactRevisionResponseData
 from ai.backend.manager.dto.context import ProcessorsCtx
@@ -16,6 +21,7 @@ from ai.backend.manager.dto.request import (
     CancelImportArtifactReq,
     CleanupArtifactsReq,
     GetArtifactRevisionReadmeReq,
+    GetDownloadProgressReqPathParam,
     ImportArtifactsReq,
     RejectArtifactRevisionReq,
     UpdateArtifactReqBodyParam,
@@ -27,6 +33,7 @@ from ai.backend.manager.dto.response import (
     CancelImportArtifactResponse,
     CleanupArtifactsResponse,
     GetArtifactRevisionReadmeResponse,
+    GetDownloadProgressResponse,
     ImportArtifactsResponse,
     RejectArtifactRevisionResponse,
     UpdateArtifactResponse,
@@ -40,6 +47,9 @@ from ai.backend.manager.services.artifact_revision.actions.cancel_import import 
 )
 from ai.backend.manager.services.artifact_revision.actions.cleanup import (
     CleanupArtifactRevisionAction,
+)
+from ai.backend.manager.services.artifact_revision.actions.get_download_progress import (
+    GetDownloadProgressAction,
 )
 from ai.backend.manager.services.artifact_revision.actions.get_readme import (
     GetArtifactRevisionReadmeAction,
@@ -263,6 +273,32 @@ class APIHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
+    @auth_required_for_method
+    @api_handler
+    async def get_download_progress(
+        self,
+        path: PathParam[GetDownloadProgressReqPathParam],
+        processors_ctx: ProcessorsCtx,
+    ) -> APIResponse:
+        """
+        Retrieve download progress for an artifact revision.
+
+        Returns detailed download progress information including artifact-level
+        and file-level progress data for the specified artifact revision.
+        Supports both local and remote download progress when delegation is enabled.
+        """
+        processors = processors_ctx.processors
+        action_result = await processors.artifact_revision.get_download_progress.wait_for_complete(
+            GetDownloadProgressAction(
+                artifact_revision_id=path.parsed.artifact_revision_id,
+            )
+        )
+
+        resp = GetDownloadProgressResponse(
+            download_progress=action_result.download_progress,
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
 
 def create_app(
     default_cors_options: CORSOptions,
@@ -296,6 +332,13 @@ def create_app(
             "GET",
             "/revisions/{artifact_revision_id}/readme",
             api_handler.get_artifact_revision_readme,
+        )
+    )
+    cors.add(
+        app.router.add_route(
+            "GET",
+            "/revisions/{artifact_revision_id}/download-progress",
+            api_handler.get_download_progress,
         )
     )
 

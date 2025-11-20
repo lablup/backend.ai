@@ -60,6 +60,7 @@
   "button": {
     "Add": "Inserisci",
     "Apply": "Applicare",
+    "AutoRefresh": "Aggiornamento automatico",
     "Cancel": "Annulla",
     "Clear": "Eliminare",
     "ClearLogs": "Cancella registri",
@@ -319,8 +320,11 @@
       "Name": "Nome",
       "NewFileName": "Nuovo nome file",
       "NewFolder": "Nuova cartella",
+      "NoAccessPermissionToVolume": "Il progetto corrente non ha accesso al volume SFTP.",
       "NoImagesSupportingFileBrowser": "Non ci sono ancora immagini che supportano filebrowser. Per caricare le cartelle è necessaria almeno una o più immagini che supportino il browser di file.",
       "NoImagesSupportingSystemSession": "Non esiste ancora un'immagine che supporti SSH / SFTP. Almeno una o più immagini che supportano il ruolo del sistema devono utilizzare SSH / SFTP.",
+      "NoPermissionToMountFolder": "Il progetto corrente non dispone delle autorizzazioni di montaggio per l'host di storage associato a questa cartella.",
+      "NoSFTPSupportingScalingGroup": "L'host di archiviazione per questa cartella non dispone di un gruppo di risorse SFTP.",
       "NoSharedFolders": "Nessuna cartella condivisa",
       "NoSharedUsers": "Nessuno è stato invitato",
       "NotEnoughResourceForFileBrowserSession": "Risorse insufficienti (cpu: 1 Core, mem: 0,5 GB) per creare la sessione per filebrowser. si prega di controllare le risorse disponibili.",
@@ -613,6 +617,7 @@
     "AuthenticationFailed": "Autenticazione fallita. Controllare le informazioni e lo stato del manager.",
     "CannotChangeVirtualFolderOption": "Non è possibile modificare le opzioni di una cartella v che non è di mia proprietà.",
     "CannotSharePrivateAutomountFolder": "Impossibile condividere le vfolders automount in linea con il criterio.",
+    "FailedToLoadTableData": "Si è verificato un errore durante il caricamento dell'elenco.",
     "FolderSharingNotAvailableToUser": "La condivisione delle cartelle non è disponibile per gli utenti richiesti.",
     "InternalServerError": "Errore interno del server. Riprovare più tardi.",
     "InvalidBaseURL": "L'URL dell'endpoint non è valido.",
@@ -723,6 +728,7 @@
     "CreateButtonCode": "Creare",
     "CreateNotebookButton": "Pulsante Crea blocco appunti",
     "Downloading": "Download in corso...",
+    "FailedToFetchRepositoryInformation": "Impossibile recuperare le informazioni del repository.",
     "FolderAlreadyExists": "C'è una cartella con lo stesso nome. nome verrà rinominato.",
     "FolderCreated": "Cartella creata.",
     "FolderName": "Nome della cartella importata:",
@@ -739,6 +745,8 @@
     "ImportGithubRepo": "Importa repository GitHub",
     "ImportGitlabRepo": "Importare il repository GitLab",
     "ImportNotebook": "Importa taccuino",
+    "InvalidGitHubURL": "URL GitHub non valido. Deve essere l'URL di un repository GitHub valido.",
+    "InvalidGitLabURL": "URL GitLab non valido. Deve essere l'URL di un repository GitLab valido.",
     "InvalidNotebookURL": "URL del blocco note non valido.",
     "NoNotebookCode": "L'indirizzo del blocco note è vuoto. Si prega di inserire un codice notebook valido per copiare il codice badge.",
     "NoSuitableResourceFoundOnGivenURL": "Nessuna risorsa adatta trovata sull'URL specificato.",
@@ -750,8 +758,11 @@
     "Preparing": "Preparazione...",
     "ReadyToImport": "Pronto per l'importazione",
     "RepoWillBeFolder": "I repository GitHub importati vengono convertiti in cartelle e possono essere montati all'avvio della sessione.",
+    "RepositoryNotFound": "Repository non trovato.",
+    "StorageHost": "Host di archiviazione",
+    "VFolderUsageMode": "Modalità di utilizzo della cartella",
     "WrongURLType": "Tipo di URL errato",
-    "YouCanCreateNotebookCode": "Inserisci l'URL del notebook per creare un codice badge come di seguito che puoi eseguire direttamente su Backend.AI."
+    "YouCanCreateNotebookCode": "Questo badge consente l'esecuzione diretta del tuo notebook su Backend.AI. Copia il codice per usarlo ovunque."
   },
   "information": {
     "APIVersion": "Versione API",
@@ -1299,6 +1310,7 @@
     "ElapsedTime": "Tempo trascorso",
     "EnvironmentAndVersion": "Ambiente e versione",
     "EnvironmentInfo": "Informazioni sull'ambiente",
+    "ExecuteSpecificApp": "Avvia {{appName}}",
     "ExecuteTerminalApp": "Eseguire l'applicazione terminale",
     "ExpiresAfter": "Tempo rimanente",
     "ExportCSV": "esporta CSV",
@@ -1415,6 +1427,7 @@
       "ConfirmAndRun": "Ho controllato e comincio",
       "ConnectUrlIsNotValid": "L'URL di connessione non è valido.",
       "DownloadSSHKey": "Scarica la chiave SSH",
+      "LaunchingApp": "Avvio dell'app {{appName}} in corso.",
       "NoExistingConnectionExample": "Nessun esempio di connessione da copiare.",
       "OpenVSCodeRemote": "Aprire il codice locale di Visual Studio",
       "Prepared": "Preparato",
@@ -1438,6 +1451,7 @@
       "BatchMode": "Lotto",
       "BatchModeConfig": "Modalità batch Configurazione",
       "BatchModeDesc": "È possibile eseguire il codice con più nodi e cluster per scalare la propria idea.",
+      "BootstrapScriptDetail": "Script di bootstrap",
       "CPU": "processore",
       "ChooseEnvironment": "Scegli l'ambiente",
       "ClusterMode": "Modalità cluster",
@@ -1455,7 +1469,8 @@
       "DescMemory": " <p> La memoria del computer è un'area di archiviazione temporanea. </p> <p> Contiene i dati e le istruzioni di cui ha bisogno la Central Processing Unit (CPU). </p> <p> Quando si utilizza una GPU in un carico di lavoro di machine learning, è necessario allocare almeno il doppio della memoria della GPU alla memoria. In caso contrario, il tempo di inattività della GPU aumenterà, con conseguente riduzione delle prestazioni. </p>",
       "DescMultiNode": " <p> Quando si esegue una sessione, un nodo gestito e uno o più nodi di lavoro vengono suddivisi su più nodi fisici o macchine virtuali. </p>",
       "DescOpenMPOptimization": "<p>Questo valore imposta il numero di thread da utilizzare per le regioni parallele impostando il valore iniziale della variabile di controllo interna nthreads-var.</p><p>Backend.AI imposta questo valore uguale al numero di core della CPU, con l'effetto di accelerare i tipici carichi di lavoro ad alte prestazioni. Tuttavia, per alcuni carichi di lavoro multi-thread, vengono utilizzati contemporaneamente più processi che utilizzano OpenMP, con il risultato di un numero anormalmente elevato di thread e di una significativa riduzione delle prestazioni. In questo caso, si consiglia di regolare questo valore a 1 o 2.</p>",
-      "DescSelectAgent": "Le risorse visualizzate sul lato destro dell'agente rappresentano la quantità effettiva di risorse disponibili. \nAttualmente, la selezione dell'agente è disponibile solo in un ambiente con contenitore singolo a nodo singolo. \nL'impostazione predefinita è l'allocazione dell'agente da parte dello scheduler.",
+      "DescSelectAgent": "Le risorse alla destra dell'agente indicano la quantità effettivamente disponibile. Gli agenti selezionati rappresentano il pool di candidati assegnabili: anche se ne vengono selezionati più, l'assegnazione può essere effettuata su un solo agente. L'impostazione predefinita è l'assegnazione automatica gestita dallo scheduler.",
+      "DescSelectAgentBefore2516": "Le risorse visualizzate sul lato destro dell'agente rappresentano la quantità effettiva di risorse disponibili. Attualmente, la selezione dell'agente è disponibile solo in un ambiente a singolo nodo con un singolo container. L'impostazione predefinita prevede l'allocazione degli agenti da parte dello schedulatore.",
       "DescSession": " <p> Una sessione è un'unità di ambiente computazionale creata in base a un ambiente e risorse specificati. </p> <p> Se questo valore è impostato su un valore maggiore di 1, vengono create più sessioni corrispondenti alla risorsa impostata sopra. </p> <p> Se non sono disponibili risorse sufficienti, le richieste di creazione di sessioni che non possono essere create vengono messe in coda di attesa. </p>",
       "DescSetEnv": " <p> Se si imposta una variabile di ambiente predefinita nel contenitore e si imposta anche una variabile di ambiente con lo stesso nome su Backend.AI, il valore impostato su Backend.AI ha la precedenza. </p> <p style='color:var(--paper-red-400);'> Ogni valore di input verrà inizializzato dopo l'avvio del launcher della sessione. <br /> Inoltre, questi ambienti verranno passati solo se sia variabile che valore non sono vuoti. </p>",
       "DescSetPreOpenPort": "Le 'Porte pre-aperte' si riferiscono a una specifica <span style='color:var(--paper-red-400);'>porta contenitore interna</span> che consente le connessioni in entrata da dispositivi o computer esterni su un dispositivo o computer di rete.",
@@ -1597,6 +1612,7 @@
       "TitleSession": "Sessione (Backend.AI)",
       "TotalAllocation": "Allocazione totale",
       "UserResourceLimit": "Limite risorse utente",
+      "UsingBootstrapScriptInfo": "Lo script di bootstrap è incluso.",
       "Version": "Versione",
       "YouCanStartWithHistory": "Questi sono i record delle sessioni create di recente. Fare clic sul nome di una sessione per avviarne una nuova."
     },
@@ -1878,6 +1894,12 @@
     "SelectColumnToDisplay": "Seleziona le colonne da visualizzare",
     "SettingTable": "Impostazione della tabella"
   },
+  "theme": {
+    "PreviewModeAlert": "Stai usando la modalità anteprima del tema. Ti preghiamo di proseguire il lavoro nella finestra originale.",
+    "button": {
+      "ExportToJson": "Esporta JSON"
+    }
+  },
   "time": {
     "Day": "day",
     "Hour": "ora",
@@ -1990,10 +2012,30 @@
     "SSHKeypairManagement": "Gestione delle coppie di chiavi SSH",
     "SessionTerminationDialog": "La chiusura della sessione non può essere annullata. Vuoi procedere per terminare la sessione?",
     "ShellEnvironments": "Ambienti shell",
+    "Theme": "Tema",
     "ThemeMode": "Modalità tema",
     "UseCompactSidebar": "Imposta Barra Laterale Compatta come Predefinita",
     "UseSystemSetting": "Utilizza Impostazioni di sistema",
-    "UserConfigScript": "Script di configurazione utente"
+    "UserConfigScript": "Script di configurazione utente",
+    "theme": {
+      "CustomThemeSettingAlert": "Il tema aggiornato non può essere applicato immediatamente. Se desideri applicarlo, contatta il nostro team di supporto fornendo il file JSON di configurazione esportato.",
+      "ErrorColor": "Colore errore",
+      "ErrorColorDesc": "Il colore applicato ai pulsanti o agli avvisi che rappresentano azioni critiche, come l'eliminazione, per indicare avvisi o errori.",
+      "HeaderBg": "Colore di sfondo dell'intestazione",
+      "HeaderBgDesc": "Il colore applicato allo sfondo dell'intestazione, ad eccezione della sezione del logo.",
+      "InfoColor": "Informazioni Colore",
+      "InfoColorDesc": "Il colore applicato alle icone informative, di guida e di modifica, utilizzato per gli elementi che comunicano informazioni agli utenti.",
+      "LinkColor": "Colore collegamento",
+      "LinkColorDesc": "Il colore utilizzato per i collegamenti che reindirizzano a un'altra pagina o aprono elementi aggiuntivi dell'interfaccia utente come cassetti o finestre modali.",
+      "NoChangesMade": "Nessuna modifica apportata.",
+      "Preview": "Anteprima",
+      "PrimaryColor": "Colore primario",
+      "PrimaryColorDesc": "Il colore principale applicato ai pulsanti o al testo descrittivo che rappresentano le azioni chiave. \nViene applicato anche come colore di sfondo per la sezione del logo nell'intestazione.",
+      "SuccessColor": "Colore del successo",
+      "SuccessColorDesc": "Il colore applicato a pulsanti, avvisi o icone che indicano che un'azione dell'utente è stata completata correttamente.",
+      "TextColor": "Colore del testo",
+      "TextColorDesc": "Il colore utilizzato per il testo generale."
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Utilizzo avanzato del terminale Web: copia il contenuto del terminale",
@@ -2022,6 +2064,7 @@
       "AgentSummary": "Riepilogo dell'agente",
       "Architecture": "Architettura",
       "ArtifactDetails": "Dettagli artefatto",
+      "Branding": "Personalizzazione del marchio",
       "Cancel": "Annulla",
       "ChangePassword": "Cambia la password",
       "Chat": "Chat",

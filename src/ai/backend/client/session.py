@@ -278,6 +278,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         "QuotaScope",
         "Network",
         "UserResourcePolicy",
+        "Notification",
     )
 
     aiohttp_session: aiohttp.ClientSession
@@ -314,6 +315,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         from .func.manager import Manager
         from .func.model import Model
         from .func.network import Network
+        from .func.notification import Notification
         from .func.quota_scope import QuotaScope
         from .func.resource import Resource
         from .func.scaling_group import ScalingGroup
@@ -358,6 +360,7 @@ class BaseSession(metaclass=abc.ABCMeta):
         self.QuotaScope = QuotaScope
         self.Network = Network
         self.UserResourcePolicy = UserResourcePolicy
+        self.Notification = Notification
 
     @property
     def proxy_mode(self) -> bool:

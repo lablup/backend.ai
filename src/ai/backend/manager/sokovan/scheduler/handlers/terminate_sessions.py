@@ -4,13 +4,7 @@ import logging
 from typing import Optional
 
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.common.events.event_types.session.broadcast import (
-    SchedulingBroadcastEvent,
-)
-from ai.backend.common.events.types import AbstractBroadcastEvent
-from ai.backend.common.types import AccessKey
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.results import ScheduleResult
@@ -52,22 +46,12 @@ class TerminateSessionsHandler(SchedulerHandler):
         return await self._scheduler.terminate_sessions()
 
     async def post_process(self, result: ScheduleResult) -> None:
-        """Log the number of terminated sessions and invalidate cache."""
-        log.info("Try to terminate {} sessions", len(result.scheduled_sessions))
-        affected_keys: set[AccessKey] = {
-            event_data.access_key for event_data in result.scheduled_sessions
-        }
-        await self._repository.invalidate_kernel_related_cache(list(affected_keys))
-        log.debug("Invalidated kernel-related cache for {} access keys", len(affected_keys))
+        """
+        No post-processing needed.
 
-        # Broadcast batch event for sessions that transitioned to TERMINATED
-        events: list[AbstractBroadcastEvent] = [
-            SchedulingBroadcastEvent(
-                session_id=event_data.session_id,
-                creation_id=event_data.creation_id,
-                status_transition=str(SessionStatus.TERMINATED),
-                reason=event_data.reason,
-            )
-            for event_data in result.scheduled_sessions
-        ]
-        await self._event_producer.broadcast_events_batch(events)
+        Actual status updates and events are handled by:
+        - Agent event callbacks (for successful terminations)
+        - sweep_lost_agent_kernels() (for lost agents or failed RPC calls)
+        """
+        # No action needed - terminate_sessions only sends RPC calls
+        pass

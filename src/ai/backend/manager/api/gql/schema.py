@@ -67,6 +67,21 @@ from .model_deployment.model_revision import (
     revision,
     revisions,
 )
+from .notification import (
+    create_notification_channel,
+    create_notification_rule,
+    delete_notification_channel,
+    delete_notification_rule,
+    notification_channel,
+    notification_channels,
+    notification_rule,
+    notification_rule_types,
+    notification_rules,
+    update_notification_channel,
+    update_notification_rule,
+    validate_notification_channel,
+    validate_notification_rule,
+)
 from .object_storage import (
     create_object_storage,
     delete_object_storage,
@@ -114,6 +129,11 @@ class Query:
     revision = revision
     replicas = replicas
     replica = replica
+    notification_channel = notification_channel
+    notification_channels = notification_channels
+    notification_rule = notification_rule
+    notification_rules = notification_rules
+    notification_rule_types = notification_rule_types
     object_storage = object_storage
     object_storages = object_storages
     vfs_storage = vfs_storage
@@ -150,6 +170,14 @@ class Mutation:
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
     create_model_revision = create_model_revision
+    create_notification_channel = create_notification_channel
+    update_notification_channel = update_notification_channel
+    delete_notification_channel = delete_notification_channel
+    validate_notification_channel = validate_notification_channel
+    create_notification_rule = create_notification_rule
+    update_notification_rule = update_notification_rule
+    delete_notification_rule = delete_notification_rule
+    validate_notification_rule = validate_notification_rule
     create_object_storage = create_object_storage
     update_object_storage = update_object_storage
     create_auto_scaling_rule = create_auto_scaling_rule

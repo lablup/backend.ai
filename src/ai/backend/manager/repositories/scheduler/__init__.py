@@ -7,6 +7,7 @@ from .types.session import (
     MarkTerminatingResult,
     SessionTerminationResult,
     TerminatingKernelData,
+    TerminatingKernelWithAgentData,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "MarkTerminatingResult",
     "SessionTerminationResult",
     "TerminatingKernelData",
+    "TerminatingKernelWithAgentData",
 ]

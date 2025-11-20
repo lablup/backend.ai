@@ -83,7 +83,7 @@ def test_check_typed_dict():
     assert isinstance(a, dict)
 
 
-def test_binary_size():
+def test_binary_size_str_conversion():
     assert 1 == BinarySize.from_str("1 byte")
     assert 19291991 == BinarySize.from_str(19291991)
     with pytest.raises(ValueError):
@@ -137,6 +137,43 @@ def test_binary_size():
     assert "{:s}".format(BinarySize(524288)) == "512k"
     assert "{:s}".format(BinarySize(1048576)) == "1m"
     assert "{:s}".format(BinarySize(2**30)) == "1g"
+
+
+def test_binary_size_decimal_conversion():
+    assert Decimal(BinarySize(1)) == 1
+    assert Decimal(BinarySize(2)) == 2
+    assert Decimal(BinarySize(1024)) == 1024
+    assert Decimal(BinarySize(2048)) == 2048
+    assert Decimal(BinarySize(105935)) == 105935
+    assert Decimal(BinarySize(127303)) == 127303
+
+
+def test_slot_name_parsing() -> None:
+    s = SlotName("cuda.shares")
+    assert s.is_accelerator()
+    assert s.device_name == "cuda"
+    assert s.major_type == "shares"
+    assert s.minor_type == ""
+    s = SlotName("cuda.device")
+    assert s.is_accelerator()
+    assert s.device_name == "cuda"
+    assert s.major_type == "device"
+    assert s.minor_type == ""
+    s = SlotName("cpu")
+    assert not s.is_accelerator()
+    assert s.device_name == "cpu"
+    assert s.major_type == ""
+    assert s.minor_type == ""
+    s = SlotName("mem")
+    assert not s.is_accelerator()
+    assert s.device_name == "mem"
+    assert s.major_type == ""
+    assert s.minor_type == ""
+    s = SlotName("cuda.device:mig-10g")
+    assert s.is_accelerator()
+    assert s.device_name == "cuda"
+    assert s.major_type == "device"
+    assert s.minor_type == "mig-10g"
 
 
 def test_resource_slot_serialization():

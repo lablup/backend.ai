@@ -44,13 +44,111 @@ The Manager is the central orchestrator of the Backend.AI cluster. It schedules 
 - Validate and manage image versions
 - Control allowed images per domain
 
+## Entry Points
+
+The Manager accepts and processes external requests through 4 entry points.
+
+### 1. REST API
+
+**Framework**: aiohttp (async HTTP web framework)
+
+**Location**: `src/ai/backend/manager/api/`
+
+**Key Features**:
+- HTTP/HTTPS-based communication
+- JSON request/response format
+- JWT or API Key-based authentication
+- Validation and authentication via middleware stack
+
+**Processing Flow**:
+```
+HTTP Request → Middleware Stack → REST Handler → Action Processor → Service → Repository → DB
+```
+
+**Related Documentation**: [REST API Documentation](./api/README.md)
+
+### 2. GraphQL API
+
+**Framework**: Strawberry (current) + Graphene (Legacy, DEPRECATED)
+
+**Location**:
+- Strawberry: `src/ai/backend/manager/api/gql/`
+- Graphene (Legacy): `src/ai/backend/manager/models/gql_models/`
+
+**Related Documentation**:
+- [GraphQL API (Strawberry)](./api/gql/README.md)
+- [Legacy GraphQL (Graphene)](./models/gql_models/README.md) - DEPRECATED
+
+### 3. Event Dispatcher
+
+**Framework**: Backend.AI Event Dispatcher
+
+**Location**: `src/ai/backend/common/events/`
+
+**Event Types**:
+- **Broadcast Events**: Received by all Manager instances
+- **Anycast Events**: Received by only one Manager instance
+
+**Processing Flow**:
+```
+Event Producer → Event Dispatcher → Event Handler → Service
+```
+
+**Related Documentation**: [Event Dispatcher System](../common/events/README.md)
+
+### 4. Background Task Handler
+
+**Framework**: Backend.AI Background Task Handler
+
+**Location**: `src/ai/backend/common/bgtask/`
+
+**Purpose**:
+Handles long-running tasks asynchronously. Issues Task IDs that allow clients to subscribe to progress updates or results via events.
+
+**Processing Flow**:
+```
+Task Request → Background Task Handler → Task Execute → Event Notification
+```
+
+**Related Documentation**: [Background Task Handler System](../common/bgtask/README.md)
+
+### Entry Point Interactions
+
+Each entry point operates independently, but service logic can trigger background tasks or publish events as needed.
+
+**Interaction Examples**:
+```
+REST API Handler → Service Logic → Event Publish (notify other Manager instances)
+Event Handler → Service Logic → Background Task Trigger (when async processing needed)
+```
+
+**Integrated Architecture**:
+
+```
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│  REST API   │  │ GraphQL API │  │   Event     │  │ Background  │
+│  (aiohttp)  │  │(Strawberry) │  │ Dispatcher  │  │    Task     │
+└──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+       │                │                │                │
+       │                │                │                │
+       └────────────────┴────────────────┴────────────────┘
+                              │
+                    ┌─────────▼──────────┐
+                    │  Services Layer    │
+                    └─────────┬──────────┘
+                              │
+                    ┌─────────▼──────────┐
+                    │ Repositories Layer │
+                    └────────────────────┘
+```
+
 ## Architecture
 
 ```
 ┌───────────────────────────────────────────┐
 │              API Layer                    │
-│  - REST API Handler (Starlette)           │
-│  - GraphQL Handler (GraphQL Core)         │
+│  - REST API Handler (aiohttp)             │
+│  - GraphQL Handler (strawberry)           │
 │  - Authentication & Authorization         │
 │  - Request Validation                     │
 └──────────────────┬────────────────────────┘
@@ -82,7 +180,7 @@ The Manager is the central orchestrator of the Backend.AI cluster. It schedules 
 ┌──────────────────┴────────────────────────┐
 │            Models Layer                   │
 │  - SQLAlchemy ORM Models                  │
-│  - Domain Types & DTOs                    │
+│  - Domain Types                           │
 └───────────────────────────────────────────┘
 ```
 
@@ -99,36 +197,29 @@ manager/
 │   ├── scaling_group.py # Scaling group models
 │   └── ...
 ├── repositories/        # Data access layer
-│   ├── session.py      # Session data access
-│   ├── agent.py        # Agent data access
-│   ├── user.py         # User data access
+│   ├── session/        # Session data access
+│   ├── agent/          # Agent data access
+│   ├── user/           # User data access
 │   └── ...
 ├── services/            # Business logic layer
-│   ├── scheduler/      # Session scheduling service
 │   ├── session/        # Session lifecycle management
-│   ├── quota/          # Resource quota management
 │   └── ...
 ├── api/                 # API handlers and routes
-│   ├── rest.py         # REST API endpoints
-│   ├── graphql.py      # GraphQL schema and resolvers
-│   ├── auth.py         # Authentication handlers
+│   ├── gql/             # GraphQL schema and resolvers
+│   ├── auth.py          # Authentication handlers
 │   └── ...
 ├── config/              # Configuration management
-│   ├── sample.toml     # Sample configuration
-│   └── ...
 ├── cli/                 # CLI commands
-│   ├── schema.py       # Database schema management
-│   ├── fixture.py      # Test data management
+│   ├── fixture.py       # Test data management
 │   └── ...
 ├── clients/             # External service clients
-│   ├── agent.py        # Agent RPC client
-│   ├── storage.py      # Storage proxy client
+│   ├── agent/           # Agent RPC client
+│   ├── storage_proxy/   # Storage proxy client
 │   └── ...
 ├── scheduler/           # Scheduling algorithms and logic
 │   ├── dispatcher.py   # Scheduling dispatcher
 │   ├── predicates.py   # Scheduling predicates
 │   └── ...
-├── events.py            # Event definitions and processing
 ├── server.py            # Main server entry point
 └── defs.py              # Shared constants and types
 ```
@@ -209,11 +300,6 @@ VFolders provide persistent storage:
   - Session rate limiting
   - Temporary session data storage
 - **Halfstack Port**: 8111 (host) → 6379 (container)
-- **Key Patterns**:
-  - `keypair.{access_key}` - Access key information cache
-  - `manager.heartbeat` - Manager heartbeat
-  - `ratelimit.{identifier}` - Rate limiting counters
-  - `lock.{resource}` - Distributed lock keys
 
 #### etcd (Global Configuration)
 - **Purpose**:
@@ -222,10 +308,6 @@ VFolders provide persistent storage:
   - Agent registration
   - Dynamic configuration updates
 - **Halfstack Port**: 8121 (host) → 2379 (container)
-- **Key Prefixes**:
-  - `config/` - Global configuration
-  - `nodes/manager` - Manager node information
-  - `volumes/` - VFolder host configuration
 
 ### Optional Infrastructure (Observability)
 
@@ -279,28 +361,19 @@ See `configs/manager/halfstack.conf` for configuration file examples.
 **Redis Settings**:
 - Redis connection information
 - Connection pool configuration
-- Key expiration time
 
 **etcd Settings**:
 - etcd endpoint addresses
-- Configuration key prefixes
-- Watch settings
+- Configuration key prefix (namespace)
 
 **API Settings**:
 - Listen address and port
 - CORS configuration
-- Rate limiting settings
-- Authentication method
 
 **Scheduling Settings**:
 - Default scheduler type
 - Scheduling interval
 - Resource allocation policy
-
-**Session Settings**:
-- Session timeout
-- Maximum session duration
-- Container creation timeout
 
 ### Halfstack Configuration
 
@@ -310,13 +383,6 @@ See `configs/manager/halfstack.conf` for configuration file examples.
 ```bash
 # Setup development environment via script (recommended)
 ./scripts/install-dev.sh
-
-# Initialize database
-./backend.ai mgr schema oneshot
-
-# Populate sample data
-./backend.ai mgr fixture populate sample-configs/example-keypairs.json
-./backend.ai mgr fixture populate sample-configs/example-resource-presets.json
 
 # Start Manager
 ./backend.ai mgr start-server
@@ -363,7 +429,6 @@ REST API request monitoring metrics.
 **`backendai_api_request_duration_sec`** (Histogram)
 - **Description**: API request processing time in seconds
 - **Labels**: Same as `backendai_api_request_count`
-- **Buckets**: [0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30] seconds
 
 #### GraphQL Metrics
 
@@ -384,7 +449,6 @@ GraphQL query execution monitoring metrics.
 **`backendai_graphql_request_duration_sec`** (Histogram)
 - **Description**: GraphQL query processing time in seconds
 - **Labels**: Same as `backendai_graphql_request_count`
-- **Buckets**: [0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30] seconds
 
 #### Event Metrics
 
@@ -412,7 +476,6 @@ Internal event processing metrics.
   - `domain`: Error domain (empty if successful)
   - `operation`: Error operation (empty if successful)
   - `error_detail`: Error details (empty if successful)
-- **Buckets**: [0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30] seconds
 
 #### Background Task Metrics
 
@@ -435,7 +498,6 @@ Periodic and scheduled task execution metrics.
 **`backendai_bgtask_processing_time_sec`** (Histogram)
 - **Description**: Background task execution time in seconds
 - **Labels**: Same as `backendai_bgtask_done_count`
-- **Buckets**: [0.1, 1, 10, 30, 60, 300, 600] seconds
 
 #### Action Metrics
 
@@ -455,7 +517,6 @@ High-level business operation metrics.
 **`backendai_action_duration_sec`** (Histogram)
 - **Description**: Action execution time in seconds
 - **Labels**: Same as `backendai_action_count`
-- **Buckets**: [0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30] seconds
 
 #### Layer Operation Metrics
 
@@ -498,7 +559,6 @@ Granular metrics for operations at each architectural layer.
   - `layer`: Specific layer identifier
   - `operation`: Operation name
   - `success`: "True" or "False"
-- **Buckets**: [0.001, 0.01, 0.1, 0.5, 1, 2, 5, 10, 30] seconds
 
 #### System Metrics
 
@@ -813,33 +873,17 @@ sum(rate(backendai_sweep_kernel_count_total[5m])) by (success)
 ### Agent Communication
 - **Protocol**: ZeroMQ RPC
 - **Port**: 6011 (agent RPC server)
-- **Main Operations**:
-  - `create_kernel`: Create kernel
-  - `destroy_kernel`: Destroy kernel
-  - `restart_kernel`: Restart kernel
-  - `execute_code`: Execute code
-  - `upload_file`: File upload
-  - `download_file`: File download
-  - `get_container_stats`: Get container resource usage
+- **Main Operations**: Kernel lifecycle management, code execution, file operations, container statistics
 
 ### Storage Proxy Communication
-- **Protocol**: HTTP/gRPC
+- **Protocol**: HTTP
 - **Port**: 6021 (client API), 6022 (manager API)
-- **Main Operations**:
-  - `create_vfolder`: Create VFolder
-  - `delete_vfolder`: Delete VFolder
-  - `upload_file`: Upload file to VFolder
-  - `download_file`: Download file from VFolder
-  - `list_files`: List VFolder files
+- **Main Operations**: VFolder management, file upload/download, file listing
 
 ### etcd Communication
 - **Protocol**: gRPC (etcd v3 API)
 - **Port**: 2379
-- **Main Operations**:
-  - `get`: Get configuration values
-  - `put`: Set configuration values
-  - `watch`: Watch configuration changes
-  - `lease`: Manage service registration
+- **Main Operations**: Configuration management, service discovery, watch notifications
 
 ## Development
 

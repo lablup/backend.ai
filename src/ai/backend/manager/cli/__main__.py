@@ -413,5 +413,15 @@ def config():
     """Command set for configuration management."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.dependencies:cli")
+def dependencies():
+    """Command set for dependency verification and validation."""
+
+
+@main.group(cls=LazyGroup, import_name="ai.backend.manager.cli.health:cli")
+def health():
+    """Command set for health checking."""
+
+
 if __name__ == "__main__":
     main()

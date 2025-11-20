@@ -19,6 +19,7 @@ from typing import (
     Tuple,
     TypeAlias,
     TypeVar,
+    cast,
     overload,
 )
 
@@ -41,6 +42,7 @@ from tenacity import (
 )
 from yarl import URL
 
+from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.logging import BraceStyleAdapter
 from ai.backend.manager.config.bootstrap import DatabaseConfig
@@ -146,6 +148,31 @@ class ExtendedAsyncSAEngine(SAEngine):
                 yield conn
 
     @actxmgr
+    async def begin_read_committed(self) -> AsyncIterator[SAConnection]:
+        """
+        Begin a read-write connection with READ COMMITTED isolation level.
+        """
+        async with self.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn = cast(SAConnection, conn)
+            conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
+            async with conn_with_isolation.begin():
+                yield conn_with_isolation
+
+    async def ping(self) -> None:
+        """
+        Ping the database to check if the connection is alive.
+
+        Raises:
+            DatabaseError: If the ping fails or connection is not available
+        """
+        async with self.begin_readonly_read_committed() as conn:
+            result = await conn.execute(sa.text("SELECT 1"))
+            scalar_result = result.scalar()
+            if scalar_result != 1:
+                raise DatabaseError("Database ping failed: unexpected result")
+
+    @actxmgr
     async def begin_readonly(
         self,
         bind: SAConnection | None = None,
@@ -164,6 +191,21 @@ class ExtendedAsyncSAEngine(SAEngine):
         else:
             async with self._begin_readonly(bind, deferrable) as conn:
                 yield conn
+
+    @actxmgr
+    async def begin_readonly_read_committed(self) -> AsyncIterator[SAConnection]:
+        """
+        Begin a read-only connection with READ COMMITTED isolation level.
+        """
+        async with self.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn = cast(SAConnection, conn)
+            conn_with_isolation = await conn.execution_options(
+                isolation_level="READ COMMITTED",
+                postgresql_readonly=True,
+            )
+            async with conn_with_isolation.begin():
+                yield conn_with_isolation
 
     @actxmgr
     async def begin_session(
@@ -188,6 +230,23 @@ class ExtendedAsyncSAEngine(SAEngine):
         else:
             async with _begin_session(bind) as sess:
                 yield sess
+
+    @actxmgr
+    async def begin_session_read_committed(self) -> AsyncIterator[SASession]:
+        """
+        Begin a read-write session with READ COMMITTED isolation level.
+        """
+        async with self.connect() as conn:
+            # Set isolation level to READ COMMITTED
+            conn = cast(SAConnection, conn)
+            conn_with_isolation = await conn.execution_options(isolation_level="READ COMMITTED")
+            async with conn_with_isolation.begin():
+                # Configure session factory with the connection
+                self._sess_factory.configure(bind=conn_with_isolation, expire_on_commit=False)
+                session = self._sess_factory()
+                session = cast(SASession, session)
+                yield session
+                await session.commit()
 
     @actxmgr
     async def begin_readonly_session(
@@ -215,6 +274,25 @@ class ExtendedAsyncSAEngine(SAEngine):
         else:
             async with _begin_session(bind) as sess:
                 yield sess
+
+    @actxmgr
+    async def begin_readonly_session_read_committed(self) -> AsyncIterator[SASession]:
+        """
+        Begin a read-only session with READ COMMITTED isolation level.
+        """
+        async with self.connect() as conn:
+            # Set isolation level to READ COMMITTED and readonly mode
+            conn = cast(SAConnection, conn)
+            conn_with_isolation = await conn.execution_options(
+                isolation_level="READ COMMITTED",
+                postgresql_readonly=True,
+            )
+            async with conn_with_isolation.begin():
+                # Configure session factory with the connection
+                self._readonly_sess_factory.configure(bind=conn_with_isolation)
+                session = self._readonly_sess_factory()
+                session = cast(SASession, session)
+                yield session
 
     @actxmgr
     async def advisory_lock(self, lock_id: LockID) -> AsyncIterator[None]:

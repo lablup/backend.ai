@@ -19,8 +19,7 @@ class InvalidBgtaskId(BackendAIError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/invalid-bgtask-id"
     error_title = "Invalid background task ID format."
 
-    @classmethod
-    def error_code(cls) -> ErrorCode:
+    def error_code(self) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.BGTASK,
             operation=ErrorOperation.READ,

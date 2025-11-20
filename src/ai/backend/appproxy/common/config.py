@@ -1,9 +1,7 @@
 import enum
-import os
 import pwd
 import types
 import typing
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -47,6 +45,13 @@ class PermitHashConfig(BaseSchema):
 class HostPortPair(BaseSchema):
     host: Annotated[str, Field(examples=["127.0.0.1"])]
     port: Annotated[int, Field(gt=0, lt=65536, examples=[8201])]
+
+    @property
+    def host_set_with_protocol(self) -> bool:
+        for protocol in ("http://", "https://"):
+            if self.host.startswith(protocol):
+                return True
+        return False
 
     def __repr__(self) -> str:
         return f"{self.host}:{self.port}"
@@ -98,7 +103,9 @@ class RedisConfig(BaseSchema):
     password: Annotated[
         str | None, Field(default=None, description="Redis password.", examples=["P@ssw0rd!"])
     ]
-    redis_helper_config: Annotated[RedisHelperConfig, Field(default=RedisHelperConfig())]
+    redis_helper_config: Annotated[
+        RedisHelperConfig, Field(default_factory=lambda: RedisHelperConfig())
+    ]
 
     def to_dict(self) -> dict[str, Any]:
         base = self.model_dump()
@@ -109,32 +116,19 @@ class RedisConfig(BaseSchema):
         return base
 
 
-@dataclass
-class UserID:
-    default_uid: int | None = None
-
+class UserIDValidator:
     @classmethod
     def uid_validator(
         cls,
-        value: int | str | None,
+        value: int | str,
     ) -> int:
-        if value is None:
-            assert cls.default_uid, "value is None but default_uid not provided"
-            return cls.default_uid
-        assert isinstance(value, (int, str)), "value must be an integer"
+        assert isinstance(value, (int, str)), "value must be an integer or string"
         match value:
             case int():
-                if value == -1:
-                    return os.getuid()
-                else:
-                    return value
+                return value
             case str():
                 try:
-                    _value = int(value)
-                    if _value == -1:
-                        return os.getuid()
-                    else:
-                        return _value
+                    return int(value)
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_uid
@@ -181,31 +175,19 @@ class UserID:
         )
 
 
-@dataclass
-class GroupID:
-    default_gid: int | None = None
-
+class GroupIDValidator:
     @classmethod
     def uid_validator(
         cls,
-        value: int | str | None,
+        value: int | str,
     ) -> int:
-        if value is None:
-            assert cls.default_gid, "value is None but default_gid not provided"
-        assert isinstance(value, (int, str)), "value must be an integer"
+        assert isinstance(value, (int, str)), "value must be an integer or string"
         match value:
             case int():
-                if value == -1:
-                    return os.getgid()
-                else:
-                    return value
+                return value
             case str():
                 try:
-                    _value = int(value)
-                    if _value == -1:
-                        return os.getgid()
-                    else:
-                        return _value
+                    return int(value)
                 except ValueError:
                     try:
                         return pwd.getpwnam(value).pw_gid

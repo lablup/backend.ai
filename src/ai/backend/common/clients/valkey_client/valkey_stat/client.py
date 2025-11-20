@@ -126,6 +126,10 @@ class ValkeyStatClient:
         self._closed = True
         await self._client.disconnect()
 
+    async def ping(self) -> None:
+        """Ping the Valkey server to check connection health."""
+        await self._client.ping()
+
     @valkey_stat_resilience.apply()
     async def get_keypair_query_count(self, access_key: str) -> int:
         """
@@ -198,6 +202,19 @@ class ValkeyStatClient:
                 result.decode("utf-8"),
             )
             return None
+
+    @valkey_stat_resilience.apply()
+    async def set_gpu_allocation_map(self, agent_id: str, alloc_map: Mapping[str, Any]) -> None:
+        """
+        Set GPU allocation mapping for an agent with 24-hour TTL.
+
+        :param agent_id: The agent ID.
+        :param alloc_map: GPU allocation map to store.
+        """
+        key = f"gpu_alloc_map.{agent_id}"
+        value = dump_json_str(alloc_map)
+        ttl = 3600 * 24  # 24 hours
+        await self._client.client.set(key, value, expiry=ExpirySet(ExpiryType.SEC, ttl))
 
     @valkey_stat_resilience.apply()
     async def get_kernel_statistics(self, kernel_id: str) -> Optional[dict[str, Any]]:
