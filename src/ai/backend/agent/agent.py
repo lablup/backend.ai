@@ -1178,8 +1178,9 @@ class AbstractAgent(
         try:
             for cctx in self.computers.values():
                 for slot_key, slot_type in cctx.instance.slot_types:
-                    slot_key_and_units[slot_key] = slot_type
-                    res_slots[slot_key] = Decimal(str(self.slots.get(slot_key, 0)))
+                    # TODO: Need to fix when cctx.instance.slot_types receives str instead of SlotName
+                    slot_key_and_units[SlotName(slot_key)] = slot_type
+                    res_slots[SlotName(slot_key)] = Decimal(str(self.slots.get(slot_key, 0)))
             agent_info = AgentInfo(
                 ip=str(self.rpc_addr.host),
                 region=self.local_config.agent.region,
