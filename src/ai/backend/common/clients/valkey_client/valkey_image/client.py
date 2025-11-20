@@ -118,20 +118,20 @@ class ValkeyImageClient:
     @valkey_image_resilience.apply()
     async def add_agent_installed_images(
         self,
-        agent_ip: str,
+        agent_id: AgentId,
         installed_image_info: list[InstalledImageInfo],
     ) -> None:
         """
         Add installed image info for an agent.
 
-        :param agent_ip: The agent IP to add.
+        :param agent_id: The agent ID to add.
         :param installed_image_info: list of installed image information
         """
         if not installed_image_info:
             return
 
         value = dump_json_str([img.model_dump() for img in installed_image_info])
-        await self._client.client.set(key=f"installed_image:{agent_ip}", value=value)
+        await self._client.client.set(key=f"installed_image:{agent_id}", value=value)
 
     # For compatibility with redis key made with image canonical strings
     # Use remove_agent_from_images instead of this if possible

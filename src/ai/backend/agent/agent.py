@@ -1209,7 +1209,7 @@ class AbstractAgent(
             )
             await self.anycast_event(AgentHeartbeatEvent(agent_info))
             await self.valkey_image_client.add_agent_installed_images(
-                agent_ip=self.rpc_addr.host, installed_image_info=list(self.images.values())
+                agent_id=self.id, installed_image_info=list(self.images.values())
             )
         except asyncio.TimeoutError:
             log.warning("event dispatch timeout: instance_heartbeat")
