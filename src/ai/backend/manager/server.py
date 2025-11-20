@@ -1605,8 +1605,12 @@ def build_prometheus_service_discovery_handler(
 
 
 def build_internal_app(root_ctx: RootContext) -> web.Application:
+    from .public_api.health import hello as health_hello
+
     app = web.Application()
+    app["_root.context"] = root_ctx
     metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", r"/health", health_hello)
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     app.router.add_route(
         "GET", r"/metrics/service_discovery", build_prometheus_service_discovery_handler(root_ctx)

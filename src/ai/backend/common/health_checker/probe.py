@@ -242,11 +242,12 @@ class HealthProbe:
         try:
             while self._running:
                 try:
-                    await asyncio.sleep(self._options.check_interval)
                     await self.check_all()
                 except Exception as e:
                     log.error(f"Error in health probe loop: {e}", exc_info=True)
                     # Continue running despite errors
+                finally:
+                    await asyncio.sleep(self._options.check_interval)
         except asyncio.CancelledError:
             log.debug("Health probe loop cancelled")
             raise

@@ -1261,9 +1261,11 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     return app
 
 
-def init_internal_app() -> web.Application:
+def init_internal_app(ctx: RootContext) -> web.Application:
     app = web.Application()
+    app["ctx"] = ctx
     metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", "/health", check_health)
     app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
     return app
 

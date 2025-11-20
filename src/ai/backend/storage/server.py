@@ -435,7 +435,7 @@ async def api_ctx(
 
     @asynccontextmanager
     async def internal_api_ctx() -> AsyncGenerator[web.Application]:
-        internal_api_app = init_internal_app()
+        internal_api_app = init_internal_app(root_ctx)
         internal_api_runner = web.AppRunner(internal_api_app)
         await internal_api_runner.setup()
         internal_addr = local_config.api.manager.internal_addr
