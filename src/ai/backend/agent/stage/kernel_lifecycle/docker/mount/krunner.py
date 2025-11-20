@@ -2,7 +2,6 @@ import enum
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass
-from decimal import Decimal
 from pathlib import Path
 from typing import Final, override
 
@@ -231,31 +230,24 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
     ) -> list[Mount]:
         mounts: list[Mount] = []
         already_injected_hooks: set[Path] = set()
-        for dev_type, device_alloc in spec.resource_spec.allocations.items():
-            computer_ctx = spec.existing_computers[dev_type]
-            alloc_sum = Decimal(0)
-            for per_dev_alloc in device_alloc.values():
-                alloc_sum += sum(per_dev_alloc.values())
-            do_hook_mount = alloc_sum > 0 or (
-                set([k for k, v in computer_ctx.instance.slot_types]) & set(device_alloc.keys())
+        for device_view in spec.resource_spec.device_list:
+            computer_ctx = spec.existing_computers[device_view.device]
+            hook_paths = await computer_ctx.instance.get_hooks(
+                runner_info.distro, runner_info.architecture
             )
-            if do_hook_mount:
-                hook_paths = await computer_ctx.instance.get_hooks(
-                    runner_info.distro, runner_info.architecture
-                )
-                for hook_path in hook_paths:
-                    if hook_path in already_injected_hooks:
-                        continue
-                    container_hook_path = f"/opt/kernel/{hook_path.name}"
-                    already_injected_hooks.add(hook_path)
-                    mounts.append(
-                        Mount(
-                            MountTypes.BIND,
-                            hook_path,
-                            Path(container_hook_path),
-                            MountPermission.READ_ONLY,
-                        )
+            for hook_path in hook_paths:
+                if hook_path in already_injected_hooks:
+                    continue
+                container_hook_path = f"/opt/kernel/{hook_path.name}"
+                already_injected_hooks.add(hook_path)
+                mounts.append(
+                    Mount(
+                        MountTypes.BIND,
+                        hook_path,
+                        Path(container_hook_path),
+                        MountPermission.READ_ONLY,
                     )
+                )
         return mounts
 
     @cached(

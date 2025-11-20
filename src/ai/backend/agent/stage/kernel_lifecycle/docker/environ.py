@@ -1,6 +1,5 @@
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
-from decimal import Decimal
 from typing import Any, Final, Optional, Self, override
 
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
@@ -163,16 +162,8 @@ class EnvironProvisioner(Provisioner[EnvironSpec, EnvironResult]):
 
     async def _get_container_hooks(self, spec: EnvironSpec) -> set[str]:
         container_hook_path_set: set[str] = set()
-        for dev_type, device_alloc in spec.kernel_info.resource_spec.allocations.items():
-            alloc_sum = Decimal(0)
-            for per_dev_alloc in device_alloc.values():
-                alloc_sum += sum(per_dev_alloc.values())
-            computer_ctx = spec.agent_info.computers[dev_type]
-            do_hook_mount = alloc_sum > 0 or (
-                set([k for k, v in computer_ctx.instance.slot_types]) & set(device_alloc.keys())
-            )
-            if not do_hook_mount:
-                continue
+        for device_view in spec.kernel_info.resource_spec.device_list:
+            computer_ctx = spec.agent_info.computers[device_view.device]
             hook_paths = await computer_ctx.instance.get_hooks(
                 spec.agent_info.distro, spec.agent_info.architecture
             )
