@@ -105,16 +105,16 @@ class KernelResourceSpec:
     Represents the resource allocations for each slot (device) type and devices.
     """
 
-    unified_devices: Iterable[tuple[DeviceName, SlotName]]
-    """
-    Represents unified devices mounted to the kernel.
-    """
-
     scratch_disk_size: int
     """The size of scratch disk. (not implemented yet)"""
 
     mounts: list["Mount"] = attrs.Factory(list)
     """The mounted vfolder list."""
+
+    unified_devices: Iterable[tuple[DeviceName, SlotName]] = attrs.Factory(list)
+    """
+    Represents unified devices mounted to the kernel.
+    """
 
     def freeze(self) -> None:
         """Replace the attribute setter to make it immutable."""
