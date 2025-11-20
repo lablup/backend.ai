@@ -177,8 +177,8 @@ class DeploymentService:
         Returns:
             CreateLegacyDeploymentActionResult: Result containing the created deployment info
         """
-        log.info("Creating deployment with name: {}", action.request.name)
-        deployment_info = await self._deployment_controller.create_deployment(action.request)
+        log.info("Creating deployment with name: {}", action.draft.name)
+        deployment_info = await self._deployment_controller.create_deployment(action.draft)
         await self._deployment_controller.mark_lifecycle_needed(
             DeploymentLifecycleType.CHECK_PENDING
         )

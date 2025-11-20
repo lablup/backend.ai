@@ -6,12 +6,12 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentMetadata,
     DeploymentNetworkSpec,
     ExecutionSpec,
+    ImageIdentifierDraft,
     ModelRevisionSpec,
+    ModelRevisionSpecDraft,
     MountInfo,
     MountMetadata,
     ReplicaSpec,
-    RequestedImageIdentifier,
-    RequestedModelRevisionSpec,
     ResourceSpec,
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
@@ -71,17 +71,17 @@ class DeploymentCreator:
 
 
 @dataclass
-class DeploymentCreateRequest:
+class DeploymentCreationDraft:
     metadata: DeploymentMetadata
     replica_spec: ReplicaSpec
     network: DeploymentNetworkSpec
-    requested_model_revision: RequestedModelRevisionSpec
+    draft_model_revision: ModelRevisionSpecDraft
 
     # Accessor properties for backward compatibility
     @property
-    def image_identifier(self) -> RequestedImageIdentifier:
+    def image_identifier(self) -> ImageIdentifierDraft:
         """Get the requested image identifier from model revision spec."""
-        return self.requested_model_revision.image_identifier
+        return self.draft_model_revision.image_identifier
 
     @property
     def domain(self) -> str:

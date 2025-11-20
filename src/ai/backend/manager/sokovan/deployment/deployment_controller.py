@@ -8,7 +8,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.deployment.creator import DeploymentCreateRequest
+from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.modifier import DeploymentModifier
 from ai.backend.manager.data.deployment.scale import AutoScalingRule, AutoScalingRuleCreator
 from ai.backend.manager.data.deployment.types import DeploymentInfo
@@ -63,33 +63,32 @@ class DeploymentController:
 
     async def create_deployment(
         self,
-        request: DeploymentCreateRequest,
+        draft: DeploymentCreationDraft,
     ) -> DeploymentInfo:
         """
         Create a new deployment based on the provided specification.
 
         Args:
-            request: Deployment creation specification
+            draft: Deployment creation specification
 
         Returns:
             DeploymentInfo: Information about the created deployment
         """
-        log.info("Creating deployment '{}' in project {}", request.name, request.project)
-
+        log.info("Creating deployment '{}' in project {}", draft.name, draft.project)
         generator = self._revision_generator_registry.get(
-            request.requested_model_revision.execution.runtime_variant
+            draft.draft_model_revision.execution.runtime_variant
         )
         model_revision = await generator.generate_revision(
-            requested_revision=request.requested_model_revision,
-            vfolder_id=request.requested_model_revision.mounts.model_vfolder_id,
-            model_definition_path=request.requested_model_revision.mounts.model_definition_path,
+            draft_revision=draft.draft_model_revision,
+            vfolder_id=draft.draft_model_revision.mounts.model_vfolder_id,
+            model_definition_path=draft.draft_model_revision.mounts.model_definition_path,
         )
         await self._scheduling_controller.validate_session_spec(
             SessionValidationSpec.from_revision(model_revision=model_revision)
         )
 
         deployment_info = await self._deployment_repository.create_endpoint(
-            request.to_creator(model_revision)
+            draft.to_creator(model_revision)
         )
         return deployment_info
 

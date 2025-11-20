@@ -10,8 +10,8 @@ from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
     DefinitionFiles,
     ModelRevisionSpec,
+    ModelRevisionSpecDraft,
     ModelServiceDefinition,
-    RequestedModelRevisionSpec,
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.revision_generator.abc import RevisionGenerator
@@ -31,7 +31,7 @@ class BaseRevisionGenerator(RevisionGenerator):
     @override
     async def generate_revision(
         self,
-        requested_revision: RequestedModelRevisionSpec,
+        draft_revision: ModelRevisionSpecDraft,
         vfolder_id: UUID,
         model_definition_path: Optional[str],
     ) -> ModelRevisionSpec:
@@ -41,9 +41,9 @@ class BaseRevisionGenerator(RevisionGenerator):
         service_definition = await self.load_service_definition(
             vfolder_id=vfolder_id,
             model_definition_path=model_definition_path,
-            runtime_variant=requested_revision.execution.runtime_variant.value,
+            runtime_variant=draft_revision.execution.runtime_variant.value,
         )
-        revision = self.merge_revision(requested_revision, service_definition)
+        revision = self.merge_revision(draft_revision, service_definition)
         await self.validate_revision(revision)
 
         return revision
@@ -139,7 +139,7 @@ class BaseRevisionGenerator(RevisionGenerator):
     @override
     def merge_revision(
         self,
-        requested_revision: RequestedModelRevisionSpec,
+        draft_revision: ModelRevisionSpecDraft,
         service_definition: Optional[ModelServiceDefinition],
     ) -> ModelRevisionSpec:
         """
@@ -155,13 +155,13 @@ class BaseRevisionGenerator(RevisionGenerator):
         """
         if service_definition is None:
             # No service definition, validate and convert request directly
-            return ModelRevisionSpec.model_validate(requested_revision.model_dump(mode="python"))
+            return ModelRevisionSpec.model_validate(draft_revision.model_dump(mode="python"))
 
-        return self._override_revision(requested_revision, service_definition)
+        return self._override_revision(draft_revision, service_definition)
 
     def _override_revision(
         self,
-        requested_revision: RequestedModelRevisionSpec,
+        draft_revision: ModelRevisionSpecDraft,
         service_definition: ModelServiceDefinition,
     ) -> ModelRevisionSpec:
         """
@@ -185,7 +185,7 @@ class BaseRevisionGenerator(RevisionGenerator):
         if service_definition.environ is not None:
             service_dict["environ"] = service_definition.environ
 
-        request_dict = requested_revision.model_dump(mode="python")
+        request_dict = draft_revision.model_dump(mode="python")
         merged_dict = {
             "image_identifier": {},
             "resource_spec": {
@@ -193,7 +193,7 @@ class BaseRevisionGenerator(RevisionGenerator):
                 "cluster_size": request_dict["resource_spec"]["cluster_size"],
                 "resource_opts": request_dict["resource_spec"]["resource_opts"],
             },
-            "mounts": asdict(requested_revision.mounts),
+            "mounts": asdict(draft_revision.mounts),
             "execution": {
                 "runtime_variant": request_dict["execution"]["runtime_variant"],
                 "startup_command": request_dict["execution"]["startup_command"],

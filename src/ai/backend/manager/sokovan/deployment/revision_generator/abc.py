@@ -8,8 +8,8 @@ from uuid import UUID
 
 from ai.backend.manager.data.deployment.types import (
     ModelRevisionSpec,
+    ModelRevisionSpecDraft,
     ModelServiceDefinition,
-    RequestedModelRevisionSpec,
 )
 
 
@@ -24,15 +24,15 @@ class RevisionGenerator(ABC):
     @abstractmethod
     async def generate_revision(
         self,
-        requested_revision: RequestedModelRevisionSpec,
+        draft_revision: ModelRevisionSpecDraft,
         vfolder_id: UUID,
         model_definition_path: Optional[str],
     ) -> ModelRevisionSpec:
         """
-        Process requested revision by loading service definition and merging.
+        Process draft revision by loading service definition and merging.
 
         Args:
-            requested_revision: Requested model revision from API
+            draft_revision: Draft model revision from API
             vfolder_id: VFolder ID containing model and service definition
             model_definition_path: Optional path to model definition directory
 
@@ -67,14 +67,14 @@ class RevisionGenerator(ABC):
     @abstractmethod
     def merge_revision(
         self,
-        requested_revision: RequestedModelRevisionSpec,
+        draft_revision: ModelRevisionSpecDraft,
         service_definition: Optional[ModelServiceDefinition],
     ) -> ModelRevisionSpec:
         """
-        Merge requested revision with service definition.
+        Merge draft revision with service definition.
 
         Args:
-            requested_revision: Requested model revision from API
+            draft_revision: Draft model revision from API
             service_definition: Optional service definition from file
 
         Returns:

@@ -220,21 +220,21 @@ class ModelRevisionSpec(ConfiguredModel):
         return v
 
 
-class RequestedImageIdentifier(ConfiguredModel):
+class ImageIdentifierDraft(ConfiguredModel):
     canonical: Optional[str]
     architecture: Optional[str]
 
 
-class RequestedResourceSpec(ConfiguredModel):
+class ResourceSpecDraft(ConfiguredModel):
     cluster_mode: ClusterMode
     cluster_size: int
     resource_slots: Optional[Mapping[str, Any]]
     resource_opts: Optional[Mapping[str, Any]] = None
 
 
-class RequestedModelRevisionSpec(ConfiguredModel):
-    image_identifier: RequestedImageIdentifier
-    resource_spec: RequestedResourceSpec
+class ModelRevisionSpecDraft(ConfiguredModel):
+    image_identifier: ImageIdentifierDraft
+    resource_spec: ResourceSpecDraft
     mounts: MountMetadata
     execution: ExecutionSpec
 

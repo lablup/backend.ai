@@ -14,11 +14,11 @@ from ai.backend.manager.data.deployment.types import (
     DefinitionFiles,
     ExecutionSpec,
     ImageEnvironment,
+    ImageIdentifierDraft,
+    ModelRevisionSpecDraft,
     ModelServiceDefinition,
     MountMetadata,
-    RequestedImageIdentifier,
-    RequestedModelRevisionSpec,
-    RequestedResourceSpec,
+    ResourceSpecDraft,
 )
 from ai.backend.manager.repositories.deployment import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.revision_generator.base import BaseRevisionGenerator
@@ -372,12 +372,12 @@ class TestMergeRevision:
     ) -> None:
         """Test merge_revision with various override scenarios."""
         # Given: API request
-        requested_revision = RequestedModelRevisionSpec(
-            image_identifier=RequestedImageIdentifier(
+        draft_revision = ModelRevisionSpecDraft(
+            image_identifier=ImageIdentifierDraft(
                 canonical=test_case.request.image,
                 architecture=test_case.request.architecture,
             ),
-            resource_spec=RequestedResourceSpec(
+            resource_spec=ResourceSpecDraft(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
                 resource_slots=test_case.request.resource_slots,
@@ -393,7 +393,7 @@ class TestMergeRevision:
         )
 
         # When: Merging
-        result = base_generator.merge_revision(requested_revision, test_case.service_definition)
+        result = base_generator.merge_revision(draft_revision, test_case.service_definition)
 
         # Then: Should match expected values
         assert result.image_identifier.canonical == test_case.expected.image
@@ -550,12 +550,12 @@ class TestCompleteOverridePipeline:
         )
 
         # And: API request
-        requested_revision = RequestedModelRevisionSpec(
-            image_identifier=RequestedImageIdentifier(
+        requested_revision = ModelRevisionSpecDraft(
+            image_identifier=ImageIdentifierDraft(
                 canonical=test_case.request.image,
                 architecture=test_case.request.architecture,
             ),
-            resource_spec=RequestedResourceSpec(
+            resource_spec=ResourceSpecDraft(
                 cluster_mode=ClusterMode.SINGLE_NODE,
                 cluster_size=1,
                 resource_slots=test_case.request.resource_slots,
@@ -572,7 +572,7 @@ class TestCompleteOverridePipeline:
 
         # When: Generating revision (complete pipeline)
         result = await base_generator.generate_revision(
-            requested_revision=requested_revision,
+            draft_revision=requested_revision,
             vfolder_id=vfolder_id,
             model_definition_path="service-definition.toml",
         )

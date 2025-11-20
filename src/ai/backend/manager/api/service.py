@@ -36,17 +36,17 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.deployment.creator import DeploymentCreateRequest
+from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
     DeploymentMetadata,
     DeploymentNetworkSpec,
     ExecutionSpec,
+    ImageIdentifierDraft,
+    ModelRevisionSpecDraft,
     MountMetadata,
     ReplicaSpec,
-    RequestedImageIdentifier,
-    RequestedModelRevisionSpec,
-    RequestedResourceSpec,
+    ResourceSpecDraft,
 )
 from ai.backend.manager.data.model_serving.creator import ModelServiceCreator
 from ai.backend.manager.data.model_serving.types import (
@@ -567,18 +567,18 @@ class NewServiceRequestModel(LegacyBaseRequestModel):
             ),
         )
 
-    def to_image_identifier(self) -> RequestedImageIdentifier:
+    def to_image_identifier(self) -> ImageIdentifierDraft:
         """Convert to ImageIdentifier for deployment."""
-        return RequestedImageIdentifier(
+        return ImageIdentifierDraft(
             canonical=self.image,
             architecture=self.architecture,
         )
 
-    def to_model_revision(self, validation_result: ValidationResult) -> RequestedModelRevisionSpec:
+    def to_model_revision(self, validation_result: ValidationResult) -> ModelRevisionSpecDraft:
         """Convert to ModelRevisionSpec for deployment."""
-        return RequestedModelRevisionSpec(
+        return ModelRevisionSpecDraft(
             image_identifier=self.to_image_identifier(),
-            resource_spec=RequestedResourceSpec(
+            resource_spec=ResourceSpecDraft(
                 cluster_mode=ClusterMode(self.cluster_mode),
                 cluster_size=self.cluster_size,
                 resource_slots=self.config.resources,
@@ -746,7 +746,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
     ):
         # Create deployment using the new deployment controller
         deployment_action = CreateLegacyDeploymentAction(
-            request=DeploymentCreateRequest(
+            draft=DeploymentCreationDraft(
                 metadata=DeploymentMetadata(
                     name=params.service_name,
                     domain=params.domain_name,
@@ -760,7 +760,7 @@ async def create(request: web.Request, params: NewServiceRequestModel) -> ServeI
                 replica_spec=ReplicaSpec(
                     replica_count=params.replicas,
                 ),
-                requested_model_revision=params.to_model_revision(validation_result),
+                draft_model_revision=params.to_model_revision(validation_result),
                 network=DeploymentNetworkSpec(
                     open_to_public=params.open_to_public,
                 ),
