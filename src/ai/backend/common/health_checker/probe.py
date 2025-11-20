@@ -10,7 +10,7 @@ from aiotools import cancel_and_wait
 
 from ai.backend.common.dto.internal.health import (
     ComponentConnectivityStatus,
-    HealthCheckResponse,
+    ConnectivityCheckResponse,
 )
 from ai.backend.logging.utils import BraceStyleAdapter
 
@@ -155,19 +155,20 @@ class HealthProbe:
 
     async def register(
         self,
-        service_group: ServiceGroup,
         checker: ServiceHealthChecker,
     ) -> None:
         """
         Register a health checker for a specific service group.
 
+        The service group is automatically obtained from checker.target_service_group.
+
         Args:
-            service_group: The service group to register (e.g., REDIS, DATABASE, ETCD)
             checker: The health checker instance that checks all components in this service group
 
         Raises:
             HealthCheckerAlreadyRegistered: If a checker is already registered for this service group
         """
+        service_group = checker.target_service_group
         async with self._lock:
             if service_group in self._checkers:
                 raise HealthCheckerAlreadyRegistered(
@@ -285,16 +286,16 @@ class HealthProbe:
             log.error(f"Health check failed for {service_group}: {e}", exc_info=True)
             return ServiceHealth(results={})
 
-    async def get_health_response(self) -> HealthCheckResponse:
+    async def get_connectivity_status(self) -> ConnectivityCheckResponse:
         """
-        Get the current health status as an API response.
+        Get the current connectivity status for all registered components.
 
         Converts internal health check results into a structured
-        API response suitable for external consumption.
+        connectivity check response suitable for external consumption.
         Flattens component statuses from all service groups into a single list.
 
         Returns:
-            HealthCheckResponse containing overall health and individual component statuses
+            ConnectivityCheckResponse containing overall connectivity health and individual component statuses
         """
         registered = await self._get_all_registered()
 
@@ -316,7 +317,7 @@ class HealthProbe:
                 )
 
         overall_healthy = all(c.is_healthy for c in components) if components else True
-        return HealthCheckResponse(
+        return ConnectivityCheckResponse(
             overall_healthy=overall_healthy,
             connectivity_checks=components,
             timestamp=datetime.now(timezone.utc),

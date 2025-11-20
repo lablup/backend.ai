@@ -17,14 +17,6 @@ from ai.backend.manager.data.artifact.types import (
 )
 
 
-class HealthResponse(BaseModel):
-    """Standard health check response"""
-
-    status: str
-    version: str
-    component: str
-
-
 class SearchArtifactsResponse(BaseResponseModel):
     artifacts: list[ArtifactDataWithRevisionsResponse]
 

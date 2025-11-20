@@ -10,8 +10,14 @@ import sqlalchemy as sa
 from aiohttp import web
 from pydantic import BaseModel
 
-from ai.backend.appproxy.common.types import AppMode, CORSOptions, PydanticResponse, WebMiddleware
+from ai.backend.appproxy.common.types import (
+    AppMode,
+    CORSOptions,
+    PydanticResponse,
+    WebMiddleware,
+)
 from ai.backend.appproxy.common.utils import pydantic_api_response_handler
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.types import ModelServiceStatus
 from ai.backend.logging import BraceStyleAdapter
 
@@ -293,17 +299,17 @@ async def get_circuit_health(
 
 
 async def hello(request: web.Request) -> web.Response:
-    """Simple health check endpoint"""
-    from ai.backend.appproxy.common.types import HealthResponse
-
+    """Health check endpoint with dependency connectivity status"""
     request["do_not_print_access_log"] = True
-
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_connectivity_status()
     response = HealthResponse(
-        status="healthy",
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
         component="appproxy-coordinator",
+        connectivity=connectivity,
     )
-    return web.json_response(response.model_dump())
+    return web.json_response(response.model_dump(mode="json"))
 
 
 @auth_required("manager")

@@ -10,7 +10,6 @@ from typing import Any, Final, Mapping, Optional, override
 import attrs
 import trafaret as t
 from aiohttp import BodyPartReader, MultipartReader, web
-from pydantic import BaseModel
 
 from ai.backend.common import validators as tx
 from ai.backend.common.types import QuotaConfig, StreamReader, VFolderID
@@ -27,7 +26,6 @@ __all__ = (
     "Stat",
     "DirEntry",
     "DirEntryType",
-    "HealthResponse",
 )
 
 
@@ -150,11 +148,3 @@ class MultipartFileUploadStreamReader(StreamReader):
     @override
     def content_type(self) -> Optional[str]:
         return self._content_type
-
-
-class HealthResponse(BaseModel):
-    """Standard health check response"""
-
-    status: str
-    version: str
-    component: str

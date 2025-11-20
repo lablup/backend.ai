@@ -59,7 +59,7 @@ def check(
     from contextlib import asynccontextmanager
     from pathlib import Path
 
-    from ai.backend.common.dto.internal.health import HealthCheckResponse
+    from ai.backend.common.dto.internal.health import ConnectivityCheckResponse
     from ai.backend.common.health_checker import (
         HealthProbe,
         HealthProbeOptions,
@@ -104,7 +104,7 @@ def check(
             # Get collected health checkers and register them
             health_checkers = dependency_stack.get_health_checkers()
             for key, checker in health_checkers.items():
-                await probe.register(key, checker)
+                await probe.register(checker)
 
             # Perform health checks on successfully initialized components
             if health_checkers:
@@ -113,7 +113,7 @@ def check(
             yield
 
     async def _display_health_results(
-        health_response: HealthCheckResponse,
+        health_response: ConnectivityCheckResponse,
         no_timestamps: bool,
     ) -> None:
         """Display health check results."""
@@ -186,7 +186,7 @@ def check(
             return False
 
         # Get health check results
-        health_response = await probe.get_health_response()
+        health_response = await probe.get_connectivity_status()
 
         # Display results
         await _display_health_results(health_response, no_timestamps)

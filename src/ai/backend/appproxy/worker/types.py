@@ -35,6 +35,7 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.common.metrics.metric import (
     APIMetricObserver,
     EventMetricObserver,
@@ -315,6 +316,7 @@ class RootContext:
     request_counter_redis_queue: asyncio.Queue[str]
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
     metrics: WorkerMetricRegistry
+    health_probe: HealthProbe
 
 
 CleanupContext: TypeAlias = Callable[["RootContext"], AsyncContextManager[None]]

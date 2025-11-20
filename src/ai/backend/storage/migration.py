@@ -25,6 +25,7 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.types import AGENTID_STORAGE
@@ -257,6 +258,8 @@ async def check_and_upgrade(
         redis_mq,
         log_events=local_config.debug.log_events,
     )
+    # Create a dummy health probe for migration context (not started)
+    health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
     ctx = RootContext(
         pid=os.getpid(),
         pidx=0,
@@ -276,6 +279,7 @@ async def check_and_upgrade(
         valkey_artifact_client=None,  # type: ignore[arg-type]
         backends={**DEFAULT_BACKENDS},
         volumes={},
+        health_probe=health_probe,
     )
 
     volumes_to_upgrade = await check_latest(ctx)

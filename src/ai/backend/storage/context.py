@@ -22,6 +22,7 @@ from ai.backend.common.events.dispatcher import (
     EventDispatcher,
     EventProducer,
 )
+from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.logging import BraceStyleAdapter
 
@@ -102,6 +103,7 @@ class RootContext:
     cors_options: Mapping[str, aiohttp_cors.ResourceOptions]
     manager_http_clients: MutableMapping[str, ManagerHTTPClient]
     valkey_artifact_client: ValkeyArtifactDownloadTrackingClient
+    health_probe: HealthProbe
 
     # volume backend states
     backends: MutableMapping[str, type[AbstractVolume]]
