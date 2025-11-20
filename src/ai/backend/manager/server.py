@@ -76,6 +76,10 @@ from ai.backend.common.events.event_types.artifact_registry.anycast import (
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.exception import BackendAIError, ErrorCode
+from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
+from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.jwt.validator import JWTValidator
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
@@ -135,6 +139,7 @@ from .config.loader.types import AbstractConfigLoader
 from .config.provider import ManagerConfigProvider
 from .config.unified import EventLoopType
 from .config.watchers.etcd import EtcdConfigWatcher
+from .health.database import DatabaseHealthChecker
 from .server_bgtask_ctx import manager_bgtask_registry_ctx
 from .sokovan.deployment.deployment_controller import (
     DeploymentController,
@@ -786,6 +791,38 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         yield
     finally:
         root_ctx.sd_loop.close()
+
+
+@asynccontextmanager
+async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """Initialize and start health probe with all health checkers."""
+    probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+    root_ctx.health_probe = probe
+
+    # Register health checkers using already-initialized resources
+    await probe.register(DatabaseHealthChecker(db=root_ctx.db))
+    await probe.register(EtcdHealthChecker(etcd=root_ctx.etcd))
+    await probe.register(
+        ValkeyHealthChecker(
+            clients={
+                ComponentId("artifact"): root_ctx.valkey_artifact,
+                ComponentId("container_log"): root_ctx.valkey_container_log,
+                ComponentId("live"): root_ctx.valkey_live,
+                ComponentId("stat"): root_ctx.valkey_stat,
+                ComponentId("image"): root_ctx.valkey_image,
+                ComponentId("stream"): root_ctx.valkey_stream,
+                ComponentId("schedule"): root_ctx.valkey_schedule,
+                ComponentId("bgtask"): root_ctx.valkey_bgtask,
+            }
+        )
+    )
+
+    # Start periodic health checking
+    await probe.start()
+    try:
+        yield
+    finally:
+        await probe.stop()
 
 
 @asynccontextmanager
@@ -1488,6 +1525,7 @@ def build_root_app(
             idle_checker_ctx,
             agent_registry_ctx,
             sched_dispatcher_ctx,
+            service_discovery_ctx,
             sokovan_orchestrator_ctx,
             leader_election_ctx,
             event_dispatcher_ctx,
@@ -1496,8 +1534,8 @@ def build_root_app(
             stale_kernel_sweeper_ctx,
             processors_ctx,
             manager_bgtask_registry_ctx,
-            service_discovery_ctx,
             gql_adapters_ctx,
+            health_probe_ctx,
         ]
     shutdown_context_instances = []
 
@@ -1567,8 +1605,12 @@ def build_prometheus_service_discovery_handler(
 
 
 def build_internal_app(root_ctx: RootContext) -> web.Application:
+    from .public_api.health import hello as health_hello
+
     app = web.Application()
+    app["_root.context"] = root_ctx
     metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", r"/health", health_hello)
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     app.router.add_route(
         "GET", r"/metrics/service_discovery", build_prometheus_service_discovery_handler(root_ctx)

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from ai.backend.common.dto.internal.health import (
     ComponentConnectivityStatus,
-    HealthCheckResponse,
+    ConnectivityCheckResponse,
 )
 
 
@@ -83,7 +83,7 @@ def test_component_health_status_has_field_descriptions() -> None:
 
 
 def test_health_check_response_creation() -> None:
-    """Test HealthCheckResponse Pydantic model creation."""
+    """Test ConnectivityCheckResponse Pydantic model creation."""
     now = datetime.now(timezone.utc)
 
     component1 = ComponentConnectivityStatus(
@@ -102,7 +102,7 @@ def test_health_check_response_creation() -> None:
         error_message=None,
     )
 
-    response = HealthCheckResponse(
+    response = ConnectivityCheckResponse(
         overall_healthy=True,
         connectivity_checks=[component1, component2],
         timestamp=now,
@@ -114,7 +114,7 @@ def test_health_check_response_creation() -> None:
 
 
 def test_health_check_response_with_unhealthy_components() -> None:
-    """Test HealthCheckResponse with unhealthy components."""
+    """Test ConnectivityCheckResponse with unhealthy components."""
     now = datetime.now(timezone.utc)
 
     component1 = ComponentConnectivityStatus(
@@ -133,7 +133,7 @@ def test_health_check_response_with_unhealthy_components() -> None:
         error_message="Connection timeout",
     )
 
-    response = HealthCheckResponse(
+    response = ConnectivityCheckResponse(
         overall_healthy=False,
         connectivity_checks=[component1, component2],
         timestamp=now,
@@ -144,7 +144,7 @@ def test_health_check_response_with_unhealthy_components() -> None:
 
 
 def test_health_check_response_serialization() -> None:
-    """Test HealthCheckResponse JSON serialization and deserialization."""
+    """Test ConnectivityCheckResponse JSON serialization and deserialization."""
     now = datetime.now(timezone.utc)
 
     component = ComponentConnectivityStatus(
@@ -155,7 +155,7 @@ def test_health_check_response_serialization() -> None:
         error_message=None,
     )
 
-    response = HealthCheckResponse(
+    response = ConnectivityCheckResponse(
         overall_healthy=True,
         connectivity_checks=[component],
         timestamp=now,
@@ -166,7 +166,7 @@ def test_health_check_response_serialization() -> None:
     assert isinstance(json_data, str)
 
     # Deserialize from JSON
-    restored = HealthCheckResponse.model_validate_json(json_data)
+    restored = ConnectivityCheckResponse.model_validate_json(json_data)
 
     assert restored.overall_healthy == response.overall_healthy
     assert len(restored.connectivity_checks) == len(response.connectivity_checks)
@@ -174,8 +174,8 @@ def test_health_check_response_serialization() -> None:
 
 
 def test_health_check_response_has_field_descriptions() -> None:
-    """Test that HealthCheckResponse has Field descriptions."""
-    schema = HealthCheckResponse.model_json_schema()
+    """Test that ConnectivityCheckResponse has Field descriptions."""
+    schema = ConnectivityCheckResponse.model_json_schema()
 
     assert "properties" in schema
     properties = schema["properties"]
@@ -187,10 +187,10 @@ def test_health_check_response_has_field_descriptions() -> None:
 
 
 def test_health_check_response_empty_components() -> None:
-    """Test HealthCheckResponse with no components."""
+    """Test ConnectivityCheckResponse with no components."""
     now = datetime.now(timezone.utc)
 
-    response = HealthCheckResponse(
+    response = ConnectivityCheckResponse(
         overall_healthy=True,
         connectivity_checks=[],
         timestamp=now,

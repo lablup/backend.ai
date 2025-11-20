@@ -13,7 +13,6 @@ import traceback
 from collections import OrderedDict, defaultdict
 from collections.abc import AsyncIterator
 from contextlib import AsyncExitStack, asynccontextmanager
-from datetime import datetime, timezone
 from ipaddress import ip_network
 from pathlib import Path
 from pprint import pformat, pprint
@@ -49,10 +48,12 @@ from setproctitle import setproctitle
 from zmq.auth.certs import load_certificate
 
 from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.health.docker import DockerHealthChecker
 from ai.backend.agent.metrics.metric import RPCMetricObserver
 from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginContext
 from ai.backend.agent.resources import scan_gpu_alloc_map
 from ai.backend.agent.runtime import AgentRuntime
+from ai.backend.agent.types import AgentBackend
 from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.bgtask import ProgressReporter
@@ -66,7 +67,7 @@ from ai.backend.common.dto.agent.response import (
     PurgeContainersResp,
     PurgeImagesResp,
 )
-from ai.backend.common.dto.internal.health import HealthCheckResponse
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.events.event_types.kernel.anycast import (
@@ -77,6 +78,10 @@ from ai.backend.common.events.event_types.kernel.broadcast import (
 )
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import ConfigurationError
+from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
+from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.json import pretty_json
 from ai.backend.common.metrics.http import (
     build_api_metric_middleware,
@@ -276,6 +281,7 @@ class AgentRPCServer(aobject):
     debug_server_task: asyncio.Task
     stats_monitor: AgentStatsPluginContext
     error_monitor: AgentErrorPluginContext
+    health_probe: HealthProbe
 
     def __init__(
         self,
@@ -396,6 +402,37 @@ class AgentRPCServer(aobject):
         async with asyncio.TaskGroup() as tg:
             for agent in self.runtime.get_agents():
                 tg.create_task(self.update_status("running", agent.id))
+
+        # Initialize health probe
+        self.health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+
+        # Register health checkers
+        await self.health_probe.register(EtcdHealthChecker(etcd=self.etcd))
+
+        # Get default agent for health checking
+        default_agent = self.runtime.get_agent(None)
+
+        # Register Docker health checker based on config
+        if self.local_config.agent_common.backend == AgentBackend.DOCKER:
+            from ai.backend.agent.docker.agent import DockerAgent
+
+            docker_agent = cast(DockerAgent, default_agent)
+            await self.health_probe.register(DockerHealthChecker(docker=docker_agent.docker))
+
+        # Register Valkey health checker with all 4 agent valkey clients
+        await self.health_probe.register(
+            ValkeyHealthChecker(
+                clients={
+                    ComponentId("stat"): default_agent.valkey_stat_client,
+                    ComponentId("stream"): default_agent.valkey_stream_client,
+                    ComponentId("bgtask"): default_agent.valkey_bgtask_client,
+                    ComponentId("container_log"): default_agent.valkey_container_log_client,
+                }
+            )
+        )
+
+        # Start periodic health checking
+        await self.health_probe.start()
 
     async def status_snapshot_request_handler(
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -549,6 +586,7 @@ class AgentRPCServer(aobject):
         await self.runtime.__aexit__(*exc_info)
         await self.stats_monitor.cleanup()
         await self.error_monitor.cleanup()
+        await self.health_probe.stop()
 
     @collect_error
     async def update_status(self, status: str, agent_id: AgentId):
@@ -602,18 +640,19 @@ class AgentRPCServer(aobject):
     @collect_error
     async def health(self) -> Mapping[str, Any]:
         """
-        Lightweight health check that returns agent health status.
+        Health check that returns agent health status with dependency connectivity.
 
-        Returns HealthCheckResponse without performing heavy operations.
-        Agent itself doesn't check connectivity to other components.
+        Returns HealthResponse with connectivity status for etcd and docker.
         """
         log.debug("rpc::health()")
-        response = HealthCheckResponse(
-            overall_healthy=True,
-            connectivity_checks=[],
-            timestamp=datetime.now(timezone.utc),
+        connectivity = await self.health_probe.get_connectivity_status()
+        response = HealthResponse(
+            status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
+            version=VERSION,
+            component="agent",
+            connectivity=connectivity,
         )
-        return response.model_dump()
+        return response.model_dump(mode="json")
 
     @rpc_function
     @collect_error
@@ -1262,18 +1301,21 @@ async def server_main_logwrapper(
 
 
 async def check_health(request: web.Request) -> web.Response:
-    """Simple health check endpoint"""
+    """Health check endpoint with dependency connectivity status"""
+
     from . import __version__
-    from .types import HealthResponse
 
     request["do_not_print_access_log"] = True
 
+    health_probe: HealthProbe = request.app["health_probe"]
+    connectivity = await health_probe.get_connectivity_status()
     response = HealthResponse(
-        status="healthy",
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
         component="agent",
+        connectivity=connectivity,
     )
-    return web.json_response(response.model_dump())
+    return web.json_response(response.model_dump(mode="json"))
 
 
 def build_root_server() -> web.Application:
@@ -1440,6 +1482,7 @@ async def agent_server_ctx(
         skip_detect_manager=local_config.agent_common.skip_manager_detection,
     )
     app = build_root_server()
+    app["health_probe"] = agent_server.health_probe
     runner = web.AppRunner(app)
     await runner.setup()
     internal_addr = local_config.agent_common.internal_addr.to_legacy()

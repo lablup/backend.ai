@@ -75,7 +75,11 @@ from ai.backend.common.defs import (
     REDIS_STREAM_DB,
     RedisRole,
 )
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.events.dispatcher import EventDispatcher, EventHandler, EventProducer
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
+from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -448,6 +452,30 @@ async def inference_metric_collection_ctx(root_ctx: RootContext) -> AsyncIterato
 
 
 @asynccontextmanager
+async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    """Initialize and start health probe with all health checkers."""
+    probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+    root_ctx.health_probe = probe
+
+    # Register health checkers using already-initialized resources
+    await probe.register(
+        ValkeyHealthChecker(
+            clients={
+                ComponentId("live"): root_ctx.valkey_live,
+                ComponentId("stat"): root_ctx.valkey_stat,
+            }
+        )
+    )
+
+    # Start periodic health checking
+    await probe.start()
+    try:
+        yield
+    finally:
+        await probe.stop()
+
+
+@asynccontextmanager
 async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     sd_type = root_ctx.local_config.service_discovery.type
     service_discovery: ServiceDiscovery
@@ -522,12 +550,17 @@ async def metrics(request: web.Request) -> web.Response:
 
 
 async def hello(request: web.Request) -> web.Response:
-    """
-    Returns the API version number.
-    """
-    return web.json_response({
-        "proxy-worker": __version__,
-    })
+    """Health check endpoint with dependency connectivity status"""
+    request["do_not_print_access_log"] = True
+    root_ctx: RootContext = request.app["_root.context"]
+    connectivity = await root_ctx.health_probe.get_connectivity_status()
+    response = HealthResponse(
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
+        version=__version__,
+        component="appproxy-worker",
+        connectivity=connectivity,
+    )
+    return web.json_response(response.model_dump(mode="json"))
 
 
 async def status(request: web.Request) -> web.Response:
@@ -666,6 +699,7 @@ def build_root_app(
             cleanup_contexts = [
                 proxy_frontend_ctx,
                 redis_ctx,
+                health_probe_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
                 inference_metric_collection_ctx,
@@ -676,6 +710,7 @@ def build_root_app(
                 redis_ctx,
                 event_dispatcher_ctx,
                 event_handler_ctx,
+                health_probe_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
                 inference_metric_collection_ctx,

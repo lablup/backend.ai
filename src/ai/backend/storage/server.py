@@ -42,6 +42,10 @@ from ai.backend.common.defs import (
 )
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
+from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
+from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
+from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.message_queue.hiredis_queue import HiRedisQueue
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
@@ -431,7 +435,7 @@ async def api_ctx(
 
     @asynccontextmanager
     async def internal_api_ctx() -> AsyncGenerator[web.Application]:
-        internal_api_app = init_internal_app()
+        internal_api_app = init_internal_app(root_ctx)
         internal_api_runner = web.AppRunner(internal_api_app)
         await internal_api_runner.setup()
         internal_addr = local_config.api.manager.internal_addr
@@ -607,6 +611,20 @@ async def server_main(
         )
         storage_init_stack.push_async_callback(valkey_artifact_client.close)
 
+        # Initialize health probe
+        health_probe = HealthProbe(options=HealthProbeOptions(check_interval=60))
+        await health_probe.register(EtcdHealthChecker(etcd=etcd))
+        await health_probe.register(
+            ValkeyHealthChecker(
+                clients={
+                    ComponentId("bgtask"): bgtask_mgr._valkey_client,
+                    ComponentId("artifact"): valkey_artifact_client,
+                }
+            )
+        )
+        await health_probe.start()
+        storage_init_stack.push_async_callback(health_probe.stop)
+
         root_ctx = RootContext(
             pid=os.getpid(),
             pidx=pidx,
@@ -627,6 +645,7 @@ async def server_main(
             },
             manager_http_clients={},
             valkey_artifact_client=valkey_artifact_client,
+            health_probe=health_probe,
             backends={**DEFAULT_BACKENDS},
             volumes={
                 NOOP_STORAGE_VOLUME_NAME: init_noop_volume(etcd, event_dispatcher, event_producer)

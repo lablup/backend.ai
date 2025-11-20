@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
     from ai.backend.common.events.fetcher import EventFetcher
     from ai.backend.common.events.hub.hub import EventHub
+    from ai.backend.common.health_checker.probe import HealthProbe
     from ai.backend.common.jwt.validator import JWTValidator
     from ai.backend.common.leader import ValkeyLeaderElection
     from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -115,3 +116,4 @@ class RootContext(BaseContext):
     service_discovery: ServiceDiscovery
     sd_loop: ServiceDiscoveryLoop
     gql_adapters: GQLAdapters
+    health_probe: HealthProbe

@@ -31,6 +31,7 @@ from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
+from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
 from ai.backend.common.dto.storage.response import VFolderCloneResponse, VFolderDeleteResponse
 from ai.backend.common.events.event_types.volume.broadcast import (
     DoVolumeMountEvent,
@@ -126,17 +127,20 @@ def skip_token_auth(
 
 @skip_token_auth
 async def check_health(request: web.Request) -> web.Response:
-    """Simple health check endpoint"""
-    from ..types import HealthResponse
+    """Health check endpoint with dependency connectivity status"""
 
     request["do_not_print_access_log"] = True
 
+    ctx: RootContext = request.app["ctx"]
+    connectivity = await ctx.health_probe.get_connectivity_status()
     response = HealthResponse(
-        status="healthy",
+        status=HealthStatus.OK if connectivity.overall_healthy else HealthStatus.DEGRADED,
         version=__version__,
         component="storage-proxy",
+        connectivity=connectivity,
     )
-    return web.json_response(response.model_dump())
+
+    return web.json_response(response.model_dump(mode="json"))
 
 
 @skip_token_auth
@@ -1257,9 +1261,11 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     return app
 
 
-def init_internal_app() -> web.Application:
+def init_internal_app(ctx: RootContext) -> web.Application:
     app = web.Application()
+    app["ctx"] = ctx
     metric_registry = CommonMetricRegistry.instance()
+    app.router.add_route("GET", "/health", check_health)
     app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
     return app
 
