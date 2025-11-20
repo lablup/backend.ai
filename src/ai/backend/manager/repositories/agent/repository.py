@@ -1,12 +1,10 @@
 import logging
-import zlib
 from collections.abc import Collection, Sequence
 from typing import Any, Mapping, cast
 
 import sqlalchemy as sa
 from sqlalchemy.orm import contains_eager
 
-from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -26,13 +24,16 @@ from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
-from ai.backend.manager.data.image.types import ImageDataWithDetails
+from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
+from ai.backend.manager.repositories.agent.stateful_source.stateful_source import (
+    AgentStatefulSource,
+)
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 
 from .query import QueryCondition, QueryOrder
@@ -58,6 +59,7 @@ agent_repository_resilience = Resilience(
 class AgentRepository:
     _db_source: AgentDBSource
     _cache_source: AgentCacheSource
+    _stateful_source: AgentStatefulSource
     _config_provider: ManagerConfigProvider
 
     def __init__(
@@ -70,6 +72,7 @@ class AgentRepository:
     ) -> None:
         self._db_source = AgentDBSource(db)
         self._cache_source = AgentCacheSource(valkey_image, valkey_live, valkey_stat)
+        self._stateful_source = AgentStatefulSource(valkey_image)
         self._config_provider = config_provider
 
     @agent_repository_resilience.apply()
@@ -77,10 +80,13 @@ class AgentRepository:
         return await self._db_source.get_by_id(agent_id)
 
     @agent_repository_resilience.apply()
-    async def add_agent_to_images(self, agent_id: AgentId, images: bytes) -> None:
-        img: list[tuple[str, str]] = msgpack.unpackb(zlib.decompress(images))
-        image_digests = [digest for canonical, digest in img]
-        images_data = await self._db_source.get_images_by_digest(image_digests)
+    async def sync_installed_images(self, agent_id: AgentId) -> None:
+        installed_image_info = await self._stateful_source.read_agent_installed_images(agent_id)
+        image_identifiers = [
+            ImageIdentifier(canonical=img.canonical, architecture=img.architecture)
+            for img in installed_image_info
+        ]
+        images_data = await self._db_source.get_images_by_image_identifiers(image_identifiers)
         image_ids: list[ImageID] = list(images_data.keys())
         with suppress_with_log(
             [Exception], message=f"Failed to cache agent: {agent_id} to images: {image_ids}"
