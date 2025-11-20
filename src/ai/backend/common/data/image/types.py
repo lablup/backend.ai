@@ -4,7 +4,7 @@ from typing import Self
 from pydantic import BaseModel
 
 
-class ImageInfo(BaseModel):
+class InstalledImageInfo(BaseModel):
     canonical: str
     digest: str
     architecture: str

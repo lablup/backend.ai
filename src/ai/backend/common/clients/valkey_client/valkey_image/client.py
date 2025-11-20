@@ -8,7 +8,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
-from ai.backend.common.data.image.types import ImageInfo
+from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -119,18 +119,18 @@ class ValkeyImageClient:
     async def add_agent_installed_images(
         self,
         agent_ip: str,
-        image_info: list[ImageInfo],
+        installed_image_info: list[InstalledImageInfo],
     ) -> None:
         """
         Add installed image info for an agent.
 
         :param agent_ip: The agent IP to add.
-        :param image_info: list of image information
+        :param installed_image_info: list of installed image information
         """
-        if not image_info:
+        if not installed_image_info:
             return
 
-        value = dump_json_str([img.model_dump() for img in image_info])
+        value = dump_json_str([img.model_dump() for img in installed_image_info])
         await self._client.client.set(key=f"installed_image:{agent_ip}", value=value)
 
     # For compatibility with redis key made with image canonical strings

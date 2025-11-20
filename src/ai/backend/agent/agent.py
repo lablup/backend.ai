@@ -84,7 +84,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.config import model_definition_iv
 from ai.backend.common.data.agent.types import AgentInfo, ImageOpts
-from ai.backend.common.data.image.types import ImageInfo, ScannedImage
+from ai.backend.common.data.image.types import InstalledImageInfo, ScannedImage
 from ai.backend.common.defs import (
     REDIS_BGTASK_DB,
     REDIS_CONTAINER_LOG,
@@ -299,8 +299,8 @@ def update_additional_gids(environ: MutableMapping[str, str], gids: Iterable[int
 
 @dataclass
 class ScanImagesResult:
-    scanned_images: Mapping[ImageCanonical, ImageInfo]
-    removed_images: Mapping[ImageCanonical, ImageInfo]
+    scanned_images: Mapping[ImageCanonical, InstalledImageInfo]
+    removed_images: Mapping[ImageCanonical, InstalledImageInfo]
 
 
 @dataclass
@@ -777,7 +777,7 @@ class AbstractAgent(
     kernel_registry: MutableMapping[KernelId, AbstractKernel]
     slots: Mapping[SlotName, Decimal]
     computers: Mapping[DeviceName, ComputerContext]
-    images: Mapping[ImageCanonical, ImageInfo]
+    images: Mapping[ImageCanonical, InstalledImageInfo]
     port_pool: set[int]
 
     restarting_kernels: MutableMapping[KernelId, RestartTracker]
@@ -1209,7 +1209,7 @@ class AbstractAgent(
             )
             await self.anycast_event(AgentHeartbeatEvent(agent_info))
             await self.valkey_image_client.add_agent_installed_images(
-                agent_ip=self.rpc_addr.host, image_info=list(self.images.values())
+                agent_ip=self.rpc_addr.host, installed_image_info=list(self.images.values())
             )
         except asyncio.TimeoutError:
             log.warning("event dispatch timeout: instance_heartbeat")
