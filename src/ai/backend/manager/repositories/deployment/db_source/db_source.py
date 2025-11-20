@@ -32,6 +32,7 @@ from ai.backend.manager.data.deployment.types import (
     RouteInfo,
     RouteStatus,
     ScaleOutDecision,
+    ScalingGroupCleanupConfig,
 )
 from ai.backend.manager.data.resource.types import ScalingGroupProxyTarget
 from ai.backend.manager.data.session.types import SessionStatus
@@ -57,7 +58,7 @@ from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.keypair import keypairs
 from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.scaling_group import scaling_groups
+from ai.backend.manager.models.scaling_group import ScalingGroupRow, scaling_groups
 from ai.backend.manager.models.storage import StorageSessionManager
 from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -242,6 +243,45 @@ class DeploymentDBSource:
             rows: Sequence[EndpointRow] = result.scalars().all()
 
             return [row.to_deployment_info() for row in rows]
+
+    async def get_scaling_group_cleanup_configs(
+        self, scaling_group_names: Sequence[str]
+    ) -> dict[str, ScalingGroupCleanupConfig]:
+        """
+        Get route cleanup target statuses configuration for scaling groups.
+
+        Args:
+            scaling_group_names: List of scaling group names to query
+
+        Returns:
+            Mapping of scaling group name to ScalingGroupCleanupConfig
+        """
+        if not scaling_group_names:
+            return {}
+
+        async with self._db.begin_readonly_session() as db_sess:
+            stmt = sa.select(ScalingGroupRow.name, ScalingGroupRow.scheduler_opts).where(
+                ScalingGroupRow.name.in_(scaling_group_names)
+            )
+            result = await db_sess.execute(stmt)
+
+            cleanup_configs: dict[str, ScalingGroupCleanupConfig] = {}
+            for row in result:
+                # Convert str to RouteStatus
+                status_strs = row.scheduler_opts.route_cleanup_target_statuses
+                statuses = []
+                for status_str in status_strs:
+                    try:
+                        statuses.append(RouteStatus(status_str))
+                    except ValueError:
+                        # Skip invalid status strings
+                        pass
+
+                cleanup_configs[row.name] = ScalingGroupCleanupConfig(
+                    scaling_group_name=row.name, cleanup_target_statuses=statuses
+                )
+
+            return cleanup_configs
 
     async def get_endpoints_by_statuses(
         self, statuses: list[EndpointLifecycle]

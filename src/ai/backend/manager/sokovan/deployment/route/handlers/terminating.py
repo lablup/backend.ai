@@ -54,6 +54,11 @@ class TerminatingRouteHandler(RouteHandler):
         # Even if termination fails, we still mark as terminated
         return None
 
+    @classmethod
+    def stale_status(cls) -> Optional[RouteStatus]:
+        """Get the stale route status if applicable."""
+        return None
+
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute termination for routes."""
         log.debug("Terminating {} routes", len(routes))

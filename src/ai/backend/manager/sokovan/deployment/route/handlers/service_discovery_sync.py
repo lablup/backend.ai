@@ -53,6 +53,11 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         """No failure status for service discovery sync."""
         return None
 
+    @classmethod
+    def stale_status(cls) -> Optional[RouteStatus]:
+        """Get the stale route status if applicable."""
+        return None
+
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute service discovery synchronization for healthy routes."""
         log.debug("Syncing {} healthy routes to service discovery", len(routes))

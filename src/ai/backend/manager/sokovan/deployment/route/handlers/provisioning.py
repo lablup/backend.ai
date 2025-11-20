@@ -46,12 +46,17 @@ class ProvisioningRouteHandler(RouteHandler):
     @classmethod
     def next_status(cls) -> Optional[RouteStatus]:
         """Get the next route status after this handler's operation."""
-        return RouteStatus.UNHEALTHY
+        return RouteStatus.DEGRADED
 
     @classmethod
     def failure_status(cls) -> Optional[RouteStatus]:
         """Get the failure route status if applicable."""
         return RouteStatus.FAILED_TO_START
+
+    @classmethod
+    def stale_status(cls) -> Optional[RouteStatus]:
+        """Get the stale route status if applicable."""
+        return None
 
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute provisioning for routes."""

@@ -34,6 +34,7 @@ class RouteStatus(enum.Enum):
     PROVISIONING = "provisioning"
     HEALTHY = "healthy"
     UNHEALTHY = "unhealthy"
+    DEGRADED = "degraded"
     TERMINATING = "terminating"
     TERMINATED = "terminated"
     FAILED_TO_START = "failed_to_start"
@@ -41,7 +42,12 @@ class RouteStatus(enum.Enum):
     @classmethod
     @lru_cache(maxsize=1)
     def active_route_statuses(cls) -> set["RouteStatus"]:
-        return {RouteStatus.PROVISIONING, RouteStatus.HEALTHY, RouteStatus.UNHEALTHY}
+        return {
+            RouteStatus.PROVISIONING,
+            RouteStatus.HEALTHY,
+            RouteStatus.UNHEALTHY,
+            RouteStatus.DEGRADED,
+        }
 
     @classmethod
     @lru_cache(maxsize=1)
@@ -57,10 +63,19 @@ class RouteStatus(enum.Enum):
     def termination_priority(self) -> int:
         priority_map = {
             RouteStatus.UNHEALTHY: 1,
-            RouteStatus.PROVISIONING: 2,
-            RouteStatus.HEALTHY: 3,
+            RouteStatus.DEGRADED: 2,
+            RouteStatus.PROVISIONING: 3,
+            RouteStatus.HEALTHY: 4,
         }
         return priority_map.get(self, 0)
+
+
+@dataclass
+class ScalingGroupCleanupConfig:
+    """Cleanup configuration for a scaling group."""
+
+    scaling_group_name: str
+    cleanup_target_statuses: list[RouteStatus]
 
 
 @dataclass

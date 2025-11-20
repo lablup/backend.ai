@@ -1,3 +1,4 @@
+import enum
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Optional, Self, cast
@@ -26,6 +27,15 @@ PENDING_QUEUE_EXPIRY_SEC = 600  # 10 minutes
 ROUTE_HEALTH_TTL_SEC = 120  # 2 minutes
 MAX_HEALTH_STALENESS_SEC = 300  # 5 minutes - threshold for health status staleness
 
+
+class HealthCheckStatus(enum.StrEnum):
+    """Status of an individual health check (readiness or liveness)."""
+
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    STALE = "stale"
+
+
 # Resilience instance for valkey_schedule layer
 valkey_schedule_resilience = Resilience(
     policies=[
@@ -46,12 +56,20 @@ valkey_schedule_resilience = Resilience(
 class HealthStatus:
     """Health status data for a route."""
 
-    readiness: bool
-    liveness: bool
+    readiness: HealthCheckStatus
+    liveness: HealthCheckStatus
     last_check: int  # Unix timestamp of last check by manager
 
-    def is_alive(self) -> bool:
-        """Check if the route is considered alive (both readiness and liveness are true)."""
+    def get_status(self) -> HealthCheckStatus:
+        """
+        Get the overall health status of the route.
+
+        Returns:
+            HealthCheckStatus based on readiness and liveness:
+            - STALE: if either readiness or liveness is stale
+            - HEALTHY: if readiness is healthy (TODO: and liveness when implemented)
+            - UNHEALTHY: if readiness is unhealthy
+        """
         # TODO: Use liveness too after applying liveness checks in agent
         return self.readiness
 
@@ -140,22 +158,27 @@ class ValkeyScheduleClient:
         seconds_bytes, _ = result
         return int(seconds_bytes)
 
-    async def _validate_health_status(self, status: str, timestamp_str: str) -> bool:
+    async def _validate_health_status(self, status: str, timestamp_str: str) -> HealthCheckStatus:
         """
         Validate health status by checking if it's healthy and timestamp is not stale.
 
         :param status: The status string ("1" for healthy, "0" for unhealthy)
         :param timestamp_str: The timestamp string value from Redis
-        :return: True if status is healthy and timestamp is not stale, False otherwise
+        :return: HealthCheckStatus indicating the status:
+                 - HEALTHY: status is "1" and timestamp is fresh
+                 - UNHEALTHY: status is "0" and timestamp is fresh
+                 - STALE: timestamp is stale or invalid
         """
-        if status != "1":
-            return False
         try:
             timestamp = int(timestamp_str)
             current_time = await self._get_redis_time()
-            return (current_time - timestamp) <= MAX_HEALTH_STALENESS_SEC
+            is_stale = (current_time - timestamp) > MAX_HEALTH_STALENESS_SEC
+            if is_stale:
+                return HealthCheckStatus.STALE
+            return HealthCheckStatus.HEALTHY if status == "1" else HealthCheckStatus.UNHEALTHY
         except (ValueError, TypeError):
-            return False
+            # If timestamp is invalid, consider it stale
+            return HealthCheckStatus.STALE
 
     @valkey_schedule_resilience.apply()
     async def mark_schedule_needed(self, schedule_type: str) -> None:
@@ -456,16 +479,16 @@ class ValkeyScheduleClient:
 
             # Parse existing data
             data = {k.decode(): v.decode() for k, v in result.items()}
-            # Parse boolean values using validation helper (checks both status and staleness)
-            readiness = await self._validate_health_status(
+            # Validate health check statuses
+            readiness_status = await self._validate_health_status(
                 data.get("readiness", "0"), data.get("last_readiness", "0")
             )
-            liveness = await self._validate_health_status(
+            liveness_status = await self._validate_health_status(
                 data.get("liveness", "0"), data.get("last_liveness", "0")
             )
             health_statuses[route_id] = HealthStatus(
-                readiness=readiness,
-                liveness=liveness,
+                readiness=readiness_status,
+                liveness=liveness_status,
                 last_check=int(data["last_check"]) if "last_check" in data else 0,
             )
 
