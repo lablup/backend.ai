@@ -16,6 +16,67 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.17.0rc3 (2025-11-20)
+
+### Features
+* Add support for array of tables syntax in config sample generator ([#6311](https://github.com/lablup/backend.ai/issues/6311))
+* Add support for multiple agents in agent server config ([#6315](https://github.com/lablup/backend.ai/issues/6315))
+* Update Agent server RPC functions to include agent ID for agent runtime with multiple agents ([#6320](https://github.com/lablup/backend.ai/issues/6320))
+* Add read committed transaction support in `ExtendedAsyncSAEngine`, enabling higher throughput for read-heavy workloads by reducing transaction isolation overhead ([#6665](https://github.com/lablup/backend.ai/issues/6665))
+* Replace time() with Redis TIME command in ValkeyScheduleClient ([#6695](https://github.com/lablup/backend.ai/issues/6695))
+* Change agent config field names and serialization aliases to use internal-addr naming ([#6697](https://github.com/lablup/backend.ai/issues/6697))
+* Support multiple Apollo Router endpoints with load balancing ([#6703](https://github.com/lablup/backend.ai/issues/6703))
+* Add missing and newly introduced fields to service field specifications ([#6714](https://github.com/lablup/backend.ai/issues/6714))
+* Add AgentEtcdClientView for clean handling of etcd clients for multi agents ([#6721](https://github.com/lablup/backend.ai/issues/6721))
+* Add custom resource allocation in agent server config ([#6724](https://github.com/lablup/backend.ai/issues/6724))
+* Extract agent common resources to AgentRuntime ([#6728](https://github.com/lablup/backend.ai/issues/6728))
+* Implement health check infrastructure for component monitoring ([#6732](https://github.com/lablup/backend.ai/issues/6732))
+* Add health checker system for all components ([#6736](https://github.com/lablup/backend.ai/issues/6736))
+* Add missing `id`, `registry_id` fields to `ArtifactRegistry` GQL Node ([#6750](https://github.com/lablup/backend.ai/issues/6750))
+* Add dependency management system for manager ([#6753](https://github.com/lablup/backend.ai/issues/6753))
+* Add dependency verification system for web component ([#6757](https://github.com/lablup/backend.ai/issues/6757))
+* Add dependency verification for storage proxy ([#6760](https://github.com/lablup/backend.ai/issues/6760))
+* Move ownership of resources from agent to a separate component in agent runtime ([#6766](https://github.com/lablup/backend.ai/issues/6766))
+* Add dependency verification for App Proxy Coordinator and Worker ([#6767](https://github.com/lablup/backend.ai/issues/6767))
+* Add resource isolation options for multi-agent setup ([#6770](https://github.com/lablup/backend.ai/issues/6770))
+* Add dependency verification CLI in agent ([#6775](https://github.com/lablup/backend.ai/issues/6775))
+* Add dependency health checking infrastructure ([#6781](https://github.com/lablup/backend.ai/issues/6781))
+* Ensure normal URLs are called even if the protocol is included in the host of `HostPortPair`, preventing network error in app-proxy communication ([#6813](https://github.com/lablup/backend.ai/issues/6813))
+* delete-dev.sh now supports interactive confirmation and non-interactive -y/--yes flag. ([#6815](https://github.com/lablup/backend.ai/issues/6815))
+* Parallelize session termination and add lost agent cleanup ([#6826](https://github.com/lablup/backend.ai/issues/6826))
+* Separate monitor and operation clients in Valkey client ([#6829](https://github.com/lablup/backend.ai/issues/6829))
+* Add model service route synchronization to service discovery ([#6832](https://github.com/lablup/backend.ai/issues/6832))
+* Add periodic service discovery sync for model service routes ([#6833](https://github.com/lablup/backend.ai/issues/6833))
+* Store installed images information to Redis in Agent ([#6834](https://github.com/lablup/backend.ai/issues/6834))
+* Integrate HealthProbe across all components with real connectivity checks ([#6836](https://github.com/lablup/backend.ai/issues/6836))
+* Implement 3-state route health check with configurable eviction ([#6839](https://github.com/lablup/backend.ai/issues/6839))
+
+### Improvements
+* Introduce Source-based structure in `AuthRepository` decoupling database access for easier testing ([#6641](https://github.com/lablup/backend.ai/issues/6641))
+* Make `error_code` method in `BackendAIError` as instance method making injection or modification of the error code from outside the class easier, improving flexibility when handling errors ([#6722](https://github.com/lablup/backend.ai/issues/6722))
+* Move kernel registry ownership to agent runtime ([#6730](https://github.com/lablup/backend.ai/issues/6730))
+* Use resources functions directly in AbstractAgent ([#6763](https://github.com/lablup/backend.ai/issues/6763))
+
+### Fixes
+* Fix app proxy to properly handle redirect parameter in HTTP protocol auth flow by appending the redirect path to the generated proxy URL ([#6686](https://github.com/lablup/backend.ai/issues/6686))
+* Fix Pydantic validation error from incorrect `slot_type` type in mock plugin ([#6692](https://github.com/lablup/backend.ai/issues/6692))
+* Fix domain admin users seeing vfolder hosts from projects they were not members of. They now only see hosts for projects they belong to ([#6694](https://github.com/lablup/backend.ai/issues/6694))
+* Model Card resolver now returns the actual error message when it fails, instead of showing a generic "Unknown error" string ([#6702](https://github.com/lablup/backend.ai/issues/6702))
+* Fix storage proxy client to handle non-JSON error responses instead of crashing on parse failures ([#6712](https://github.com/lablup/backend.ai/issues/6712))
+* Support service-definition.toml override with optional fields(image, arch, resource) ([#6751](https://github.com/lablup/backend.ai/issues/6751))
+* Add missing advertise_address info in app proxy status response ([#6772](https://github.com/lablup/backend.ai/issues/6772))
+* Allow zero values in DecimalType conversion ([#6783](https://github.com/lablup/backend.ai/issues/6783))
+* Disallow dot('.') usage in model service name ([#6800](https://github.com/lablup/backend.ai/issues/6800))
+* Fix auto-scaling functionality for inference services when using framework-based scaling rules. Metrics collection and rule comparison logic have been corrected to ensure proper scaling behavior ([#6801](https://github.com/lablup/backend.ai/issues/6801))
+* Use the kernel’s occupied slots when calculating the agent’s resources ([#6817](https://github.com/lablup/backend.ai/issues/6817))
+* Make agent installed image sync to match by canonical name and architecture instead of digest, preventing digest change by container image driver ([#6838](https://github.com/lablup/backend.ai/issues/6838))
+* Explicitly wrap slot key with `SlotName()` to prevent validation failure when initializing `AgentInfo` ([#6841](https://github.com/lablup/backend.ai/issues/6841))
+
+### Miscellaneous
+* Move `EndpointLifecycle` enum to a shared common package for improved reusability ([#6637](https://github.com/lablup/backend.ai/issues/6637))
+* Add debug log when app proxy worker got server disconnected error making tracing and diagnosing unexpected disconnections easier ([#6735](https://github.com/lablup/backend.ai/issues/6735))
+
+
 ## 25.17.0rc2 (2025-11-10)
 
 ### Fixes

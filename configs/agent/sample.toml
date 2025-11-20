@@ -9,7 +9,7 @@
 # Complete agent configuration (common + overridable).
 [agent]
   # Agent ID
-  id = "agent-001"
+  ## id = "agent-001"
   # Agent socket port
   agent-sock-port = 6007
   # Scaling group name
@@ -74,7 +74,7 @@
   # Metadata server port
   metadata-server-port = 40128
   # Allowed compute plugins
-  ## allow-compute-plugins = [ "ai.backend.activator.agent", "ai.backend.accelerator.cuda_open",]
+  ## allow-compute-plugins = [ "ai.backend.accelerator.cuda_open", "ai.backend.activator.agent",]
   # Blocked compute plugins
   ## block-compute-plugins = [ "ai.backend.accelerator.mock",]
   # Allowed network plugins
@@ -366,7 +366,7 @@
   # Agent settings that can be overridden per-agent in multi-agent mode.
   [agents.agent]
     # Agent ID
-    id = "agent-001"
+    ## id = "agent-001"
     # Agent socket port
     agent-sock-port = 6007
     # Scaling group name
