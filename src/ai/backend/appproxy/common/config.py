@@ -48,6 +48,13 @@ class HostPortPair(BaseSchema):
     host: Annotated[str, Field(examples=["127.0.0.1"])]
     port: Annotated[int, Field(gt=0, lt=65536, examples=[8201])]
 
+    @property
+    def host_set_with_protocol(self) -> bool:
+        for protocol in ("http://", "https://"):
+            if self.host.startswith(protocol):
+                return True
+        return False
+
     def __repr__(self) -> str:
         return f"{self.host}:{self.port}"
 
