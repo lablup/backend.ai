@@ -237,33 +237,84 @@ RunningRouteHandler manages running routes. It routes client requests to appropr
 
 #### HealthCheckRouteHandler
 
-HealthCheckRouteHandler performs periodic health checks to verify normal operation of replicas. It detects unhealthy endpoints that don't respond or return errors, and triggers automatic recovery when configured thresholds are exceeded.
+HealthCheckRouteHandler performs periodic health checks using a 3-state health classification system. The handler queries health status data from Redis (populated by agents) and classifies routes based on readiness checks and data freshness.
+
+**3-State Health Classification:**
+- **HEALTHY**: Readiness check passes and health data is fresh
+- **UNHEALTHY**: Readiness check fails
+- **DEGRADED**: Health data is stale or missing (TTL expired in Redis)
 
 **Health Check Configuration:**
 ```json
 {
-    "interval": 10,            # Check interval
-    "timeout": 5,              # Timeout
-    "unhealthy_threshold": 3,  # Threshold for marking unhealthy
-    "healthy_threshold": 2,    # Threshold for marking healthy
-    "path": "/health",         # Health check path
-    "method": "GET"            # HTTP method
+    "route_health_ttl": 120,           # Redis TTL for health data (seconds)
+    "max_health_staleness": 300        # Threshold for marking data as stale (seconds)
 }
 ```
 
 **Processing Flow:**
 ```
-1. Send health check requests to all endpoints
+1. Fetch health status from Redis for all routes
    ↓
-2. Check responses
-   ├─ Success: Increment healthy counter
-   └─ Failure: Increment unhealthy counter
+2. Check each route's health data
+   ├─ No data (TTL expired)
+   │   └─ Mark as DEGRADED
+   ├─ Data exists but stale (last_check > max_staleness)
+   │   └─ Mark as DEGRADED
+   ├─ Readiness check passes
+   │   └─ Mark as HEALTHY
+   └─ Readiness check fails
+       └─ Mark as UNHEALTHY
    ↓
-3. Check thresholds
-   ├─ Unhealthy threshold exceeded
-   │   └─ Remove endpoint or restart replica
-   └─ Healthy threshold reached
-       └─ Activate endpoint
+3. Update route status in database
+```
+
+**Note**: Health data is written to Redis by agents during their periodic health check cycles. The manager reads this data to determine route status.
+
+#### RouteEvictionHandler
+
+RouteEvictionHandler automatically cleans up routes based on scaling group configuration. This handler provides flexible route lifecycle management by allowing different cleanup policies per scaling group.
+
+**Key Features:**
+- Configurable cleanup targets per scaling group
+- Supports selective eviction based on route health status
+- No-lock operation for efficiency
+
+**Scaling Group Configuration:**
+```python
+{
+    "route_cleanup_target_statuses": ["unhealthy"]  # Default
+    # Valid values: ["healthy", "unhealthy", "degraded"]
+}
+```
+
+**Processing Flow:**
+```
+1. Query routes in UNHEALTHY status
+   ↓
+2. For each route:
+   ├─ Fetch scaling group configuration
+   ├─ Check if route status in cleanup_target_statuses
+   └─ If yes, mark route for TERMINATING
+   ↓
+3. Terminate marked routes
+```
+
+**Configuration Examples:**
+
+Aggressive cleanup (remove all unhealthy):
+```python
+"route_cleanup_target_statuses": ["unhealthy"]
+```
+
+Conservative cleanup (keep degraded routes):
+```python
+"route_cleanup_target_statuses": ["unhealthy"]  # Keep degraded for recovery
+```
+
+Complete cleanup (remove all non-healthy):
+```python
+"route_cleanup_target_statuses": ["unhealthy", "degraded"]
 ```
 
 #### TerminatingRouteHandler
@@ -338,6 +389,31 @@ TerminatingRouteHandler is responsible for termination processing of routes. It 
 6. Wait for cooldown period
 ```
 
+### Route Health Monitoring and Cleanup Flow
+
+```
+1. Agent: Perform readiness/liveness checks on kernels
+   ├─ Write health status to Redis
+   └─ Set TTL (2 minutes)
+   ↓
+2. HealthCheckRouteHandler (every 5 seconds)
+   ├─ Query health status from Redis
+   ├─ Classify routes:
+   │   ├─ HEALTHY: readiness passes, data fresh
+   │   ├─ UNHEALTHY: readiness fails
+   │   └─ DEGRADED: data stale or missing
+   └─ Update route status in database
+   ↓
+3. RouteEvictionHandler (every 1 minute)
+   ├─ Query UNHEALTHY routes
+   ├─ Check scaling group cleanup config
+   ├─ Filter routes matching cleanup_target_statuses
+   └─ Mark matched routes as TERMINATING
+   ↓
+4. TerminatingRouteHandler
+   └─ Terminate sessions and remove routes
+```
+
 ## State Transition Details
 
 ### Deployment State Transitions
@@ -396,17 +472,39 @@ STARTING ┤      ↕       ├─→ TERMINATING → TERMINATED
 Routes follow these state transition paths:
 
 ```
-PENDING → PROVISIONING → RUNNING → TERMINATING → TERMINATED
+                    ┌──────────┐
+                    │ DEGRADED │←────┐
+                    └────┬─────┘     │
+                         │           │
+PENDING → PROVISIONING → ├─→ HEALTHY ┤ → TERMINATING → TERMINATED
+                         │           │
+                    ┌────┴─────┐     │
+                    │ UNHEALTHY│←────┘
+                    └──────────┘
 ```
 
 **Transition Condition Details:**
 
 | Current State | Next State | Transition Trigger | Responsible Component |
-|----------|----------|------------|--------------|
+|---------------|------------|-------------------|---------------------|
 | PENDING | PROVISIONING | Route creation started | RouteController |
-| PROVISIONING | RUNNING | Endpoint collection completed, load balancer configured | ProvisioningHandler |
-| RUNNING | TERMINATING | Deployment termination or route deletion | RouteController |
-| TERMINATING | TERMINATED | Traffic draining completed | TerminatingHandler |
+| PROVISIONING | HEALTHY | Session ready and health check passes | HealthCheckHandler |
+| HEALTHY | HEALTHY | Readiness passes, data fresh | HealthCheckHandler |
+| HEALTHY | UNHEALTHY | Readiness fails | HealthCheckHandler |
+| HEALTHY | DEGRADED | Health data becomes stale | HealthCheckHandler |
+| UNHEALTHY | HEALTHY | Readiness passes again | HealthCheckHandler |
+| UNHEALTHY | DEGRADED | Health data becomes stale | HealthCheckHandler |
+| UNHEALTHY | TERMINATING | Matches cleanup config | RouteEvictionHandler |
+| DEGRADED | HEALTHY | Data refreshed and readiness passes | HealthCheckHandler |
+| DEGRADED | UNHEALTHY | Data refreshed but readiness fails | HealthCheckHandler |
+| DEGRADED | TERMINATING | Matches cleanup config (optional) | RouteEvictionHandler |
+| * | TERMINATING | Deployment termination or manual deletion | RouteController |
+| TERMINATING | TERMINATED | Session termination completed | TerminatingHandler |
+
+**Health Status Lifecycle:**
+- **Fresh → Stale threshold**: 5 minutes (configurable via MAX_HEALTH_STALENESS_SEC)
+- **Redis TTL**: 2 minutes (ROUTE_HEALTH_TTL_SEC)
+- **Recovery**: Routes can transition from UNHEALTHY/DEGRADED back to HEALTHY when conditions improve
 
 ## Configuration and Tuning
 
@@ -425,6 +523,45 @@ Auto-scaling policy is configured by selecting the metric type to monitor (cpu, 
 ### Health Check Configuration
 
 Health checks are configured by setting check interval and timeout, specifying thresholds for marking replicas as unhealthy or healthy, and setting the HTTP path and method for performing health checks.
+
+### Route Cleanup Configuration
+
+Route cleanup behavior is configured per scaling group to support different operational policies:
+
+```python
+# Scaling group scheduler_opts
+{
+    "route_cleanup_target_statuses": ["unhealthy"]  # List of statuses to clean up
+}
+```
+
+**Available Target Statuses:**
+- `healthy`: Clean up healthy routes (unusual, for controlled teardown)
+- `unhealthy`: Clean up routes failing health checks (recommended default)
+- `degraded`: Clean up routes with stale health data
+
+**Policy Examples:**
+
+**Aggressive Cleanup** (maximize resource efficiency):
+```python
+"route_cleanup_target_statuses": ["unhealthy", "degraded"]
+```
+- Quickly removes any non-healthy routes
+- Minimizes resource waste
+- Risk: May remove temporarily degraded routes that could recover
+
+**Conservative Cleanup** (maximize availability):
+```python
+"route_cleanup_target_statuses": ["unhealthy"]
+```
+- Only removes confirmed unhealthy routes
+- Keeps degraded routes for potential recovery
+- Risk: May retain non-functional routes with stale data
+
+**Custom Policies**:
+```python
+"route_cleanup_target_statuses": []  # Disable automatic cleanup
+```
 
 ### Routing Configuration
 
@@ -517,6 +654,51 @@ To monitor system state, track deployment creation, update, and deletion counts,
 4. Add agents or secure resources if resource shortage
 
 > **Note**: Scale-up can fail if unable to create new sessions due to resource shortage even if metrics are normal.
+
+### 3. Routes Stuck in DEGRADED State
+
+**Symptoms**:
+- Multiple routes remain in DEGRADED state
+- Routes don't transition back to HEALTHY despite kernel running
+
+**Causes**:
+- Agent health check cycle not running
+- Redis connectivity issues between agent and manager
+- Health check TTL too short for agent check interval
+
+**Diagnosis**:
+- **Route Details**: Check route status and last health check timestamp
+- **Agent Health**: Verify agent health check is running
+- **Redis Connection**: Check agent can write to Redis
+- **Timing Configuration**: Compare ROUTE_HEALTH_TTL_SEC vs agent check interval
+
+**Resolution**:
+1. Verify agent health check cycle is active
+2. Check Redis connectivity from agents
+3. Increase ROUTE_HEALTH_TTL_SEC if agent checks are slower
+4. Review MAX_HEALTH_STALENESS_SEC threshold
+
+### 4. Routes Not Being Cleaned Up
+
+**Symptoms**:
+- UNHEALTHY or DEGRADED routes persist indefinitely
+- Expected automatic cleanup not happening
+
+**Causes**:
+- Scaling group cleanup_target_statuses not configured
+- Route status not in cleanup target list
+- RouteEvictionHandler not running
+
+**Diagnosis**:
+- **Scaling Group Config**: Check route_cleanup_target_statuses setting
+- **Route Status**: Verify route status matches cleanup targets
+- **Handler Status**: Confirm RouteEvictionHandler is executing
+
+**Resolution**:
+1. Update scaling group scheduler_opts with appropriate cleanup_target_statuses
+2. Verify route status is in the cleanup target list
+3. Check RouteEvictionHandler logs for execution
+4. Manually trigger cleanup via API if needed
 
 ## Parent Document
 - [Sokovan Overall Architecture](../README.md)
