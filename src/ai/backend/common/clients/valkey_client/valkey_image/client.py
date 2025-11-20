@@ -10,7 +10,7 @@ from ai.backend.common.clients.valkey_client.client import (
 )
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.exception import BackendAIError
-from ai.backend.common.json import dump_json_str
+from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
     BackoffStrategy,
@@ -132,6 +132,25 @@ class ValkeyImageClient:
 
         value = dump_json_str([img.model_dump() for img in installed_image_info])
         await self._client.client.set(key=f"installed_image:{agent_id}", value=value)
+
+    @valkey_image_resilience.apply()
+    async def get_agent_installed_images(
+        self,
+        agent_id: AgentId,
+    ) -> list[InstalledImageInfo]:
+        """
+        Get installed image info for an agent.
+
+        :param agent_id: The agent ID to get.
+        :return: list of installed image information
+        """
+        value = await self._client.client.get(key=f"installed_image:{agent_id}")
+        if value is None:
+            return []
+
+        json_value = value.decode()
+        installed_image_dicts = load_json(json_value)
+        return [InstalledImageInfo.model_validate(img_dict) for img_dict in installed_image_dicts]
 
     # For compatibility with redis key made with image canonical strings
     # Use remove_agent_from_images instead of this if possible
