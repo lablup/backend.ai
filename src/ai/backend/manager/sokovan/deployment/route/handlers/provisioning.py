@@ -46,7 +46,7 @@ class ProvisioningRouteHandler(RouteHandler):
     @classmethod
     def next_status(cls) -> Optional[RouteStatus]:
         """Get the next route status after this handler's operation."""
-        return RouteStatus.UNHEALTHY
+        return RouteStatus.DEGRADED
 
     @classmethod
     def failure_status(cls) -> Optional[RouteStatus]:
