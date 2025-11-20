@@ -261,7 +261,7 @@ HealthCheckRouteHandler performs periodic health checks using a 3-state health c
 3. Update route status in database
 ```
 
-**Note**: Health data is written to Redis by agents during their periodic health check cycles. The manager reads this data to determine route status.
+**Note**: Health data is written to Redis by app-proxy workers during their periodic readiness checks on kernels. The manager reads this data to determine route status.
 
 #### RouteEvictionHandler
 
@@ -384,7 +384,7 @@ TerminatingRouteHandler is responsible for termination processing of routes. It 
 ### Route Health Monitoring and Cleanup Flow
 
 ```
-1. Agent: Perform readiness/liveness checks on kernels
+1. App-proxy worker: Perform readiness checks on kernels
    ├─ Write health status to Redis
    └─ Set TTL (2 minutes)
    ↓
@@ -516,45 +516,6 @@ Auto-scaling policy is configured by selecting the metric type to monitor (cpu, 
 
 Health checks are configured by setting check interval and timeout, specifying thresholds for marking replicas as unhealthy or healthy, and setting the HTTP path and method for performing health checks.
 
-### Route Cleanup Configuration
-
-Route cleanup behavior is configured per scaling group to support different operational policies:
-
-```python
-# Scaling group scheduler_opts
-{
-    "route_cleanup_target_statuses": ["unhealthy"]  # List of statuses to clean up
-}
-```
-
-**Available Target Statuses:**
-- `healthy`: Clean up healthy routes (unusual, for controlled teardown)
-- `unhealthy`: Clean up routes failing health checks (recommended default)
-- `degraded`: Clean up routes with stale health data
-
-**Policy Examples:**
-
-**Aggressive Cleanup** (maximize resource efficiency):
-```python
-"route_cleanup_target_statuses": ["unhealthy", "degraded"]
-```
-- Quickly removes any non-healthy routes
-- Minimizes resource waste
-- Risk: May remove temporarily degraded routes that could recover
-
-**Conservative Cleanup** (maximize availability):
-```python
-"route_cleanup_target_statuses": ["unhealthy"]
-```
-- Only removes confirmed unhealthy routes
-- Keeps degraded routes for potential recovery
-- Risk: May retain non-functional routes with stale data
-
-**Custom Policies**:
-```python
-"route_cleanup_target_statuses": []  # Disable automatic cleanup
-```
-
 ### Routing Configuration
 
 Routing-related configurations include selecting the load balancing strategy to use (round-robin, least connections, weight-based), setting request timeout, and configuring retry policy for failed requests.
@@ -654,43 +615,21 @@ To monitor system state, track deployment creation, update, and deletion counts,
 - Routes don't transition back to HEALTHY despite kernel running
 
 **Causes**:
-- Agent health check cycle not running
-- Redis connectivity issues between agent and manager
-- Health check TTL too short for agent check interval
+- App-proxy worker health check cycle not running
+- Redis connectivity issues between app-proxy and manager
+- Health check TTL too short for app-proxy check interval
 
 **Diagnosis**:
 - **Route Details**: Check route status and last health check timestamp
-- **Agent Health**: Verify agent health check is running
-- **Redis Connection**: Check agent can write to Redis
-- **Timing Configuration**: Compare ROUTE_HEALTH_TTL_SEC vs agent check interval
+- **App-proxy Health**: Verify app-proxy health check is running
+- **Redis Connection**: Check app-proxy can write to Redis
+- **Timing Configuration**: Compare ROUTE_HEALTH_TTL_SEC vs app-proxy check interval
 
 **Resolution**:
-1. Verify agent health check cycle is active
-2. Check Redis connectivity from agents
-3. Increase ROUTE_HEALTH_TTL_SEC if agent checks are slower
+1. Verify app-proxy health check cycle is active
+2. Check Redis connectivity from app-proxy workers
+3. Increase ROUTE_HEALTH_TTL_SEC if app-proxy checks are slower
 4. Review MAX_HEALTH_STALENESS_SEC threshold
-
-### 4. Routes Not Being Cleaned Up
-
-**Symptoms**:
-- UNHEALTHY or DEGRADED routes persist indefinitely
-- Expected automatic cleanup not happening
-
-**Causes**:
-- Scaling group cleanup_target_statuses not configured
-- Route status not in cleanup target list
-- RouteEvictionHandler not running
-
-**Diagnosis**:
-- **Scaling Group Config**: Check route_cleanup_target_statuses setting
-- **Route Status**: Verify route status matches cleanup targets
-- **Handler Status**: Confirm RouteEvictionHandler is executing
-
-**Resolution**:
-1. Update scaling group scheduler_opts with appropriate cleanup_target_statuses
-2. Verify route status is in the cleanup target list
-3. Check RouteEvictionHandler logs for execution
-4. Manually trigger cleanup via API if needed
 
 ## Parent Document
 - [Sokovan Overall Architecture](../README.md)
