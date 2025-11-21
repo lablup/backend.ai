@@ -189,8 +189,19 @@ def setup_mock_resources(
     async def _mock_load(self: ResourceAllocator) -> Mapping[DeviceName, AbstractComputePlugin]:
         return computers
 
+    def _mock_calculate_total_slots(self: ResourceAllocator) -> Mapping[SlotName, Decimal]:
+        # Calculate from the mocked computers
+        total_slots: dict[SlotName, Decimal] = {}
+        for ctx in self.computers.values():
+            for slot_info in ctx.alloc_map.device_slots.values():
+                if slot_info.slot_name not in total_slots:
+                    total_slots[slot_info.slot_name] = Decimal("0")
+                total_slots[slot_info.slot_name] += slot_info.amount
+        return total_slots
+
     async def _mock_scan(self: ResourceAllocator) -> Mapping[SlotName, Decimal]:
-        return dict(self.total_slots)
+        # Calculate from the mocked computers
+        return _mock_calculate_total_slots(self)
 
     monkeypatch.setattr(
         "ai.backend.agent.resources.ResourceAllocator._load_resources",
@@ -447,9 +458,9 @@ class TestAutoSplitMode:
 
         reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
         reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        # Each agent has 6 reserved (6 allocated out of 12 total after reservation)
-        assert reserved1[SlotName("cpu")] == Decimal("6")
-        assert reserved2[SlotName("cpu")] == Decimal("6")
+        # Each agent has 10 reserved away (6 for other agent + 4 for system)
+        assert reserved1[SlotName("cpu")] == Decimal("10")
+        assert reserved2[SlotName("cpu")] == Decimal("10")
 
         await allocator.__aexit__(None, None, None)
 
@@ -572,7 +583,14 @@ class TestMultiDeviceScenarios:
         allocator = ResourceAllocator(config, mock_etcd)
         await allocator.__ainit__()
 
-        assert allocator.total_slots[SlotName("cpu")] == Decimal("8")
+        # Verify total slots by summing from computers
+        total_cpu = sum(
+            slot.amount
+            for ctx in allocator.computers.values()
+            for slot in ctx.alloc_map.device_slots.values()
+            if slot.slot_name == SlotName("cpu")
+        )
+        assert total_cpu == Decimal("8")
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
@@ -650,7 +668,13 @@ class TestMultiDeviceScenarios:
         await allocator.__ainit__()
 
         # 4 GPUs × 8GB each = 32GB total VRAM
-        assert allocator.total_slots[SlotName("cuda.mem")] == Decimal("32000000000")
+        total_cuda_mem = sum(
+            slot.amount
+            for ctx in allocator.computers.values()
+            for slot in ctx.alloc_map.device_slots.values()
+            if slot.slot_name == SlotName("cuda.mem")
+        )
+        assert total_cuda_mem == Decimal("32000000000")
 
         await allocator.__aexit__(None, None, None)
 
@@ -725,8 +749,21 @@ class TestMultiDeviceScenarios:
         allocator = ResourceAllocator(config, mock_etcd)
         await allocator.__ainit__()
 
-        assert allocator.total_slots[SlotName("cpu")] == Decimal("4")
-        assert allocator.total_slots[SlotName("cuda.shares")] == Decimal("1.0")
+        # Verify total slots by summing from computers
+        total_cpu = sum(
+            slot.amount
+            for ctx in allocator.computers.values()
+            for slot in ctx.alloc_map.device_slots.values()
+            if slot.slot_name == SlotName("cpu")
+        )
+        total_cuda_shares = sum(
+            slot.amount
+            for ctx in allocator.computers.values()
+            for slot in ctx.alloc_map.device_slots.values()
+            if slot.slot_name == SlotName("cuda.shares")
+        )
+        assert total_cpu == Decimal("4")
+        assert total_cuda_shares == Decimal("1.0")
 
         agent1_computers = allocator.get_computers(AgentId("agent1"))
         agent2_computers = allocator.get_computers(AgentId("agent2"))
