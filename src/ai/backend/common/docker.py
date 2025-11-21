@@ -92,6 +92,7 @@ class LabelName(enum.StrEnum):
     BLOCK_SERVICE_PORTS = "ai.backend.internal.block-service-ports"
 
     # Identification
+    AGENT_ID = "ai.backend.agent-id"
     KERNEL_ID = "ai.backend.kernel-id"
     SESSION_ID = "ai.backend.session-id"
     OWNER_AGENT = "ai.backend.owner"

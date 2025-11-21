@@ -1080,6 +1080,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             "WorkingDir": "/home/work",
             "Hostname": self.kernel_config["cluster_hostname"],
             "Labels": {
+                LabelName.AGENT_ID: str(self.agent_id),
                 LabelName.KERNEL_ID: str(self.kernel_id),
                 LabelName.SESSION_ID: str(self.session_id),
                 LabelName.OWNER_USER: self.ownership_data.owner_user_id_to_str,
