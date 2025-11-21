@@ -759,7 +759,6 @@ class ValkeyStatClient:
             return 0
         return await self._client.client.delete(keys_to_delete)
 
-    @valkey_stat_resilience.apply()
     async def invalidate_all_resource_presets(self) -> None:
         """
         Invalidate all resource preset caches by scanning and deleting all preset-related keys.
