@@ -447,9 +447,9 @@ class TestAutoSplitMode:
 
         reserved1 = allocator.agent_reserved_slots[AgentId("agent1")]
         reserved2 = allocator.agent_reserved_slots[AgentId("agent2")]
-        # Each agent has 6 reserved (6 allocated out of 12 total after reservation)
-        assert reserved1[SlotName("cpu")] == Decimal("6")
-        assert reserved2[SlotName("cpu")] == Decimal("6")
+        # Each agent has 10 reserved away (6 for other agent + 4 for system)
+        assert reserved1[SlotName("cpu")] == Decimal("10")
+        assert reserved2[SlotName("cpu")] == Decimal("10")
 
         await allocator.__aexit__(None, None, None)
 

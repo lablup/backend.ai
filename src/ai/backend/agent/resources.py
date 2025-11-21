@@ -701,8 +701,8 @@ class ResourceAllocator(aobject):
     def _calculate_reserved_slots(self, device_slots: SlotsMap) -> SlotsMap:
         reserved_slots: dict[SlotName, Decimal] = {}
         for slot_name, slot in device_slots.items():
-            available_total_slot = self.available_total_slots[slot_name]
-            reserved_slots[slot_name] = max(available_total_slot - slot, Decimal(0))
+            total_slot = self.total_slots[slot_name]
+            reserved_slots[slot_name] = max(total_slot - slot, Decimal(0))
         return reserved_slots
 
     def _calculate_resource_scaling_factor(self, allocated_slots: SlotsMap) -> SlotsMap:
@@ -712,10 +712,15 @@ class ResourceAllocator(aobject):
             case ResourceAllocationMode.AUTO_SPLIT:
                 return defaultdict(lambda: Decimal(1.0) / Decimal(self.num_agents))
             case ResourceAllocationMode.MANUAL:
-                total_slots = self.total_slots
-                if SlotName("cpu") not in allocated_slots or SlotName("cpu") not in total_slots:
+                if (
+                    SlotName("cpu") not in allocated_slots
+                    or SlotName("cpu") not in self.available_total_slots
+                ):
                     raise ValueError("CPU not in allocated or total slots seen")
-                if SlotName("mem") not in allocated_slots or SlotName("mem") not in total_slots:
+                if (
+                    SlotName("mem") not in allocated_slots
+                    or SlotName("mem") not in self.available_total_slots
+                ):
                     raise ValueError("Memory not in allocated or total slots seen")
                 scaling_factor = {
                     slot_name: slot / self.available_total_slots[slot_name]
