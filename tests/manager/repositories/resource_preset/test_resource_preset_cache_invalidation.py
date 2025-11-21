@@ -6,6 +6,7 @@ Tests the repository layer with real database and Redis/Valkey operations.
 from __future__ import annotations
 
 import uuid
+from decimal import Decimal
 from typing import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
 
@@ -75,7 +76,10 @@ class TestResourcePresetCacheInvalidation:
         """Create sample resource preset creator for testing"""
         creator = ResourcePresetCreator(
             name=f"test-preset-{uuid.uuid4().hex[:8]}",
-            resource_slots=ResourceSlot({"cpu": "2", "mem": "4G"}),
+            resource_slots=ResourceSlot({
+                "cpu": Decimal("2"),
+                "mem": Decimal(BinarySize.from_str("4G")),
+            }),
             shared_memory="1 GiB",
             scaling_group_name=test_scaling_group_name,
         )
@@ -140,7 +144,10 @@ class TestResourcePresetCacheInvalidation:
         dummy_preset = ResourcePresetData(
             id=uuid.uuid4(),
             name="dummy-preset",
-            resource_slots=ResourceSlot({"cpu": "1", "mem": "1G"}),
+            resource_slots=ResourceSlot({
+                "cpu": Decimal("1"),
+                "mem": Decimal(BinarySize.from_str("1G")),
+            }),
             shared_memory=int(BinarySize.from_str("512M")),
             scaling_group_name=None,
         )
@@ -177,14 +184,20 @@ class TestResourcePresetCacheInvalidation:
         preset1 = ResourcePresetData(
             id=uuid.uuid4(),
             name="preset-1",
-            resource_slots=ResourceSlot({"cpu": "2", "mem": "2G"}),
+            resource_slots=ResourceSlot({
+                "cpu": Decimal("2"),
+                "mem": Decimal(BinarySize.from_str("2G")),
+            }),
             shared_memory=int(BinarySize.from_str("1G")),
             scaling_group_name=None,
         )
         preset2 = ResourcePresetData(
             id=uuid.uuid4(),
             name="preset-2",
-            resource_slots=ResourceSlot({"cpu": "4", "mem": "4G"}),
+            resource_slots=ResourceSlot({
+                "cpu": Decimal("4"),
+                "mem": Decimal(BinarySize.from_str("4G")),
+            }),
             shared_memory=int(BinarySize.from_str("2G")),
             scaling_group_name="test-group",
         )
