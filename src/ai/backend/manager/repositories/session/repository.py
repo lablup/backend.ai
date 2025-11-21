@@ -302,7 +302,13 @@ class SessionRepository:
         session_id: str | SessionId,
     ) -> Optional[SessionRow]:
         async with self._db.begin_readonly_session() as db_session:
-            stmt = sa.select(SessionRow).where(SessionRow.id == session_id)
+            stmt = (
+                sa.select(SessionRow)
+                .where(SessionRow.id == session_id)
+                .options(
+                    selectinload(SessionRow.kernels),
+                )
+            )
             return await db_session.scalar(stmt)
 
     @session_repository_resilience.apply()
