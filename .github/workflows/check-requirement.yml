@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout the revision
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           lfs: false
       - name: Check if a precompiled binary file exists in dependencies
