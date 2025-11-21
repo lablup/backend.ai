@@ -9,6 +9,7 @@ class StorageBgtaskName(enum.StrEnum):
 
     CLONE_VFOLDER = "clone_vfolder"
     DELETE_VFOLDER = "delete_vfolder"
+    DELETE_FILES = "delete_files"
 
     @classmethod
     def from_str(cls, value: str) -> Self:

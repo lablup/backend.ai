@@ -131,3 +131,27 @@ class GetPresignedUploadURLReq(BaseRequestModel):
     expiration: Optional[int] = Field(default=None, description="URL expiration time in seconds")
     min_size: Optional[int] = Field(default=None, description="Minimum file size")
     max_size: Optional[int] = Field(default=None, description="Maximum file size")
+
+
+class DeleteFilesAsyncPathParam(BaseRequestModel):
+    """Path parameter for delete_files_async endpoint."""
+
+    name: str = Field(description="VFolder name or ID to resolve")
+
+
+class DeleteFilesAsyncBodyParam(BaseRequestModel):
+    """Body parameter for delete_files_async endpoint."""
+
+    files: list[str] = Field(
+        description="""
+        List of file paths to delete within the vfolder.
+        Paths are relative to the vfolder root.
+        """,
+    )
+    recursive: bool = Field(
+        default=False,
+        description="""
+        Whether to delete directories recursively.
+        Set to True when deleting non-empty directories.
+        """,
+    )

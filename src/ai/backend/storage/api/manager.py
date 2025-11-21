@@ -30,9 +30,19 @@ import trafaret as t
 from aiohttp import hdrs, web
 
 from ai.backend.common import validators as tx
+from ai.backend.common.api_handlers import (
+    APIResponse,
+    BodyParam,
+    api_handler,
+)
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.dto.internal.health import HealthResponse, HealthStatus
-from ai.backend.common.dto.storage.response import VFolderCloneResponse, VFolderDeleteResponse
+from ai.backend.common.dto.storage.request import FileDeleteAsyncRequest
+from ai.backend.common.dto.storage.response import (
+    FileDeleteAsyncResponse,
+    VFolderCloneResponse,
+    VFolderDeleteResponse,
+)
 from ai.backend.common.events.event_types.volume.broadcast import (
     DoVolumeMountEvent,
     DoVolumeUnmountEvent,
@@ -60,6 +70,8 @@ from ai.backend.storage.bgtask.types import StorageBgtaskName
 from .. import __version__
 from ..bgtask.tasks.clone import VFolderCloneManifest
 from ..bgtask.tasks.delete import VFolderDeleteManifest
+from ..bgtask.tasks.delete_files import FileDeleteManifest
+from ..dto.context import StorageRootCtx
 from ..exception import (
     ExternalStorageServiceError,
     InvalidQuotaConfig,
@@ -1156,6 +1168,37 @@ async def delete_files(request: web.Request) -> web.Response:
         )
 
 
+class FileOperationHandler:
+    """Handler for file operations within vfolders."""
+
+    @api_handler
+    async def delete_files_async(
+        self,
+        body: BodyParam[FileDeleteAsyncRequest],
+        ctx: StorageRootCtx,
+    ) -> APIResponse:
+        """Delete files or directories asynchronously using background tasks."""
+        # Create file deletion manifest
+        delete_manifest = FileDeleteManifest(
+            volume=body.parsed.volume,
+            vfolder_id=body.parsed.vfid,
+            relpaths=body.parsed.relpaths,
+            recursive=body.parsed.recursive,
+        )
+
+        # Start background task
+        task_id = await ctx.root_ctx.background_task_manager.start_retriable(
+            StorageBgtaskName.DELETE_FILES,
+            delete_manifest,
+        )
+
+        # Return task ID with HTTP 202 ACCEPTED
+        return APIResponse.build(
+            status_code=HTTPStatus.ACCEPTED,
+            response_model=FileDeleteAsyncResponse(bgtask_id=task_id),
+        )
+
+
 async def _shutdown(app: web.Application) -> None:
     pass
 
@@ -1219,6 +1262,10 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     )
     app["ctx"] = ctx
     app.on_shutdown.append(_shutdown)
+
+    # Initialize handlers
+    file_operation_handler = FileOperationHandler()
+
     app.router.add_route("GET", "/", check_status)
     app.router.add_route("GET", "/health", check_health)
     app.router.add_route("GET", "/status", check_status)
@@ -1248,6 +1295,9 @@ async def init_manager_app(ctx: RootContext) -> web.Application:
     app.router.add_route("POST", "/folder/file/download", create_download_session)
     app.router.add_route("POST", "/folder/file/upload", create_upload_session)
     app.router.add_route("POST", "/folder/file/delete", delete_files)
+    app.router.add_route(
+        "POST", "/folder/file/delete-async", file_operation_handler.delete_files_async
+    )
 
     app.add_subapp("/v1/storages/s3", create_object_storages_app(ctx))
     app.add_subapp("/v1/storages/vfs", create_vfs_storages_app(ctx))

@@ -43,7 +43,9 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from ai.backend.common import msgpack
 from ai.backend.common import typed_validators as tv
 from ai.backend.common import validators as tx
-from ai.backend.common.api_handlers import BaseFieldModel
+from ai.backend.common.api_handlers import (
+    BaseFieldModel,
+)
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
@@ -125,6 +127,7 @@ from ..services.vfolder.actions.file import (
     CreateDownloadSessionAction,
     CreateUploadSessionAction,
     DeleteFilesAction,
+    DeleteFilesAsyncAction,
     ListFilesAction,
     MkdirAction,
     RenameFileAction,
@@ -211,6 +214,8 @@ def with_vfolder_status_checked(
                 raise VFolderNotFound()
             row = folder_rows[0]
             await check_vfolder_status(row, status)
+            # Store vfolder_row in request for MiddlewareParam to access
+            request["vfolder_row"] = row
             return await handler(request, row, *args, **kwargs)
 
         return _wrapped
@@ -317,14 +322,17 @@ def with_vfolder_rows_resolved(
                 folder_name_or_id = uuid.UUID(piece)
             except ValueError:
                 folder_name_or_id = piece
+            vfolder_rows = await resolve_vfolder_rows(
+                request,
+                perm,
+                folder_name_or_id,
+                allow_privileged_access=allow_privileged_access,
+            )
+            # Store vfolder_rows in request for MiddlewareParam to access
+            request["vfolder_rows"] = vfolder_rows
             return await handler(
                 request,
-                await resolve_vfolder_rows(
-                    request,
-                    perm,
-                    folder_name_or_id,
-                    allow_privileged_access=allow_privileged_access,
-                ),
+                vfolder_rows,
                 *args,
                 **kwargs,
             )
@@ -1242,6 +1250,44 @@ async def delete_files(request: web.Request, params: Any, row: VFolderRow) -> we
         )
     )
     return web.json_response({}, status=HTTPStatus.OK)
+
+
+@auth_required
+@server_status_required(READ_ALLOWED)
+@with_vfolder_rows_resolved(VFolderPermissionSetAlias.WRITABLE)
+@with_vfolder_status_checked(VFolderStatusSet.UPDATABLE)
+@check_api_params(
+    t.Dict({
+        t.Key("files"): t.List(t.String),
+        t.Key("recursive", default=False): t.Bool,
+    })
+)
+async def delete_files_async(request: web.Request, params: Any, row: VFolderRow) -> web.Response:
+    """Delete files asynchronously within a vfolder."""
+    root_ctx: RootContext = request.app["_root.context"]
+    log.info(
+        "VFOLDER.DELETE_FILES_ASYNC (email:{}, ak:{}, vf:{} (resolved-from:{!r}), files:{}, recursive:{})",
+        request["user"]["email"],
+        request["keypair"]["access_key"],
+        row["id"],
+        request.match_info["name"],
+        params["files"],
+        params["recursive"],
+    )
+
+    result = await root_ctx.processors.vfolder_file.delete_files_async.wait_for_complete(
+        DeleteFilesAsyncAction(
+            user_uuid=request["user"]["uuid"],
+            vfolder_uuid=row["id"],
+            files=params["files"],
+            recursive=params["recursive"],
+        )
+    )
+
+    return web.json_response(
+        {"bgtask_id": str(result.task_id)},
+        status=HTTPStatus.ACCEPTED,
+    )
 
 
 @auth_required
@@ -2764,6 +2810,7 @@ def create_app(default_cors_options):
     app["folders.context"] = PrivateContext()
     cors = aiohttp_cors.setup(app, defaults=default_cors_options)
     add_route = app.router.add_route
+
     root_resource = cors.add(app.router.add_resource(r""))
     cors.add(root_resource.add_route("POST", create))
     cors.add(root_resource.add_route("GET", list_folders))
@@ -2787,6 +2834,7 @@ def create_app(default_cors_options):
     cors.add(add_route("POST", r"/{name}/rename-file", rename_file))
     cors.add(add_route("POST", r"/{name}/delete-files", delete_files))
     cors.add(add_route("DELETE", r"/{name}/delete-files", delete_files))
+    cors.add(add_route("POST", r"/{name}/delete-files-async", delete_files_async))
     cors.add(add_route("POST", r"/{name}/rename_file", rename_file))  # legacy underbar
     cors.add(add_route("DELETE", r"/{name}/delete_files", delete_files))  # legacy underbar
     cors.add(add_route("GET", r"/{name}/files", list_files))
