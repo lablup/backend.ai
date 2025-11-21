@@ -31,7 +31,7 @@ Configuration of WSL
 
 3. Run ``wsl --shutdown`` in a PowerShell prompt to restart the WSL distribution to ensure your ``wsl.conf`` updates applied.
 
-4. Enter the WSL shell again. If it is applied, your path must appears like ``/c/some/path`` instead of ``/mnt/c/some/path``.
+4. Enter the WSL shell again. If it is applied, your path must appear like ``/c/some/path`` instead of ``/mnt/c/some/path``.
 
 5. Run ``sudo mount --make-rshared /`` in the WSL shell. Otherwise, your container creation from Backend.AI will fail with an error message like ``aiodocker.exceptions.DockerError: DockerError(500, 'path is mounted on /d but it is not a shared mount.')``.
 
