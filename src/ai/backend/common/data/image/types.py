@@ -3,6 +3,8 @@ from typing import Self
 
 from pydantic import BaseModel
 
+from ai.backend.common.arch import arch_name_aliases
+
 
 class InstalledImageInfo(BaseModel):
     """ "
@@ -10,7 +12,7 @@ class InstalledImageInfo(BaseModel):
     Attributes:
         canonical (str): The canonical name of the image.
         digest (str): The digest of the image.
-        architecture (str): The architecture of the image. Supported values are 'x86_64' and 'aarch64'.
+        architecture (str): The architecture of the image. Supported values are 'x86', 'x86_64', 'aarch64'.
     """
 
     canonical: str
@@ -20,13 +22,11 @@ class InstalledImageInfo(BaseModel):
     @classmethod
     def from_inspect_result(cls, canonical: str, inspect_result: dict[str, str]) -> Self:
         architecture = inspect_result.get("Architecture", "x86_64")
-        match architecture:
-            case "arm64":
-                architecture = "aarch64"
+        architecture_alias = arch_name_aliases.get(architecture, architecture)
         return cls(
             canonical=canonical,
             digest=inspect_result["Id"],
-            architecture=architecture,
+            architecture=architecture_alias,
         )
 
 
