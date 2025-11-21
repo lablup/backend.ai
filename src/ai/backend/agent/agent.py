@@ -1181,6 +1181,10 @@ class AbstractAgent(
                     # TODO: Need to fix when cctx.instance.slot_types receives str instead of SlotName
                     slot_key_and_units[SlotName(slot_key)] = slot_type
                     res_slots[SlotName(slot_key)] = Decimal(str(self.slots.get(slot_key, 0)))
+            if self.local_config.agent.advertised_rpc_addr:
+                rpc_addr = self.local_config.agent.advertised_rpc_addr
+            else:
+                rpc_addr = self.local_config.agent.rpc_listen_addr
             agent_info = AgentInfo(
                 ip=str(rpc_addr.host),
                 region=self.local_config.agent.region,
