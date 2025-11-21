@@ -12,7 +12,7 @@ class InstalledImageInfo(BaseModel):
     Attributes:
         canonical (str): The canonical name of the image.
         digest (str): The digest of the image.
-        architecture (str): The architecture of the image. Supported values are 'x86_64' and 'aarch64'.
+        architecture (str): The architecture of the image. Supported values are 'x86', 'x86_64', 'aarch64'.
     """
 
     canonical: str
