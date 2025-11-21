@@ -476,7 +476,6 @@ class ResourceAllocator(aobject):
     agent_configs: Sequence[AgentUnifiedConfig]
 
     computers: ComputersMap
-    total_slots: SlotsMap
     available_total_slots: SlotsMap
 
     agent_computers: Mapping[AgentId, ComputersMap]
@@ -502,14 +501,14 @@ class ResourceAllocator(aobject):
             alloc_map = await computer.create_alloc_map()
             computer_contexts[name] = ComputerContext(computer, devices, alloc_map)
         self.computers = computer_contexts
-        self.total_slots = self._calculate_total_slots()
-        self.available_total_slots = self._calculate_available_total_slots()
+        total_slots = self._calculate_total_slots()
+        self.available_total_slots = self._calculate_available_total_slots(total_slots)
 
         agent_computers = {}
         agent_reserved_slots = {}
         agent_resource_scaling_factor = {}
         for agent_idx, agent_config in enumerate(self.agent_configs):
-            res = await self._calculate_agent_partition(agent_idx, agent_config)
+            res = await self._calculate_agent_partition(agent_idx, agent_config, total_slots)
             agent_computer, reserved_slots, resource_scaling_factor = res
 
             agent_id = AgentId(agent_config.agent.defaulted_id)
@@ -581,7 +580,7 @@ class ResourceAllocator(aobject):
                 total_slots[slot_info.slot_name] += slot_info.amount
         return total_slots
 
-    def _calculate_available_total_slots(self) -> SlotsMap:
+    def _calculate_available_total_slots(self, total_slots: SlotsMap) -> SlotsMap:
         reserved_resources = {
             SlotName("cpu"): Decimal(self.local_config.resource.reserved_cpu),
             SlotName("mem"): Decimal(self.local_config.resource.reserved_mem),
@@ -589,7 +588,7 @@ class ResourceAllocator(aobject):
         }
 
         available_slots: dict[SlotName, Decimal] = {}
-        for slot_name, total_slot in self.total_slots.items():
+        for slot_name, total_slot in total_slots.items():
             reserved_slot = reserved_resources.get(slot_name, Decimal("0"))
             if total_slot < reserved_slot:
                 raise InvalidResourceConfigError(
@@ -603,6 +602,7 @@ class ResourceAllocator(aobject):
         self,
         agent_idx: int,
         agent_config: AgentUnifiedConfig,
+        total_slots: SlotsMap,
     ) -> tuple[ComputersMap, SlotsMap, SlotsMap]:
         agent_computers: dict[DeviceName, ComputerContext] = {}
         devices_allocated_slots: list[Mapping[SlotName, Decimal]] = []
@@ -619,7 +619,9 @@ class ResourceAllocator(aobject):
                 ctx.instance, ctx.devices, agent_alloc_map
             )
 
-            device_reserved_slots = self._calculate_reserved_slots(device_allocated_slots)
+            device_reserved_slots = self._calculate_reserved_slots(
+                device_allocated_slots, total_slots
+            )
             devices_reserved_slots.append(device_reserved_slots)
 
         reserved_slots = _combine_mappings(devices_reserved_slots)
@@ -698,10 +700,10 @@ class ResourceAllocator(aobject):
                 )
             return resource_config.allocations.devices[slot_name]
 
-    def _calculate_reserved_slots(self, device_slots: SlotsMap) -> SlotsMap:
+    def _calculate_reserved_slots(self, device_slots: SlotsMap, total_slots: SlotsMap) -> SlotsMap:
         reserved_slots: dict[SlotName, Decimal] = {}
         for slot_name, slot in device_slots.items():
-            total_slot = self.total_slots[slot_name]
+            total_slot = total_slots[slot_name]
             reserved_slots[slot_name] = max(total_slot - slot, Decimal(0))
         return reserved_slots
 
@@ -734,7 +736,7 @@ class ResourceAllocator(aobject):
 
         allocated_slots: dict[SlotName, Decimal] = defaultdict(lambda: Decimal("0"))
         for agent_reserved_slots in self.agent_reserved_slots.values():
-            for slot_name in self.total_slots.keys():
+            for slot_name in self.available_total_slots.keys():
                 available_total_slot = self.available_total_slots[slot_name]
                 allocated_slot = available_total_slot - agent_reserved_slots[slot_name]
                 allocated_slots[slot_name] += allocated_slot
