@@ -23,6 +23,10 @@ class InstalledImageInfo(BaseModel):
         match architecture:
             case "arm64":
                 architecture = "aarch64"
+            case "amd64":
+                architecture = "x86_64"
+            case _:
+                architecture = "x86_64"
         return cls(
             canonical=canonical,
             digest=inspect_result["Id"],
