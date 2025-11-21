@@ -265,7 +265,7 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.valkey_stat.close()
 
 
-@asynccontextmanager
+@actxmgr
 async def http_client_pool_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     from functools import partial
 
@@ -689,7 +689,6 @@ def build_root_app(
                 proxy_frontend_ctx,
                 redis_ctx,
                 http_client_pool_ctx,
-                health_probe_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
                 inference_metric_collection_ctx,
