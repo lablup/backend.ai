@@ -759,6 +759,30 @@ class ValkeyStatClient:
             return 0
         return await self._client.client.delete(keys_to_delete)
 
+    async def invalidate_all_resource_presets(self) -> None:
+        """
+        Invalidate all resource preset caches by scanning and deleting all preset-related keys.
+        This includes keys for ID, name, list, and check data.
+        """
+        # Scan for all preset-related keys
+        patterns = [
+            "resource_preset:id:*",
+            "resource_preset:name:*",
+            "resource_preset:list:*",
+            "resource_preset:check:*",
+        ]
+
+        all_keys: list[bytes] = []
+        for pattern in patterns:
+            keys = await self._keys(pattern)
+            all_keys.extend(keys)
+
+        # Delete all keys in batch
+        if all_keys:
+            batch = self._create_batch()
+            batch = self._invalidate_resource_presets(batch, all_keys)
+            await self._client.client.exec(batch, raise_on_error=True)
+
     # TODO: Remove this too generalized methods
     @valkey_decorator()
     async def set(
