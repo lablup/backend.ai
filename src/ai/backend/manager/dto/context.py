@@ -1,4 +1,5 @@
-from typing import Self, override
+import uuid
+from typing import Any, Mapping, Self, override
 
 from aiohttp import web
 from pydantic import ConfigDict
@@ -57,3 +58,44 @@ class ValkeyArtifactCtx(MiddlewareParam):
     async def from_request(cls, request: web.Request) -> Self:
         root_ctx: RootContext = request.app["_root.context"]
         return cls(valkey_artifact=root_ctx.valkey_artifact)
+
+
+class VFolderAuthContext(MiddlewareParam):
+    """
+    Middleware parameter providing authenticated user and vfolder information.
+
+    This context is populated by the following decorators:
+    - @auth_required: Sets user authentication information
+    - @with_vfolder_rows_resolved: Resolves vfolder and checks permissions
+    - @with_vfolder_status_checked: Validates vfolder status
+    """
+
+    user_uuid: uuid.UUID
+    user_email: str
+    access_key: str
+    vfolder_row: Mapping[str, Any]
+    processors: Processors
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @override
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        # Get user info from auth middleware
+        user_uuid = request["user"]["uuid"]
+        user_email = request["user"]["email"]
+        access_key = request["keypair"]["access_key"]
+
+        # Get root context
+        root_ctx: RootContext = request.app["_root.context"]
+
+        # Get vfolder_row from decorator (set by @with_vfolder_rows_resolved and @with_vfolder_status_checked)
+        row = request["vfolder_row"]
+
+        return cls(
+            user_uuid=user_uuid,
+            user_email=user_email,
+            access_key=access_key,
+            vfolder_row=row,
+            processors=root_ctx.processors,
+        )

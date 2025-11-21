@@ -64,6 +64,19 @@ class VFolderDeleteResponse(BaseResponseModel):
     bgtask_id: TaskID
 
 
+class FileDeleteAsyncResponse(BaseResponseModel):
+    """Response for asynchronous file deletion operation."""
+
+    bgtask_id: TaskID = Field(
+        description="""
+        Unique identifier for the background file deletion task.
+        Use this ID to subscribe to task progress updates via GraphQL subscriptions
+        or to check the current status of the deletion operation.
+        The task transitions through states: ONGOING → SUCCESS/FAILURE/CANCELLED.
+        """,
+    )
+
+
 class HuggingFaceScanModelsResponse(BaseResponseModel):
     """Response for HuggingFace scan operation."""
 

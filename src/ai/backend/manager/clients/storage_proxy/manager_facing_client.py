@@ -10,6 +10,7 @@ import aiohttp
 from ai.backend.common.dto.storage.request import (
     DeleteObjectReq,
     DownloadObjectReq,
+    FileDeleteAsyncRequest,
     HuggingFaceGetCommitHashReqPathParam,
     HuggingFaceGetCommitHashReqQueryParam,
     HuggingFaceImportModelsReq,
@@ -25,6 +26,7 @@ from ai.backend.common.dto.storage.request import (
     VFSListFilesReq,
 )
 from ai.backend.common.dto.storage.response import (
+    FileDeleteAsyncResponse,
     HuggingFaceGetCommitHashResponse,
     HuggingFaceImportModelsResponse,
     HuggingFaceRetrieveModelResponse,
@@ -436,6 +438,24 @@ class StorageProxyManagerFacingClient:
                 "recursive": recursive,
             },
         )
+
+    @storage_proxy_client_resilience.apply()
+    async def delete_files_async(
+        self,
+        request: FileDeleteAsyncRequest,
+    ) -> FileDeleteAsyncResponse:
+        """
+        Delete files or directories asynchronously using background tasks.
+
+        :param request: Request containing volume, vfid, relpaths, and recursive flag
+        :return: Response containing background task ID
+        """
+        response = await self._client.request_with_response(
+            "POST",
+            "folder/file/delete-async",
+            body=request.model_dump(mode="json"),
+        )
+        return FileDeleteAsyncResponse.model_validate(response)
 
     @storage_proxy_client_resilience.apply()
     async def move_file(

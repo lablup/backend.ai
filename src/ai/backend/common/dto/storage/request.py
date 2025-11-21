@@ -1,3 +1,4 @@
+from pathlib import PurePosixPath
 from typing import Optional
 
 from pydantic import Field
@@ -6,7 +7,8 @@ from ai.backend.common.data.storage.types import ArtifactStorageImportStep
 
 from ...api_handlers import BaseRequestModel
 from ...data.storage.registries.types import ModelSortKey, ModelTarget
-from ...types import QuotaConfig, VFolderID
+from ...type_adapters import VFolderIDField
+from ...types import QuotaConfig
 
 
 class QuotaScopeReq(BaseRequestModel):
@@ -23,9 +25,56 @@ class GetVFolderMetaReq(BaseRequestModel):
 
 
 class CloneVFolderReq(BaseRequestModel):
-    dst_vfolder_id: VFolderID = Field(
+    dst_vfolder_id: VFolderIDField = Field(
         description="The destination virtual folder ID.",
         alias="dst_vfid",
+    )
+
+
+class FileDeleteAsyncRequest(BaseRequestModel):
+    """
+    Request for asynchronous file deletion within a virtual folder.
+
+    This request initiates a background task to delete files/directories,
+    returning immediately with a task ID that can be used to track progress.
+    """
+
+    volume: str = Field(
+        description="""
+        Volume name where the vfolder is located.
+        This identifies the storage backend (e.g., 'local', 'ceph', 'nfs')
+        that contains the virtual folder. The volume name must match one of
+        the configured volumes in the storage proxy.
+        """,
+        examples=["local", "ceph-volume-1", "nfs-shared"],
+    )
+    vfid: VFolderIDField = Field(
+        description="""
+        Virtual folder ID containing the files to delete.
+        This is a composite identifier consisting of quota_scope_id and folder_id,
+        uniquely identifying the vfolder within the storage system.
+        Format: "{quota_scope_id}/{folder_id}" or just "{folder_id}" for legacy vfolders.
+        """,
+        examples=["user:550e8400-e29b-41d4-a716-446655440000/a1b2c3d4", "a1b2c3d4"],
+    )
+    relpaths: list[PurePosixPath] = Field(
+        description="""
+        List of relative paths of files/directories to delete within the vfolder.
+        All paths must be relative to the vfolder root and use POSIX path format.
+        Use forward slashes (/) as path separators regardless of the host OS.
+        Example: ["data/logs/old.log", "temp/cache", "reports/2024/january.pdf"]
+        """,
+        examples=[["data/file.txt"], ["logs/old", "cache/temp.dat"]],
+    )
+    recursive: bool = Field(
+        default=False,
+        description="""
+        Whether to delete directories recursively.
+        - If True: Directories and all their contents will be deleted (like 'rm -rf')
+        - If False: Only files and empty directories can be deleted
+        Defaults to False for safety. Set to True when deleting non-empty directories.
+        """,
+        examples=[False, True],
     )
 
 
