@@ -22,7 +22,7 @@ class InstalledImageInfo(BaseModel):
     @classmethod
     def from_inspect_result(cls, canonical: str, inspect_result: dict[str, str]) -> Self:
         architecture = inspect_result.get("Architecture", "x86_64")
-        architecture_alias = arch_name_aliases.get(architecture, "x86_64")
+        architecture_alias = arch_name_aliases.get(architecture, architecture)
         return cls(
             canonical=canonical,
             digest=inspect_result["Id"],
