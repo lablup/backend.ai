@@ -130,6 +130,11 @@ class Container:
         return str(self.id)[:12]
 
     @property
+    def agent_id(self) -> AgentId:
+        raw_agent_id = self.labels[LabelName.AGENT_ID]
+        return AgentId(raw_agent_id)
+
+    @property
     def kernel_id(self) -> KernelId:
         raw_kernel_id = self.labels[LabelName.KERNEL_ID]
         return KernelId(uuid.UUID(raw_kernel_id))
