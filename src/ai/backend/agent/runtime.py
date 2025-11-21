@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import signal
 from decimal import Decimal
 from typing import TYPE_CHECKING, Mapping, Optional, Sequence
@@ -20,13 +19,9 @@ from ai.backend.common.auth import PublicKey
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.metrics.types import UTILIZATION_METRIC_INTERVAL
 from ai.backend.common.types import AgentId, DeviceName, SlotName
-from ai.backend.logging.utils import BraceStyleAdapter
 
 if TYPE_CHECKING:
     from .docker.metadata.server import MetadataServer
-
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class AgentRuntime:
