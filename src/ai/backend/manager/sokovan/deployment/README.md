@@ -74,7 +74,7 @@ DeploymentCoordinator acts as the top-level orchestrator of deployment lifecycle
 
 ### DeploymentController
 
-DeploymentController performs the actual control logic for deployments. It handles basic CRUD operations such as creating, updating, and deleting deployments, and manages the replica count for each deployment. It orchestrates the revision generation process through Revision Generators and validates session specifications before deployment creation.
+DeploymentController performs the actual control logic for deployments. It handles basic CRUD operations such as creating, updating, and deleting deployments, and manages the replica count for each deployment. It automatically generates final revision spec tailored to deployment types (vLLM, TGI, SGLang, etc.) with deployment user request, service-definition toml file, and applies configured auto-scaling policies to deployments.
 
 **Key Methods:**
 - `create_deployment()`: Creates a new deployment
