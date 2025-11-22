@@ -1,0 +1,1447 @@
+.\" Manpage for bssh
+.\" Contact the maintainers to correct errors or typos.
+.TH BSSH 1 "October 2025" "v1.2.2" "bssh Manual"
+
+.SH NAME
+bssh \- Broadcast SSH - SSH-compatible client with parallel execution capabilities
+
+.SH SYNOPSIS
+.B bssh
+[\fIOPTIONS\fR] [\fIdestination\fR] [\fIcommand\fR [\fIargument\fR...]]
+.br
+.B bssh
+[\fIOPTIONS\fR] \fICOMMAND\fR
+
+.SH DESCRIPTION
+.B bssh
+is a high-performance SSH client that can be used as a drop-in replacement for standard SSH while also providing
+powerful parallel execution capabilities for cluster management. Built with Rust, it supports both single-host
+SSH connections (SSH compatibility mode) and multi-server operations (cluster mode).
+
+.B SSH Compatibility Mode:
+When used with a single destination (e.g., bssh user@host), bssh behaves like standard SSH, supporting
+common SSH options and automatically starting an interactive shell when no command is provided.
+
+.B Multi-Server Mode:
+When used with clusters (-C) or multiple hosts (-H), bssh executes commands across multiple nodes
+simultaneously with real-time output streaming.
+
+The tool provides secure file transfer capabilities using SFTP protocol, supports multiple authentication
+methods (SSH keys with passphrase support, SSH agent, password), and automatically detects Backend.AI
+multi-node session environments.
+
+.SH OPTIONS
+
+.SS SSH-Compatible Options
+.TP
+.BR \-i " " \fIidentity_file\fR
+SSH private key file path (same as ssh -i)
+
+.TP
+.BR \-l " " \fIlogin_name\fR
+Specifies the user to log in as on the remote machine (same as ssh -l)
+
+.TP
+.BR \-p " " \fIport\fR
+Port to connect to on the remote host (same as ssh -p)
+
+.TP
+.BR \-o " " \fIoption\fR
+SSH options in key=value format (e.g., -o StrictHostKeyChecking=no)
+Can be specified multiple times
+
+.TP
+.BR \-F " " \fIconfigfile\fR
+Specifies an alternative SSH configuration file
+
+.TP
+.BR \-q
+Quiet mode (suppress non-error messages)
+
+.TP
+.BR \-t
+Force pseudo-terminal allocation
+
+.TP
+.BR \-T
+Disable pseudo-terminal allocation
+
+.TP
+.BR \-J " " \fIdestination\fR
+Connect via jump host(s) (ProxyJump). Supports comma-separated list for multiple jump hosts.
+Example: -J jump1@proxy1,jump2@proxy2
+
+.TP
+.BR \-Q " " \fIquery_option\fR
+Query SSH configuration options (cipher, kex, mac, key, protocol-version, help)
+
+.TP
+.BR \-4
+Force use of IPv4 addresses only
+
+.TP
+.BR \-6
+Force use of IPv6 addresses only
+
+.TP
+.BR \-x
+Disable X11 forwarding
+
+.TP
+.BR \-L " " \fI[bind_address:]port:host:hostport\fR
+Local port forwarding. Binds a local port to forward connections to a remote destination via SSH.
+Multiple -L options can be specified for multiple forwards.
+Example: -L 8080:example.com:80 (localhost:8080 → example.com:80)
+
+.TP
+.BR \-R " " \fI[bind_address:]port:host:hostport\fR
+Remote port forwarding. Requests the SSH server to bind a port and forward connections to local destination.
+Multiple -R options can be specified for multiple forwards.
+Example: -R 8080:localhost:80 (remote:8080 → localhost:80)
+
+.TP
+.BR \-D " " \fI[bind_address:]port[/socks_version]\fR
+Dynamic port forwarding (SOCKS proxy). Creates a local SOCKS proxy that dynamically forwards connections via SSH.
+Supports SOCKS4 and SOCKS5 protocols. Default is SOCKS5.
+Multiple -D options can be specified for multiple SOCKS proxies.
+Example: -D 1080 (SOCKS5 proxy on localhost:1080), -D *:1080/4 (SOCKS4 on all interfaces)
+
+.SS Multi-Server Options
+.TP
+.BR \-H ", " \-\-hosts " " \fIHOSTS\fR
+Comma-separated list of hosts in [user@]hostname[:port] format.
+Example: user1@host1:2222,user2@host2
+
+.TP
+.BR \-C ", " \-\-cluster " " \fICLUSTER\fR
+Cluster name from configuration file (uppercase C for multi-server mode)
+
+.TP
+.BR \-\-config " " \fICONFIG\fR
+Configuration file path (default: ~/.config/bssh/config.yaml)
+
+
+.TP
+.BR \-A ", " \-\-use\-agent
+Use SSH agent for authentication (Unix/Linux/macOS only).
+When this option is specified, bssh will attempt to use the SSH agent
+for authentication. Falls back to key file authentication if the agent
+is not available or authentication fails.
+
+.TP
+.BR \-\-password
+Use password authentication. When this option is specified, bssh will
+prompt for the password securely without echoing it to the terminal.
+This is useful for systems that don't have SSH keys configured.
+
+.TP
+.BR \-f ", " \-\-filter " " \fIPATTERN\fR
+Filter hosts by pattern (supports wildcards like 'web*').
+Use with -H or -C to execute on a subset of hosts.
+Example: -f "web*" matches web01, web02, etc.
+
+.TP
+.BR \-\-parallel " " \fIPARALLEL\fR
+Maximum parallel connections for multi-server mode (default: 10)
+Note: -p is now used for port (SSH compatibility)
+
+.TP
+.BR \-\-output\-dir " " \fIOUTPUT_DIR\fR
+Output directory for command results. When specified, saves command outputs
+to separate files for each node with stdout, stderr, and execution summary
+
+.TP
+.BR \-v ", " \-\-verbose
+Increase verbosity (can be used multiple times: -v, -vv, -vvv)
+
+.TP
+.BR \-\-strict\-host\-key\-checking " " \fIMODE\fR
+Host key checking mode: yes, no, or accept-new (default: accept-new)
+
+.TP
+.BR \-h ", " \-\-help
+Print help information
+
+.TP
+.BR \-V ", " \-\-version
+Print version information
+
+.SS Exit Code Strategy Options (v1.2.0+)
+.TP
+.BR \-\-require\-all\-success
+Require all nodes to succeed (v1.0-v1.1 behavior).
+By default (v1.2+), bssh returns the main rank's exit code, matching
+standard MPI tools like mpirun and srun. When this flag is specified,
+bssh returns exit code 0 only if ALL nodes succeed, and exit code 1
+if ANY node fails. This is useful for health checks and monitoring
+where you need to ensure all nodes are operational.
+
+.TP
+.BR \-\-check\-all\-nodes
+Return main rank exit code but also check all nodes.
+If the main rank succeeds but other nodes fail, returns exit code 1.
+If the main rank fails, returns the main rank's actual exit code.
+This hybrid strategy provides detailed error codes from the main rank
+while maintaining awareness of failures on other nodes.
+
+.SH COMMANDS
+In multi-server mode (-H or -C), commands can be executed directly without the 'exec' subcommand.
+For example: bssh -H "host1,host2" "uptime" (automatic command execution)
+
+.TP
+.B Built-in subcommands:
+These commands provide special functionality and must be specified explicitly.
+
+.TP
+.B list
+List available clusters from configuration
+
+.TP
+.B ping
+Test connectivity to hosts
+
+.TP
+.B upload
+Upload files to remote hosts using SFTP (supports glob patterns)
+.RS
+Usage: bssh upload \fISOURCE\fR \fIDESTINATION\fR
+.br
+Uploads the local file(s) matching SOURCE pattern to DESTINATION path on all specified remote hosts.
+SOURCE can be a single file path or a glob pattern (e.g., *.txt, logs/*.log).
+When uploading multiple files, DESTINATION should be a directory (end with /).
+Uses SFTP protocol for secure file transfer with progress indicators.
+.RE
+
+.TP
+.B download
+Download files from remote hosts using SFTP (supports glob patterns)
+.RS
+Usage: bssh download \fISOURCE\fR \fIDESTINATION\fR
+.br
+Downloads the remote file(s) matching SOURCE pattern from all specified hosts to the local DESTINATION directory.
+SOURCE can be a single file path or a glob pattern (e.g., /var/log/*.log, /etc/*.conf).
+Each downloaded file is saved with a unique name prefixed by the hostname.
+Uses SFTP protocol for secure file transfer with progress indicators.
+.RE
+
+.TP
+.B interactive
+Start an interactive shell session on cluster nodes
+.RS
+Usage: bssh interactive [\fIOPTIONS\fR]
+.br
+Opens an interactive shell session with one or more remote hosts. Supports both single-node
+and multiplex modes. In multiplex mode, commands are sent to all active nodes simultaneously.
+.PP
+Options:
+.IP "\-\-single\-node"
+Connect to a single node instead of multiplexing to all nodes
+.IP "\-\-multiplex"
+Multiplex input across all nodes (default behavior)
+.IP "\-\-prompt\-format FORMAT"
+Custom prompt format with variables: {node}, {user}, {host}, {pwd}
+.IP "\-\-history\-file PATH"
+History file path for command history (default: ~/.bssh_history)
+.IP "\-\-work\-dir DIR"
+Initial working directory on remote hosts
+.PP
+Interactive mode settings can be configured globally or per-cluster in the configuration file.
+CLI arguments override configuration file settings.
+.RE
+
+.SH CONFIGURATION
+.B bssh
+loads configuration from the following sources in priority order:
+
+.IP 1. 4
+Backend.AI environment variables (automatic detection)
+.IP 2. 4
+Current directory (./config.yaml)
+.IP 3. 4
+XDG config directory ($XDG_CONFIG_HOME/bssh/config.yaml or ~/.config/bssh/config.yaml)
+.IP 4. 4
+CLI specified path (via --config flag)
+
+.SS Configuration File Format
+.nf
+defaults:
+  user: admin
+  port: 22
+  ssh_key: ~/.ssh/id_rsa
+  parallel: 10
+
+# Global interactive mode settings (optional)
+interactive:
+  default_mode: multiplex        # single_node or multiplex
+  prompt_format: "[{node}] $ "   # Variables: {node}, {user}, {host}, {pwd}
+  history_file: ~/.bssh_history
+  show_timestamps: false         # Show timestamps in output
+  work_dir: /home/admin          # Initial working directory
+  broadcast_prefix: "!all "      # Prefix for broadcasting to all nodes
+  node_switch_prefix: "!"        # Prefix for special commands
+
+clusters:
+  production:
+    nodes:
+      - web1.example.com
+      - web2.example.com
+      - user@web3.example.com:2222
+    ssh_key: ~/.ssh/prod_key
+    # Cluster-specific interactive settings (overrides global)
+    interactive:
+      default_mode: single_node
+      prompt_format: "prod> "
+      work_dir: /var/www
+  
+  staging:
+    nodes:
+      - host: staging1.example.com
+        port: 2200
+        user: deploy
+      - staging2.example.com
+    user: staging_user
+.fi
+
+.SH SSH CONFIGURATION OPTIONS
+.B bssh
+supports OpenSSH-compatible configuration via the
+.B -F
+flag or default SSH config files (~/.ssh/config, /etc/ssh/ssh_config).
+
+In addition to standard SSH configuration directives, bssh supports advanced options for
+certificate-based authentication and port forwarding control:
+
+.SS Certificate Authentication Options
+.TP
+.B CertificateFile
+Specifies a file containing the SSH certificate for PKI authentication.
+Can be specified multiple times (maximum 100 certificates).
+.br
+Example:
+.I CertificateFile ~/.ssh/id_rsa-cert.pub
+
+.TP
+.B CASignatureAlgorithms
+Specifies the signature algorithms that will be used for certificate validation.
+Comma-separated list of algorithms (maximum 50 entries).
+.br
+Example:
+.I CASignatureAlgorithms ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+
+.TP
+.B HostbasedAuthentication
+Enables or disables host-based authentication. Default is no.
+.br
+Example:
+.I HostbasedAuthentication yes
+
+.TP
+.B HostbasedAcceptedAlgorithms
+Specifies the signature algorithms that will be accepted for host-based authentication.
+Comma-separated list (maximum 50 entries).
+.br
+Example:
+.I HostbasedAcceptedAlgorithms ssh-ed25519,rsa-sha2-512
+
+.SS Port Forwarding Control Options
+.TP
+.B GatewayPorts
+Specifies whether remote hosts are allowed to connect to ports forwarded for the client.
+Possible values:
+.RS
+.IP \[bu] 2
+.B yes
+- Remote hosts can connect to forwarded ports
+.IP \[bu] 2
+.B no
+- Only localhost connections allowed (default)
+.IP \[bu] 2
+.B clientspecified
+- Client can specify which addresses may connect
+.RE
+.IP
+Example:
+.I GatewayPorts clientspecified
+
+.TP
+.B ExitOnForwardFailure
+Specifies whether the connection should be terminated if port forwarding fails.
+Default is no.
+.br
+Example:
+.I ExitOnForwardFailure yes
+
+.TP
+.B PermitRemoteOpen
+Specifies the destinations to which remote TCP port forwarding is permitted.
+Can be specified multiple times (maximum 1000 entries).
+Format: host:port or host:* to allow any port.
+.br
+Example:
+.I PermitRemoteOpen localhost:8080
+.br
+.I PermitRemoteOpen db.internal:5432
+
+.SS Proxy Options
+.TP
+.B ProxyUseFdpass
+Specifies that ProxyCommand will pass a connected file descriptor back to ssh(1)
+instead of continuing to execute and relay data.
+This reduces overhead by avoiding an unnecessary lingering process and extra I/O operations.
+When enabled, the proxy command establishes a connection, passes the file descriptor
+to ssh via the fdpass mechanism, and exits. The ssh process then communicates directly
+with the connection, eliminating the intermediate proxy process.
+.br
+Default is no.
+.br
+Introduced in OpenSSH 6.5 (January 2014).
+.br
+This is particularly useful with proxy commands like netcat that support file descriptor
+passing via the -F option (nc.openbsd).
+.br
+Example:
+.I ProxyUseFdpass yes
+.br
+Note: This option is currently parsed from SSH configuration files for compatibility
+but is not yet utilized in bssh's SSH client implementation, as proxy connections
+are not yet supported.
+
+.SS Command Execution and Automation Options
+.TP
+.B PermitLocalCommand
+Specifies whether to allow execution of local commands after successful SSH connection.
+Commands are executed on the local machine with the user's shell.
+Default is no for security reasons.
+.br
+Example:
+.I PermitLocalCommand yes
+
+.TP
+.B LocalCommand
+Specifies a local command to execute after successfully connecting to the remote host.
+Requires PermitLocalCommand to be enabled. Supports token substitution:
+.RS
+.IP \[bu] 2
+.B %h
+- Remote hostname (from config)
+.IP \[bu] 2
+.B %H
+- Remote hostname (as specified on command line)
+.IP \[bu] 2
+.B %n
+- Original hostname
+.IP \[bu] 2
+.B %p
+- Remote port
+.IP \[bu] 2
+.B %r
+- Remote username
+.IP \[bu] 2
+.B %u
+- Local username
+.IP \[bu] 2
+.B %%
+- Literal percent sign
+.RE
+.IP
+Example:
+.I LocalCommand rsync -av ~/project/ %h:~/project/
+
+.TP
+.B RemoteCommand
+Specifies a command to execute on the remote host instead of starting an interactive shell.
+Alternative to providing command on the command line.
+.br
+Example:
+.I RemoteCommand tmux attach -t dev || tmux new -s dev
+
+.TP
+.B KnownHostsCommand
+Specifies a command to execute to obtain host keys dynamically.
+Supplements UserKnownHostsFile and GlobalKnownHostsFile.
+The command output must be in known_hosts format.
+Supports token substitution (%h, %H, etc.).
+.br
+Example:
+.I KnownHostsCommand /usr/local/bin/fetch-host-key %H
+
+.TP
+.B ForkAfterAuthentication
+Specifies whether to fork the SSH process into the background after successful authentication.
+Useful for persistent background connections. Default is no.
+.br
+Example:
+.I ForkAfterAuthentication yes
+
+.TP
+.B SessionType
+Specifies the type of session to request from the server.
+Valid values are:
+.RS
+.IP \[bu] 2
+.B none
+- No session (port forwarding only)
+.IP \[bu] 2
+.B subsystem
+- Request a subsystem (e.g., SFTP)
+.IP \[bu] 2
+.B default
+- Standard shell session (default)
+.RE
+.IP
+Example:
+.I SessionType none
+
+.TP
+.B StdinNull
+Specifies whether to redirect stdin from /dev/null.
+Useful for background operations and scripting. Default is no.
+.br
+Example:
+.I StdinNull yes
+
+.SS Host Key Verification & Security Options
+.TP
+.B NoHostAuthenticationForLocalhost
+Specifies whether to skip host key verification for localhost connections.
+Convenient for local development and testing environments.
+Reduces known_hosts clutter for local connections. Default is no.
+.br
+Example:
+.I NoHostAuthenticationForLocalhost yes
+
+.TP
+.B HashKnownHosts
+Specifies whether to hash hostnames in the known_hosts file.
+When enabled, hostnames are hashed to prevent hostname disclosure
+if the known_hosts file is compromised. Recommended for security-conscious users.
+Default is no.
+.br
+Example:
+.I HashKnownHosts yes
+
+.TP
+.B CheckHostIP
+Specifies whether to check the host IP address in the known_hosts file.
+Helps detect DNS spoofing attacks by verifying the IP address matches the known_hosts entry.
+.br
+.B Note:
+This option has been deprecated in OpenSSH 8.5+ (2021) and is disabled by default
+in modern OpenSSH. It is retained for legacy compatibility.
+.br
+Example:
+.I CheckHostIP no
+
+.TP
+.B VisualHostKey
+Specifies whether to display an ASCII art representation of the remote host key fingerprint.
+Helps users visually verify host identity. Useful for security-conscious users
+who can recognize the pattern of trusted hosts. Default is no.
+.br
+Example:
+.I VisualHostKey yes
+
+.TP
+.B HostKeyAlias
+Specifies an alias to use for host key lookup instead of the actual hostname.
+Useful when multiple hosts share the same host key (e.g., load-balanced services).
+The specified alias is used for looking up the host key in the known_hosts file.
+.br
+Example:
+.I HostKeyAlias lb.example.com
+
+.TP
+.B VerifyHostKeyDNS
+Specifies whether to verify the remote host key using DNS SSHFP resource records.
+Possible values:
+.RS
+.IP \[bu] 2
+.B yes
+- DNS records are used and must be valid
+.IP \[bu] 2
+.B no
+- DNS records are not used (default)
+.IP \[bu] 2
+.B ask
+- User is asked whether to trust DNS records
+.RE
+.IP
+Example:
+.I VerifyHostKeyDNS ask
+
+.TP
+.B UpdateHostKeys
+Specifies whether to accept updated host keys from the server.
+When the server offers new or additional host keys, this option controls
+whether they should be automatically accepted. Possible values:
+.RS
+.IP \[bu] 2
+.B yes
+- Automatically accept updated host keys
+.IP \[bu] 2
+.B no
+- Reject updated host keys (default)
+.IP \[bu] 2
+.B ask
+- Ask the user before accepting
+.RE
+.IP
+Example:
+.I UpdateHostKeys ask
+
+.SS Additional Authentication Options
+.TP
+.B NumberOfPasswordPrompts
+Specifies the number of password prompts before giving up when using password authentication.
+Valid range is 1-10. Default is 3 in OpenSSH.
+Setting this to 1 is useful for automated scripts to fail quickly.
+.br
+Example:
+.I NumberOfPasswordPrompts 1
+
+.TP
+.B EnableSSHKeysign
+Specifies whether to enable ssh-keysign for host-based authentication.
+ssh-keysign is used to access the local host keys and generate the digital signature
+required for host-based authentication. Default is no.
+.br
+Example:
+.I EnableSSHKeysign yes
+
+.SS Network & Connection Options
+.TP
+.B BindInterface
+Specifies the network interface to bind the connection to.
+Alternative to BindAddress for multi-homed hosts.
+Useful for VPN scenarios or systems with multiple network interfaces
+where you want to force connections through a specific interface.
+.br
+Example:
+.I BindInterface tun0
+
+.TP
+.B IPQoS
+Specifies the IP type-of-service (ToS) or DSCP (Differentiated Services Code Point) values.
+Two values are specified: one for interactive traffic and one for bulk traffic.
+Valid values include: af11, af12, af13, af21, af22, af23, af31, af32, af33, af41, af42, af43,
+cs0-cs7, ef, lowdelay, throughput, reliability, or numeric values.
+.br
+Example:
+.I IPQoS lowdelay throughput
+
+.TP
+.B RekeyLimit
+Specifies the maximum amount of data that may be transmitted or received before the session key
+is renegotiated, optionally followed by a maximum amount of time that may pass.
+Format: "data [time]" where data can use K, M, or G suffixes for kilobytes, megabytes, or gigabytes.
+Time can use s, m, h, d, or w suffixes. Default is "default none" (no rekeying based on data or time).
+.br
+Example:
+.I RekeyLimit 1G 1h
+
+.SS X11 Forwarding Options
+.TP
+.B ForwardX11Timeout
+Specifies a timeout for untrusted X11 forwarding connections.
+After this time, untrusted X11 connections will be refused.
+The timeout is specified as a time interval (e.g., 1h, 30m, 600s).
+A value of zero means no timeout (default).
+.br
+Example:
+.I ForwardX11Timeout 1h
+
+.TP
+.B ForwardX11Trusted
+Specifies whether to enable trusted X11 forwarding.
+When enabled, the remote X11 clients will have full access to the local X11 display.
+When disabled (default), X11 forwarding is subject to X11 SECURITY extension restrictions.
+.br
+Example:
+.I ForwardX11Trusted yes
+
+.SS Authentication and Security Management Options
+
+These options provide essential authentication management, security enforcement, and user convenience features for practical SSH configurations.
+
+.TP
+.B IdentitiesOnly
+Specifies that SSH should only use identity files explicitly configured in the SSH config.
+When enabled, SSH agent keys are ignored, preventing authentication conflicts in multi-account setups.
+Default is no.
+.br
+Example:
+.I IdentitiesOnly yes
+
+.TP
+.B AddKeysToAgent
+Specifies whether keys should be automatically added to the SSH agent after successful authentication.
+Possible values:
+.RS
+.IP \[bu] 2
+.B yes
+- Automatically add keys to agent
+.IP \[bu] 2
+.B no
+- Do not add keys (default)
+.IP \[bu] 2
+.B ask
+- Ask user before adding
+.IP \[bu] 2
+.B confirm
+- Require confirmation for each use after adding
+.RE
+.IP
+Example:
+.I AddKeysToAgent yes
+
+.TP
+.B UseKeychain
+.B (macOS only)
+Specifies whether to use the macOS Keychain for storing SSH key passphrases.
+This is an Apple-specific patch to OpenSSH and is only available on macOS systems.
+When enabled, passphrases are automatically retrieved from and stored in the macOS Keychain.
+.RS
+.IP \[bu] 2
+.B Implementation:
+Fully integrated with macOS Keychain via Security Framework. Passphrases are securely stored after successful authentication and retrieved on subsequent connections.
+.IP \[bu] 2
+.B Cross-platform compatibility:
+Use
+.I IgnoreUnknown UseKeychain
+before
+.I UseKeychain
+in your SSH config to prevent errors on non-macOS systems.
+.RE
+.IP
+Example:
+.nf
+.I IgnoreUnknown UseKeychain
+.I UseKeychain yes
+.fi
+
+.TP
+.B IdentityAgent
+Specifies the path to the SSH agent socket to use for authentication.
+Allows integration with custom agent implementations like 1Password, gpg-agent, etc.
+Special values:
+.RS
+.IP \[bu] 2
+.B none
+- Explicitly disable agent authentication
+.IP \[bu] 2
+.B SSH_AUTH_SOCK
+- Use environment variable (default)
+.RE
+.IP
+Example:
+.I IdentityAgent ~/.1password/agent.sock
+
+.TP
+.B PubkeyAcceptedAlgorithms
+Specifies the signature algorithms that will be used for public key authentication.
+Comma-separated list of algorithms (maximum 50 entries).
+Useful for enforcing security policies by restricting to modern algorithms.
+.br
+Example:
+.I PubkeyAcceptedAlgorithms ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+
+.TP
+.B RequiredRSASize
+Specifies the minimum RSA key size in bits that will be accepted.
+Valid range is 1024-16384 bits.
+OpenSSH 9.0+ default is 2048 bits. Using values below 2048 will generate a warning.
+Added in OpenSSH 8.7 (2021).
+.br
+Example:
+.I RequiredRSASize 2048
+
+.TP
+.B FingerprintHash
+Specifies the hash algorithm to use when displaying SSH key fingerprints.
+Possible values:
+.RS
+.IP \[bu] 2
+.B md5
+- Use MD5 hash (legacy, for compatibility)
+.IP \[bu] 2
+.B sha256
+- Use SHA-256 hash (default since OpenSSH 6.8)
+.RE
+.IP
+Using MD5 will generate a deprecation warning as it's considered weak.
+.br
+Example:
+.I FingerprintHash sha256
+
+.SS SSH Config Example with New Options
+.nf
+# ~/.ssh/config
+
+# Production servers with certificate authentication
+Host *.prod.example.com
+    User admin
+    CertificateFile ~/.ssh/prod-user-cert.pub
+    CertificateFile ~/.ssh/prod-host-cert.pub
+    CASignatureAlgorithms ssh-ed25519,rsa-sha2-512
+    HostbasedAuthentication yes
+    HostbasedAcceptedAlgorithms ssh-ed25519,rsa-sha2-512
+
+# Secure hosts with strict port forwarding
+Host *.secure.prod.example.com
+    GatewayPorts clientspecified
+    ExitOnForwardFailure yes
+    PermitRemoteOpen localhost:8080
+    PermitRemoteOpen db.internal:5432
+
+# Optimized proxy connection with file descriptor passing
+Host internal-server
+    ProxyCommand nc -X connect -x proxy.example.com:1080 -F %h %p
+    ProxyUseFdpass yes
+
+# SOCKS proxy with netcat (reduces overhead)
+Host *.internal.example.com
+    ProxyCommand nc -x socks.example.com:1080 -F %h %p
+    ProxyUseFdpass yes
+
+# Development server with automatic file sync
+Host dev-server
+    User developer
+    PermitLocalCommand yes
+    LocalCommand rsync -av ~/project/ %h:~/project/
+
+# Auto-attach to tmux session
+Host project-server
+    RemoteCommand tmux attach -t project || tmux new -s project
+    RequestTTY yes
+
+# Dynamic host key fetching for cloud instances
+Host *.cloud.example.com
+    KnownHostsCommand /usr/local/bin/fetch-cloud-key %H
+
+# Background SSH tunnel
+Host tunnel
+    ForkAfterAuthentication yes
+    SessionType none
+    LocalForward 8080 internal-server:80
+    StdinNull yes
+
+# Local development environment
+Host localhost 127.0.0.1 ::1
+    NoHostAuthenticationForLocalhost yes
+    NumberOfPasswordPrompts 1
+
+# Security-hardened configuration
+Host *.secure.example.com
+    HashKnownHosts yes
+    VisualHostKey yes
+    VerifyHostKeyDNS ask
+    UpdateHostKeys ask
+    CheckHostIP no
+
+# Load-balanced service with shared host key
+Host lb-node-*
+    HostKeyAlias lb.example.com
+
+# Multi-homed host with specific interface
+Host vpn-only
+    BindInterface tun0
+    IPQoS lowdelay throughput
+
+# High-security session with frequent rekeying
+Host sensitive-data
+    RekeyLimit 500M 30m
+
+# X11 forwarding with timeout and trust
+Host graphics-workstation
+    ForwardX11 yes
+    ForwardX11Trusted yes
+    ForwardX11Timeout 2h
+
+# Authentication and Security Best Practices
+# Multi-account setup with identity isolation
+Host work
+    HostName work.example.com
+    IdentityFile ~/.ssh/work_rsa
+    IdentitiesOnly yes
+
+# Auto-add keys to SSH agent
+Host *
+    AddKeysToAgent yes
+
+# Custom SSH agent (1Password, gpg-agent, etc.)
+Host secure-*
+    IdentityAgent ~/.1password/agent.sock
+
+# Security-hardened public key settings
+Host *.prod.example.com
+    PubkeyAcceptedAlgorithms ssh-ed25519,rsa-sha2-512,rsa-sha2-256
+    RequiredRSASize 2048
+    FingerprintHash sha256
+
+# Legacy system with MD5 fingerprints
+Host legacy.example.com
+    FingerprintHash md5
+    RequiredRSASize 1024
+.fi
+
+.SH BACKEND.AI INTEGRATION
+When running inside a Backend.AI multi-node session, bssh automatically detects cluster configuration
+from environment variables:
+
+.TP
+.B BACKENDAI_CLUSTER_HOSTS
+Comma-separated list of all node hostnames
+
+.TP
+.B BACKENDAI_CLUSTER_HOST
+Current node's hostname
+
+.TP
+.B BACKENDAI_CLUSTER_ROLE
+Current node's role (main or sub)
+
+Note: Backend.AI multi-node clusters use SSH port 2200 by default, which is automatically configured.
+
+.SH EXAMPLES
+
+.SS SSH Compatibility Mode (Single Host)
+.TP
+Connect to a host (interactive shell):
+.B bssh user@hostname
+
+.TP
+Execute a command:
+.B bssh user@hostname "uptime"
+
+.TP
+Specify port and key:
+.B bssh -p 2222 -i ~/.ssh/key.pem admin@server.com
+
+.TP
+Use SSH options:
+.B bssh -o StrictHostKeyChecking=no user@host
+
+.TP
+Query SSH capabilities:
+.B bssh -Q cipher
+
+.SS Port Forwarding
+.TP
+Local port forwarding:
+.B bssh -L 8080:example.com:80 user@host
+.RS
+Forward local port 8080 to example.com:80 via SSH connection
+.RE
+
+.TP
+Remote port forwarding:
+.B bssh -R 8080:localhost:80 user@host
+.RS
+Forward remote port 8080 to localhost:80
+.RE
+
+.TP
+Dynamic port forwarding (SOCKS proxy):
+.B bssh -D 1080 user@host
+.RS
+Create SOCKS5 proxy on local port 1080
+.RE
+
+.TP
+Multiple port forwards:
+.B bssh -L 3306:db:3306 -R 80:web:80 -D 1080 user@host
+.RS
+Combine local, remote, and dynamic port forwarding
+.RE
+
+.TP
+SOCKS4 proxy on all interfaces:
+.B bssh -D *:1080/4 user@host
+.RS
+Create SOCKS4 proxy listening on all network interfaces
+.RE
+
+.TP
+Port forwarding with command execution:
+.B bssh -L 5432:postgres:5432 user@host "psql -h localhost"
+.RS
+Set up port forwarding and execute command
+.RE
+
+.SS Jump Host Support
+.TP
+Connect through jump host:
+.B bssh -J jump@bastion.example.com user@internal-server
+.RS
+Connect to internal-server via bastion jump host
+.RE
+
+.TP
+Multiple jump hosts:
+.B bssh -J "jump1@proxy1,jump2@proxy2" user@final-destination
+.RS
+Chain multiple jump hosts for connection
+.RE
+
+.SS Multi-Server Mode
+.TP
+Execute command on multiple hosts (automatic execution):
+.B bssh -H "user1@host1,user2@host2" "uptime"
+.RS
+Commands are executed directly without needing 'exec' subcommand
+.RE
+
+.TP
+Use cluster from configuration:
+.B bssh -C production "df -h"
+
+.TP
+Filter hosts with pattern matching:
+.B bssh -H "web1,web2,db1,db2" -f "web*" "systemctl status nginx"
+.RS
+Executes command only on hosts matching the pattern 'web*'
+.RE
+
+.TP
+.B bssh -C production -f "db*" "pg_dump --version"
+.RS
+Executes command only on database nodes in the production cluster
+.RE
+
+.TP
+Test connectivity:
+.B bssh -C production ping
+.RS
+Note: 'ping' is a built-in subcommand, not an automatic execution
+.RE
+
+.TP
+Upload file to remote hosts (SFTP):
+.B bssh -C production upload local_file.txt /tmp/remote_file.txt
+
+.TP
+Download file from remote hosts (SFTP):
+.B bssh -C production download /etc/passwd ./downloads/
+.RS
+Downloads /etc/passwd from each host to ./downloads/ directory.
+Files are saved as hostname_passwd (e.g., web1_passwd, web2_passwd)
+.RE
+
+.TP
+Backend.AI multi-node session (automatic):
+.B bssh "nvidia-smi"
+
+.TP
+Increase verbosity for debugging:
+.B bssh -vv -H localhost "echo test"
+
+.TP
+Use custom SSH key:
+.B bssh -i ~/.ssh/custom_key -C staging "systemctl status"
+
+.TP
+Use SSH agent for authentication:
+.B bssh -A -C production "systemctl status"
+
+.TP
+Use password authentication:
+.B bssh -P -H "user@host.com" "uptime"
+.RS
+Prompts for password interactively
+.RE
+
+.TP
+Use encrypted SSH key:
+.B bssh -i ~/.ssh/encrypted_key -C production "df -h"
+.RS
+Automatically detects encrypted key and prompts for passphrase
+.RE
+
+.TP
+Save output to files:
+.B bssh --output-dir ./results -C production "ps aux"
+.RS
+Creates timestamped files per node:
+.br
+- hostname_TIMESTAMP.stdout (standard output)
+.br
+- hostname_TIMESTAMP.stderr (error output)
+.br  
+- hostname_TIMESTAMP.error (connection errors)
+.br
+- summary_TIMESTAMP.txt (execution summary)
+.RE
+
+.TP
+Upload configuration file to all nodes:
+.B bssh -H "node1,node2,node3" upload /etc/myapp.conf /etc/myapp.conf
+
+.TP
+Download logs from all web servers:
+.B bssh -C webservers download /var/log/nginx/access.log ./logs/
+.RS
+Each file is saved as hostname_access.log in the ./logs/ directory
+.RE
+
+.TP
+Upload with custom SSH key and increased parallelism:
+.B bssh -i ~/.ssh/deploy_key --parallel 20 -C production upload deploy.tar.gz /tmp/
+
+.TP
+Upload multiple files with glob pattern:
+.B bssh -C production upload "*.log" /var/backups/logs/
+.RS
+Uploads all .log files from current directory to /var/backups/logs/ on all nodes
+.RE
+
+.TP
+Download logs with wildcard pattern:
+.B bssh -C production download "/var/log/app*.log" ./collected_logs/
+.RS
+Downloads all files matching app*.log from /var/log/ on each node
+.RE
+
+.TP
+Start interactive mode with all nodes:
+.B bssh -C production interactive
+.RS
+Opens an interactive shell session with all nodes in multiplex mode
+.RE
+
+.TP
+Start interactive mode with single node:
+.B bssh -C production interactive --single-node
+.RS
+Prompts to select one node for interactive session
+.RE
+
+.TP
+Interactive mode with custom prompt:
+.B bssh -H server1,server2 interactive --prompt-format "{user}@{host}> "
+
+.TP
+Interactive mode with initial working directory:
+.B bssh -C staging interactive --work-dir /var/www
+.RS
+Sets initial working directory to /var/www on all nodes
+.RE
+
+.SS Exit Code Handling Examples (v1.2.0+)
+
+.TP
+MPI job with intelligent error handling:
+.nf
+.B bssh -C cluster "mpirun -n 16 ./simulation"
+.B EXIT_CODE=$?
+.B
+.B case $EXIT_CODE in
+.B     0)   echo "Success!" ;;
+.B     139) echo "Segmentation fault!"; collect_core_dump ;;
+.B     137) echo "Out of memory!"; increase_memory; retry ;;
+.B     124) echo "Command timeout!"; extend_time_limit ;;
+.B     *)   echo "Failed with code $EXIT_CODE"; exit $EXIT_CODE ;;
+.B esac
+.fi
+
+.TP
+Health check requiring all nodes (legacy behavior):
+.nf
+.B bssh --require-all-success -C production "disk-check"
+.B if [ $? -ne 0 ]; then
+.B     alert_ops "One or more nodes unhealthy"
+.B fi
+.fi
+
+.TP
+Hybrid mode - preserve main exit code but detect failures:
+.nf
+.B bssh --check-all-nodes -C cluster "mpirun ./program"
+.B EXIT_CODE=$?
+.B
+.B if [ $EXIT_CODE -eq 1 ]; then
+.B     echo "Main succeeded but other nodes failed"
+.B elif [ $EXIT_CODE -ne 0 ]; then
+.B     echo "Main rank failed with code: $EXIT_CODE"
+.B fi
+.fi
+
+.TP
+CI/CD pipeline integration (no changes needed):
+.nf
+.B # Works exactly like mpirun
+.B if bssh -C cluster "mpirun ./tests"; then
+.B     echo "Tests passed"
+.B     deploy_to_production
+.B else
+.B     echo "Tests failed with exit code $?"
+.B     rollback
+.B fi
+.fi
+
+.SS Interactive Mode Special Commands
+When in interactive mode, the following special commands are available (default prefix is !):
+.IP "!all"
+Activate all connected nodes
+.IP "!broadcast <cmd>"
+Execute command on all nodes temporarily
+.IP "!node<N>"
+Switch to node N (e.g., !node1, !node2)
+.IP "!list"
+List all nodes with their connection status
+.IP "!status"
+Show currently active nodes
+.IP "!help"
+Show help for special commands
+.IP "exit"
+Exit interactive mode
+.PP
+Note: The special command prefix can be customized in the configuration file.
+
+.SH EXIT STATUS
+.B bssh
+uses different exit code strategies depending on command-line flags.
+
+.SS Default Behavior (v1.2.0+)
+Returns the exit code from the main rank (rank 0 or first node).
+This matches standard MPI tool behavior (mpirun, srun, mpiexec).
+
+.TP
+.B 0
+Main rank succeeded
+
+.TP
+.B 1-255
+Main rank failed with this exit code.
+.br
+Common exit codes:
+.RS
+.IP \(bu 2
+.B 1
+\- General error
+.IP \(bu 2
+.B 2
+\- Misuse of shell command
+.IP \(bu 2
+.B 124
+\- Command timeout
+.IP \(bu 2
+.B 126
+\- Command cannot execute
+.IP \(bu 2
+.B 127
+\- Command not found
+.IP \(bu 2
+.B 130
+\- Terminated by Ctrl+C (SIGINT)
+.IP \(bu 2
+.B 137
+\- Killed by SIGKILL (often Out of Memory)
+.IP \(bu 2
+.B 139
+\- Segmentation fault (SIGSEGV)
+.IP \(bu 2
+.B 143
+\- Terminated by SIGTERM
+.RE
+
+.SS Legacy Behavior (--require-all-success)
+When using the
+.B --require-all-success
+flag, bssh uses the v1.0-v1.1 behavior:
+
+.TP
+.B 0
+Success - all commands executed successfully on all nodes
+
+.TP
+.B 1
+Failure - one or more commands failed or connection errors occurred
+
+.SS Hybrid Mode (--check-all-nodes)
+When using the
+.B --check-all-nodes
+flag:
+
+.TP
+.B 0
+All nodes succeeded (main rank and all other nodes)
+
+.TP
+.B 1
+Main rank succeeded but other nodes failed
+
+.TP
+.B 2-255
+Main rank failed with this exit code
+
+.SH OUTPUT FILES
+When using the
+.B --output-dir
+option, bssh creates the following files:
+
+.TP
+.I hostname_YYYYMMDD_HHMMSS.stdout
+Standard output from successful command execution
+
+.TP
+.I hostname_YYYYMMDD_HHMMSS.stderr
+Standard error output (created only if stderr is not empty)
+
+.TP
+.I hostname_YYYYMMDD_HHMMSS.error
+Error messages for failed connections or command execution
+
+.TP
+.I hostname_YYYYMMDD_HHMMSS.empty
+Marker file when command produces no output
+
+.TP
+.I summary_YYYYMMDD_HHMMSS.txt
+Overall execution summary with success/failure counts for all nodes
+
+Each output file includes metadata headers with command, host, user, exit status, and timestamp information.
+
+.SH FILES
+.TP
+.I ~/.config/bssh/config.yaml
+Default configuration file (XDG Base Directory standard)
+
+.TP
+.I $XDG_CONFIG_HOME/bssh/config.yaml
+Configuration file when XDG_CONFIG_HOME is set
+
+.TP
+.I ~/.ssh/known_hosts
+SSH known hosts file for host key verification
+
+.TP
+.I ~/.ssh/id_ed25519, ~/.ssh/id_rsa, ~/.ssh/id_ecdsa, ~/.ssh/id_dsa
+Default SSH private keys (checked in order of preference). If a key is
+encrypted, bssh will prompt for the passphrase.
+
+.TP
+.I $SSH_AUTH_SOCK
+SSH agent socket for agent-based authentication
+
+.SH ENVIRONMENT
+.TP
+.B BSSH_MAX_JUMP_HOSTS
+Maximum number of jump hosts allowed in a connection chain. Default is 10,
+with an absolute maximum of 30 for security reasons. Invalid or zero values
+fall back to the default. This setting helps prevent resource exhaustion
+attacks while allowing flexible jump host configurations.
+.br
+Example: BSSH_MAX_JUMP_HOSTS=20 bssh -J host1,host2,...,host20 target
+
+.TP
+.B USER
+Used as default username when not specified
+
+.TP
+.B HOME
+Used for expanding tilde (~) in paths
+
+.TP
+.B BACKENDAI_CLUSTER_HOSTS
+Backend.AI cluster node list
+
+.TP
+.B BACKENDAI_CLUSTER_HOST
+Backend.AI current node hostname
+
+.TP
+.B BACKENDAI_CLUSTER_ROLE
+Backend.AI node role (main/sub)
+
+.TP
+.B SSH_AUTH_SOCK
+SSH agent socket path. When set, bssh can automatically detect and use
+the SSH agent for authentication without specifying the -A flag
+
+.SH AUTHOR
+Written by Jeongkyu Shin and the Lablup team.
+.br
+Developed and maintained as part of the Backend.AI project.
+
+.SH REPORTING BUGS
+Report bugs to: https://github.com/lablup/bssh/issues
+
+.SH COPYRIGHT
+Copyright � 2025 Lablup Inc. and Jeongkyu Shin
+.br
+Licensed under the Apache License, Version 2.0
+
+.SH SEE ALSO
+.BR ssh (1),
+.BR scp (1),
+.BR sftp (1),
+.BR ssh-agent (1),
+.BR ssh-keygen (1)
+
+.SH NOTES
+.SS Breaking Changes (v0.5.3+)
+.TP
+.B Cluster option changed:
+The cluster option has changed from lowercase -c to uppercase -C to avoid conflicts 
+with SSH's -c (cipher) option. Update your scripts accordingly.
+.TP
+.B Parallel option changed:
+The -p option now specifies port (SSH compatibility). For parallel connections,
+use --parallel instead.
+
+.SS Breaking Changes (v1.2.0)
+.TP
+.B Exit code behavior changed:
+The default exit code behavior has changed to match standard MPI tools.
+.RS
+.IP \(bu 2
+.B Old behavior (v1.0-v1.1):
+Returns 0 if all nodes succeeded, 1 if any node failed
+.IP \(bu 2
+.B New behavior (v1.2+):
+Returns main rank's actual exit code (matches mpirun/srun/mpiexec)
+.IP \(bu 2
+.B Migration:
+Use
+.I --require-all-success
+flag to preserve old behavior
+.IP \(bu 2
+.B Why this change?
+This change aligns bssh with industry-standard MPI tools, preserves actual exit codes
+for better error diagnosis (139=segfault, 137=OOM, etc.), enables exit-code-based
+automation in CI/CD pipelines, and improves integration with shell scripts and
+monitoring systems.
+.RE
+
+.TP
+.B Main Rank Detection:
+The main rank is automatically identified using the following priority order:
+.RS
+.IP 1. 4
+.B BACKENDAI_CLUSTER_ROLE=main
+environment variable (Backend.AI multi-node sessions)
+.IP 2. 4
+.B BACKENDAI_CLUSTER_HOST
+matching with the node list
+.IP 3. 4
+First node in the list (fallback)
+.RE
+
+.SS SFTP Requirements
+The upload and download commands require SFTP subsystem to be enabled on the remote SSH servers.
+Most SSH servers have SFTP enabled by default with a configuration line like:
+.br
+.I Subsystem sftp /usr/lib/openssh/sftp-server
+.br
+or
+.br
+.I Subsystem sftp internal-sftp
+
+.SS Performance
+File transfers use SFTP protocol which provides secure and reliable transfers.
+The parallel transfer capability allows simultaneous uploads/downloads to multiple nodes,
+significantly reducing total transfer time for cluster-wide file distribution or collection.
+
+For more information and documentation, visit:
+.br
+https://github.com/lablup/bssh
