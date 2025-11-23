@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "Agen aktif",
+    "ActiveAgentsTooltip": "Menunjukkan ikhtisar sekilas dari semua agen yang saat ini berjalan dalam sistem."
+  },
   "agent": {
     "Agent": "Agen",
     "AgentSetting": "Pengaturan Agen",
@@ -27,6 +31,10 @@
     "Terminated": "Dihentikan",
     "Utilization": "Pemanfaatan"
   },
+  "agentStats": {
+    "AgentStats": "Statistik Agen",
+    "AgentStatsDescription": "Panel ini menunjukkan semua sumber daya yang digunakan di seluruh agen dalam sistem. \nNilai mewakili total sumber daya yang digunakan oleh semua sesi aktif."
+  },
   "autoScalingRule": {
     "AddAutoScalingRule": "Tambahkan aturan penskalaan otomatis",
     "Comparator": "Pembanding",
@@ -52,6 +60,7 @@
   "button": {
     "Add": "Tambah",
     "Apply": "Menerapkan",
+    "AutoRefresh": "Penyegaran otomatis",
     "Cancel": "Batalkan",
     "Clear": "Menghapus",
     "ClearLogs": "Hapus Log",
@@ -213,6 +222,10 @@
     "WarningLessRateLimit": "Jika nilai Rate Limit kecil, operasi API seperti login dapat diblokir.",
     "YouAreAboutToDeleteCredential": "Anda akan menghapus kredensial pengguna ini:"
   },
+  "dashboard": {
+    "Free": "Bebas",
+    "Used": "Digunakan"
+  },
   "data": {
     "Active": "Aktif",
     "Add": "Menambahkan",
@@ -241,6 +254,7 @@
     "FolderInfo": "Info Forder",
     "FolderNameRequired": "Nama folder wajib diisi",
     "FolderNameTooLong": "Masukkan nama folder yang kurang dari 64 karakter",
+    "FolderStatus": "Status Map",
     "FolderToCopy": "Folder untuk disalin",
     "Foldername": "Nama folder",
     "Folders": "Folder",
@@ -251,7 +265,7 @@
     "InvalidEmail": "Alamat email yang tidak valid",
     "Invited": "diundang",
     "InvitedFolders": "Folder yang diundang",
-    "InvitedFoldersTooltip": "{{ count }} Undangan folder sedang menunggu respons.",
+    "InvitedFoldersTooltip": "Klik untuk memeriksa {{count}} undangan yang tertunda",
     "Limit": "Batas",
     "ModelStore": "Toko Model",
     "Models": "Model",
@@ -273,7 +287,6 @@
     "SearchByName": "Cari berdasarkan nama",
     "SelectStorageHost": "Memilih host penyimpanan",
     "SharedFolderPermission": "Izin folder bersama",
-    "StorageStatus": "Status Penyimpanan",
     "Type": "Tipe",
     "Update": "Perbarui",
     "UsageMode": "Mode Penggunaan",
@@ -307,8 +320,11 @@
       "Name": "Nama",
       "NewFileName": "Nama file baru",
       "NewFolder": "Folder Baru",
+      "NoAccessPermissionToVolume": "Proyek saat ini tidak memiliki akses ke volume SFTP.",
       "NoImagesSupportingFileBrowser": "Belum ada image yang mendukung file browser. Setidaknya satu atau lebih image yang mendukung file browser diperlukan untuk mengunggah folder.",
       "NoImagesSupportingSystemSession": "Belum ada image yang mendukung SSH / SFTP. Setidaknya satu atau lebih image yang mendukung image peran sistem untuk menggunakan SSH / SFTP.",
+      "NoPermissionToMountFolder": "Proyek saat ini tidak memiliki izin mount untuk host penyimpanan yang terkait dengan folder ini.",
+      "NoSFTPSupportingScalingGroup": "Host penyimpanan folder ini tidak memiliki grup sumber daya SFTP.",
       "NoSharedFolders": "Tidak ada folder bersama",
       "NoSharedUsers": "Tidak ada yang diundang",
       "NotEnoughResourceForFileBrowserSession": "Tidak ada sumber daya yang cukup (cpu: 1 Core, mem: 0.5GB) untuk membuat sesi untuk filebrowser. Mohon periksa sumber daya yang tersedia.",
@@ -355,6 +371,7 @@
       "DownloadingModel": "Mengunduh model ...",
       "Edit": "Sunting",
       "EditDelete": "Sunting+Hapus",
+      "ExcludedFolders": "Folder berikut yang tidak memiliki izin hapus akan dikecualikan.",
       "FileDeleted": "File sudah dihapus",
       "FileRenamed": "File sudah diganti nama",
       "FolderCloneFailed": "Gagal mengkloning folder.",
@@ -429,6 +446,7 @@
       "Invited": "Berhasil diundang",
       "LeaveSharedFolder": "Tinggalkan folder bersama",
       "LeaveSharedFolderDesc": "Apakah Anda ingin meninggalkan folder bersama ‘{{folderName}}’?",
+      "NoMoreInvitation": "Tidak ada undangan untuk meninjau.",
       "NoOneWasInvited": "Tidak ada yang diundang karena undangan sudah ada",
       "NoOneWasShared": "Gagal membagikan folder grup",
       "NoValidEmails": "Tidak ada email valid yang dimasukkan",
@@ -599,6 +617,7 @@
     "AuthenticationFailed": "Otentikasi gagal. Memeriksa informasi dan status manajer.",
     "CannotChangeVirtualFolderOption": "Anda tidak dapat mengubah opsi vfolder yang bukan milik saya sendiri.",
     "CannotSharePrivateAutomountFolder": "Tidak dapat berbagi vfolder otomatis sesuai dengan kebijakan.",
+    "FailedToLoadTableData": "Terjadi kesalahan saat memuat daftar.",
     "FolderSharingNotAvailableToUser": "Berbagi folder tidak tersedia untuk pengguna yang diminta.",
     "InternalServerError": "Kesalahan Server Internal. Silakan coba lagi nanti.",
     "InvalidBaseURL": "URL titik akhir tidak valid.",
@@ -639,17 +658,18 @@
     "Title": "Telah terjadi kesalahan."
   },
   "explorer": {
-    "FileInProgress": "Mengunggah '{{fileName}}' ...",
     "FileUploadCancelled": "Unggah file dibatalkan dengan permintaan pengguna.",
     "FileUploadFailed": "Gagal mengunggah beberapa file di folder '{{folderName}}'.",
+    "Filename": "Nama File",
     "FolderNotFoundOrNoAccess": "Folder tidak ditemukan atau akses ditolak",
     "InputTooShort": "MasukanTerlaluPendek",
     "NoExplorerSupportForUnmanagedFolder": "Folder yang tidak dikelola tidak mendukung file explorer.",
     "NoPermissions": "Tidak ada izin untuk mengakses folder ini",
     "ProcessingUpload": "File Anda sedang diunggah. \nHarap tunggu.",
-    "SuccessfullyUploadedToFolder": "File berhasil diunggah di folder '{{folderName}}'",
+    "SuccessfullyUploadedToFolder": "File berhasil diunggah.",
     "UploadFailed": "Unggah gagal di '{{folderName}}'",
-    "UploadToFolder": "Mengunggah ke '{{folderName}}'",
+    "UploadingFiles": "Mengunggah file...",
+    "VFolder": "Map",
     "ValueRequired": "NilaiDiperlukan"
   },
   "general": {
@@ -708,6 +728,7 @@
     "CreateButtonCode": "Buat",
     "CreateNotebookButton": "Tombol Buat Buku Catatan",
     "Downloading": "Mengunduh...",
+    "FailedToFetchRepositoryInformation": "Gagal mengambil informasi repositori.",
     "FolderAlreadyExists": "Ada folder dengan nama yang sama. nama akan diganti.",
     "FolderCreated": "Folder Dibuat.",
     "FolderName": "Nama folder yang diimpor:",
@@ -724,6 +745,8 @@
     "ImportGithubRepo": "Impor Repositori GitHub",
     "ImportGitlabRepo": "Impor Repositori GitLab",
     "ImportNotebook": "Impor Buku Catatan",
+    "InvalidGitHubURL": "URL GitHub tidak valid. Harus berupa URL repositori GitHub yang valid.",
+    "InvalidGitLabURL": "URL GitLab tidak valid. Harus berupa URL repositori GitLab yang valid.",
     "InvalidNotebookURL": "URL Buku Catatan tidak valid.",
     "NoNotebookCode": "Alamat buku catatan kosong. Harap masukkan kode buku catatan yang valid untuk menyalin kode lencana.",
     "NoSuitableResourceFoundOnGivenURL": "Tidak ada sumber daya yang sesuai ditemukan pada URL yang diberikan.",
@@ -735,8 +758,11 @@
     "Preparing": "Mempersiapkan...",
     "ReadyToImport": "Siap Impor",
     "RepoWillBeFolder": "Repositori GitHub yang diimpor dikonversi ke folder dan dapat dipasang saat sesi dimulai.",
+    "RepositoryNotFound": "Repositori tidak ditemukan.",
+    "StorageHost": "Host Penyimpanan",
+    "VFolderUsageMode": "Mode Penggunaan Folder",
     "WrongURLType": "Jenis URL Salah",
-    "YouCanCreateNotebookCode": "Masukkan URL buku catatan untuk membuat kode lencana seperti di bawah ini yang dapat Anda jalankan langsung di Backend.AI."
+    "YouCanCreateNotebookCode": "Lencana ini memungkinkan eksekusi langsung notebook Anda di Backend.AI. Salin kode ini untuk menggunakannya di mana pun."
   },
   "information": {
     "APIVersion": "Versi API",
@@ -977,7 +1003,7 @@
     "ServiceInfo": "Info Layanan",
     "ServiceName": "Nama Layanan",
     "ServiceNameCannotStartWithHyphen": "Tanda hubung (-) tidak dapat digunakan pada kedua ujungnya.",
-    "ServiceNameInvalidCharacter": "Di tengah nama layanan, hanya alfabet, nomor, '_', '.', '-' hanya dapat dimasukkan.",
+    "ServiceNameInvalidCharacter": "Di tengah nama layanan, hanya alfabet, nomor, '_', '-' hanya dapat dimasukkan.",
     "ServiceNameMaxLength": "Silakan masukkan 24 karakter atau kurang.",
     "ServiceNameMinLength": "Silakan masukkan setidaknya 4 karakter.",
     "ServiceNameShouldEndWith": "Nama sesi harus diakhiri dengan alfabet, karakter besar dan kecil, angka, dan '_'.",
@@ -1164,11 +1190,6 @@
     "TypeResourceGroupNameToDelete": "Ketik nama grup sumber daya yang akan dihapus",
     "WsproxyAddress": "Alamat Server WSProxy"
   },
-  "resourcePanel": {
-    "Limit": "Membatasi",
-    "RemainingNumber": "Rmaining",
-    "UsingNumber": "Menggunakan"
-  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Anda akan menghapus kebijakan sumber daya ini:",
     "AllowedHosts": "Host yang diizinkan",
@@ -1253,10 +1274,12 @@
     "PendingSessions": "Sesi yang tertunda"
   },
   "session": {
+    "ActiveSessions": "Sesi aktif",
     "Agent": "Agen",
     "AgentId": "ID Agen",
     "Agents": "Agen",
     "AllowedClientIps": "IP klien yang diizinkan",
+    "AllowedMultipleClientsIps": "IP klien yang diizinkan (dipisahkan koma)",
     "AlreadyTerminatingSession": "Sudah mengakhiri sesi.",
     "AnotherUserSession": "Sesi ini dibuat oleh pengguna lain.",
     "Architecture": "Arsitektur",
@@ -1288,6 +1311,7 @@
     "ElapsedTime": "Waktu yang Telah Berlalu",
     "EnvironmentAndVersion": "Lingkungan dan Versi",
     "EnvironmentInfo": "Info Lingkungan",
+    "ExecuteSpecificApp": "Jalankan aplikasi {{appName}}",
     "ExecuteTerminalApp": "Jalankan Aplikasi Terminal",
     "ExpiresAfter": "Sisa waktu",
     "ExportCSV": "ekspor CSV",
@@ -1315,6 +1339,7 @@
     "Inference": "Kesimpulan",
     "InputTensorboardPath": "Harap masukkan direktori log yang akan dirujuk oleh TensorBoard. Perhatikan bahwa direktori log tidak akan dibuat secara otomatis..",
     "Interactive": "Interaktif",
+    "InvalidRedirectURL": "Aplikasi tidak dapat diluncurkan karena URL tidak valid.",
     "KernelExitCode": "Kode keluar kernel",
     "LastTry": "Percobaan Terakhir",
     "MEM": "Memori",
@@ -1404,6 +1429,7 @@
       "ConfirmAndRun": "Saya sudah memeriksa dan saya akan mulai",
       "ConnectUrlIsNotValid": "URL koneksi tidak valid.",
       "DownloadSSHKey": "Unduh Kunci SSH",
+      "LaunchingApp": "Menjalankan aplikasi {{appName}}.",
       "NoExistingConnectionExample": "Tidak Ada Koneksi Contoh untuk disalin.",
       "OpenVSCodeRemote": "Buka kode Visual Studio lokal",
       "Prepared": "Siap",
@@ -1427,6 +1453,7 @@
       "BatchMode": "Batch",
       "BatchModeConfig": "Konfigurasi mode batch",
       "BatchModeDesc": "Anda dapat menjalankan kode Anda dengan beberapa node & cluster untuk menskalakan ide Anda",
+      "BootstrapScriptDetail": "Skrip Bootstrap",
       "CPU": "CPU",
       "ChooseEnvironment": "Pilih Lingkungan",
       "ClusterMode": "Modus klaster",
@@ -1444,7 +1471,8 @@
       "DescMemory": " <p>Memori komputer adalah tempat penyimpanan sementara. </p> <p> Ini menyimpan data dan instruksi yang dibutuhkan oleh Central Processing Unit (CPU).</p><p>Saat menggunakan GPU dalam beban kerja machine learning, Anda harus mengalokasikan setidaknya dua kali memori GPU ke memori. Jika tidak, waktu idle GPU akan meningkat, menyebabkan penalti kinerja.</p>",
       "DescMultiNode": " <p>Saat menjalankan sesi, satu node terkelola dan satu atau lebih node pekerja dibagi menjadi beberapa node fisik atau mesin virtual.</p>",
       "DescOpenMPOptimization": "<p>Nilai ini menetapkan jumlah thread yang akan digunakan untuk wilayah paralel dengan menetapkan nilai awal variabel kontrol internal nthreads-var.</p> <p>Backend.AI menetapkan nilai ini sama dengan jumlah inti CPU, yang memiliki efek mempercepat beban kerja komputasi berkinerja tinggi yang khas. Namun, untuk beberapa beban kerja multi-threaded, beberapa proses yang menggunakan OpenMP digunakan pada saat yang sama, sehingga menghasilkan jumlah thread yang sangat besar dan penurunan kinerja yang signifikan. Dalam kasus ini, silakan sesuaikan nilai ini ke 1 atau 2.</p>",
-      "DescSelectAgent": "Sumber daya yang ditampilkan di sisi kanan agen mewakili jumlah sebenarnya sumber daya yang tersedia. \nSaat ini, pemilihan agen hanya tersedia di lingkungan kontainer tunggal node tunggal. \nPengaturan defaultnya adalah alokasi agen oleh penjadwal.",
+      "DescSelectAgent": "Jumlah sumber daya di sebelah kanan agen menunjukkan jumlah yang benar-benar dapat digunakan. Agen yang dipilih menunjukkan kandidat untuk alokasi; meskipun beberapa dipilih, alokasi hanya dilakukan ke satu agen. Pengaturan default adalah alokasi otomatis oleh penjadwal.",
+      "DescSelectAgentBefore2516": "Sumber daya yang ditampilkan di sisi kanan agen menunjukkan jumlah sumber daya yang sebenarnya tersedia. Saat ini, pemilihan agen hanya tersedia di lingkungan satu-node satu-kontainer. Pengaturan default adalah alokasi agen oleh penjadwal.",
       "DescSession": " <p>Sesi adalah unit lingkungan komputasi yang dibuat sesuai dengan lingkungan dan sumber daya yang ditentukan.</p><p>Jika nilai ini disetel ke nilai yang lebih besar dari 1, beberapa sesi yang terkait dengan kumpulan sumber daya di atas akan dibuat.</p><p>Jika tidak ada cukup sumber daya yang tersedia, permintaan untuk membuat sesi yang tidak dapat dibuat akan dimasukkan ke dalam antrian tunggu.</p>",
       "DescSetEnv": " <p>Jika Anda menetapkan variabel lingkungan default dalam kontainer dan juga menetapkan variabel lingkungan dengan nama yang sama di Backend.AI, nilai yang ditetapkan di Backend.AI akan diutamakan.</p><p style='color:var(--paper-red-400);'> Setiap nilai input akan diinisialisasi setelah memulai peluncur sesi.<br/>Selain itu, lingkungan tersebut akan diteruskan hanya jika variabel dan nilai tidak kosong.</p>",
       "DescSetPreOpenPort": "'Preopen Ports' mengacu pada <span style='color:var(--paper-red-400);'>internal container port</span> tertentu yang memungkinkan koneksi masuk dari perangkat eksternal atau komputer pada perangkat jaringan atau komputer.",
@@ -1587,6 +1615,7 @@
       "TitleSession": "Sesi (Backend.AI)",
       "TotalAllocation": "Alokasi Total",
       "UserResourceLimit": "Batas Sumber Daya Pengguna",
+      "UsingBootstrapScriptInfo": "Skrip bootstrap disertakan.",
       "Version": "Versi",
       "YouCanStartWithHistory": "Ini adalah catatan sesi yang baru saja Anda buat. Klik nama sesi untuk memulai sesi baru."
     },
@@ -1868,6 +1897,12 @@
     "SelectColumnToDisplay": "Pilih kolom yang akan ditampilkan",
     "SettingTable": "Penataan meja"
   },
+  "theme": {
+    "PreviewModeAlert": "Anda sedang menggunakan mode pratinjau tema. Silakan lanjutkan pekerjaan Anda di jendela asli.",
+    "button": {
+      "ExportToJson": "Ekspor JSON"
+    }
+  },
   "time": {
     "Day": "day",
     "Hour": "jam",
@@ -1919,6 +1954,8 @@
     "BootstrapScriptDescription": "Skrip bootstrap akan dieksekusi hanya sekali setelah pembuatan sesi",
     "BootstrapScriptEmpty": "Skripnya kosong. \nSilakan masukkan skripnya.",
     "BootstrapScriptUpdated": "Skrip Bootstrap diperbarui.",
+    "ClassicFeatures": "Fitur klasik",
+    "ClassicFeaturesDesc": "Bergulir kembali ke versi klasik dapat membantu Anda mendapatkan kembali stabilitas dan fungsionalitas saat Anda menunggu pembaruan atau perbaikan untuk dirilis.",
     "ClassicSessionList": "Halaman Daftar Sesi Klasik",
     "ClearSSHKeypairInput": "Pasangan Kunci SSH tertulis akan dihapus. Apakah anda yakin ingin melanjutkan?",
     "ConfigFilename": "Nama file konfigurasi",
@@ -1928,12 +1965,12 @@
     "DescAutoLogout": "Keluar secara otomatis jika semua halaman yang masuk ditutup kecuali halaman yang berasal dari sesi untuk aplikasi (mis. Jupyter notebook, terminal web, dll.)",
     "DescAutomaticUpdateCheck": "Beri tahu ketika versi webui baru dirilis.<br />Jika fitur dinonaktifkan secara otomatis, mengklik sakelar lagi akan melanjutkan pemeriksaan pembaruan.",
     "DescBetaFeatures": "Gunakan fitur beta untuk UI Web. <br />Fitur beta mungkin tidak stabil. Beberapa fitur beta mungkin tidak diadopsi sebagai fitur resmi.",
-    "DescClassicSessionLauncher": "Gunakan peluncur sesi Classic alih-alih peluncur sesi NEO. \nPeluncur sesi Classic mungkin tidak memiliki fitur terbaru.",
     "DescDesktopNotification": "Mengaktifkan notifikasi desktop. <br />Ketika dinyalakan, Backend.AI juga menggunakan sistem notifikasi sistem operasi. Mematikan ini tidak memengaruhi notifikasi dalam UI web. Tergantung pada sistem operasi, izin notifikasi mungkin perlu diaktifkan dalam pengaturan sistem.",
     "DescExperimentalDashboard": "Gunakan halaman dasbor alih -alih halaman ringkasan.",
     "DescKeepLoginSessionInformation": "Biarkan aplikasi UI web menyimpan informasi sesi login saat ini di lain waktu. <br />Jika opsi dimatikan, informasi login akan dihapus setiap keluar.",
     "DescLanguage": "Atur bahasa antarmuka. Bahasa selain bahasa Inggris dan Korea akan disediakan melalui terjemahan mesin.",
     "DescLetUserUpdateScriptWithNonEmptyValue": "Harap perbarui skrip dengan nilai yang tidak kosong.",
+    "DescMaxConcurrentUploads": "Membatasi jumlah file yang dapat diunggah secara bersamaan melalui File Explorer.",
     "DescMyKeypairInfo": "Lihat informasi keypair saya",
     "DescNewUserConfigFileCreated": "File konfigurasi pengguna baru dapat dibuat dengan data yang tidak kosong.",
     "DescNoBetaFeatures": "Tidak ada fitur beta yang tersedia sekarang. :)",
@@ -1960,6 +1997,7 @@
     "Language": "Bahasa",
     "LightMode": "Modus Cahaya",
     "Logs": "Log",
+    "MaxConcurrentUploads": "Batas Pengunggahan File Bersamaan Maks",
     "MyKeypairInfo": "Informasi Pasangan Kunci Saya",
     "NEODataPage": "Halaman data neo",
     "NEOSessionList": "Daftar Sesi NEO",
@@ -1977,10 +2015,30 @@
     "SSHKeypairManagement": "Manajemen Pasangan Kunci SSH",
     "SessionTerminationDialog": "Penghentian sesi tidak dapat diurungkan. Apakah Anda ingin melanjutkan untuk mengakhiri sesi?",
     "ShellEnvironments": "Lingkungan Shell",
+    "Theme": "Tema",
     "ThemeMode": "Modus Tema",
     "UseCompactSidebar": "Atur Sidebar Kompak sebagai Default",
     "UseSystemSetting": "Gunakan Pengaturan Sistem",
-    "UserConfigScript": "Skrip konfigurasi pengguna"
+    "UserConfigScript": "Skrip konfigurasi pengguna",
+    "theme": {
+      "CustomThemeSettingAlert": "Tema yang telah diperbarui tidak dapat diterapkan secara langsung. Jika Anda ingin menerapkannya, silakan hubungi tim dukungan kami dengan file JSON konfigurasi yang diekspor.",
+      "ErrorColor": "Warna Kesalahan",
+      "ErrorColorDesc": "Warna yang diterapkan pada tombol atau peringatan yang mewakili tindakan penting, seperti penghapusan, untuk menunjukkan peringatan atau kesalahan.",
+      "HeaderBg": "Warna Latar Belakang Tajuk",
+      "HeaderBgDesc": "Warna diterapkan pada background header, kecuali bagian logo.",
+      "InfoColor": "Informasi Warna",
+      "InfoColorDesc": "Warna yang diterapkan pada ikon panduan informasi dan modifikasi untuk elemen yang menyampaikan informasi kepada pengguna.",
+      "LinkColor": "Warna Tautan",
+      "LinkColorDesc": "Warna yang digunakan untuk link yang mengalihkan ke halaman lain atau membuka elemen UI tambahan seperti laci atau modals.",
+      "NoChangesMade": "Tidak ada perubahan.",
+      "Preview": "Pratinjau",
+      "PrimaryColor": "Warna Primer",
+      "PrimaryColorDesc": "Warna utama diterapkan pada tombol atau teks deskriptif yang mewakili tindakan utama. \nIni juga diterapkan sebagai warna latar belakang untuk bagian logo di header.",
+      "SuccessColor": "Warna Sukses",
+      "SuccessColorDesc": "Warna yang diterapkan pada tombol, peringatan, atau ikon yang menunjukkan tindakan pengguna telah berhasil diselesaikan.",
+      "TextColor": "Warna Teks",
+      "TextColorDesc": "Warna yang digunakan untuk teks umum."
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Penggunaan Terminal Web Tingkat Lanjut: Salin konten terminal",
@@ -2004,13 +2062,16 @@
       "AIAccelerator": "Akselerator AI",
       "AIAgents": "Agen AI",
       "AboutBackendAI": "Tentang Backend.AI",
+      "AdminDashboard": "Dasbor Admin",
       "Administration": "Administrasi",
       "AgentSummary": "Ringkasan Agen",
       "Architecture": "Arsitektur",
       "ArtifactDetails": "Detail Artefak",
+      "Branding": "Penjenamaan",
       "Cancel": "Batal",
       "ChangePassword": "Ganti kata sandi",
       "Chat": "Mengobrol",
+      "ClassicDashboardPage": "Halaman dasbor klasik (halaman ringkasan)",
       "ClickToDownload": "Klik untuk mengunduh",
       "ComputationResources": "Sumber Daya Komputasi",
       "Configurations": "Konfigurasi",
@@ -2045,10 +2106,10 @@
       "MyAccountInformation": "Informasi Akun Saya",
       "MyEnvironments": "Lingkungan Saya",
       "MyResources": "Batas Total Sumber Daya Saya",
-      "MyResourcesDescription": "<p>Panel ini menunjukkan total penggunaan sumber daya dan batas di semua proyek dan grup sumber daya.</p><p>Ketika beberapa batas diterapkan (seperti domain, proyek, atau pasangan kunci), batas yang paling ketat digunakan untuk perhitungan.</p>",
+      "MyResourcesDescription": "<p>Panel ini menampilkan total sumber daya yang saat ini digunakan dan gratis di semua proyek dan grup sumber daya.</p><p>Jika beberapa batasan diterapkan (seperti domain, proyek, atau pasangan kunci), penghitungan akan menggunakan batas sumber daya gratis yang paling ketat.</p>",
       "MyResourcesIn": "Sumber daya saya di",
       "MyResourcesInResourceGroup": "Sumber Daya Saya dalam Grup Sumber Daya",
-      "MyResourcesInResourceGroupDescription": "Panel ini menunjukkan penggunaan sumber daya saya saat ini dan tersisa di grup sumber daya yang dipilih.",
+      "MyResourcesInResourceGroupDescription": "Panel ini menunjukkan berapa banyak sumber daya yang telah Anda gunakan dan berapa banyak yang gratis di grup sumber daya yang dipilih pada proyek Anda saat ini.",
       "NewPassword": "Kata sandi baru",
       "NewPasswordAgain": "Kata sandi (konfirmasi)",
       "NewPasswordCannotBeSame": "Masukkan kata sandi yang berbeda dari kata sandi Anda saat ini.",
@@ -2081,7 +2142,7 @@
       "TermsOfService": "Persyaratan Layanan",
       "TotalResourcesIn": "Total sumber daya di",
       "TotalResourcesInResourceGroup": "Total Sumber Daya dalam Grup Sumber Daya",
-      "TotalResourcesInResourceGroupDescription": "Panel ini menunjukkan total sumber daya yang digunakan dan sisa. \nNilai dihitung dengan menambahkan penggunaan dan jumlah yang tersisa dari semua agen menggunakan grup sumber daya yang dipilih.",
+      "TotalResourcesInResourceGroupDescription": "Panel ini memperlihatkan total sumber daya yang digunakan dan gratis dalam grup sumber daya yang dipilih. \nNilainya dihitung dengan menjumlahkan jumlah terpakai dan jumlah bebas semua agen yang menggunakan grup tersebut.",
       "TotpActivated": "2FA Diaktifkan",
       "Update": "Perbarui",
       "Usage": "Penggunaan",

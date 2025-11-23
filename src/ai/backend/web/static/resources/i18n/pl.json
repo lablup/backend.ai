@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "Aktywni agenci",
+    "ActiveAgentsTooltip": "Pokazuje przegląd w skrócie wszystkich agentów obecnie działających w systemie."
+  },
   "agent": {
     "Agent": "Agent",
     "AgentSetting": "Ustawienia agenta",
@@ -27,6 +31,10 @@
     "Terminated": "Zakończony",
     "Utilization": "Wykorzystanie"
   },
+  "agentStats": {
+    "AgentStats": "Statystyki agentów",
+    "AgentStatsDescription": "Ten panel pokazuje wszystkie wykorzystane zasoby wszystkich agentów w systemie. \nWartości reprezentują całkowite zasoby wykorzystane przez wszystkie aktywne sesje."
+  },
   "autoScalingRule": {
     "AddAutoScalingRule": "Dodaj regułę automatycznego skalowania",
     "Comparator": "Komparator",
@@ -52,6 +60,7 @@
   "button": {
     "Add": "Dodaj",
     "Apply": "Zastosuj",
+    "AutoRefresh": "Automatyczne odświeżanie",
     "Cancel": "Anuluj",
     "Clear": "Usuwać",
     "ClearLogs": "Wyczyść dzienniki",
@@ -214,6 +223,10 @@
     "WarningLessRateLimit": "Jeśli wartość Rate Limit jest niska, operacje API, takie jak logowanie, mogą zostać zablokowane.",
     "YouAreAboutToDeleteCredential": "Zamierzasz usunąć dane uwierzytelniające tego użytkownika:"
   },
+  "dashboard": {
+    "Free": "Bezpłatny",
+    "Used": "Używany"
+  },
   "data": {
     "Active": "Aktywny",
     "Add": "Dodaj",
@@ -242,6 +255,7 @@
     "FolderInfo": "Informacje o Floder",
     "FolderNameRequired": "Nazwa folderu jest wymagana",
     "FolderNameTooLong": "Wpisz nazwę folderu krótszą niż 64 znaki",
+    "FolderStatus": "Stan folderu",
     "FolderToCopy": "Folder do skopiowania",
     "Foldername": "Nazwa folderu",
     "Folders": "Lornetka składana",
@@ -252,7 +266,7 @@
     "InvalidEmail": "Nieprawidłowy adres e -mail",
     "Invited": "zaproszony",
     "InvitedFolders": "Zaproszone foldery",
-    "InvitedFoldersTooltip": "{{ count }} Zaproszenia do folderów oczekują odpowiedzi.",
+    "InvitedFoldersTooltip": "Kliknij, aby sprawdzić oczekujące zaproszenia ({{count}})",
     "Limit": "Limit",
     "ModelStore": "Sklep modelarski",
     "Models": "Modele",
@@ -274,7 +288,6 @@
     "SearchByName": "Szukaj według nazwy",
     "SelectStorageHost": "Wybór hosta pamięci masowej",
     "SharedFolderPermission": "Udostępniono uprawnienia do folderu",
-    "StorageStatus": "Stan przechowywania",
     "Type": "Rodzaj",
     "Update": "Aktualizacja",
     "UsageMode": "Tryb użytkowania",
@@ -308,8 +321,11 @@
       "Name": "Nazwa",
       "NewFileName": "Nowa nazwa pliku",
       "NewFolder": "Nowy folder",
+      "NoAccessPermissionToVolume": "Bieżący projekt nie ma dostępu do woluminu SFTP.",
       "NoImagesSupportingFileBrowser": "Nie ma jeszcze obrazów obsługujących przeglądarkę plików. Do przesłania folderów wymagany jest co najmniej jeden obraz obsługujący przeglądarkę plików.",
       "NoImagesSupportingSystemSession": "Nie ma jeszcze obrazu obsługującego SSH / SFTP. Co najmniej jeden obraz, który obsługuje obrazy ról systemowych do korzystania z SSH / SFTP.",
+      "NoPermissionToMountFolder": "Bieżący projekt nie ma uprawnień do montowania hosta pamięci masowej powiązanego z tym folderem.",
+      "NoSFTPSupportingScalingGroup": "Host przechowywania tego folderu nie ma grupy zasobów SFTP.",
       "NoSharedFolders": "Brak folderów udostępnionych",
       "NoSharedUsers": "Nikt nie został zaproszony",
       "NotEnoughResourceForFileBrowserSession": "Brak wystarczających zasobów (cpu: 1 rdzeń, mem: 0,5 GB), aby utworzyć sesję dla przeglądarki plików. sprawdź dostępne zasoby.",
@@ -356,6 +372,7 @@
       "DownloadingModel": "Model pobierania ...",
       "Edit": "Edytować",
       "EditDelete": "Edytuj+Usuń",
+      "ExcludedFolders": "Następujące foldery bez uprawnień do usuwania zostaną wykluczone.",
       "FileDeleted": "Plik usunięty",
       "FileRenamed": "Zmieniono nazwę pliku",
       "FolderCloneFailed": "Nie udało się sklonować folderu.",
@@ -430,6 +447,7 @@
       "Invited": "Pomyślnie zaproszono",
       "LeaveSharedFolder": "Zostaw wspólny folder",
       "LeaveSharedFolderDesc": "Czy chcesz zostawić udostępniony folder „{{foldername}}”?",
+      "NoMoreInvitation": "Brak zaproszeń do recenzji.",
       "NoOneWasInvited": "Nikt nie został zaproszony, ponieważ zaproszenie już istnieje",
       "NoOneWasShared": "Nie udało się udostępnić folderu grupy",
       "NoValidEmails": "Nie wprowadzono poprawnych adresów e-mail",
@@ -600,6 +618,7 @@
     "AuthenticationFailed": "Uwierzytelnianie nie powiodło się. Sprawdź informacje i status menedżera.",
     "CannotChangeVirtualFolderOption": "Nie można zmienić opcji folderu v, który nie jest moją własnością.",
     "CannotSharePrivateAutomountFolder": "Nie można udostępniać folderów vfolder automount zgodnie z zasadami.",
+    "FailedToLoadTableData": "Wystąpił błąd podczas ładowania listy.",
     "FolderSharingNotAvailableToUser": "Udostępnianie folderów nie jest dostępne dla żądanych użytkowników.",
     "InternalServerError": "Wewnętrzny błąd serwera. Spróbuj ponownie później.",
     "InvalidBaseURL": "Adres URL punktu końcowego jest nieprawidłowy.",
@@ -640,16 +659,17 @@
     "Title": "Wystąpił błąd."
   },
   "explorer": {
-    "FileInProgress": "Przesyłanie „{{fileName}}” ...",
     "FileUploadCancelled": "Przesłanie pliku zostało anulowane na żądanie użytkownika.",
     "FileUploadFailed": "Nie udało się przesłać niektórych plików w folderze „{{folderName}}”.",
+    "Filename": "Nazwa pliku",
     "FolderNotFoundOrNoAccess": "Folder nie został znaleziony ani nie ma dostępu",
     "InputTooShort": "Wejście zbyt krótkie",
     "NoExplorerSupportForUnmanagedFolder": "Foldery niezarządzane nie obsługują eksploratora plików.",
     "ProcessingUpload": "Twój plik jest przesyłany. \nProszę poczekaj.",
-    "SuccessfullyUploadedToFolder": "Pliki przesłane pomyślnie w folderze '{{folderName}}'",
+    "SuccessfullyUploadedToFolder": "Pliki przesłane pomyślnie.",
     "UploadFailed": "Przesyłanie nie powiodło się w '{{folderName}}' '",
-    "UploadToFolder": "Przesyłanie do „{{folderName}}”",
+    "UploadingFiles": "Przesyłanie plików...",
+    "VFolder": "Falcówka",
     "ValueRequired": "Wymagana wartość"
   },
   "general": {
@@ -708,6 +728,7 @@
     "CreateButtonCode": "Stwórz",
     "CreateNotebookButton": "Przycisk Utwórz notatnik",
     "Downloading": "Ściąganie...",
+    "FailedToFetchRepositoryInformation": "Nie udało się pobrać informacji o repozytorium.",
     "FolderAlreadyExists": "Istnieje folder o tej samej nazwie. nazwa zostanie zmieniona.",
     "FolderCreated": "Utworzono folder.",
     "FolderName": "Nazwa importowanego folderu:",
@@ -724,6 +745,8 @@
     "ImportGithubRepo": "Importuj repozytorium GitHub",
     "ImportGitlabRepo": "Importowanie repozytorium GitLab",
     "ImportNotebook": "Importuj notatnik",
+    "InvalidGitHubURL": "Nieprawidłowy adres URL GitHub. Wprowadź prawidłowy adres URL repozytorium GitHub.",
+    "InvalidGitLabURL": "Nieprawidłowy adres URL GitLab. Musi to być prawidłowy adres URL repozytorium GitLab.",
     "InvalidNotebookURL": "Nieprawidłowy adres URL notatnika.",
     "NoNotebookCode": "Adres notatnika jest pusty. Wprowadź prawidłowy kod notebooka, aby skopiować kod plakietki.",
     "NoSuitableResourceFoundOnGivenURL": "Nie znaleziono odpowiedniego zasobu pod podanym adresem URL.",
@@ -735,8 +758,11 @@
     "Preparing": "Przygotowuję...",
     "ReadyToImport": "Gotowy do importu",
     "RepoWillBeFolder": "Zaimportowane repozytoria GitHub są konwertowane na foldery i można je zamontować po rozpoczęciu sesji.",
+    "RepositoryNotFound": "Nie znaleziono repozytorium.",
+    "StorageHost": "Host pamięci masowej",
+    "VFolderUsageMode": "Tryb użycia folderu",
     "WrongURLType": "Nieprawidłowy typ adresu URL",
-    "YouCanCreateNotebookCode": "Wprowadź adres URL notatnika, aby utworzyć kod plakietki, taki jak poniżej, który możesz uruchomić bezpośrednio w Backend.AI."
+    "YouCanCreateNotebookCode": "Ta odznaka umożliwia bezpośrednie uruchamianie Twojego notatnika na Backend.AI. Skopiuj kod, aby użyć go w dowolnym miejscu."
   },
   "information": {
     "APIVersion": "Wersja API",
@@ -978,7 +1004,7 @@
     "ServiceInfo": "Informacje o usłudze",
     "ServiceName": "Nazwa usługi",
     "ServiceNameCannotStartWithHyphen": "Łączników (-) nie można używać na żadnym końcu.",
-    "ServiceNameInvalidCharacter": "W środku nazwy usługi, tylko alfabet, liczba,„ _ ”, '.', '-' może być tylko uwzględnione.",
+    "ServiceNameInvalidCharacter": "W środku nazwy usługi, tylko alfabet, liczba,'_', '-' może być tylko uwzględnione.",
     "ServiceNameMaxLength": "Wprowadź maksymalnie 24 znaki.",
     "ServiceNameMinLength": "Proszę wpisać co najmniej 4 znaki.",
     "ServiceNameShouldEndWith": "Nazwa sesji musi zakończyć się alfabetem, dużymi i małymi znakami, liczbami i „_”.",
@@ -1165,11 +1191,6 @@
     "TypeResourceGroupNameToDelete": "Wpisz nazwę grupy zasobów do usunięcia",
     "WsproxyAddress": "Adres serwera WSProxy"
   },
-  "resourcePanel": {
-    "Limit": "Limit",
-    "RemainingNumber": "Rmaring",
-    "UsingNumber": "Używając"
-  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "Zamierzasz usunąć tę zasadę dotyczącą zasobów:",
     "AllowedHosts": "Dozwolone hosty",
@@ -1254,10 +1275,12 @@
     "PendingSessions": "Oczekujące sesje"
   },
   "session": {
+    "ActiveSessions": "Aktywne sesje",
     "Agent": "Agent",
     "AgentId": "Identyfikator agenta",
     "Agents": "Agenci",
     "AllowedClientIps": "Dozwolone adresy IP klientów",
+    "AllowedMultipleClientsIps": "Dozwolone adresy IP klientów (oddzielone przecinkami)",
     "AlreadyTerminatingSession": "Zakończono już sesję.",
     "AnotherUserSession": "Ta sesja została stworzona przez innego użytkownika.",
     "Architecture": "Architektura",
@@ -1289,6 +1312,7 @@
     "ElapsedTime": "Upływający czas",
     "EnvironmentAndVersion": "Środowisko i wersja",
     "EnvironmentInfo": "Informacje o środowisku",
+    "ExecuteSpecificApp": "Uruchom {{appName}}",
     "ExecuteTerminalApp": "Uruchom aplikację terminalową",
     "ExpiresAfter": "Pozostały czas",
     "ExportCSV": "eksportuj CSV",
@@ -1316,6 +1340,7 @@
     "Inference": "Wnioskowanie",
     "InputTensorboardPath": "Wprowadź katalog dziennika, do którego będzie się odwoływać TensorBoard. Pamiętaj, że katalog dziennika nie zostanie utworzony automatycznie.",
     "Interactive": "Interaktywny",
+    "InvalidRedirectURL": "Aplikacji nie można uruchomić z powodu nieprawidłowego adresu URL.",
     "KernelExitCode": "Kod wyjściowy jądra",
     "LastTry": "Ostatnia próba",
     "MEM": "Pamięć",
@@ -1405,6 +1430,7 @@
       "ConfirmAndRun": "Sprawdziłem i zacznę",
       "ConnectUrlIsNotValid": "Adres URL połączenia jest nieprawidłowy.",
       "DownloadSSHKey": "Pobierz klucz SSH",
+      "LaunchingApp": "Uruchamianie aplikacji {{appName}}.",
       "NoExistingConnectionExample": "Brak przykładu połączenia do skopiowania.",
       "OpenVSCodeRemote": "Otwórz lokalny kod Visual Studio",
       "Prepared": "Przygotowany",
@@ -1428,6 +1454,7 @@
       "BatchMode": "Partia",
       "BatchModeConfig": "Konfiguracja trybu wsadowego",
       "BatchModeDesc": "Możesz uruchomić swój kod z wieloma węzłami i klastrami, aby skalować swój pomysł",
+      "BootstrapScriptDetail": "Skrypt inicjalizacyjny",
       "CPU": "procesor",
       "ChooseEnvironment": "Wybierz środowisko",
       "ClusterMode": "Tryb klastra",
@@ -1445,7 +1472,8 @@
       "DescMemory": " <p> Pamięć komputera to tymczasowy obszar przechowywania. </p> <p> Zawiera dane i instrukcje, których potrzebuje jednostka centralna (CPU). </p> <p> W przypadku korzystania z procesora GPU w obciążeniu uczenia maszynowego należy przydzielić co najmniej dwa razy więcej pamięci procesora GPU do pamięci. W przeciwnym razie czas bezczynności GPU wydłuży się, co spowoduje spadek wydajności. </p>",
       "DescMultiNode": " <p> Podczas uruchamiania sesji jeden węzeł zarządzany i jeden lub więcej węzłów roboczych są dzielone na wiele węzłów fizycznych lub maszyn wirtualnych. </p>",
       "DescOpenMPOptimization": "<p>Wartość ta ustawia liczbę wątków do użycia w regionach równoległych poprzez ustawienie początkowej wartości wewnętrznej zmiennej kontrolnej nthreads-var.</p><p>Backend.AI ustawia tę wartość równą liczbie rdzeni procesora, co ma wpływ na przyspieszenie typowych obciążeń obliczeniowych o wysokiej wydajności. Jednak w przypadku niektórych obciążeń wielowątkowych wiele procesów korzystających z OpenMP jest używanych w tym samym czasie, co skutkuje nienormalnie dużą liczbą wątków i znacznym spadkiem wydajności. W takim przypadku należy dostosować tę wartość do 1 lub 2.</p>",
-      "DescSelectAgent": "Zasoby wyświetlane po prawej stronie agenta reprezentują rzeczywistą ilość dostępnych zasobów. \nObecnie wybór agenta jest dostępny tylko w środowisku z jednym węzłem i jednym kontenerem. \nUstawieniem domyślnym jest przydzielanie agentów przez program planujący.",
+      "DescSelectAgent": "Zasoby po prawej stronie agenta pokazują rzeczywistą dostępną ilość. Wybrane agenty reprezentują kandydatów do przydziału — nawet jeśli wybierzesz kilka, przydział nastąpi tylko do jednego z nich. Domyślnie przydział odbywa się automatycznie przez scheduler.",
+      "DescSelectAgentBefore2516": "Zasoby wyświetlane po prawej stronie agenta odzwierciedlają rzeczywistą ilość dostępnych zasobów. Obecnie wybór agenta jest możliwy tylko w środowisku z jednym węzłem i jednym kontenerem. Domyślnie agenty są przydzielane przez scheduler.",
       "DescSession": " <p> Sesja to jednostka środowiska obliczeniowego tworzona zgodnie z określonym środowiskiem i zasobami. </p> <p> Jeśli ta wartość jest ustawiona na wartość większą niż 1, tworzonych jest wiele sesji odpowiadających zasobowi ustawionemu powyżej. </p> <p> Jeśli nie ma wystarczającej ilości dostępnych zasobów, żądania utworzenia sesji, których nie można utworzyć, są umieszczane w kolejce oczekiwania. </p>",
       "DescSetEnv": " <p> Jeśli ustawisz domyślną zmienną środowiskową w kontenerze, a także ustawisz zmienną środowiskową o tej samej nazwie w Backend.AI, wartość ustawiona w Backend.AI ma pierwszeństwo. </p> <p style='color:var(--paper-red-400);'> Każda wartość wejściowa zostanie zainicjowana po uruchomieniu uruchamiania sesji. <br /> Ponadto, te środowiska zostaną przekazane tylko wtedy, gdy zarówno zmienna, jak i wartość nie są puste. </p>",
       "DescSetPreOpenPort": "\"Wstępnie otwarte porty\" odnoszą się do określonego <span style=\"color:var(--paper-red-400);\">wewnętrznego portu kontenera</span>, który umożliwia połączenia przychodzące z zewnętrznych urządzeń lub komputerów na urządzeniu sieciowym lub komputerze.",
@@ -1587,6 +1615,7 @@
       "TitleSession": "Sesja (Backend.AI)",
       "TotalAllocation": "Całkowity przydział",
       "UserResourceLimit": "Limit zasobów użytkownika",
+      "UsingBootstrapScriptInfo": "Skrypt bootstrap jest dołączony.",
       "Version": "Wersja",
       "YouCanStartWithHistory": "Są to ostatnio utworzone rekordy sesji. Kliknij nazwę sesji, aby rozpocząć nową sesję."
     },
@@ -1868,6 +1897,12 @@
     "SelectColumnToDisplay": "Wybierz, które kolumny mają być wyświetlane",
     "SettingTable": "Nakrycie stołu"
   },
+  "theme": {
+    "PreviewModeAlert": "Obecnie korzystasz z trybu podglądu motywu. Kontynuuj swoją pracę w oryginalnym oknie.",
+    "button": {
+      "ExportToJson": "Eksportuj JSON"
+    }
+  },
   "time": {
     "Day": "day",
     "Hour": "godzina",
@@ -1919,6 +1954,8 @@
     "BootstrapScriptDescription": "Skrypt Bootstrap zostanie wykonany tylko raz po utworzeniu sesji.",
     "BootstrapScriptEmpty": "Skrypt jest pusty. \nProszę wprowadzić skrypt.",
     "BootstrapScriptUpdated": "Zaktualizowano skrypt Bootstrap.",
+    "ClassicFeatures": "Klasyczne funkcje",
+    "ClassicFeaturesDesc": "Powrót do klasycznej wersji może pomóc w odzyskaniu stabilności i funkcjonalności podczas oczekiwania na wydanie aktualizacji lub poprawek.",
     "ClassicSessionList": "Klasyczna strona listy sesji",
     "ClearSSHKeypairInput": "Zapisana para kluczy SSH zostanie usunięta. Jesteś pewien, że chcesz kontynuować?",
     "ConfigFilename": "Nazwa pliku konfiguracyjnego",
@@ -1928,12 +1965,12 @@
     "DescAutoLogout": "Wyloguj się automatycznie, jeśli wszystkie zalogowane strony są zamknięte, z wyjątkiem stron pochodzących z sesji dla aplikacji (np. notatnik jupyter, terminal internetowy itp.)",
     "DescAutomaticUpdateCheck": "Powiadom o wydaniu nowej wersji webui.<br />Jeśli funkcja jest automatycznie wyłączona, ponowne kliknięcie przełącznika wznowi sprawdzanie aktualizacji.",
     "DescBetaFeatures": "Korzystaj z funkcji beta interfejsu internetowego. <br /> Funkcje beta mogą być niestabilne. Niektóre funkcje beta mogą nie zostać przyjęte jako funkcja oficjalna.",
-    "DescClassicSessionLauncher": "Użyj Classic programu uruchamiającego sesję zamiast programu uruchamiającego sesję NEO. \nClassic program uruchamiający sesję może nie mieć najnowszych funkcji.",
     "DescDesktopNotification": "Włącza powiadomienia pulpitu. <br />Po włączeniu Backend.AI używa również systemu powiadomień systemu operacyjnego. Wyłączenie tego nie wpływa na powiadomienia w interfejsie web. W zależności od systemu operacyjnego uprawnienia do powiadomień mogą wymagać włączenia w ustawieniach systemu.",
     "DescExperimentalDashboard": "Użyj strony Dashboard zamiast strony podsumowującej.",
     "DescKeepLoginSessionInformation": "Pozwól aplikacji webui zachować bieżące informacje o sesji logowania następnym razem. <br /> Jeśli opcja jest wyłączona, dane logowania będą usuwane przy każdym wylogowaniu.",
     "DescLanguage": "Ustaw język interfejsu. Języki inne niż angielski i koreański będą dostarczane przez tłumaczenie maszynowe.",
     "DescLetUserUpdateScriptWithNonEmptyValue": "Proszę zaktualizować skrypt o niepustą wartość.",
+    "DescMaxConcurrentUploads": "Ogranicza liczbę plików, które można przesłać jednocześnie za pomocą Eksploratora plików.",
     "DescMyKeypairInfo": "Zobacz informacje o mojej parze kluczy",
     "DescNewUserConfigFileCreated": "Nowy plik konfiguracji użytkownika można utworzyć z niepustymi danymi.",
     "DescNoBetaFeatures": "Obecnie nie ma dostępnej funkcji beta. :)",
@@ -1960,6 +1997,7 @@
     "Language": "Język",
     "LightMode": "Tryb światła",
     "Logs": "Dzienniki",
+    "MaxConcurrentUploads": "Maksymalny limit jednoczesnego przesyłania plików",
     "MyKeypairInfo": "Informacje o mojej parze kluczy",
     "NEODataPage": "Strona danych NEO",
     "NEOSessionList": "Lista sesji NEO",
@@ -1977,10 +2015,30 @@
     "SSHKeypairManagement": "Zarządzanie parami kluczy SSH",
     "SessionTerminationDialog": "Zakończenia sesji nie można cofnąć. Czy chcesz kontynuować, aby zakończyć sesję?",
     "ShellEnvironments": "Środowiska powłoki",
+    "Theme": "Temat",
     "ThemeMode": "Tryb tematyczny",
     "UseCompactSidebar": "Ustaw Kompaktowy Pasek Boczny jako Domyślny",
     "UseSystemSetting": "Użyj ustawień systemowych",
-    "UserConfigScript": "Skrypt konfiguracji użytkownika"
+    "UserConfigScript": "Skrypt konfiguracji użytkownika",
+    "theme": {
+      "CustomThemeSettingAlert": "Zaktualizowanego motywu nie można zastosować od razu. Jeśli chcesz go zastosować, skontaktuj się z naszym zespołem wsparcia i dołącz wyeksportowany plik konfiguracyjny w formacie JSON.",
+      "ErrorColor": "Kolor błędu",
+      "ErrorColorDesc": "Kolor zastosowany do przycisków lub alertów reprezentujących krytyczne działania, takie jak usuwanie, w celu wskazania ostrzeżeń lub błędów.",
+      "HeaderBg": "Kolor tła nagłówka",
+      "HeaderBgDesc": "Kolor zastosowany do tła nagłówka, z wyjątkiem sekcji logo.",
+      "InfoColor": "Kolor informacyjny",
+      "InfoColorDesc": "Kolor stosowany w ikonach informacyjnych i edycyjnych, używany dla elementów przekazujących informacje użytkownikom.",
+      "LinkColor": "Kolor łącza",
+      "LinkColorDesc": "Kolor używany w przypadku linków przekierowujących do innej strony lub otwierających dodatkowe elementy interfejsu użytkownika, takie jak szuflady lub moduły.",
+      "NoChangesMade": "Nie wprowadzono żadnych zmian.",
+      "Preview": "Zapowiedź",
+      "PrimaryColor": "Kolor podstawowy",
+      "PrimaryColorDesc": "Główny kolor stosowany do przycisków lub tekstu opisowego reprezentującego kluczowe działania. \nJest on również stosowany jako kolor tła sekcji logo w nagłówku.",
+      "SuccessColor": "Kolor sukcesu",
+      "SuccessColorDesc": "Kolor zastosowany do przycisków, alertów lub ikon wskazujących, że czynność użytkownika została pomyślnie wykonana.",
+      "TextColor": "Kolor tekstu",
+      "TextColorDesc": "Kolor używany w tekście ogólnym."
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "Zaawansowane korzystanie z terminala internetowego: Skopiuj zawartość terminala",
@@ -2004,13 +2062,16 @@
       "AIAccelerator": "Akcelerator AI",
       "AIAgents": "Agenci AI",
       "AboutBackendAI": "O Backend.AI",
+      "AdminDashboard": "Pulpit nawigacyjny administratora",
       "Administration": "Administracja",
       "AgentSummary": "Podsumowanie agenta",
       "Architecture": "Architektura",
       "ArtifactDetails": "Szczegóły artefaktu",
+      "Branding": "Identyfikacja wizualna",
       "Cancel": "Anuluj",
       "ChangePassword": "Zmień hasło",
       "Chat": "Czat",
+      "ClassicDashboardPage": "Klasyczna strona deski rozdzielczej (strona podsumowująca)",
       "ClickToDownload": "Kliknij, aby pobrać",
       "ComputationResources": "Zasoby obliczeniowe",
       "Configurations": "Konfiguracje",
@@ -2045,10 +2106,10 @@
       "MyAccountInformation": "Zmień informacje o użytkowniku",
       "MyEnvironments": "Moje Środowiska",
       "MyResources": "Mój całkowity limit zasobów",
-      "MyResourcesDescription": "<p>Ten panel pokazuje całkowite wykorzystanie zasobów i limity we wszystkich projektach i grupach zasobów.</p><p>Gdy stosowanych jest wiele limitów (domena, projekt lub para kluczy), do obliczeń używany jest najbardziej restrykcyjny limit.</p>",
+      "MyResourcesDescription": "<p>Ten panel wyświetla całkowitą liczbę aktualnie używanych i wolnych zasobów we wszystkich projektach i grupach zasobów.</p><p>W przypadku zastosowania wielu limitów (takich jak domena, projekt lub para kluczy) do obliczeń używany jest najbardziej restrykcyjny limit wolnych zasobów.</p>",
       "MyResourcesIn": "Moje zasoby",
       "MyResourcesInResourceGroup": "Moje zasoby w grupie zasobów",
-      "MyResourcesInResourceGroupDescription": "Ten panel pokazuje twoje bieżące wykorzystanie i pozostanie w wybranej grupie zasobów.",
+      "MyResourcesInResourceGroupDescription": "Ten panel pokazuje, ile zasobów wykorzystałeś i ile jest wolnych w wybranej grupie zasobów Twojego bieżącego projektu.",
       "NewPassword": "Nowe hasło",
       "NewPasswordAgain": "Powtórz nowe hasło)",
       "NewPasswordCannotBeSame": "Wprowadź hasło, które różni się od aktualnego hasła.",
@@ -2081,7 +2142,7 @@
       "TermsOfService": "Warunki usługi",
       "TotalResourcesIn": "Całkowite zasoby w",
       "TotalResourcesInResourceGroup": "Całkowite zasoby w grupie zasobów",
-      "TotalResourcesInResourceGroupDescription": "Ten panel pokazuje całkowite wykorzystane i pozostałe zasoby. \nWartości są obliczane przez dodanie użycia i pozostałych ilości wszystkich agentów za pomocą wybranej grupy zasobów.",
+      "TotalResourcesInResourceGroupDescription": "Ten panel pokazuje całkowitą liczbę wykorzystanych i wolnych zasobów w wybranej grupie zasobów. \nWartości obliczane są poprzez zsumowanie wykorzystanych i wolnych ilości wszystkich środków korzystających z danej grupy.",
       "TotpActivated": "Włączone 2FA",
       "Update": "Aktualizacja",
       "Usage": "Stosowanie",

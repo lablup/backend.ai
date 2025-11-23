@@ -16,6 +16,19 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.6.16 (2025-11-23)
+
+### Features
+* Add missing and newly introduced fields to service field specifications ([#6714](https://github.com/lablup/backend.ai/issues/6714))
+
+### Fixes
+* Fix model service extra mounts in client SDK to omit unset mount `type` fields, ensuring compatibility with the manager API ([#6347](https://github.com/lablup/backend.ai/issues/6347))
+* Change keypair query to include keypairs of users with no group membership ([#6455](https://github.com/lablup/backend.ai/issues/6455))
+* Resolve deadlock occurring due to incorrect use of semaphore in specific image rescan scenarios ([#6469](https://github.com/lablup/backend.ai/issues/6469))
+* Allow zero values in DecimalType conversion ([#6783](https://github.com/lablup/backend.ai/issues/6783))
+* Disallow dot('.') usage in model service name ([#6800](https://github.com/lablup/backend.ai/issues/6800))
+
+
 ## 25.6.15 (2025-10-02)
 
 ### Features

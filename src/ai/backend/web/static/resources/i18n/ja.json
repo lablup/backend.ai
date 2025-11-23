@@ -1,5 +1,9 @@
 {
   "$schema": "../i18n.schema.json",
+  "activeAgent": {
+    "ActiveAgents": "アクティブなエージェント",
+    "ActiveAgentsTooltip": "現在システムで実行されているすべてのエージェントの概要を示しています。"
+  },
   "agent": {
     "Agent": "代理店",
     "AgentSetting": "エージェント設定",
@@ -27,6 +31,10 @@
     "Terminated": "終了しました",
     "Utilization": "使用量"
   },
+  "agentStats": {
+    "AgentStats": "エージェントの統計",
+    "AgentStatsDescription": "このパネルには、システム内のすべてのエージェントにわたって使用されているすべてのリソースが表示されます。\n値は、すべてのアクティブなセッションで使用されたリソースの合計を表します。"
+  },
   "autoScalingRule": {
     "AddAutoScalingRule": "自動スケーリングルールを追加します",
     "Comparator": "コンパレータ",
@@ -52,6 +60,7 @@
   "button": {
     "Add": "追加",
     "Apply": "応募する",
+    "AutoRefresh": "自動更新",
     "Cancel": "キャンセル",
     "Clear": "消去",
     "ClearLogs": "ログをクリアする",
@@ -213,6 +222,10 @@
     "WarningLessRateLimit": "Rate Limit値が小さいと、ログインなどのAPI操作がブロックされることがあります。",
     "YouAreAboutToDeleteCredential": "このユーザーの資格情報を削除しようとしています:"
   },
+  "dashboard": {
+    "Free": "無料",
+    "Used": "使用済み"
+  },
   "data": {
     "Active": "アクティブ",
     "Add": "追加",
@@ -241,6 +254,7 @@
     "FolderInfo": "フォーダー情報",
     "FolderNameRequired": "フォルダ名が必要です",
     "FolderNameTooLong": "64文字未満のフォルダ名を入力してください",
+    "FolderStatus": "フォルダーのステータス",
     "FolderToCopy": "コピーするフォルダ",
     "Foldername": "フォルダ名",
     "Folders": "フォルダー",
@@ -251,7 +265,7 @@
     "InvalidEmail": "無効なメールアドレス",
     "Invited": "招待",
     "InvitedFolders": "招待されたフォルダー",
-    "InvitedFoldersTooltip": "{{ count }}フォルダーの招待状は、回答が保留されています。",
+    "InvitedFoldersTooltip": "クリックして保留中の {{count}} 件の招待状を確認してください",
     "Limit": "制限",
     "ModelStore": "モデルストア",
     "Models": "モデル",
@@ -273,7 +287,6 @@
     "SearchByName": "名前で検索",
     "SelectStorageHost": "ホストを選択してください",
     "SharedFolderPermission": "共有フォルダー許可",
-    "StorageStatus": "ストレージ利用状況",
     "Type": "タイプ",
     "Update": "更新",
     "UsageMode": "使用モード",
@@ -307,8 +320,11 @@
       "Name": "名前",
       "NewFileName": "新しいファイル名",
       "NewFolder": "新しいフォルダ",
+      "NoAccessPermissionToVolume": "現在のプロジェクトはSFTPボリュームへのアクセス権がありません。",
       "NoImagesSupportingFileBrowser": "Filebrowserを利用するには、対応するイメージが必要です。現在はまだ登録されていません。フォルダーをアップロードするには、少なくとも1つ以上の対応イメージを追加してください。",
       "NoImagesSupportingSystemSession": "SSH / SFTPをサポートするイメージがありません。 SSH / SFTPを利用するには、システムイメージが必要です。",
+      "NoPermissionToMountFolder": "現在のプロジェクトには、このフォルダーに紐づくストレージホストをマウントする権限がありません。",
+      "NoSFTPSupportingScalingGroup": "このフォルダのストレージホストにSFTPのリソースグループがありません。",
       "NoSharedFolders": "共有フォルダーはありません",
       "NoSharedUsers": "誰も招待されていません",
       "NotEnoughResourceForFileBrowserSession": "ファイルブラウザのセッションを作成するのに十分なリソース（CPU：1コア、メモリ：0.5GB）がありません。利用可能なリソースを確認してください。",
@@ -355,6 +371,7 @@
       "DownloadingModel": "モデルのダウンロード...",
       "Edit": "編集",
       "EditDelete": "編集+削除",
+      "ExcludedFolders": "以下の削除権限のないフォルダーは除外されます。",
       "FileDeleted": "ファイルが削除されました",
       "FileRenamed": "ファイルの名前が変更されました",
       "FolderCloneFailed": "フォルダのクローンに失敗しました。",
@@ -429,6 +446,7 @@
       "Invited": "招待に成功",
       "LeaveSharedFolder": "共有フォルダーを残します",
       "LeaveSharedFolderDesc": "共有フォルダー「{{foldername}}」を残しますか？",
+      "NoMoreInvitation": "レビューへの招待はありません。",
       "NoOneWasInvited": "招待状が既に存在するため、誰も招待されていません",
       "NoOneWasShared": "グループフォルダの共有に失敗しました",
       "NoValidEmails": "有効なメールが入力されていません",
@@ -599,6 +617,7 @@
     "AuthenticationFailed": "認証に失敗しました。情報とマネージャーのステータスを確認してください。",
     "CannotChangeVirtualFolderOption": "自分が所有していないvfolderのオプションを変更することはできません。",
     "CannotSharePrivateAutomountFolder": "ポリシーに従って自動マウントVフォルダーを共有できない。",
+    "FailedToLoadTableData": "一覧の読み込み中にエラーが発生しました。",
     "FolderSharingNotAvailableToUser": "要求されたユーザーのフォルダ共有は利用できません。",
     "InternalServerError": "内部サーバーエラーです。後でもう一度お試しください。",
     "InvalidBaseURL": "エンドポイント URL が無効です。",
@@ -639,17 +658,18 @@
     "Title": "エラーが発生しました。"
   },
   "explorer": {
-    "FileInProgress": "'{{fileName}}'のアップロード...",
     "FileUploadCancelled": "ファイルのアップロードは、ユーザーリクエストによってキャンセルされました。",
     "FileUploadFailed": "Folder '{{folderName}}'にいくつかのファイルをアップロードできませんでした。",
+    "Filename": "ファイル名",
     "FolderNotFoundOrNoAccess": "フォルダーが見つかりませんまたはアクセスが拒否されません",
     "InputTooShort": "InputTooShort",
     "NoExplorerSupportForUnmanagedFolder": "管理されていないフォルダーは、ファイルエクスプローラーをサポートしていません。",
     "NoPermissions": "このフォルダーにアクセスする権限はありません",
     "ProcessingUpload": "ファイルがアップロードされています。\nお待ちください。",
-    "SuccessfullyUploadedToFolder": "FilesがFolder '{{folderName}}'に正常にアップロードされました '",
+    "SuccessfullyUploadedToFolder": "ファイルは正常にアップロードされました。",
     "UploadFailed": "'{{folderName}}'で故障したアップロード",
-    "UploadToFolder": "'{{folderName}}にアップロードする",
+    "UploadingFiles": "ファイルをアップロードしています...",
+    "VFolder": "フォルダ",
     "ValueRequired": "ValueRequired"
   },
   "general": {
@@ -708,6 +728,7 @@
     "CreateButtonCode": "作成する",
     "CreateNotebookButton": "ノートブック実行ボタン生成",
     "Downloading": "ダウンロード中...",
+    "FailedToFetchRepositoryInformation": "リポジトリ情報の取得に失敗しました。",
     "FolderAlreadyExists": "同じ名前のフォルダがあります。名前が変更されます。",
     "FolderCreated": "フォルダが作成されました。",
     "FolderName": "インポートされたフォルダ名：",
@@ -724,6 +745,8 @@
     "ImportGithubRepo": "GitHubリポジトリをインポートする",
     "ImportGitlabRepo": "GitLabリポジトリ取り込み",
     "ImportNotebook": "ノートブック取り込み",
+    "InvalidGitHubURL": "無効なGitHub URLです。有効なGitHubリポジトリのURLを指定してください。",
+    "InvalidGitLabURL": "GitLab の URL が無効です。正しい GitLab リポジトリの URL を指定してください。",
     "InvalidNotebookURL": "ノートブックの URL が無効です。",
     "NoNotebookCode": "ノートブックアドレスが空です。バッジコードをコピーするには、有効なノートブックコードを入力してください。",
     "NoSuitableResourceFoundOnGivenURL": "指定されたURLに適切なリソースが見つかりません。",
@@ -735,8 +758,11 @@
     "Preparing": "準備...",
     "ReadyToImport": "インポートする準備ができました",
     "RepoWillBeFolder": "インポートされたGitHubリポジトリはフォルダーに変換され、セッションの開始時にマウントできます。",
+    "RepositoryNotFound": "リポジトリが見つかりません。",
+    "StorageHost": "ストレージホスト",
+    "VFolderUsageMode": "フォルダ利用モード",
     "WrongURLType": "間違ったURLタイプ",
-    "YouCanCreateNotebookCode": "ノートブックのURLを入力すると、Backend.AIで直接実行できる以下のようなバッジコードを生成します。"
+    "YouCanCreateNotebookCode": "このバッジを使うと、ノートブックを Backend.AI 上で直接実行できます。コードをコピーして任意の場所でご利用ください。"
   },
   "information": {
     "APIVersion": "APIバージョン",
@@ -978,7 +1004,7 @@
     "ServiceInfo": "サービス情報",
     "ServiceName": "サービス名",
     "ServiceNameCannotStartWithHyphen": "両端にハイフン（-）を使用することはできません。",
-    "ServiceNameInvalidCharacter": "サービス名の中央では、アルファベット、数字、「_」、 '、'  -  'のみを含めることができます。",
+    "ServiceNameInvalidCharacter": "サービス名の中央では、アルファベット、数字、'_', '-' のみを含めることができます。",
     "ServiceNameMaxLength": "24文字以内で入力してください。",
     "ServiceNameMinLength": "少なくとも 4 文字を入力してください。",
     "ServiceNameShouldEndWith": "アルファベット、大小の文字、数字、および「_」で終わる必要があります。",
@@ -1165,11 +1191,6 @@
     "TypeResourceGroupNameToDelete": "削除するリソースグループ名を入力します",
     "WsproxyAddress": "WSProxy サーバアドレス"
   },
-  "resourcePanel": {
-    "Limit": "制限",
-    "RemainingNumber": "rmaining",
-    "UsingNumber": "使用"
-  },
   "resourcePolicy": {
     "AboutToDeleteResourcePolicy": "このリソースポリシーを削除しようとしています。",
     "AllowedHosts": "許可されたホスト",
@@ -1254,10 +1275,12 @@
     "PendingSessions": "保留中のセッション"
   },
   "session": {
+    "ActiveSessions": "アクティブセッション",
     "Agent": "エージェント",
     "AgentId": "エージェントID",
     "Agents": "エージェント",
     "AllowedClientIps": "許可されたクライアントIP",
+    "AllowedMultipleClientsIps": "許可されたクライアント IP (カンマ区切り)",
     "AlreadyTerminatingSession": "すでに終了しているセッションです",
     "AnotherUserSession": "このセッションは、別のユーザーによって作成されました.",
     "Architecture": "アーキテクチャ",
@@ -1289,6 +1312,7 @@
     "ElapsedTime": "経過時間",
     "EnvironmentAndVersion": "環境とバージョン",
     "EnvironmentInfo": "環境情報",
+    "ExecuteSpecificApp": "{{appName}} アプリを起動",
     "ExecuteTerminalApp": "ターミナルアプリを起動する",
     "ExpiresAfter": "残り時間",
     "ExportCSV": "CSVをエクスポート",
@@ -1316,6 +1340,7 @@
     "Inference": "INFERENCE",
     "InputTensorboardPath": "TensorBoardが参照するログディレクトリを入力してください。ログディレクトリは自動的に作成されないことに注意してください。",
     "Interactive": "インタラクティブ",
+    "InvalidRedirectURL": "無効なURLのため、アプリを起動できません。",
     "KernelExitCode": "カーネル出口コード",
     "LastTry": "最近試した時間",
     "MEM": "メモリ",
@@ -1405,6 +1430,7 @@
       "ConfirmAndRun": "確認して始めます",
       "ConnectUrlIsNotValid": "接続 URL が無効です。",
       "DownloadSSHKey": "SSHキーをダウンロード",
+      "LaunchingApp": "{{appName}} アプリを起動しています。",
       "NoExistingConnectionExample": "コピーする接続例がありません。",
       "OpenVSCodeRemote": "ローカルVisual Studio Codeを開く",
       "Prepared": "準備",
@@ -1428,6 +1454,7 @@
       "BatchMode": "バッチ",
       "BatchModeConfig": "Batchモード設定",
       "BatchModeDesc": "複数のノードやクラスタでコードを実行し、アイデアをスケールさせることができます。",
+      "BootstrapScriptDetail": "ブートストラップスクリプト",
       "CPU": "CPU",
       "ChooseEnvironment": "環境を選択",
       "ClusterMode": "クラスターモード",
@@ -1445,7 +1472,8 @@
       "DescMemory": " <p>コンピュータのメモリは一時的な記憶領域です。 </p> <p>中央処理装置（CPU）が必要とするデータと命令を保持します。 </p> <p>機械学習ワークロードでGPUを使用する場合、GPUのメモリの少なくとも2倍をメモリに割り当てる必要があります。そうしないと、GPUのアイドル時間が長くなり、パフォーマンスが低下します。 </p>",
       "DescMultiNode": " <p>セッションを実行すると、1つの管理対象ノードと1つ以上のワーカーノードが複数の物理ノードまたは仮想マシンに分割されます。 </p>",
       "DescOpenMPOptimization": "<p>この値はnthreads-var内部制御変数の初期値を設定し、並列領域に使用するスレッド数を設定します。</p><p>Backend.AIはこの値をCPUコア数と同じに設定し、一般的な高性能コンピューティングワークロードを加速する効果があります。 しかし、一部のマルチスレッドワークロードの場合、OpenMPを使用する複数のプロセスが同時に使用され、異常に多くのスレッドが生成され、パフォーマンスが大幅に低下します。このような場合は、この値を1または2に調整してください</p>。",
-      "DescSelectAgent": "エージェントの右側に表示されるリソースは、使用可能なリソースの実際の量を表します。\n現在、エージェントの選択は、単一ノード、単一コンテナー環境でのみ使用できます。\nデフォルト設定は、スケジューラによるエージェント割り当てです。",
+      "DescSelectAgent": "エージェントの右に表示されているリソースは、実際に利用可能な量を示しています。選択されたエージェントは割り当て候補を表しており、複数選択しても1つのエージェントにしか割り当てられないことがあります。既定ではスケジューラーによる自動割り当てです。",
+      "DescSelectAgentBefore2516": "エージェントの右側に表示されているリソースは、実際に利用可能なリソース量を示しています。現在、エージェントの選択は単一ノード・単一コンテナ環境でのみ利用可能です。デフォルト設定はスケジューラによるエージェント割り当てです。",
       "DescSession": " <p>セッションは、指定された環境とリソースに従って作成される計算環境の単位です。 </p> <p>この値が1より大きい値に設定されている場合、上記のリソースセットに対応する複数のセッションが作成されます。 </p> <p>使用可能なリソースが十分にない場合、作成できないセッションを作成する要求は待機キューに入れられます。 </p>",
       "DescSetEnv": " <p>コンテナにデフォルトの環境変数を設定し、Backend.AIに同じ名前の環境変数を設定すると、Backend.AIに設定された値が優先されます。 </p> <p style='color:var(--paper-red-400);'>すべての入力値は、セッションランチャーの開始後に初期化されます。 <br />また、これらの環境は、変数と値の両方が空でない場合にのみ渡されます。 </p>",
       "DescSetPreOpenPort": "ネットワーク機器またはコンピュータで外部からの接続を許可する <span style='color:var(--paper-red-400);'> コンテナ内部の特定のポート番号</span>を「事前開放ポート」の値に設定します。",
@@ -1587,6 +1615,7 @@
       "TitleSession": "セッション（Backend.AI）",
       "TotalAllocation": "総割り当て",
       "UserResourceLimit": "ユーザーリソース制限",
+      "UsingBootstrapScriptInfo": "ブートストラップスクリプトが含まれています。",
       "Version": "バージョン",
       "YouCanStartWithHistory": "これらは最近作成されたセッション記録です。セッション名をクリックすると、新しいセッションが開始されます。"
     },
@@ -1868,6 +1897,12 @@
     "SelectColumnToDisplay": "表示する列を選択します",
     "SettingTable": "テーブルセッティング"
   },
+  "theme": {
+    "PreviewModeAlert": "現在、テーマのプレビュー モードを使用しています。実際の作業は元のウィンドウで行ってください。",
+    "button": {
+      "ExportToJson": "JSON をエクスポート"
+    }
+  },
   "time": {
     "Day": "日",
     "Hour": "時間",
@@ -1919,6 +1954,8 @@
     "BootstrapScriptDescription": "ブートストラップスクリプトはセッション作成後一度だけ実行されます。",
     "BootstrapScriptEmpty": "スクリプトが空です。\nスクリプトを入力してください。",
     "BootstrapScriptUpdated": "ブートストラップスクリプトが更新されました。",
+    "ClassicFeatures": "古典的な機能",
+    "ClassicFeaturesDesc": "古典的なバージョンに戻ると、更新や修正がリリースされるのを待っている間、安定性と機能を取り戻すのに役立ちます。",
     "ClassicSessionList": "クラシックセッションリストページ",
     "ClearSSHKeypairInput": "書き込まれたSSHキーペアは削除されます。続行してもよろしいですか？",
     "ConfigFilename": "構成ファイル名",
@@ -1928,12 +1965,12 @@
     "DescAutoLogout": "アプリのセッション開始ページ（jupyterノートブック、Webターミナルなど）を除き、ログインしたすべてのページが閉じている場合は、自動的にログアウトします。",
     "DescAutomaticUpdateCheck": "新しいwebuiバージョンがリリースされたときに通知します。<br />機能が自動的に無効になった場合、トグルを再度クリックすると更新チェックが再開されます。",
     "DescBetaFeatures": "WebUIのベータ機能を使用します。 <br />ベータ機能が不安定な場合があります。一部のベータ機能は、公式機能として採用されない場合があります。",
-    "DescClassicSessionLauncher": "NEO セッション ランチャーの代わりに Classic セッション ランチャーを使用します。\nClassic セッション ランチャーには最新の機能が含まれていない可能性があります。",
     "DescDesktopNotification": "デスクトップ通知を有効にします。<br />オンにすると、Backend.AIはオペレーティングシステムの通知システムも使用します。これをオフにしても、WebUI内の通知には影響しません。オペレーティングシステムによっては、システム設定で通知権限を有効にする必要がある場合があります。",
     "DescExperimentalDashboard": "要約ページの代わりにダッシュボードページを使用します。",
     "DescKeepLoginSessionInformation": "次回、webuiアプリに現在のログインセッション情報を保持させます。 <br />オプションがオフの場合、ログイン情報はログアウトごとにクリアされます。",
     "DescLanguage": "インターフェイス言語を設定します。英語と韓国以外の言語は、機械翻訳によって提供されます。",
     "DescLetUserUpdateScriptWithNonEmptyValue": "空でない値でスクリプトを更新してください。",
+    "DescMaxConcurrentUploads": "ファイル エクスプローラーを通じて同時にアップロードできるファイルの数を制限します。",
     "DescMyKeypairInfo": "私のキーペア情報を参照してください",
     "DescNewUserConfigFileCreated": "空でないデータを使用して、新しいユーザー構成ファイルを作成できます。",
     "DescNoBetaFeatures": "現在、ベータ機能は利用できません。 :)",
@@ -1960,6 +1997,7 @@
     "Language": "言語",
     "LightMode": "ライトモード",
     "Logs": "ログ",
+    "MaxConcurrentUploads": "最大同時ファイルアップロード制限",
     "MyKeypairInfo": "私のキーペア情報",
     "NEODataPage": "NEOデータページ",
     "NEOSessionList": "NEOセッションリスト",
@@ -1977,10 +2015,30 @@
     "SSHKeypairManagement": "SSHキーペア管理",
     "SessionTerminationDialog": "セッションの終了は元に戻せません。セッションの終了に進みますか？",
     "ShellEnvironments": "シェル環境",
+    "Theme": "テーマ",
     "ThemeMode": "テーマモード",
     "UseCompactSidebar": "コンパクトサイドバーをデフォルトに設定",
     "UseSystemSetting": "システム設定を使用する",
-    "UserConfigScript": "ユーザー構成スクリプト"
+    "UserConfigScript": "ユーザー構成スクリプト",
+    "theme": {
+      "CustomThemeSettingAlert": "更新されたテーマはすぐには適用できません。テーマを適用したい場合は、エクスポートした設定のJSONファイルを添えてサポートチームまでご連絡ください。",
+      "ErrorColor": "エラーの色",
+      "ErrorColorDesc": "警告やエラーを示すために、削除などの重要なアクションを表すボタンまたはアラートに適用される色。",
+      "HeaderBg": "ヘッダーの背景色",
+      "HeaderBgDesc": "ロゴセクションを除く、ヘッダーの背景に適用される色。",
+      "InfoColor": "情報の色",
+      "InfoColorDesc": "ユーザーに情報を伝える要素（情報案内や編集アイコン）に適用される色。",
+      "LinkColor": "リンクの色",
+      "LinkColorDesc": "別のページにリダイレクトするリンク、またはドロワーやモーダルなどの追加の UI 要素を開くリンクに使用される色。",
+      "NoChangesMade": "変更はありません。",
+      "Preview": "プレビュー",
+      "PrimaryColor": "原色",
+      "PrimaryColorDesc": "キーアクションを表すボタンまたは説明テキストに適用されるメインカラー。\nヘッダーのロゴセクションの背景色としても適用されます。",
+      "SuccessColor": "サクセスカラー",
+      "SuccessColorDesc": "ユーザーアクションが正常に完了したことを示すボタン、アラート、またはアイコンに適用される色。",
+      "TextColor": "文字の色",
+      "TextColorDesc": "一般的なテキストに使用される色。"
+    }
   },
   "webTerminalUsageGuide": {
     "CopyGuide": "高度なWeb端末の使用法：端末の内容をコピーする",
@@ -2004,13 +2062,16 @@
       "AIAccelerator": "AIアクセラレータ",
       "AIAgents": "AIエージェント",
       "AboutBackendAI": "Backend.AIについて",
+      "AdminDashboard": "管理ダッシュボード",
       "Administration": "管理",
       "AgentSummary": "リソース概要",
       "Architecture": "建築",
       "ArtifactDetails": "アーティファクトの詳細",
+      "Branding": "ブランディング",
       "Cancel": "キャンセル",
       "ChangePassword": "パスワードを変更する",
       "Chat": "チャット",
+      "ClassicDashboardPage": "クラシックダッシュボードページ（要約ページ）",
       "ClickToDownload": "クリックしてダウンロードします",
       "ComputationResources": "計算リソース",
       "Configurations": "構成",
@@ -2045,10 +2106,10 @@
       "MyAccountInformation": "ユーザー情報の変更",
       "MyEnvironments": "利用環境",
       "MyResources": "私の総リソース制限",
-      "MyResourcesDescription": "<p>このパネルは、全てのプロジェクトとリソースグループを合算した総リソース使用量と制限を表示します。</p><p>複数の制限（ドメイン、プロジェクト、キーペアなど）が適用される場合、最も厳しい制限に基づいて計算されます。</p>",
+      "MyResourcesDescription": "<p>このパネルには、すべてのプロジェクトおよびリソース グループにわたって現在使用されているリソースと空きリソースの合計が表示されます。</p><p>複数の制限が適用されている場合 (ドメイン、プロジェクト、キーペアなど)、計算では最も制限の厳しい無料リソース制限が使用されます。</p>",
       "MyResourcesIn": "私のリソース",
       "MyResourcesInResourceGroup": "リソースグループの私のリソース",
-      "MyResourcesInResourceGroupDescription": "このパネルは、現在の私のリソースの使用と選択したリソースグループに残っていることを示しています。",
+      "MyResourcesInResourceGroupDescription": "このパネルには、現在のプロジェクトで選択したリソース グループで使用したリソースの量と空き容量が表示されます。",
       "NewPassword": "新しいパスワード",
       "NewPasswordAgain": "新しいパスワードを再入力）",
       "NewPasswordCannotBeSame": "既存のパスワードとは異なる新しいパスワードを入力してください。",
@@ -2081,7 +2142,7 @@
       "TermsOfService": "利用規約",
       "TotalResourcesIn": "総リソース",
       "TotalResourcesInResourceGroup": "リソースグループの総リソース",
-      "TotalResourcesInResourceGroupDescription": "このパネルは、使用されている合計と残りのリソースを示しています。\n値は、選択したリソースグループを使用して、すべてのエージェントの使用量と残りの量を追加することによって計算されます。",
+      "TotalResourcesInResourceGroupDescription": "このパネルには、選択したリソース グループ内の使用済みリソースと空きリソースの合計が表示されます。\n値は、そのグループを使用するすべてのエージェントの使用量と空き量を合計することによって計算されます。",
       "TotpActivated": "二要素認証の使用",
       "Update": "更新",
       "Usage": "使用法",
