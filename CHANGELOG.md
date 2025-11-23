@@ -16,6 +16,21 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.17.0 (2025-11-23)
+
+### Features
+* Implement async file deletion API in vfolder ([#6861](https://github.com/lablup/backend.ai/issues/6861))
+* Add agent-id label for session Docker containers ([#6870](https://github.com/lablup/backend.ai/issues/6870))
+
+### Fixes
+* Apply http client pool in app proxy worker ([#6851](https://github.com/lablup/backend.ai/issues/6851))
+* Add missing cache invalidation for resource preset ([#6852](https://github.com/lablup/backend.ai/issues/6852))
+* Eager load kernel when fetch session by it's id preventing SQLAlchemy error when attempting to use relationships outside the db session context manager ([#6866](https://github.com/lablup/backend.ai/issues/6866))
+
+### Documentation Updates
+* Document deployment revision generator in deployment README.md ([#6872](https://github.com/lablup/backend.ai/issues/6872))
+
+
 ## 25.17.0rc3 (2025-11-20)
 
 ### Features
