@@ -99,7 +99,7 @@ jobs:
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
         lfs: false
@@ -167,7 +167,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         lfs: false
     - name: Parse versions from config
@@ -227,7 +227,7 @@ jobs:
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
         lfs: false
@@ -294,7 +294,7 @@ jobs:
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
         lfs: false
@@ -363,7 +363,7 @@ jobs:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Git LFS Pull
@@ -420,7 +420,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Git LFS Pull
@@ -488,7 +488,7 @@ jobs:
       contents: write
     environment: deploy-to-pypi
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@v6
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Extract Python version from pants.toml
@@ -632,7 +632,7 @@ jobs:
 
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
     - name: Git LFS Pull
       run: git lfs pull
     - name: Extract Python version from pants.toml
