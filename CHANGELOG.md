@@ -16,6 +16,28 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 25.15.3 (2025-11-23)
+
+### Features
+* Support bind, advertised address configuration options for app-proxy coordinator and worker components ([#6631](https://github.com/lablup/backend.ai/issues/6631))
+* Add missing and newly introduced fields to service field specifications ([#6714](https://github.com/lablup/backend.ai/issues/6714))
+* Parallelize session termination and add lost agent cleanup ([#6826](https://github.com/lablup/backend.ai/issues/6826))
+
+### Fixes
+* Add AppProxy setup and initialization workflow to the TUI installer (replacing WSProxy) ([#6228](https://github.com/lablup/backend.ai/issues/6228))
+* Fix Pydantic validation error from incorrect `slot_type` type in mock plugin ([#6692](https://github.com/lablup/backend.ai/issues/6692))
+* Fix domain admin users seeing vfolder hosts from projects they were not members of. They now only see hosts for projects they belong to ([#6694](https://github.com/lablup/backend.ai/issues/6694))
+* Model Card resolver now returns the actual error message when it fails, instead of showing a generic "Unknown error" string ([#6702](https://github.com/lablup/backend.ai/issues/6702))
+* Add missing advertise_address info in app proxy status response ([#6772](https://github.com/lablup/backend.ai/issues/6772))
+* Allow zero values in DecimalType conversion ([#6783](https://github.com/lablup/backend.ai/issues/6783))
+* Disallow dot('.') usage in model service name ([#6800](https://github.com/lablup/backend.ai/issues/6800))
+* Fix auto-scaling functionality for inference services when using framework-based scaling rules. Metrics collection and rule comparison logic have been corrected to ensure proper scaling behavior ([#6801](https://github.com/lablup/backend.ai/issues/6801))
+* Use the kernel’s occupied slots when calculating the agent’s resources ([#6817](https://github.com/lablup/backend.ai/issues/6817))
+* Explicitly wrap slot key with `SlotName()` to prevent validation failure when initializing `AgentInfo` ([#6841](https://github.com/lablup/backend.ai/issues/6841))
+* Apply http client pool in app proxy worker ([#6851](https://github.com/lablup/backend.ai/issues/6851))
+* Add missing cache invalidation for resource preset ([#6852](https://github.com/lablup/backend.ai/issues/6852))
+
+
 ## 25.15.2 (2025-11-07)
 
 ### Features
