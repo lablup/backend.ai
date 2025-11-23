@@ -74,7 +74,7 @@ DeploymentCoordinator acts as the top-level orchestrator of deployment lifecycle
 
 ### DeploymentController
 
-DeploymentController performs the actual control logic for deployments. It handles basic CRUD operations such as creating, updating, and deleting deployments, and manages the replica count for each deployment. It automatically generates session definitions tailored to deployment types (vLLM, TGI, SGLang, etc.) and applies configured auto-scaling policies to deployments.
+DeploymentController performs the actual control logic for deployments. It handles basic CRUD operations such as creating, updating, and deleting deployments, and manages the replica count for each deployment. It automatically generates final revision spec tailored to deployment types (vLLM, TGI, SGLang, etc.) with deployment user request, service-definition toml file, and applies configured auto-scaling policies to deployments.
 
 **Key Methods:**
 - `create_deployment()`: Creates a new deployment
@@ -87,24 +87,120 @@ DeploymentController performs the actual control logic for deployments. It handl
 ```
 1. Receive deployment request
    ↓
-2. Select Definition Generator
+2. Create draft deployment dataclass with draft model revision (DeploymentCreationDraft)
    ↓
-3. Create session creation request
+3. Select Revision Generator based on runtime variant
    ↓
-4. Request validation from SchedulingController
+4. Generate final deployment creator
+   ├─ Load service definition from vfolder (if exists)
+   ├─ Merge service definition with API request
+   └─ Validate the final revision
    ↓
-5. Request session creation from Scheduler
+5. Validate session specification with SchedulingController
    ↓
-6. Save deployment record (PENDING)
+6. Request session creation from Scheduler
    ↓
-7. Request route creation from RouteController
+7. Save deployment record (PENDING)
+   ↓
+8. Request route creation from RouteController
 ```
 
 ## Definition Generators
 
-Definition Generator is a strategy pattern that generates appropriate session creation requests based on deployment type. Since each deployment type (vLLM, TGI, SGLang, NIM, etc.) has different images, environment variables, and resource requirements, it is designed to abstract these differences and handle them through a consistent interface.
+Definition Generators transform finalized model revisions into runtime-specific session configurations. Each deployment type (vLLM, TGI, SGLang, NIM, etc.) requires different container images, environment variables, and resource requirements. Definition Generators abstract these runtime-specific differences and provide a consistent interface for session creation.
 
 > **Note**: Specific configurations for each deployment type will be managed as DB-based fixtures in the future.
+
+**Supported Runtime Variants:**
+- **vLLM**: Optimized for vLLM inference engine
+- **HUGGINGFACE_TGI**: Hugging Face Text Generation Inference
+- **SGLANG**: SGLang inference framework
+- **NIM**: NVIDIA Inference Microservices
+- **MODULAR_MAX**: Modular MAX inference engine
+- **CMD**: Custom command-based execution
+- **CUSTOM**: User-defined custom configurations
+
+
+## Revision Generators
+
+Revision Generators process draft model revisions from API requests and produce validated, deployment-ready model revision specifications. They handle the integration of service definitions stored in vfolders with user-provided parameters, implementing a sophisticated override mechanism.
+
+**Key Responsibilities:**
+- Load and parse service definition files from vfolders
+- Merge service definitions with API request parameters
+- Validate final revision specifications
+- Support variant-specific validation rules
+
+**Service Definition Override Mechanism:**
+
+Service definitions are TOML files stored in model vfolders that provide default configurations for deployments. The override priority follows a three-level hierarchy:
+
+```
+1. Root-level service definition (lowest priority, base configuration)
+   ↓
+2. Runtime variant-specific section (field-level override)
+   ↓
+3. API request parameters (highest priority, explicit user input)
+```
+
+**Service Definition Structure:**
+
+```toml
+# service-definition.toml
+
+# Root level - Default configuration for all variants
+[environment]
+image = "default-inference:latest"
+architecture = "x86_64"
+
+[resource_slots]
+cpu = 4
+mem = "16gb"
+gpu = 1
+
+[environ]
+LOG_LEVEL = "INFO"
+MAX_BATCH_SIZE = "32"
+
+# vLLM variant - Overrides specific fields only
+[vllm.environment]
+image = "vllm-optimized:0.4.0"
+
+[vllm.resource_slots]
+cpu = 8
+gpu = 2
+
+[vllm.environ]
+VLLM_GPU_MEMORY_UTILIZATION = "0.95"
+```
+
+**Override Resolution Example:**
+
+For a vLLM deployment, the final configuration merges:
+- `environment.image`: `"vllm-optimized:0.4.0"` (from vllm variant)
+- `environment.architecture`: `"x86_64"` (from root, not overridden)
+- `resource_slots.cpu`: `8` (from vllm variant)
+- `resource_slots.mem`: `"16gb"` (from root, not overridden)
+- `resource_slots.gpu`: `2` (from vllm variant)
+- `environ`: `{LOG_LEVEL: "INFO", MAX_BATCH_SIZE: "32", VLLM_GPU_MEMORY_UTILIZATION: "0.95"}` (merged)
+
+If the API request specifies `resource_slots.gpu = 4`, the final value will be `4` (API request overrides all).
+
+**Revision Generation Process:**
+
+```
+1. Load service-definition.toml from vfolder (if exists)
+   ↓
+2. Merge service definition with API request (draft revision)
+   ├─ Service definition provides defaults
+   └─ API request overrides specific fields
+   ↓
+3. Validate final ModelRevisionSpec
+   ↓
+4. Return validated ModelRevisionSpec
+```
+
+> **Note**: Service definition files are optional. If no service definition exists, the API request must provide all required configuration. When a service definition is present, it serves as a template that users can selectively override through API parameters, reducing repetitive configuration for commonly deployed models.
 
 ## State-Specific Handlers
 
