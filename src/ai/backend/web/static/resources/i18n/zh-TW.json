@@ -1339,6 +1339,7 @@
     "Inference": "推论",
     "InputTensorboardPath": "請輸入 TensorBoard 將引用的日誌目錄。請注意，日誌目錄不會自動創建..",
     "Interactive": "交互式",
+    "InvalidRedirectURL": "應用程式無法啟動，因為 URL 無效。",
     "KernelExitCode": "內核退出代碼",
     "LastTry": "最后一次尝试",
     "MEM": "内存",

@@ -1341,6 +1341,7 @@
     "Inference": "Çıkarım",
     "InputTensorboardPath": "Lütfen TensorBoard'un başvuracağı günlük dizinini girin. Günlük dizininin otomatik olarak oluşturulmayacağını unutmayın..",
     "Interactive": "İnteraktif",
+    "InvalidRedirectURL": "Geçersiz bir URL nedeniyle uygulama başlatılamıyor.",
     "KernelExitCode": "Çekirdek çıkış kodu",
     "LastTry": "Son Deneme",
     "MEM": "Hafıza",

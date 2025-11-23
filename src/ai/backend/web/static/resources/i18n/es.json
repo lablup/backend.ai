@@ -1341,6 +1341,7 @@
     "Inference": "Inferencia",
     "InputTensorboardPath": "Por favor, introduzca el directorio de registro al que se referirá TensorBoard. Tenga en cuenta que el directorio de registro no se creará automáticamente...",
     "Interactive": "Interactivo",
+    "InvalidRedirectURL": "No se puede iniciar la aplicación debido a una URL no válida.",
     "KernelExitCode": "Código de salida del kernel",
     "LastTry": "Último intento",
     "MEM": "Memoria",

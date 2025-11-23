@@ -1339,6 +1339,7 @@
     "Inference": "Kesimpulan",
     "InputTensorboardPath": "Harap masukkan direktori log yang akan dirujuk oleh TensorBoard. Perhatikan bahwa direktori log tidak akan dibuat secara otomatis..",
     "Interactive": "Interaktif",
+    "InvalidRedirectURL": "Aplikasi tidak dapat diluncurkan karena URL tidak valid.",
     "KernelExitCode": "Kode keluar kernel",
     "LastTry": "Percobaan Terakhir",
     "MEM": "Memori",

@@ -1340,6 +1340,7 @@
     "Inference": "Wnioskowanie",
     "InputTensorboardPath": "Wprowadź katalog dziennika, do którego będzie się odwoływać TensorBoard. Pamiętaj, że katalog dziennika nie zostanie utworzony automatycznie.",
     "Interactive": "Interaktywny",
+    "InvalidRedirectURL": "Aplikacji nie można uruchomić z powodu nieprawidłowego adresu URL.",
     "KernelExitCode": "Kod wyjściowy jądra",
     "LastTry": "Ostatnia próba",
     "MEM": "Pamięć",

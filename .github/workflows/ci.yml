@@ -99,7 +99,7 @@ jobs:
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
+      uses: actions/checkout@v5
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
         lfs: false
@@ -126,7 +126,7 @@ jobs:
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
       with:
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ github.sha }}
         cache-lmdb-store: 'true'
     - name: Check BUILD files
       run: pants tailor --check update-build-files --check '::'
@@ -167,7 +167,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v6
+      uses: actions/checkout@v5
       with:
         lfs: false
     - name: Parse versions from config
@@ -193,7 +193,7 @@ jobs:
     - name: Bootstrap Pants
       uses: ./actions/init-pants
       with:
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ github.sha }}
         cache-lmdb-store: 'true'
     - name: Prepare DB
       run: docker compose -f docker-compose.halfstack-main.yml up -d backendai-half-db --wait
@@ -227,7 +227,7 @@ jobs:
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
+      uses: actions/checkout@v5
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
         lfs: false
@@ -252,7 +252,7 @@ jobs:
     - name: Bootstrap Pants
       uses: ./actions/init-pants
       with:
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ github.sha }}
         cache-lmdb-store: 'true'
     - name: Typecheck
       run: |
@@ -294,7 +294,7 @@ jobs:
           echo "GIT_FETCH_DEPTH=2" >> "${GITHUB_ENV}"
         fi
     - name: Check out the revision with minimal required history
-      uses: actions/checkout@v6
+      uses: actions/checkout@v5
       with:
         fetch-depth: ${{ env.GIT_FETCH_DEPTH }}
         lfs: false
@@ -319,7 +319,7 @@ jobs:
     - name: Bootstrap Pants
       uses: ./actions/init-pants
       with:
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ github.sha }}
         cache-lmdb-store: 'true'
     - name: Test
       timeout-minutes: 15
@@ -363,7 +363,7 @@ jobs:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v6
+      uses: actions/checkout@v5
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Git LFS Pull
@@ -382,10 +382,9 @@ jobs:
         python-version: ${{ env.PROJECT_PYTHON_VERSION }}
         cache: "pip"
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v8
+      uses: ./actions/init-pants
       with:
-        gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ github.sha }}
         cache-lmdb-store: 'false'
     - name: Build both lazy and fat packages
       run: |
@@ -420,7 +419,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v6
+      uses: actions/checkout@v5
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Git LFS Pull
@@ -439,10 +438,9 @@ jobs:
       run: |
         pip install -U 'packaging>=21.3'
     - name: Bootstrap Pants
-      uses: pantsbuild/actions/init-pants@v8
+      uses: ./actions/init-pants
       with:
-        gha-cache-key: pants-cache-main-1-deploy-py${{ env.PROJECT_PYTHON_VERSION }}-${{ runner.os }}-${{ runner.arch }}
-        named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
+        named-caches-hash: ${{ github.sha }}
         cache-lmdb-store: 'false'
     - name: Build wheel packages
       run: |
@@ -488,7 +486,7 @@ jobs:
       contents: write
     environment: deploy-to-pypi
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v5
     - name: Fetch remote tags
       run: git fetch origin 'refs/tags/*:refs/tags/*' -f
     - name: Extract Python version from pants.toml
@@ -632,7 +630,7 @@ jobs:
 
     steps:
     - name: Check out the revision
-      uses: actions/checkout@v6
+      uses: actions/checkout@v5
     - name: Git LFS Pull
       run: git lfs pull
     - name: Extract Python version from pants.toml

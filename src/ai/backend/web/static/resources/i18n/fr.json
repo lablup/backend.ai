@@ -1341,6 +1341,7 @@
     "Inference": "Inférence",
     "InputTensorboardPath": "Veuillez saisir le répertoire de journal auquel TensorBoard fera référence. Notez que le répertoire des journaux ne sera pas automatiquement créé.",
     "Interactive": "Interactif",
+    "InvalidRedirectURL": "L'application ne peut pas être lancée en raison d'une URL invalide.",
     "KernelExitCode": "Code de sortie du noyau",
     "LastTry": "Dernier essai",
     "MEM": "Mémoire",
