@@ -105,11 +105,11 @@
       "patternProperties": {
         ".*": {
           "type": "string",
-          "description": "Sort order key for the group"
+          "description": "Sort key value that determines the display order of this group. Uses string comparison for sorting, so padding numbers with leading zeros is recommended for consistent ordering"
         }
       },
       "additionalProperties": false,
-      "description": "Mapping of group names to their sort order"
+      "description": "Controls the display order of image groups in the UI. The keys in this map must match the 'group' property values defined in imageInfo entries (e.g., 'NPU', 'Language', 'Machine Learning / Deep Learning'). The values are sort keys that determine each group's position in the UI. Groups not defined in this map are sorted alphabetically by their group name after the mapped groups"
     }
   },
   "required": ["imageInfo", "tagAlias", "tagReplace"]
