@@ -1345,6 +1345,7 @@
     "Inference": "Inference",
     "InputTensorboardPath": "TensorBoard가 참조할 로그 디렉토리 경로를 입력하세요. 로그 디렉토리는 자동으로 생성되지 않는다는 점에 주의하세요.",
     "Interactive": "Interactive",
+    "InvalidRedirectURL": "유효하지 않은 URL로 인해 앱을 실행할 수 없습니다.",
     "KernelExitCode": "커널 종료 코드",
     "LastTry": "최근 시도한 시간",
     "MEM": "메모리",

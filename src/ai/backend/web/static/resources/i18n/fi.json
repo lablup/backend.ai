@@ -1340,6 +1340,7 @@
     "Inference": "Päättely",
     "InputTensorboardPath": "Syötä lokihakemisto, johon TensorBoard viittaa. Huomaa, että lokihakemistoa ei luoda automaattisesti...",
     "Interactive": "Interaktiivinen",
+    "InvalidRedirectURL": "Sovellusta ei voi käynnistää virheellisen URL-osoitteen vuoksi.",
     "KernelExitCode": "Ytimen poistumiskoodi",
     "LastTry": "Viimeinen yritys",
     "MEM": "Muisti",

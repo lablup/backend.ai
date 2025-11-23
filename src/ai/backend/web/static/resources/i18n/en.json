@@ -1347,6 +1347,7 @@
     "Inference": "Inference",
     "InputTensorboardPath": "Please input log directory that TensorBoard will refer to. Note that the log directory will not be automatically created..",
     "Interactive": "Interactive",
+    "InvalidRedirectURL": "The app cannot be launched due to an invalid URL.",
     "KernelExitCode": "Kernel Exit Code",
     "LastTry": "Last Try",
     "MEM": "MEM",

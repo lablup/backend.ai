@@ -1341,6 +1341,7 @@
     "Inference": "推论",
     "InputTensorboardPath": "请输入 TensorBoard 将引用的日志目录。请注意，日志目录不会自动创建..",
     "Interactive": "交互式",
+    "InvalidRedirectURL": "由于 URL 无效，无法启动该应用。",
     "KernelExitCode": "内核退出代码",
     "LastTry": "最后一次尝试",
     "MEM": "内存",

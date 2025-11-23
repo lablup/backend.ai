@@ -1340,6 +1340,7 @@
     "Inference": "INFERENCE",
     "InputTensorboardPath": "TensorBoardが参照するログディレクトリを入力してください。ログディレクトリは自動的に作成されないことに注意してください。",
     "Interactive": "インタラクティブ",
+    "InvalidRedirectURL": "無効なURLのため、アプリを起動できません。",
     "KernelExitCode": "カーネル出口コード",
     "LastTry": "最近試した時間",
     "MEM": "メモリ",

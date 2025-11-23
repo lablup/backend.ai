@@ -1341,6 +1341,7 @@
     "Inference": "Sự suy luận",
     "InputTensorboardPath": "Vui lòng nhập thư mục nhật ký mà TensorBoard sẽ tham chiếu đến. Lưu ý rằng thư mục nhật ký sẽ không được tạo tự động ..",
     "Interactive": "Tương tác",
+    "InvalidRedirectURL": "Không thể khởi chạy ứng dụng vì URL không hợp lệ.",
     "KernelExitCode": "Mã thoát Kernel",
     "LastTry": "Lần thử cuối cùng",
     "MEM": "Ký ức",

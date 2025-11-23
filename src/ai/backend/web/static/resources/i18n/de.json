@@ -1339,6 +1339,7 @@
     "Inference": "Inferenz",
     "InputTensorboardPath": "Bitte geben Sie das Protokollverzeichnis ein, auf das sich TensorBoard bezieht. Beachten Sie, dass das Protokollverzeichnis nicht automatisch erstellt wird.",
     "Interactive": "Interaktiv",
+    "InvalidRedirectURL": "Die App kann aufgrund einer ungültigen URL nicht gestartet werden.",
     "KernelExitCode": "Kernel Exit Code",
     "LastTry": "Letzter Versuch",
     "MEM": "Speicher",
