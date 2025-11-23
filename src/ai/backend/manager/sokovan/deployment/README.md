@@ -87,7 +87,7 @@ DeploymentController performs the actual control logic for deployments. It handl
 ```
 1. Receive deployment request
    ↓
-2. Create draft deployment dataclass with draft model revision(DeploymentCreationDraft)
+2. Create draft deployment dataclass with draft model revision (DeploymentCreationDraft)
    ↓
 3. Select Revision Generator based on runtime variant
    ↓
