@@ -22,9 +22,11 @@ from dateutil.parser import parse as dtparse
 from graphql import Undefined, UndefinedType
 from sqlalchemy.orm import selectinload
 
+from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.types import (
     AgentId,
+    DispatchResult,
     ImageID,
 )
 from ai.backend.logging import BraceStyleAdapter
@@ -33,7 +35,6 @@ from ai.backend.manager.bgtask.tasks.purge_images import (
     PurgeImagesManifest,
     PurgeImageSpec,
 )
-from ai.backend.manager.bgtask.tasks.rescan_images import RescanImagesManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 from ai.backend.manager.models.minilang import EnumFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
@@ -44,9 +45,13 @@ from ai.backend.manager.models.minilang.queryfilter import (
 from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.rbac.permission_defs import ImagePermission
 from ai.backend.manager.services.container_registry.actions.clear_images import ClearImagesAction
+from ai.backend.manager.services.container_registry.actions.load_all_container_registries import (
+    LoadAllContainerRegistriesAction,
+)
 from ai.backend.manager.services.container_registry.actions.load_container_registries import (
     LoadContainerRegistriesAction,
 )
+from ai.backend.manager.services.container_registry.actions.rescan_images import RescanImagesAction
 from ai.backend.manager.services.image.actions.alias_image import AliasImageAction
 from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
     ClearImageCustomResourceLimitAction,
@@ -77,7 +82,7 @@ from ai.backend.manager.services.image.actions.untag_image_from_registry import 
 )
 from ai.backend.manager.types import OptionalState, TriState
 
-from ...data.image.types import ImageStatus, ImageType, ImageWithAgentInstallStatus
+from ...data.image.types import ImageData, ImageStatus, ImageType, ImageWithAgentInstallStatus
 from ...defs import DEFAULT_IMAGE_ARCH
 from ..base import (
     FilterExprArg,
@@ -967,14 +972,44 @@ class RescanImages(graphene.Mutation):
         )
         ctx: GraphQueryContext = info.context
 
-        manifest = RescanImagesManifest(
-            registry=registry,
-            project=project,
-        )
-        task_id = await ctx.background_task_manager.start_retriable(
-            ManagerBgtaskName.RESCAN_IMAGES,
-            manifest,
-        )
+        async def _rescan_task(reporter: ProgressReporter) -> DispatchResult:
+            if registry is None:
+                all_registries = await ctx.processors.container_registry.load_all_container_registries.wait_for_complete(
+                    LoadAllContainerRegistriesAction()
+                )
+                loaded_registries = all_registries.registries
+            else:
+                registries = await ctx.processors.container_registry.load_container_registries.wait_for_complete(
+                    LoadContainerRegistriesAction(
+                        registry=registry,
+                        project=project,
+                    )
+                )
+                loaded_registries = registries.registries
+
+            rescanned_images: list[ImageData] = []
+            errors: list[str] = []
+            for registry_data in loaded_registries:
+                action_result = (
+                    await ctx.processors.container_registry.rescan_images.wait_for_complete(
+                        RescanImagesAction(
+                            registry=registry_data.registry_name,
+                            project=registry_data.project,
+                            progress_reporter=reporter,
+                        )
+                    )
+                )
+                for error in action_result.errors:
+                    log.error(error)
+                errors.extend(action_result.errors)
+                rescanned_images.extend(action_result.images)
+
+            rescanned_image_ids = [str(image.id) for image in rescanned_images]
+            if errors:
+                return DispatchResult.partial_success(rescanned_image_ids, errors)
+            return DispatchResult.success(rescanned_image_ids)
+
+        task_id = await ctx.background_task_manager.start(_rescan_task)
         return RescanImages(ok=True, msg="", task_id=task_id)
 
 
