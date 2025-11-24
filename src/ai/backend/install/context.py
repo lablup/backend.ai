@@ -305,6 +305,9 @@ class Context(metaclass=ABCMeta):
         self.copy_config("prometheus.yaml")
         self.copy_config("grafana-dashboards")
         self.copy_config("grafana-provisioning")
+        self.copy_config("otel-collector-config.yaml")
+        self.copy_config("loki-config.yaml")
+        self.copy_config("tempo-config.yaml")
 
         volume_path = self.install_info.base_path / "volumes"
         (volume_path / "postgres-data").mkdir(parents=True, exist_ok=True)
