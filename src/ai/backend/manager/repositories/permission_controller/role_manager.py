@@ -168,17 +168,20 @@ class RoleManager:
         operations: Collection[OperationType],
     ) -> RoleDataWithPermissions:
         """
-        Adds object permissions to the system role mapped to the user and adds permission groups for all scopes mapped to the entity.
+        Adds object permissions to the system role mapped to the user
+        and adds permission groups for the scopes associated with the entity if not already present in the role.
+
         Returns the updated role with permissions.
         Raises an exception if the user does not have a system role.
         """
 
         role = await self._query_system_role_by_user(db_session, user_id)
-        role_id = role.id
         entity_associated_scopes = await self._query_entity_associated_scopes(db_session, entity_id)
-        await self._add_permission_groups_to_role(db_session, role_id, entity_associated_scopes)
-        await self._add_object_permissions_to_role(db_session, role_id, entity_id, operations)
-        updated_role = await self._query_role_extended_data_by_id(db_session, role_id)
+        await self._add_permission_groups_to_role_if_not_exist(
+            db_session, role, entity_associated_scopes
+        )
+        await self._add_object_permissions_to_role(db_session, role.id, entity_id, operations)
+        updated_role = await self._query_role_by_id(db_session, role.id)
         return updated_role
 
     async def _query_system_role_by_user(
@@ -190,13 +193,14 @@ class RoleManager:
             sa.select(RoleRow)
             .select_from(sa.join(RoleRow, UserRoleRow, RoleRow.id == UserRoleRow.role_id))
             .where(sa.and_(UserRoleRow.user_id == user_id, RoleRow.source == RoleSource.SYSTEM))
+            .options(selectinload(RoleRow.permission_group_rows))
         )
         role_row = cast(Optional[RoleRow], role_row)
         if role_row is None:
             raise UserSystemRoleNotFound(f"System role for user {user_id} not found")
         return role_row
 
-    async def _query_role_extended_data_by_id(
+    async def _query_role_by_id(
         self,
         db_session: SASession,
         role_id: uuid.UUID,
@@ -214,7 +218,7 @@ class RoleManager:
         role_row = cast(Optional[RoleRow], role_row)
         if role_row is None:
             raise RoleNotFound(f"Role with id {role_id} not found")
-        return role_row.to_data_with_permissions()
+        return role_row
 
     async def _query_entity_associated_scopes(
         self,
@@ -234,20 +238,22 @@ class RoleManager:
             ScopeId(scope_type=row.scope_type, scope_id=row.scope_id) for row in scope_entity_rows
         ]
 
-    async def _add_permission_groups_to_role(
+    async def _add_permission_groups_to_role_if_not_exist(
         self,
         db_session: SASession,
-        role_id: uuid.UUID,
+        role_row: RoleRow,
         scope_ids: Collection[ScopeId],
     ) -> None:
-        if not scope_ids:
-            return
+        scope_ids_to_add = {scope for scope in scope_ids}
+        for permission_group in role_row.permission_group_rows:
+            scope_id = permission_group.parsed_scope_id()
+            scope_ids_to_add.discard(scope_id)
         creators = [
             PermissionGroupCreator(
-                role_id=role_id,
+                role_id=role_row.id,
                 scope_id=scope_id,
             )
-            for scope_id in scope_ids
+            for scope_id in scope_ids_to_add
         ]
 
         rows = [PermissionGroupRow.from_input(creator) for creator in creators]
