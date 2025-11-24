@@ -8,8 +8,9 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
-
-from .db_source import UserResourcePolicyDBSource
+from ai.backend.manager.repositories.user_resource_policy.db_source.db_source import (
+    UserResourcePolicyDBSource,
+)
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
