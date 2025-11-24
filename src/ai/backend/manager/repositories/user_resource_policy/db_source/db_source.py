@@ -4,13 +4,12 @@ from typing import TYPE_CHECKING, Any, Mapping
 
 import sqlalchemy as sa
 
-from ai.backend.common.exception import BackendAIError
+from ai.backend.common.exception import BackendAIError, UserResourcePolicyNotFound
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 
 if TYPE_CHECKING:
@@ -60,7 +59,9 @@ class UserResourcePolicyDBSource:
             query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
             row = await db_sess.scalar(query)
             if row is None:
-                raise ObjectNotFound(f"User resource policy with name {name} not found.")
+                raise UserResourcePolicyNotFound(
+                    f"User resource policy with name {name} not found."
+                )
             return row.to_dataclass()
 
     @user_resource_policy_db_source_resilience.apply()
@@ -70,7 +71,9 @@ class UserResourcePolicyDBSource:
             query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
             row = await db_sess.scalar(query)
             if row is None:
-                raise ObjectNotFound(f"User resource policy with name {name} not found.")
+                raise UserResourcePolicyNotFound(
+                    f"User resource policy with name {name} not found."
+                )
             for key, value in fields.items():
                 setattr(row, key, value)
             await db_sess.flush()
@@ -83,6 +86,8 @@ class UserResourcePolicyDBSource:
             query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
             row = await db_sess.scalar(query)
             if row is None:
-                raise ObjectNotFound(f"User resource policy with name {name} not found.")
+                raise UserResourcePolicyNotFound(
+                    f"User resource policy with name {name} not found."
+                )
             await db_sess.delete(row)
             return row.to_dataclass()

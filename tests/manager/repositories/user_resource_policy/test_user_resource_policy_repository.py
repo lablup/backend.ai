@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.exception import UserResourcePolicyNotFound
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
-from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -97,9 +97,7 @@ class TestUserResourcePolicyRepository:
     @pytest.mark.asyncio
     async def test_get_by_name_not_found(self, repository: UserResourcePolicyRepository) -> None:
         """Test getting a policy by name when it doesn't exist"""
-        with pytest.raises(
-            ObjectNotFound, match="User resource policy with name non-existing not found"
-        ):
+        with pytest.raises(UserResourcePolicyNotFound):
             await repository.get_by_name("non-existing")
 
     @pytest.mark.asyncio
@@ -125,9 +123,7 @@ class TestUserResourcePolicyRepository:
     @pytest.mark.asyncio
     async def test_update_policy_not_found(self, repository: UserResourcePolicyRepository) -> None:
         """Test updating a policy that doesn't exist"""
-        with pytest.raises(
-            ObjectNotFound, match="User resource policy with name non-existing not found"
-        ):
+        with pytest.raises(UserResourcePolicyNotFound):
             await repository.update("non-existing", {"max_vfolder_count": 20})
 
     @pytest.mark.asyncio
@@ -141,15 +137,13 @@ class TestUserResourcePolicyRepository:
         assert result.name == sample_policy.name
 
         # Verify it's actually deleted
-        with pytest.raises(ObjectNotFound):
+        with pytest.raises(UserResourcePolicyNotFound):
             await repository.get_by_name(sample_policy.name)
 
     @pytest.mark.asyncio
     async def test_delete_policy_not_found(self, repository: UserResourcePolicyRepository) -> None:
         """Test deleting a policy that doesn't exist"""
-        with pytest.raises(
-            ObjectNotFound, match="User resource policy with name non-existing not found"
-        ):
+        with pytest.raises(UserResourcePolicyNotFound):
             await repository.delete("non-existing")
 
     @pytest.mark.asyncio
@@ -179,5 +173,5 @@ class TestUserResourcePolicyRepository:
             # Cleanup
             try:
                 await repository.delete("test-policy-roundtrip")
-            except ObjectNotFound:
+            except UserResourcePolicyNotFound:
                 pass
