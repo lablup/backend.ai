@@ -172,6 +172,7 @@ class ErrorDomain(enum.StrEnum):
     MESSAGE_QUEUE = "message-queue"
     NOTIFICATION = "notification"
     HEALTH_CHECK = "health-check"
+    USER_RESOURCE_POLICY = "user-resource-policy"
 
 
 class ErrorOperation(enum.StrEnum):
@@ -834,4 +835,16 @@ class DatabaseError(BackendAIError, web.HTTPServiceUnavailable):
             domain=ErrorDomain.HEALTH_CHECK,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class UserResourcePolicyNotFound(BackendAIError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/user-resource-policy-not-found"
+    error_title = "User Resource Policy Not Found"
+
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.USER_RESOURCE_POLICY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.NOT_FOUND,
         )
