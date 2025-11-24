@@ -325,34 +325,36 @@ class TestAgentRepository:
         self,
         db_source: AgentDBSource,
         scaling_group: str,
+        database_engine: ExtendedAsyncSAEngine,
     ) -> None:
         """Test upserting an existing alive agent"""
         # Given - create an existing agent
         async with self._create_agents(db_source, scaling_group, count=1) as agents:
             agent_id = agents[0].agent_id
             original_upsert = agents[0].heartbeat_upsert
+            different_version = "changed-version"
+            different_region = "changed-region"
 
             # Create updated heartbeat with modified version
-            updated_info = AgentInfo(
-                ip=original_upsert.network_info.addr.split("//")[1].split(":")[0],
-                version="24.12.1",  # Different version
-                scaling_group=original_upsert.metadata.scaling_group,
-                available_resource_slots=original_upsert.resource_info.available_slots,
-                slot_key_and_units=dict(original_upsert.resource_info.slot_key_and_units),
-                compute_plugins={
-                    k: dict(v) for k, v in original_upsert.resource_info.compute_plugins.items()
-                },
-                addr=original_upsert.network_info.addr,
-                public_key=original_upsert.network_info.public_key,
-                public_host=original_upsert.network_info.public_host,
-                images=b"\x82\xc4\x00\x00",
-                region=original_upsert.metadata.region or "us-west-1",
-                architecture=original_upsert.metadata.architecture,
-                auto_terminate_abusing_kernel=original_upsert.metadata.auto_terminate_abusing_kernel,
-            )
             updated_upsert = AgentHeartbeatUpsert.from_agent_info(
                 agent_id=agent_id,
-                agent_info=updated_info,
+                agent_info=AgentInfo(
+                    ip=original_upsert.network_info.addr.split("//")[1].split(":")[0],
+                    version=different_version,  # Different version
+                    scaling_group=original_upsert.metadata.scaling_group,
+                    available_resource_slots=original_upsert.resource_info.available_slots,
+                    slot_key_and_units=dict(original_upsert.resource_info.slot_key_and_units),
+                    compute_plugins={
+                        k: dict(v) for k, v in original_upsert.resource_info.compute_plugins.items()
+                    },
+                    addr=original_upsert.network_info.addr,
+                    public_key=original_upsert.network_info.public_key,
+                    public_host=original_upsert.network_info.public_host,
+                    images=b"\x82\xc4\x00\x00",
+                    region=different_region,  # Different region
+                    architecture=original_upsert.metadata.architecture,
+                    auto_terminate_abusing_kernel=original_upsert.metadata.auto_terminate_abusing_kernel,
+                ),
                 heartbeat_received=datetime.now(tzutc()),
             )
 
@@ -362,6 +364,12 @@ class TestAgentRepository:
             # Then
             assert result.was_revived is False
             assert result.need_resource_slot_update is True
+            async with database_engine.begin_readonly_session() as db_session:
+                agent_row: AgentRow = await db_session.scalar(
+                    sa.select(AgentRow).where(AgentRow.id == agent_id)
+                )
+                assert agent_row.version == different_version
+                assert agent_row.region == different_region
 
     @pytest.mark.asyncio
     async def test_db_source_upsert_scaling_group_not_found(
