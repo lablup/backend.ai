@@ -44,6 +44,7 @@ from .handlers import (
     TerminateSessionsHandler,
 )
 from .kernel import KernelStateEngine
+from .recorder import RecorderContext
 from .types import KernelCreationInfo
 
 log = BraceStyleAdapter(logging.getLogger(__name__))
@@ -180,25 +181,35 @@ class ScheduleCoordinator:
                 log.warning("No handler for schedule type: {}", schedule_type.value)
                 return False
 
-            # Execute the handler with optional locking
-            async with AsyncExitStack() as stack:
-                stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
-                if handler.lock_id is not None:
-                    lock_lifetime = (
-                        self._config_provider.config.manager.session_schedule_lock_lifetime
+            # Execute the handler with optional locking and transition recording
+            with RecorderContext.scope(schedule_type.value) as recorder:
+                async with AsyncExitStack() as stack:
+                    stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
+                    if handler.lock_id is not None:
+                        lock_lifetime = (
+                            self._config_provider.config.manager.session_schedule_lock_lifetime
+                        )
+                        await stack.enter_async_context(
+                            self._lock_factory(handler.lock_id, lock_lifetime)
+                        )
+                    result = await handler.execute()
+                    self._operation_metrics.observe_success(
+                        operation=handler.name(), count=result.success_count()
                     )
-                    await stack.enter_async_context(
-                        self._lock_factory(handler.lock_id, lock_lifetime)
+                    if result.needs_post_processing():
+                        try:
+                            await handler.post_process(result)
+                        except Exception as e:
+                            log.error("Error during post-processing: {}", e)
+
+                # Log recorded steps for debugging (can be saved to DB later)
+                all_steps = recorder.get_all_steps()
+                if all_steps:
+                    log.debug(
+                        "Recorded {} sessions with execution steps for {}",
+                        len(all_steps),
+                        schedule_type.value,
                     )
-                result = await handler.execute()
-                self._operation_metrics.observe_success(
-                    operation=handler.name(), count=result.success_count()
-                )
-                if result.needs_post_processing():
-                    try:
-                        await handler.post_process(result)
-                    except Exception as e:
-                        log.error("Error during post-processing: {}", e)
             return True
         except Exception as e:
             log.exception(
