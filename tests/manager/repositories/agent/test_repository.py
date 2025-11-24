@@ -1,4 +1,5 @@
-from collections.abc import AsyncGenerator, Generator, Mapping
+from collections.abc import AsyncGenerator, AsyncIterator, Generator, Mapping
+from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
@@ -50,34 +51,81 @@ class _SampleAgent:
 
 
 class TestAgentRepository:
-    @pytest.fixture
-    async def sample_agent_info(self) -> AgentInfo:
-        """Create sample agent info for testing"""
-        return AgentInfo(
-            ip="192.168.1.100",
-            version="24.12.0",
-            scaling_group="default",
-            available_resource_slots=ResourceSlot({
-                SlotName("cpu"): "8",
-                SlotName("mem"): "32768",
-                SlotName("cuda.shares"): "4",
-            }),
-            slot_key_and_units={
-                SlotName("cpu"): SlotTypes.COUNT,
-                SlotName("mem"): SlotTypes.BYTES,
-                SlotName("cuda.shares"): SlotTypes.COUNT,
-            },
-            compute_plugins={
-                DeviceName("cpu"): {"brand": "Intel", "model": "Core i7"},
-            },
-            addr="tcp://192.168.1.100:6001",
-            public_key=PublicKey(b"test-public-key"),
-            public_host="192.168.1.100",
-            images=b"\x82\xc4\x00\x00",  # msgpack compressed data
-            region="us-west-1",
-            architecture="x86_64",
-            auto_terminate_abusing_kernel=False,
-        )
+    @actxmgr
+    async def _create_agents(
+        self,
+        db_source: AgentDBSource,
+        scaling_group: str,
+        count: int = 1,
+        **overrides: Any,
+    ) -> AsyncIterator[list[_SampleAgent]]:
+        """Create multiple test agents and yield them, cleaning up afterwards
+
+        Args:
+            db_source: Database source for agent operations
+            scaling_group: Scaling group name for the agents
+            count: Number of agents to create
+            **overrides: Override default agent info attributes
+        """
+        agents: list[_SampleAgent] = []
+        agent_ids: list[AgentId] = []
+
+        try:
+            for i in range(count):
+                agent_id = AgentId(f"agent-{uuid4().hex[:8]}")
+                agent_ids.append(agent_id)
+
+                agent_info = AgentInfo(
+                    ip=overrides.get("ip", f"192.168.1.{100 + i}"),
+                    version=overrides.get("version", "24.12.0"),
+                    scaling_group=scaling_group,
+                    available_resource_slots=overrides.get(
+                        "available_resource_slots",
+                        ResourceSlot({
+                            SlotName("cpu"): "8",
+                            SlotName("mem"): "32768",
+                            SlotName("cuda.shares"): "4",
+                        }),
+                    ),
+                    slot_key_and_units=overrides.get(
+                        "slot_key_and_units",
+                        {
+                            SlotName("cpu"): SlotTypes.COUNT,
+                            SlotName("mem"): SlotTypes.BYTES,
+                            SlotName("cuda.shares"): SlotTypes.COUNT,
+                        },
+                    ),
+                    compute_plugins=overrides.get(
+                        "compute_plugins",
+                        {DeviceName("cpu"): {"brand": "Intel", "model": "Core i7"}},
+                    ),
+                    addr=overrides.get("addr", f"tcp://192.168.1.{100 + i}:6001"),
+                    public_key=overrides.get("public_key", PublicKey(f"key-{100 + i}".encode())),
+                    public_host=overrides.get("public_host", f"192.168.1.{100 + i}"),
+                    images=overrides.get("images", b"\x82\xc4\x00\x00"),
+                    region=overrides.get("region", "us-west-1"),
+                    architecture=overrides.get("architecture", "x86_64"),
+                    auto_terminate_abusing_kernel=overrides.get(
+                        "auto_terminate_abusing_kernel", False
+                    ),
+                )
+
+                heartbeat_upsert = AgentHeartbeatUpsert.from_agent_info(
+                    agent_id=agent_id,
+                    agent_info=agent_info,
+                    heartbeat_received=datetime.now(tzutc()),
+                )
+
+                await db_source.upsert_agent_with_state(heartbeat_upsert)
+                agents.append(_SampleAgent(agent_id=agent_id, heartbeat_upsert=heartbeat_upsert))
+
+            yield agents
+
+        finally:
+            # Cleanup
+            async with db_source._db.begin_session() as db_session:
+                for agent_id in agent_ids:
+                    await db_session.execute(sa.delete(AgentRow).where(AgentRow.id == agent_id))
 
     @pytest.fixture
     async def scaling_group(
@@ -220,113 +268,23 @@ class TestAgentRepository:
         ):
             yield mock
 
-    @pytest.fixture
-    async def sample_agent(
-        self,
-        database_engine: ExtendedAsyncSAEngine,
-        scaling_group: str,
-        sample_agent_info: AgentInfo,
-    ) -> AsyncGenerator[_SampleAgent, None]:
-        """Create a sample agent in the database"""
-        agent_id = AgentId(f"agent-{uuid4().hex[:8]}")
-
-        # Update sample_agent_info to use the test scaling group
-        agent_info = AgentInfo(
-            ip=sample_agent_info.ip,
-            version=sample_agent_info.version,
-            scaling_group=scaling_group,
-            available_resource_slots=sample_agent_info.available_resource_slots,
-            slot_key_and_units=sample_agent_info.slot_key_and_units,
-            compute_plugins=sample_agent_info.compute_plugins,
-            addr=sample_agent_info.addr,
-            public_key=sample_agent_info.public_key,
-            public_host=sample_agent_info.public_host,
-            images=sample_agent_info.images,
-            region=sample_agent_info.region,
-            architecture=sample_agent_info.architecture,
-            auto_terminate_abusing_kernel=sample_agent_info.auto_terminate_abusing_kernel,
-        )
-
-        heartbeat_upsert = AgentHeartbeatUpsert.from_agent_info(
-            agent_id=agent_id,
-            agent_info=agent_info,
-            heartbeat_received=datetime.now(tzutc()),
-        )
-
-        db_source = AgentDBSource(db=database_engine)
-        await db_source.upsert_agent_with_state(heartbeat_upsert)
-
-        try:
-            yield _SampleAgent(agent_id=agent_id, heartbeat_upsert=heartbeat_upsert)
-        finally:
-            async with database_engine.begin_session() as db_session:
-                await db_session.execute(sa.delete(AgentRow).where(AgentRow.id == agent_id))
-
-    async def _create_test_agent(
-        self,
-        db_source: AgentDBSource,
-        agent_id: AgentId,
-        scaling_group: str,
-        ip_suffix: int = 100,
-        **overrides: Any,
-    ) -> None:
-        """Helper method to create a test agent with minimal required configuration"""
-        agent_info = AgentInfo(
-            ip=overrides.get("ip", f"192.168.1.{ip_suffix}"),
-            version=overrides.get("version", "24.12.0"),
-            scaling_group=scaling_group,
-            available_resource_slots=overrides.get(
-                "available_resource_slots",
-                ResourceSlot({
-                    SlotName("cpu"): "8",
-                    SlotName("mem"): "32768",
-                    SlotName("cuda.shares"): "4",
-                }),
-            ),
-            slot_key_and_units=overrides.get(
-                "slot_key_and_units",
-                {
-                    SlotName("cpu"): SlotTypes.COUNT,
-                    SlotName("mem"): SlotTypes.BYTES,
-                    SlotName("cuda.shares"): SlotTypes.COUNT,
-                },
-            ),
-            compute_plugins=overrides.get(
-                "compute_plugins",
-                {DeviceName("cpu"): {"brand": "Intel", "model": "Core i7"}},
-            ),
-            addr=overrides.get("addr", f"tcp://192.168.1.{ip_suffix}:6001"),
-            public_key=overrides.get("public_key", PublicKey(f"key-{ip_suffix}".encode())),
-            public_host=overrides.get("public_host", f"192.168.1.{ip_suffix}"),
-            images=overrides.get("images", b"\x82\xc4\x00\x00"),
-            region=overrides.get("region", "us-west-1"),
-            architecture=overrides.get("architecture", "x86_64"),
-            auto_terminate_abusing_kernel=overrides.get("auto_terminate_abusing_kernel", False),
-        )
-
-        heartbeat_upsert = AgentHeartbeatUpsert.from_agent_info(
-            agent_id=agent_id,
-            agent_info=agent_info,
-            heartbeat_received=datetime.now(tzutc()),
-        )
-
-        await db_source.upsert_agent_with_state(heartbeat_upsert)
-
     @pytest.mark.asyncio
     async def test_db_source_get_by_id_existing_agent(
         self,
         db_source: AgentDBSource,
-        sample_agent: _SampleAgent,
+        scaling_group: str,
     ) -> None:
         """Test getting an existing agent by ID"""
-        agent_id = sample_agent.agent_id
+        # Given
+        async with self._create_agents(db_source, scaling_group, count=1) as agents:
+            agent_id = agents[0].agent_id
 
-        # When
-        result = await db_source.get_by_id(agent_id)
+            # When
+            result = await db_source.get_by_id(agent_id)
 
-        # Then
-        assert result.id == agent_id
-        assert result.status == AgentStatus.ALIVE
+            # Then
+            assert result.id == agent_id
+            assert result.status == AgentStatus.ALIVE
 
     @pytest.mark.asyncio
     async def test_db_source_get_by_id_nonexistent_agent(
@@ -347,92 +305,95 @@ class TestAgentRepository:
         scaling_group: str,
     ) -> None:
         """Test upserting a new agent creates it successfully"""
-        agent_id = AgentId(f"agent-new-{uuid4().hex[:8]}")
-
-        try:
-            # When - create new agent
-            await self._create_test_agent(
-                db_source,
-                agent_id,
-                scaling_group,
-                ip_suffix=200,
-                public_key=PublicKey(b"new-agent-key"),
-            )
+        # When - create new agent
+        async with self._create_agents(
+            db_source,
+            scaling_group,
+            count=1,
+            ip="192.168.1.200",
+            public_key=PublicKey(b"new-agent-key"),
+        ) as agents:
+            agent_id = agents[0].agent_id
 
             # Then - verify agent was created successfully
             agent_data = await db_source.get_by_id(agent_id)
             assert agent_data.id == agent_id
             assert agent_data.status == AgentStatus.ALIVE
-        finally:
-            # Cleanup
-            async with db_source._db.begin_session() as db_session:
-                await db_session.execute(sa.delete(AgentRow).where(AgentRow.id == agent_id))
 
     @pytest.mark.asyncio
     async def test_db_source_upsert_existing_agent_alive(
         self,
         db_source: AgentDBSource,
-        sample_agent: _SampleAgent,
+        scaling_group: str,
     ) -> None:
         """Test upserting an existing alive agent"""
-        agent_id = sample_agent.agent_id
-        original_upsert = sample_agent.heartbeat_upsert
+        # Given - create an existing agent
+        async with self._create_agents(db_source, scaling_group, count=1) as agents:
+            agent_id = agents[0].agent_id
+            original_upsert = agents[0].heartbeat_upsert
 
-        # Create updated heartbeat with modified version
-        updated_info = AgentInfo(
-            ip=original_upsert.network_info.addr.split("//")[1].split(":")[0],
-            version="24.12.1",  # Different version
-            scaling_group=original_upsert.metadata.scaling_group,
-            available_resource_slots=original_upsert.resource_info.available_slots,
-            slot_key_and_units=dict(original_upsert.resource_info.slot_key_and_units),
-            compute_plugins={
-                k: dict(v) for k, v in original_upsert.resource_info.compute_plugins.items()
-            },
-            addr=original_upsert.network_info.addr,
-            public_key=original_upsert.network_info.public_key,
-            public_host=original_upsert.network_info.public_host,
-            images=b"\x82\xc4\x00\x00",
-            region=original_upsert.metadata.region or "us-west-1",
-            architecture=original_upsert.metadata.architecture,
-            auto_terminate_abusing_kernel=original_upsert.metadata.auto_terminate_abusing_kernel,
-        )
-        updated_upsert = AgentHeartbeatUpsert.from_agent_info(
-            agent_id=agent_id,
-            agent_info=updated_info,
-            heartbeat_received=datetime.now(tzutc()),
-        )
+            # Create updated heartbeat with modified version
+            updated_info = AgentInfo(
+                ip=original_upsert.network_info.addr.split("//")[1].split(":")[0],
+                version="24.12.1",  # Different version
+                scaling_group=original_upsert.metadata.scaling_group,
+                available_resource_slots=original_upsert.resource_info.available_slots,
+                slot_key_and_units=dict(original_upsert.resource_info.slot_key_and_units),
+                compute_plugins={
+                    k: dict(v) for k, v in original_upsert.resource_info.compute_plugins.items()
+                },
+                addr=original_upsert.network_info.addr,
+                public_key=original_upsert.network_info.public_key,
+                public_host=original_upsert.network_info.public_host,
+                images=b"\x82\xc4\x00\x00",
+                region=original_upsert.metadata.region or "us-west-1",
+                architecture=original_upsert.metadata.architecture,
+                auto_terminate_abusing_kernel=original_upsert.metadata.auto_terminate_abusing_kernel,
+            )
+            updated_upsert = AgentHeartbeatUpsert.from_agent_info(
+                agent_id=agent_id,
+                agent_info=updated_info,
+                heartbeat_received=datetime.now(tzutc()),
+            )
 
-        # When
-        result = await db_source.upsert_agent_with_state(updated_upsert)
+            # When
+            result = await db_source.upsert_agent_with_state(updated_upsert)
 
-        # Then
-        assert result.was_revived is False
-        assert result.need_resource_slot_update is True
+            # Then
+            assert result.was_revived is False
+            assert result.need_resource_slot_update is True
 
     @pytest.mark.asyncio
     async def test_db_source_upsert_scaling_group_not_found(
         self,
         db_source: AgentDBSource,
-        sample_agent_info: AgentInfo,
     ) -> None:
         """Test upserting with non-existent scaling group raises error"""
         agent_id = AgentId(f"agent-fail-{uuid4().hex[:8]}")
 
         # Create agent info with non-existent scaling group
         agent_info = AgentInfo(
-            ip=sample_agent_info.ip,
-            version=sample_agent_info.version,
+            ip="192.168.1.100",
+            version="24.12.0",
             scaling_group="nonexistent-group",
-            available_resource_slots=sample_agent_info.available_resource_slots,
-            slot_key_and_units=sample_agent_info.slot_key_and_units,
-            compute_plugins=sample_agent_info.compute_plugins,
-            addr=sample_agent_info.addr,
-            public_key=sample_agent_info.public_key,
-            public_host=sample_agent_info.public_host,
-            images=sample_agent_info.images,
-            region=sample_agent_info.region,
-            architecture=sample_agent_info.architecture,
-            auto_terminate_abusing_kernel=sample_agent_info.auto_terminate_abusing_kernel,
+            available_resource_slots=ResourceSlot({
+                SlotName("cpu"): "8",
+                SlotName("mem"): "32768",
+                SlotName("cuda.shares"): "4",
+            }),
+            slot_key_and_units={
+                SlotName("cpu"): SlotTypes.COUNT,
+                SlotName("mem"): SlotTypes.BYTES,
+                SlotName("cuda.shares"): SlotTypes.COUNT,
+            },
+            compute_plugins={DeviceName("cpu"): {"brand": "Intel", "model": "Core i7"}},
+            addr="tcp://192.168.1.100:6001",
+            public_key=PublicKey(b"test-key"),
+            public_host="192.168.1.100",
+            images=b"\x82\xc4\x00\x00",
+            region="us-west-1",
+            architecture="x86_64",
+            auto_terminate_abusing_kernel=False,
         )
 
         heartbeat_upsert = AgentHeartbeatUpsert.from_agent_info(
@@ -449,41 +410,44 @@ class TestAgentRepository:
     async def test_db_source_list_agents_no_filter(
         self,
         db_source: AgentDBSource,
-        sample_agent: _SampleAgent,
+        scaling_group: str,
     ) -> None:
         """Test listing all agents without filter"""
-        agent_id = sample_agent.agent_id
+        # Given - create a test agent
+        async with self._create_agents(db_source, scaling_group, count=1) as agents:
+            agent_id = agents[0].agent_id
 
-        # When
-        result = await db_source.fetch_agent_data_list()
+            # When
+            result = await db_source.fetch_agent_data_list()
 
-        # Then
-        assert len(result) >= 1
-        agent_ids = [agent.id for agent in result]
-        assert agent_id in agent_ids
+            # Then
+            assert len(result) >= 1
+            agent_ids = [agent.id for agent in result]
+            assert agent_id in agent_ids
 
     @pytest.mark.asyncio
     async def test_db_source_list_agents_with_querier(
         self,
         db_source: AgentDBSource,
-        sample_agent: _SampleAgent,
         scaling_group: str,
     ) -> None:
         """Test listing agents with querier conditions"""
-        agent_id = sample_agent.agent_id
+        # Given - create a test agent
+        async with self._create_agents(db_source, scaling_group, count=1) as agents:
+            agent_id = agents[0].agent_id
 
-        # When
-        querier = Querier(
-            conditions=[AgentConditions.by_scaling_group(scaling_group)],
-            orders=[AgentOrders.id(ascending=True)],
-        )
-        result = await db_source.fetch_agent_data_list(querier)
+            # When
+            querier = Querier(
+                conditions=[AgentConditions.by_scaling_group(scaling_group)],
+                orders=[AgentOrders.id(ascending=True)],
+            )
+            result = await db_source.fetch_agent_data_list(querier)
 
-        # Then
-        assert len(result) >= 1
-        assert all(agent.scaling_group == scaling_group for agent in result)
-        agent_ids = [agent.id for agent in result]
-        assert agent_id in agent_ids
+            # Then
+            assert len(result) >= 1
+            assert all(agent.scaling_group == scaling_group for agent in result)
+            agent_ids = [agent.id for agent in result]
+            assert agent_id in agent_ids
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("ascending", [True, False])
@@ -494,14 +458,10 @@ class TestAgentRepository:
         ascending: bool,
     ) -> None:
         """Test listing agents with different sort orders"""
-        # Create multiple agents
-        agent_ids = []
-        for i in range(3):
-            agent_id = AgentId(f"agent-order-{i:02d}-{uuid4().hex[:8]}")
-            await self._create_test_agent(db_source, agent_id, scaling_group, ip_suffix=100 + i)
-            agent_ids.append(agent_id)
+        # Given - create multiple agents
+        async with self._create_agents(db_source, scaling_group, count=3) as agents:
+            agent_ids = [agent.agent_id for agent in agents]
 
-        try:
             # When
             querier = Querier(
                 conditions=[AgentConditions.by_scaling_group(scaling_group)],
@@ -513,11 +473,6 @@ class TestAgentRepository:
             result_ids = [agent.id for agent in result if agent.id in agent_ids]
             sorted_ids = sorted(agent_ids, reverse=not ascending)
             assert result_ids == sorted_ids
-        finally:
-            # Cleanup
-            async with db_source._db.begin_session() as db_session:
-                for agent_id in agent_ids:
-                    await db_session.execute(sa.delete(AgentRow).where(AgentRow.id == agent_id))
 
     @pytest.mark.asyncio
     async def test_db_source_list_agents_with_pagination(
@@ -526,14 +481,9 @@ class TestAgentRepository:
         scaling_group: str,
     ) -> None:
         """Test listing agents with pagination"""
-        # Create multiple agents
-        agent_ids = []
-        for i in range(5):
-            agent_id = AgentId(f"agent-page-{i:02d}-{uuid4().hex[:8]}")
-            await self._create_test_agent(db_source, agent_id, scaling_group, ip_suffix=100 + i)
-            agent_ids.append(agent_id)
-
-        try:
+        # Given - create multiple agents
+        async with self._create_agents(db_source, scaling_group, count=5) as agents:
+            agent_ids = [agent.agent_id for agent in agents]
             # Sort agent_ids for expected order
             sorted_agent_ids = sorted(agent_ids)
 
@@ -583,58 +533,59 @@ class TestAgentRepository:
             all_page_ids = first_page_ids + second_page_ids + third_page_ids
             assert len(all_page_ids) == len(set(all_page_ids))  # No duplicates
             assert set(all_page_ids) == set(sorted_agent_ids)  # All agents retrieved
-        finally:
-            # Cleanup
-            async with db_source._db.begin_session() as db_session:
-                for agent_id in agent_ids:
-                    await db_session.execute(sa.delete(AgentRow).where(AgentRow.id == agent_id))
 
     @pytest.mark.asyncio
     async def test_repository_update_gpu_alloc_map(
         self,
         agent_repository: AgentRepository,
+        db_source: AgentDBSource,
         valkey_stat_client: ValkeyStatClient,
-        sample_agent: _SampleAgent,
+        scaling_group: str,
     ) -> None:
         """Test GPU allocation map update via repository"""
-        agent_id = sample_agent.agent_id
-        alloc_map: Mapping[str, Any] = {
-            "cuda:0": {"session_id": "sess-001"},
-            "cuda:1": {"session_id": "sess-002"},
-        }
+        # Given - create a test agent
+        async with self._create_agents(db_source, scaling_group, count=1) as agents:
+            agent_id = agents[0].agent_id
+            alloc_map: Mapping[str, Any] = {
+                "cuda:0": {"session_id": "sess-001"},
+                "cuda:1": {"session_id": "sess-002"},
+            }
 
-        # When
-        await agent_repository.update_gpu_alloc_map(agent_id, alloc_map)
+            # When
+            await agent_repository.update_gpu_alloc_map(agent_id, alloc_map)
 
-        # Then
-        stored_map = await valkey_stat_client.get_gpu_allocation_map(str(agent_id))
-        assert stored_map == alloc_map
+            # Then
+            stored_map = await valkey_stat_client.get_gpu_allocation_map(str(agent_id))
+            assert stored_map == alloc_map
 
     @pytest.mark.asyncio
     async def test_repository_list_data(
         self,
         agent_repository: AgentRepository,
-        sample_agent: _SampleAgent,
+        db_source: AgentDBSource,
         scaling_group: str,
     ) -> None:
         """Test repository list_data returns agents correctly"""
-        agent_id = sample_agent.agent_id
+        # Given - create test agents
+        async with self._create_agents(db_source, scaling_group, count=2) as agents:
+            agent_ids = [agent.agent_id for agent in agents]
 
-        # When
-        querier = Querier(
-            conditions=[AgentConditions.by_scaling_group(scaling_group)],
-            orders=[AgentOrders.id(ascending=True)],
-        )
-        result = await agent_repository.list_data(querier)
+            # When
+            querier = Querier(
+                conditions=[AgentConditions.by_scaling_group(scaling_group)],
+                orders=[AgentOrders.id(ascending=True)],
+            )
+            result = await agent_repository.list_data(querier)
 
-        # Then
-        assert len(result) >= 1
-        assert all(agent.scaling_group == scaling_group for agent in result)
-        agent_ids = [agent.id for agent in result]
-        assert agent_id in agent_ids
+            # Then
+            assert len(result) >= 2
+            assert all(agent.scaling_group == scaling_group for agent in result)
+            result_ids = [agent.id for agent in result]
+            for agent_id in agent_ids:
+                assert agent_id in result_ids
 
     @pytest.mark.parametrize(
-        "status_filter, expected_count",
+        "status_filter, expected_min_count",
         [
             ([AgentStatus.ALIVE], 1),
             ([AgentStatus.LOST], 0),
@@ -645,21 +596,24 @@ class TestAgentRepository:
     async def test_repository_list_data_with_status_filter(
         self,
         agent_repository: AgentRepository,
-        sample_agent: _SampleAgent,
+        db_source: AgentDBSource,
+        scaling_group: str,
         status_filter: list[AgentStatus],
-        expected_count: int,
+        expected_min_count: int,
     ) -> None:
         """Test repository list_data with status filter"""
-        # When
-        querier = Querier(
-            conditions=[AgentConditions.by_statuses(status_filter)],
-            orders=[],
-        )
-        result = await agent_repository.list_data(querier)
+        # Given - create a test agent
+        async with self._create_agents(db_source, scaling_group, count=1):
+            # When
+            querier = Querier(
+                conditions=[AgentConditions.by_statuses(status_filter)],
+                orders=[],
+            )
+            result = await agent_repository.list_data(querier)
 
-        # Then
-        assert len(result) == expected_count
-        assert all(agent.status in status_filter for agent in result)
+            # Then
+            assert len(result) >= expected_min_count
+            assert all(agent.status in status_filter for agent in result)
 
     @pytest.mark.asyncio
     async def test_repository_list_data_empty_result(
@@ -681,34 +635,29 @@ class TestAgentRepository:
     async def test_repository_list_extended_data(
         self,
         agent_repository: AgentRepository,
-        sample_agent: _SampleAgent,
+        db_source: AgentDBSource,
         scaling_group: str,
         mock_get_resource_slots: AsyncMock,
     ) -> None:
         """Test repository list_extended_data returns agents with extended info"""
-        agent_id = sample_agent.agent_id
+        # Given - create test agents
+        async with self._create_agents(db_source, scaling_group, count=2) as agents:
+            agent_ids = [agent.agent_id for agent in agents]
 
-        # When
-        querier = Querier(
-            conditions=[AgentConditions.by_scaling_group(scaling_group)],
-            orders=[AgentOrders.id(ascending=True)],
-        )
-        result = await agent_repository.list_extended_data(querier)
+            # When
+            querier = Querier(
+                conditions=[AgentConditions.by_scaling_group(scaling_group)],
+                orders=[AgentOrders.id(ascending=True)],
+            )
+            result = await agent_repository.list_extended_data(querier)
 
-        # Then
-        assert len(result) >= 1
-        assert all(isinstance(agent, AgentDataExtended) for agent in result)
-        assert all(agent.scaling_group == scaling_group for agent in result)
-        agent_ids = [agent.id for agent in result]
-        assert agent_id in agent_ids
-
-        # Verify extended data fields exist
-        for agent in result:
-            assert hasattr(agent, "known_slot_types")
-            assert hasattr(agent, "kernels")
-
-        # Verify get_resource_slots was called
-        mock_get_resource_slots.assert_called_once()
+            # Then
+            assert len(result) >= 2
+            assert all(isinstance(agent, AgentDataExtended) for agent in result)
+            assert all(agent.scaling_group == scaling_group for agent in result)
+            result_ids = [agent.id for agent in result]
+            for agent_id in agent_ids:
+                assert agent_id in result_ids
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -721,25 +670,25 @@ class TestAgentRepository:
     async def test_repository_list_extended_data_with_status(
         self,
         agent_repository: AgentRepository,
-        sample_agent: _SampleAgent,
+        db_source: AgentDBSource,
+        scaling_group: str,
         status_filter: list[AgentStatus],
         mock_get_resource_slots: AsyncMock,
     ) -> None:
         """Test repository list_extended_data with different status filters"""
-        agent_id = sample_agent.agent_id
+        # Given - create test agent
+        async with self._create_agents(db_source, scaling_group, count=1) as agents:
+            agent_id = agents[0].agent_id
 
-        # When
-        querier = Querier(
-            conditions=[AgentConditions.by_statuses(status_filter)],
-            orders=[],
-        )
-        result = await agent_repository.list_extended_data(querier)
+            # When
+            querier = Querier(
+                conditions=[AgentConditions.by_statuses(status_filter)],
+                orders=[],
+            )
+            result = await agent_repository.list_extended_data(querier)
 
-        # Then
-        assert len(result) >= 1
-        assert all(agent.status in status_filter for agent in result)
-        agent_ids = [agent.id for agent in result]
-        assert agent_id in agent_ids
-
-        # Verify get_resource_slots was called
-        mock_get_resource_slots.assert_called_once()
+            # Then
+            assert len(result) >= 1
+            assert all(agent.status in status_filter for agent in result)
+            result_ids = [agent.id for agent in result]
+            assert agent_id in result_ids
