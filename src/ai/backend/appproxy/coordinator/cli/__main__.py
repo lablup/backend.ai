@@ -228,5 +228,10 @@ def health():
     """Command set for health checking."""
 
 
+@main.group(cls=LazyGroup, import_name="ai.backend.appproxy.coordinator.cli.dbschema:cli")
+def schema():
+    """Command set for managing the database schema."""
+
+
 if __name__ == "__main__":
     main()
