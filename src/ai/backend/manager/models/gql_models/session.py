@@ -41,6 +41,7 @@ from ai.backend.manager.idle import ReportInfo
 from ai.backend.manager.models.gql_models.user import UserNode
 from ai.backend.manager.models.kernel import KernelRow
 from ai.backend.manager.models.utils import agg_to_array
+from ai.backend.manager.repositories.types import QueryCondition, QueryOption
 from ai.backend.manager.services.session.actions.check_and_transit_status import (
     CheckAndTransitStatusAction,
 )
@@ -98,8 +99,6 @@ from .kernel import ComputeContainer, KernelConnection, KernelNode
 from .vfolder import VirtualFolderConnection, VirtualFolderNode
 
 if TYPE_CHECKING:
-    from ai.backend.manager.repositories.types import QueryCondition, QueryOption
-
     from ..gql import GraphQueryContext
 
 __all__ = (
@@ -781,7 +780,7 @@ class TotalResourceSlot(graphene.ObjectType):
             query_conditions.append(by_domain_name(domain_name))
         if resource_group_name is not None:
             query_conditions.append(by_resource_group_name(resource_group_name))
-        query_options: list["QueryOption"] = [
+        query_options: list[QueryOption] = [
             load_related_field(SessionRow.kernel_load_option()),
             join_by_related_field(SessionRow.user),
             join_by_related_field(SessionRow.group),
@@ -796,7 +795,7 @@ class TotalResourceSlot(graphene.ObjectType):
             requested_slots += row.requested_slots
         occupied, requested = occupied_slots.to_json(), requested_slots.to_json()
 
-        return TotalResourceSlot(
+        return cls(
             occupied_slots=occupied,
             requested_slots=requested,
         )

@@ -273,7 +273,7 @@ class UserRow(Base):
     async def query_by_condition(
         cls,
         conditions: Sequence[QueryCondition],
-        options: Sequence["QueryOption"] = tuple(),
+        options: Sequence[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:

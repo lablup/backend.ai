@@ -1191,7 +1191,7 @@ class SessionRow(Base):
     async def list_session_by_condition(
         cls,
         conditions: Iterable[QueryCondition],
-        options: Iterable["QueryOption"] = tuple(),
+        options: Iterable[QueryOption] = tuple(),
         *,
         db: ExtendedAsyncSAEngine,
     ) -> list[Self]:
