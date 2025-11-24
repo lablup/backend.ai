@@ -265,7 +265,6 @@ class Context(metaclass=ABCMeta):
     async def install_halfstack(self) -> None:
         self.log_header("Installing halfstack...")
 
-        # TODO: 설치할 때 routing url이 달라질수 있으니 인스톨러에서 flag로 세팅하여 routing_url 수정하도록 변경필요
         self.log_header("Generating supergraph.graphql via rover CLI...")
 
         compose_cmd = [
