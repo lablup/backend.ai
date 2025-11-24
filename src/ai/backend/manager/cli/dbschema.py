@@ -7,20 +7,8 @@ import sys
 from typing import TYPE_CHECKING, TypedDict
 
 import click
-from alembic import command
-from alembic.config import Config
-from alembic.runtime.environment import EnvironmentContext
-from alembic.runtime.migration import MigrationContext, MigrationStep
-from alembic.script import Script, ScriptDirectory
-from sqlalchemy.engine import Connection, Engine
 
-from ai.backend.common.json import load_json, pretty_json_str
 from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager import __version__
-
-from ..models.alembic import invoked_programmatically
-from ..models.base import metadata
-from ..models.utils import create_async_engine
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -58,6 +46,13 @@ def cli(args) -> None:
 @click.pass_obj
 def show(cli_ctx: CLIContext, alembic_config) -> None:
     """Show the current schema information."""
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from sqlalchemy.engine import Connection
+
+    from ..models.alembic import invoked_programmatically
+    from ..models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
@@ -100,6 +95,11 @@ def show(cli_ctx: CLIContext, alembic_config) -> None:
 @click.pass_obj
 def dump_history(cli_ctx: CLIContext, alembic_config: str, output: str) -> None:
     """Dump current alembic history in a serialiazable format."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    from ai.backend.common.json import pretty_json_str
+    from ai.backend.manager import __version__
 
     alembic_cfg = Config(alembic_config)
     script = ScriptDirectory.from_config(alembic_cfg)
@@ -149,6 +149,13 @@ def apply_missing_revisions(
     Compare current alembic revision paths with the given serialized
     alembic revision history and try to execute every missing revisions.
     """
+    from alembic.config import Config
+    from alembic.runtime.environment import EnvironmentContext
+    from alembic.runtime.migration import MigrationStep
+    from alembic.script import Script, ScriptDirectory
+
+    from ai.backend.common.json import load_json
+
     with importlib.resources.as_file(
         importlib.resources.files("ai.backend.manager.models.alembic.revision_history")
     ) as f:
@@ -210,6 +217,15 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
     Reference: http://alembic.sqlalchemy.org/en/latest/cookbook.html
                #building-an-up-to-date-database-from-scratch
     """
+    from alembic import command
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from sqlalchemy.engine import Connection, Engine
+
+    from ..models.alembic import invoked_programmatically
+    from ..models.base import metadata
+    from ..models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)

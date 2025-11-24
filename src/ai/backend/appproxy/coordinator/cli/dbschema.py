@@ -5,17 +5,8 @@ import logging
 from typing import TYPE_CHECKING
 
 import click
-from alembic import command
-from alembic.config import Config
-from alembic.runtime.migration import MigrationContext
-from alembic.script import ScriptDirectory
-from sqlalchemy.engine import Connection, Engine
 
 from ai.backend.logging import BraceStyleAdapter
-
-from ..models.alembic import invoked_programmatically
-from ..models.base import metadata_obj as metadata
-from ..models.utils import create_async_engine
 
 if TYPE_CHECKING:
     from .context import CLIContext
@@ -39,6 +30,13 @@ def cli(args) -> None:
 @click.pass_obj
 def show(cli_ctx: CLIContext, alembic_config) -> None:
     """Show the current schema information."""
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from sqlalchemy.engine import Connection
+
+    from ..models.alembic import invoked_programmatically
+    from ..models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
@@ -81,6 +79,15 @@ def oneshot(cli_ctx: CLIContext, alembic_config: str) -> None:
     Reference: http://alembic.sqlalchemy.org/en/latest/cookbook.html
                #building-an-up-to-date-database-from-scratch
     """
+    from alembic import command
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from sqlalchemy.engine import Connection, Engine
+
+    from ..models.alembic import invoked_programmatically
+    from ..models.base import metadata_obj as metadata
+    from ..models.utils import create_async_engine
 
     def _get_current_rev_sync(connection: Connection) -> str | None:
         context = MigrationContext.configure(connection)
