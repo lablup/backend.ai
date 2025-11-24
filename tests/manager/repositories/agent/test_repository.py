@@ -1,7 +1,8 @@
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Generator, Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -22,6 +23,8 @@ from ai.backend.common.types import (
     SlotTypes,
     ValkeyTarget,
 )
+from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
     AgentDataExtended,
     AgentHeartbeatUpsert,
@@ -175,24 +178,47 @@ class TestAgentRepository:
         yield AgentDBSource(db=database_engine)
 
     @pytest.fixture
+    async def mock_config_provider(self) -> AsyncGenerator[ManagerConfigProvider, None]:
+        mock_provider = MagicMock(spec=ManagerConfigProvider)
+        mock_legacy_loader = MagicMock(spec=LegacyEtcdLoader)
+        mock_provider.legacy_etcd_config_loader = mock_legacy_loader
+        yield mock_provider
+
+    @pytest.fixture
     async def agent_repository(
         self,
         database_engine: ExtendedAsyncSAEngine,
         valkey_image_client: ValkeyImageClient,
         valkey_live_client: ValkeyLiveClient,
         valkey_stat_client: ValkeyStatClient,
-        mock_config_provider_ctx: Any,
+        mock_config_provider: ManagerConfigProvider,
     ) -> AsyncGenerator[AgentRepository, None]:
         """Create AgentRepository with real database and Redis clients"""
-        async with mock_config_provider_ctx(None) as config_provider:
-            repo = AgentRepository(
-                db=database_engine,
-                valkey_image=valkey_image_client,
-                valkey_live=valkey_live_client,
-                valkey_stat=valkey_stat_client,
-                config_provider=config_provider,
-            )
-            yield repo
+        yield AgentRepository(
+            db=database_engine,
+            valkey_image=valkey_image_client,
+            valkey_live=valkey_live_client,
+            valkey_stat=valkey_stat_client,
+            config_provider=mock_config_provider,
+        )
+
+    @pytest.fixture
+    def mock_get_resource_slots(
+        self, agent_repository: AgentRepository
+    ) -> Generator[AsyncMock, None, None]:
+        mock = AsyncMock(
+            return_value={
+                SlotName("cpu"): SlotTypes.COUNT,
+                SlotName("mem"): SlotTypes.BYTES,
+                SlotName("cuda.shares"): SlotTypes.COUNT,
+            }
+        )
+        with patch.object(
+            agent_repository._config_provider.legacy_etcd_config_loader,
+            "get_resource_slots",
+            mock,
+        ):
+            yield mock
 
     @pytest.fixture
     async def sample_agent(
@@ -526,8 +552,12 @@ class TestAgentRepository:
             assert all(agent.scaling_group == scaling_group for agent in first_page)
 
             # When - get second page
-            querier.pagination = OffsetPagination(limit=2, offset=2)
-            second_page = await db_source.fetch_agent_data_list(querier)
+            second_querier = Querier(
+                conditions=[AgentConditions.by_scaling_group(scaling_group)],
+                orders=[AgentOrders.id(ascending=True)],
+                pagination=OffsetPagination(limit=2, offset=2),
+            )
+            second_page = await db_source.fetch_agent_data_list(second_querier)
 
             # Then - verify second page has correct data
             assert len(second_page) == 2
@@ -536,8 +566,12 @@ class TestAgentRepository:
             assert all(agent.scaling_group == scaling_group for agent in second_page)
 
             # When - get third page (last page with 1 item)
-            querier.pagination = OffsetPagination(limit=2, offset=4)
-            third_page = await db_source.fetch_agent_data_list(querier)
+            third_querier = Querier(
+                conditions=[AgentConditions.by_scaling_group(scaling_group)],
+                orders=[AgentOrders.id(ascending=True)],
+                pagination=OffsetPagination(limit=2, offset=4),
+            )
+            third_page = await db_source.fetch_agent_data_list(third_querier)
 
             # Then - verify third page has correct data
             assert len(third_page) == 1
@@ -599,27 +633,33 @@ class TestAgentRepository:
         agent_ids = [agent.id for agent in result]
         assert agent_id in agent_ids
 
+    @pytest.mark.parametrize(
+        "status_filter, expected_count",
+        [
+            ([AgentStatus.ALIVE], 1),
+            ([AgentStatus.LOST], 0),
+            ([AgentStatus.TERMINATED], 0),
+        ],
+    )
     @pytest.mark.asyncio
     async def test_repository_list_data_with_status_filter(
         self,
         agent_repository: AgentRepository,
         sample_agent: _SampleAgent,
+        status_filter: list[AgentStatus],
+        expected_count: int,
     ) -> None:
         """Test repository list_data with status filter"""
-        agent_id = sample_agent.agent_id
-
         # When
         querier = Querier(
-            conditions=[AgentConditions.by_statuses([AgentStatus.ALIVE])],
+            conditions=[AgentConditions.by_statuses(status_filter)],
             orders=[],
         )
         result = await agent_repository.list_data(querier)
 
         # Then
-        assert len(result) >= 1
-        assert all(agent.status == AgentStatus.ALIVE for agent in result)
-        agent_ids = [agent.id for agent in result]
-        assert agent_id in agent_ids
+        assert len(result) == expected_count
+        assert all(agent.status in status_filter for agent in result)
 
     @pytest.mark.asyncio
     async def test_repository_list_data_empty_result(
@@ -643,6 +683,7 @@ class TestAgentRepository:
         agent_repository: AgentRepository,
         sample_agent: _SampleAgent,
         scaling_group: str,
+        mock_get_resource_slots: AsyncMock,
     ) -> None:
         """Test repository list_extended_data returns agents with extended info"""
         agent_id = sample_agent.agent_id
@@ -666,6 +707,9 @@ class TestAgentRepository:
             assert hasattr(agent, "known_slot_types")
             assert hasattr(agent, "kernels")
 
+        # Verify get_resource_slots was called
+        mock_get_resource_slots.assert_called_once()
+
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
         "status_filter",
@@ -679,6 +723,7 @@ class TestAgentRepository:
         agent_repository: AgentRepository,
         sample_agent: _SampleAgent,
         status_filter: list[AgentStatus],
+        mock_get_resource_slots: AsyncMock,
     ) -> None:
         """Test repository list_extended_data with different status filters"""
         agent_id = sample_agent.agent_id
@@ -695,3 +740,6 @@ class TestAgentRepository:
         assert all(agent.status in status_filter for agent in result)
         agent_ids = [agent.id for agent in result]
         assert agent_id in agent_ids
+
+        # Verify get_resource_slots was called
+        mock_get_resource_slots.assert_called_once()
