@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -21,6 +23,8 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
+from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.data.session.types import SessionInfo
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import MainKernelNotFound, TooManyKernelsFound
 from ai.backend.manager.exceptions import ErrorStatusInfo
@@ -823,3 +827,58 @@ class SessionRunningData:
 
     session_id: SessionId
     occupying_slots: ResourceSlot
+
+
+# ============================================================================
+# New types for scheduler refactoring
+# ============================================================================
+
+
+@dataclass
+class SessionWithKernels:
+    """
+    Bundles a session with its associated kernels.
+
+    This is the primary data unit for scheduler operations,
+    representing a session and all its kernels as an atomic unit.
+    """
+
+    session_info: SessionInfo
+    kernel_infos: list[KernelInfo]
+
+
+@dataclass
+class SchedulerExecutionError:
+    """
+    Represents a failed scheduler operation.
+
+    Steps/history are managed separately via RecorderContext at coordinator level.
+    """
+
+    session_with_kernels: SessionWithKernels
+    reason: str
+    error_detail: str
+
+
+@dataclass
+class SchedulerExecutionResult:
+    """
+    Result of a scheduler handler execution.
+
+    Follows the deployment pattern with successes, errors, and skipped lists.
+    Steps/history are managed separately via RecorderContext at coordinator level.
+    """
+
+    successes: list[SessionWithKernels] = field(default_factory=list)
+    errors: list[SchedulerExecutionError] = field(default_factory=list)
+    skipped: list[SessionWithKernels] = field(default_factory=list)
+
+    @property
+    def has_failures(self) -> bool:
+        """Check if there are any failed operations."""
+        return len(self.errors) > 0
+
+    @property
+    def has_successes(self) -> bool:
+        """Check if there are any successful operations."""
+        return len(self.successes) > 0
