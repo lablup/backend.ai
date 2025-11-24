@@ -1,7 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
@@ -24,13 +24,13 @@ class RBACEntityCreateInput:
     object_id: ObjectId
 
 
-@dataclass
-class CreatorResult:
-    row: Any
-    scope_map_rows: list[AssociationScopesEntitiesRow]
-
-
 TRow = TypeVar("TRow")
+
+
+@dataclass
+class CreatorResult(Generic[TRow]):
+    row: TRow
+    scope_map_rows: list[AssociationScopesEntitiesRow]
 
 
 class RBACEntityCreator(Generic[TRow], ABC):
@@ -43,10 +43,10 @@ class RBACEntityCreator(Generic[TRow], ABC):
         pass
 
 
-async def execute_cretor(
+async def execute_cretor[TRow](
     db_sess: SASession,
-    creator: RBACEntityCreator,
-) -> CreatorResult:
+    creator: RBACEntityCreator[TRow],
+) -> CreatorResult[TRow]:
     created_row = creator.row()
     db_sess.add(created_row)
     await db_sess.flush()
@@ -66,7 +66,7 @@ async def execute_cretor(
             created_scope_map_rows.append(map_row)
         except IntegrityError:
             log.exception(
-                "entity and scope mapping already exists: {}, {}. Skipping.",
+                "entity and scope mapping already exists (entity id: {}, scope id: {}). Skipping.",
                 entity_id.to_str(),
                 scope_id.to_str(),
             )
