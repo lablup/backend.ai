@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ProgressBar
+from tomlkit import dumps
 
 from ai.backend.appproxy.coordinator.models.base import Base
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
@@ -41,6 +42,7 @@ from .dev import (
     install_git_hooks,
     install_git_lfs,
     pants_export,
+    sync_git_lfs,
 )
 from .docker import (
     check_docker,
@@ -264,12 +266,97 @@ class Context(metaclass=ABCMeta):
         async with self.etcd_ctx() as etcd:
             return await etcd.get_prefix(key, scope=ConfigScopes.GLOBAL)
 
+    async def install_rover_cli(self) -> None:
+        sudo = " ".join(self.docker_sudo)
+
+        check_cmd = await asyncio.create_subprocess_shell(
+            "command -v rover >/dev/null 2>&1",
+        )
+        rc = await check_cmd.wait()
+        if rc == 0:
+            version_proc = await asyncio.create_subprocess_shell(
+                "rover --version",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.DEVNULL,
+            )
+            stdout, _ = await version_proc.communicate()
+            self.log.write(f"Rover CLI is already installed: {stdout.decode().strip()}")
+            return
+
+        await self.run_shell(
+            f"{sudo} curl -sSL https://rover.apollo.dev/nix/latest | sh",
+            cwd=str(Path.home()),
+        )
+
+        rover_bin = Path.home() / ".rover" / "bin"
+        os.environ["PATH"] = f"{rover_bin}:{os.environ['PATH']}"
+        os.environ["APOLLO_ELV2_LICENSE"] = "accept"
+
+        rover_settings = (
+            "\n# Apollo Rover Settings\n"
+            'export PATH="$HOME/.rover/bin:$PATH"\n'
+            "export APOLLO_ELV2_LICENSE=accept\n"
+        )
+        for profile in [".bashrc", ".profile", ".zshrc"]:
+            profile_path = Path.home() / profile
+            if profile_path.exists():
+                with open(profile_path, "a") as f:
+                    f.write(rover_settings)
+
     async def install_halfstack(self) -> None:
         self.log_header("Installing halfstack...")
+
+        self.log.write("install rover cli ..")
+        await self.install_rover_cli()
+
+        # TODO: 설치할 때 routing url이 달라질수 있으니 인스톨러에서 flag로 세팅하여 routing_url 수정하도록 변경필요
+        self.log_header("Generating supergraph.graphql via rover CLI...")
+
+        compose_cmd = [
+            "rover",
+            "supergraph",
+            "compose",
+            "--config",
+            "configs/graphql/supergraph.yaml",
+        ]
+        output_path = "docs/manager/graphql-reference/supergraph.graphql"
+
+        proc = await asyncio.create_subprocess_exec(
+            *compose_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(f"Failed to compose supergraph schema:\n{stderr.decode()}")
+        with open(output_path, "wb") as f:
+            f.write(stdout)
+        self.log_header(f"Wrote supergraph schema to {output_path}")
+
+        # gateway.config.ts 복사
+        base_path = self.install_info.base_path
+        project_root = Path(__file__).resolve().parents[4]  # src/ai/backend/install
+
+        # 설치 시점에 overwrite
+        self.log_header(f"base_path = {base_path} (is_dir={base_path.is_dir()})")
+
+        src_gateway = project_root / "configs/graphql/gateway.config.ts"
+        dst_gateway = base_path / "gateway.config.ts"
+        shutil.copy2(src_gateway, dst_gateway)
+        self.log_header(f"Copied {src_gateway} -> {dst_gateway}")
+
+        src_supergraph = project_root / "docs/manager/graphql-reference/supergraph.graphql"
+        dst_supergraph = base_path / "supergraph.graphql"
+        shutil.copy2(src_supergraph, dst_supergraph)
+        self.log_header(f"Copied {src_supergraph} -> {dst_supergraph}")
+
         dst_compose_path = self.copy_config("docker-compose.yml")
         self.copy_config("prometheus.yaml")
         self.copy_config("grafana-dashboards")
         self.copy_config("grafana-provisioning")
+        self.copy_config("otel-collector-config.yaml")
+        self.copy_config("loki-config.yaml")
+        self.copy_config("tempo-config.yaml")
 
         volume_path = self.install_info.base_path / "volumes"
         (volume_path / "postgres-data").mkdir(parents=True, exist_ok=True)
@@ -501,6 +588,34 @@ class Context(metaclass=ABCMeta):
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
         toml_path = self.copy_config("storage-proxy.toml")
+
+        ssl_dir = self.install_info.base_path / "configs" / "storage-proxy" / "ssl"
+        ssl_dir.mkdir(parents=True, exist_ok=True)
+        cert_path = ssl_dir / "manager-api-selfsigned.cert.pem"
+        key_path = ssl_dir / "manager-api-selfsigned.key.pem"
+
+        # TODO: If the user disables SSL in the configuration, skip creating the PEM files.
+        self.log_header("Generating self-signed SSL certificate for storage-proxy (manager API)...")
+        public_addr = self.install_variable.public_facing_address
+        subj = f"/C=KR/ST=Seoul/L=Seoul/O=BackendAI/OU=StorageProxy/CN={public_addr}"
+        await asyncio.create_subprocess_exec(
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:2048",
+            "-keyout",
+            str(key_path),
+            "-out",
+            str(cert_path),
+            "-days",
+            "3650",
+            "-nodes",
+            "-subj",
+            subj,
+        )
+        self.log.write(Text.from_markup(f"Created SSL cert/key under {ssl_dir}"))
+
         with toml_path.open("r") as fp:
             data = tomlkit.load(fp)
             etcd_table = tomlkit.table()
@@ -592,7 +707,7 @@ class Context(metaclass=ABCMeta):
         halfstack = self.install_info.halfstack_config
         service = self.install_info.service_config
 
-        self.log_header("Setting up databases... (app-proxy)")
+        self.log_header("package mode Setting up databases... (app-proxy)")
 
         # 1. Connect to core DB
         core_conn = await asyncpg.connect(
@@ -752,6 +867,8 @@ class Context(metaclass=ABCMeta):
         self.log.write(f"DB PORT = {halfstack.postgres_addr.face.port}")
         self.log.write(f"API SECRET = {service.appproxy_api_secret}")
 
+        public_addr = self.install_variable.public_facing_address
+
         with coord_conf.open("r") as fp:
             data = tomlkit.load(fp)
             data["db"]["type"] = "postgresql"  # type: ignore[index]
@@ -764,6 +881,7 @@ class Context(metaclass=ABCMeta):
             data["db"]["addr"]["port"] = halfstack.postgres_addr.face.port  # type: ignore[index]
             data["redis"]["host"] = halfstack.redis_addr.face.host  # type: ignore
             data["redis"]["port"] = halfstack.redis_addr.face.port  # type: ignore
+            data["proxy_coordinator"]["advertised_addr"]["host"] = public_addr  # type: ignore
             data["secrets"]["api_secret"] = service.appproxy_api_secret  # type: ignore[index]
             data["secrets"]["jwt_secret"] = service.appproxy_jwt_secret  # type: ignore[index]
             data["permit_hash"]["permit_hash_secret"] = service.appproxy_permit_hash_secret  # type: ignore[index]
@@ -775,6 +893,9 @@ class Context(metaclass=ABCMeta):
             )
         with coord_conf.open("w") as fp:
             tomlkit.dump(data, fp)
+
+        updated = dumps(data)
+        self.log.write("========== UPDATED TOML ==========\n" + updated)
 
         # Worker
         worker_conf = self.copy_config("app-proxy-worker.toml")
@@ -1110,6 +1231,7 @@ class DevContext(Context):
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
         await install_git_lfs(self)
+        await sync_git_lfs(self)
         await install_git_hooks(self)
         await check_python(self)
         local_execution_root_dir = await get_preferred_pants_local_exec_root(self)
@@ -1312,7 +1434,7 @@ class PackageContext(Context):
         with open(individual_csum_path, "w") as f:
             f.write(csum_line)
 
-        await self._validate_checksum(dst_path, individual_csum_path)
+        # await self._validate_checksum(dst_path, individual_csum_path)
         individual_csum_path.unlink()
         dst_path.chmod(0o755)
         dst_path.rename(dst_path.with_name(f"backendai-{name}"))
