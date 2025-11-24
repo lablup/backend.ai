@@ -28,6 +28,11 @@ async def install_git_lfs(ctx: Context) -> None:
     await ctx.run_shell("git lfs install", stderr=asyncio.subprocess.DEVNULL)
 
 
+async def sync_git_lfs(ctx: Context) -> None:
+    ctx.log_header("Syncing Git LFS objects")
+    await ctx.run_shell("git lfs pull", stderr=asyncio.subprocess.DEVNULL)
+
+
 async def install_git_hooks(ctx: Context) -> None:
     ctx.log_header("Installing Git hooks")
 
