@@ -264,6 +264,43 @@ class Context(metaclass=ABCMeta):
 
     async def install_halfstack(self) -> None:
         self.log_header("Installing halfstack...")
+
+        self.log_header("Generating supergraph.graphql via rover CLI...")
+
+        compose_cmd = [
+            "rover",
+            "supergraph",
+            "compose",
+            "--config",
+            "configs/graphql/supergraph.yaml",
+        ]
+        output_path = "docs/manager/graphql-reference/supergraph.graphql"
+
+        proc = await asyncio.create_subprocess_exec(
+            *compose_cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+        if proc.returncode != 0:
+            raise RuntimeError(f"Failed to compose supergraph schema:\n{stderr.decode()}")
+        with open(output_path, "wb") as f:
+            f.write(stdout)
+        self.log_header(f"Wrote supergraph schema to {output_path}")
+
+        base_path = self.install_info.base_path
+        project_root = Path(__file__).resolve().parents[4]
+
+        src_gateway = project_root / "configs/graphql/gateway.config.ts"
+        dst_gateway = base_path / "gateway.config.ts"
+        shutil.copy2(src_gateway, dst_gateway)
+        self.log_header(f"Copied {src_gateway} -> {dst_gateway}")
+
+        src_supergraph = project_root / "docs/manager/graphql-reference/supergraph.graphql"
+        dst_supergraph = base_path / "supergraph.graphql"
+        shutil.copy2(src_supergraph, dst_supergraph)
+        self.log_header(f"Copied {src_supergraph} -> {dst_supergraph}")
+
         dst_compose_path = self.copy_config("docker-compose.yml")
         self.copy_config("prometheus.yaml")
         self.copy_config("grafana-dashboards")
