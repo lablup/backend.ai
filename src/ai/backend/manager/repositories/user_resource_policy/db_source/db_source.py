@@ -74,20 +74,32 @@ class UserResourcePolicyDBSource:
     ) -> UserResourcePolicyData:
         """Updates an existing user resource policy."""
         async with self._db.begin_session() as db_sess:
-            query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
-            row: Optional[UserResourcePolicyRow] = await db_sess.scalar(query)
-            if row is None:
+            # Check if the policy exists first
+            check_query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
+            existing_row: Optional[UserResourcePolicyRow] = await db_sess.scalar(check_query)
+            if existing_row is None:
                 raise UserResourcePolicyNotFound(
                     f"User resource policy with name {name} not found."
                 )
+
             fields = modifier.fields_to_update()
-            query = (
+            update_stmt = (
                 sa.update(UserResourcePolicyRow)
                 .where(UserResourcePolicyRow.name == name)
                 .values(**fields)
+                .returning(UserResourcePolicyRow)
             )
-            await db_sess.execute(query)
-            return row.to_dataclass()
+            query_stmt = (
+                sa.select(UserResourcePolicyRow)
+                .from_statement(update_stmt)
+                .execution_options(populate_existing=True)
+            )
+            updated_row: Optional[UserResourcePolicyRow] = await db_sess.scalar(query_stmt)
+            if updated_row is None:
+                raise UserResourcePolicyNotFound(
+                    f"User resource policy with name {name} not found after update."
+                )
+            return updated_row.to_dataclass()
 
     @user_resource_policy_db_source_resilience.apply()
     async def delete(self, name: str) -> UserResourcePolicyData:
