@@ -4,7 +4,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AccessKey, ResourceSlot, SessionId
-from ai.backend.manager.sokovan.scheduler.sequencers.drf import DRFSequencer
+from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.drf import DRFSequencer
 from ai.backend.manager.sokovan.scheduler.types import (
     ConcurrencySnapshot,
     KeypairOccupancy,

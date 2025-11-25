@@ -6,7 +6,7 @@ from typing import Optional
 import pytest
 
 from ai.backend.common.types import AgentId, ResourceSlot
-from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentInfo
 
 
 def create_agent_info(

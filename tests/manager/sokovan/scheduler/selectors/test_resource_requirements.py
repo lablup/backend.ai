@@ -6,7 +6,7 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import ClusterMode, ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionCriteria,
     KernelResourceSpec,
     SessionMetadata,

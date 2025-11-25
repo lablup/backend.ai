@@ -89,7 +89,7 @@ from ai.backend.manager.scheduler.types import (
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.types import SessionAllocation
 
-from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentInfo
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentInfo
 from ai.backend.manager.sokovan.scheduler.types import (
     AllocationBatch,
     ConcurrencySnapshot,

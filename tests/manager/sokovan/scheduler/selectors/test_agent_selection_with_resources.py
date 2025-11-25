@@ -6,9 +6,13 @@ from decimal import Decimal
 import pytest
 
 from ai.backend.common.types import AgentId, ClusterMode, ResourceSlot, SessionId, SessionTypes
-from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
-from ai.backend.manager.sokovan.scheduler.selectors.dispersed import DispersedAgentSelector
-from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
+    ConcentratedAgentSelector,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.dispersed import (
+    DispersedAgentSelector,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentInfo,
     AgentSelectionConfig,
     AgentSelectionCriteria,
@@ -235,7 +239,9 @@ class TestAgentSelectionWithResources:
         selector = AgentSelector(strategy)
 
         # Try to select designated agent
-        from ai.backend.manager.sokovan.scheduler.selectors.exceptions import NoAvailableAgentError
+        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.exceptions import (
+            NoAvailableAgentError,
+        )
 
         with pytest.raises(NoAvailableAgentError) as exc_info:
             await selector.select_agents_for_batch_requirements(

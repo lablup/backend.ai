@@ -33,7 +33,7 @@ from ai.backend.manager.models.network import NetworkType
 from ai.backend.manager.models.session import SessionStatus
 
 if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+    from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
         AgentSelection,
         AgentSelectionCriteria,
     )
@@ -236,7 +236,7 @@ class SessionWorkload:
             AgentSelectionCriteria for agent selection
         """
         # Import here to avoid circular dependency
-        from ai.backend.manager.sokovan.scheduler.selectors.selector import (
+        from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
             AgentSelectionCriteria,
             KernelResourceSpec,
             SessionMetadata,

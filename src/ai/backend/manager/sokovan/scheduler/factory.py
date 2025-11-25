@@ -8,37 +8,45 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.scheduler import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.allocators.repository_allocator import RepositoryAllocator
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.concentrated import (
+    ConcentratedAgentSelector,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
+from ai.backend.manager.sokovan.scheduler.provisioner.sequencers.fifo import FIFOSequencer
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.concurrency import (
+    ConcurrencyValidator,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.dependencies import (
+    DependenciesValidator,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.domain_resource_limit import (
+    DomainResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.group_resource_limit import (
+    GroupResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.keypair_resource_limit import (
+    KeypairResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.pending_session_count_limit import (
+    PendingSessionCountLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.pending_session_resource_limit import (
+    PendingSessionResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.reserved_batch import (
+    ReservedBatchSessionValidator,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.user_resource_limit import (
+    UserResourceLimitValidator,
+)
+from ai.backend.manager.sokovan.scheduler.provisioner.validators.validator import (
+    SchedulingValidator,
+)
 from ai.backend.manager.sokovan.scheduler.scheduler import (
     Scheduler,
     SchedulerArgs,
 )
-from ai.backend.manager.sokovan.scheduler.selectors.concentrated import ConcentratedAgentSelector
-from ai.backend.manager.sokovan.scheduler.selectors.selector import AgentSelector
-from ai.backend.manager.sokovan.scheduler.sequencers.fifo import FIFOSequencer
-from ai.backend.manager.sokovan.scheduler.validators.concurrency import ConcurrencyValidator
-from ai.backend.manager.sokovan.scheduler.validators.dependencies import DependenciesValidator
-from ai.backend.manager.sokovan.scheduler.validators.domain_resource_limit import (
-    DomainResourceLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.validators.group_resource_limit import (
-    GroupResourceLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.validators.keypair_resource_limit import (
-    KeypairResourceLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.validators.pending_session_count_limit import (
-    PendingSessionCountLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.validators.pending_session_resource_limit import (
-    PendingSessionResourceLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.validators.reserved_batch import (
-    ReservedBatchSessionValidator,
-)
-from ai.backend.manager.sokovan.scheduler.validators.user_resource_limit import (
-    UserResourceLimitValidator,
-)
-from ai.backend.manager.sokovan.scheduler.validators.validator import SchedulingValidator
 from ai.backend.manager.types import DistributedLockFactory
 
 
