@@ -176,12 +176,15 @@ class RoleManager:
         """
 
         role = await self._query_system_role_by_user(db_session, user_id)
+        role_id = role.id
         entity_associated_scopes = await self._query_entity_associated_scopes(db_session, entity_id)
         await self._add_permission_groups_to_role_if_not_exist(
             db_session, role, entity_associated_scopes
         )
-        await self._add_object_permissions_to_role(db_session, role.id, entity_id, operations)
-        updated_role = await self._query_role_by_id(db_session, role.id)
+        await self._add_object_permissions_to_role(db_session, role_id, entity_id, operations)
+        await db_session.commit()
+        db_session.expire(role)
+        updated_role = await self._query_role_by_id(db_session, role_id)
         return updated_role
 
     async def _query_system_role_by_user(
@@ -218,7 +221,7 @@ class RoleManager:
         role_row = cast(Optional[RoleRow], role_row)
         if role_row is None:
             raise RoleNotFound(f"Role with id {role_id} not found")
-        return role_row
+        return role_row.to_data_with_permissions()
 
     async def _query_entity_associated_scopes(
         self,
@@ -248,6 +251,8 @@ class RoleManager:
         for permission_group in role_row.permission_group_rows:
             scope_id = permission_group.parsed_scope_id()
             scope_ids_to_add.discard(scope_id)
+        if not scope_ids_to_add:
+            return
         creators = [
             PermissionGroupCreator(
                 role_id=role_row.id,
