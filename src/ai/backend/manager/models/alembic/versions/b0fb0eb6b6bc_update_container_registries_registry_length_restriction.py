@@ -1,7 +1,7 @@
 """Update container_registries.registry_name length restriction
 
 Revision ID: b0fb0eb6b6bc
-Revises: d811b103dbfc
+Revises: dd15fd17f232
 Create Date: 2025-10-29 10:38:05.866930
 
 """
@@ -11,7 +11,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "b0fb0eb6b6bc"
-down_revision = "d811b103dbfc"
+down_revision = "dd15fd17f232"
 branch_labels = None
 depends_on = None
 
