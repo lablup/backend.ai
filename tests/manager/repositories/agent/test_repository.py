@@ -27,7 +27,6 @@ from ai.backend.common.types import (
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
-    AgentDataExtended,
     AgentHeartbeatUpsert,
     AgentStatus,
 )
@@ -51,29 +50,29 @@ class _SampleAgent:
 
 
 class TestAgentRepository:
-    @actxmgr
-    async def _create_agents(
-        self,
-        db_source: AgentDBSource,
-        scaling_group: str,
-        count: int = 1,
-        **overrides: Any,
-    ) -> AsyncIterator[list[_SampleAgent]]:
-        """Create multiple test agents and yield them, cleaning up afterwards
+    @pytest.fixture
+    async def agent_factory(self, db_source: AgentDBSource) -> AsyncGenerator[Any, None]:
+        """Factory fixture for creating test agents with automatic cleanup."""
+        created_agent_ids: list[AgentId] = []
 
-        Args:
-            db_source: Database source for agent operations
-            scaling_group: Scaling group name for the agents
-            count: Number of agents to create
-            **overrides: Override default agent info attributes
-        """
-        agents: list[_SampleAgent] = []
-        agent_ids: list[AgentId] = []
+        @actxmgr
+        async def _create_agents(
+            scaling_group: str,
+            count: int = 1,
+            **overrides: Any,
+        ) -> AsyncIterator[list[_SampleAgent]]:
+            """Create multiple test agents and yield them
 
-        try:
+            Args:
+                scaling_group: Scaling group name for the agents
+                count: Number of agents to create
+                **overrides: Override default agent info attributes
+            """
+            agents: list[_SampleAgent] = []
+
             for i in range(count):
                 agent_id = AgentId(f"agent-{uuid4().hex[:8]}")
-                agent_ids.append(agent_id)
+                created_agent_ids.append(agent_id)
 
                 agent_info = AgentInfo(
                     ip=overrides.get("ip", f"192.168.1.{100 + i}"),
@@ -121,11 +120,17 @@ class TestAgentRepository:
 
             yield agents
 
-        finally:
-            # Cleanup
-            async with db_source._db.begin_session() as db_session:
-                for agent_id in agent_ids:
+        yield _create_agents
+
+        # Cleanup all created agents
+        # Delete in reverse order to handle dependencies and use individual try-catch
+        async with db_source._db.begin_session() as db_session:
+            for agent_id in reversed(created_agent_ids):
+                try:
                     await db_session.execute(sa.delete(AgentRow).where(AgentRow.id == agent_id))
+                except Exception:
+                    # Ignore cleanup errors - agent might have been deleted by test
+                    pass
 
     @pytest.fixture
     async def scaling_group(
@@ -147,7 +152,11 @@ class TestAgentRepository:
         try:
             yield group_name
         finally:
+            # Delete all agents in this scaling group first to avoid foreign key violations
             async with database_engine.begin_session() as db_session:
+                await db_session.execute(
+                    sa.delete(AgentRow).where(AgentRow.scaling_group == group_name)
+                )
                 await db_session.execute(
                     sa.delete(ScalingGroupRow).where(ScalingGroupRow.name == group_name)
                 )
@@ -268,23 +277,35 @@ class TestAgentRepository:
         ):
             yield mock
 
+    @pytest.fixture
+    async def single_agent(
+        self, agent_factory: Any, scaling_group: str
+    ) -> AsyncGenerator[_SampleAgent, None]:
+        """Pre-created single agent for simple tests."""
+        async with agent_factory(scaling_group, count=1) as agents:
+            yield agents[0]
+
+    @pytest.fixture
+    async def two_agents(
+        self, agent_factory: Any, scaling_group: str
+    ) -> AsyncGenerator[list[_SampleAgent], None]:
+        """Pre-created two agents for list/pagination tests."""
+        async with agent_factory(scaling_group, count=2) as agents:
+            yield agents
+
     @pytest.mark.asyncio
     async def test_db_source_get_by_id_existing_agent(
         self,
         db_source: AgentDBSource,
-        scaling_group: str,
+        single_agent: _SampleAgent,
     ) -> None:
         """Test getting an existing agent by ID"""
-        # Given
-        async with self._create_agents(db_source, scaling_group, count=1) as agents:
-            agent_id = agents[0].agent_id
+        # When
+        result = await db_source.get_by_id(single_agent.agent_id)
 
-            # When
-            result = await db_source.get_by_id(agent_id)
-
-            # Then
-            assert result.id == agent_id
-            assert result.status == AgentStatus.ALIVE
+        # Then
+        assert result.id == single_agent.agent_id
+        assert result.status == AgentStatus.ALIVE
 
     @pytest.mark.asyncio
     async def test_db_source_get_by_id_nonexistent_agent(
@@ -302,74 +323,63 @@ class TestAgentRepository:
     async def test_db_source_upsert_new_agent(
         self,
         db_source: AgentDBSource,
-        scaling_group: str,
+        single_agent: _SampleAgent,
     ) -> None:
         """Test upserting a new agent creates it successfully"""
-        # When - create new agent
-        async with self._create_agents(
-            db_source,
-            scaling_group,
-            count=1,
-            ip="192.168.1.200",
-            public_key=PublicKey(b"new-agent-key"),
-        ) as agents:
-            agent_id = agents[0].agent_id
-
-            # Then - verify agent was created successfully
-            agent_data = await db_source.get_by_id(agent_id)
-            assert agent_data.id == agent_id
-            assert agent_data.status == AgentStatus.ALIVE
+        # Then - verify agent was created successfully
+        agent_data = await db_source.get_by_id(single_agent.agent_id)
+        assert agent_data.id == single_agent.agent_id
+        assert agent_data.status == AgentStatus.ALIVE
 
     @pytest.mark.asyncio
     async def test_db_source_upsert_existing_agent_alive(
         self,
         db_source: AgentDBSource,
-        scaling_group: str,
         database_engine: ExtendedAsyncSAEngine,
+        single_agent: _SampleAgent,
     ) -> None:
         """Test upserting an existing alive agent"""
-        # Given - create an existing agent
-        async with self._create_agents(db_source, scaling_group, count=1) as agents:
-            agent_id = agents[0].agent_id
-            original_upsert = agents[0].heartbeat_upsert
-            different_version = "changed-version"
-            different_region = "changed-region"
+        # Given - Different version and region
+        agent_id = single_agent.agent_id
+        original_upsert = single_agent.heartbeat_upsert
+        different_version = "changed-version"
+        different_region = "changed-region"
 
-            # Create updated heartbeat with modified version
-            updated_upsert = AgentHeartbeatUpsert.from_agent_info(
-                agent_id=agent_id,
-                agent_info=AgentInfo(
-                    ip=original_upsert.network_info.addr.split("//")[1].split(":")[0],
-                    version=different_version,  # Different version
-                    scaling_group=original_upsert.metadata.scaling_group,
-                    available_resource_slots=original_upsert.resource_info.available_slots,
-                    slot_key_and_units=dict(original_upsert.resource_info.slot_key_and_units),
-                    compute_plugins={
-                        k: dict(v) for k, v in original_upsert.resource_info.compute_plugins.items()
-                    },
-                    addr=original_upsert.network_info.addr,
-                    public_key=original_upsert.network_info.public_key,
-                    public_host=original_upsert.network_info.public_host,
-                    images=b"\x82\xc4\x00\x00",
-                    region=different_region,  # Different region
-                    architecture=original_upsert.metadata.architecture,
-                    auto_terminate_abusing_kernel=original_upsert.metadata.auto_terminate_abusing_kernel,
-                ),
-                heartbeat_received=datetime.now(tzutc()),
+        # Create updated heartbeat with modified version
+        updated_upsert = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=agent_id,
+            agent_info=AgentInfo(
+                ip=original_upsert.network_info.addr.split("//")[1].split(":")[0],
+                version=different_version,  # Different version
+                scaling_group=original_upsert.metadata.scaling_group,
+                available_resource_slots=original_upsert.resource_info.available_slots,
+                slot_key_and_units=dict(original_upsert.resource_info.slot_key_and_units),
+                compute_plugins={
+                    k: dict(v) for k, v in original_upsert.resource_info.compute_plugins.items()
+                },
+                addr=original_upsert.network_info.addr,
+                public_key=original_upsert.network_info.public_key,
+                public_host=original_upsert.network_info.public_host,
+                images=b"\x82\xc4\x00\x00",
+                region=different_region,  # Different region
+                architecture=original_upsert.metadata.architecture,
+                auto_terminate_abusing_kernel=original_upsert.metadata.auto_terminate_abusing_kernel,
+            ),
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        # When
+        result = await db_source.upsert_agent_with_state(updated_upsert)
+
+        # Then
+        assert result.was_revived is False
+        assert result.need_resource_slot_update is True
+        async with database_engine.begin_readonly_session() as db_session:
+            agent_row: AgentRow = await db_session.scalar(
+                sa.select(AgentRow).where(AgentRow.id == agent_id)
             )
-
-            # When
-            result = await db_source.upsert_agent_with_state(updated_upsert)
-
-            # Then
-            assert result.was_revived is False
-            assert result.need_resource_slot_update is True
-            async with database_engine.begin_readonly_session() as db_session:
-                agent_row: AgentRow = await db_session.scalar(
-                    sa.select(AgentRow).where(AgentRow.id == agent_id)
-                )
-                assert agent_row.version == different_version
-                assert agent_row.region == different_region
+            assert agent_row.version == different_version
+            assert agent_row.region == different_region
 
     @pytest.mark.asyncio
     async def test_db_source_upsert_scaling_group_not_found(
@@ -418,44 +428,47 @@ class TestAgentRepository:
     async def test_db_source_list_agents_no_filter(
         self,
         db_source: AgentDBSource,
-        scaling_group: str,
+        single_agent: _SampleAgent,
     ) -> None:
         """Test listing all agents without filter"""
-        # Given - create a test agent
-        async with self._create_agents(db_source, scaling_group, count=1) as agents:
-            agent_id = agents[0].agent_id
+        # When
+        result = await db_source.fetch_agent_data_list()
 
-            # When
-            result = await db_source.fetch_agent_data_list()
-
-            # Then
-            assert len(result) >= 1
-            agent_ids = [agent.id for agent in result]
-            assert agent_id in agent_ids
+        # Then
+        assert len(result) == 1
+        agent_ids = [agent.id for agent in result]
+        assert single_agent.agent_id in agent_ids
 
     @pytest.mark.asyncio
     async def test_db_source_list_agents_with_querier(
         self,
         db_source: AgentDBSource,
         scaling_group: str,
+        single_agent: _SampleAgent,
     ) -> None:
         """Test listing agents with querier conditions"""
-        # Given - create a test agent
-        async with self._create_agents(db_source, scaling_group, count=1) as agents:
-            agent_id = agents[0].agent_id
+        # Given - Querier with scaling group filter
+        querier = Querier(
+            conditions=[AgentConditions.by_scaling_group(scaling_group)],
+            orders=[AgentOrders.id(ascending=True)],
+        )
 
-            # When
-            querier = Querier(
-                conditions=[AgentConditions.by_scaling_group(scaling_group)],
-                orders=[AgentOrders.id(ascending=True)],
-            )
-            result = await db_source.fetch_agent_data_list(querier)
+        # When
+        result = await db_source.fetch_agent_data_list(querier)
 
-            # Then
-            assert len(result) >= 1
-            assert all(agent.scaling_group == scaling_group for agent in result)
-            agent_ids = [agent.id for agent in result]
-            assert agent_id in agent_ids
+        # Then
+        assert len(result) == 1
+        assert all(agent.scaling_group == scaling_group for agent in result)
+        agent_ids = [agent.id for agent in result]
+        assert single_agent.agent_id in agent_ids
+
+    @pytest.fixture
+    async def three_agents(
+        self, agent_factory: Any, scaling_group: str
+    ) -> AsyncGenerator[list[_SampleAgent], None]:
+        """Pre-created three agents for ordering tests."""
+        async with agent_factory(scaling_group, count=3) as agents:
+            yield agents
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize("ascending", [True, False])
@@ -463,134 +476,138 @@ class TestAgentRepository:
         self,
         db_source: AgentDBSource,
         scaling_group: str,
+        three_agents: list[_SampleAgent],
         ascending: bool,
     ) -> None:
         """Test listing agents with different sort orders"""
-        # Given - create multiple agents
-        async with self._create_agents(db_source, scaling_group, count=3) as agents:
-            agent_ids = [agent.agent_id for agent in agents]
+        # Given - Querier with ordering
+        agent_ids = [agent.agent_id for agent in three_agents]
+        querier = Querier(
+            conditions=[AgentConditions.by_scaling_group(scaling_group)],
+            orders=[AgentOrders.id(ascending=ascending)],
+        )
 
-            # When
-            querier = Querier(
-                conditions=[AgentConditions.by_scaling_group(scaling_group)],
-                orders=[AgentOrders.id(ascending=ascending)],
-            )
-            result = await db_source.fetch_agent_data_list(querier)
+        # When
+        result = await db_source.fetch_agent_data_list(querier)
 
-            # Then
-            result_ids = [agent.id for agent in result if agent.id in agent_ids]
-            sorted_ids = sorted(agent_ids, reverse=not ascending)
-            assert result_ids == sorted_ids
+        # Then
+        result_ids = [agent.id for agent in result if agent.id in agent_ids]
+        sorted_ids = sorted(agent_ids, reverse=not ascending)
+        assert result_ids == sorted_ids
+
+    @pytest.fixture
+    async def five_agents(
+        self, agent_factory: Any, scaling_group: str
+    ) -> AsyncGenerator[list[_SampleAgent], None]:
+        """Pre-created five agents for pagination tests."""
+        async with agent_factory(scaling_group, count=5) as agents:
+            yield agents
 
     @pytest.mark.asyncio
     async def test_db_source_list_agents_with_pagination(
         self,
         db_source: AgentDBSource,
         scaling_group: str,
+        five_agents: list[_SampleAgent],
     ) -> None:
         """Test listing agents with pagination"""
-        # Given - create multiple agents
-        async with self._create_agents(db_source, scaling_group, count=5) as agents:
-            agent_ids = [agent.agent_id for agent in agents]
-            # Sort agent_ids for expected order
-            sorted_agent_ids = sorted(agent_ids)
+        # Given - Sort agent IDs for expected order
+        agent_ids = [agent.agent_id for agent in five_agents]
+        sorted_agent_ids = sorted(agent_ids)
 
-            # When - get first page
-            querier = Querier(
-                conditions=[AgentConditions.by_scaling_group(scaling_group)],
-                orders=[AgentOrders.id(ascending=True)],
-                pagination=OffsetPagination(limit=2, offset=0),
-            )
-            first_page = await db_source.fetch_agent_data_list(querier)
+        # When - get first page
+        querier = Querier(
+            conditions=[AgentConditions.by_scaling_group(scaling_group)],
+            orders=[AgentOrders.id(ascending=True)],
+            pagination=OffsetPagination(limit=2, offset=0),
+        )
+        first_page = await db_source.fetch_agent_data_list(querier)
 
-            # Then - verify first page has correct data
-            assert len(first_page) == 2
-            first_page_ids = [agent.id for agent in first_page]
-            assert first_page_ids == sorted_agent_ids[0:2]
-            assert all(agent.scaling_group == scaling_group for agent in first_page)
+        # Then - verify first page
+        assert len(first_page) == 2
+        first_page_ids = [agent.id for agent in first_page]
+        assert first_page_ids == sorted_agent_ids[0:2]
+        assert all(agent.scaling_group == scaling_group for agent in first_page)
 
-            # When - get second page
-            second_querier = Querier(
-                conditions=[AgentConditions.by_scaling_group(scaling_group)],
-                orders=[AgentOrders.id(ascending=True)],
-                pagination=OffsetPagination(limit=2, offset=2),
-            )
-            second_page = await db_source.fetch_agent_data_list(second_querier)
+        # When - get second page
+        second_querier = Querier(
+            conditions=[AgentConditions.by_scaling_group(scaling_group)],
+            orders=[AgentOrders.id(ascending=True)],
+            pagination=OffsetPagination(limit=2, offset=2),
+        )
+        second_page = await db_source.fetch_agent_data_list(second_querier)
 
-            # Then - verify second page has correct data
-            assert len(second_page) == 2
-            second_page_ids = [agent.id for agent in second_page]
-            assert second_page_ids == sorted_agent_ids[2:4]
-            assert all(agent.scaling_group == scaling_group for agent in second_page)
+        # Then - verify second page
+        assert len(second_page) == 2
+        second_page_ids = [agent.id for agent in second_page]
+        assert second_page_ids == sorted_agent_ids[2:4]
+        assert all(agent.scaling_group == scaling_group for agent in second_page)
 
-            # When - get third page (last page with 1 item)
-            third_querier = Querier(
-                conditions=[AgentConditions.by_scaling_group(scaling_group)],
-                orders=[AgentOrders.id(ascending=True)],
-                pagination=OffsetPagination(limit=2, offset=4),
-            )
-            third_page = await db_source.fetch_agent_data_list(third_querier)
+        # When - get third page (last page with 1 item)
+        third_querier = Querier(
+            conditions=[AgentConditions.by_scaling_group(scaling_group)],
+            orders=[AgentOrders.id(ascending=True)],
+            pagination=OffsetPagination(limit=2, offset=4),
+        )
+        third_page = await db_source.fetch_agent_data_list(third_querier)
 
-            # Then - verify third page has correct data
-            assert len(third_page) == 1
-            third_page_ids = [agent.id for agent in third_page]
-            assert third_page_ids == sorted_agent_ids[4:5]
-            assert all(agent.scaling_group == scaling_group for agent in third_page)
+        # Then - verify third page
+        assert len(third_page) == 1
+        third_page_ids = [agent.id for agent in third_page]
+        assert third_page_ids == sorted_agent_ids[4:5]
+        assert all(agent.scaling_group == scaling_group for agent in third_page)
 
-            # Verify no overlap between pages
-            all_page_ids = first_page_ids + second_page_ids + third_page_ids
-            assert len(all_page_ids) == len(set(all_page_ids))  # No duplicates
-            assert set(all_page_ids) == set(sorted_agent_ids)  # All agents retrieved
+        # Then - verify no overlap between pages
+        all_page_ids = first_page_ids + second_page_ids + third_page_ids
+        assert len(all_page_ids) == len(set(all_page_ids))  # No duplicates
+        assert set(all_page_ids) == set(sorted_agent_ids)  # All agents retrieved
 
     @pytest.mark.asyncio
     async def test_repository_update_gpu_alloc_map(
         self,
         agent_repository: AgentRepository,
-        db_source: AgentDBSource,
         valkey_stat_client: ValkeyStatClient,
-        scaling_group: str,
+        single_agent: _SampleAgent,
     ) -> None:
         """Test GPU allocation map update via repository"""
-        # Given - create a test agent
-        async with self._create_agents(db_source, scaling_group, count=1) as agents:
-            agent_id = agents[0].agent_id
-            alloc_map: Mapping[str, Any] = {
-                "cuda:0": {"session_id": "sess-001"},
-                "cuda:1": {"session_id": "sess-002"},
-            }
+        # Given - GPU allocation map
+        agent_id = single_agent.agent_id
+        alloc_map: Mapping[str, Any] = {
+            "cuda:0": {"session_id": "sess-001"},
+            "cuda:1": {"session_id": "sess-002"},
+        }
 
-            # When
-            await agent_repository.update_gpu_alloc_map(agent_id, alloc_map)
+        # When
+        await agent_repository.update_gpu_alloc_map(agent_id, alloc_map)
 
-            # Then
-            stored_map = await valkey_stat_client.get_gpu_allocation_map(str(agent_id))
-            assert stored_map == alloc_map
+        # Then
+        stored_map = await valkey_stat_client.get_gpu_allocation_map(str(agent_id))
+        assert stored_map == alloc_map
 
     @pytest.mark.asyncio
     async def test_repository_list_data(
         self,
         agent_repository: AgentRepository,
-        db_source: AgentDBSource,
         scaling_group: str,
+        two_agents: list[_SampleAgent],
     ) -> None:
         """Test repository list_data returns agents correctly"""
-        # Given - create test agents
-        async with self._create_agents(db_source, scaling_group, count=2) as agents:
-            agent_ids = [agent.agent_id for agent in agents]
+        # Given - Querier with scaling group filter
+        agent_ids = [agent.agent_id for agent in two_agents]
+        querier = Querier(
+            conditions=[AgentConditions.by_scaling_group(scaling_group)],
+            orders=[AgentOrders.id(ascending=True)],
+        )
 
-            # When
-            querier = Querier(
-                conditions=[AgentConditions.by_scaling_group(scaling_group)],
-                orders=[AgentOrders.id(ascending=True)],
-            )
-            result = await agent_repository.list_data(querier)
+        # When
+        result = await agent_repository.list_data(querier)
 
-            # Then
-            assert len(result) >= 2
-            assert all(agent.scaling_group == scaling_group for agent in result)
-            result_ids = [agent.id for agent in result]
-            for agent_id in agent_ids:
-                assert agent_id in result_ids
+        # Then
+        assert len(result) == 2
+        assert all(agent.scaling_group == scaling_group for agent in result)
+        result_ids = [agent.id for agent in result]
+        for agent_id in agent_ids:
+            assert agent_id in result_ids
 
     @pytest.mark.parametrize(
         "status_filter, expected_min_count",
@@ -604,24 +621,23 @@ class TestAgentRepository:
     async def test_repository_list_data_with_status_filter(
         self,
         agent_repository: AgentRepository,
-        db_source: AgentDBSource,
-        scaling_group: str,
+        single_agent: _SampleAgent,
         status_filter: list[AgentStatus],
         expected_min_count: int,
     ) -> None:
         """Test repository list_data with status filter"""
-        # Given - create a test agent
-        async with self._create_agents(db_source, scaling_group, count=1):
-            # When
-            querier = Querier(
-                conditions=[AgentConditions.by_statuses(status_filter)],
-                orders=[],
-            )
-            result = await agent_repository.list_data(querier)
+        # Given - Querier with status filter
+        querier = Querier(
+            conditions=[AgentConditions.by_statuses(status_filter)],
+            orders=[],
+        )
 
-            # Then
-            assert len(result) >= expected_min_count
-            assert all(agent.status in status_filter for agent in result)
+        # When
+        result = await agent_repository.list_data(querier)
+
+        # Then
+        assert len(result) == expected_min_count
+        assert all(agent.status in status_filter for agent in result)
 
     @pytest.mark.asyncio
     async def test_repository_list_data_empty_result(
@@ -643,29 +659,27 @@ class TestAgentRepository:
     async def test_repository_list_extended_data(
         self,
         agent_repository: AgentRepository,
-        db_source: AgentDBSource,
         scaling_group: str,
+        two_agents: list[_SampleAgent],
         mock_get_resource_slots: AsyncMock,
     ) -> None:
         """Test repository list_extended_data returns agents with extended info"""
-        # Given - create test agents
-        async with self._create_agents(db_source, scaling_group, count=2) as agents:
-            agent_ids = [agent.agent_id for agent in agents]
+        # Given - Querier with scaling group filter
+        agent_ids = [agent.agent_id for agent in two_agents]
+        querier = Querier(
+            conditions=[AgentConditions.by_scaling_group(scaling_group)],
+            orders=[AgentOrders.id(ascending=True)],
+        )
 
-            # When
-            querier = Querier(
-                conditions=[AgentConditions.by_scaling_group(scaling_group)],
-                orders=[AgentOrders.id(ascending=True)],
-            )
-            result = await agent_repository.list_extended_data(querier)
+        # When
+        result = await agent_repository.list_extended_data(querier)
 
-            # Then
-            assert len(result) >= 2
-            assert all(isinstance(agent, AgentDataExtended) for agent in result)
-            assert all(agent.scaling_group == scaling_group for agent in result)
-            result_ids = [agent.id for agent in result]
-            for agent_id in agent_ids:
-                assert agent_id in result_ids
+        # Then
+        assert len(result) == 2
+        assert all(agent.scaling_group == scaling_group for agent in result)
+        result_ids = [agent.id for agent in result]
+        for agent_id in agent_ids:
+            assert agent_id in result_ids
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
@@ -678,25 +692,22 @@ class TestAgentRepository:
     async def test_repository_list_extended_data_with_status(
         self,
         agent_repository: AgentRepository,
-        db_source: AgentDBSource,
-        scaling_group: str,
+        single_agent: _SampleAgent,
         status_filter: list[AgentStatus],
         mock_get_resource_slots: AsyncMock,
     ) -> None:
         """Test repository list_extended_data with different status filters"""
-        # Given - create test agent
-        async with self._create_agents(db_source, scaling_group, count=1) as agents:
-            agent_id = agents[0].agent_id
+        # Given - Querier with status filter
+        querier = Querier(
+            conditions=[AgentConditions.by_statuses(status_filter)],
+            orders=[],
+        )
 
-            # When
-            querier = Querier(
-                conditions=[AgentConditions.by_statuses(status_filter)],
-                orders=[],
-            )
-            result = await agent_repository.list_extended_data(querier)
+        # When
+        result = await agent_repository.list_extended_data(querier)
 
-            # Then
-            assert len(result) >= 1
-            assert all(agent.status in status_filter for agent in result)
-            result_ids = [agent.id for agent in result]
-            assert agent_id in result_ids
+        # Then
+        assert len(result) == 1
+        assert all(agent.status in status_filter for agent in result)
+        result_ids = [agent.id for agent in result]
+        assert single_agent.agent_id in result_ids
