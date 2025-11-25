@@ -22,7 +22,7 @@ if TYPE_CHECKING:
 user_resource_policy_db_source_resilience = Resilience(
     policies=[
         MetricPolicy(
-            MetricArgs(domain=DomainType.DB_SOURCE, layer=LayerType.USER_RESOURCE_POLICY_REPOSITORY)
+            MetricArgs(domain=DomainType.DB_SOURCE, layer=LayerType.USER_RESOURCE_POLICY_DB_SOURCE)
         ),
         RetryPolicy(
             RetryArgs(
