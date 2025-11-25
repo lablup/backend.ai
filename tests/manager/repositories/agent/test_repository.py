@@ -2,13 +2,13 @@ from collections.abc import AsyncGenerator, AsyncIterator, Generator, Mapping
 from contextlib import asynccontextmanager as actxmgr
 from dataclasses import dataclass
 from datetime import datetime
+from datetime import timezone as tz
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 import sqlalchemy as sa
-from dateutil.tz import tzutc
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
@@ -112,7 +112,7 @@ class TestAgentRepository:
                 heartbeat_upsert = AgentHeartbeatUpsert.from_agent_info(
                     agent_id=agent_id,
                     agent_info=agent_info,
-                    heartbeat_received=datetime.now(tzutc()),
+                    heartbeat_received=datetime.now(tz.utc),
                 )
 
                 await db_source.upsert_agent_with_state(heartbeat_upsert)
@@ -365,7 +365,7 @@ class TestAgentRepository:
                 architecture=original_upsert.metadata.architecture,
                 auto_terminate_abusing_kernel=original_upsert.metadata.auto_terminate_abusing_kernel,
             ),
-            heartbeat_received=datetime.now(tzutc()),
+            heartbeat_received=datetime.now(tz.utc),
         )
 
         # When
@@ -417,7 +417,7 @@ class TestAgentRepository:
         heartbeat_upsert = AgentHeartbeatUpsert.from_agent_info(
             agent_id=agent_id,
             agent_info=agent_info,
-            heartbeat_received=datetime.now(tzutc()),
+            heartbeat_received=datetime.now(tz.utc),
         )
 
         # When & Then
