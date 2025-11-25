@@ -1,4 +1,4 @@
-"""Remove container_registries.registry_name length restriction
+"""Update container_registries.registry_name length restriction
 
 Revision ID: b0fb0eb6b6bc
 Revises: d811b103dbfc
@@ -21,7 +21,7 @@ def upgrade() -> None:
         "container_registries",
         "registry_name",
         existing_type=sa.String(length=50),
-        type_=sa.String(),
+        type_=sa.String(length=255),
         existing_nullable=False,
         existing_server_default=None,
     )
