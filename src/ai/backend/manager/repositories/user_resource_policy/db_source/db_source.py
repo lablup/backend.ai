@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Optional
 
 import sqlalchemy as sa
 
@@ -11,6 +11,10 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
+    UserResourcePolicyModifier,
+)
+from ai.backend.manager.services.user_resource_policy.types import UserResourcePolicyCreator
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -44,10 +48,10 @@ class UserResourcePolicyDBSource:
         self._db = db
 
     @user_resource_policy_db_source_resilience.apply()
-    async def create(self, fields: Mapping[str, Any]) -> UserResourcePolicyData:
+    async def create(self, creator: UserResourcePolicyCreator) -> UserResourcePolicyData:
         """Creates a new user resource policy."""
         async with self._db.begin_session() as db_sess:
-            db_row = UserResourcePolicyRow(**fields)
+            db_row = UserResourcePolicyRow.from_creator(creator)
             db_sess.add(db_row)
             await db_sess.flush()
             return db_row.to_dataclass()
@@ -65,18 +69,24 @@ class UserResourcePolicyDBSource:
             return row.to_dataclass()
 
     @user_resource_policy_db_source_resilience.apply()
-    async def update(self, name: str, fields: Mapping[str, Any]) -> UserResourcePolicyData:
+    async def update(
+        self, name: str, modifier: UserResourcePolicyModifier
+    ) -> UserResourcePolicyData:
         """Updates an existing user resource policy."""
         async with self._db.begin_session() as db_sess:
             query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
-            row = await db_sess.scalar(query)
+            row: Optional[UserResourcePolicyRow] = await db_sess.scalar(query)
             if row is None:
                 raise UserResourcePolicyNotFound(
                     f"User resource policy with name {name} not found."
                 )
-            for key, value in fields.items():
-                setattr(row, key, value)
-            await db_sess.flush()
+            fields = modifier.fields_to_update()
+            query = (
+                sa.update(UserResourcePolicyRow)
+                .where(UserResourcePolicyRow.name == name)
+                .values(**fields)
+            )
+            await db_sess.execute(query)
             return row.to_dataclass()
 
     @user_resource_policy_db_source_resilience.apply()
@@ -84,7 +94,7 @@ class UserResourcePolicyDBSource:
         """Deletes a user resource policy."""
         async with self._db.begin_session() as db_sess:
             query = sa.select(UserResourcePolicyRow).where(UserResourcePolicyRow.name == name)
-            row = await db_sess.scalar(query)
+            row: Optional[UserResourcePolicyRow] = await db_sess.scalar(query)
             if row is None:
                 raise UserResourcePolicyNotFound(
                     f"User resource policy with name {name} not found."

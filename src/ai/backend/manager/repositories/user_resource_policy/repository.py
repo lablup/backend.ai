@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING
 
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -11,6 +11,10 @@ from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.repositories.user_resource_policy.db_source.db_source import (
     UserResourcePolicyDBSource,
 )
+from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
+    UserResourcePolicyModifier,
+)
+from ai.backend.manager.services.user_resource_policy.types import UserResourcePolicyCreator
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -43,9 +47,9 @@ class UserResourcePolicyRepository:
         self._db_source = UserResourcePolicyDBSource(db)
 
     @user_resource_policy_repository_resilience.apply()
-    async def create(self, fields: Mapping[str, Any]) -> UserResourcePolicyData:
+    async def create(self, creator: UserResourcePolicyCreator) -> UserResourcePolicyData:
         """Creates a new user resource policy."""
-        return await self._db_source.create(fields)
+        return await self._db_source.create(creator)
 
     @user_resource_policy_repository_resilience.apply()
     async def get_by_name(self, name: str) -> UserResourcePolicyData:
@@ -53,9 +57,11 @@ class UserResourcePolicyRepository:
         return await self._db_source.get_by_name(name)
 
     @user_resource_policy_repository_resilience.apply()
-    async def update(self, name: str, fields: Mapping[str, Any]) -> UserResourcePolicyData:
+    async def update(
+        self, name: str, modifier: UserResourcePolicyModifier
+    ) -> UserResourcePolicyData:
         """Updates an existing user resource policy."""
-        return await self._db_source.update(name, fields)
+        return await self._db_source.update(name, modifier)
 
     @user_resource_policy_repository_resilience.apply()
     async def delete(self, name: str) -> UserResourcePolicyData:

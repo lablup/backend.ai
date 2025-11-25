@@ -12,6 +12,11 @@ from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
 )
+from ai.backend.manager.services.user_resource_policy.actions.modify_user_resource_policy import (
+    UserResourcePolicyModifier,
+)
+from ai.backend.manager.services.user_resource_policy.types import UserResourcePolicyCreator
+from ai.backend.manager.types import OptionalState
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -61,17 +66,17 @@ class TestUserResourcePolicyRepository:
         max_session_count_per_model_session = 5
         max_customized_image_count = 3
 
-        policy_fields = {
-            "name": policy_name,
-            "max_vfolder_count": max_vfolder_count,
-            "max_quota_scope_size": max_quota_scope_size,
-            "max_session_count_per_model_session": max_session_count_per_model_session,
-            "max_customized_image_count": max_customized_image_count,
-        }
+        creator = UserResourcePolicyCreator(
+            name=policy_name,
+            max_vfolder_count=max_vfolder_count,
+            max_quota_scope_size=max_quota_scope_size,
+            max_session_count_per_model_session=max_session_count_per_model_session,
+            max_vfolder_size=None,  # Deprecated
+            max_customized_image_count=max_customized_image_count,
+        )
 
         try:
-            result = await repository.create(policy_fields)
-
+            result = await repository.create(creator)
             assert isinstance(result, UserResourcePolicyData)
             assert result.name == "test-policy-create"
             assert result.max_vfolder_count == max_vfolder_count
@@ -101,30 +106,97 @@ class TestUserResourcePolicyRepository:
             await repository.get_by_name("non-existing")
 
     @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "modifier,expected_updates",
+        [
+            (
+                UserResourcePolicyModifier(
+                    max_vfolder_count=OptionalState.update(20),
+                    max_quota_scope_size=OptionalState.nop(),
+                    max_session_count_per_model_session=OptionalState.nop(),
+                    max_customized_image_count=OptionalState.nop(),
+                ),
+                UserResourcePolicyData(
+                    name="test-policy",
+                    max_vfolder_count=20,
+                    max_quota_scope_size=1000000,  # unchanged
+                    max_session_count_per_model_session=5,  # unchanged
+                    max_customized_image_count=3,  # unchanged
+                ),
+            ),
+            (
+                UserResourcePolicyModifier(
+                    max_vfolder_count=OptionalState.update(20),
+                    max_quota_scope_size=OptionalState.update(2000000),
+                    max_session_count_per_model_session=OptionalState.nop(),
+                    max_customized_image_count=OptionalState.nop(),
+                ),
+                UserResourcePolicyData(
+                    name="test-policy",
+                    max_vfolder_count=20,
+                    max_quota_scope_size=2000000,
+                    max_session_count_per_model_session=5,  # unchanged
+                    max_customized_image_count=3,  # unchanged
+                ),
+            ),
+            (
+                UserResourcePolicyModifier(
+                    max_vfolder_count=OptionalState.update(25),
+                    max_quota_scope_size=OptionalState.update(3000000),
+                    max_session_count_per_model_session=OptionalState.update(10),
+                    max_customized_image_count=OptionalState.update(7),
+                ),
+                UserResourcePolicyData(
+                    name="test-policy",
+                    max_vfolder_count=25,
+                    max_quota_scope_size=3000000,
+                    max_session_count_per_model_session=10,
+                    max_customized_image_count=7,
+                ),
+            ),
+            (
+                UserResourcePolicyModifier(
+                    max_vfolder_count=OptionalState.update(15),
+                    max_quota_scope_size=OptionalState.nop(),
+                    max_session_count_per_model_session=OptionalState.update(8),
+                    max_customized_image_count=OptionalState.nop(),
+                ),
+                UserResourcePolicyData(
+                    name="test-policy",
+                    max_vfolder_count=15,
+                    max_quota_scope_size=1000000,  # unchanged
+                    max_session_count_per_model_session=8,
+                    max_customized_image_count=3,  # unchanged
+                ),
+            ),
+        ],
+    )
     async def test_update_policy_success(
-        self, repository: UserResourcePolicyRepository, sample_policy: UserResourcePolicyData
+        self,
+        repository: UserResourcePolicyRepository,
+        sample_policy: UserResourcePolicyData,
+        modifier: UserResourcePolicyModifier,
+        expected_updates: UserResourcePolicyData,
     ) -> None:
-        """Test updating a policy successfully"""
-        updated_vfolder_count = 20
-        updated_quota_size = 2000000
-
-        update_fields = {
-            "max_vfolder_count": updated_vfolder_count,
-            "max_quota_scope_size": updated_quota_size,
-        }
-
-        result = await repository.update(sample_policy.name, update_fields)
+        """Test updating a policy successfully with various field combinations"""
+        result = await repository.update(sample_policy.name, modifier)
 
         assert isinstance(result, UserResourcePolicyData)
         assert result.name == sample_policy.name
-        assert result.max_vfolder_count == updated_vfolder_count
-        assert result.max_quota_scope_size == updated_quota_size
+        assert result.max_vfolder_count == expected_updates.max_vfolder_count
+        assert result.max_quota_scope_size == expected_updates.max_quota_scope_size
+        assert (
+            result.max_session_count_per_model_session
+            == expected_updates.max_session_count_per_model_session
+        )
+        assert result.max_customized_image_count == expected_updates.max_customized_image_count
 
     @pytest.mark.asyncio
     async def test_update_policy_not_found(self, repository: UserResourcePolicyRepository) -> None:
         """Test updating a policy that doesn't exist"""
+        modifier = UserResourcePolicyModifier(max_vfolder_count=OptionalState.update(20))
         with pytest.raises(UserResourcePolicyNotFound):
-            await repository.update("non-existing", {"max_vfolder_count": 20})
+            await repository.update("non-existing", modifier)
 
     @pytest.mark.asyncio
     async def test_delete_policy_success(
@@ -149,16 +221,23 @@ class TestUserResourcePolicyRepository:
     @pytest.mark.asyncio
     async def test_create_and_get_roundtrip(self, repository: UserResourcePolicyRepository) -> None:
         """Test creating a policy and retrieving it"""
-        policy_fields = {
-            "name": "test-policy-roundtrip",
-            "max_vfolder_count": 15,
-            "max_quota_scope_size": 500000,
-            "max_session_count_per_model_session": 10,
-            "max_customized_image_count": 5,
-        }
+        policy_name = "test-policy-roundtrip"
+        max_vfolder_count = 15
+        max_quota_scope_size = 500000
+        max_session_count_per_model_session = 10
+        max_customized_image_count = 5
 
         try:
-            created = await repository.create(policy_fields)
+            created = await repository.create(
+                UserResourcePolicyCreator(
+                    name=policy_name,
+                    max_vfolder_count=max_vfolder_count,
+                    max_quota_scope_size=max_quota_scope_size,
+                    max_session_count_per_model_session=max_session_count_per_model_session,
+                    max_customized_image_count=max_customized_image_count,
+                    max_vfolder_size=None,  # Deprecated
+                )
+            )
             retrieved = await repository.get_by_name(created.name)
 
             assert created.name == retrieved.name
