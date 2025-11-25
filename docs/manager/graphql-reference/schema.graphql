@@ -2451,7 +2451,7 @@ type Mutation {
     ssl_verify: Boolean
 
     """
-    Added in 24.09.0. Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local', 'ocp').
+    Added in 24.09.0. Container Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local', 'ocp').
     """
     type: ContainerRegistryTypeField!
 
@@ -2486,7 +2486,7 @@ type Mutation {
     ssl_verify: Boolean
 
     """
-    Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local', 'ocp'). Added in 24.09.0.
+    Container Registry type. One of ('docker', 'harbor', 'harbor2', 'github', 'gitlab', 'ecr', 'ecr-public', 'local', 'ocp'). Added in 24.09.0.
     """
     type: ContainerRegistryTypeField
 
