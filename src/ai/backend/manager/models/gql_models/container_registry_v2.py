@@ -117,7 +117,7 @@ class CreateContainerRegistryNodeV2(graphene.Mutation):
                 action
             )
         )
-        return cls(container_registry=ContainerRegistryNode.from_dataclass(ctx, result.data))
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
 class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):
@@ -188,7 +188,7 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):
             )
         )
 
-        return cls(container_registry=ContainerRegistryNode.from_dataclass(ctx, result.data))
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
 class DeleteContainerRegistryNodeV2(graphene.Mutation):
@@ -223,4 +223,4 @@ class DeleteContainerRegistryNodeV2(graphene.Mutation):
             )
         )
 
-        return cls(container_registry=ContainerRegistryNode.from_dataclass(ctx, result.data))
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))

@@ -179,7 +179,7 @@ class ContainerRegistryNode(graphene.ObjectType):
         return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     @classmethod
-    def from_dataclass(cls, ctx: GraphQueryContext, data: ContainerRegistryData) -> Self:
+    def from_dataclass(cls, data: ContainerRegistryData) -> Self:
         return cls(
             id=data.id,  # auto-converted to Relay global ID
             row_id=data.id,
@@ -368,7 +368,7 @@ class CreateContainerRegistryNode(graphene.Mutation):
                 action
             )
         )
-        return cls(container_registry=ContainerRegistryNode.from_dataclass(ctx, result.data))
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
 class ModifyContainerRegistryNode(graphene.Mutation):
@@ -442,7 +442,7 @@ class ModifyContainerRegistryNode(graphene.Mutation):
             )
         )
 
-        return cls(container_registry=ContainerRegistryNode.from_dataclass(ctx, result.data))
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
 class DeleteContainerRegistryNode(graphene.Mutation):
@@ -479,7 +479,7 @@ class DeleteContainerRegistryNode(graphene.Mutation):
             )
         )
 
-        return cls(container_registry=ContainerRegistryNode.from_dataclass(ctx, result.data))
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
 
 
 class CreateContainerRegistryQuota(graphene.Mutation):
