@@ -27,7 +27,7 @@ from ai.backend.manager.data.permission.types import (
     RoleSource,
 )
 from ai.backend.manager.data.permission.user_role import UserRoleCreateInput
-from ai.backend.manager.errors.rbac import RoleNotFound, UserSystemRoleNotFound
+from ai.backend.manager.errors.rbac import EmptyOperation, RoleNotFound, UserSystemRoleNotFound
 from ai.backend.manager.models.rbac_models.association_scopes_entities import (
     AssociationScopesEntitiesRow,
 )
@@ -268,10 +268,7 @@ class RoleManager:
         operations: Collection[OperationType],
     ) -> None:
         if not operations:
-            log.warning(
-                "no operations provided to add object permissions to role {}, skipping.", role_id
-            )
-            return
+            raise EmptyOperation("No operations provided to add object permissions.")
         creators = [
             ObjectPermissionCreateInput(
                 role_id=role_id,
