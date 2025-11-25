@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any, AsyncGenerator, Mapping, Optional
 
 import aiohttp
@@ -27,12 +28,14 @@ class PurityClient:
         self.api_token = api_token
         self.api_version = api_version
         self._auth_token = None
+        self._lock = asyncio.Lock()
         self._session = aiohttp.ClientSession()
 
     async def aclose(self) -> None:
         await self._session.close()
 
     async def __aenter__(self) -> PurityClient:
+        await self._lock.acquire()
         async with self._session.post(
             self.endpoint / "api" / "login",
             headers={"api-token": self.api_token},
@@ -46,6 +49,7 @@ class PurityClient:
 
     async def __aexit__(self, *exc_info) -> None:
         self._auth_token = None
+        self._lock.release()
 
     # For the concrete API reference, check out:
     # https://purity-fb.readthedocs.io/en/latest/
