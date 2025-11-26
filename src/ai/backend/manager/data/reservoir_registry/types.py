@@ -1,12 +1,6 @@
-import uuid
-from dataclasses import dataclass
+# Re-export from common for backward compatibility
+from ai.backend.common.data.artifact.types import (
+    ReservoirRegistryData,
+)
 
-
-@dataclass
-class ReservoirRegistryData:
-    id: uuid.UUID
-    name: str
-    endpoint: str
-    access_key: str
-    secret_key: str
-    api_version: str
+__all__ = ("ReservoirRegistryData",)

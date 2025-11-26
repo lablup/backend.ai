@@ -1,11 +1,6 @@
-import uuid
-from dataclasses import dataclass
-from typing import Optional
+# Re-export from common for backward compatibility
+from ai.backend.common.data.artifact.types import (
+    HuggingFaceRegistryData,
+)
 
-
-@dataclass
-class HuggingFaceRegistryData:
-    id: uuid.UUID
-    name: str
-    url: str
-    token: Optional[str]
+__all__ = ("HuggingFaceRegistryData",)
