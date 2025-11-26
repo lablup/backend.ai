@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from pathlib import Path
 
+from ai.backend.common.types import AgentId
+
 from ...kernel import KernelRegistry
 from ..loader.pickle import PickleBasedKernelRegistryLoader
 from ..writer.pickle import PickleBasedKernelRegistryWriter
@@ -11,17 +13,20 @@ from ..writer.types import KernelRegistrySaveMetadata
 class PickleBasedKernelRegistryRecoveryArgs:
     ipc_base_path: Path
     var_base_path: Path
+    agent_id: AgentId
     local_instance_id: str
 
 
 class PickleBasedKernelRegistryRecovery:
     def __init__(self, args: PickleBasedKernelRegistryRecoveryArgs) -> None:
-        registry_file_name = f"kernel_registry.{args.local_instance_id}.dat"
+        registry_file_name = f"kernel_registry.{args.agent_id}.dat"
+        fallback_registry_file_name = f"kernel_registry.{args.local_instance_id}.dat"
         legacy_registry_file_path = args.ipc_base_path / registry_file_name
+        fallback_registry_file_path = args.var_base_path / fallback_registry_file_name
         last_registry_file_path = args.var_base_path / registry_file_name
 
         self._loader = PickleBasedKernelRegistryLoader(
-            last_registry_file_path, legacy_registry_file_path
+            last_registry_file_path, fallback_registry_file_path, legacy_registry_file_path
         )
         self._writer = PickleBasedKernelRegistryWriter(last_registry_file_path)
 
