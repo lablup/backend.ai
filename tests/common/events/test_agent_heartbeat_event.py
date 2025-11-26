@@ -10,7 +10,7 @@ from ai.backend.common.types import DeviceName, ResourceSlot, SlotName, SlotType
 
 
 class TestAgentHeartbeatEvent:
-    """Test suite for AgentHeartbeatEvent backward compatibility with old agents."""
+    """Test suite for AgentHeartbeatEvent backward compatibility with old agent versions."""
 
     @pytest.mark.parametrize(
         ("agent_info_dict", "expected_slot_keys"),

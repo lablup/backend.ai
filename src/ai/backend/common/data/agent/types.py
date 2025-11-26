@@ -39,7 +39,7 @@ class AgentInfo(BaseModel):
     def normalize_slot_keys(
         cls, value: dict[str | SlotName, SlotTypes]
     ) -> dict[SlotName, SlotTypes]:
-        """Convert string keys to SlotName instances for backward compatibility with older agents."""
+        """Convert string keys to SlotName instances for backward compatibility with older agent versions."""
         if not isinstance(value, dict):
             raise ValueError("slot_key_and_units must be a dictionary")
         normalized = {}
