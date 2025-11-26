@@ -59,6 +59,7 @@ class HealthStatus:
     readiness: HealthCheckStatus
     liveness: HealthCheckStatus
     last_check: int  # Unix timestamp of last check by manager
+    created_at: int  # Unix timestamp when route was initialized (Redis time)
 
     def get_status(self) -> HealthCheckStatus:
         """
@@ -157,6 +158,15 @@ class ValkeyScheduleClient:
         result = await self._client.client.time()
         seconds_bytes, _ = result
         return int(seconds_bytes)
+
+    async def get_redis_time(self) -> int:
+        """
+        Get current Unix timestamp from Redis server using TIME command.
+        This ensures consistent timestamps across distributed systems.
+
+        :return: Current Unix timestamp in seconds
+        """
+        return await self._get_redis_time()
 
     async def _validate_health_status(self, status: str, timestamp_str: str) -> HealthCheckStatus:
         """
@@ -363,8 +373,14 @@ class ValkeyScheduleClient:
             data.get("liveness", "0"), data.get("last_liveness", "0")
         )
         last_check = int(data["last_check"]) if "last_check" in data else 0
+        created_at = int(data["created_at"]) if "created_at" in data else 0
 
-        return HealthStatus(readiness=readiness, liveness=liveness, last_check=last_check)
+        return HealthStatus(
+            readiness=readiness,
+            liveness=liveness,
+            last_check=last_check,
+            created_at=created_at,
+        )
 
     @valkey_schedule_resilience.apply()
     async def initialize_routes_health_status_batch(self, route_ids: list[str]) -> None:
@@ -387,6 +403,7 @@ class ValkeyScheduleClient:
                 "readiness": "0",
                 "liveness": "0",
                 "last_check": current_time,
+                "created_at": current_time,
                 # last_readiness and last_liveness are not set until first health check
             }
             batch.hset(key, data)
@@ -490,6 +507,7 @@ class ValkeyScheduleClient:
                 readiness=readiness_status,
                 liveness=liveness_status,
                 last_check=int(data["last_check"]) if "last_check" in data else 0,
+                created_at=int(data["created_at"]) if "created_at" in data else 0,
             )
 
         return health_statuses
