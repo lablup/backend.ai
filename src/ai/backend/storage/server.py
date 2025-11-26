@@ -591,6 +591,10 @@ async def server_main(
         )
         storage_pool = StoragePool.from_config(local_config)
 
+        # Clean up temporary storages only on the first process
+        if pidx == 0:
+            storage_pool.cleanup_temporary_storages()
+
         bgtask_mgr = await storage_init_stack.enter_async_context(
             bgtask_ctx(local_config, redis_config, event_producer, volume_pool)
         )

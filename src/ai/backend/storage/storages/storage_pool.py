@@ -139,3 +139,14 @@ class StoragePool(AbstractStoragePool):
             True if storage exists
         """
         return name in self._storages
+
+    def cleanup_temporary_storages(self) -> None:
+        """
+        Clean up all temporary VFS storages.
+        This should be called only by the first process (pidx=0) on server startup.
+        """
+        from .vfs_storage import VFSStorage
+
+        for storage in self._storages.values():
+            if isinstance(storage, VFSStorage):
+                storage.cleanup_temporary_storage()
