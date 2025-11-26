@@ -57,7 +57,6 @@ from ai.backend.appproxy.common.types import (
     AppCreator,
     AppMode,
     EventLoopType,
-    HealthCheckConfig,
     ProxyProtocol,
     RouteInfo,
     WebMiddleware,
@@ -73,6 +72,7 @@ from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
 from ai.backend.common import redis_helper
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
 from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.etcd import ConfigScopes
@@ -414,12 +414,12 @@ async def on_route_update_event(
     route_connection_info = InferenceAppConfigDict.validate_json(route_connection_info_json)
 
     health_check_enabled = health_check_enabled_str.decode("utf-8") == "true"
-    health_check_config: HealthCheckConfig | None
+    health_check_config: ModelHealthCheck | None
     if health_check_enabled:
         assert health_check_config_json, (
             f"EndpointRouteListUpdatedEvent fired but invalid health check configuration provided - expected 'endpoint.{event.endpoint_id}.health_check_config' key to be present on redis_live"
         )
-        health_check_config = HealthCheckConfig.model_validate_json(
+        health_check_config = ModelHealthCheck.model_validate_json(
             health_check_config_json.decode("utf-8")
         )
     else:

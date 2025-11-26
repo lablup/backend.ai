@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import relationship, selectinload
 
 from ai.backend.appproxy.common.exceptions import ObjectNotFound
-from ai.backend.appproxy.common.types import HealthCheckConfig
+from ai.backend.common.config import ModelHealthCheck
 
 from .base import (
     Base,
@@ -34,7 +34,7 @@ class Endpoint(Base, BaseMixin):
     id = IDColumn()
 
     health_check_enabled = sa.Column(sa.Boolean(), nullable=False, default=False)
-    health_check_config = sa.Column(StructuredJSONObjectColumn(HealthCheckConfig), nullable=True)
+    health_check_config = sa.Column(StructuredJSONObjectColumn(ModelHealthCheck), nullable=True)
 
     created_at = sa.Column(sa.DateTime(timezone=True), server_default=sa.func.now())
     updated_at = sa.Column(
@@ -88,7 +88,7 @@ class Endpoint(Base, BaseMixin):
         cls,
         endpoint_id: UUID,
         health_check_enabled: bool = False,
-        health_check_config: HealthCheckConfig | None = None,
+        health_check_config: ModelHealthCheck | None = None,
     ) -> "Endpoint":
         endpoint = cls()
         endpoint.id = endpoint_id
