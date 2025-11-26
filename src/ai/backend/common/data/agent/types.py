@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.types import DeviceName, ResourceSlot, SlotName, SlotTypes
@@ -33,3 +33,16 @@ class AgentInfo(BaseModel):
 
     # Pydantic model configuration
     model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    @field_validator("slot_key_and_units", mode="before")
+    @classmethod
+    def normalize_slot_keys(
+        cls, value: dict[str, SlotTypes] | dict[SlotName, SlotTypes]
+    ) -> dict[SlotName, SlotTypes]:
+        """Convert string keys to SlotName instances for backward compatibility with older agents."""
+        if not isinstance(value, dict):
+            raise ValueError("slot_key_and_units must be a dictionary")
+        normalized = {}
+        for key, val in value.items():
+            normalized[SlotName(key)] = val
+        return normalized
