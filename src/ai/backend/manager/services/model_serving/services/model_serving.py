@@ -183,10 +183,10 @@ class ModelServingService:
             f"./{filename}",
         )
 
-    def _apply_service_definition_overrides(
+    async def apply_service_definition_overrides(
         self,
-        service_definition_toml: str,
-        runtime_variant: str,
+        service_definition: dict[str, Any],
+        runtime_variant: RuntimeVariant,
         user_requested_variables: ApiRequestedServiceConfig,
     ) -> ServiceDefinitionOverrideResult:
         """
@@ -200,22 +200,14 @@ class ModelServingService:
         Override priority (later overrides earlier):
         Root → Variant → Request
         """
-        service_definition = tomli.loads(service_definition_toml)
-
         # Stage 1: Extract root level (excluding variant keys)
         all_variant_keys = {variant.value for variant in RuntimeVariant}
         root_level_dict = {k: v for k, v in service_definition.items() if k not in all_variant_keys}
 
         # Stage 2: Get variant overrides and merge with root (field-level)
-        variant_overrides = service_definition.get(runtime_variant, {})
+        variant_overrides = service_definition.get(runtime_variant.value, {})
         merged_dict = self._merge_dicts(root_level_dict, variant_overrides)
-
-        # Parse merged service definition
-        try:
-            variant_def = ModelServiceDefinition.model_validate(merged_dict)
-        except Exception:
-            # If parsing fails, fall back to empty definition
-            variant_def = ModelServiceDefinition.model_validate({})
+        variant_def = ModelServiceDefinition.model_validate(merged_dict)
 
         # Stage 3: Apply API request overrides (highest priority)
         result: dict[str, Any] = {}
@@ -284,12 +276,11 @@ class ModelServingService:
             chunks = await self._fetch_file_from_storage_proxy(
                 "service-definition.toml", model_vfolder_row
             )
-        except UnexpectedStorageProxyResponseError:
-            chunks = None
+            service_definition_dict = tomli.loads(chunks.decode("utf-8"))
 
-        if chunks:
-            overrides = self._apply_service_definition_overrides(
-                service_definition_toml=chunks.decode("utf-8"),
+            # Apply service definition overrides
+            overrides = await self.apply_service_definition_overrides(
+                service_definition=service_definition_dict,
                 runtime_variant=action.creator.runtime_variant,
                 user_requested_variables=ApiRequestedServiceConfig(
                     image=action.creator.image,
@@ -307,6 +298,9 @@ class ModelServingService:
                 action.creator.config.resources = overrides.resource_slots
             if overrides.environ is not None:
                 action.creator.config.environ = overrides.environ
+        except UnexpectedStorageProxyResponseError:
+            # No service definition file, use API request config as-is
+            pass
 
         creation_config = action.creator.config.to_dict()
         creation_config["mounts"] = [
@@ -501,36 +495,41 @@ class ModelServingService:
         # TODO: Seperate background task definition and trigger into different layer
         service_prepare_ctx = action.model_service_prepare_ctx
 
-        # Get model vfolder for service definition
+        # Get model vfolder
         model_vfolder_row = await self._repository.get_vfolder_by_id(service_prepare_ctx.model_id)
-        if model_vfolder_row:
-            try:
-                chunks = await self._fetch_file_from_storage_proxy(
-                    "service-definition.toml", model_vfolder_row
-                )
-            except UnexpectedStorageProxyResponseError:
-                chunks = None
+        if not model_vfolder_row:
+            raise InvalidAPIParameters("Model vfolder not found")
+        if model_vfolder_row.ownership_type == VFolderOwnershipType.GROUP:
+            raise InvalidAPIParameters("Cannot use project-type vfolder for model service")
 
-            if chunks:
-                overrides = self._apply_service_definition_overrides(
-                    service_definition_toml=chunks.decode("utf-8"),
-                    runtime_variant=action.runtime_variant,
-                    user_requested_variables=ApiRequestedServiceConfig(
-                        image=action.image,
-                        architecture=action.architecture,
-                        resource_slots=action.config.resources,
-                        environ=action.config.environ,
-                    ),
-                )
+        # Try to fetch service-definition.toml and apply overrides
+        try:
+            chunks = await self._fetch_file_from_storage_proxy(
+                "service-definition.toml", model_vfolder_row
+            )
+            service_definition_dict = tomli.loads(chunks.decode("utf-8"))
+            overrides = await self.apply_service_definition_overrides(
+                service_definition=service_definition_dict,
+                runtime_variant=action.runtime_variant,
+                user_requested_variables=ApiRequestedServiceConfig(
+                    image=action.image,
+                    architecture=action.architecture,
+                    resource_slots=action.config.resources,
+                    environ=action.config.environ,
+                ),
+            )
 
-                if overrides.image is not None:
-                    action.image = overrides.image
-                if overrides.architecture is not None:
-                    action.architecture = overrides.architecture
-                if overrides.resource_slots is not None:
-                    action.config.resources = overrides.resource_slots
-                if overrides.environ is not None:
-                    action.config.environ = overrides.environ
+            if overrides.image is not None:
+                action.image = overrides.image
+            if overrides.architecture is not None:
+                action.architecture = overrides.architecture
+            if overrides.resource_slots is not None:
+                action.config.resources = overrides.resource_slots
+            if overrides.environ is not None:
+                action.config.environ = overrides.environ
+        except UnexpectedStorageProxyResponseError:
+            # No service definition file, use API request config as-is
+            pass
 
         # Get user with keypair
         created_user = await self._repository.get_user_with_keypair(action.request_user_id)
