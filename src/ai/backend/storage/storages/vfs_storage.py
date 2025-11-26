@@ -130,8 +130,8 @@ class VFSStorage(AbstractStorage):
     _base_path: Path
     _upload_chunk_size: int
     _download_chunk_size: int
-    _max_file_size: Optional[int]
     _temporary: bool
+    _max_file_size: Optional[int]
 
     def __init__(self, name: str, cfg: VFSStorageConfig) -> None:
         self._name = name

@@ -145,7 +145,6 @@ class StoragePool(AbstractStoragePool):
         Clean up all temporary VFS storages.
         This should be called only by the first process (pidx=0) on server startup.
         """
-        from .vfs_storage import VFSStorage
 
         for storage in self._storages.values():
             if isinstance(storage, VFSStorage):
