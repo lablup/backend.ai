@@ -2234,7 +2234,9 @@ class AbstractAgent(
             shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
         try:
             with open(var_base_path / last_registry_file, "rb") as f:
-                self.kernel_registry = pickle.load(f)
+                kernel_registry: MutableMapping[KernelId, AbstractKernel] = pickle.load(f)
+                for kernel_id, kernel in kernel_registry.items():
+                    self.kernel_registry[kernel_id] = kernel
         except EOFError:
             log.warning(
                 "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
