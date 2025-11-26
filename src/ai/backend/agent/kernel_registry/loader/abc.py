@@ -1,21 +1,21 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Generic
 
+from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
-from ..types import TKernelRegistry
+from ....agent.kernel import AbstractKernel
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class AbstractKernelRegistryLoader(Generic[TKernelRegistry], ABC):
+class AbstractKernelRegistryLoader(ABC):
     """
     Loader interface for loading KernelRegistry
     """
 
     @abstractmethod
-    async def load_kernel_registry(self) -> TKernelRegistry:
+    async def load_kernel_registry(self) -> dict[KernelId, AbstractKernel]:
         """
         Load the KernelRegistry from persistent storage.
         Raises:

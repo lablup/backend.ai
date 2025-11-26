@@ -5,16 +5,17 @@ import shutil
 from pathlib import Path
 from typing import override
 
+from ai.backend.common.types import KernelId
 from ai.backend.logging import BraceStyleAdapter
 
+from ....agent.kernel import AbstractKernel
 from ...exception import KernelRegistryLoadError, KernelRegistryNotFound
-from ...kernel import KernelRegistry
 from .abc import AbstractKernelRegistryLoader
 
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
-class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader[KernelRegistry]):
+class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader):
     def __init__(
         self,
         last_registry_file_path: Path,
@@ -26,7 +27,7 @@ class PickleBasedKernelRegistryLoader(AbstractKernelRegistryLoader[KernelRegistr
         self._legacy_registry_file_path = legacy_registry_file_path
 
     @override
-    async def load_kernel_registry(self) -> KernelRegistry:
+    async def load_kernel_registry(self) -> dict[KernelId, AbstractKernel]:
         legacy_registry_file = self._legacy_registry_file_path
         fallback_registry_file = self._fallback_registry_file_path
         final_file_path = self._last_registry_file_path
