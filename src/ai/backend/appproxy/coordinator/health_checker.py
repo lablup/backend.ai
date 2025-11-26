@@ -10,13 +10,14 @@ import aiohttp
 import sqlalchemy as sa
 
 from ai.backend.appproxy.common.exceptions import ObjectNotFound
-from ai.backend.appproxy.common.types import AppMode, HealthCheckConfig, HealthCheckState, RouteInfo
+from ai.backend.appproxy.common.types import AppMode, HealthCheckState, RouteInfo
 from ai.backend.appproxy.coordinator.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_txn_retry,
 )
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
+from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.model_serving.broadcast import (
     ModelServiceStatusBroadcastEvent,
@@ -102,7 +103,7 @@ class HealthCheckEngine:
             log.debug("Health check disabled for endpoint {}", endpoint.id)
             return
 
-        config = endpoint.health_check_config
+        config: ModelHealthCheck = endpoint.health_check_config
 
         # Validate configuration
         if not self._validate_config(config, endpoint.id):
@@ -110,6 +111,7 @@ class HealthCheckEngine:
             return
 
         # Check if enough time has elapsed since last health check based on endpoint's interval
+        # Note: Initial delay is handled at route level via _should_check_route_now()
         if not await self._should_check_endpoint_now(endpoint.id, config.interval):
             log.debug(
                 "Skipping health check for endpoint {} - interval {:.1f}s not elapsed",
@@ -143,6 +145,13 @@ class HealthCheckEngine:
         status_changed = False
         for route in circuit.route_info:
             if not route.route_id:
+                continue
+            # Check route-level initial delay using Redis time
+            if not await self._should_check_route_now(route.route_id, config.initial_delay):
+                log.debug(
+                    "Skipping health check for route {} - initial delay not elapsed",
+                    route.route_id,
+                )
                 continue
             # Check individual container health via route_info
             is_healthy = await self._check_individual_container_health(route, config)
@@ -225,7 +234,7 @@ class HealthCheckEngine:
         await self._record_endpoint_check_time(endpoint.id)
 
     async def _check_individual_container_health(
-        self, route: RouteInfo, config: HealthCheckConfig
+        self, route: RouteInfo, config: ModelHealthCheck
     ) -> bool:
         """
         Check health of an individual container using its route information
@@ -496,11 +505,16 @@ class HealthCheckEngine:
             # Don't re-raise here as this is a propagation failure, not a health check failure
             # The health status updates were already persisted successfully
 
-    async def _should_check_endpoint_now(self, endpoint_id: UUID, interval: float) -> bool:
+    async def _should_check_endpoint_now(
+        self,
+        endpoint_id: UUID,
+        interval: float,
+    ) -> bool:
         """
         Check if enough time has elapsed since the last health check for this endpoint
 
-        Uses Valkey to store last check times with TTL to handle multi-process coordination
+        Uses Valkey to store last check times with TTL to handle multi-process coordination.
+        Note: Initial delay is now handled at route level via _should_check_route_now().
 
         Args:
             endpoint_id: Endpoint to check
@@ -510,17 +524,16 @@ class HealthCheckEngine:
             True if health check should be performed, False if interval hasn't elapsed
         """
         try:
-            # Valkey key for storing last check time
-            redis_key = f"endpoint.{endpoint_id}.last_health_check"
+            # Valkey key for last check time
+            last_check_key = f"endpoint.{endpoint_id}.last_health_check"
 
             # Get last check time from Valkey
-            last_check_bytes = await self.valkey_live.get_live_data(redis_key)
+            last_check_bytes = await self.valkey_live.get_live_data(last_check_key)
             last_check_str = last_check_bytes.decode("utf-8") if last_check_bytes else None
 
             current_time = time.time()
 
             if last_check_str is None:
-                # No previous check recorded, should check now
                 log.debug("No previous health check recorded for endpoint {}", endpoint_id)
                 return True
 
@@ -557,6 +570,64 @@ class HealthCheckEngine:
             log.error(
                 "Failed to check last health check time for endpoint {} from Valkey: {} - will check now",
                 endpoint_id,
+                e,
+            )
+            # On Valkey errors, default to checking (fail-safe)
+            return True
+
+    async def _should_check_route_now(
+        self,
+        route_id: UUID,
+        initial_delay: float,
+    ) -> bool:
+        """
+        Check if a route has passed its initial delay period using Redis time.
+
+        This ensures consistent time comparison across distributed systems by using
+        Redis server time for both created_at (set during route initialization) and
+        current time check.
+
+        Args:
+            route_id: Route to check
+            initial_delay: Initial delay in seconds before the first health check
+
+        Returns:
+            True if initial delay has passed or no delay configured, False otherwise
+        """
+        if initial_delay <= 0:
+            return True
+
+        try:
+            # Get route health status which includes created_at (Redis time)
+            health_status = await self.valkey_schedule.get_route_health_status(str(route_id))
+            if health_status is None:
+                # No health status found - route not initialized yet, skip check
+                log.debug(
+                    "No health status found for route {} - skipping initial delay check",
+                    route_id,
+                )
+                return False
+
+            # Get current Redis time for consistent comparison
+            current_redis_time = await self.valkey_schedule.get_redis_time()
+
+            # Check if initial delay has passed
+            time_since_creation = current_redis_time - health_status.created_at
+            if time_since_creation < initial_delay:
+                log.debug(
+                    "Initial delay not elapsed for route {} ({:.1f}s < {:.1f}s)",
+                    route_id,
+                    time_since_creation,
+                    initial_delay,
+                )
+                return False
+
+            return True
+
+        except Exception as e:
+            log.error(
+                "Failed to check initial delay for route {} from Valkey: {} - will check now",
+                route_id,
                 e,
             )
             # On Valkey errors, default to checking (fail-safe)
@@ -601,7 +672,7 @@ class HealthCheckEngine:
     async def _perform_health_check_request(
         self,
         url: str,
-        config: HealthCheckConfig,
+        config: ModelHealthCheck,
         current_state: HealthCheckState,
     ) -> bool:
         """
@@ -700,6 +771,16 @@ class HealthCheckEngine:
                         if not route.route_id:
                             continue
 
+                        # Check route-level initial delay using Redis time
+                        if not await self._should_check_route_now(
+                            route.route_id, endpoint.health_check_config.initial_delay
+                        ):
+                            log.debug(
+                                "Skipping health check for route {} - initial delay not elapsed",
+                                route.route_id,
+                            )
+                            continue
+
                         status, check_time, failures = await self._check_route_health(
                             route, endpoint.health_check_config
                         )
@@ -712,7 +793,7 @@ class HealthCheckEngine:
         return results
 
     async def _check_route_health(
-        self, route: RouteInfo, config: HealthCheckConfig
+        self, route: RouteInfo, config: ModelHealthCheck
     ) -> tuple[ModelServiceStatus | None, float | None, int]:
         """
         Perform health check on a single route
@@ -763,7 +844,7 @@ class HealthCheckEngine:
     async def _perform_health_check_request_for_route(
         self,
         url: str,
-        config: HealthCheckConfig,
+        config: ModelHealthCheck,
         route: RouteInfo,
     ) -> bool:
         """
@@ -985,7 +1066,7 @@ class HealthCheckEngine:
             concurrency_limit,
         )
 
-    def _validate_config(self, config: HealthCheckConfig, endpoint_id: UUID) -> bool:
+    def _validate_config(self, config: ModelHealthCheck, endpoint_id: UUID) -> bool:
         """
         Validate health check configuration
 
