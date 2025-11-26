@@ -36,16 +36,21 @@ class PurityClient:
 
     async def __aenter__(self) -> PurityClient:
         await self._lock.acquire()
-        async with self._session.post(
-            self.endpoint / "api" / "login",
-            headers={"api-token": self.api_token},
-            ssl=False,
-            raise_for_status=True,
-        ) as resp:
-            auth_token = resp.headers["x-auth-token"]
-            self._auth_token = auth_token
-            _ = await resp.json()
-        return self
+        try:
+            async with self._session.post(
+                self.endpoint / "api" / "login",
+                headers={"api-token": self.api_token},
+                ssl=False,
+                raise_for_status=True,
+            ) as resp:
+                auth_token = resp.headers["x-auth-token"]
+                self._auth_token = auth_token
+                _ = await resp.json()
+            return self
+        except Exception:
+            self._auth_token = None
+            self._lock.release()
+            raise
 
     async def __aexit__(self, *exc_info) -> None:
         self._auth_token = None
