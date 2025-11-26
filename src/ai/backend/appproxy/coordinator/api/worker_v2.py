@@ -30,8 +30,6 @@ from ai.backend.appproxy.common.utils import (
     pydantic_api_handler,
     pydantic_api_response_handler,
 )
-from ai.backend.appproxy.coordinator.defs import LockID
-from ai.backend.common.distributed import GlobalTimer
 from ai.backend.common.events.dispatcher import EventHandler
 from ai.backend.common.types import AgentId
 from ai.backend.logging import BraceStyleAdapter
@@ -360,7 +358,6 @@ async def check_worker_lost(
 
 @attrs.define(slots=True, auto_attribs=True, init=False)
 class PrivateContext:
-    worker_lost_check_timer: GlobalTimer
     worker_lost_check_evh: EventHandler[web.Application, DoCheckWorkerLostEvent]
 
 
@@ -368,27 +365,17 @@ async def init(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["worker.context"]
 
-    # Scan ALIVE workers
+    # Scan ALIVE workers (timer is managed by LeaderCron in leader_election_ctx)
     app_ctx.worker_lost_check_evh = root_ctx.event_dispatcher.consume(
         DoCheckWorkerLostEvent,
         app,
         check_worker_lost,
     )
-    app_ctx.worker_lost_check_timer = GlobalTimer(
-        root_ctx.distributed_lock_factory(LockID.LOCKID_WORKER_LOST, 15.0),
-        root_ctx.event_producer,
-        lambda: DoCheckWorkerLostEvent(),
-        15.0,
-        initial_delay=10.0,
-        task_name="check_worker_lost_task",
-    )
-    await app_ctx.worker_lost_check_timer.join()
 
 
 async def shutdown(app: web.Application) -> None:
     root_ctx: RootContext = app["_root.context"]
     app_ctx: PrivateContext = app["worker.context"]
-    await app_ctx.worker_lost_check_timer.leave()
     root_ctx.event_dispatcher.unconsume(app_ctx.worker_lost_check_evh)
 
 
