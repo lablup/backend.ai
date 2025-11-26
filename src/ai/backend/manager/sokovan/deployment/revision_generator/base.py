@@ -8,7 +8,6 @@ from uuid import UUID
 
 from ai.backend.common.types import RuntimeVariant
 from ai.backend.manager.data.deployment.types import (
-    DefinitionFiles,
     ModelRevisionSpec,
     ModelRevisionSpecDraft,
     ModelServiceDefinition,
@@ -93,14 +92,9 @@ class BaseRevisionGenerator(RevisionGenerator):
         - resource_slots.mem: "16gb" (from root)
         - environ: {MY_VAR: "default", VLLM_SPECIFIC: "true"} (merged)
         """
-        definition_files: DefinitionFiles = (
-            await self._deployment_repository.fetch_definition_files(
-                vfolder_id=vfolder_id,
-                model_definition_path=model_definition_path,
-            )
+        service_definition_dict = await self._deployment_repository.fetch_service_definition(
+            vfolder_id
         )
-
-        service_definition_dict = definition_files.service_definition
         if service_definition_dict is None:
             return None
 
