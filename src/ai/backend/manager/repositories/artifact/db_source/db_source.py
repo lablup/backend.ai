@@ -400,7 +400,8 @@ class ArtifactDBSource:
                 else:
                     # Update existing revision only if there are changes
                     has_changes = (
-                        existing_revision.digest != revision_data.digest
+                        existing_revision.readme != revision_data.readme
+                        or existing_revision.digest != revision_data.digest
                         or existing_revision.remote_status != revision_data.remote_status
                     )
 

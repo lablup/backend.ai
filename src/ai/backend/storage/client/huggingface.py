@@ -489,40 +489,6 @@ class HuggingFaceScanner:
         tasks = [download_metadata(model) for model in models]
         await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def download_metadata_batch_sync(
-        self,
-        models: list[ModelData],
-        max_concurrent: int = 8,
-    ) -> None:
-        """Download metadata (README and file size) for all models synchronously and update model objects.
-
-        Args:
-            models: List of ModelData objects to download metadata for and update in-place
-            max_concurrent: Maximum number of concurrent metadata downloads (default: 8)
-        """
-        log.info(
-            f"Starting synchronous batch metadata processing for {len(models)} models (max_concurrent={max_concurrent})"
-        )
-        semaphore = asyncio.Semaphore(max_concurrent)
-
-        async def download_and_update_metadata(model_data: ModelData) -> None:
-            """Download metadata (README and file size) for a single model and update it in-place."""
-            async with semaphore:
-                try:
-                    model_target = ModelTarget(model_id=model_data.id, revision=model_data.revision)
-                    total_size = await self._calculate_model_size(model_target)
-                    readme_content = await self._download_readme(model_target)
-
-                    # Update the model data with README content and size
-                    model_data.readme = readme_content
-                    model_data.size = total_size
-                except Exception:
-                    pass
-
-        # Download metadata concurrently with semaphore limit
-        tasks = [download_and_update_metadata(model) for model in models]
-        await asyncio.gather(*tasks, return_exceptions=True)
-
     async def _download_readme(self, model: ModelTarget) -> Optional[str]:
         """Download README content for a model.
 
