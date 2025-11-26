@@ -13,7 +13,8 @@ class UnauthorizedPurityClient(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/purity-unauthorized-client"
     error_title = "Unauthorized Purity Client"
 
-    def error_code(self) -> ErrorCode:
+    @classmethod
+    def error_code(cls) -> ErrorCode:
         return ErrorCode(
             domain=ErrorDomain.STORAGE,
             operation=ErrorOperation.ACCESS,
