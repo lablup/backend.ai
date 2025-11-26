@@ -2230,11 +2230,21 @@ class AbstractAgent(
         ipc_base_path = self.local_config.agent.ipc_base_path
         var_base_path = self.local_config.agent.var_base_path
         last_registry_file = f"last_registry.{self.id}.dat"
+        if not (var_base_path / last_registry_file).is_file():
+            log.warning(
+                "Registry file with name {} not found. "
+                "Falling back to name based on local instance ID {}...",
+                last_registry_file,
+                self.local_instance_id,
+            )
+            last_registry_file = f"last_registry.{self.local_instance_id}.dat"
         if os.path.isfile(ipc_base_path / last_registry_file):
             shutil.move(ipc_base_path / last_registry_file, var_base_path / last_registry_file)
         try:
             with open(var_base_path / last_registry_file, "rb") as f:
-                self.kernel_registry = pickle.load(f)
+                kernel_registry: MutableMapping[KernelId, AbstractKernel] = pickle.load(f)
+                for kernel_id, kernel in kernel_registry.items():
+                    self.kernel_registry[kernel_id] = kernel
         except EOFError:
             log.warning(
                 "Failed to load the last kernel registry: {}", (var_base_path / last_registry_file)
@@ -3701,7 +3711,7 @@ class AbstractAgent(
         last_registry_file = f"last_registry.{self.id}.dat"
         try:
             with open(var_base_path / last_registry_file, "wb") as f:
-                pickle.dump(self.kernel_registry, f)
+                pickle.dump(dict(self.kernel_registry), f)
             self.last_registry_written_time = now
             log.debug("saved {}", last_registry_file)
         except Exception as e:
