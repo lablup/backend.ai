@@ -6,6 +6,8 @@ import pytest
 
 from ai.backend.common.types import AccessKey, ClusterMode, RuntimeVariant
 from ai.backend.manager.data.model_serving.types import ModelServicePrepareCtx, ServiceConfig
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.services.model_serving.actions.dry_run_model_service import (
     DryRunModelServiceAction,
@@ -20,8 +22,6 @@ from ...utils import ScenarioBase
 
 @pytest.fixture
 def mock_get_vfolder_by_id_dry_run(mocker, mock_repositories):
-    from ai.backend.manager.models.vfolder import VFolderOwnershipType
-
     mock = mocker.patch.object(
         mock_repositories.repository,
         "get_vfolder_by_id",
@@ -36,8 +36,6 @@ def mock_get_vfolder_by_id_dry_run(mocker, mock_repositories):
 
 @pytest.fixture
 def mock_fetch_file_from_storage_proxy_dry_run(mocker, model_serving_service):
-    from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
-
     mock = mocker.patch.object(
         model_serving_service,
         "_fetch_file_from_storage_proxy",
