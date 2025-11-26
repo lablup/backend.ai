@@ -41,12 +41,15 @@ def mock_get_vfolder_by_id(mocker, mock_repositories):
 
 @pytest.fixture
 def mock_fetch_file_from_storage_proxy(mocker, model_serving_service):
+    from ai.backend.manager.errors.storage import UnexpectedStorageProxyResponseError
+
     mock = mocker.patch.object(
         model_serving_service,
         "_fetch_file_from_storage_proxy",
         new_callable=AsyncMock,
     )
-    mock.return_value = None
+    # Simulate no service-definition.toml file
+    mock.side_effect = UnexpectedStorageProxyResponseError(extra_msg="File not found")
     return mock
 
 
